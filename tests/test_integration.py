@@ -2,45 +2,45 @@ import asyncio
 import logging
 import random
 import re
-from contextlib import asynccontextmanager
+from decimal import Decimal
 
 import pytest
 
-from sdk.python.api import HoprdAPI, Protocol
+from sdk.python.api import Protocol
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
-from sdk.python.localcluster.constants import (
-    OPEN_CHANNEL_FUNDING_VALUE_HOPR,
-)
+from sdk.python.localcluster.constants import OPEN_CHANNEL_FUNDING_VALUE_HOPR
 from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
 from .utils import (
     PARAMETERIZED_SAMPLE_SIZE,
     TICKET_AGGREGATION_THRESHOLD,
+    HoprSession,
+    basic_send_and_receive_packets,
+    basic_send_and_receive_packets_over_single_route,
     check_all_tickets_redeemed,
     check_native_balance_below,
     check_rejected_tickets_value,
     check_safe_balance,
     check_unredeemed_tickets_value,
-    create_channel,
-    shuffled,
-    basic_send_and_receive_packets,
-    HoprSession,
-    get_ticket_price,
     create_bidirectional_channels_for_route,
-    basic_send_and_receive_packets_over_single_route,
+    create_channel,
+    get_ticket_price,
+    shuffled,
 )
 
 
-@asynccontextmanager
-async def create_alias(alias, peer, api):
-    """Ensure that the created alias is also released at the end of the test."""
-    assert await api.aliases_set_alias(alias, peer) is True
-    try:
-        yield api
-    finally:
-        assert await api.aliases_remove_alias(alias)
+async def assert_channel_statuses(api):
+    open_channels = await api.all_channels(include_closed=False)
+    open_and_closed_channels = await api.all_channels(include_closed=True)
+
+    assert len(open_and_closed_channels.all) > 0, "More than 0 channels are present"
+    assert len(open_and_closed_channels.all) >= len(open_channels.all), "Open and closed channels should be present"
+
+    assert all(
+        c.status in [ChannelStatus.Closed, ChannelStatus.PendingToClose] for c in open_and_closed_channels.all
+    ), "All channels must be closed or closing"
 
 
 @pytest.mark.usefixtures("swarm7_reset")
@@ -52,7 +52,7 @@ class TestIntegrationWithSwarm:
         async def check_all_connected(me: Node, others: list[str]):
             others2 = set(others)
             while True:
-                current_peers = set([x.peer_id for x in await me.api.peers()])
+                current_peers = set([x.address for x in await me.api.peers()])
                 if current_peers.intersection(others) == others2:
                     break
                 else:
@@ -62,7 +62,7 @@ class TestIntegrationWithSwarm:
         await asyncio.gather(
             *[
                 asyncio.wait_for(
-                    check_all_connected(swarm7[k], [swarm7[v].peer_id for v in barebone_nodes() if v != k]), 60.0
+                    check_all_connected(swarm7[k], [swarm7[v].address for v in barebone_nodes() if v != k]), 60.0
                 )
                 for k in barebone_nodes()
             ]
@@ -74,52 +74,15 @@ class TestIntegrationWithSwarm:
             addr = await node.api.addresses()
             assert re.match("^0x[0-9a-fA-F]{40}$", addr.native) is not None
             balances = await node.api.balances()
-            assert int(balances.native) > 0
-            assert int(balances.safe_hopr) > 0
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_should_be_able_to_remove_existing_aliases(self, peer: str, swarm7: dict[str, Node]):
-        other_peers = barebone_nodes()
-        other_peers.remove(peer)
-
-        alice = swarm7[random.choice(other_peers)]
-
-        assert alice.address != swarm7[peer].address
-
-        assert await swarm7[peer].api.aliases_get_alias("Alice") is None
-        assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is True
-        assert (await swarm7[peer].api.aliases_get_alias("Alice")).peer_id == alice.peer_id
-        assert (await swarm7[peer].api.aliases_get_aliases())["Alice"] == alice.peer_id
-        assert await swarm7[peer].api.aliases_remove_alias("Alice")
-        assert await swarm7[peer].api.aliases_get_alias("Alice") is None
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_should_not_be_able_to_set_multiple_aliases_to_a_single_peerid(
-        self, peer: str, swarm7: dict[str, Node]
-    ):
-        other_peers = barebone_nodes()
-        other_peers.remove(peer)
-
-        rufus_peer_id = swarm7[random.choice(other_peers)].peer_id
-        my_peer_id = swarm7[peer].peer_id
-        assert rufus_peer_id != my_peer_id
-
-        async with create_alias("Rufus", rufus_peer_id, swarm7[peer].api) as api:
-            assert await api.aliases_set_alias("Simon", rufus_peer_id) is False
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_should_contain_self_alias_automatically(self, peer: str, swarm7: dict[str, Node]):
-        assert (await swarm7[peer].api.aliases_get_alias("me")).peer_id == swarm7[peer].peer_id
+            assert balances.native > 0
+            assert balances.safe_hopr > 0
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
     async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
-        response = await swarm7[src].api.ping(swarm7[dest].peer_id)
+        response = await swarm7[src].api.ping(swarm7[dest].address)
 
         assert response is not None
         # Zero-roundtrip (in ms precision) can happen on fast local setups
@@ -128,7 +91,7 @@ class TestIntegrationWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_ping_to_self_should_fail(self, peer: str, swarm7: dict[str, Node]):
-        response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
+        response = await swarm7[peer].api.ping(swarm7[peer].address)
 
         assert response is None, "Pinging self should fail"
 
@@ -168,12 +131,13 @@ class TestIntegrationWithSwarm:
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
         # convert HOPR to weiHOPR
-        hopr_amount = OPEN_CHANNEL_FUNDING_VALUE_HOPR * 1e18
+        hopr_amount = OPEN_CHANNEL_FUNDING_VALUE_HOPR
         ticket_price = await get_ticket_price(swarm7[src])
 
         async with create_channel(swarm7[src], swarm7[dest], funding=ticket_price) as channel:
             balance_before = await swarm7[src].api.balances()
             channel_before = await swarm7[src].api.get_channel(channel.id)
+            logging.debug(f"balance_before: {balance_before}, channel_before: {channel_before}")
 
             assert await swarm7[src].api.fund_channel(channel.id, hopr_amount)
 
@@ -190,9 +154,12 @@ class TestIntegrationWithSwarm:
 
             # Safe allowance can be checked too at this point
             balance_after = await swarm7[src].api.balances()
-            assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
+            logging.debug(f"balance_after: {balance_after}")
 
+            assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
             await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_before.native), 20.0)
+
+        await assert_channel_statuses(swarm7[src].api)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -228,6 +195,8 @@ class TestIntegrationWithSwarm:
 
         assert count_metrics(await swarm7[mid].api.metrics()) == 0
 
+        await assert_channel_statuses(swarm7[src].api)
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
@@ -252,8 +221,8 @@ class TestIntegrationWithSwarm:
                 Protocol.UDP,
                 swarm7[src],
                 swarm7[dest],
-                {"IntermediatePath": [swarm7[mid].peer_id]},
-                {"IntermediatePath": [swarm7[mid].peer_id]},
+                {"IntermediatePath": [swarm7[mid].address]},
+                {"IntermediatePath": [swarm7[mid].address]},
                 capabilities=SessionCapabilitiesBody(segmentation=True, no_delay=True),
                 use_response_buffer=None,
             ) as session:
@@ -295,18 +264,19 @@ class TestIntegrationWithSwarm:
                 assert await swarm7[mid].api.tickets_redeem()
                 await asyncio.wait_for(check_all_tickets_redeemed(swarm7[mid]), 30.0)
 
+        await assert_channel_statuses(swarm7[src].api)
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
     async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
         async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR):
-            # the context manager handles opening and closing of the channel with verification, using counter-party address
+            # the context manager handles opening and closing of the channel with verification,
+            # using counter-party address
             assert True
 
-        async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR, use_peer_id=True):
-            # the context manager handles opening and closing of the channel with verification using counter-party peerID
-            assert True
+        await assert_channel_statuses(swarm7[src].api)
 
     # generate a 1-hop route with a node using strategies in the middle
     @pytest.mark.asyncio
@@ -352,7 +322,10 @@ class TestIntegrationWithSwarm:
 
                     redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
                     logging.debug(
-                        f"redeemed_value diff: {redeemed_value_diff} | before: {statistics_before.redeemed_value} | now: {statistics_now.redeemed_value} | target: {aggregated_ticket_price}"
+                        f"redeemed_value diff: {redeemed_value_diff} |"
+                        + f"before: {statistics_before.redeemed_value} |"
+                        + f"now: {statistics_now.redeemed_value} |"
+                        + f"target: {aggregated_ticket_price}"
                     )
 
                     # break out of the loop if the aggregated value is reached
@@ -363,48 +336,24 @@ class TestIntegrationWithSwarm:
 
             await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid]), 60.0)
 
-    # FIXME: This test depends on side-effects and cannot be run on its own. It
-    # should be redesigned.
-    @pytest.mark.asyncio
-    async def test_hoprd_sanity_check_channel_status(self, swarm7: dict[str, Node]):
-        """
-        The bash integration-test.sh opens and closes channels that can be visible inside this test scope
-        """
-        alice_api = swarm7["1"].api
-
-        open_channels = await alice_api.all_channels(include_closed=False)
-        open_and_closed_channels = await alice_api.all_channels(include_closed=True)
-
-        assert len(open_and_closed_channels.all) >= len(open_channels.all), "Open and closed channels should be present"
-
-        statuses = [c.status for c in open_and_closed_channels.all]
-        assert (
-            ChannelStatus.Closed in statuses or ChannelStatus.PendingToClose in statuses
-        ), "Closed channels should be present"
+        await assert_channel_statuses(swarm7[src].api)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_native_withdraw(self, peer, swarm7: dict[str, Node]):
-        amount = "9876"
-        remaining_attempts = 10
+        before_balance = (await swarm7[peer].api.balances()).native
+        assert before_balance > 0
 
-        before_balance = int((await swarm7[peer].api.balances()).safe_native)
-        await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "Native")
+        # Withdraw some native balance into the Safe address
+        amount = before_balance / 10
+        await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "xDai")
 
-        after_balance = before_balance
-        while remaining_attempts > 0:
-            after_balance = int((await swarm7[peer].api.balances()).safe_native)
-            if after_balance != before_balance:
-                break
-            await asyncio.sleep(0.5)
-            remaining_attempts -= 1
-
-        assert after_balance - before_balance == int(amount)
+        await asyncio.wait_for(check_native_balance_below(swarm7[peer], before_balance - amount), 120.0)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_ticket_price_is_default(self, peer, swarm7: dict[str, Node]):
         price = await swarm7[peer].api.ticket_price()
 
-        assert isinstance(price.value, int)
+        assert isinstance(price.value, Decimal)
         assert price.value > 0

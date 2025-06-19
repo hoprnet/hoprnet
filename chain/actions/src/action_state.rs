@@ -8,23 +8,25 @@
 //! that must match on any chain event log in a block containing the given transaction hash.
 //!
 //! ### Example
-//! Once the [RegisterSafe(`0x0123..ef`)](hopr_chain_types::actions::Action) action that has been submitted via [ActionQueue](crate::action_queue::ActionQueue)
-//! in a transaction with hash `0xabcd...00`.
+//! Once the [RegisterSafe(`0x0123..ef`)](hopr_chain_types::actions::Action) action that has been submitted via
+//! [ActionQueue](crate::action_queue::ActionQueue) in a transaction with hash `0xabcd...00`.
 //! The [IndexerExpectation] is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
 //! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
 //! If such event is never encountered by the Indexer, the safe registration action naturally times out.
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Formatter},
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+};
+
 use async_lock::RwLock;
 use async_trait::async_trait;
-use futures::{channel, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt, channel};
 use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use hopr_crypto_types::types::Hash;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use tracing::{debug, error};
+use tracing::{debug, error, trace};
 
 use crate::errors::{ChainActionsError, Result};
 
@@ -32,9 +34,9 @@ use crate::errors::{ChainActionsError, Result};
 /// Also allows mocking in tests.
 pub type ExpectationResolver = Pin<Box<dyn Future<Output = Result<SignificantChainEvent>> + Send>>;
 
-/// Allows tracking state of an [Action](hopr_chain_types::actions::Action) via registering [IndexerExpectations](IndexerExpectation) on
-/// [SignificantChainEvents](SignificantChainEvent) coming from the Indexer and resolving them as they are
-/// matched. Once expectations are matched, they are automatically unregistered.
+/// Allows tracking state of an [Action](hopr_chain_types::actions::Action) via registering
+/// [IndexerExpectations](IndexerExpectation) on [SignificantChainEvents](SignificantChainEvent) coming from the Indexer
+/// and resolving them as they are matched. Once expectations are matched, they are automatically unregistered.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ActionState {
@@ -105,25 +107,29 @@ impl ActionState for IndexerActionTracker {
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation> {
         let matched_keys = self
             .expectations
-            .read()
+            .read_arc()
             .await
             .iter()
             .filter_map(|(k, (e, _))| e.test(event).then_some(*k))
             .collect::<Vec<_>>();
 
-        debug!(count = matched_keys.len(), ?event, "found expectations to match event",);
-
         if matched_keys.is_empty() {
+            trace!(%event, "no expectations matched for event");
             return Vec::new();
         }
-        let mut db = self.expectations.write().await;
+
+        debug!(count = matched_keys.len(), %event, "found expectations to match event",);
+
+        let mut db_write_locked = self.expectations.write_arc().await;
+
         matched_keys
             .into_iter()
             .filter_map(|key| {
-                db.remove(&key)
+                db_write_locked
+                    .remove(&key)
                     .and_then(|(exp, sender)| match sender.send(event.clone()) {
                         Ok(_) => {
-                            debug!(%event, "expectation resolved ");
+                            debug!(%event, tx_hash = %key, "expectation resolved");
                             Some(exp)
                         }
                         Err(_) => {
@@ -139,41 +145,42 @@ impl ActionState for IndexerActionTracker {
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver> {
-        match self.expectations.write().await.entry(exp.tx_hash) {
-            Entry::Occupied(_) => {
-                // TODO: currently cannot register multiple expectations for the same TX hash
-                return Err(ChainActionsError::InvalidState(format!(
-                    "expectation for tx {} already present",
-                    exp.tx_hash
-                )));
-            }
-            Entry::Vacant(e) => {
-                let (tx, rx) = channel::oneshot::channel();
-                e.insert((exp, tx));
-                Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
-            }
+        let mut db = self.expectations.write_arc().await;
+        if let std::collections::hash_map::Entry::Vacant(e) = db.entry(exp.tx_hash) {
+            let (tx, rx) = channel::oneshot::channel();
+            e.insert((exp, tx));
+            Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
+        } else {
+            // TODO: currently cannot register multiple expectations for the same TX hash
+            Err(ChainActionsError::InvalidState(format!(
+                "expectation for tx {} already present",
+                exp.tx_hash
+            )))
         }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn unregister_expectation(&self, tx_hash: Hash) {
-        self.expectations.write().await.remove(&tx_hash);
+        self.expectations.write_arc().await.remove(&tx_hash);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
-    use crate::errors::ChainActionsError;
+    use std::{sync::Arc, time::Duration};
+
     use anyhow::Context;
     use hex_literal::hex;
     use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_primitive_types::prelude::*;
-    use std::sync::Arc;
-    use std::time::Duration;
     use tokio::time::timeout;
+
+    use crate::{
+        action_state::{ActionState, IndexerActionTracker, IndexerExpectation},
+        errors::ChainActionsError,
+    };
 
     lazy_static::lazy_static! {
         // some random address

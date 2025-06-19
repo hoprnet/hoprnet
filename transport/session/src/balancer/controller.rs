@@ -1,5 +1,6 @@
-use pid::Pid;
 use std::fmt::Display;
+
+use pid::Pid;
 
 use crate::balancer::{SurbFlowController, SurbFlowEstimator};
 
@@ -214,11 +215,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::sync::{Arc, atomic::AtomicU64};
 
+    use super::*;
     use crate::balancer::MockSurbFlowController;
-    use std::sync::atomic::AtomicU64;
-    use std::sync::Arc;
 
     #[test_log::test]
     fn surb_balancer_should_start_increase_level_when_below_target() {

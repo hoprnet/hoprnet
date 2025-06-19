@@ -1,23 +1,22 @@
-use alloy::network::Ethereum;
-use alloy::node_bindings::AnvilInstance;
-use alloy::primitives::U256;
-use alloy::rpc::client::RpcClient;
-use alloy::transports::http::{Http, ReqwestTransport};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
+
+use alloy::{
+    node_bindings::AnvilInstance, primitives::U256, rpc::client::RpcClient, transports::http::ReqwestTransport,
+};
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
+use hopr_chain_types::{
+    ContractAddresses, ContractInstances,
+    utils::{
+        add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
+    },
+};
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use tokio::time::sleep;
 use tracing::info;
 
-use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
-use hopr_chain_rpc::transport::ReqwestClient;
-use hopr_chain_types::utils::{
-    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
-};
-use hopr_chain_types::{ContractAddresses, ContractInstances};
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-
 /// Used for testing. Creates RPC client to the local Anvil instance.
+#[allow(dead_code)]
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
@@ -28,22 +27,19 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
 
     let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
-    let rpc_client = ClientBuilder::default()
+    ClientBuilder::default()
         .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
-        .transport(transport_client.clone(), transport_client.guess_local());
-    rpc_client
+        .transport(transport_client.clone(), transport_client.guess_local())
 }
 
-/// Used for testing. Creates RPC client to the local Anvil instance.
+/// Used for testing. Creates an RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_provider_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
     anvil: &alloy::node_bindings::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> Arc<AnvilRpcClient> {
-    use alloy::providers::ProviderBuilder;
-    use alloy::rpc::client::ClientBuilder;
-    use alloy::signers::local::PrivateKeySigner;
+    use alloy::{providers::ProviderBuilder, rpc::client::ClientBuilder, signers::local::PrivateKeySigner};
     use hopr_chain_rpc::client::SnapshotRequestorLayer;
     use hopr_crypto_types::keypairs::Keypair;
 
@@ -55,7 +51,7 @@ pub fn create_provider_to_anvil_with_snapshot(
         .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
         .transport(transport_client.clone(), transport_client.guess_local());
 
-    let provider = ProviderBuilder::new().wallet(wallet).on_client(rpc_client);
+    let provider = ProviderBuilder::new().wallet(wallet).connect_client(rpc_client);
 
     Arc::new(provider)
 }
@@ -127,7 +123,7 @@ pub async fn onboard_node(
 
     // Deploy Safe and Module for node
     let (module, safe) =
-        hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<(), Arc<AnvilRpcClient>, Ethereum>(
+        hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<Arc<AnvilRpcClient>>(
             &chain_env.contract_instances,
             provider.clone(),
             &chain_env.contract_deployer,
@@ -158,7 +154,7 @@ pub async fn onboard_node(
         provider.clone(),
         safe,
         module,
-        chain_env.contract_instances.announcements.address().0 .0.into(),
+        chain_env.contract_instances.announcements.address().0.0.into(),
         &chain_env.contract_deployer,
     )
     .await
@@ -182,8 +178,8 @@ pub async fn onboard_node(
     approve_channel_transfer_from_safe(
         provider.clone(),
         safe,
-        chain_env.contract_instances.token.address().0 .0.into(),
-        chain_env.contract_instances.channels.address().0 .0.into(),
+        chain_env.contract_instances.token.address().0.0.into(),
+        chain_env.contract_instances.channels.address().0.0.into(),
         &chain_env.contract_deployer,
     )
     .await

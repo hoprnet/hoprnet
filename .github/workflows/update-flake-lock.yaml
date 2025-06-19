@@ -26,7 +26,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -58,9 +58,10 @@ jobs:
             automated
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable Auto Merge
+      - name: Configure PR and mark as ready
         run: |
+          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-assignee "@copilot"
+          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-reviewer "hoprnet/hopr-development"
           gh pr ready ${{ steps.update.outputs.pull-request-number }}
-          gh pr merge ${{ steps.update.outputs.pull-request-number }} --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

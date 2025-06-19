@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import tempfile
+from decimal import Decimal
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
 
@@ -40,20 +42,21 @@ class Node:
         network: str,
         identity_path: str,
         cfg_file: str,
-        alias: str,
         base_port: int,
         api_addr: str = None,
         use_nat: bool = False,
+        remove_temp_data: bool = True,
     ):
         # initialized
         self.id = id
-        self.alias = alias
         self.host_addr: str = host_addr
         self.api_token: str = api_token
         self.network: str = network
         self.identity_path: str = identity_path
         self.use_nat: bool = use_nat
+        self.remove_temp_data: bool = remove_temp_data
         self.base_port: int = base_port
+        self.temp_data_dir = tempfile.TemporaryDirectory(prefix=f"{NODE_NAME_PREFIX}_{self.id}_")
 
         # optional
         self.cfg_file: str = cfg_file
@@ -67,7 +70,6 @@ class Node:
         self.proc: Popen = None
 
         # private
-        self.peer_id: str = None
         self.address: str = None
         self.dir: Path = None
         self.cfg_file_path: Path = None
@@ -91,8 +93,41 @@ class Node:
         self.tokio_console_port = self.p2p_port + 1
 
         logging.info(
-            f"Node {self.id} ports: api {self.api_port}, p2p {self.p2p_port}, anvil {self.anvil_port}, tokio console {self.tokio_console_port}"
+            f"Node {self.id} ports: "
+            + f"api {self.api_port}, "
+            + f"p2p {self.p2p_port}, "
+            + f"tokio console {self.tokio_console_port}, "
+            + f"anvil {self.anvil_port}"
         )
+
+    def load_native_address(self):
+        logging.debug(f"Reading node_id {self}")
+
+        safe_custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "PATH": os.environ["PATH"],
+        }
+
+        res = run(
+            [
+                "hopli",
+                "identity",
+                "read",
+                "--identity-from-path",
+                self.dir.joinpath("hoprd.id"),
+            ],
+            env=os.environ | safe_custom_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            cwd=PWD,
+        )
+
+        for el in res.stdout.split("\n"):
+            if el.startswith("Identity addresses:"):
+                logging.debug(f"Node {self.id} identity read line: {el}")
+                self.address = el.split("[")[-1].rstrip("]")
 
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))
@@ -126,7 +161,7 @@ class Node:
                 "--contracts-root",
                 "./ethereum/contracts",
                 "--hopr-amount",
-                "20000.0",
+                "200000000000.0",
                 "--native-amount",
                 "10.0",
                 "--private-key",
@@ -161,7 +196,7 @@ class Node:
         logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
         return False
 
-    def setup(self, password: str, config_file: Path, dir: Path):
+    def setup(self, password: str, config_file: Path, dir: Path, log_tag: str):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
         log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
 
@@ -170,15 +205,15 @@ class Node:
             "RUST_LOG": ",".join(
                 [
                     log_level,
-                    "libp2p_swarm=info",
-                    "multistream_select=info",
-                    "isahc=error",
-                    "sea_orm=warn",
-                    "sqlx=warn",
                     "hyper_util=warn",
+                    "hickory_resolver=warn",
+                    "isahc=error",
+                    "libp2p_swarm=info",
                     "libp2p_tcp=info",
                     "libp2p_dns=info",
-                    "hickory_resolver=warn",
+                    "multistream_select=info",
+                    "sea_orm=warn",
+                    "sqlx=warn",
                 ]
             ),
             "RUST_BACKTRACE": "full",
@@ -199,7 +234,7 @@ class Node:
             "--testPreferLocalAddresses",
             f"--apiHost={self.api_addr}",
             f"--apiPort={self.api_port}",
-            f"--data={self.dir}",
+            f"--data={self.temp_data_dir.name}",
             f"--host={self.host_addr}:{self.p2p_port}",
             f"--identity={self.dir.joinpath('hoprd.id')}",
             f"--network={self.network}",
@@ -210,8 +245,9 @@ class Node:
         ]
         if self.cfg_file_path is not None:
             cmd += [f"--configurationFilePath={self.cfg_file_path}"]
+        log_file_name = f"hoprd.{log_tag}.log" if log_tag else "hoprd.log"
 
-        with open(self.dir.joinpath("hoprd.log"), "w") as log_file:
+        with open(self.dir.joinpath(log_file_name), "w") as log_file:
             self.proc = Popen(
                 cmd,
                 stdout=log_file,
@@ -231,7 +267,7 @@ class Node:
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
             # filter out peers that are not well-connected yet
-            connected_peers = [p.peer_id for p in peers_info if p.quality >= 0.25]
+            connected_peers = [p.address for p in peers_info if p.quality >= 0.25]
             connected_peers.sort()
             logging.debug(f"Peers connected on {self.id}: {connected_peers}")
 
@@ -249,12 +285,16 @@ class Node:
 
     def clean_up(self):
         self.proc.kill()
+        if self.remove_temp_data:
+            try:
+                self.temp_data_dir.cleanup()
+            except OSError as e:
+                logging.warning(f"Failed to cleanup temporary directory for node {self.id}: {e}")
 
     @classmethod
     def fromConfig(
         cls,
         index: int,
-        alias: str,
         config: dict,
         defaults: dict,
         network: str,
@@ -271,27 +311,18 @@ class Node:
             network,
             config["identity_path"],
             config["config_file"],
-            alias,
             api_addr="0.0.0.0" if exposed else None,
             use_nat=use_nat,
             base_port=base_port,
         )
 
-    async def alias_peers(self, aliases_dict: dict[str, str]):
-        for peer_id, alias in aliases_dict.items():
-            if peer_id == self.peer_id:
-                continue
-            await self.api.aliases_set_alias(alias, peer_id)
-
-    async def connect_peers(self, peer_ids: list[str]):
+    async def connect_peers(self, addresses: list[str]):
         tasks = []
 
-        for peer_id in peer_ids:
-            if peer_id == self.peer_id:
+        for address in addresses:
+            if address == self.address:
                 continue
-            tasks.append(
-                asyncio.create_task(self.api.open_channel(peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
-            )
+            tasks.append(asyncio.create_task(self.api.open_channel(address, OPEN_CHANNEL_FUNDING_VALUE_HOPR)))
 
         await asyncio.gather(*tasks)
 
@@ -302,7 +333,6 @@ class Node:
         output_strings = []
 
         output_strings.append(f"\t{self}")
-        output_strings.append(f"\t\tPeer Id:\t{addresses.hopr}")
         output_strings.append(f"\t\tAddress:\t{addresses.native}")
         output_strings.append(
             f"\t\tRest API:\thttp://{self.api_addr}:{self.api_port}/scalar | http://{self.api_addr}:{self.api_port}/swagger-ui/index.html"
@@ -312,7 +342,7 @@ class Node:
         return "\n".join(output_strings)
 
     def __eq__(self, other):
-        return self.peer_id == other.peer_id
+        return self.address == other.address
 
     def __str__(self):
-        return f"{self.alias} @ {self.api_addr}:{self.api_port}"
+        return f"node @ {self.api_addr}:{self.api_port}"

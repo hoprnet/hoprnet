@@ -9,7 +9,6 @@ import pytest
 
 from sdk.python.localcluster.constants import (
     ANVIL_CONFIG_FILE,
-    IDENTITY_PREFIX,
     CONTRACTS_ADDRESSES,
     CONTRACTS_DIR,
     MAIN_DIR,
@@ -60,8 +59,6 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str, base_port: in
         "faucet",
         "--network",
         NETWORK,
-        "--address",
-        node_addr,
         "--contracts-root",
         CONTRACTS_DIR,
         "--hopr-amount",
@@ -380,16 +377,16 @@ class TestHopliWithSwarm:
 
         # Check if `hopli faucet` funds node to the desired amount
         # on the native token
-        if balance_before.native > 10 * 1e18:
+        if balance_before.native > 10:
             assert balance_after.native == balance_before.native
         else:
-            assert balance_after.native == int(10 * 1e18)
+            assert balance_after.native == 10
 
         # on the HOPR token
-        if balance_before.hopr > 1 * 1e18:
+        if balance_before.hopr > 1:
             assert balance_after.hopr == balance_before.hopr
         else:
-            assert balance_after.hopr == int(1 * 1e18)
+            assert balance_after.hopr == 1
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))

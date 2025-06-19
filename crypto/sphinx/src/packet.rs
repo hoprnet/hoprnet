@@ -1,19 +1,19 @@
-use hopr_crypto_types::crypto_traits::StreamCipher;
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use std::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+};
 
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
+use hopr_crypto_types::{crypto_traits::StreamCipher, prelude::*};
+use hopr_primitive_types::prelude::*;
 use typenum::Unsigned;
 
-use crate::errors::SphinxError;
-use crate::routing::{forward_header, SphinxHeaderSpec};
-use crate::surb::{ReplyOpener, SURB};
 use crate::{
     derivation::derive_packet_tag,
-    routing::{ForwardedHeader, RoutingInfo},
+    errors::SphinxError,
+    routing::{ForwardedHeader, RoutingInfo, SphinxHeaderSpec, forward_header},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
+    surb::{ReplyOpener, SURB},
 };
 
 /// Holds data that are padded up to `P + 1`.
@@ -23,12 +23,10 @@ use crate::{
 pub struct PaddedPayload<const P: usize>(Box<[u8]>);
 
 impl<const P: usize> PaddedPayload<P> {
-    /// Tag used to separate padding from data
-    pub const PADDING_TAG: u8 = 0xaa;
-
     /// Byte used to pad the data.
     pub const PADDING: u8 = 0x00;
-
+    /// Tag used to separate padding from data
+    pub const PADDING_TAG: u8 = 0xaa;
     /// Size of the padded data.
     pub const SIZE: usize = P + size_of_val(&Self::PADDING_TAG);
 
@@ -37,7 +35,8 @@ impl<const P: usize> PaddedPayload<P> {
     /// The padding consists of prepending a [`PaddedPayload::PADDING_TAG`], preceded by as many zero bytes
     /// to fill it up to [`PaddedPayload::SIZE`]. If data is `P` bytes-long, only the padding tag is prepended.
     ///
-    /// If the argument's length is greater or equal to [`PaddedPayload::SIZE`], [`SphinxError::PaddingError`] is returned.
+    /// If the argument's length is greater or equal to [`PaddedPayload::SIZE`], [`SphinxError::PaddingError`] is
+    /// returned.
     pub fn new(msg: &[u8]) -> Result<Self, SphinxError> {
         if msg.len() < Self::SIZE {
             // Zeroes followed by the PADDING_TAG and then the message
@@ -513,31 +512,31 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> BytesRepresentable for
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
+    use std::{hash::Hash, num::NonZeroUsize};
 
-    use crate::surb::create_surb;
-    use crate::tests::WrappedBytes;
     use anyhow::anyhow;
     use bimap::BiHashMap;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use parameterized::parameterized;
-    use std::hash::Hash;
-    use std::num::NonZeroUsize;
+
+    use super::*;
+    use crate::{surb::create_surb, tests::WrappedBytes};
 
     #[derive(Debug, Clone, Copy)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct TestHeader<S: SphinxSuite>(PhantomData<S>);
 
     impl<S: SphinxSuite> SphinxHeaderSpec for TestHeader<S> {
-        const MAX_HOPS: NonZeroUsize = NonZeroUsize::new(4).unwrap();
         type KeyId = KeyIdent<4>;
+        type PRG = hopr_crypto_types::primitives::ChaCha20;
+        type PacketReceiverData = SimplePseudonym;
         type Pseudonym = SimplePseudonym;
         type RelayerData = WrappedBytes<53>;
-        type PacketReceiverData = SimplePseudonym;
         type SurbReceiverData = WrappedBytes<54>;
-        type PRG = hopr_crypto_types::primitives::ChaCha20;
         type UH = hopr_crypto_types::primitives::Poly1305;
+
+        const MAX_HOPS: NonZeroUsize = NonZeroUsize::new(4).unwrap();
     }
 
     const PAYLOAD_SIZE: usize = 799;
@@ -625,7 +624,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<()>
+    fn generic_test_meta_packet<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
     where
         S: SphinxSuite,
         <S::P as Keypair>::Public: Eq + Hash,
@@ -683,7 +682,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    fn generic_meta_packet_reply_test<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<()>
+    fn generic_meta_packet_reply_test<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
     where
         S: SphinxSuite,
         <S::P as Keypair>::Public: Eq + Hash,

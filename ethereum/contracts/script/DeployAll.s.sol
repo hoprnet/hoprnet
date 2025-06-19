@@ -86,7 +86,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         _deployNetworkRegistry(deployerAddress);
 
         // 3.8. TicketPriceOracle
-        _deployHoprTicketPriceOracle(deployerAddress, 100);
+        _deployHoprTicketPriceOracle(deployerAddress);
 
         // 3.9. WinningProbabilityOracle, with a default value of 1.0
         _deployHoprWinningProbabilityOracle(deployerAddress, WinProb.wrap(type(uint56).max));
@@ -207,13 +207,18 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * In development, dummy is used
      */
     function _deployNRProxy(address deployerAddress) internal {
-        if (currentEnvironmentType == EnvironmentType.LOCAL) {
-            // deploy DummyProxy in LOCAL environment
-            currentNetworkDetail.addresses.networkRegistryProxyContractAddress = deployCode(
-                "DummyProxyForNetworkRegistry.sol:HoprDummyProxyForNetworkRegistry", abi.encode(deployerAddress)
-            );
-            isHoprNetworkRegistryDeployed = true;
-        } else if (!isValidAddress(currentNetworkDetail.addresses.networkRegistryProxyContractAddress)) {
+        bool shouldDeployStakingProxy = false;
+
+        if (currentEnvironmentType == EnvironmentType.LOCAL && vm.envBool("USE_STAKING_PROXY")) {
+            shouldDeployStakingProxy = true;
+        } else if (
+            currentEnvironmentType != EnvironmentType.LOCAL
+                && !isValidAddress(currentNetworkDetail.addresses.networkRegistryProxyContractAddress)
+        ) {
+            shouldDeployStakingProxy = true;
+        }
+
+        if (shouldDeployStakingProxy) {
             // deploy StakingProxy in other environment types, if no proxy contract is given.
             // temporarily grant default admin role to the deployer wallet
             currentNetworkDetail.addresses.networkRegistryProxyContractAddress = deployCode(
@@ -230,9 +235,15 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
             // swap owner and grant manager role to more wallets
             _helperSwapOwnerGrantManager(
-                currentNetworkDetail.addresses.networkRegistryContractAddress, deployerAddress, owner
+                currentNetworkDetail.addresses.networkRegistryProxyContractAddress, deployerAddress, owner
             );
             // flag isHoprNetworkRegistryDeployed
+            isHoprNetworkRegistryDeployed = true;
+        } else {
+            // deploy DummyProxy in LOCAL environment
+            currentNetworkDetail.addresses.networkRegistryProxyContractAddress = deployCode(
+                "DummyProxyForNetworkRegistry.sol:HoprDummyProxyForNetworkRegistry", abi.encode(deployerAddress)
+            );
             isHoprNetworkRegistryDeployed = true;
         }
     }
@@ -272,15 +283,17 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     /**
      * @dev deploy ticket price oracle
      */
-    function _deployHoprTicketPriceOracle(address deployerAddress, uint256 price) internal {
+    function _deployHoprTicketPriceOracle(address deployerAddress) internal {
+        uint256 price = 100;
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.addresses.ticketPriceOracleContractAddress)
         ) {
-            // deploy contract
-            currentNetworkDetail.addresses.ticketPriceOracleContractAddress =
-                deployCode("TicketPriceOracle.sol:HoprTicketPriceOracle", abi.encode(deployerAddress, price));
+            price = 1_000_000_000_000_000; // 0.001 HOPR in test environment
         }
+        // deploy contract
+        currentNetworkDetail.addresses.ticketPriceOracleContractAddress =
+            deployCode("TicketPriceOracle.sol:HoprTicketPriceOracle", abi.encode(deployerAddress, price));
     }
 
     /**

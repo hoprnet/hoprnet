@@ -1,6 +1,6 @@
 ---
 #################################################################################
-# Cron daily pipeline to clean cache contents (stale issues and docker images)
+# Cron daily pipeline to clean cache contents (docker images)
 #################################################################################
 name: Cleanup
 
@@ -12,28 +12,6 @@ on:
     - cron: "30 1 * * *"
 
 jobs:
-  stale:
-    name: Close stale issues
-    runs-on: self-hosted-hoprnet-small
-    timeout-minutes: 10
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      # See docs: https://github.com/actions/stale
-      - uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639 # v9.1.0
-        with:
-          stale-issue-message: "This issue is stale because it has been open 60 days with no activity. Remove stale label or comment or this will be closed in 30 days."
-          days-before-stale: 60
-          days-before-close: 30
-          stale-issue-label: "stale"
-          stale-pr-label: "stale"
-          exempt-issue-labels: "epic"
-          exempt-pr-labels: "epic"
-
   cleanup-docker:
     name: Cleanup Docker images
     runs-on: self-hosted-hoprnet-small
@@ -60,7 +38,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 

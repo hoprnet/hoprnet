@@ -1,24 +1,27 @@
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_entity::prelude::{Account, Announcement};
-use hopr_db_entity::{account, announcement};
-use hopr_internal_types::account::AccountType;
-use hopr_internal_types::prelude::AccountEntry;
-use hopr_primitive_types::errors::GeneralError;
-use hopr_primitive_types::prelude::{Address, ToHex};
+use hopr_db_entity::{
+    account, announcement,
+    prelude::{Account, Announcement},
+};
+use hopr_internal_types::{account::AccountType, prelude::AccountEntry};
+use hopr_primitive_types::{
+    errors::GeneralError,
+    prelude::{Address, ToHex},
+};
 use multiaddr::Multiaddr;
-use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
-    Set,
+    Set, sea_query::Expr,
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
 
-use crate::db::HoprDb;
-use crate::errors::DbSqlError::MissingAccount;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{
+    HoprDbGeneralModelOperations, OptTx,
+    db::HoprDb,
+    errors::{DbSqlError, DbSqlError::MissingAccount, Result},
+};
 
 /// A type that can represent both [chain public key](Address) and [packet public key](OffchainPublicKey).
 #[allow(clippy::large_enum_variant)] // TODO: use CompactOffchainPublicKey
@@ -237,7 +240,7 @@ impl HoprDbAccountOperations for HoprDb {
                     .await
                     {
                         // Proceed if succeeded or already exists
-                        Ok(_) | Err(DbErr::RecordNotInserted) => {
+                        res @ Ok(_) | res @ Err(DbErr::RecordNotInserted) => {
                             myself
                                 .caches
                                 .chain_to_offchain
@@ -249,7 +252,13 @@ impl HoprDbAccountOperations for HoprDb {
                                 .insert(account.public_key, Some(account.chain_addr))
                                 .await;
 
-                            myself.caches.key_id_mapper.update_key_id_binding(&account)?;
+                            // Update key-id binding only if the account was inserted successfully
+                            // (= not re-announced)
+                            if res.is_ok() {
+                                if let Err(error) = myself.caches.key_id_mapper.update_key_id_binding(&account) {
+                                    tracing::warn!(?account, %error, "keybinding not updated")
+                                }
+                            }
 
                             if let AccountType::Announced {
                                 multiaddr,
@@ -448,13 +457,15 @@ impl HoprDbAccountOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::errors::DbSqlError;
-    use crate::errors::DbSqlError::DecodingError;
-    use crate::HoprDbGeneralModelOperations;
     use anyhow::Context;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_internal_types::prelude::AccountType::NotAnnounced;
+
+    use super::*;
+    use crate::{
+        HoprDbGeneralModelOperations,
+        errors::{DbSqlError, DbSqlError::DecodingError},
+    };
 
     #[tokio::test]
     async fn test_insert_account_announcement() -> anyhow::Result<()> {

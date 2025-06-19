@@ -51,7 +51,6 @@ prof = [
 anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
-chrono = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.11"
@@ -88,7 +87,6 @@ hopr-lib = { workspace = true, features = [
   "session-client",
   "session-server",
 ] }
-hoprd-db-api = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-platform = { workspace = true }

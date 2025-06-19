@@ -18,11 +18,11 @@
 //! The configuration through CLI allows only fairly primitive single-strategy setting, through the `defaultStrategy`
 //! parameter. It can be set to any of the above strategies, however, the strategy parameters are not further
 //! configurable via the CLI and will always have their default values.
-//! In addition, if the ` disableTicketAutoRedeem ` CLI argument is `false`, the default Auto Redeem strategy is added to the
-//! strategy configured via the `defaultStrategy` argument (they execute together as Multi strategy).
+//! In addition, if the ` disableTicketAutoRedeem ` CLI argument is `false`, the default Auto Redeem strategy is added
+//! to the strategy configured via the `defaultStrategy` argument (they execute together as Multi strategy).
 //!
-//! For more complex strategy configurations, the YAML configuration method is recommended via the `strategy` YAML section.
-//! In this case, the top-most strategy is always assumed to be Multi strategy:
+//! For more complex strategy configurations, the YAML configuration method is recommended via the `strategy` YAML
+//! section. In this case, the top-most strategy is always assumed to be Multi strategy:
 //!
 //! ```yaml
 //! strategy:
@@ -39,17 +39,21 @@
 //!       aggregation_threshold: 1000
 //! ```
 
+use std::str::FromStr;
+
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
-use crate::aggregating::AggregatingStrategyConfig;
-use crate::auto_funding::AutoFundingStrategyConfig;
-use crate::auto_redeeming::AutoRedeemingStrategyConfig;
-use crate::channel_finalizer::ClosureFinalizerStrategyConfig;
-use crate::promiscuous::PromiscuousStrategyConfig;
-use crate::strategy::MultiStrategyConfig;
-use crate::Strategy::{Aggregating, AutoRedeeming};
+use crate::{
+    Strategy::{Aggregating, AutoRedeeming},
+    aggregating::AggregatingStrategyConfig,
+    auto_funding::AutoFundingStrategyConfig,
+    auto_redeeming::AutoRedeemingStrategyConfig,
+    channel_finalizer::ClosureFinalizerStrategyConfig,
+    promiscuous::PromiscuousStrategyConfig,
+    strategy::MultiStrategyConfig,
+};
 
 pub mod aggregating;
 pub mod auto_funding;
@@ -91,10 +95,10 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
         allow_recursive: false,
         execution_interval: 60,
         strategies: vec![
-            /*AutoFunding(AutoFundingStrategyConfig {
-                min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
-                funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-            }),*/
+            // AutoFunding(AutoFundingStrategyConfig {
+            // min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
+            // funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
+            // }),
             Aggregating(AggregatingStrategyConfig {
                 aggregation_threshold: Some(100),
                 unrealized_balance_ratio: Some(0.9),
@@ -103,7 +107,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
                 redeem_all_on_close: true,
-                minimum_redeem_ticket_value: Balance::new_from_str("90000000000000000", BalanceType::HOPR),
+                minimum_redeem_ticket_value: HoprBalance::from_str("0.09 wxHOPR").unwrap(),
             }),
         ],
     }

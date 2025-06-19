@@ -87,14 +87,20 @@ pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
-    use elliptic_curve::{sec1::ToEncodedPoint, ProjectivePoint, ScalarPrimitive};
+    use elliptic_curve::{
+        ProjectivePoint, ScalarPrimitive,
+        hash2curve::{ExpandMsgXmd, GroupDigest},
+        sec1::ToEncodedPoint,
+    };
     use hex_literal::hex;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_crypto_types::types::PublicKey;
-    use hopr_crypto_types::vrf::derive_vrf_parameters;
+    use hopr_crypto_types::{
+        keypairs::{ChainKeypair, Keypair},
+        types::PublicKey,
+        vrf::derive_vrf_parameters,
+    };
     use k256::{Scalar, Secp256k1};
+
+    use super::*;
 
     #[test]
     fn test_sample_field_element() {
@@ -112,10 +118,10 @@ mod tests {
         // vrf verification algorithm
         let pub_key = PublicKey::from_privkey(&priv_key)?;
 
-        let params = derive_vrf_parameters(&message, &keypair, dst)?;
+        let params = derive_vrf_parameters(message, &keypair, dst)?;
 
         let cap_b =
-            Secp256k1::hash_from_bytes::<ExpandMsgXmd<Keccak256>>(&[&pub_key.to_address().as_ref(), &message], &[dst])?;
+            Secp256k1::hash_from_bytes::<ExpandMsgXmd<Keccak256>>(&[pub_key.to_address().as_ref(), &message], &[dst])?;
 
         assert_eq!(
             params.get_s_b_witness(&keypair.public().to_address(), &message, dst)?,
@@ -129,7 +135,7 @@ mod tests {
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<Keccak256>>(
             &[
-                &pub_key.to_address().as_ref(),
+                pub_key.to_address().as_ref(),
                 &params.V.as_uncompressed().as_bytes()[1..],
                 &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 &message,

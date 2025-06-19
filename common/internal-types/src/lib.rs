@@ -16,10 +16,5 @@ pub mod errors;
 pub mod protocol;
 #[doc(hidden)]
 pub mod prelude {
-    pub use super::account::*;
-    pub use super::announcement::*;
-    pub use super::channels::*;
-    pub use super::errors::CoreTypesError;
-    pub use super::protocol::*;
-    pub use super::tickets::*;
+    pub use super::{account::*, announcement::*, channels::*, errors::CoreTypesError, protocol::*, tickets::*};
 }

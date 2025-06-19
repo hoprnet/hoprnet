@@ -5,29 +5,30 @@
 //! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
 //!
 //! There are two main implementations:
-//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently
-//!   not used by a HOPR node.
-//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
-//!   SAFE transaction. This is currently the main mode of HOPR node operation.
-//!
+//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently not
+//!   used by a HOPR node.
+//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the SAFE
+//!   transaction. This is currently the main mode of HOPR node operation.
 
-use alloy::network::TransactionBuilder;
-use alloy::primitives::aliases::U96;
-use alloy::primitives::aliases::{U24, U48, U56};
-use alloy::primitives::{B256, U256};
-use alloy::rpc::types::TransactionRequest;
-use alloy::sol_types::SolCall;
-
+use alloy::{
+    network::TransactionBuilder,
+    primitives::{
+        B256, U256,
+        aliases::{U24, U48, U56, U96},
+    },
+    rpc::types::TransactionRequest,
+    sol_types::SolCall,
+};
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{
         announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
     },
     hoprchannels::{
         HoprChannels::{
-            closeIncomingChannelCall, closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall,
-            finalizeOutgoingChannelClosureSafeCall, fundChannelCall, fundChannelSafeCall,
-            initiateOutgoingChannelClosureCall, initiateOutgoingChannelClosureSafeCall, redeemTicketCall,
-            redeemTicketSafeCall, RedeemableTicket as OnChainRedeemableTicket, TicketData,
+            RedeemableTicket as OnChainRedeemableTicket, TicketData, closeIncomingChannelCall,
+            closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall, finalizeOutgoingChannelClosureSafeCall,
+            fundChannelCall, fundChannelSafeCall, initiateOutgoingChannelClosureCall,
+            initiateOutgoingChannelClosureSafeCall, redeemTicketCall, redeemTicketSafeCall,
         },
         HoprCrypto::{CompactSignature, VRFParameters},
     },
@@ -54,18 +55,18 @@ enum Operation {
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.
 pub trait PayloadGenerator<T: Into<TransactionRequest>> {
-    /// Create a ERC20 approve transaction payload. Pre-requisite to open payment channels.
+    /// Create an ERC20 approve transaction payload. Pre-requisite to open payment channels.
     /// The `spender` address is typically the HOPR Channels contract address.
-    fn approve(&self, spender: Address, amount: Balance) -> Result<T>;
+    fn approve(&self, spender: Address, amount: HoprBalance) -> Result<T>;
 
     /// Create a ERC20 transfer transaction payload
-    fn transfer(&self, destination: Address, amount: Balance) -> Result<T>;
+    fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> Result<T>;
 
     /// Creates the transaction payload to announce a node on-chain.
     fn announce(&self, announcement: AnnouncementData) -> Result<T>;
 
     /// Creates the transaction payload to open a payment channel
-    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<T>;
+    fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<T>;
 
     /// Creates the transaction payload to immediately close an incoming payment channel
     fn close_incoming_channel(&self, source: Address) -> Result<T>;
@@ -102,7 +103,7 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
     .abi_encode()
 }
 
-fn approve_tx(spender: Address, amount: Balance) -> TransactionRequest {
+fn approve_tx(spender: Address, amount: HoprBalance) -> TransactionRequest {
     TransactionRequest::default().with_input(
         approveCall {
             spender: spender.into(),
@@ -112,18 +113,21 @@ fn approve_tx(spender: Address, amount: Balance) -> TransactionRequest {
     )
 }
 
-fn transfer_tx(destination: Address, amount: Balance) -> TransactionRequest {
+fn transfer_tx<C: Currency>(destination: Address, amount: Balance<C>) -> TransactionRequest {
     let amount_u256 = U256::from_be_bytes(amount.amount().to_be_bytes());
     let tx = TransactionRequest::default();
-    match amount.balance_type() {
-        BalanceType::HOPR => tx.with_input(
+    if WxHOPR::is::<C>() {
+        tx.with_input(
             transferCall {
                 recipient: destination.into(),
                 amount: amount_u256,
             }
             .abi_encode(),
-        ),
-        BalanceType::Native => tx.with_value(amount_u256),
+        )
+    } else if XDai::is::<C>() {
+        tx.with_value(amount_u256)
+    } else {
+        unimplemented!("other currencies are currently not supported")
     }
 }
 
@@ -150,22 +154,18 @@ impl BasicPayloadGenerator {
 }
 
 impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
-    fn approve(&self, spender: Address, amount: Balance) -> Result<TransactionRequest> {
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments(
-                "Invalid balance type. Expected a HOPR balance.".into(),
-            ));
-        }
-
+    fn approve(&self, spender: Address, amount: HoprBalance) -> Result<TransactionRequest> {
         let tx = approve_tx(spender, amount).with_to(self.contract_addrs.token.into());
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.token.into()));
         Ok(tx)
     }
 
-    fn transfer(&self, destination: Address, amount: Balance) -> Result<TransactionRequest> {
-        let to = match amount.balance_type() {
-            BalanceType::Native => destination,
-            BalanceType::HOPR => self.contract_addrs.token,
+    fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> Result<TransactionRequest> {
+        let to = if XDai::is::<C>() {
+            destination
+        } else if WxHOPR::is::<C>() {
+            self.contract_addrs.token
+        } else {
+            return Err(InvalidArguments("invalid currency".into()));
         };
         let tx = transfer_tx(destination, amount).with_to(to.into());
         Ok(tx)
@@ -196,15 +196,9 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TransactionRequest> {
+    fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<TransactionRequest> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
-        }
-
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments(
-                "Invalid balance type. Expected a HOPR balance.".into(),
-            ));
         }
 
         let tx = TransactionRequest::default()
@@ -315,12 +309,7 @@ impl SafePayloadGenerator {
 }
 
 impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
-    fn approve(&self, spender: Address, amount: Balance) -> Result<TransactionRequest> {
-        if amount.balance_type() != BalanceType::HOPR {
-            return Err(InvalidArguments(
-                "Invalid balance type. Expected a HOPR balance.".into(),
-            ));
-        }
+    fn approve(&self, spender: Address, amount: HoprBalance) -> Result<TransactionRequest> {
         let tx = approve_tx(spender, amount)
             .with_to(self.contract_addrs.token.into())
             .with_gas_limit(DEFAULT_TX_GAS);
@@ -328,10 +317,13 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn transfer(&self, destination: Address, amount: Balance) -> Result<TransactionRequest> {
-        let to = match amount.balance_type() {
-            BalanceType::Native => destination,
-            BalanceType::HOPR => self.contract_addrs.token,
+    fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> Result<TransactionRequest> {
+        let to = if XDai::is::<C>() {
+            destination
+        } else if WxHOPR::is::<C>() {
+            self.contract_addrs.token
+        } else {
+            return Err(InvalidArguments("invalid currency".into()));
         };
         let tx = transfer_tx(destination, amount)
             .with_to(to.into())
@@ -377,14 +369,14 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TransactionRequest> {
+    fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<TransactionRequest> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
         }
 
-        if amount.balance_type() != BalanceType::HOPR {
+        if amount.amount() > hopr_primitive_types::prelude::U256::from(ChannelEntry::MAX_CHANNEL_BALANCE) {
             return Err(InvalidArguments(
-                "Invalid balance type. Expected a HOPR balance.".into(),
+                "Cannot fund channel with amount larger than 96 bits".into(),
             ));
         }
 
@@ -562,7 +554,7 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
         Ok(OnChainRedeemableTicket {
             data: TicketData {
                 channelId: B256::from_slice(off_chain.verified_ticket().channel_id.as_ref()),
-                amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), // Extract only the last 12 bytes (lowest 96 bits)
+                amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), /* Extract only the last 12 bytes (lowest 96 bits) */
                 ticketIndex: U48::from_be_slice(&off_chain.verified_ticket().index.to_be_bytes()[8 - 6..]),
                 indexOffset: off_chain.verified_ticket().index_offset,
                 epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),
@@ -581,19 +573,19 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 
 #[cfg(test)]
 mod tests {
-    use super::{BasicPayloadGenerator, PayloadGenerator};
+    use std::str::FromStr;
 
     use alloy::{primitives::U256, providers::Provider};
     use anyhow::Context;
     use hex_literal::hex;
-    use multiaddr::Multiaddr;
-    use std::str::FromStr;
-
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::{Balance, BalanceType};
+    use hopr_primitive_types::prelude::HoprBalance;
+    use multiaddr::Multiaddr;
+
+    use super::{BasicPayloadGenerator, PayloadGenerator};
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
@@ -630,12 +622,14 @@ mod tests {
         let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
         let reannounce_tx = generator.announce(ad_reannounce)?;
 
-        assert!(client
-            .send_transaction(reannounce_tx)
-            .await?
-            .get_receipt()
-            .await?
-            .status());
+        assert!(
+            client
+                .send_transaction(reannounce_tx)
+                .await?
+                .get_receipt()
+                .await?
+                .status()
+        );
 
         Ok(())
     }
@@ -653,8 +647,7 @@ mod tests {
         // Mint 1000 HOPR to Alice
         let _ = hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128)).await;
 
-        // let domain_separator = contract_instances.channels.domainSeparator().call().await?._0;
-        let domain_separator: Hash = contract_instances.channels.domainSeparator().call().await?._0.0.into();
+        let domain_separator: Hash = contract_instances.channels.domainSeparator().call().await?.0.into();
 
         // Open channel Alice -> Bob
         let _ = hopr_chain_types::utils::fund_channel(
@@ -697,12 +690,14 @@ mod tests {
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
         let client = create_rpc_client_to_anvil(&anvil, &chain_key_bob);
 
-        assert!(client
-            .send_transaction(redeem_ticket_tx)
-            .await?
-            .get_receipt()
-            .await?
-            .status());
+        assert!(
+            client
+                .send_transaction(redeem_ticket_tx)
+                .await?
+                .get_receipt()
+                .await?
+                .status()
+        );
 
         Ok(())
     }
@@ -726,18 +721,11 @@ mod tests {
             .token
             .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
             .call()
-            .await?
-            ._0;
+            .await?;
         assert_eq!(balance, U256::from(1000_u128));
 
         // Alice withdraws 100 HOPR (to Bob's address)
-        let tx = generator.transfer(
-            (&chain_key_bob).into(),
-            Balance::new(
-                hopr_primitive_types::primitives::U256::from(100_u128),
-                BalanceType::HOPR,
-            ),
-        )?;
+        let tx = generator.transfer((&chain_key_bob).into(), HoprBalance::from(100))?;
 
         assert!(client.send_transaction(tx).await?.get_receipt().await?.status());
 
@@ -746,8 +734,7 @@ mod tests {
             .token
             .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
             .call()
-            .await?
-            ._0;
+            .await?;
         assert_eq!(balance, U256::from(900_u128));
 
         Ok(())

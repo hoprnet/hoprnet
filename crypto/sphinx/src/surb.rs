@@ -1,10 +1,14 @@
-use crate::routing::{RoutingInfo, SphinxHeaderSpec};
-use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
+use std::fmt::Formatter;
+
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::fmt::Formatter;
 use typenum::Unsigned;
+
+use crate::{
+    routing::{RoutingInfo, SphinxHeaderSpec},
+    shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
+};
 
 /// Single Use Reply Block
 ///
@@ -207,10 +211,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::ec_groups::X25519Suite;
-    use crate::tests::*;
     use hopr_crypto_random::Randomizable;
+
+    use super::*;
+    use crate::{ec_groups::X25519Suite, tests::*};
 
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;
@@ -219,7 +223,7 @@ mod tests {
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
     {
-        let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
+        let pub_keys = keypairs.iter().map(|kp| *kp.public()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;
 
         Ok(create_surb::<S, HeaderSpec<S>>(

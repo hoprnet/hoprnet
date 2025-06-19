@@ -42,7 +42,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -93,7 +93,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -137,7 +137,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -154,11 +154,16 @@ jobs:
         env:
           HOPR_NETWORK: anvil-localhost
 
-  tests-smoke-hopli:
+  build-candidate-binaries:
+    name: Build Candidate Binaries
     runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 10
-    env:
-      needs_nix_setup: true
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        binary:
+          - hoprd
+          - hopli
     if: github.event.pull_request.draft == false
     steps:
       - name: Harden Runner
@@ -172,17 +177,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup GCP
-        id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
-        with:
-          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-          login-artifact-registry: "false"
-          install-sdk: "true"
-
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -194,60 +191,13 @@ jobs:
         env:
           USER: runner
 
-      - name: Find base port
-        id: find_base_port
-        run: |
-          base_port=$(nix run .#find-port-ci)
-          echo "Using base port ${base_port}"
-          echo "base-port=${base_port}" >> "$GITHUB_OUTPUT"
-          echo "snapshot-name=snapshot-${base_port}" >> "$GITHUB_OUTPUT"
-          echo "snapshot-dir=/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
-
-      - name: Download snapshot
-        id: download-snapshot
-        if: ${{ !env.ACT }}
-        run: |
-          mkdir -p "${{ steps.find_base_port.outputs.snapshot-dir }}"
-          gcloud storage rsync gs://hoprnet-test-artifacts/${{ steps.find_base_port.outputs.snapshot-name }} ${{ steps.find_base_port.outputs.snapshot-dir }} --recursive
-        continue-on-error: true
-
-      - name: Check snapshot
-        run: ls -lR ${{ steps.find_base_port.outputs.snapshot-dir }} || echo "no snapshot found"
-
-      - name: Run smoke tests hopli
-        run: nix develop -L .#citest -c uv run --frozen -m pytest tests/test_hopli.py
-        env:
-          HOPR_SMOKETEST_BASE_PORT: ${{ steps.find_base_port.outputs.base-port }}
-
-      - name: Upload snapshot
-        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
-        if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
-        with:
-          path: ${{ steps.find_base_port.outputs.snapshot-dir }}
-          destination: hoprnet-test-artifacts/
-          gzip: false
-
-      - name: Compress and upload test logs
-        if: ${{ !env.ACT && always() }}
-        working-directory: "/tmp"
-        run: |
-          # Copy all the logs to a directory to avoid log file changes and simplify tar command
-          test_name=test-smoke-hopli-${{ github.run_id }}-${{ github.run_number }}
-          mkdir -p ${test_name}
-
-          # Copy files, delete all but the log files
-          cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
-          find ${test_name}/ -type f ! -name "hoprd.log" -delete
-          cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
-
-          # Create tarball and upload to GCP
-          tar -czvf ${test_name}.tgz ${test_name}/
-          gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
+      - name: Build binary
+        run: nix build .#${{ matrix.binary }}-candidate
 
   tests-smoke:
     runs-on: self-hosted-hoprnet-bigger
     needs:
-      - tests-smoke-hopli
+      - build-candidate-binaries
     timeout-minutes: 30
     env:
       needs_nix_setup: true
@@ -255,6 +205,7 @@ jobs:
       fail-fast: false
       matrix:
         suite:
+          - hopli
           - websocket_api
           - rest_api
           - session
@@ -284,7 +235,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 

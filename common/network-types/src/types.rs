@@ -1,17 +1,21 @@
-use crate::errors::NetworkTypeError;
-use hickory_resolver::name_server::ConnectionProvider;
-use hickory_resolver::AsyncResolver;
-use hopr_crypto_packet::prelude::HoprSenderId;
-use hopr_crypto_packet::HoprSurb;
+use std::{
+    fmt::{Display, Formatter},
+    net::SocketAddr,
+    str::FromStr,
+};
+
+use hickory_resolver::{AsyncResolver, name_server::ConnectionProvider};
+use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_path::ValidatedPath;
-use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
-use hopr_primitive_types::prelude::Address;
+pub use hopr_path::ValidatedPath;
+use hopr_primitive_types::{
+    bounded::{BoundedSize, BoundedVec},
+    prelude::Address,
+};
 use libp2p_identity::PeerId;
-use std::fmt::{Display, Formatter};
-use std::net::SocketAddr;
-use std::str::FromStr;
+
+use crate::errors::NetworkTypeError;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
@@ -172,9 +176,9 @@ impl IpOrHost {
 ///
 /// ### Example
 /// ```rust
-/// use libp2p_identity::PeerId;
 /// use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 /// use hopr_network_types::prelude::{IpOrHost, SealedHost};
+/// use libp2p_identity::PeerId;
 ///
 /// # fn main() -> anyhow::Result<()> {
 /// let keypair = OffchainKeypair::random();
@@ -211,12 +215,12 @@ pub enum SealedHost {
 }
 
 impl SealedHost {
+    const MAX_LEN_WITH_PADDING: usize = 50;
     /// Character that can be appended to the host to obscure its length.
     ///
     /// User can add as many of this character to the host, and it will be removed
     /// during unsealing.
     pub const PADDING_CHAR: char = '@';
-    const MAX_LEN_WITH_PADDING: usize = 50;
 
     /// Seals the given [`IpOrHost`] using the Exit node's peer ID.
     pub fn seal(host: IpOrHost, peer_id: PeerId) -> crate::errors::Result<Self> {
@@ -407,10 +411,12 @@ impl ResolvedTransportRouting {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::net::SocketAddr;
+
     use anyhow::anyhow;
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
-    use std::net::SocketAddr;
+
+    use super::*;
 
     #[tokio::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {

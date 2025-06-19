@@ -1,7 +1,7 @@
+use std::{marker::PhantomData, ops::Mul};
+
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_types::prelude::*;
-use std::marker::PhantomData;
-use std::ops::Mul;
 
 use crate::derivation::{create_kdf_instance, generate_key_iv};
 
@@ -175,8 +175,9 @@ pub trait SphinxSuite {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
     use subtle::ConstantTimeEq;
+
+    use super::*;
 
     pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) {
         let (pub_keys, priv_keys): (Vec<S::G>, Vec<S::E>) = (0..node_count).map(|_| S::G::random_pair()).unzip();
