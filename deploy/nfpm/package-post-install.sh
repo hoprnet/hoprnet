@@ -139,6 +139,9 @@ add_rpc_provider_var() {
 add_hoprd_api_host_var() {
   if [ -z "${HOPRD_API_HOST}" ]; then
     read -r -p "Enter HOPRD_API_HOST (default: 0.0.0.0): " HOPRD_API_HOST
+    if [ -z "$HOPRD_API_HOST" ]; then
+      HOPRD_API_HOST="0.0.0.0"
+    fi
     # Validate that HOPRD_API_HOST is a standard IPv4 address
     if ! echo "$HOPRD_API_HOST" | grep -Eq "^([0-9]{1,3}\.){3}[0-9]{1,3}$"; then
       echo "Invalid IP address format for HOPRD_API_HOST. Please enter a valid IPv4 address."
