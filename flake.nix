@@ -658,6 +658,7 @@
               ;
             extraPackages = with pkgs; [
               nfpm
+              envsubst
             ];
           };
           ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
