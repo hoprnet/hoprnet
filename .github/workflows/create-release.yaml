@@ -122,6 +122,7 @@ jobs:
 
       - name: Upload release assets
         run: |
+          set -x
           for artifact in ./dist/bin/* ./dist/packages/*; do
             echo "Uploading $artifact to release v${{ steps.setup.outputs.current_version }}"
             gh release upload v${{ steps.setup.outputs.current_version }} "$artifact" --clobber
