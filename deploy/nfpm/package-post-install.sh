@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
 env_data=""
 HOPRD_CONFIG_FILE="/etc/hoprd/hoprd.cfg.yaml"
@@ -23,8 +24,8 @@ get_public_ip() {
 
 # Function to find an available port range
 find_available_port_range() {
-  local initial_port=$1
-  local required_ports=$2
+  local initial_port="$1"
+  local required_ports="$2"
 
   # Loop through potential starting ports
   while true; do
@@ -215,8 +216,8 @@ create_user_group() {
   # Create a user and group for the HOPR node if they do not exist
   if ! id -u hopr >/dev/null 2>&1; then
     echo "Creating user and group for HOPR node..."
-    groupadd -r hopr
-    useradd --system -g hopr --home /var/lib/hoprd --shell /usr/sbin/nologin -c "HOPR Node User" hopr
+    groupadd -r hoprd
+    useradd --system -g hoprd --home /var/lib/hoprd --shell /usr/sbin/nologin -c "HOPR Node User" hoprd
     echo "Setting ownership and permissions for hoprd files..."
     chown -R hoprd:hoprd /etc/hoprd
     chown -R hoprd:hoprd /var/lib/hoprd
@@ -228,7 +229,7 @@ create_user_group() {
     # Add the logged-in user to the hoprd group
     if [ -n "$SUDO_USER" ]; then
       echo "Adding user '$SUDO_USER' to the hoprd group..."
-      usermod -aG hopr "$SUDO_USER"
+      usermod -aG hoprd "$SUDO_USER"
     else
       echo "Could not identify the user who initiated the installation."
     fi

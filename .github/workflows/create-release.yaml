@@ -5,11 +5,7 @@
 name: Create Release
 
 on:
-  workflow_call:
-  pull_request:
-    types:
-      - closed
-      # - synchronize
+  workflow_call: {}
 
 concurrency:
   group: create-release
@@ -48,7 +44,6 @@ jobs:
       - name: Setup workspace
         id: setup
         run: |
-          set -x
           current_version=$(./scripts/get-current-version.sh semver)
           echo "current_version=${current_version}" >> $GITHUB_OUTPUT
           if [[ $current_version == *"-rc."* ]]; then
@@ -57,17 +52,15 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
           ./scripts/download-workflow-binaries.sh ${{ github.event.pull_request.head.ref }}
-          echo ./scripts/download-workflow-binaries.sh "bot/close-${current_version}"
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Tag repository
         id: tag
         run: |
-          set -x
           # Tag semver
           git tag v${{ steps.setup.outputs.current_version }}
-          echo git push origin v${{ steps.setup.outputs.current_version }}
+          git push origin v${{ steps.setup.outputs.current_version }}
 
           declare base_branch=${{ github.event.pull_request.base.ref }}
           # Tag release name
@@ -77,7 +70,7 @@ jobs:
             release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
           fi
           git tag --force ${release_name}
-          echo git push --force origin ${release_name}
+          git push --force origin ${release_name}
           echo "release_name=${release_name}" >> $GITHUB_OUTPUT
 
       - name: Generate Changelog
@@ -106,8 +99,8 @@ jobs:
               ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
               ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
             echo "Pushing images into Docker Hub"
-            echo docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
-            echo docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
+            docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
+            docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
           done
 
       - name: Create Release
@@ -120,8 +113,6 @@ jobs:
 
       - name: Upload release assets
         run: |
-          set -x
-          ls -alR ./dist
           for artifact in ./dist/binaries/* ./dist/packages/*; do
             echo "Uploading $artifact to release v${{ steps.setup.outputs.current_version }}"
             gh release upload v${{ steps.setup.outputs.current_version }} "$artifact" --clobber
@@ -129,23 +120,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # - name: Close Milestone
-      #   run: |
-      #     gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+      - name: Close Milestone
+        run: |
+          gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
-      # - name: Notify release
-      #   uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-      #   with:
-      #     api-key: ${{ secrets.ZULIP_API_KEY }}
-      #     email: ${{ secrets.ZULIP_EMAIL }}
-      #     organization-url: "https://hopr.zulipchat.com"
-      #     type: "stream"
-      #     to: "HOPRd"
-      #     topic: "Releases"
-      #     content: |
-      #       I'm thrilled to inform the new hoprd version v${{ steps.setup.outputs.current_version }} has been released.
-      #       [Release Notes](https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }})
-      #       [Docker Hub](https://hub.docker.com/repository/docker/hoprnet/hoprd/tags)
+      - name: Notify release
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Releases"
+          content: |
+            I'm thrilled to inform the new hoprd version v${{ steps.setup.outputs.current_version }} has been released.
+            [Release Notes](https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }})
+            [Docker Hub](https://hub.docker.com/repository/docker/hoprnet/hoprd/tags)
 

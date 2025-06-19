@@ -24,7 +24,8 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 head_branch=${1}
 workflow_run_id=$(gh api repos/hoprnet/hoprnet/actions/workflows/build.yaml/runs | jq --arg head_branch "$head_branch" '[.workflow_runs[] | select(.head_branch == $head_branch and .conclusion == "success" and .status == "completed")] | first | .id')
 artifacts=$(gh api repos/hoprnet/hoprnet/actions/runs/${workflow_run_id}/artifacts | jq -r '.artifacts[] | "\(.name) \(.archive_download_url)"')
-rm -rf ./dist && mkdir -p ./dist/zip ./dist/bin ./dist/packages ./dist/binaries
+rm -rf "${mydir}/dist"
+mkdir -p "${mydir}/dist/zip" "${mydir}/dist/bin" "${mydir}/dist/packages"
 while IFS= read -r line; do
   artifact_name=$(echo $line | awk '{print $1}')
   artifact_url=$(echo $line | awk '{print $2}')

@@ -13,7 +13,7 @@ on:
   pull_request:
     types:
       - closed
-      - synchronize
+      # - synchronize
 
 concurrency:
   group: merge
@@ -23,219 +23,219 @@ permissions:
   contents: write
 
 jobs:
-  # cleanup_actions:
-  #   name: Cleanup Actions
-  #   runs-on: self-hosted-hoprnet-small
-  #   steps:
-  #     - name: Harden Runner
-  #       uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
-  #       with:
-  #         disable-sudo: true
-  #         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+  cleanup_actions:
+    name: Cleanup Actions
+    runs-on: self-hosted-hoprnet-small
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-  #       with:
-  #         persist-credentials: false
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
-  #     - name: Cleanup
-  #       run: |
-  #         gh extension install actions/gh-actions-cache
+      - name: Cleanup
+        run: |
+          gh extension install actions/gh-actions-cache
 
-  #         REPO=${{ github.repository }}
-  #         BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+          REPO=${{ github.repository }}
+          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
 
-  #         echo "Fetching list of cache key"
-  #         cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
+          echo "Fetching list of cache key"
+          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
 
-  #         ## Setting this to not fail the workflow while deleting cache keys.
-  #         set +e
-  #         echo "Deleting caches..."
-  #         for cacheKey in $cacheKeysForPR
-  #         do
-  #           gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-  #         done
-  #         echo "Done"
-  #       env:
-  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting caches..."
+          for cacheKey in $cacheKeysForPR
+          do
+            gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+          done
+          echo "Done"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - name: "Undeploy PR deployment"
-  #       if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
-  #       # Remove the deploy_nodes label to indicate that the PR deployment has been cleaned up
-  #       run: |
-  #         gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
-  #       env:
-  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Undeploy PR deployment"
+        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
+        # Remove the deploy_nodes label to indicate that the PR deployment has been cleaned up
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # build_docker:
-  #   strategy:
-  #     matrix:
-  #       package:
-  #         - hopli
-  #         - hoprd
-  #   name: Build ${{ matrix.package }}
-  #   # only run build and tag if the PR is merged, not if its closed
-  #   if: github.event.pull_request.merged == true
-  #   uses: ./.github/workflows/build-docker.yaml
-  #   with:
-  #     branch: ${{ github.event.pull_request.base.ref }}
-  #     package: ${{ matrix.package }}
-  #     production: true
-  #   secrets: inherit
+  build_docker:
+    strategy:
+      matrix:
+        package:
+          - hopli
+          - hoprd
+    name: Build ${{ matrix.package }}
+    # only run build and tag if the PR is merged, not if its closed
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/build-docker.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+      package: ${{ matrix.package }}
+      production: true
+    secrets: inherit
 
-  # cache_deps:
-  #   name: Cache deps
-  #   if: github.event.pull_request.merged == true
-  #   uses: ./.github/workflows/cache-deps.yaml
-  #   with:
-  #     branch: ${{ github.event.pull_request.base.ref }}
-  #   secrets: inherit
+  cache_deps:
+    name: Cache deps
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/cache-deps.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+    secrets: inherit
 
-  # load_test:
-  #   name: Load tests
-  #   if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
-  #   needs:
-  #     - build_docker
-  #   uses: ./.github/workflows/load-tests.yaml
-  #   with:
-  #     test_id: pr-${{ github.event.pull_request.number }}
-  #     cluster_nodes: core-rotsee
-  #     topology: receiver
-  #     workload: constant
-  #     duration: ${{ fromJson(vars.K6_TEST_DURATION) || 60 }}
-  #     echo_service_replicas: ${{ fromJson(vars.K6_ECHO_SERVERS_REPLICAS) || 1 }}
-  #     payload_size: ${{ fromJson(vars.K6_PAYLOAD_SIZE)  || 10485760  }} # 10MB
-  #     download_throughput: ${{ fromJson(vars.K6_DOWNLOAD_THROUGHPUT) || 1048576 }} # 1MB/s
-  #     upload_throughput: ${{ fromJson(vars.K6_UPLOAD_THROUGHPUT) || 524288 }} # 512KB/s
-  #   secrets: inherit
+  load_test:
+    name: Load tests
+    if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
+    needs:
+      - build_docker
+    uses: ./.github/workflows/load-tests.yaml
+    with:
+      test_id: pr-${{ github.event.pull_request.number }}
+      cluster_nodes: core-rotsee
+      topology: receiver
+      workload: constant
+      duration: ${{ fromJson(vars.K6_TEST_DURATION) || 60 }}
+      echo_service_replicas: ${{ fromJson(vars.K6_ECHO_SERVERS_REPLICAS) || 1 }}
+      payload_size: ${{ fromJson(vars.K6_PAYLOAD_SIZE)  || 10485760  }} # 10MB
+      download_throughput: ${{ fromJson(vars.K6_DOWNLOAD_THROUGHPUT) || 1048576 }} # 1MB/s
+      upload_throughput: ${{ fromJson(vars.K6_UPLOAD_THROUGHPUT) || 524288 }} # 512KB/s
+    secrets: inherit
 
   create_release:
     name: Create Release
     if: contains(github.event.pull_request.labels.*.name, 'release')
     uses: ./.github/workflows/create-release.yaml
-    # needs:
-    #   - build_docker
+    needs:
+      - build_docker
     secrets: inherit
 
-  # new_release:
-  #   name: Open new release
-  #   if: contains(github.event.pull_request.labels.*.name, 'release')
-  #   needs:
-  #     - create_release
-  #   uses: ./.github/workflows/open-release.yaml
-  #   with:
-  #     release_type: ${{ vars.NEXT_RELEASE_TYPE }}
-  #     base_branch: ${{ github.event.pull_request.base.ref }}
-  #   secrets: inherit
+  new_release:
+    name: Open new release
+    if: contains(github.event.pull_request.labels.*.name, 'release')
+    needs:
+      - create_release
+    uses: ./.github/workflows/open-release.yaml
+    with:
+      release_type: ${{ vars.NEXT_RELEASE_TYPE }}
+      base_branch: ${{ github.event.pull_request.base.ref }}
+    secrets: inherit
 
-  # build_dappnode:
-  #   name: Build dappNode
-  #   if: contains(github.event.pull_request.labels.*.name, 'release')
-  #   needs:
-  #     - create_release
-  #   uses: ./.github/workflows/generate-dappnode-pr.yaml
-  #   with:
-  #     base_branch: ${{ github.event.pull_request.base.ref }}
-  #   secrets: inherit
+  build_dappnode:
+    name: Build dappNode
+    if: contains(github.event.pull_request.labels.*.name, 'release')
+    needs:
+      - create_release
+    uses: ./.github/workflows/generate-dappnode-pr.yaml
+    with:
+      base_branch: ${{ github.event.pull_request.base.ref }}
+    secrets: inherit
 
-  # build_pluto:
-  #   strategy:
-  #     matrix:
-  #       package:
-  #         - hopr-pluto
-  #   name: Build ${{ matrix.package }}
-  #   # only run build and tag if the PR is merged, not if its closed
-  #   if: github.event.pull_request.merged == true
-  #   uses: ./.github/workflows/build-docker.yaml
-  #   with:
-  #     branch: ${{ github.event.pull_request.base.ref }}
-  #     package: ${{ matrix.package }}
-  #     production: true
-  #   secrets: inherit
+  build_pluto:
+    strategy:
+      matrix:
+        package:
+          - hopr-pluto
+    name: Build ${{ matrix.package }}
+    # only run build and tag if the PR is merged, not if its closed
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/build-docker.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+      package: ${{ matrix.package }}
+      production: true
+    secrets: inherit
 
-  # docs:
-  #   name: Docs
-  #   needs:
-  #     - build_docker
-  #   uses: ./.github/workflows/build-docs.yaml
-  #   secrets: inherit
-  #   with:
-  #     publish: true
+  docs:
+    name: Docs
+    needs:
+      - build_docker
+    uses: ./.github/workflows/build-docs.yaml
+    secrets: inherit
+    with:
+      publish: true
 
-  # bencher:
-  #   name: Benchmarks
-  #   uses: ./.github/workflows/bencher.yaml
-  #   secrets: inherit
-  #   with:
-  #     branch: ${{ github.event.pull_request.base.ref }}
-  #     type: merge
+  bencher:
+    name: Benchmarks
+    uses: ./.github/workflows/bencher.yaml
+    secrets: inherit
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+      type: merge
 
-  # notify_failure:
-  #   name: Notify in Zulip on merge pipeline failure
-  #   needs:
-  #     - cleanup_actions
-  #     - build_docker
-  #     - cache_deps
-  #     - load_test
-  #     - build_dappnode
-  #     - build_pluto
-  #     - docs
-  #     - bencher
-  #   if: ${{ failure() }}
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Notify failed merge pipeline
-  #       uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-  #       with:
-  #         api-key: ${{ secrets.ZULIP_API_KEY }}
-  #         email: ${{ secrets.ZULIP_EMAIL }}
-  #         organization-url: "https://hopr.zulipchat.com"
-  #         type: "stream"
-  #         to: "HOPRd"
-  #         topic: "Core"
-  #         content: |
-  #           The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }})
+  notify_failure:
+    name: Notify in Zulip on merge pipeline failure
+    needs:
+      - cleanup_actions
+      - build_docker
+      - cache_deps
+      - load_test
+      - build_dappnode
+      - build_pluto
+      - docs
+      - bencher
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify failed merge pipeline
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Core"
+          content: |
+            The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }})
 
 
-  # notify:
-  #   name: Notify Changes
-  #   runs-on: self-hosted-hoprnet-small
-  #   steps:
-  #     - name: Harden Runner
-  #       uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
-  #       with:
-  #         disable-sudo: true
-  #         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+  notify:
+    name: Notify Changes
+    runs-on: self-hosted-hoprnet-small
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-  #       with:
-  #         persist-credentials: false
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
-  #     - name: Check for changes in specific folder
-  #       id: folder_changes
-  #       run: |
-  #         # Fetch the base branch
-  #         git fetch origin ${{ github.event.pull_request.base.ref }}
+      - name: Check for changes in specific folder
+        id: folder_changes
+        run: |
+          # Fetch the base branch
+          git fetch origin ${{ github.event.pull_request.base.ref }}
 
-  #         # Check if any file in the folder 'deploy' has changed
-  #         if git diff --name-only origin/${{ github.event.pull_request.base.ref }} ${{ github.sha }} | grep -q '^deploy/'; then
-  #           echo "folder_changed=true" >> $GITHUB_OUTPUT
-  #         else
-  #           echo "folder_changed=false" >> $GITHUB_OUTPUT
-  #         fi
+          # Check if any file in the folder 'deploy' has changed
+          if git diff --name-only origin/${{ github.event.pull_request.base.ref }} ${{ github.sha }} | grep -q '^deploy/'; then
+            echo "folder_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "folder_changed=false" >> $GITHUB_OUTPUT
+          fi
 
-  #     # Conditional step to notify if the folder has changed
-  #     - name: Notify deployment changes
-  #       if: steps.folder_changes.outputs.folder_changed == 'true'
-  #       uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-  #       with:
-  #         api-key: ${{ secrets.ZULIP_API_KEY }}
-  #         email: ${{ secrets.ZULIP_EMAIL }}
-  #         organization-url: "https://hopr.zulipchat.com"
-  #         type: "stream"
-  #         to: "GnosisVPN"
-  #         topic: "gnosisvpn-js"
-  #         content: |
-  #           The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
-  #           Review the changes manually and update the `uhttp-docker` repository accordingly.
+      # Conditional step to notify if the folder has changed
+      - name: Notify deployment changes
+        if: steps.folder_changes.outputs.folder_changed == 'true'
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "GnosisVPN"
+          topic: "gnosisvpn-js"
+          content: |
+            The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
+            Review the changes manually and update the `uhttp-docker` repository accordingly.
