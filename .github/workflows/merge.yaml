@@ -115,8 +115,6 @@ jobs:
     uses: ./.github/workflows/create-release.yaml
     # needs:
     #   - build_docker
-    with:
-      branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
 
   # new_release:
