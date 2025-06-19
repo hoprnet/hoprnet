@@ -229,7 +229,7 @@ impl Probe {
                 async move {
                     // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occuring on random tags
                     if data.application_tag == ReservedTag::Ping.into() {
-                        let message: anyhow::Result<Message> = data.try_into().context("failed to convert data into message");
+                        let message: anyhow::Result<Message> = data.try_into().map_err(|e| anyhow::anyhow!("failed to convert data into message: {e}"));
 
                         match message {
                             Ok(message) => {
