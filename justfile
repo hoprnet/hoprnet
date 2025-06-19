@@ -27,30 +27,29 @@ package-packager packager arch:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
     RELEASE_VERSION=$(./scripts/get-current-version.sh)
-    ARCH="{{arch}}"
-    export RELEASE_VERSION ARCH
-    envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
-    mkdir -p dist/packages
-    nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-${ARCH}.{{packager}}"
-
-package arch:
-    #!/usr/bin/env bash
-    set -o errexit -o nounset -o pipefail
     case "{{arch}}" in
         x86_64-linux)
-            architecture="amd64"
+            ARCHITECTURE="amd64"
             ;;
         aarch64-linux)
-            architecture="arm64"
+            ARCHITECTURE="arm64"
             ;;
         armv7l-linux)
-            architecture="armhf"
+            ARCHITECTURE="armhf"
             ;;
         *)
             echo "Unsupported architecture: {{arch}}"
             exit 1
             ;;
     esac
-    just package-packager deb ${architecture}
-    just package-packager rpm ${architecture}
-    just package-packager apk ${architecture}
+    export RELEASE_VERSION ARCHITECTURE
+    envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
+    mkdir -p dist/packages
+    nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
+
+package arch:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    just package-packager deb {{arch}}
+    just package-packager rpm {{arch}}
+    just package-packager apk {{arch}}

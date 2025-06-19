@@ -1,5 +1,5 @@
 name: hoprd
-arch: "${ARCH}"
+arch: "${ARCHITECTURE}"
 platform: linux
 version: "${RELEASE_VERSION}"
 section: default
