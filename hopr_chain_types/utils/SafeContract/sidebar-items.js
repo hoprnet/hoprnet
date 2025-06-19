@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["SafeContractCalls"],"fn":["new"],"mod":["abi"],"struct":["SafeContractInstance","execTransactionCall","execTransactionReturn","getTransactionHashCall","getTransactionHashReturn","nonceCall","nonceReturn"]};
