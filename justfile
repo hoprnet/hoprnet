@@ -29,7 +29,8 @@ package-packager packager arch:
     RELEASE_VERSION=$(./scripts/get-current-version.sh)
     ARCH="{{arch}}"
     envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
-    nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "target/hoprd-{{arch}}.{{packager}}"
+    mkdir -p dist/packages
+    nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
 
 package arch:
     #! /usr/bin/env bash

@@ -36,20 +36,17 @@ jobs:
 
       - name: Download artifacts from parent workflow run
         run: |
-          set -x
           curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ inputs.workflow_run_id }}/artifacts \
             -o artifacts.json
 
           hoprd_url=$(jq -r '.artifacts[] | select(.name == "hoprd-${{ inputs.target }}").archive_download_url' artifacts.json)
           curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hoprd_url" -o hoprd-${{ inputs.target }}.zip
-          unzip hoprd-${{ inputs.target }}.zip -d ./artifacts
+          unzip hoprd-${{ inputs.target }}.zip -d ./dist/bin
 
           hopli_url=$(jq -r '.artifacts[] | select(.name == "hopli-${{ inputs.target }}").archive_download_url' artifacts.json)
           curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hopli_url" -o hopli-${{ inputs.target }}.zip
-          unzip hopli-${{ inputs.target }}.zip -d ./artifacts
-          ls -alR ./artifacts
-
+          unzip hopli-${{ inputs.target }}.zip -d ./dist/bin
 
       - name: Install Nix
         uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
@@ -71,16 +68,16 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.deb
-          path: ${{ github.workspace }}/target/hoprd-${{ inputs.target }}.deb
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.deb
 
       - name: Upload rpm packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.rpm
-          path: ${{ github.workspace }}/target/hoprd-${{ inputs.target }}.rpm
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.rpm
 
       - name: Upload alpine packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.apk
-          path: ${{ github.workspace }}/target/hoprd-${{ inputs.target }}.apk
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.apk

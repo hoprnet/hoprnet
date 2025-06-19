@@ -24,26 +24,24 @@ mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 head_branch=${1}
 workflow_run_id=$(gh api repos/hoprnet/hoprnet/actions/workflows/build.yaml/runs | jq --arg head_branch "$head_branch" '[.workflow_runs[] | select(.head_branch == $head_branch and .conclusion == "success" and .status == "completed")] | first | .id')
 artifacts=$(gh api repos/hoprnet/hoprnet/actions/runs/${workflow_run_id}/artifacts | jq -r '.artifacts[] | "\(.name) \(.archive_download_url)"')
-rm -rf ./binaries && mkdir -p ./binaries
+rm -rf ./dist && mkdir -p ./dist/zip ./dist/bin
 while IFS= read -r line; do
   artifact_name=$(echo $line | awk '{print $1}')
   artifact_url=$(echo $line | awk '{print $2}')
-  if ! curl -L -s -f -o "binaries/${artifact_name}.zip" -H "Authorization: Bearer ${GH_TOKEN}" "${artifact_url}"; then
+  if ! curl -L -s -f -o "dist/zip/${artifact_name}.zip" -H "Authorization: Bearer ${GH_TOKEN}" "${artifact_url}"; then
     echo "Error: Failed to download binary file ${artifact_name}"
     exit 1
   else
     echo "Downloaded binary file ${artifact_name}..."
   fi
   # Extract the zip file
-  unzip -o "binaries/${artifact_name}.zip" -d "./binaries/${artifact_name}"
+  unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/bin/${artifact_name}"
 done <<<"$artifacts"
 
-# Remove zip files after extraction
-rm binaries/*.zip
 
 # Group files by platform and create a single zip file for each platform
-platforms=$(find ./binaries -type d -name '*-*' | grep -v '\..*\.' | awk -F '-' '{print $2"-"$3}' | sort -u)
+platforms=$(find ./dist/bin -type d -name '*-*' | grep -v '\..*\.' | awk -F '-' '{print $2"-"$3}' | sort -u)
 for platform in $platforms; do
   echo "Creating zip for platform: $platform"
-  zip -r "binaries/hopr-binaries-${platform}.zip" ./binaries/*-${platform}/*
+  zip -r "dist/hopr-binaries-${platform}.zip" ./dist/bin/*-${platform}/*
 done
