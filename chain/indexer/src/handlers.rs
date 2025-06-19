@@ -135,7 +135,7 @@ where
                 // safeguard against empty multiaddrs, skip
                 if address_announcement.baseMultiaddr.is_empty() {
                     warn!(
-                        address = ?address_announcement.node,
+                        address = %address_announcement.node,
                         "encountered empty multiaddress announcement",
                     );
                     return Ok(None);
@@ -163,8 +163,8 @@ where
             }
             HoprAnnouncementsEvents::KeyBinding(key_binding) => {
                 debug!(
-                    address = ?key_binding.chain_key,
-                    public_key = ?key_binding.ed25519_pub_key.0,
+                    address = %key_binding.chain_key,
+                    public_key = %key_binding.ed25519_pub_key,
                     "on_announcement_event: KeyBinding",
                 );
                 match KeyBinding::from_parts(
