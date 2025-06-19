@@ -36,9 +36,11 @@ jobs:
 
       - name: Download artifacts from parent workflow run
         run: |
+          set -x
           curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ inputs.workflow_run_id }}/artifacts \
             -o artifacts.json
+          mkdir -p ./dist/bin
 
           hoprd_url=$(jq -r '.artifacts[] | select(.name == "hoprd-${{ inputs.target }}").archive_download_url' artifacts.json)
           curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hoprd_url" -o hoprd-${{ inputs.target }}.zip
