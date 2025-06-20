@@ -247,8 +247,10 @@ impl CacheKeyMapper {
                     Ok(())
                 }
             }
-            // This should never happen.
-            (Entry::Vacant(_v_id), Entry::Occupied(v_key)) => {
+            // This only happens on re-announcements:
+            // The re-announcement uses the same packet key and chain-key, but the block number (published at)
+            // is different, and therefore the id_entry will be vacant.
+            (Entry::Vacant(_), Entry::Occupied(v_key)) => {
                 tracing::debug!(
                     "attempt to insert key {key} with key-id {id} failed because key is already set as {}",
                     v_key.get()
@@ -256,7 +258,7 @@ impl CacheKeyMapper {
                 Err(DbSqlError::LogicalError("inconsistent key-id binding".into()))
             }
             // This should never happen.
-            (Entry::Occupied(v_id), Entry::Vacant(_v_key)) => {
+            (Entry::Occupied(v_id), Entry::Vacant(_)) => {
                 tracing::debug!(
                     "attempt to insert key {key} with key-id {id} failed because key-id is already set as {}",
                     v_id.get()
