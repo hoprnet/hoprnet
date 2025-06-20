@@ -393,7 +393,8 @@ impl RoutingOptions {
         "target": {"Plain": "localhost:8080"},
         "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"],
-        "responseBuffer": "2 MB"
+        "responseBuffer": "2 MB",
+        "sessionPool": 0,
     }))]
 #[serde(rename_all = "camelCase")]
 /// Request body for creating a new client session.
@@ -430,6 +431,12 @@ pub(crate) struct SessionClientRequest {
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = String)]
     pub response_buffer: Option<bytesize::ByteSize>,
+    /// How many Sessions to pool for clients.
+    ///
+    /// If no sessions are pooled, they will be opened ad-hoc when client connects.
+    /// Has no effect for UDP sessions.
+    #[schema(value_type = String)]
+    pub session_pool: Option<usize>,
 }
 
 impl SessionClientRequest {
@@ -546,6 +553,150 @@ fn build_binding_host(requested: Option<&str>, default: std::net::SocketAddr) ->
     }
 }
 
+async fn create_tcp_client_binding(
+    bind_host: std::net::SocketAddr,
+    state: Arc<InternalState>,
+    args: SessionClientRequest,
+) -> Result<std::net::SocketAddr, (StatusCode, ApiErrorStatus)> {
+    let target_spec = args.target.clone();
+    let (dst, target, data) = args
+        .clone()
+        .into_protocol_session_config(IpProtocol::TCP)
+        .await
+        .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
+
+    // Bind the TCP socket first
+    let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AddrInUse {
+            (StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed)
+        } else {
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(format!("failed to start TCP listener on {bind_host}: {e}")),
+            )
+        }
+    })?;
+    info!(%bound_host, "TCP session listener bound");
+
+    // For each new TCP connection coming to the listener,
+    // open a Session with the same parameters
+    let hopr = state.hopr.clone();
+
+    // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
+
+    state.open_listeners.write_arc().await.insert(
+        ListenerId(hopr_network_types::types::IpProtocol::TCP, bound_host),
+        StoredSessionEntry {
+            destination: dst,
+            target: target_spec.clone(),
+            forward_path: args.forward_path.clone(),
+            return_path: args.return_path.clone(),
+            abort_handle: hopr_async_runtime::spawn_as_abortable(
+                tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
+                    .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
+                    .for_each_concurrent(None, move |accepted_client| {
+                        let data = data.clone();
+                        let target = target.clone();
+                        let hopr = hopr.clone();
+                        async move {
+                            match accepted_client {
+                                Ok((sock_addr, stream)) => {
+                                    debug!(socket = ?sock_addr, "incoming TCP connection");
+                                    let session = match hopr.connect_to(dst, target, data).await {
+                                        Ok(s) => s,
+                                        Err(error) => {
+                                            error!(%error, "failed to establish session");
+                                            return;
+                                        }
+                                    };
+
+                                    debug!(
+                                        socket = ?sock_addr,
+                                        session_id = tracing::field::debug(*session.id()),
+                                        "new session for incoming TCP connection",
+                                    );
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
+
+                                    bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await;
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
+                                }
+                                Err(e) => error!(error = %e, "failed to accept connection"),
+                            }
+                        }
+                    }),
+            ),
+        },
+    );
+    Ok(bound_host)
+}
+
+async fn create_udp_client_binding(
+    bind_host: std::net::SocketAddr,
+    state: Arc<InternalState>,
+    args: SessionClientRequest,
+) -> Result<std::net::SocketAddr, (StatusCode, ApiErrorStatus)> {
+    let target_spec = args.target.clone();
+    let (dst, target, data) = args
+        .clone()
+        .into_protocol_session_config(IpProtocol::TCP)
+        .await
+        .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
+
+    // Bind the UDP socket first
+    let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AddrInUse {
+            (StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed)
+        } else {
+            (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ApiErrorStatus::UnknownFailure(format!("failed to start UDP listener on {bind_host}: {e}")),
+            )
+        }
+    })?;
+
+    info!(%bound_host, "UDP session listener bound");
+
+    let hopr = state.hopr.clone();
+
+    // Create a single session for the UDP socket
+    let session = hopr.connect_to(dst, target, data).await.map_err(|e| {
+        (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )
+    })?;
+
+    let open_listeners_clone = state.open_listeners.clone();
+    let listener_id = ListenerId(hopr_network_types::types::IpProtocol::UDP, bound_host);
+
+    state.open_listeners.write_arc().await.insert(
+        listener_id,
+        StoredSessionEntry {
+            destination: dst,
+            target: target_spec.clone(),
+            forward_path: args.forward_path.clone(),
+            return_path: args.return_path.clone(),
+            abort_handle: hopr_async_runtime::spawn_as_abortable(async move {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
+
+                bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE).await;
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+
+                // Once the Session closes, remove it from the list
+                open_listeners_clone.write_arc().await.remove(&listener_id);
+            }),
+        },
+    );
+    Ok(bound_host)
+}
+
 /// Creates a new client session returning the given session listening host and port over TCP or UDP.
 /// If no listening port is given in the request, the socket will be bound to a random free
 /// port and returned in the response.
@@ -603,135 +754,10 @@ pub(crate) async fn create_client(
         return Err((StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed));
     }
 
-    let target_spec = args.target.clone();
-    let (dst, target, data) = args
-        .clone()
-        .into_protocol_session_config(protocol)
-        .await
-        .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
-
-    // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
-
     debug!("binding {protocol} session listening socket to {bind_host}");
     let bound_host = match protocol {
-        IpProtocol::TCP => {
-            // Bind the TCP socket first
-            let (bound_host, tcp_listener) = tcp_listen_on(bind_host).await.map_err(|e| {
-                if e.kind() == std::io::ErrorKind::AddrInUse {
-                    (StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed)
-                } else {
-                    (
-                        StatusCode::UNPROCESSABLE_ENTITY,
-                        ApiErrorStatus::UnknownFailure(format!("failed to start TCP listener on {bind_host}: {e}")),
-                    )
-                }
-            })?;
-            info!(%bound_host, "TCP session listener bound");
-
-            // For each new TCP connection coming to the listener,
-            // open a Session with the same parameters
-            let hopr = state.hopr.clone();
-
-            state.open_listeners.write_arc().await.insert(
-                ListenerId(protocol.into(), bound_host),
-                StoredSessionEntry {
-                    destination: dst,
-                    target: target_spec.clone(),
-                    forward_path: args.forward_path.clone(),
-                    return_path: args.return_path.clone(),
-                    abort_handle: hopr_async_runtime::spawn_as_abortable(
-                        tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
-                            .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
-                            .for_each_concurrent(None, move |accepted_client| {
-                                let data = data.clone();
-                                let target = target.clone();
-                                let hopr = hopr.clone();
-                                async move {
-                                    match accepted_client {
-                                        Ok((sock_addr, stream)) => {
-                                            debug!(socket = ?sock_addr, "incoming TCP connection");
-                                            let session = match hopr.connect_to(dst, target, data).await {
-                                                Ok(s) => s,
-                                                Err(error) => {
-                                                    error!(%error, "failed to establish session");
-                                                    return;
-                                                }
-                                            };
-
-                                            debug!(
-                                                socket = ?sock_addr,
-                                                session_id = tracing::field::debug(*session.id()),
-                                                "new session for incoming TCP connection",
-                                            );
-
-                                            #[cfg(all(feature = "prometheus", not(test)))]
-                                            METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
-
-                                            bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await;
-
-                                            #[cfg(all(feature = "prometheus", not(test)))]
-                                            METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
-                                        }
-                                        Err(e) => error!(error = %e, "failed to accept connection"),
-                                    }
-                                }
-                            }),
-                    ),
-                },
-            );
-            bound_host
-        }
-        IpProtocol::UDP => {
-            // Bind the UDP socket first
-            let (bound_host, udp_socket) = udp_bind_to(bind_host).await.map_err(|e| {
-                if e.kind() == std::io::ErrorKind::AddrInUse {
-                    (StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed)
-                } else {
-                    (
-                        StatusCode::UNPROCESSABLE_ENTITY,
-                        ApiErrorStatus::UnknownFailure(format!("failed to start UDP listener on {bind_host}: {e}")),
-                    )
-                }
-            })?;
-
-            info!(%bound_host, "UDP session listener bound");
-
-            let hopr = state.hopr.clone();
-
-            // Create a single session for the UDP socket
-            let session = hopr.connect_to(dst, target, data).await.map_err(|e| {
-                (
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(e.to_string()),
-                )
-            })?;
-
-            let open_listeners_clone = state.open_listeners.clone();
-            let listener_id = ListenerId(protocol.into(), bound_host);
-
-            state.open_listeners.write_arc().await.insert(
-                listener_id,
-                StoredSessionEntry {
-                    destination: dst,
-                    target: target_spec.clone(),
-                    forward_path: args.forward_path.clone(),
-                    return_path: args.return_path.clone(),
-                    abort_handle: hopr_async_runtime::spawn_as_abortable(async move {
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
-
-                        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE).await;
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
-
-                        // Once the Session closes, remove it from the list
-                        open_listeners_clone.write_arc().await.remove(&listener_id);
-                    }),
-                },
-            );
-            bound_host
-        }
+        IpProtocol::TCP => create_tcp_client_binding(bind_host, state, args.clone()).await?,
+        IpProtocol::UDP => create_udp_client_binding(bind_host, state, args.clone()).await?,
     };
 
     Ok::<_, (StatusCode, ApiErrorStatus)>(
@@ -741,8 +767,8 @@ pub(crate) async fn create_client(
                 protocol,
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
-                target: target_spec.to_string(),
-                destination: dst,
+                target: args.target.to_string(),
+                destination: args.destination,
                 forward_path: args.forward_path.clone(),
                 return_path: args.return_path.clone(),
                 mtu: SESSION_PAYLOAD_SIZE,
