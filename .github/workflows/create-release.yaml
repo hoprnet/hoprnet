@@ -5,7 +5,16 @@
 name: Create Release
 
 on:
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      base_branch:
+        description: 'The base branch for the pull request'
+        required: true
+        type: string
+      head_branch:
+        description: 'The head branch for the pull request'
+        required: true
+        type: string
 
 concurrency:
   group: create-release
@@ -26,6 +35,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          ref: ${{ inputs.head_branch }}
 
       - name: Setup GCP
         id: gcp
@@ -51,7 +61,7 @@ jobs:
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
-          ./scripts/download-workflow-binaries.sh ${{ github.event.pull_request.head.ref }}
+          ./scripts/download-workflow-binaries.sh ${{ inputs.head_branch }}
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
@@ -62,15 +72,19 @@ jobs:
           git tag v${{ steps.setup.outputs.current_version }}
           git push origin v${{ steps.setup.outputs.current_version }}
 
-          declare base_branch=${{ github.event.pull_request.base.ref }}
+          declare base_branch=${{ inputs.base_branch }}
           # Tag release name
           if [[ "${base_branch}" == "master" ]]; then
             release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}
           elif [[ "${base_branch}" =~ ^"release" ]]; then
             release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
+          else
+            echo "❌ Unsupported base branch: ${base_branch}" >&2
+            exit 1
           fi
-          git tag --force ${release_name}
-          git push --force origin ${release_name}
+          fi
+          git tag --force "${release_name}"
+          git push --force origin "${release_name}"
           echo "release_name=${release_name}" >> $GITHUB_OUTPUT
 
       - name: Generate Changelog

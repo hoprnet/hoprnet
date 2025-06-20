@@ -30,10 +30,12 @@ overrides:
       - logrotate
 
 contents:
+  # Binaries
   - src: ./dist/bin/hoprd
     dst: /usr/bin/hoprd
   - src: ./dist/bin/hopli
     dst: /usr/bin/hopli
+  # Configuration files
   - src: ./deploy/nfpm/logrotate.conf
     dst: /etc/logrotate.d/hoprd
   - src: ./deploy/nfpm/hoprd-sample.cfg.yaml
