@@ -6,16 +6,15 @@ After=network.target
 User=hoprd
 Group=hoprd
 EnvironmentFile=/etc/hoprd/hoprd.env
-ExecStartPre=/bin/bash -c 'touch /var/log/hoprd//hoprd.log && chown hoprd:hoprd /var/log/hoprd/hoprd.log'
-ExecStart=/usr/bin/hoprd --configurationFilePath /etc/hoprd/hoprd.cfg.yaml
+ExecStart=/bin/bash -c "/usr/bin/hoprd --configurationFilePath /etc/hoprd/hoprd.cfg.yaml"
 ExecStop=/bin/kill -SIGTERM $MAINPID
 Restart=always
 RestartSec=30s
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=90
-StandardOutput=file:/var/log/hoprd/hoprd.log
-StandardError=file:/var/log/hoprd/hoprd.log
+StandardOutput=append:/var/log/hoprd/hoprd.log
+StandardError=append:/var/log/hoprd/hoprd.log
 Type=simple
 
 [Install]

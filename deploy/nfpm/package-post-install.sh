@@ -220,7 +220,7 @@ create_user_group() {
     chown -R hoprd:hoprd /var/lib/hoprd /var/log/hoprd
     chown hoprd:hoprd /usr/bin/hoprd /usr/bin/hopli
     chmod 770 /etc/hoprd
-    chmod 755 /usr/bin/hoprd /usr/bin/hopli
+    chmod 755 /usr/bin/hoprd /usr/bin/hopli /var/log/hoprd
     # Add the logged-in user to the hoprd group
     if [ -n "$SUDO_USER" ]; then
       echo "Adding user '$SUDO_USER' to the hoprd group..."
