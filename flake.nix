@@ -210,9 +210,10 @@
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
 
-          hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { runTests = true; }
-          );
+          hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            runTests = true;
+            runTestsWithCoverage = true;
+          });
 
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
