@@ -125,7 +125,7 @@ Download the latest package from https://github.com/hoprnet/hoprnet/releases/lat
 
 ```bash
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -o hoprd-${arch}-linux.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.deb
+curl -s -L -o hoprd-${arch}-linux.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.deb
 dpkg -i hoprd-${arch}-linux.deb
 ```
 
@@ -133,6 +133,38 @@ Uninstall:
 
 ```bash
 dpkg --purge --force-remove-reinstreq hoprd
+```
+
+### Install via Red Hat package manager
+
+Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+
+```bash
+arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
+curl -s -L -o hoprd-${arch}-linux.rpm https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.rpm
+sudo dnf install -y ./hoprd-${arch}-linux.rpm
+```
+
+Uninstall:
+
+```bash
+dnf remove -y hoprd
+```
+
+### Install via Alpine package manager
+
+Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+
+```bash
+arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
+curl -s -L -o hoprd-${arch}-linux.apk https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.apk
+sudo apk add --allow-untrusted hoprd-${arch}-linux.apk
+```
+
+Uninstall:
+
+```bash
+apk del hoprd
 ```
 
 ## Usage
