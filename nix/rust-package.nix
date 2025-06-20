@@ -193,7 +193,8 @@ let
   };
 
   builder =
-    if runTestsWithCoverage then craneLib.cargoTest # Use cargoTest for coverage
+    if runTestsWithCoverage then
+      craneLib.cargoTest # Use cargoTest for coverage
     else if runTests then
       craneLib.cargoTest
     else if runClippy then

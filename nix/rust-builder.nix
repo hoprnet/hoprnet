@@ -14,6 +14,13 @@ let
   crossSystem0 = crossSystem;
 in
 let
+  coverageOverlay = final: prev: {
+    cargo-llvm-cov = prev.cargo-llvm-cov.overrideAttrs (old: {
+      meta.broken = false;
+      buildInputs = (old.buildInputs or []) ++ [ final.llvmPackages.libllvm ];
+    });
+  };
+
   # the foundry overlay uses the hostPlatform, so we need to use a
   # localSystem-only pkgs to get the correct architecture
   pkgsLocal = import nixpkgs {
@@ -40,6 +47,7 @@ let
     overlays = [
       rust-overlay.overlays.default
       solc.overlay
+      coverageOverlay
     ];
   };
 
@@ -58,11 +66,7 @@ let
     if hostPlatform.config == "armv7l-unknown-linux-gnueabihf" then
       "armv7-unknown-linux-gnueabihf"
     else
-      (pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile
-        ../rust-toolchain.toml).override { 
-          targets = [ cargoTarget ]; 
-          extensions = [ "llvm-tools-preview" ];
-    };
+      hostPlatform.config;
 
   rustToolchainFun =
     if useRustNightly then
@@ -71,7 +75,30 @@ let
       p:
       (p.pkgsBuildHost.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml).override {
         targets = [ cargoTarget ];
+        extensions = [ "llvm-tools-preview" "rust-src" ];
       };
+
+  # Correct profiler_builtins lookup
+  profiler_builtins = 
+    let
+      llvmPkgs = pkgs.llvmPackages;
+    in
+    if llvmPkgs ? profiler_builtins then
+      llvmPkgs.profiler_builtins
+    else if llvmPkgs ? compiler-rt then
+      llvmPkgs.compiler-rt
+    else
+      pkgs.stdenv.mkDerivation {
+        name = "dummy-profiler";
+        installPhase = "mkdir -p $out/lib && touch $out/lib/libprofiler.a";
+      };
+
+  # Coverage environment
+  coverageEnv = {
+    NIX_LDFLAGS = "-L${profiler_builtins}/lib";
+    RUSTFLAGS = "-Cinstrument-coverage -Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code";
+    RUSTC_BOOTSTRAP = "1";
+  };
 
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchainFun;
 
@@ -117,12 +144,16 @@ in
     # Override the derivation to add cross-compilation environment variables.
     crate.overrideAttrs (
       previous:
-      buildEnv
+      buildEnv // coverageEnv
       // {
+        # Add profiler_builtins to build inputs if doing coverage
+        buildInputs = (previous.buildInputs or []) ++ [
+          profiler_builtins
+        ];
         # We also have to override the `cargoArtifacts` derivation with the same changes.
         cargoArtifacts =
           if previous.cargoArtifacts != null then
-            previous.cargoArtifacts.overrideAttrs (previous: buildEnv)
+            previous.cargoArtifacts.overrideAttrs (previous: buildEnv // coverageEnv)
           else
             null;
       }
