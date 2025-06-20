@@ -74,10 +74,7 @@ add_host_address_env_var() {
 # Function to add the HOPRD_PASSWORD environment variable
 add_hoprd_password_var() {
   if [ -z "${HOPRD_PASSWORD}" ]; then
-    read -r -p "Enter HOPRD_PASSWORD (default: random 32 hex characters): " HOPRD_PASSWORD
-    if [ -z "$HOPRD_PASSWORD" ]; then
-      HOPRD_PASSWORD=$(openssl rand -hex 32)
-    fi
+    HOPRD_PASSWORD=$(openssl rand -hex 32)
   fi
   append_env_data "# HOPRD_PASSWORD is the password used to access the HOPR node identity file"
   append_env_data "HOPRD_PASSWORD=${HOPRD_PASSWORD}\n"
@@ -86,10 +83,7 @@ add_hoprd_password_var() {
 # Function to add the HOPRD_API_TOKEN environment variable
 add_api_token_var() {
   if [ -z "${HOPRD_API_TOKEN}" ]; then
-    read -r -p "Enter HOPRD_API_TOKEN (default: random 32 hex characters): " HOPRD_API_TOKEN
-    if [ -z "$HOPRD_API_TOKEN" ]; then
-      HOPRD_API_TOKEN=$(openssl rand -hex 32)
-    fi
+    HOPRD_API_TOKEN=$(openssl rand -hex 32)
   fi
   append_env_data "# HOPRD_API_TOKEN is the token use to access the HOPR rest API"
   append_env_data "HOPRD_API_TOKEN=${HOPRD_API_TOKEN}\n"

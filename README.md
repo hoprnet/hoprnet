@@ -158,6 +158,11 @@ Download the latest package from https://github.com/hoprnet/hoprnet/releases/lat
 ```bash
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
 curl -s -L -o hoprd-${arch}-linux.apk https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.apk
+# You can the Safe address and the Module addres from https://hub.hoprnet.org
+export HOPRD_SAFE_ADDRESS=
+export HOPRD_MODULE_ADDRESS=
+# Choose your own local RPC provider or any from http://chainlist.org/chain/100
+export HOPRD_PROVIDER=
 sudo apk add --allow-untrusted hoprd-${arch}-linux.apk
 ```
 
