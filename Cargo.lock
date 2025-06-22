@@ -5345,7 +5345,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5455,7 +5455,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.0.0"
+version = "4.1.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -5467,6 +5467,7 @@ dependencies = [
  "either",
  "futures",
  "futures-concurrency",
+ "futures-time",
  "hopr-async-runtime",
  "hopr-crypto-types",
  "hopr-db-api",

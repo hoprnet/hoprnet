@@ -1,4 +1,4 @@
-use std::{fmt::Formatter, future::Future, net::IpAddr, str::FromStr, sync::Arc};
+use std::{collections::VecDeque, fmt::Formatter, future::Future, net::IpAddr, str::FromStr, sync::Arc};
 
 use axum::{
     Error,
@@ -14,8 +14,8 @@ use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionTarget,
-    SurbBalancerConfig, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
+    SessionTarget, SurbBalancerConfig, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
@@ -37,6 +37,9 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
+
+/// Maximum number of pooled-up Sessions.
+pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -553,6 +556,89 @@ fn build_binding_host(requested: Option<&str>, default: std::net::SocketAddr) ->
     }
 }
 
+struct SessionPool {
+    pool: Option<Arc<std::sync::Mutex<VecDeque<HoprSession>>>>,
+    ah: Option<AbortHandle>,
+}
+
+impl SessionPool {
+    async fn new(
+        size: usize,
+        dst: Address,
+        target: SessionTarget,
+        cfg: SessionClientConfig,
+        hopr: Arc<Hopr>,
+    ) -> Result<Self, (StatusCode, ApiErrorStatus)> {
+        let mut pool = VecDeque::with_capacity(size);
+        for i in 0..size {
+            match hopr.connect_to(dst, target.clone(), cfg.clone()).await {
+                Ok(s) => {
+                    debug!(session_id = %s.id(), num_session = i, "created a new session in pool");
+                    pool.push_back(s)
+                }
+                Err(error) => {
+                    error!(%error, num_session = i, "failed to establish session for pool");
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        ApiErrorStatus::UnknownFailure(format!(
+                            "failed to establish session #{i} in pool to {dst}: {error}"
+                        )),
+                    ));
+                }
+            }
+        }
+
+        // Spawn a task that periodically sends keep alive messages to the Session in the pool.
+        if !pool.is_empty() {
+            let pool = Arc::new(std::sync::Mutex::new(pool));
+            let pool_clone_1 = pool.clone();
+            let pool_clone_2 = pool.clone();
+            Ok(Self {
+                pool: Some(pool),
+                ah: Some(hopr_async_runtime::spawn_as_abortable(
+                    futures_time::stream::interval(futures_time::time::Duration::from(
+                        std::time::Duration::from_secs(1).max(hopr.config().session.idle_timeout / 2)
+                    ))
+                    .flat_map(move |_| {
+                        // Get all SessionIds of the remaining Sessions in the pool
+                        let ids = pool_clone_1.lock().ok().map(|v| v.iter().map(|s| *s.id()).collect::<Vec<_>>());
+                        futures::stream::iter(ids.into_iter().flatten())
+                    })
+                    .for_each(move |id| {
+                        let hopr = hopr.clone();
+                        let pool_clone_2 = pool_clone_2.clone();
+                        async move {
+                            // Make sure the Session is still alive, otherwise remove it from the pool
+                            if let Err(error) = hopr.keep_alive_session(&id).await {
+                                error!(%error, %dst, session_id = %id, "session in pool is not alive, removing from pool");
+                                if let Ok(mut pool) = pool_clone_2.lock() {
+                                    pool.retain(|s| *s.id() != id);
+                                }
+                            }
+                        }
+                    })
+                ))
+            })
+        } else {
+            Ok(Self { pool: None, ah: None })
+        }
+    }
+
+    fn pop(&self) -> Option<HoprSession> {
+        self.pool
+            .clone()
+            .and_then(|pool| pool.lock().ok().and_then(|mut v| v.pop_front()))
+    }
+}
+
+impl Drop for SessionPool {
+    fn drop(&mut self) {
+        if let Some(ah) = self.ah.take() {
+            ah.abort();
+        }
+    }
+}
+
 async fn create_tcp_client_binding(
     bind_host: std::net::SocketAddr,
     state: Arc<InternalState>,
@@ -583,22 +669,14 @@ async fn create_tcp_client_binding(
     let hopr = state.hopr.clone();
 
     // Create a session pool if requested
-    let mut session_pool = Vec::with_capacity(args.session_pool.unwrap_or(0));
-    for i in 0..args.session_pool.unwrap_or(0) {
-        match hopr.connect_to(dst, target.clone(), data.clone()).await {
-            Ok(s) => {
-                debug!(session_id = %s.id(), num_session = i, "created a new session in pool");
-                session_pool.push(s)
-            },
-            Err(error) => {
-                error!(%error, num_session = i, "failed to establish session for pool");
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    ApiErrorStatus::UnknownFailure(format!("failed to establish session #{i} in pool to {dst}: {error}")),
-                ))
-            }
-        }
-    }
+    let session_pool = SessionPool::new(
+        args.session_pool.unwrap_or(0).min(MAX_SESSION_POOL_SIZE),
+        dst,
+        target.clone(),
+        data.clone(),
+        hopr.clone(),
+    )
+    .await?;
 
     state.open_listeners.write_arc().await.insert(
         ListenerId(hopr_network_types::types::IpProtocol::TCP, bound_host),
@@ -614,19 +692,20 @@ async fn create_tcp_client_binding(
                         let data = data.clone();
                         let target = target.clone();
                         let hopr = hopr.clone();
-                        let maybe_pooled_session = session_pool.pop();
+
+                        // Try to pop from the pool only if a client was accepted
+                        let maybe_pooled_session = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
                                     debug!(socket = ?sock_addr, "incoming TCP connection");
                                     let session = match maybe_pooled_session {
                                         Some(s) => {
-                                            // TODO: make sure the session is still alive
                                             debug!(session_id = %s.id(), "using pooled session");
                                             s
-                                        },
+                                        }
                                         None => {
-                                            debug!("no more sessions in pool, creating a new one");
+                                            debug!("no more active sessions in pool, creating a new one");
                                             match hopr.connect_to(dst, target, data).await {
                                                 Ok(s) => s,
                                                 Err(error) => {
