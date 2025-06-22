@@ -582,7 +582,23 @@ async fn create_tcp_client_binding(
     // open a Session with the same parameters
     let hopr = state.hopr.clone();
 
-    // TODO: consider pooling the sessions on a listener, so that the negotiation is amortized
+    // Create a session pool if requested
+    let mut session_pool = Vec::with_capacity(args.session_pool.unwrap_or(0));
+    for i in 0..args.session_pool.unwrap_or(0) {
+        match hopr.connect_to(dst, target.clone(), data.clone()).await {
+            Ok(s) => {
+                debug!(session_id = %s.id(), num_session = i, "created a new session in pool");
+                session_pool.push(s)
+            },
+            Err(error) => {
+                error!(%error, num_session = i, "failed to establish session for pool");
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    ApiErrorStatus::UnknownFailure(format!("failed to establish session #{i} in pool to {dst}: {error}")),
+                ))
+            }
+        }
+    }
 
     state.open_listeners.write_arc().await.insert(
         ListenerId(hopr_network_types::types::IpProtocol::TCP, bound_host),
@@ -598,15 +614,26 @@ async fn create_tcp_client_binding(
                         let data = data.clone();
                         let target = target.clone();
                         let hopr = hopr.clone();
+                        let maybe_pooled_session = session_pool.pop();
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
                                     debug!(socket = ?sock_addr, "incoming TCP connection");
-                                    let session = match hopr.connect_to(dst, target, data).await {
-                                        Ok(s) => s,
-                                        Err(error) => {
-                                            error!(%error, "failed to establish session");
-                                            return;
+                                    let session = match maybe_pooled_session {
+                                        Some(s) => {
+                                            // TODO: make sure the session is still alive
+                                            debug!(session_id = %s.id(), "using pooled session");
+                                            s
+                                        },
+                                        None => {
+                                            debug!("no more sessions in pool, creating a new one");
+                                            match hopr.connect_to(dst, target, data).await {
+                                                Ok(s) => s,
+                                                Err(error) => {
+                                                    error!(%error, "failed to establish session");
+                                                    return;
+                                                }
+                                            }
                                         }
                                     };
 
