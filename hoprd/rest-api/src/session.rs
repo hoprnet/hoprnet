@@ -438,7 +438,6 @@ pub(crate) struct SessionClientRequest {
     ///
     /// If no sessions are pooled, they will be opened ad-hoc when client connects.
     /// Has no effect for UDP sessions.
-    #[schema(value_type = String)]
     pub session_pool: Option<usize>,
 }
 
