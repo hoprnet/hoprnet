@@ -707,7 +707,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 .get()
                 .ok_or(SessionManagerError::NotStarted)?
                 .send_message(
-                    StartProtocol::KeepAlive(*id).try_into()?,
+                    StartProtocol::KeepAlive((*id).into()).try_into()?,
                     session_data.routing_opts.clone(),
                 )
                 .await?)
