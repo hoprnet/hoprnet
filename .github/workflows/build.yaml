@@ -74,8 +74,42 @@ jobs:
       target: ${{ matrix.target.name }}
     secrets: inherit
 
+  validate-pr-title:
+    name: PR / Validate title
+    runs-on: self-hosted-hoprnet-small
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Configure which types are allowed (newline-delimited).
+          types: |
+            fix
+            feat
+            build
+            chore
+            docs
+            style
+            refactor
+            perf
+            test
+          # These are regex patterns auto-wrapped in `^ $`.
+          scopes: |
+            ci
+            deps
+            hoprd
+            hopr-lib
+            tests
+            sdk
+          requireScope: false
+          ignoreLabels: |
+            bot
+            ignore-semantic-pull-request
+
   label:
-    name: Add PR labels
+    name: PR / Add labels
     runs-on: self-hosted-hoprnet-small
     permissions:
       contents: read
