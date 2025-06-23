@@ -436,8 +436,8 @@ pub(crate) struct SessionClientRequest {
     pub response_buffer: Option<bytesize::ByteSize>,
     /// How many Sessions to pool for clients.
     ///
-    /// If no sessions are pooled, they will be opened ad-hoc when client connects.
-    /// Has no effect for UDP sessions.
+    /// If no sessions are pooled, they will be opened ad-hoc when a client connects.
+    /// Has no effect on UDP sessions.
     pub session_pool: Option<usize>,
 }
 
@@ -568,28 +568,46 @@ impl SessionPool {
         cfg: SessionClientConfig,
         hopr: Arc<Hopr>,
     ) -> Result<Self, (StatusCode, ApiErrorStatus)> {
-        let mut pool = VecDeque::with_capacity(size);
-        for i in 0..size {
-            match hopr.connect_to(dst, target.clone(), cfg.clone()).await {
-                Ok(s) => {
-                    debug!(session_id = %s.id(), num_session = i, "created a new session in pool");
-                    pool.push_back(s)
+        let pool = Arc::new(std::sync::Mutex::new(VecDeque::with_capacity(size)));
+        let hopr_clone = hopr.clone();
+        let pool_clone = pool.clone();
+        futures::stream::iter(0..size)
+            .map(Ok)
+            .try_for_each_concurrent(Some(MAX_SESSION_POOL_SIZE), move |i| {
+                let pool = pool_clone.clone();
+                let hopr = hopr_clone.clone();
+                let target = target.clone();
+                let cfg = cfg.clone();
+                async move {
+                    match hopr.connect_to(dst, target.clone(), cfg.clone()).await {
+                        Ok(s) => {
+                            debug!(session_id = %s.id(), num_session = i, "created a new session in pool");
+                            pool.lock()
+                                .map_err(|_| {
+                                    (
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        ApiErrorStatus::UnknownFailure("lock failed".into()),
+                                    )
+                                })?
+                                .push_back(s);
+                            Ok(())
+                        }
+                        Err(error) => {
+                            error!(%error, num_session = i, "failed to establish session for pool");
+                            Err((
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                ApiErrorStatus::UnknownFailure(format!(
+                                    "failed to establish session #{i} in pool to {dst}: {error}"
+                                )),
+                            ))
+                        }
+                    }
                 }
-                Err(error) => {
-                    error!(%error, num_session = i, "failed to establish session for pool");
-                    return Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        ApiErrorStatus::UnknownFailure(format!(
-                            "failed to establish session #{i} in pool to {dst}: {error}"
-                        )),
-                    ));
-                }
-            }
-        }
+            })
+            .await?;
 
         // Spawn a task that periodically sends keep alive messages to the Session in the pool.
-        if !pool.is_empty() {
-            let pool = Arc::new(std::sync::Mutex::new(pool));
+        if !pool.lock().map(|p| p.is_empty()).unwrap_or(true) {
             let pool_clone_1 = pool.clone();
             let pool_clone_2 = pool.clone();
             Ok(Self {
