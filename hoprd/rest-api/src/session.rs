@@ -771,7 +771,7 @@ async fn create_udp_client_binding(
     let target_spec = args.target.clone();
     let (dst, target, data) = args
         .clone()
-        .into_protocol_session_config(IpProtocol::TCP)
+        .into_protocol_session_config(IpProtocol::UDP)
         .await
         .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
 
