@@ -316,7 +316,7 @@ where
                                     return Some(PeerDiscovery::Ban(peer_id))
                                 }
                             }
-                            PeerDiscovery::Announce(peer, multiaddresses, allowed) => {
+                            PeerDiscovery::Announce(peer, multiaddresses) => {
                                 debug!(peer = %peer, ?multiaddresses, "Processing peer discovery event: Announce");
                                 if peer != me {
                                     // decapsulate the `p2p/<peer_id>` to remove duplicities
@@ -326,12 +326,28 @@ where
                                         .filter(|v| !v.is_empty())
                                         .collect::<Vec<_>>();
 
-                                    if ! mas.is_empty() && allowed {
-                                        if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
-                                        {
-                                            error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
-                                        } else {
-                                            return Some(PeerDiscovery::Announce(peer, mas, allowed))
+                                    if ! mas.is_empty() {
+                                        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
+                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk)).await {
+                                                let key: Result<Address, _> = key.try_into();
+
+                                                if let Ok(key) = key {
+                                                    if db
+                                                        .is_allowed_in_network_registry(None, &key)
+                                                        .await
+                                                        .unwrap_or(false)
+                                                    {
+                                                        if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
+                                                        {
+                                                            error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
+                                                        } else {
+                                                            return Some(PeerDiscovery::Announce(peer, mas))
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                error!(%peer, "Failed to announce peer due to convertibility error");
+                                            }
                                         }
                                     }
                                 }
@@ -352,12 +368,12 @@ where
                 addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Allow(peer))
+                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone(), true))
+                    .send(PeerDiscovery::Allow(peer))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
             }

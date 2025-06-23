@@ -32,9 +32,10 @@ use std::{
 use async_lock::RwLock;
 use errors::{HoprLibError, HoprStatusError};
 use futures::{
-    Stream, StreamExt,
+    SinkExt, Stream, StreamExt,
     channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
     future::AbortHandle,
+    stream::{self},
 };
 use hopr_async_runtime::prelude::{sleep, spawn};
 pub use hopr_chain_actions::errors::ChainActionsError;
@@ -223,6 +224,8 @@ where
         let indexer_action_tracker = indexer_action_tracker.clone();
 
         async move {
+            let mut result = Vec::new();
+
             let resolved = indexer_action_tracker.match_and_resolve(&event).await;
             if resolved.is_empty() {
                 trace!(%event, "No indexer expectations resolved for the event");
@@ -236,7 +239,14 @@ where
                         .is_allowed_in_network_registry(None, &address)
                         .await
                         .unwrap_or(false);
-                    Some(PeerDiscovery::Announce(peer, multiaddresses, allowed))
+
+                    result.push(PeerDiscovery::Announce(peer, multiaddresses));
+
+                    if allowed {
+                        result.push(PeerDiscovery::Allow(peer));
+                    }
+
+                    Some(result)
                 }
                 ChainEventType::ChannelOpened(channel) |
                 ChainEventType::ChannelClosureInitiated(channel) |
@@ -295,7 +305,7 @@ where
                                         hopr_chain_types::chain_events::NetworkRegistryStatus::Denied => PeerDiscovery::Ban(peer_id),
                                     };
 
-                                    Some(res)
+                                    Some(vec![res])
                                 } else {
                                     error!("Failed to unwrap as offchain key at this point");
                                     None
@@ -316,7 +326,9 @@ where
                 }
             }
         }
-    }))
+    })
+    .flat_map(stream::iter)
+)
 }
 
 /// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
@@ -673,7 +685,7 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
-        let (indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
+        let (mut indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
 
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),
