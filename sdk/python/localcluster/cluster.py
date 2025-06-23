@@ -84,6 +84,14 @@ class Cluster:
             else:
                 raise RuntimeError(f"Node {node} did not return addresses")
 
+        # remove nodes to network registry
+        self.remove_nodes_to_network_registry()
+        await asyncio.sleep(2.5)
+
+        # add nodes to network registry
+        self.add_nodes_to_network_registry()
+        await asyncio.sleep(2.5)
+
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
         peer_connection_timeout = 2 * GLOBAL_TIMEOUT
         logging.info(f"Waiting up to {peer_connection_timeout}s for nodes to connect to all peers")
@@ -118,6 +126,38 @@ class Cluster:
                 "--contracts-root",
                 "./ethereum/contracts",
                 "--enable",
+                "--provider-url",
+                f"http://127.0.0.1:{self.base_port}",
+            ],
+            env=os.environ | custom_env,
+            check=True,
+            capture_output=True,
+            cwd=PWD,
+        )
+
+    def remove_nodes_to_network_registry(self):
+        addresses = ",".join(node.address for node in self.nodes.values())
+        logging.info(f"Removing nodes {addresses} from the network registry")
+
+        private_key = utils.load_private_key(self.anvil_config)
+
+        custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "MANAGER_PRIVATE_KEY": private_key,
+            "PATH": os.environ["PATH"],
+        }
+        run(
+            [
+                "hopli",
+                "network-registry",
+                "manager-deregister",
+                "--network",
+                NETWORK,
+                "--contracts-root",
+                "./ethereum/contracts",
+                "--node-address",
+                addresses,
                 "--provider-url",
                 f"http://127.0.0.1:{self.base_port}",
             ],
