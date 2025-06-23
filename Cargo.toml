@@ -45,7 +45,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.9", default-features = false, features = [
+alloy = { version = "=1.0.12", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -122,7 +122,7 @@ mockito = "1.7.0"
 moka = { version = "0.12.10", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
-num_enum = "0.7.3"
+num_enum = "0.7.4"
 opentelemetry = { version = "0.30.0" }
 opentelemetry-otlp = { version = "0.30.0", default-features = false }
 opentelemetry_sdk = { version = "0.30.0" }
@@ -163,7 +163,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_bytes = "0.11.17"
 serde_json = "1.0.140"
 serde_repr = "0.1.20"
-serde_with = { version = "3.12.0", features = ["base64"] }
+serde_with = { version = "3.13.0", features = ["base64"] }
 serde_yaml = { version = "0.9.34+deprecated" }
 serial_test = "3.2.0"
 sha3 = "0.10.8"
