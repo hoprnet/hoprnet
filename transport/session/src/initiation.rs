@@ -87,7 +87,22 @@ pub enum StartProtocol<T> {
     /// Counterparty has closed the session.
     CloseSession(T),
     /// A ping message to keep the session alive.
-    KeepAlive(T),
+    KeepAlive(KeepAliveMessage<T>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KeepAliveMessage<T> {
+    /// Session ID.
+    pub id: T,
+    /// Reserved for future use, always zero currently.
+    pub flags: u8,
+}
+
+impl<T> From<T> for KeepAliveMessage<T> {
+    fn from(value: T) -> Self {
+        Self { id: value, flags: 0 }
+    }
 }
 
 impl<T> StartProtocol<T> {
@@ -122,8 +137,8 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             StartProtocol::CloseSession(id) => {
                 bincode::serde::encode_into_std_write(&id, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
             }
-            StartProtocol::KeepAlive(id) => {
-                bincode::serde::encode_into_std_write(&id, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
+            StartProtocol::KeepAlive(msg) => {
+                bincode::serde::encode_into_std_write(&msg, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
             }
         }?;
 
@@ -331,7 +346,7 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn start_protocol_keep_alive_message_should_encode_and_decode() -> anyhow::Result<()> {
-        let msg_1 = StartProtocol::<i32>::KeepAlive(10);
+        let msg_1 = StartProtocol::<i32>::KeepAlive(10.into());
 
         let (tag, msg) = msg_1.clone().encode()?;
         let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
@@ -389,7 +404,7 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()).into());
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "KeepAlive must fit within {}",
@@ -401,7 +416,7 @@ mod tests {
 
     #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()).into());
         let len = msg.encode()?.1.len();
         assert!(
             HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,

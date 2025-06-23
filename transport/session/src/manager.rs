@@ -432,7 +432,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         sender: Arc<CountingSendMsg<S>>,
         routing: DestinationRouting,
     ) -> (KeepAliveController, AbortHandle) {
-        let elem = StartProtocol::KeepAlive(session_id);
+        let elem = StartProtocol::KeepAlive(session_id.into());
 
         // The stream is suspended until the caller sets a rate via the Controller
         let (ka_stream, controller) = futures::stream::repeat(elem).rate_limit_per_unit(0, Duration::from_secs(1));
@@ -924,7 +924,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     _ => {}
                 }
             }
-            StartProtocol::KeepAlive(session_id) => {
+            StartProtocol::KeepAlive(msg) => {
+                let session_id = msg.id;
                 if self.sessions.get(&session_id).await.is_some() {
                     trace!(?session_id, "received keep-alive request");
                 } else {
