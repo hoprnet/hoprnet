@@ -129,7 +129,7 @@ pub enum ProtocolProcesses {
 pub enum PeerDiscovery {
     Allow(PeerId),
     Ban(PeerId),
-    Announce(PeerId, Vec<Multiaddr>, bool),
+    Announce(PeerId, Vec<Multiaddr>),
 }
 
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
