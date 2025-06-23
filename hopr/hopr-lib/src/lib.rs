@@ -685,12 +685,46 @@ impl Hopr {
         )
         .await;
 
-        // terminated once all senders are dropped and no items in the receiver remain
-        let indexer_peer_update_tx_2 = indexer_peer_update_tx.clone();
+        {
+            // This has to happen before the indexing process starts in order to make sure that the pre-existing data is
+            // properly populated into the transport mechanism before the synced data in the follow up process.
+            info!("Syncing peer announcements and network registry updates from previous runs");
+            let accounts = self.db.get_accounts(None, true).await?;
+            for account in accounts.into_iter() {
+                match account.entry_type {
+                    AccountType::NotAnnounced => {}
+                    AccountType::Announced { multiaddr, .. } => {
+                        indexer_peer_update_tx
+                            .send(PeerDiscovery::Announce(account.public_key.into(), vec![multiaddr]))
+                            .await
+                            .map_err(|e| {
+                                HoprLibError::GeneralError(format!("Failed to send peer discovery announcement: {e}"))
+                            })?;
+
+                        let allow_status = if self
+                            .db
+                            .is_allowed_in_network_registry(None, &account.chain_addr)
+                            .await?
+                        {
+                            PeerDiscovery::Allow(account.public_key.into())
+                        } else {
+                            PeerDiscovery::Ban(account.public_key.into())
+                        };
+
+                        indexer_peer_update_tx.send(allow_status).await.map_err(|e| {
+                            HoprLibError::GeneralError(format!(
+                                "Failed to send peer discovery network registry event: {e}"
+                            ))
+                        })?;
+                    }
+                }
+            }
+        }
+
         spawn(async move {
             indexer_event_pipeline
                 .map(Ok)
-                .forward(indexer_peer_update_tx_2)
+                .forward(indexer_peer_update_tx)
                 .await
                 .expect("The index to transport event chain failed");
         });
@@ -823,38 +857,6 @@ impl Hopr {
                         cg.update_channel(channel);
                     }
                     Err(error) => error!(%error, "Failed to sync channel into the graph"),
-                }
-            }
-
-            info!("Syncing peer announcements and network registry updates from previous runs");
-            let accounts = self.db.get_accounts(None, true).await?;
-            for account in accounts.into_iter() {
-                match account.entry_type {
-                    AccountType::NotAnnounced => {}
-                    AccountType::Announced { multiaddr, .. } => {
-                        indexer_peer_update_tx
-                            .send(PeerDiscovery::Announce(account.public_key.into(), vec![multiaddr]))
-                            .await
-                            .map_err(|e| {
-                                HoprLibError::GeneralError(format!("Failed to send peer discovery announcement: {e}"))
-                            })?;
-
-                        let allow_status = if self
-                            .db
-                            .is_allowed_in_network_registry(None, &account.chain_addr)
-                            .await?
-                        {
-                            PeerDiscovery::Allow(account.public_key.into())
-                        } else {
-                            PeerDiscovery::Ban(account.public_key.into())
-                        };
-
-                        indexer_peer_update_tx.send(allow_status).await.map_err(|e| {
-                            HoprLibError::GeneralError(format!(
-                                "Failed to send peer discovery network registry event: {e}"
-                            ))
-                        })?;
-                    }
                 }
             }
 
