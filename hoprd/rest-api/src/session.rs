@@ -38,9 +38,6 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
-/// Maximum number of pooled-up Sessions.
-pub const MAX_SESSION_POOL_SIZE: usize = 5;
-
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
@@ -437,7 +434,9 @@ pub(crate) struct SessionClientRequest {
     /// How many Sessions to pool for clients.
     ///
     /// If no sessions are pooled, they will be opened ad-hoc when a client connects.
-    /// Has no effect on UDP sessions.
+    /// It has no effect on UDP sessions in the current implementation.
+    ///
+    /// Currently, the maximum value is 5.
     pub session_pool: Option<usize>,
 }
 
@@ -561,6 +560,8 @@ struct SessionPool {
 }
 
 impl SessionPool {
+    pub const MAX_SESSION_POOL_SIZE: usize = 5;
+
     async fn new(
         size: usize,
         dst: Address,
@@ -571,9 +572,9 @@ impl SessionPool {
         let pool = Arc::new(std::sync::Mutex::new(VecDeque::with_capacity(size)));
         let hopr_clone = hopr.clone();
         let pool_clone = pool.clone();
-        futures::stream::iter(0..size)
+        futures::stream::iter(0..size.min(Self::MAX_SESSION_POOL_SIZE))
             .map(Ok)
-            .try_for_each_concurrent(Some(MAX_SESSION_POOL_SIZE), move |i| {
+            .try_for_each_concurrent(Self::MAX_SESSION_POOL_SIZE, move |i| {
                 let pool = pool_clone.clone();
                 let hopr = hopr_clone.clone();
                 let target = target.clone();
@@ -610,25 +611,30 @@ impl SessionPool {
         if !pool.lock().map(|p| p.is_empty()).unwrap_or(true) {
             let pool_clone_1 = pool.clone();
             let pool_clone_2 = pool.clone();
+            let pool_clone_3 = pool.clone();
             Ok(Self {
                 pool: Some(pool),
                 ah: Some(hopr_async_runtime::spawn_as_abortable(
                     futures_time::stream::interval(futures_time::time::Duration::from(
                         std::time::Duration::from_secs(1).max(hopr.config().session.idle_timeout / 2)
                     ))
+                    .take_while(move |_| {
+                        // Continue the infinite interval stream until there are sessions in the pool
+                        futures::future::ready(pool_clone_1.lock().ok().map_or(false, |p| !p.is_empty()))
+                    })
                     .flat_map(move |_| {
                         // Get all SessionIds of the remaining Sessions in the pool
-                        let ids = pool_clone_1.lock().ok().map(|v| v.iter().map(|s| *s.id()).collect::<Vec<_>>());
+                        let ids = pool_clone_2.lock().ok().map(|v| v.iter().map(|s| *s.id()).collect::<Vec<_>>());
                         futures::stream::iter(ids.into_iter().flatten())
                     })
                     .for_each(move |id| {
                         let hopr = hopr.clone();
-                        let pool_clone_2 = pool_clone_2.clone();
+                        let pool = pool_clone_3.clone();
                         async move {
                             // Make sure the Session is still alive, otherwise remove it from the pool
                             if let Err(error) = hopr.keep_alive_session(&id).await {
                                 error!(%error, %dst, session_id = %id, "session in pool is not alive, removing from pool");
-                                if let Ok(mut pool) = pool_clone_2.lock() {
+                                if let Ok(mut pool) = pool.lock() {
                                     pool.retain(|s| *s.id() != id);
                                 }
                             }
@@ -641,7 +647,7 @@ impl SessionPool {
         }
     }
 
-    fn pop(&self) -> Option<HoprSession> {
+    fn pop(&mut self) -> Option<HoprSession> {
         self.pool
             .clone()
             .and_then(|pool| pool.lock().ok().and_then(|mut v| v.pop_front()))
@@ -686,8 +692,8 @@ async fn create_tcp_client_binding(
     let hopr = state.hopr.clone();
 
     // Create a session pool if requested
-    let session_pool = SessionPool::new(
-        args.session_pool.unwrap_or(0).min(MAX_SESSION_POOL_SIZE),
+    let mut session_pool = SessionPool::new(
+        args.session_pool.unwrap_or(0),
         dst,
         target.clone(),
         data.clone(),
