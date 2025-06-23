@@ -620,7 +620,7 @@ impl SessionPool {
                     ))
                     .take_while(move |_| {
                         // Continue the infinite interval stream until there are sessions in the pool
-                        futures::future::ready(pool_clone_1.lock().ok().map_or(false, |p| !p.is_empty()))
+                        futures::future::ready(pool_clone_1.lock().is_ok_and(|p| !p.is_empty()))
                     })
                     .flat_map(move |_| {
                         // Get all SessionIds of the remaining Sessions in the pool
