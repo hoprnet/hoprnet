@@ -240,7 +240,7 @@ impl HoprDbAccountOperations for HoprDb {
                     .await
                     {
                         // Proceed if succeeded or already exists
-                        Ok(_) | Err(DbErr::RecordNotInserted) => {
+                        res @ Ok(_) | res @ Err(DbErr::RecordNotInserted) => {
                             myself
                                 .caches
                                 .chain_to_offchain
@@ -252,7 +252,13 @@ impl HoprDbAccountOperations for HoprDb {
                                 .insert(account.public_key, Some(account.chain_addr))
                                 .await;
 
-                            myself.caches.key_id_mapper.update_key_id_binding(&account)?;
+                            // Update key-id binding only if the account was inserted successfully
+                            // (= not re-announced)
+                            if res.is_ok() {
+                                if let Err(error) = myself.caches.key_id_mapper.update_key_id_binding(&account) {
+                                    tracing::warn!(?account, %error, "keybinding not updated")
+                                }
+                            }
 
                             if let AccountType::Announced {
                                 multiaddr,
