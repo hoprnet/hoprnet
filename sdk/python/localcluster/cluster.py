@@ -84,14 +84,6 @@ class Cluster:
             else:
                 raise RuntimeError(f"Node {node} did not return addresses")
 
-        # remove nodes to network registry
-        self.remove_nodes_to_network_registry()
-        await asyncio.sleep(2.5)
-
-        # add nodes to network registry
-        self.add_nodes_to_network_registry()
-        await asyncio.sleep(2.5)
-
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
         peer_connection_timeout = 2 * GLOBAL_TIMEOUT
         logging.info(f"Waiting up to {peer_connection_timeout}s for nodes to connect to all peers")

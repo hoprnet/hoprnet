@@ -316,7 +316,7 @@ where
                                     return Some(PeerDiscovery::Ban(peer_id))
                                 }
                             }
-                            PeerDiscovery::Announce(peer, multiaddresses) => {
+                            PeerDiscovery::Announce(peer, multiaddresses, allowed) => {
                                 debug!(peer = %peer, ?multiaddresses, "Processing peer discovery event: Announce");
                                 if peer != me {
                                     // decapsulate the `p2p/<peer_id>` to remove duplicities
@@ -341,7 +341,7 @@ where
                                                         {
                                                             error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
                                                         } else {
-                                                            return Some(PeerDiscovery::Announce(peer, mas))
+                                                            return Some(PeerDiscovery::Announce(peer, mas, true))
                                                         }
                                                     }
                                                 }
@@ -373,7 +373,7 @@ where
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
+                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone(), true))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
             }

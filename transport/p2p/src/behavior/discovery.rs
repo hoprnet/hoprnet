@@ -199,9 +199,14 @@ impl NetworkBehaviour for Behaviour {
                         tracing::debug!(%peer, "Requesting disconnect due to ban");
                     }
                 }
-                PeerDiscovery::Announce(peer, multiaddresses) => {
+                PeerDiscovery::Announce(peer, multiaddresses, allowed) => {
                     if peer != self.me {
                         tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");
+
+                        if allowed && !self.allowed_peers.contains(&peer) {
+                            tracing::debug!(%peer, "Peer not allowed, adding it to allowed_peers");
+                            self.allowed_peers.insert(peer);
+                        }
 
                         for multiaddress in &multiaddresses {
                             self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {

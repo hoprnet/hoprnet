@@ -231,8 +231,12 @@ where
             }
 
             match event.event_type {
-                ChainEventType::Announcement{peer, multiaddresses, ..} => {
-                    Some(PeerDiscovery::Announce(peer, multiaddresses))
+                ChainEventType::Announcement{peer, address, multiaddresses} => {
+                    let allowed = db
+                        .is_allowed_in_network_registry(None, &address)
+                        .await
+                        .unwrap_or(false);
+                    Some(PeerDiscovery::Announce(peer, multiaddresses, allowed))
                 }
                 ChainEventType::ChannelOpened(channel) |
                 ChainEventType::ChannelClosureInitiated(channel) |
