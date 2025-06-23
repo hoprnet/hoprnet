@@ -326,14 +326,12 @@ where
                                         .filter(|v| !v.is_empty())
                                         .collect::<Vec<_>>();
 
-                                    if ! mas.is_empty() {
-                                        if allowed {
-                                            if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
-                                            {
-                                                error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
-                                            } else {
-                                                return Some(PeerDiscovery::Announce(peer, mas, allowed))
-                                            }
+                                    if ! mas.is_empty() && allowed {
+                                        if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
+                                        {
+                                            error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
+                                        } else {
+                                            return Some(PeerDiscovery::Announce(peer, mas, allowed))
                                         }
                                     }
                                 }
