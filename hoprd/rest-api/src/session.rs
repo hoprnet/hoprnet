@@ -648,9 +648,7 @@ impl SessionPool {
     }
 
     fn pop(&mut self) -> Option<HoprSession> {
-        self.pool
-            .as_ref()
-            .and_then(|pool| pool.lock().ok()?.pop_front())
+        self.pool.as_ref().and_then(|pool| pool.lock().ok()?.pop_front())
     }
 }
 
