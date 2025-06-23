@@ -127,38 +127,6 @@ class Cluster:
             cwd=PWD,
         )
 
-    def remove_nodes_to_network_registry(self):
-        addresses = ",".join(node.address for node in self.nodes.values())
-        logging.info(f"Removing nodes {addresses} from the network registry")
-
-        private_key = utils.load_private_key(self.anvil_config)
-
-        custom_env = {
-            "ETHERSCAN_API_KEY": "anykey",
-            "IDENTITY_PASSWORD": PASSWORD,
-            "MANAGER_PRIVATE_KEY": private_key,
-            "PATH": os.environ["PATH"],
-        }
-        run(
-            [
-                "hopli",
-                "network-registry",
-                "manager-deregister",
-                "--network",
-                NETWORK,
-                "--contracts-root",
-                "./ethereum/contracts",
-                "--node-address",
-                addresses,
-                "--provider-url",
-                f"http://127.0.0.1:{self.base_port}",
-            ],
-            env=os.environ | custom_env,
-            check=True,
-            capture_output=True,
-            cwd=PWD,
-        )
-
     def add_nodes_to_network_registry(self):
         safe_addresses = ",".join(node.safe_address for node in self.nodes.values())
         addresses = ",".join(node.address for node in self.nodes.values())
