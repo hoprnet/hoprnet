@@ -327,26 +327,12 @@ where
                                         .collect::<Vec<_>>();
 
                                     if ! mas.is_empty() {
-                                        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
-                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk)).await {
-                                                let key: Result<Address, _> = key.try_into();
-
-                                                if let Ok(key) = key {
-                                                    if db
-                                                        .is_allowed_in_network_registry(None, &key)
-                                                        .await
-                                                        .unwrap_or(false)
-                                                    {
-                                                        if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
-                                                        {
-                                                            error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
-                                                        } else {
-                                                            return Some(PeerDiscovery::Announce(peer, mas, true))
-                                                        }
-                                                    }
-                                                }
+                                        if allowed {
+                                            if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
+                                            {
+                                                error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
                                             } else {
-                                                error!(%peer, "Failed to announce peer due to convertibility error");
+                                                return Some(PeerDiscovery::Announce(peer, mas, allowed))
                                             }
                                         }
                                     }
