@@ -14,7 +14,7 @@ use libp2p::{
         dummy::ConnectionHandler,
     },
 };
-use tracing::debug;
+use tracing::{debug, trace};
 
 #[derive(Debug)]
 pub enum DiscoveryInput {
@@ -71,10 +71,10 @@ impl NetworkBehaviour for Behaviour {
         remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         if self.allowed_peers.contains(&peer) {
-            debug!(%peer, "Discovery::handle_established_inbound_connection contains");
+            trace!(%peer, "Discovery::handle_established_inbound_connection in allowed_peers");
             Ok(Self::ConnectionHandler {})
         } else {
-            debug!(%peer, "Discovery::handle_established_inbound_connection contains");
+            trace!(%peer, "Discovery::handle_established_inbound_connection NOT in allowed_peers");
             Err(libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(
                 format!("Connection from '{peer}' is not allowed"),
             )))
@@ -97,7 +97,7 @@ impl NetworkBehaviour for Behaviour {
     ) -> Result<Vec<Multiaddr>, ConnectionDenied> {
         if let Some(peer) = maybe_peer {
             if self.allowed_peers.contains(&peer) {
-                debug!(%peer, "Discovery::handle_pending_outbound_connection contains");
+                trace!(%peer, "Discovery::handle_pending_outbound_connection in allowed_peers");
                 // inject the multiaddress of the peer for possible dial usage by stream protocols
                 return Ok(self.all_peers.get(&peer).map_or_else(
                     || {
@@ -107,7 +107,7 @@ impl NetworkBehaviour for Behaviour {
                     |addresses| addresses.clone(),
                 ));
             } else {
-                debug!(%peer, "Discovery::handle_pending_outbound_connection NOT contains");
+                trace!(%peer, "Discovery::handle_pending_outbound_connection NOT in allowed_peers");
                 return Err(libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(
                     format!("Connection to '{peer}' is not allowed"),
                 )));
