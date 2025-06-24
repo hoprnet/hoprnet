@@ -240,8 +240,9 @@ impl HoprSwarm {
                         connection_id,
                         error,
                         send_back_addr,
+                        peer_id
                     } => {
-                        error!(%local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error");
+                        error!(?peer_id, %local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error");
 
                         print_network_info(swarm.network_info(), "incoming connection error");
                     }
