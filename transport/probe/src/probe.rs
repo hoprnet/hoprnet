@@ -113,6 +113,7 @@ impl Probe {
         Up: futures::Sink<(HoprPseudonym, ApplicationData)> + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
+        let interval_between_rounds = self.cfg.interval;
 
         // For each probe target a cached version of transport routing is stored
         let cache_peer_routing: moka::future::Cache<PeerId, ResolvedTransportRouting> = moka::future::Cache::builder()
@@ -170,7 +171,10 @@ impl Probe {
 
         processes.insert(
             HoprProbeProcess::Emit,
-            hopr_async_runtime::spawn_as_abortable(direct_neighbors
+            hopr_async_runtime::spawn_as_abortable(async move {
+                hopr_async_runtime::prelude::sleep(2 * interval_between_rounds).await;   // delay to allow network to stabilize
+
+                direct_neighbors
                 .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                     let db = db.clone();
                     let cache_peer_routing = cache_peer_routing.clone();
@@ -213,6 +217,7 @@ impl Probe {
                         };
                     }
                 })
+            }
             )
         );
 
