@@ -78,6 +78,15 @@ pub struct OutgoingPacket {
     pub data: Box<[u8]>,
 }
 
+impl std::fmt::Debug for OutgoingPacket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OutgoingPacket")
+            .field("next_hop", &self.next_hop)
+            .field("ack_challenge", &self.ack_challenge)
+            .finish()
+    }
+}
+
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum ResolvedAcknowledgement {
     Sending(Acknowledgement),
