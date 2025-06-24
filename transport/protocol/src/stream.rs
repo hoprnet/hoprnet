@@ -39,7 +39,12 @@ where
     let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(10_000);
     let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(10_000);
 
-    let cache_out = moka::future::Cache::new(2000);
+    let cache_out = moka::future::Cache::builder()
+        .max_capacity(2000)
+        .eviction_listener(|key: Arc<PeerId>, _value, cause| {
+            tracing::trace!(?key, ?cause, "Evicting stream for peer");
+        })
+        .build();
 
     let incoming = control
         .clone()
@@ -163,7 +168,7 @@ where
             match cached {
                 Ok(mut cached) => {
                     if let Err(error) = cached.send(msg).await {
-                        tracing::error!(peer = %peer, %error, "Error sending message to peer");
+                        tracing::error!(%peer, %error, "Error sending message to peer");
                         cache.invalidate(&peer).await;
                     }
                 }
