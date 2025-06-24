@@ -471,6 +471,7 @@ mod tests {
     async fn probe_should_record_value_for_manual_neighbor_probe() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(5),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
@@ -510,6 +511,7 @@ mod tests {
     async fn probe_should_record_failure_on_manual_fail() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(5),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
@@ -548,6 +550,7 @@ mod tests {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(20),
             max_parallel_probes: NEIGHBOURS.len(),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
@@ -600,6 +603,7 @@ mod tests {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(10),
             max_parallel_probes: NEIGHBOURS.len(),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
@@ -653,6 +657,7 @@ mod tests {
     async fn probe_should_pass_through_non_associated_tags() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(20),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
