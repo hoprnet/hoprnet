@@ -224,8 +224,6 @@ where
         let indexer_action_tracker = indexer_action_tracker.clone();
 
         async move {
-            let mut result = Vec::new();
-
             let resolved = indexer_action_tracker.match_and_resolve(&event).await;
             if resolved.is_empty() {
                 trace!(%event, "No indexer expectations resolved for the event");
@@ -240,13 +238,11 @@ where
                         .await
                         .unwrap_or(false);
 
-                    result.push(PeerDiscovery::Announce(peer, multiaddresses));
-
-                    if allowed {
-                        result.push(PeerDiscovery::Allow(peer));
-                    }
-
-                    Some(result)
+                    Some(vec![PeerDiscovery::Announce(peer, multiaddresses), if allowed {
+                        PeerDiscovery::Allow(peer)
+                    } else {
+                        PeerDiscovery::Ban(peer)
+                    }])
                 }
                 ChainEventType::ChannelOpened(channel) |
                 ChainEventType::ChannelClosureInitiated(channel) |
@@ -314,8 +310,8 @@ where
                                 None
                             }
                         }
-                        Err(e) => {
-                            error!(error = %e, "on_network_registry_node_allowed failed");
+                        Err(error) => {
+                            error!(%error, "on_network_registry_node_allowed failed");
                             None
                         },
                     }
