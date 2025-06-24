@@ -37,6 +37,7 @@ pub type StatelessSocket<const C: usize> = SessionSocket<C, Stateless<C>>;
 /// Represents a socket with reliable delivery.
 pub type ReliableSocket<const C: usize> = SessionSocket<C, AcknowledgementState<C>>;
 
+/// Computes the Session Socket MTU, given the MTU `C` of the underlying socket.
 pub const fn session_socket_mtu<const C: usize>() -> usize {
     C - SessionMessage::<C>::SEGMENT_OVERHEAD
 }

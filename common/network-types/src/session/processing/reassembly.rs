@@ -47,7 +47,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
 impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, M> {
     type Item = Result<Frame, SessionError>;
 
-    #[instrument(name = "Reassembler::poll_next", level = "trace", skip(self, cx))]
+    #[instrument(name = "Reassembler::poll_next", level = "trace", skip(self, cx), ret)]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         loop {
@@ -190,7 +190,7 @@ mod tests {
     use rand::{SeedableRng, prelude::SliceRandom, rngs::StdRng};
 
     use super::*;
-    use crate::session::processing::segment;
+    use crate::session::utils::test::segment;
 
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 

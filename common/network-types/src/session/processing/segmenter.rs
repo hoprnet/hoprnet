@@ -114,7 +114,7 @@ impl<const C: usize, S> futures::io::AsyncWrite for Segmenter<C, S>
 where
     S: futures::sink::Sink<Segment, Error = SessionError>,
 {
-    #[instrument(name = "Segmenter::poll_write", level = "trace", skip(self, cx, buf), fields(len = buf.len()))]
+    #[instrument(name = "Segmenter::poll_write", level = "trace", skip(self, cx, buf), fields(len = buf.len()), ret)]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         tracing::trace!("polling write");
         if self.closed {
@@ -167,7 +167,7 @@ where
         Poll::Ready(Ok(new_len_in_buffer))
     }
 
-    #[instrument(name = "Segmenter::poll_flush", level = "trace", skip(self, cx))]
+    #[instrument(name = "Segmenter::poll_flush", level = "trace", skip(self, cx), ret)]
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         tracing::trace!("flush");
 
@@ -189,7 +189,7 @@ where
         self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other)
     }
 
-    #[instrument(name = "Segmenter::poll_close", level = "trace", skip(self, cx))]
+    #[instrument(name = "Segmenter::poll_close", level = "trace", skip(self, cx), ret)]
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         tracing::trace!("close");
 
@@ -235,7 +235,7 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
-    use crate::session::processing::segment;
+    use crate::session::utils::test::segment;
 
     const MTU: usize = 1000;
     const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;

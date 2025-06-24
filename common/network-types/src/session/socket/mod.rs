@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, pin_mut};
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future};
 use futures_concurrency::stream::Merge;
 use state::SocketState;
 use tracing::{Instrument, instrument};
@@ -277,36 +277,27 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
 impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncRead for SessionSocket<C, S> {
     #[instrument(name = "SessionSocket::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        let inner = &mut self.downstream_frames_out;
-        pin_mut!(inner);
-        inner.poll_read(cx, buf)
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+        self.project().downstream_frames_out.as_mut().poll_read(cx, buf)
     }
 }
 
 impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncWrite for SessionSocket<C, S> {
     #[instrument(name = "SessionSocket::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        let inner = &mut self.upstream_frames_in;
-        pin_mut!(inner);
-        inner.poll_write(cx, buf)
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        self.project().upstream_frames_in.as_mut().poll_write(cx, buf)
     }
 
     #[instrument(name = "SessionSocket::poll_flush", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let inner = &mut self.upstream_frames_in;
-        pin_mut!(inner);
-        inner.poll_flush(cx)
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        self.project().upstream_frames_in.as_mut().poll_flush(cx)
     }
 
     #[instrument(name = "SessionSocket::poll_close", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
         let _ = this.state.stop();
-
-        let inner = this.upstream_frames_in;
-        pin_mut!(inner);
-        inner.poll_close(cx)
+        this.upstream_frames_in.as_mut().poll_close(cx)
     }
 }
 

@@ -104,7 +104,6 @@ where
                     return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
                 }
             } else if *this.is_closed {
-                tracing::trace!("closed");
                 return Poll::Ready(None);
             }
         }

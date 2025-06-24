@@ -562,7 +562,7 @@ mod tests {
     use super::*;
     use crate::session::{
         frames::{FrameBuilder, FrameDashMap, FrameMap},
-        processing::segment,
+        utils::test::segment,
     };
 
     const FRAME_SIZE: usize = 1500;

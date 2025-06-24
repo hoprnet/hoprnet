@@ -21,6 +21,44 @@ use crate::utils::DuplexIO;
 // Using static RNG seed to make tests reproducible between different runs
 // const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
+/// Helper function to segment `data` into segments of a given ` max_segment_size ` length.
+/// All segments are tagged with the same `frame_id`.
+pub fn segment<T: AsRef<[u8]>>(
+    data: T,
+    max_segment_size: usize,
+    frame_id: u32,
+) -> crate::session::errors::Result<Vec<crate::session::frames::Segment>> {
+    use crate::session::frames::SeqNum;
+
+    if frame_id == 0 {
+        return Err(crate::session::errors::SessionError::InvalidFrameId);
+    }
+
+    if max_segment_size == 0 {
+        return Err(crate::session::errors::SessionError::InvalidSegmentSize);
+    }
+
+    let data = data.as_ref();
+
+    let num_chunks = data.len().div_ceil(max_segment_size);
+    if num_chunks > SeqNum::MAX as usize {
+        return Err(crate::session::errors::SessionError::DataTooLong);
+    }
+
+    let chunks = data.chunks(max_segment_size);
+
+    let seq_len = chunks.len() as SeqNum;
+    Ok(chunks
+        .enumerate()
+        .map(|(idx, data)| crate::session::frames::Segment {
+            frame_id,
+            seq_len,
+            seq_idx: idx as u8,
+            data: data.into(),
+        })
+        .collect())
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FaultyNetworkConfig {
     pub fault_prob: f64,

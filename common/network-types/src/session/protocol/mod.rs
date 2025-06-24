@@ -167,8 +167,8 @@ mod tests {
     use super::*;
     use crate::session::{
         frames::{FrameId, SegmentId},
-        processing::segment,
     };
+    use crate::session::utils::test::segment;
 
     #[test]
     fn ensure_session_protocol_version_1_values() {

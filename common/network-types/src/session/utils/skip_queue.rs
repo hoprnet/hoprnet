@@ -108,9 +108,9 @@ impl<T> SkipDelayQueue<T> {
 pub struct SkipDelayReceiver<T>(Arc<std::sync::Mutex<SkipDelayQueue<T>>>);
 
 impl<T> Drop for SkipDelayReceiver<T> {
+    #[instrument(name = "SkipDelayReceiver::drop", level = "trace", skip(self))]
     fn drop(&mut self) {
         // When the receiver is dropped, clear the poison and mark the queue as closed.
-        tracing::trace!("SkipDelayQueueSender::drop");
         self.0.clear_poison();
         let mut queue = self.0.lock().expect("cannot panic because poison is cleared");
         queue.is_closed = true;
@@ -162,7 +162,6 @@ impl<T: Ord> futures::Stream for SkipDelayReceiver<T> {
             Poll::Pending
         } else {
             // We're done
-            tracing::trace!("done");
             Poll::Ready(None)
         }
     }
@@ -207,7 +206,12 @@ impl<T> SkipDelaySender<T> {
 }
 
 impl<T: Ord> SkipDelaySender<T> {
-    #[instrument(name = "SkipDelaySender::send_internal", level = "trace", skip(self, items, flush))]
+    #[instrument(
+        name = "SkipDelaySender::send_internal",
+        level = "trace",
+        skip(self, items, flush),
+        ret
+    )]
     fn send_internal<I: Iterator<Item = DelayedItem<T>>>(&self, items: I, flush: bool) -> Result<(), std::io::Error> {
         if let Some(queue) = self.0.as_ref() {
             let mut queue = queue.lock().map_err(|_| std::io::ErrorKind::BrokenPipe)?;
@@ -283,7 +287,7 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelaySender<T> {
         self.send_internal(std::iter::once(item), false)
     }
 
-    #[instrument(name = "SkipDelaySender::poll_flush", level = "trace", skip(self))]
+    #[instrument(name = "SkipDelaySender::poll_flush", level = "trace", skip(self), ret)]
     fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if let Some(queue) = self.0.as_ref() {
             let Ok(mut queue) = queue.lock() else {
