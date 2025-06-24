@@ -35,6 +35,7 @@ use futures::{
     SinkExt, Stream, StreamExt,
     channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
     future::AbortHandle,
+    stream::{self},
 };
 use hopr_async_runtime::prelude::{sleep, spawn};
 pub use hopr_chain_actions::errors::ChainActionsError;
@@ -231,8 +232,17 @@ where
             }
 
             match event.event_type {
-                ChainEventType::Announcement{peer, multiaddresses, ..} => {
-                    Some(PeerDiscovery::Announce(peer, multiaddresses))
+                ChainEventType::Announcement{peer, address, multiaddresses} => {
+                    let allowed = db
+                        .is_allowed_in_network_registry(None, &address)
+                        .await
+                        .unwrap_or(false);
+
+                    Some(vec![PeerDiscovery::Announce(peer, multiaddresses), if allowed {
+                        PeerDiscovery::Allow(peer)
+                    } else {
+                        PeerDiscovery::Ban(peer)
+                    }])
                 }
                 ChainEventType::ChannelOpened(channel) |
                 ChainEventType::ChannelClosureInitiated(channel) |
@@ -291,7 +301,7 @@ where
                                         hopr_chain_types::chain_events::NetworkRegistryStatus::Denied => PeerDiscovery::Ban(peer_id),
                                     };
 
-                                    Some(res)
+                                    Some(vec![res])
                                 } else {
                                     error!("Failed to unwrap as offchain key at this point");
                                     None
@@ -300,8 +310,8 @@ where
                                 None
                             }
                         }
-                        Err(e) => {
-                            error!(error = %e, "on_network_registry_node_allowed failed");
+                        Err(error) => {
+                            error!(%error, "on_network_registry_node_allowed failed");
                             None
                         },
                     }
@@ -312,7 +322,9 @@ where
                 }
             }
         }
-    }))
+    })
+    .flat_map(stream::iter)
+)
 }
 
 /// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
