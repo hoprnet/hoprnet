@@ -51,6 +51,7 @@ where
 {
     #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
     async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
+        tracing::trace!("sending message");
         let message: ApplicationData = message
             .try_into()
             .map_err(|e: anyhow::Error| ProbeError::SendError(e.to_string()))?;
@@ -241,6 +242,7 @@ impl Probe {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
                                         match db.find_surb(SurbMatcher::Pseudonym(pseudonym)).await.map(|(sender_id, surb)| ResolvedTransportRouting::Return(sender_id, surb)) {
                                             Ok(path) => {
+                                                tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
                                                 let message = Message::Probe(NeighborProbe::Pong(ping));
                                                 let _ = push_to_network.send_message(path, message).await;
                                             },
