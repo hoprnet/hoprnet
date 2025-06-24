@@ -185,6 +185,8 @@ hopr:
     max_parallel_probes: 50
     # The time interval for which to consider peer reprobing in seconds
     recheck_threshold: 60
+    # The delay between individual probing rounds for neighbor discovery
+    interval: 5
   # Defines how the quality of nodes in the HOPR network
   # is evaluated and criteria for nodes to be considered of good/bad quality.
   # This is closely related to the heartbeat mechanism.

@@ -23,7 +23,7 @@ pub struct ProbeConfig {
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_probing_interval")]
     #[default(default_probing_interval())]
-    pub(crate) interval: std::time::Duration,
+    pub interval: std::time::Duration,
 
     /// The time threshold after which it is reasonable to recheck the nearest neighbor
     #[serde_as(as = "DurationSeconds<u64>")]
