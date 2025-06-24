@@ -68,7 +68,17 @@ class TicketPrice(JsonResponse):
 
 @APIobject
 class TicketProbability(JsonResponse):
-    value: Decimal = APIfield("probability")
+    _value: Decimal = APIfield("probability")
+
+    @property
+    def value(self) -> Decimal:
+        return self._value.quantize(Decimal("1e-8"))
+
+    @value.setter
+    def value(self, value: Decimal):
+        if not isinstance(value, Decimal):
+            raise TypeError("Value must be a Decimal instance")
+        self._value = value
 
 
 @APIobject

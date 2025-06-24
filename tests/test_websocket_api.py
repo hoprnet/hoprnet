@@ -36,7 +36,7 @@ class TestWebsocketWithSwarm:
             except websocket.WebSocketBadStatusException as e:
                 assert "401 Unauthorized" in str(e)
             else:
-                pytest.fail("Should fail with 401 Unauthorized") # ty: ignore[call-non-callable]
+                pytest.fail("Should fail with 401 Unauthorized")  # ty: ignore[call-non-callable]
 
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
     def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_token(
@@ -53,7 +53,7 @@ class TestWebsocketWithSwarm:
             except websocket.WebSocketBadStatusException as e:
                 assert "401 Unauthorized" in str(e)
             else:
-                pytest.fail("Should fail with 401 Unauthorized") # ty: ignore[call-non-callable]
+                pytest.fail("Should fail with 401 Unauthorized")  # ty: ignore[call-non-callable]
 
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
     def test_hoprd_websocket_api_should_not_accept_a_connection_with_an_invalid_token_passed_as_query_param(
@@ -70,7 +70,7 @@ class TestWebsocketWithSwarm:
             except websocket.WebSocketBadStatusException as e:
                 assert "401 Unauthorized" in str(e)
             else:
-                pytest.fail("Should fail with 401 Unauthorized") # ty: ignore[call-non-callable]
+                pytest.fail("Should fail with 401 Unauthorized")  # ty: ignore[call-non-callable]
 
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
     def test_hoprd_websocket_api_should_reject_a_connection_with_an_invalid_bearer_token(
@@ -87,7 +87,7 @@ class TestWebsocketWithSwarm:
             except websocket.WebSocketBadStatusException as e:
                 assert "401 Unauthorized" in str(e)
             else:
-                pytest.fail("Should fail with 401 Unauthorized") # ty: ignore[call-non-callable]
+                pytest.fail("Should fail with 401 Unauthorized")  # ty: ignore[call-non-callable]
 
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
     def test_hoprd_websocket_api_should_accept_a_connection_with_a_valid_token(
@@ -152,7 +152,7 @@ class TestWebsocketWithSwarm:
         except websocket.WebSocketBadStatusException as e:
             assert "404 Not Found" in str(e)
         else:
-            pytest.fail("Should fail with 404 Not Found") # ty: ignore[call-non-callable]
+            pytest.fail("Should fail with 404 Not Found")  # ty: ignore[call-non-callable]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
