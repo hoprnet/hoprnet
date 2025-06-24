@@ -105,6 +105,7 @@ where
                     tracing::error!(peer = %peer_id, %error, "Error sending message to peer from the cached connection");
                     cache.invalidate(&peer_id).await;
                 } else {
+                    tracing::trace!(peer_id = %peer_id, "Message sent over an existing transport stream");
                     return;
                 }
             }
