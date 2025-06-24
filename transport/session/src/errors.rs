@@ -55,6 +55,8 @@ pub enum SessionManagerError {
     AlreadyStarted,
     #[error("all challenge slots are occupied")]
     NoChallengeSlots,
+    #[error("session with the given id does not exist")]
+    NonExistingSession,
     #[error("loopback sessions are not allowed")]
     Loopback,
     #[error("non-specific session manager error: {0}")]

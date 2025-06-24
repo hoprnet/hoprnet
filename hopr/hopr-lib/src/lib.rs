@@ -572,6 +572,10 @@ impl Hopr {
         self.chain_cfg.clone()
     }
 
+    pub fn config(&self) -> &config::HoprLibConfig {
+        &self.cfg
+    }
+
     pub fn get_provider(&self) -> String {
         self.cfg
             .chain
@@ -1111,6 +1115,14 @@ impl Hopr {
         .retry(backoff)
         .sleep(Sleeper)
         .await?)
+    }
+
+    /// Sends keep-alive to the given [`HoprSessionId`], making sure the session is not
+    /// closed due to inactivity.
+    #[cfg(feature = "session-client")]
+    pub async fn keep_alive_session(&self, id: &HoprSessionId) -> errors::Result<()> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        Ok(self.transport_api.probe_session(id).await?)
     }
 
     /// Send a message to another peer in the network

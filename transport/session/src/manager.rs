@@ -697,6 +697,25 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         }
     }
 
+    /// Sends a keep-alive packet with the given [`SessionId`].
+    ///
+    /// This currently "fires & forgets" and does not expect nor await any "pong" response.
+    pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
+        if let Some(session_data) = self.sessions.get(id).await {
+            Ok(self
+                .msg_sender
+                .get()
+                .ok_or(SessionManagerError::NotStarted)?
+                .send_message(
+                    StartProtocol::KeepAlive((*id).into()).try_into()?,
+                    session_data.routing_opts.clone(),
+                )
+                .await?)
+        } else {
+            Err(SessionManagerError::NonExistingSession.into())
+        }
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
