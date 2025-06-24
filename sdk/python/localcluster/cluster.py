@@ -16,7 +16,7 @@ from .constants import (
 )
 from .node import Node
 
-GLOBAL_TIMEOUT = 100
+GLOBAL_TIMEOUT = 200
 
 
 class Cluster:
@@ -98,6 +98,70 @@ class Cluster:
         except asyncio.TimeoutError:
             raise RuntimeError("Not all nodes are connected to all peers, interrupting setup")
 
+    def enable_network_registry(self):
+        logging.info("Enabling network registry")
+        private_key = utils.load_private_key(self.anvil_config)
+
+        custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "MANAGER_PRIVATE_KEY": private_key,
+            "PATH": os.environ["PATH"],
+        }
+        run(
+            [
+                "hopli",
+                "network-registry",
+                "toggle",
+                "--network",
+                NETWORK,
+                "--contracts-root",
+                "./ethereum/contracts",
+                "--enable",
+                "--provider-url",
+                f"http://127.0.0.1:{self.base_port}",
+            ],
+            env=os.environ | custom_env,
+            check=True,
+            capture_output=True,
+            cwd=PWD,
+        )
+
+    def add_nodes_to_network_registry(self):
+        safe_addresses = ",".join(node.safe_address for node in self.nodes.values())
+        addresses = ",".join(node.address for node in self.nodes.values())
+        logging.info(f"Adding nodes {addresses} and safes {safe_addresses} to the network registry")
+
+        private_key = utils.load_private_key(self.anvil_config)
+
+        custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "MANAGER_PRIVATE_KEY": private_key,
+            "PATH": os.environ["PATH"],
+        }
+        run(
+            [
+                "hopli",
+                "network-registry",
+                "manager-register",
+                "--network",
+                NETWORK,
+                "--contracts-root",
+                "./ethereum/contracts",
+                "--node-address",
+                addresses,
+                "--safe-address",
+                safe_addresses,
+                "--provider-url",
+                f"http://127.0.0.1:{self.base_port}",
+            ],
+            env=os.environ | custom_env,
+            check=True,
+            capture_output=True,
+            cwd=PWD,
+        )
+
     def fund_nodes(self):
         logging.info("Funding nodes")
 
@@ -162,6 +226,10 @@ class Cluster:
     def load_addresses(self):
         for node in self.nodes.values():
             node.load_addresses()
+
+    def load_native_addresses(self):
+        for node in self.nodes.values():
+            node.load_native_address()
 
     def get_safe_and_module_addresses(self):
         for node in self.node.values():

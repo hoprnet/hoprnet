@@ -6,7 +6,7 @@ use alloy::primitives::{B256, U256};
 use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
-use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, sleep, spawn};
+use hopr_async_runtime::{AbortHandle, prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
     action_queue::{ActionQueue, ActionQueueConfig},
@@ -72,8 +72,8 @@ struct ChainNode {
     offchain_key: OffchainKeypair,
     db: HoprDb,
     actions: ChainActions<HoprDb>,
-    _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
-    node_tasks: Vec<JoinHandle<()>>,
+    _indexer: Indexer<TestRpc, ContractEventHandlers<TestRpc, HoprDb>, HoprDb>,
+    node_tasks: Vec<AbortHandle>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -108,11 +108,23 @@ async fn start_node_chain_logic(
 
     let http_requestor_in = DefaultHttpRequestor::new();
     let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_in.clone(), &chain_env.anvil);
-    let rpc_ops_in = RpcOperations::new(json_rpc_client, http_requestor_in.clone(), chain_key, rpc_cfg.clone())?;
+    let rpc_ops_in = RpcOperations::new(
+        json_rpc_client,
+        http_requestor_in.clone(),
+        chain_key,
+        rpc_cfg.clone(),
+        None,
+    )?;
 
     let http_requestor_out = DefaultHttpRequestor::new();
     let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_out.clone(), &chain_env.anvil);
-    let rpc_ops_out = RpcOperations::new(json_rpc_client, http_requestor_out.clone(), chain_key, rpc_cfg.clone())?;
+    let rpc_ops_out = RpcOperations::new(
+        json_rpc_client,
+        http_requestor_out.clone(),
+        chain_key,
+        rpc_cfg.clone(),
+        None,
+    )?;
 
     // Transaction executor
     let eth_client = RpcEthereumClient::new(rpc_ops_out, RpcEthereumClientConfig::default());
@@ -128,13 +140,13 @@ async fn start_node_chain_logic(
 
     let mut node_tasks = Vec::new();
 
-    node_tasks.push(spawn(async move {
+    node_tasks.push(spawn_as_abortable(async move {
         action_queue.start().await;
     }));
 
     // Action state tracking
     let (sce_tx, sce_rx) = async_channel::unbounded();
-    node_tasks.push(spawn(async move {
+    node_tasks.push(spawn_as_abortable(async move {
         let rx = sce_rx.clone();
         pin_mut!(rx);
 
@@ -150,6 +162,7 @@ async fn start_node_chain_logic(
         safe_cfg.safe_address,
         chain_key.clone(),
         db.clone(),
+        rpc_ops_in.clone(),
     );
 
     let indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);
@@ -804,8 +817,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         "alice and bob must be at the same checksum"
     );
 
-    futures::future::join_all(alice_node.node_tasks.into_iter().map(cancel_join_handle)).await;
-    futures::future::join_all(bob_node.node_tasks.into_iter().map(cancel_join_handle)).await;
+    futures::future::join_all(alice_node.node_tasks.into_iter().map(|ah| async move { ah.abort() })).await;
+    futures::future::join_all(bob_node.node_tasks.into_iter().map(|ah| async move { ah.abort() })).await;
 
     Ok(())
 }

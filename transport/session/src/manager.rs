@@ -375,7 +375,7 @@ where
         &self,
         msg_sender: S,
         new_session_notifier: UnboundedSender<IncomingSession>,
-    ) -> crate::errors::Result<Vec<hopr_async_runtime::prelude::JoinHandle<()>>> {
+    ) -> crate::errors::Result<Vec<hopr_async_runtime::AbortHandle>> {
         self.msg_sender
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -386,8 +386,9 @@ where
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let myself = self.clone();
-        let jh_closure_notifications =
-            hopr_async_runtime::prelude::spawn(session_close_rx.for_each_concurrent(None, move |closed_session_id| {
+        let ah_closure_notifications = hopr_async_runtime::spawn_as_abortable(session_close_rx.for_each_concurrent(
+            None,
+            move |closed_session_id| {
                 let myself = myself.clone();
                 async move {
                     trace!(
@@ -407,14 +408,15 @@ where
                         _ => {}
                     }
                 }
-            }));
+            },
+        ));
 
         // This is necessary to evict expired entries from the caches if
         // no session-related operations happen at all.
         // This ensures the dangling expired sessions are properly closed
         // and their closure is timely notified to the other party.
         let myself = self.clone();
-        let jh_session_expiration = hopr_async_runtime::prelude::spawn(async move {
+        let ah_session_expiration = hopr_async_runtime::spawn_as_abortable(async move {
             let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
             let timeout = 2 * initiation_timeout_max_one_way(
                 myself.cfg.initiation_timeout_base,
@@ -435,7 +437,7 @@ where
                 .await;
         });
 
-        Ok(vec![jh_closure_notifications, jh_session_expiration])
+        Ok(vec![ah_closure_notifications, ah_session_expiration])
     }
 
     /// Check if [`start`](SessionManager::start) has been called and the instance is running.
@@ -678,6 +680,25 @@ where
         }
     }
 
+    /// Sends a keep-alive packet with the given [`SessionId`].
+    ///
+    /// This currently "fires & forgets" and does not expect nor await any "pong" response.
+    pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
+        if let Some(session_data) = self.sessions.get(id).await {
+            Ok(self
+                .msg_sender
+                .get()
+                .ok_or(SessionManagerError::NotStarted)?
+                .send_message(
+                    StartProtocol::KeepAlive((*id).into()).try_into()?,
+                    session_data.routing_opts.clone(),
+                )
+                .await?)
+        } else {
+            Err(SessionManagerError::NonExistingSession.into())
+        }
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -896,7 +917,8 @@ where
                     _ => {}
                 }
             }
-            StartProtocol::KeepAlive(session_id) => {
+            StartProtocol::KeepAlive(msg) => {
+                let session_id = msg.id;
                 if self.sessions.get(&session_id).await.is_some() {
                     trace!(?session_id, "received keep-alive request");
                 } else {
@@ -1103,15 +1125,15 @@ mod tests {
                 })
             });
 
-        let mut jhs = Vec::new();
+        let mut ahs = Vec::new();
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
-        jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
-        jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -1147,8 +1169,8 @@ mod tests {
         alice_session.close().await?;
 
         tokio::time::sleep(Duration::from_millis(100)).await;
-        futures::stream::iter(jhs)
-            .for_each(hopr_async_runtime::prelude::cancel_join_handle)
+        futures::stream::iter(ahs)
+            .for_each(|ah| async move { ah.abort() })
             .await;
 
         Ok(())
@@ -1245,15 +1267,15 @@ mod tests {
                 })
             });
 
-        let mut jhs = Vec::new();
+        let mut ahs = Vec::new();
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
-        jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
-        jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -1288,8 +1310,8 @@ mod tests {
         // Let the session timeout
         tokio::time::sleep(Duration::from_millis(300)).await;
 
-        futures::stream::iter(jhs)
-            .for_each(hopr_async_runtime::prelude::cancel_join_handle)
+        futures::stream::iter(ahs)
+            .for_each(|ah| async move { ah.abort() })
             .await;
 
         Ok(())
@@ -1603,15 +1625,15 @@ mod tests {
                 })
             });
 
-        let mut jhs = Vec::new();
+        let mut ahs = Vec::new();
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
-        jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
         let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
-        jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
@@ -1646,8 +1668,8 @@ mod tests {
         alice_session.close().await?;
 
         tokio::time::sleep(Duration::from_millis(300)).await;
-        futures::stream::iter(jhs)
-            .for_each(hopr_async_runtime::prelude::cancel_join_handle)
+        futures::stream::iter(ahs)
+            .for_each(|ah| async move { ah.abort() })
             .await;
 
         Ok(())

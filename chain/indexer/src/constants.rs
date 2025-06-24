@@ -13,7 +13,6 @@ pub mod topics {
         },
         hoprnodesaferegistryevents::HoprNodeSafeRegistryEvents::{DergisteredNodeSafe, RegisteredNodeSafe},
         hoprticketpriceoracleevents::HoprTicketPriceOracleEvents::TicketPriceUpdated,
-        hoprtoken::HoprToken::{Approval, Transfer},
         hoprwinningprobabilityoracleevents::HoprWinningProbabilityOracleEvents::WinProbUpdated,
     };
 
@@ -28,10 +27,6 @@ pub mod topics {
             DomainSeparatorUpdated::SIGNATURE_HASH,
             LedgerDomainSeparatorUpdated::SIGNATURE_HASH,
         ]
-    }
-
-    pub fn token() -> Vec<B256> {
-        vec![Transfer::SIGNATURE_HASH, Approval::SIGNATURE_HASH]
     }
 
     pub fn network_registry() -> Vec<B256> {

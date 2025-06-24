@@ -91,7 +91,7 @@ where
         destination: Address,
         options: RoutingOptions,
     ) -> crate::errors::Result<ValidatedPath> {
-        let cg = self.channel_graph.read().await;
+        let cg = self.channel_graph.read_arc().await;
         let path = match options {
             RoutingOptions::IntermediatePath(path) => {
                 trace!(?path, "resolving a specific path");
