@@ -216,9 +216,8 @@ impl Probe {
                             Err(error) => tracing::error!(%peer, %error, "failed to resolve transport routing"),
                         };
                     }
-                })
-            }
-            )
+                }).await;
+            })
         );
 
         // -- Process probes --

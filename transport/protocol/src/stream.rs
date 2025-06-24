@@ -63,11 +63,15 @@ where
             let (send, recv) = channel::<<C as Decoder>::Item>(1000);
             let cache_internal = cache.clone();
 
-            hopr_async_runtime::prelude::spawn(recv.map(Ok).forward({
-                let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
-                fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
-                fw
-            }));
+            hopr_async_runtime::prelude::spawn(
+                recv.inspect(|_data| tracing::trace!("sending data through tranport"))
+                    .map(Ok)
+                    .forward({
+                        let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
+                        fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
+                        fw
+                    }),
+            );
             hopr_async_runtime::prelude::spawn(async move {
                 if let Err(error) = FramedRead::new(stream_rx.compat(), codec)
                     .filter_map(move |v| async move {
