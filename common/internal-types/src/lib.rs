@@ -14,16 +14,7 @@ pub mod channels;
 pub mod errors;
 /// Types related to internal HOPR protocol logic.
 pub mod protocol;
-
-#[doc(hidden)]
-pub mod legacy; // TODO: remove this in 3.0
-
 #[doc(hidden)]
 pub mod prelude {
-    pub use super::account::*;
-    pub use super::announcement::*;
-    pub use super::channels::*;
-    pub use super::errors::CoreTypesError;
-    pub use super::protocol::*;
-    pub use super::tickets::*;
+    pub use super::{account::*, announcement::*, channels::*, errors::CoreTypesError, protocol::*, tickets::*};
 }

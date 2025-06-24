@@ -1,11 +1,12 @@
 use async_trait::async_trait;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_api::errors::DbError;
-use hopr_db_api::{errors::Result, resolver::HoprDbResolverOperations};
+use hopr_db_api::{
+    errors::{DbError, Result},
+    resolver::HoprDbResolverOperations,
+};
 use hopr_primitive_types::primitives::Address;
 
-use crate::accounts::HoprDbAccountOperations;
-use crate::db::HoprDb;
+use crate::{accounts::HoprDbAccountOperations, db::HoprDb};
 
 #[async_trait]
 impl HoprDbResolverOperations for HoprDb {
@@ -30,13 +31,14 @@ impl HoprDbResolverOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_internal_types::account::{AccountEntry, AccountType};
     use hopr_primitive_types::prelude::ToHex;
     use sea_orm::{EntityTrait, Set};
 
-    #[async_std::test]
+    use super::*;
+
+    #[tokio::test]
     async fn test_get_offchain_key_should_return_nothing_if_a_mapping_to_chain_key_does_not_exist() -> anyhow::Result<()>
     {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
@@ -48,26 +50,26 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_chain_key_should_return_nothing_if_a_mapping_to_offchain_key_does_not_exist() -> anyhow::Result<()>
     {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let packet = OffchainKeypair::random().public().clone();
+        let packet = *OffchainKeypair::random().public();
 
         let actual_ck = db.resolve_chain_key(&packet).await?;
         assert_eq!(actual_ck, None, "chain key should not be present");
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_chain_key_should_succeed_if_a_mapping_to_offchain_key_exists() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         // Inserting to the table directly to avoid cache
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
         let account_1 = hopr_db_entity::account::ActiveModel {
             chain_key: Set(chain_1.to_hex()),
             packet_key: Set(packet_1.to_hex()),
@@ -75,7 +77,7 @@ mod tests {
         };
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
         let account_2 = hopr_db_entity::account::ActiveModel {
             chain_key: Set(chain_2.to_hex()),
             packet_key: Set(packet_2.to_hex()),
@@ -91,35 +93,51 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_chain_key_should_succeed_if_a_mapping_to_offchain_key_exists_with_cache() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         // Inserting to the table via API to insert into cache as well
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
-        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
-            .await?;
+        let packet_1 = *OffchainKeypair::random().public();
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_1,
+                chain_addr: chain_1,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
-        db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
-            .await?;
+        let packet_2 = *OffchainKeypair::random().public();
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_2,
+                chain_addr: chain_2,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
 
         let actual_ck = db.resolve_chain_key(&packet_1).await?;
         assert_eq!(actual_ck, Some(chain_1), "chain keys must match");
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_offchain_key_should_succeed_if_a_mapping_to_chain_key_exists() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         // Inserting to the table directly to avoid cache
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
         let account_1 = hopr_db_entity::account::ActiveModel {
             chain_key: Set(chain_1.to_hex()),
             packet_key: Set(packet_1.to_hex()),
@@ -127,7 +145,7 @@ mod tests {
         };
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
         let account_2 = hopr_db_entity::account::ActiveModel {
             chain_key: Set(chain_2.to_hex()),
             packet_key: Set(packet_2.to_hex()),
@@ -144,21 +162,37 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_offchain_key_should_succeed_if_a_mapping_to_chain_key_exists_with_cache() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         // Inserting to the table via API to insert into cache as well
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
-        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
-            .await?;
+        let packet_1 = *OffchainKeypair::random().public();
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_1,
+                chain_addr: chain_1,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
-        db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
-            .await?;
+        let packet_2 = *OffchainKeypair::random().public();
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_2,
+                chain_addr: chain_2,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
 
         let actual_pk = db.resolve_packet_key(&chain_2).await?;
 

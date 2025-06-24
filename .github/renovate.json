@@ -1,14 +1,29 @@
 {
   "enabled": true,
   "prCreation": "not-pending",
-  "extends": ["config:base", ":disableDependencyDashboard"],
-  "docker": {
-    "enabled": true,
-    "pinDigests": true
-  },
-  "vulnerabilityAlerts": {
-    "enabled": true
-  },
+  "extends": [
+    "schedule:earlyMondays",
+    "config:recommended",
+    "group:allNonMajor",
+    "group:allDigest",
+    ":disableDependencyDashboard"
+  ],
+  "vulnerabilityAlerts": { "enabled": true },
   "semanticCommits": "enabled",
-  "rangeStrategy": "auto"
+  "rangeStrategy": "bump",
+  "packageRules": [
+    { "matchCategories": ["rust"], "enabled": true },
+    { "matchCategories": ["docker"], "enabled": true, "pinDigests": true },
+    {
+      "matchPackageNames": [
+        "serde_yaml",
+        "libp2p-stream",
+        "generic-array",
+        "hickory-resolver",
+        "rand",
+        "rand_distr"
+      ],
+      "enabled": false
+    }
+  ]
 }

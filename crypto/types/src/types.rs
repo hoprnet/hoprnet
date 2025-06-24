@@ -1,107 +1,49 @@
+use std::{
+    fmt::{Debug, Display, Formatter},
+    hash,
+    hash::Hasher,
+    ops::Add,
+    result,
+    str::FromStr,
+    sync::OnceLock,
+};
+
+use cipher::crypto_common::{Output, OutputSizeUser};
 use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},
     montgomery::MontgomeryPoint,
 };
-use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
-use hopr_primitive_types::errors::GeneralError::ParseError;
-use hopr_primitive_types::prelude::*;
-use k256::elliptic_curve::group::prime::PrimeCurveAffine;
+use digest::Digest;
+use elliptic_curve::{NonZeroScalar, ProjectivePoint, sec1::EncodedPoint};
+use hopr_crypto_random::Randomizable;
+use hopr_primitive_types::{errors::GeneralError::ParseError, prelude::*};
 use k256::{
+    AffinePoint, Secp256k1,
     ecdsa::{
-        self,
-        signature::{hazmat::PrehashVerifier, Verifier},
-        RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
+        self, RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
+        signature::{Verifier, hazmat::PrehashVerifier},
     },
     elliptic_curve::{
-        self,
+        self, CurveArithmetic,
         generic_array::GenericArray,
+        group::prime::PrimeCurveAffine,
         sec1::{FromEncodedPoint, ToEncodedPoint},
-        CurveArithmetic,
     },
-    AffinePoint, Secp256k1,
 };
-use serde::{Deserialize, Serialize};
+use libp2p_identity::PeerId;
 use sha2::Sha512;
-use std::fmt::Debug;
-use std::sync::OnceLock;
-use std::{
-    fmt::{Display, Formatter},
-    ops::Add,
-    str::FromStr,
-};
+use sha3::Keccak256;
 use tracing::warn;
+use typenum::Unsigned;
 
-use crate::utils::random_group_element;
 use crate::{
     errors::{
         CryptoError::{self, CalculationError, InvalidInputValue},
         Result,
     },
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    primitives::{DigestLike, EthDigest},
+    utils::random_group_element,
 };
-
-pub use libp2p_identity::PeerId;
-
-/// Extend support for arbitrary array sizes in serde
-///
-/// Array of arbitrary sizes are not supported in serde due to backwards compatibility.
-/// Read more in: `<https://github.com/serde-rs/serde/issues/1937>`
-mod arrays {
-    use std::{convert::TryInto, marker::PhantomData};
-
-    use serde::{
-        de::{SeqAccess, Visitor},
-        ser::SerializeTuple,
-        Deserialize, Deserializer, Serialize, Serializer,
-    };
-    pub fn serialize<S: Serializer, T: Serialize, const N: usize>(data: &[T; N], ser: S) -> Result<S::Ok, S::Error> {
-        let mut s = ser.serialize_tuple(N)?;
-        for item in data {
-            s.serialize_element(item)?;
-        }
-        s.end()
-    }
-
-    struct ArrayVisitor<T, const N: usize>(PhantomData<T>);
-
-    impl<'de, T, const N: usize> Visitor<'de> for ArrayVisitor<T, N>
-    where
-        T: Deserialize<'de>,
-    {
-        type Value = [T; N];
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str(&format!("an array of length {}", N))
-        }
-
-        #[inline]
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-        {
-            // can be optimized using MaybeUninit
-            let mut data = Vec::with_capacity(N);
-            for _ in 0..N {
-                match seq.next_element()? {
-                    Some(val) => data.push(val),
-                    None => return Err(serde::de::Error::invalid_length(N, &self)),
-                }
-            }
-            match data.try_into() {
-                Ok(arr) => Ok(arr),
-                Err(_) => unreachable!(),
-            }
-        }
-    }
-    pub fn deserialize<'de, D, T, const N: usize>(deserializer: D) -> Result<[T; N], D::Error>
-    where
-        D: Deserializer<'de>,
-        T: Deserialize<'de>,
-    {
-        deserializer.deserialize_tuple(N, ArrayVisitor::<T, N>(PhantomData))
-    }
-}
 
 /// Represents an elliptic curve point on the secp256k1 curve
 /// It stores the compressed (and optionally also the uncompressed) form.
@@ -185,6 +127,12 @@ impl CurvePoint {
             .to_affine();
 
         affine.into()
+    }
+}
+
+impl std::hash::Hash for CurvePoint {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.compressed.hash(state);
     }
 }
 
@@ -302,7 +250,7 @@ impl From<Challenge> for EthereumChallenge {
 }
 
 impl Challenge {
-    /// Obtains the PoR challenge by adding the two EC points represented by the half-key challenges
+    /// Gets the PoR challenge by adding the two EC points represented by the half-key challenges
     pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
         let curve_point: CurvePoint = PublicKey::combine(&[
             &PublicKey::try_from(own_share.0.as_ref())?,
@@ -312,7 +260,7 @@ impl Challenge {
         Ok(curve_point.into())
     }
 
-    /// Obtains the PoR challenge by converting the given HalfKey into a secp256k1 point and
+    /// Gets the PoR challenge by converting the given HalfKey into a secp256k1 point and
     /// adding it with the given HalfKeyChallenge (which already represents a secp256k1 point).
     pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Result<Self> {
         Self::from_hint_and_share(own_share, &half_key.to_challenge())
@@ -355,18 +303,15 @@ impl BytesRepresentable for Challenge {
 ///
 /// Half-key is equivalent to a non-zero scalar in the field used by secp256k1, but the type
 /// itself does not validate nor enforce this fact.
-// TODO: change this to HalfKey([u8; Self::SIZE]) in 3.0
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct HalfKey {
-    hkey: [u8; Self::SIZE],
-}
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HalfKey(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Default for HalfKey {
     fn default() -> Self {
-        let mut ret = Self {
-            hkey: [0u8; Self::SIZE],
-        };
-        ret.hkey.copy_from_slice(
+        let mut ret = Self([0u8; Self::SIZE]);
+
+        ret.0.copy_from_slice(
             NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
@@ -377,25 +322,24 @@ impl Default for HalfKey {
 }
 
 impl HalfKey {
-    /// Generates random half-key, useful for tests.
-    pub fn random() -> Self {
-        Self {
-            hkey: random_group_element().0,
-        }
-    }
-
     /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
-        CurvePoint::from_exponent(&self.hkey)
+        CurvePoint::from_exponent(&self.0)
             .map(|cp| HalfKeyChallenge::new(cp.as_compressed().as_bytes()))
             .expect("invalid public key")
     }
 }
 
+impl Randomizable for HalfKey {
+    fn random() -> Self {
+        Self(random_group_element().0)
+    }
+}
+
 impl AsRef<[u8]> for HalfKey {
     fn as_ref(&self) -> &[u8] {
-        &self.hkey
+        &self.0
     }
 }
 
@@ -403,9 +347,7 @@ impl TryFrom<&[u8]> for HalfKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self {
-            hkey: value.try_into().map_err(|_| ParseError("HalfKey".into()))?,
-        })
+        Ok(Self(value.try_into().map_err(|_| ParseError("HalfKey".into()))?))
     }
 }
 
@@ -417,8 +359,9 @@ impl BytesRepresentable for HalfKey {
 /// Represents a challenge for the half-key in Proof of Relay.
 /// Half-key challenge is equivalent to a secp256k1 curve point.
 /// Therefore, HalfKeyChallenge can be obtained from a HalfKey.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-pub struct HalfKeyChallenge(#[serde(with = "arrays")] [u8; Self::SIZE]);
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HalfKeyChallenge(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Display for HalfKeyChallenge {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -438,7 +381,6 @@ impl Default for HalfKeyChallenge {
 
 impl HalfKeyChallenge {
     pub fn new(half_key_challenge: &[u8]) -> Self {
-        assert_eq!(half_key_challenge.len(), Self::SIZE, "invalid length");
         let mut ret = Self::default();
         ret.0.copy_from_slice(half_key_challenge);
         ret
@@ -494,8 +436,9 @@ impl From<HalfKey> for HalfKeyChallenge {
 
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
-#[derive(Clone, Copy, Eq, PartialEq, Default, Serialize, Deserialize, PartialOrd, Ord, std::hash::Hash)]
-pub struct Hash([u8; Self::SIZE]);
+#[derive(Clone, Copy, Eq, PartialEq, Default, PartialOrd, Ord, std::hash::Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Hash(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Debug for Hash {
     // Intentionally same as Display
@@ -527,11 +470,11 @@ impl Hash {
     /// Takes all the byte slices and computes hash of their concatenated value.
     /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
-        let mut hash = EthDigest::default();
+        let mut output = Output::<Keccak256>::default();
+        let mut hash = Keccak256::default();
         inputs.iter().for_each(|v| hash.update(v));
-        let mut ret = Self([0u8; Self::SIZE]);
-        hash.finalize_into(&mut ret.0);
-        ret
+        hash.finalize_into(&mut output);
+        Self(output.into())
     }
 }
 
@@ -550,8 +493,8 @@ impl TryFrom<&[u8]> for Hash {
 }
 
 impl BytesRepresentable for Hash {
-    /// Size of the digest, which is [`EthDigest::SIZE`].
-    const SIZE: usize = EthDigest::SIZE;
+    /// Size of the digest is 32 bytes.
+    const SIZE: usize = <Keccak256 as OutputSizeUser>::OutputSize::USIZE;
 }
 
 impl From<[u8; Self::SIZE]> for Hash {
@@ -585,12 +528,37 @@ impl From<primitive_types::H256> for Hash {
 }
 
 /// Represents an Ed25519 public key.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
-pub struct OffchainPublicKey(CompressedEdwardsY);
+#[derive(Clone, Copy, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct OffchainPublicKey {
+    compressed: CompressedEdwardsY,
+    edwards: EdwardsPoint,
+    montgomery: MontgomeryPoint,
+}
+
+impl std::fmt::Debug for OffchainPublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OffchainPublicKey")
+            .field("compressed", &self.compressed)
+            .finish()
+    }
+}
+
+impl std::hash::Hash for OffchainPublicKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.compressed.hash(state);
+    }
+}
+
+impl PartialEq for OffchainPublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.compressed == other.compressed
+    }
+}
 
 impl AsRef<[u8]> for OffchainPublicKey {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.compressed.as_bytes()
     }
 }
 
@@ -598,9 +566,15 @@ impl TryFrom<&[u8]> for OffchainPublicKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(
-            CompressedEdwardsY::from_slice(value).map_err(|_| ParseError("OffchainPublicKey".into()))?,
-        ))
+        let compressed = CompressedEdwardsY::from_slice(value).map_err(|_| ParseError("OffchainPublicKey".into()))?;
+        let edwards = compressed
+            .decompress()
+            .ok_or(ParseError("OffchainPublicKey.decompress".into()))?;
+        Ok(Self {
+            compressed,
+            edwards,
+            montgomery: edwards.to_montgomery(),
+        })
     }
 }
 
@@ -631,11 +605,7 @@ impl TryFrom<&PeerId> for OffchainPublicKey {
                         .map(|p| p.to_bytes())
                         .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
                 })
-                .and_then(|pk| {
-                    CompressedEdwardsY::from_slice(&pk)
-                        .map_err(|_| GeneralError::ParseError("invalid ed25519 peerid".into()))
-                })
-                .map(Self)
+                .and_then(Self::try_from)
         } else {
             Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
         }
@@ -652,7 +622,7 @@ impl TryFrom<PeerId> for OffchainPublicKey {
 
 impl From<OffchainPublicKey> for PeerId {
     fn from(value: OffchainPublicKey) -> Self {
-        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.0.as_bytes()).unwrap();
+        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.compressed.as_bytes()).unwrap();
         PeerId::from_public_key(&k.into())
     }
 }
@@ -673,13 +643,12 @@ impl OffchainPublicKey {
     /// Tries to create the public key from a Ed25519 private key.
     /// The length must be exactly `ed25519_dalek::SECRET_KEY_LENGTH`.
     pub fn from_privkey(private_key: &[u8]) -> Result<Self> {
-        let mut pk: [u8; ed25519_dalek::SECRET_KEY_LENGTH] = private_key.try_into().map_err(|_| InvalidInputValue)?;
-        let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk).map_err(|_| InvalidInputValue)?;
+        let mut pk: [u8; ed25519_dalek::SECRET_KEY_LENGTH] =
+            private_key.try_into().map_err(|_| InvalidInputValue("private_key"))?;
+        let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk)
+            .map_err(|_| InvalidInputValue("private_key"))?;
         let kp: libp2p_identity::ed25519::Keypair = sk.into();
-        Ok(Self(
-            CompressedEdwardsY::from_slice(&kp.public().to_bytes())
-                .map_err(|_| GeneralError::ParseError("OffchainPublicKey".into()))?,
-        ))
+        Ok(Self::try_from(kp.public().to_bytes())?)
     }
 
     /// Outputs the public key as PeerId represented as Base58 string.
@@ -690,13 +659,36 @@ impl OffchainPublicKey {
 
 impl From<&OffchainPublicKey> for EdwardsPoint {
     fn from(value: &OffchainPublicKey) -> Self {
-        value.0.decompress().unwrap()
+        value.edwards
     }
 }
 
 impl From<&OffchainPublicKey> for MontgomeryPoint {
     fn from(value: &OffchainPublicKey) -> Self {
-        value.0.decompress().unwrap().to_montgomery()
+        value.montgomery
+    }
+}
+
+/// Compact representation of [`OffchainPublicKey`] suitable for use in enums.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CompactOffchainPublicKey(CompressedEdwardsY);
+
+impl From<OffchainPublicKey> for CompactOffchainPublicKey {
+    fn from(value: OffchainPublicKey) -> Self {
+        Self(value.compressed)
+    }
+}
+
+impl CompactOffchainPublicKey {
+    /// Performs an **expensive** operation of converting back to the [`OffchainPublicKey`].
+    pub fn into_offchain_public_key(self) -> OffchainPublicKey {
+        let decompressed = self.0.decompress().expect("decompression must not fail");
+        OffchainPublicKey {
+            compressed: self.0,
+            edwards: decompressed,
+            montgomery: decompressed.to_montgomery(),
+        }
     }
 }
 
@@ -750,17 +742,15 @@ pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 ///
 /// assert_eq!(from_uncompressed, from_transaction_signature);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PublicKey(CurvePoint);
 
 impl PublicKey {
     /// Size of the compressed public key in bytes
     pub const SIZE_COMPRESSED: usize = 33;
-
-    pub const SIZE_UNCOMPRESSED_PLAIN: usize = 64;
-
     /// Size of the uncompressed public key in bytes
     pub const SIZE_UNCOMPRESSED: usize = 65;
+    pub const SIZE_UNCOMPRESSED_PLAIN: usize = 64;
 
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {
         // This verifies that it is indeed a non-zero scalar, and thus represents a valid public key
@@ -835,14 +825,6 @@ impl PublicKey {
         new_pk.try_into().expect("tweak add resulted in an invalid public key")
     }
 
-    /// Generates a new random public key.
-    /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
-    pub fn random() -> Self {
-        let (_, cp) = random_group_element();
-        cp.try_into()
-            .expect("random_group_element cannot generate identity points")
-    }
-
     /// Converts the public key to an Ethereum address
     pub fn to_address(&self) -> Address {
         let uncompressed = self.to_bytes(false);
@@ -862,6 +844,16 @@ impl PublicKey {
     pub fn to_hex(&self, compressed: bool) -> String {
         let offset = if compressed { 0 } else { 1 };
         format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
+    }
+}
+
+impl Randomizable for PublicKey {
+    /// Generates a new random public key.
+    /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
+    fn random() -> Self {
+        let (_, cp) = random_group_element();
+        cp.try_into()
+            .expect("random_group_element cannot generate identity points")
     }
 }
 
@@ -941,7 +933,7 @@ impl From<&PublicKey> for k256::ProjectivePoint {
 }
 
 /// Represents a compressed serializable extension of the `PublicKey` using the secp256k1 curve.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct CompressedPublicKey(pub PublicKey);
 
 impl TryFrom<&[u8]> for CompressedPublicKey {
@@ -955,7 +947,7 @@ impl TryFrom<&[u8]> for CompressedPublicKey {
 impl AsRef<[u8]> for CompressedPublicKey {
     fn as_ref(&self) -> &[u8] {
         // CurvePoint::as_ref() returns a compressed representation of the curve point
-        self.0 .0.as_ref()
+        self.0.0.as_ref()
     }
 }
 
@@ -983,19 +975,13 @@ impl CompressedPublicKey {
 
 /// Contains a response upon ticket acknowledgement
 /// It is equivalent to a non-zero secret scalar on secp256k1 (EC private key).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Response([u8; Self::SIZE]);
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Response(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Default for Response {
     fn default() -> Self {
-        let mut ret = Self([0u8; Self::SIZE]);
-        ret.0.copy_from_slice(
-            NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
-                .unwrap()
-                .to_bytes()
-                .as_slice(),
-        );
-        ret
+        Self(HalfKey::default().0)
     }
 }
 
@@ -1050,12 +1036,9 @@ impl From<[u8; Self::SIZE]> for Response {
 }
 
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
-// TODO: change this to OffchainSignature([u8; Self::SIZE]) in 3.0
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OffchainSignature {
-    #[serde(with = "arrays")]
-    signature: [u8; Self::SIZE],
-}
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct OffchainSignature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl OffchainSignature {
     /// Sign the given message using the [OffchainKeypair].
@@ -1065,24 +1048,24 @@ impl OffchainSignature {
             &ed25519_dalek::SecretKey::try_from(signing_keypair.secret().as_ref()).expect("invalid private key"),
         );
 
-        // Get the verifying key from the SAME keypair, avoiding Double Public Key Signing Function Oracle Attack on Ed25519
-        // See https://github.com/MystenLabs/ed25519-unsafe-libs for details
-        let verifying = ed25519_dalek::VerifyingKey::from_bytes(signing_keypair.public().0.as_bytes()).unwrap();
+        // Get the verifying key from the SAME keypair, avoiding Double Public Key Signing Function Oracle Attack on
+        // Ed25519 See https://github.com/MystenLabs/ed25519-unsafe-libs for details
+        let verifying = ed25519_dalek::VerifyingKey::from(signing_keypair.public().edwards);
 
         ed25519_dalek::hazmat::raw_sign::<Sha512>(&expanded_sk, msg, &verifying).into()
     }
 
     /// Verify this signature of the given message and [OffchainPublicKey].
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
-        let sgn = ed25519_dalek::Signature::from_slice(&self.signature).expect("corrupted OffchainSignature");
-        let pk = ed25519_dalek::VerifyingKey::from_bytes(public_key.0.as_bytes()).unwrap();
+        let sgn = ed25519_dalek::Signature::from_slice(&self.0).expect("corrupted OffchainSignature");
+        let pk = ed25519_dalek::VerifyingKey::from(public_key.edwards);
         pk.verify_strict(msg, &sgn).is_ok()
     }
 }
 
 impl AsRef<[u8]> for OffchainSignature {
     fn as_ref(&self) -> &[u8] {
-        &self.signature
+        &self.0
     }
 }
 
@@ -1103,10 +1086,8 @@ impl BytesRepresentable for OffchainSignature {
 
 impl From<ed25519_dalek::Signature> for OffchainSignature {
     fn from(value: ed25519_dalek::Signature) -> Self {
-        let mut ret = Self {
-            signature: [0u8; Self::SIZE],
-        };
-        ret.signature.copy_from_slice(value.to_bytes().as_ref());
+        let mut ret = Self([0u8; Self::SIZE]);
+        ret.0.copy_from_slice(value.to_bytes().as_ref());
         ret
     }
 }
@@ -1121,16 +1102,16 @@ impl TryFrom<([u8; 32], [u8; 32])> for OffchainSignature {
 
 /// Represents an ECDSA signature based on the secp256k1 curve with a recoverable public key.
 /// This signature encodes the 2-bit recovery information into the
-/// uppermost bits of MSB of the S value, which are never used by this ECDSA
+/// uppermost bits from MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
 /// The instance holds the byte array consisting of `R` and `S` values with the recovery bit
 /// already embedded in S.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct Signature(#[serde(with = "arrays")] [u8; Self::SIZE]);
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Signature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Signature {
     pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
-        assert_eq!(raw_bytes.len(), Self::SIZE, "invalid length");
         assert!(recovery <= 1, "invalid recovery bit");
 
         let mut ret = Self([0u8; Self::SIZE]);
@@ -1232,26 +1213,84 @@ impl PartialEq for Signature {
 
 impl Eq for Signature {}
 
+/// Pseudonym used to identify the creator of a `SURB`.
+/// This allows indexing `SURB` and `LocalSURBEntry` at both parties.
+///
+/// To maintain anonymity, this must be something else than the sender's
+/// public key or public key identifier.
+pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display + Randomizable {}
+
+/// Represents a simple UUID-like pseudonym consisting of 10 bytes.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SimplePseudonym(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] pub [u8; Self::SIZE]);
+
+impl Display for SimplePseudonym {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl Debug for SimplePseudonym {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl BytesRepresentable for SimplePseudonym {
+    const SIZE: usize = 10;
+}
+
+impl AsRef<[u8]> for SimplePseudonym {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for SimplePseudonym {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> result::Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(Self)
+            .map_err(|_| ParseError("SimplePseudonym".into()))
+    }
+}
+
+impl Randomizable for SimplePseudonym {
+    /// Generates a random pseudonym.
+    fn random() -> Self {
+        let mut data = vec![0u8; Self::SIZE];
+        hopr_crypto_random::random_fill(&mut data);
+        Self::try_from(data.as_slice()).unwrap()
+    }
+}
+
+impl Pseudonym for SimplePseudonym {}
+
 #[cfg(test)]
 mod tests {
-    use crate::utils::random_group_element;
+    use std::str::FromStr;
+
+    use ed25519_dalek::Signer;
+    use hex_literal::hex;
+    use hopr_primitive_types::prelude::*;
+    use k256::{
+        AffinePoint, NonZeroScalar, Secp256k1, U256,
+        ecdsa::VerifyingKey,
+        elliptic_curve::{CurveArithmetic, sec1::ToEncodedPoint},
+    };
+    use libp2p_identity::PeerId;
+
     use crate::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{
             Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey,
             Response, Signature,
         },
+        utils::random_group_element,
     };
-    use ed25519_dalek::Signer;
-    use hex_literal::hex;
-    use hopr_primitive_types::prelude::*;
-    use k256::{
-        ecdsa::VerifyingKey,
-        elliptic_curve::{sec1::ToEncodedPoint, CurveArithmetic},
-        AffinePoint, {NonZeroScalar, Secp256k1, U256},
-    };
-    use libp2p_identity::PeerId;
-    use std::str::FromStr;
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PUBLIC_KEY_UNCOMPRESSED_PLAIN: [u8; 64] = hex!("1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");
@@ -1586,9 +1625,7 @@ mod tests {
 
     #[test]
     fn test_half_key() -> anyhow::Result<()> {
-        let hk1 = HalfKey {
-            hkey: [0u8; HalfKey::SIZE],
-        };
+        let hk1 = HalfKey([0u8; HalfKey::SIZE]);
         let hk2 = HalfKey::try_from(hk1.as_ref())?;
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");

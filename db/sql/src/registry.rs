@@ -4,19 +4,24 @@ use hopr_primitive_types::prelude::{Address, ToHex};
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set};
 use sea_query::OnConflict;
 
-use crate::db::HoprDb;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{
+    HoprDbGeneralModelOperations, OptTx,
+    db::HoprDb,
+    errors::{DbSqlError, Result},
+};
 
 /// Defines DB access API for network registry operations.
 #[async_trait]
 pub trait HoprDbRegistryOperations {
     /// Sets the given node as allowed or denied in network registry.
     async fn set_access_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address, allowed: bool)
-        -> Result<()>;
+    -> Result<()>;
 
     /// Returns `true` if the given node is allowed in network registry.
-    async fn is_allowed_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
+    async fn is_allowed_in_network_registry<'a, T>(&'a self, tx: OptTx<'a>, address_like: &T) -> Result<bool>
+    where
+        Address: TryFrom<T>,
+        T: Clone + Sync;
 
     /// Sets or unsets Safe NR eligibility.
     async fn set_safe_eligibility<'a>(&'a self, tx: OptTx<'a>, address: Address, eligible: bool) -> Result<()>;
@@ -67,7 +72,13 @@ impl HoprDbRegistryOperations for HoprDb {
             .await
     }
 
-    async fn is_allowed_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool> {
+    async fn is_allowed_in_network_registry<'a, T>(&'a self, tx: OptTx<'a>, address_like: &T) -> Result<bool>
+    where
+        Address: TryFrom<T>,
+        T: Clone + Sync,
+    {
+        let address = Address::try_from((*address_like).clone()).map_err(|_| DbSqlError::DecodingError)?;
+
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -139,12 +150,11 @@ impl HoprDbRegistryOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::HoprDb;
-    use crate::registry::HoprDbRegistryOperations;
-    use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_primitive_types::prelude::Address;
     use lazy_static::lazy_static;
+
+    use crate::{db::HoprDb, registry::HoprDbRegistryOperations};
 
     lazy_static! {
         static ref ADDR_1: Address = "4331eaa9542b6b034c43090d9ec1c2198758dbc3"
@@ -155,36 +165,36 @@ mod tests {
             .expect("lazy static address should be valid");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_registry_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
 
         db.set_access_in_network_registry(None, *ADDR_1, true).await?;
 
-        assert!(db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
 
         db.set_access_in_network_registry(None, *ADDR_1, true).await?;
 
-        assert!(db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
 
         db.set_access_in_network_registry(None, *ADDR_1, false).await?;
 
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
 
         db.set_access_in_network_registry(None, *ADDR_1, false).await?;
 
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_eligiblity_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 

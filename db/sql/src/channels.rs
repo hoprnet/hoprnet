@@ -1,24 +1,23 @@
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
-use hopr_db_entity::channel;
-use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
-use hopr_db_entity::prelude::Channel;
+use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelude::Channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 
-use crate::cache::ChannelParties;
-use crate::db::HoprDb;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{
+    HoprDbGeneralModelOperations, OptTx,
+    cache::ChannelParties,
+    db::HoprDb,
+    errors::{DbSqlError, Result},
+};
 
 /// API for editing [ChannelEntry] in the DB.
 pub struct ChannelEditor {
     orig: ChannelEntry,
     model: channel::ActiveModel,
+    delete: bool,
 }
 
 impl ChannelEditor {
@@ -28,8 +27,7 @@ impl ChannelEditor {
     }
 
     /// Change the HOPR balance of the channel.
-    pub fn change_balance(mut self, balance: Balance) -> Self {
-        assert_eq!(BalanceType::HOPR, balance.balance_type());
+    pub fn change_balance(mut self, balance: HoprBalance) -> Self {
         self.model.balance = Set(balance.amount().to_be_bytes().to_vec());
         self
     }
@@ -51,6 +49,12 @@ impl ChannelEditor {
         self.model.epoch = Set(epoch.into().to_be_bytes().to_vec());
         self
     }
+
+    /// If set, the channel will be deleted, no other edits will be done.
+    pub fn delete(mut self) -> Self {
+        self.delete = true;
+        self
+    }
 }
 
 /// Defines DB API for accessing information about HOPR payment channels.
@@ -67,6 +71,7 @@ pub trait HoprDbChannelOperations {
     async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>>;
 
     /// Commits changes of the channel to the database.
+    /// Returns the updated channel, or on deletion, the deleted channel entry.
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
 
     /// Retrieves the channel by source and destination.
@@ -92,7 +97,7 @@ pub trait HoprDbChannelOperations {
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Incoming, my_node)`
     async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    /// Fetches all channels that are `Incoming` to this node.
+    /// Fetches all channels that are `Outgoing` from this node.
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Outgoing, my_node)`
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
@@ -145,6 +150,7 @@ impl HoprDbChannelOperations for HoprDb {
                             Some(ChannelEditor {
                                 orig: model.clone().try_into()?,
                                 model: model.into_active_model(),
+                                delete: false,
                             })
                         } else {
                             None
@@ -156,18 +162,36 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
+        let epoch = editor.model.epoch.clone();
         let parties = ChannelParties(editor.orig.source, editor.orig.destination);
         let ret = self
             .nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let model = editor.model.update(tx.as_ref()).await?;
-                    Ok::<_, DbSqlError>(model.try_into()?)
+                    if !editor.delete {
+                        let model = editor.model.update(tx.as_ref()).await?;
+                        Ok::<_, DbSqlError>(model.try_into()?)
+                    } else {
+                        editor.model.delete(tx.as_ref()).await?;
+                        Ok::<_, DbSqlError>(editor.orig)
+                    }
                 })
             })
             .await?;
         self.caches.src_dst_to_channel.invalidate(&parties).await;
+
+        // Finally invalidate any unrealized values from the cache.
+        // This might be a no-op if the channel was not in the cache
+        // like for channels that are not ours.
+        let channel_id = editor.orig.get_id();
+        if let Some(channel_epoch) = epoch.try_as_ref() {
+            self.caches
+                .unrealized_value
+                .invalidate(&(channel_id, U256::from_big_endian(channel_epoch.as_slice())))
+                .await;
+        }
+
         Ok(ret)
     }
 
@@ -305,31 +329,42 @@ impl HoprDbChannelOperations for HoprDb {
             .await?;
 
         self.caches.src_dst_to_channel.invalidate(&parties).await;
+
+        // Finally, invalidate any unrealized values from the cache.
+        // This might be a no-op if the channel was not in the cache
+        // like for channels that are not ours.
+        let channel_id = channel_entry.get_id();
+        let channel_epoch = channel_entry.channel_epoch;
+        self.caches
+            .unrealized_value
+            .invalidate(&(channel_id, channel_epoch))
+            .await;
+
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::HoprDbChannelOperations;
-    use crate::db::HoprDb;
-    use crate::HoprDbGeneralModelOperations;
     use anyhow::Context;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
-    use hopr_internal_types::channels::ChannelStatus;
-    use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
-    use hopr_primitive_types::prelude::{Address, BalanceType};
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
+    use hopr_internal_types::{
+        channels::ChannelStatus,
+        prelude::{ChannelDirection, ChannelEntry},
+    };
+    use hopr_primitive_types::prelude::Address;
 
-    #[async_std::test]
+    use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations, db::HoprDb};
+
+    #[tokio::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let ce = ChannelEntry::new(
             Address::default(),
             Address::default(),
-            BalanceType::HOPR.zero(),
+            0.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -346,21 +381,14 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_insert_get_by_parties() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
 
-        let ce = ChannelEntry::new(
-            a,
-            b,
-            BalanceType::HOPR.zero(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let ce = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into());
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
@@ -373,7 +401,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_channel_get_for_destination_that_does_not_exist_returns_none() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -388,7 +416,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_channel_get_for_destination_that_exists_should_be_returned() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -396,8 +424,8 @@ mod tests {
 
         let ce = ChannelEntry::new(
             Address::default(),
-            expected_destination.clone(),
-            BalanceType::HOPR.zero(),
+            expected_destination,
+            0.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -415,7 +443,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_incoming_outgoing_channels() -> anyhow::Result<()> {
         let ckp = ChainKeypair::random();
         let addr_1 = ckp.public().to_address();
@@ -426,7 +454,7 @@ mod tests {
         let ce_1 = ChannelEntry::new(
             addr_1,
             addr_2,
-            BalanceType::HOPR.zero(),
+            0.into(),
             1_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -435,7 +463,7 @@ mod tests {
         let ce_2 = ChannelEntry::new(
             addr_2,
             addr_1,
-            BalanceType::HOPR.zero(),
+            0.into(),
             2_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),

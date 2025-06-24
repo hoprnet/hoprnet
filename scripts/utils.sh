@@ -101,6 +101,7 @@ try_cmd() {
   else
     # the output needs to be captured to not mess up the return result
     # also exit on error needs to be disabled for execution of the command and re-enabled afterwards again
+    mkdir -p /tmp
     output_file="$(mktemp -q)"
     rm -f "${output_file}"
     set +Eeo pipefail
@@ -180,7 +181,7 @@ get_native_address() {
   local endpoint url cmd
 
   endpoint="${1:-localhost:3001}"
-  url="${endpoint}/api/v3/account/addresses"
+  url="${endpoint}/api/v4/account/addresses"
   cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".native"
@@ -191,7 +192,7 @@ get_hopr_address() {
   local endpoint url cmd
 
   endpoint="${1:-localhost:3001}"
-  url="${endpoint}/api/v3/account/addresses"
+  url="${endpoint}/api/v4/account/addresses"
   cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".hopr"
@@ -322,7 +323,3 @@ get_eth_block_number() {
 }
 
 setup_colors
-
-# Ensure that jq and curl are installed
-check_package jq
-check_package curl

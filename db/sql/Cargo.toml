@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-sql"
-version = "0.11.1"
+version = "0.14.2"
 edition = "2021"
 description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"
@@ -10,12 +10,6 @@ license = "GPL-3.0-only"
 [features]
 default = ["traits"]
 traits = []
-runtime-async-std = [
-  "hopr-async-runtime/runtime-async-std",
-  "sea-orm/runtime-async-std",
-  "sea-query-binder/runtime-async-std-rustls",
-  "sqlx/runtime-async-std-rustls",
-]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "sea-orm/runtime-tokio",
@@ -28,13 +22,15 @@ prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 async-lock = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
-chrono = { workspace = true }
 bincode = { workspace = true }
+chrono = { workspace = true }
+dashmap = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
-moka = { workspace = true }
+moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
+ringbuffer = { workspace = true }
 sea-orm = { workspace = true }
 sea-query = { workspace = true, default-features = false, features = [
   "with-chrono",
@@ -56,21 +52,26 @@ hopr-db-migration = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-network-types = { workspace = true }
+hopr-path = { workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
+tokio = { workspace = true }
 rand = { workspace = true }
-sea-orm = { workspace = true, features = ["runtime-async-std-rustls"] }
+sea-orm = { workspace = true, features = ["runtime-tokio-rustls"] }
 sea-query-binder = { workspace = true, default-features = false, features = [
   "with-chrono",
   "sqlx-sqlite",
-  "runtime-async-std-rustls",
+  "runtime-tokio-rustls",
 ] }
-sqlx = { workspace = true, features = ["runtime-async-std-rustls"] }
+sqlx = { workspace = true, features = ["runtime-tokio-rustls"] }
 lazy_static = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hex-literal = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["hopr-db-migration"]

@@ -1,6 +1,6 @@
 [package]
-name = "chain-api"
-version = "0.3.1"
+name = "hopr-chain-api"
+version = "0.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR chain interface"
 edition = "2021"
@@ -11,26 +11,24 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = [
-  "chain-actions/runtime-async-std",
-  "chain-indexer/runtime-async-std",
-  "hopr-db-sql/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-]
 runtime-tokio = [
-  "chain-actions/runtime-tokio",
-  "chain-indexer/runtime-tokio",
+  "hopr-chain-actions/runtime-tokio",
+  "hopr-chain-indexer/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
 ]
 prometheus = [
   "hopr-chain-rpc/prometheus",
-  "chain-actions/prometheus",
-  "chain-indexer/prometheus",
+  "hopr-chain-actions/prometheus",
+  "hopr-chain-indexer/prometheus",
   "hopr-db-sql/prometheus",
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = [
+  "essentials",
+  "json-rpc",
+] }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
@@ -42,11 +40,12 @@ smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+url = { workspace = true }
 validator = { workspace = true }
 
-chain-actions = { workspace = true }
-chain-indexer = { workspace = true }
-chain-types = { workspace = true }
+hopr-chain-actions = { workspace = true }
+hopr-chain-indexer = { workspace = true }
+hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
@@ -55,5 +54,5 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+tokio = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }

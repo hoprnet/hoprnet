@@ -1,14 +1,17 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use futures::{AsyncReadExt, AsyncWriteExt};
-use hopr_network_types::prelude::state::{SessionConfig, SessionSocket};
-use hopr_network_types::utils::DuplexIO;
-use rand::{thread_rng, Rng};
+#[allow(unused)]
+#[path = "../src/session/utils.rs"]
+mod utils;
+
 use std::collections::HashSet;
 
-#[cfg(not(feature = "testing"))]
-compile_error!("Must specify the 'testing' feature");
-
-use hopr_network_types::prelude::{FaultyNetwork, FaultyNetworkConfig};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use futures::{AsyncReadExt, AsyncWriteExt};
+use hopr_network_types::{
+    prelude::state::{SessionConfig, SessionSocket},
+    utils::DuplexIO,
+};
+use rand::{Rng, thread_rng};
+use utils::{FaultyNetwork, FaultyNetworkConfig};
 
 /// This MTU is based on the current MTU size in HOPR 2.2
 const MTU: usize = 466;
@@ -29,7 +32,7 @@ fn setup_network<const MTU: usize>(
 async fn send_one_way(network_cfg: FaultyNetworkConfig, session_cfg: SessionConfig, data: &[u8]) -> anyhow::Result<()> {
     let (mut a_to_b, mut b_to_a) = setup_network::<MTU>(network_cfg, session_cfg);
 
-    a_to_b.write_all(&data).await?;
+    a_to_b.write_all(data).await?;
 
     let mut data_out = vec![0u8; data.len()];
     b_to_a.read_exact(&mut data_out[..]).await?;
@@ -60,10 +63,14 @@ pub fn session_one_way_reliable_send_recv_benchmark(c: &mut Criterion) {
         thread_rng().fill(&mut data[..]);
 
         group.throughput(Throughput::Bytes(*size as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(size), &data, |b, data| {
-            b.to_async(&runtime)
-                .iter(|| send_one_way(network_cfg, session_cfg.clone(), data));
-        });
+        group.bench_with_input(
+            BenchmarkId::from_parameter(bytesize::ByteSize::b(*size as u64).to_string().replace(" ", "_")),
+            &data,
+            |b, data| {
+                b.to_async(&runtime)
+                    .iter(|| send_one_way(network_cfg, session_cfg.clone(), data));
+            },
+        );
     }
     group.finish();
 }

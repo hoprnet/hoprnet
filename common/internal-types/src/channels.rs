@@ -1,11 +1,14 @@
+use std::{
+    fmt::{Display, Formatter},
+    time::{Duration, SystemTime},
+};
+
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::time::{Duration, SystemTime};
 
 /// Describes status of a channel
-#[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]
+#[derive(Copy, Clone, Debug, smart_default::SmartDefault, strum::Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
     /// The channel is closed.
@@ -59,28 +62,34 @@ pub enum ChannelDirection {
     Outgoing = 1,
 }
 
+/// Alias for the [`Hash`] representing a channel ID.
+pub type ChannelId = Hash;
+
 /// Overall description of a channel
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChannelEntry {
     pub source: Address,
     pub destination: Address,
-    pub balance: Balance,
+    pub balance: HoprBalance,
     pub ticket_index: U256,
     pub status: ChannelStatus,
     pub channel_epoch: U256,
-    id: Hash,
+    id: ChannelId,
 }
 
 impl ChannelEntry {
+    /// Maximum possible balance of a channel: 10^25 wxHOPR
+    pub const MAX_CHANNEL_BALANCE: u128 = 10_u128.pow(25);
+
     pub fn new(
         source: Address,
         destination: Address,
-        balance: Balance,
+        balance: HoprBalance,
         ticket_index: U256,
         status: ChannelStatus,
         channel_epoch: U256,
     ) -> Self {
-        assert_eq!(BalanceType::HOPR, balance.balance_type(), "invalid balance currency");
         ChannelEntry {
             source,
             destination,
@@ -93,7 +102,7 @@ impl ChannelEntry {
     }
 
     /// Generates the channel ID using the source and destination address
-    pub fn get_id(&self) -> Hash {
+    pub fn get_id(&self) -> ChannelId {
         self.id
     }
 
@@ -163,14 +172,14 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
     Hash::create(&[source.as_ref(), destination.as_ref()])
 }
 
-/// Enumerates possible changes on a channel entry update
+/// Lists possible changes on a channel entry update
 #[derive(Clone, Copy, Debug)]
 pub enum ChannelChange {
     /// Channel status has changed
     Status { left: ChannelStatus, right: ChannelStatus },
 
     /// Channel balance has changed
-    CurrentBalance { left: Balance, right: Balance },
+    CurrentBalance { left: HoprBalance, right: HoprBalance },
 
     /// Channel epoch has changed
     Epoch { left: u32, right: u32 },
@@ -244,13 +253,17 @@ impl ChannelChange {
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::{generate_channel_id, ChannelEntry, ChannelStatus};
+    use std::{
+        ops::Add,
+        str::FromStr,
+        time::{Duration, SystemTime},
+    };
+
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
-    use std::ops::Add;
-    use std::str::FromStr;
-    use std::time::{Duration, SystemTime};
+
+    use crate::channels::{ChannelEntry, ChannelStatus, generate_channel_id};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -285,7 +298,7 @@ mod tests {
         let mut ce = ChannelEntry::new(
             *ADDRESS_1,
             *ADDRESS_2,
-            Balance::new(10_u64, BalanceType::HOPR),
+            10.into(),
             23u64.into(),
             ChannelStatus::Open,
             3u64.into(),

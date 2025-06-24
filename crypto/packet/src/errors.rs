@@ -1,8 +1,8 @@
-use hopr_crypto_types::errors::CryptoError;
-use hopr_internal_types::errors::CoreTypesError;
-use hopr_internal_types::prelude::Ticket;
-use hopr_primitive_types::errors::GeneralError;
 use std::fmt::{Debug, Display, Formatter};
+
+use hopr_crypto_types::errors::CryptoError;
+use hopr_internal_types::{errors::CoreTypesError, prelude::Ticket};
+use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -12,9 +12,6 @@ pub enum PacketError {
 
     #[error("failed to construct packet: {0}")]
     PacketConstructionError(String),
-
-    #[error("packet is in invalid state")]
-    InvalidPacketState,
 
     #[error("packet tag already present, possible replay")]
     TagReplay,
@@ -54,6 +51,9 @@ pub enum PacketError {
 
     #[error(transparent)]
     CoreTypesError(#[from] CoreTypesError),
+
+    #[error(transparent)]
+    SphinxError(#[from] hopr_crypto_sphinx::errors::SphinxError),
 
     #[error(transparent)]
     Other(#[from] GeneralError),

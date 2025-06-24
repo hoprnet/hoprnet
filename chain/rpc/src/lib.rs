@@ -7,32 +7,35 @@
 //!
 //! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
 //! so this represents the main entry point to all RPC related operations.
+
+extern crate core;
+
+use std::{
+    cmp::Ordering,
+    collections::BTreeSet,
+    fmt::{Display, Formatter},
+    pin::Pin,
+    time::Duration,
+};
+
+use alloy::{primitives::B256, providers::PendingTransaction, rpc::types::TransactionRequest};
 use async_trait::async_trait;
-pub use ethers::types::transaction::eip2718::TypedTransaction;
-use futures::{FutureExt, Stream};
-use http_types::convert::Deserialize;
-use primitive_types::H256;
-use serde::Serialize;
-use std::cmp::Ordering;
-use std::collections::BTreeSet;
-use std::fmt::{Display, Formatter};
-use std::future::{Future, IntoFuture};
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::time::Duration;
-
+use errors::LogConversionError;
+use futures::Stream;
 use hopr_crypto_types::types::Hash;
+use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
 
-use crate::errors::RpcError::{ProviderError, TransactionDropped};
-use crate::errors::{HttpRequestError, Result};
-use crate::RetryAction::NoRetry;
+use crate::{RetryAction::NoRetry, errors::Result};
 
 pub mod client;
 pub mod errors;
-mod helper;
 pub mod indexer;
 pub mod rpc;
+pub mod transport;
+
+pub use crate::transport::ReqwestClient;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 ///
@@ -59,26 +62,35 @@ pub struct Log {
     pub removed: bool,
 }
 
-impl From<ethers::types::Log> for Log {
-    fn from(value: ethers::prelude::Log) -> Self {
-        Self {
-            address: value.address.into(),
-            topics: value.topics.into_iter().map(Hash::from).collect(),
-            data: Box::from(value.data.as_ref()),
-            tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
-            block_number: value.block_number.expect("block id must be present").as_u64(),
-            block_hash: value.block_hash.expect("block hash must be present").into(),
-            log_index: value.log_index.expect("log index must be present"),
-            tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
-            removed: value.removed.expect("removed flag must be present"),
-        }
+impl TryFrom<alloy::rpc::types::Log> for Log {
+    type Error = LogConversionError;
+
+    fn try_from(value: alloy::rpc::types::Log) -> std::result::Result<Self, Self::Error> {
+        Ok(Self {
+            address: value.address().into(),
+            topics: value.topics().iter().map(|t| Hash::from(t.0)).collect(),
+            data: Box::from(value.data().data.as_ref()),
+            tx_index: value
+                .transaction_index
+                .ok_or(LogConversionError::MissingTransactionIndex)?,
+            block_number: value.block_number.ok_or(LogConversionError::MissingBlockNumber)?,
+            block_hash: value.block_hash.ok_or(LogConversionError::MissingBlockHash)?.0.into(),
+            log_index: value.log_index.ok_or(LogConversionError::MissingLogIndex)?.into(),
+            tx_hash: value
+                .transaction_hash
+                .ok_or(LogConversionError::MissingTransactionHash)?
+                .0
+                .into(),
+            removed: value.removed,
+        })
     }
 }
 
-impl From<Log> for ethers::abi::RawLog {
+impl From<Log> for alloy::rpc::types::RawLog {
     fn from(value: Log) -> Self {
-        ethers::abi::RawLog {
-            topics: value.topics.into_iter().map(H256::from).collect(),
+        alloy::rpc::types::RawLog {
+            address: value.address.into(),
+            topics: value.topics.into_iter().map(|h| B256::from_slice(h.as_ref())).collect(),
             data: value.data.into(),
         }
     }
@@ -163,45 +175,23 @@ impl PartialOrd<Self> for Log {
     }
 }
 
-/// Represents a filter to extract logs containing specific contract events from a block.
+/// Represents a set of categorized blockchain log filters for optimized indexer performance.
+///
+/// This structure organizes filters into different categories to enable selective log
+/// processing based on the indexer's operational state. During initial synchronization,
+/// the indexer uses `no_token` filters to exclude irrelevant token events, significantly
+/// reducing processing time and storage requirements. During normal operation, it uses
+/// `all` filters for complete event coverage.
+///
+/// The `token` filters specifically target token-related events for the node's safe address.
 #[derive(Debug, Clone, Default)]
-pub struct LogFilter {
-    /// Contract addresses
-    pub address: Vec<Address>,
-    /// Event topics
-    pub topics: Vec<Hash>,
-}
-
-impl LogFilter {
-    /// Indicates if this filter filters anything.
-    pub fn is_empty(&self) -> bool {
-        self.address.is_empty() && self.topics.is_empty()
-    }
-}
-
-impl Display for LogFilter {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "filter of {} contracts with {} topics",
-            self.address.len(),
-            self.topics.len()
-        )
-    }
-}
-
-impl From<LogFilter> for ethers::types::Filter {
-    fn from(value: LogFilter) -> Self {
-        ethers::types::Filter::new()
-            .address(
-                value
-                    .address
-                    .into_iter()
-                    .map(ethers::types::Address::from)
-                    .collect::<Vec<_>>(),
-            )
-            .topic0(value.topics)
-    }
+pub struct FilterSet {
+    /// holds all filters for the indexer
+    pub all: Vec<alloy::rpc::types::Filter>,
+    /// holds only the token contract related filters
+    pub token: Vec<alloy::rpc::types::Filter>,
+    /// holds only filters not related to the token contract
+    pub no_token: Vec<alloy::rpc::types::Filter>,
 }
 
 /// Indicates what retry action should be taken, as result of a `RetryPolicy` implementation.
@@ -219,28 +209,6 @@ pub trait RetryPolicy<E> {
     fn is_retryable_error(&self, _err: &E, _retry_number: u32, _retry_queue_size: u32) -> RetryAction {
         NoRetry
     }
-}
-
-/// Performs no retries.
-#[derive(Clone, Debug)]
-pub struct ZeroRetryPolicy<E>(PhantomData<E>);
-
-impl<E> Default for ZeroRetryPolicy<E> {
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
-
-/// Abstraction for an HTTP client that performs HTTP POST with serializable request data.
-#[async_trait]
-pub trait HttpPostRequestor: Send + Sync {
-    /// Performs HTTP POST of JSON data to the given URL
-    /// and gets the JSON response.
-    async fn http_post<T>(&self, url: &str, data: T) -> std::result::Result<Box<[u8]>, HttpRequestError>
-    where
-        T: Serialize + Send + Sync;
 }
 
 /// Common configuration for all native `HttpPostRequestor`s
@@ -266,86 +234,6 @@ pub struct HttpPostRequestorConfig {
     pub max_requests_per_sec: Option<u32>,
 }
 
-/// Shorthand for creating a new EIP1559 transaction object.
-pub fn create_eip1559_transaction() -> TypedTransaction {
-    TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
-}
-
-/// Contains some selected fields of a receipt for a transaction that has been
-/// already included in the blockchain.
-#[derive(Debug, Clone)]
-pub struct TransactionReceipt {
-    /// Hash of the transaction.
-    pub tx_hash: Hash,
-    /// Number of the block in which the transaction has been included into the blockchain.
-    pub block_number: u64,
-}
-
-impl Display for TransactionReceipt {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "receipt of tx {} in block {}", self.tx_hash, self.block_number)
-    }
-}
-
-impl From<ethers::types::TransactionReceipt> for TransactionReceipt {
-    fn from(value: ethers::prelude::TransactionReceipt) -> Self {
-        Self {
-            tx_hash: value.transaction_hash.into(),
-            block_number: value.block_number.expect("invalid transaction receipt").as_u64(),
-        }
-    }
-}
-
-type Resolver<'a> = Box<dyn Future<Output = Result<TransactionReceipt>> + Send + 'a>;
-
-/// Represents a pending transaction that can be eventually
-/// resolved until confirmation, which is done by polling
-/// the respective RPC provider.
-///
-/// The polling interval and number of confirmations are defined by the underlying provider.
-pub struct PendingTransaction<'a> {
-    tx_hash: Hash,
-    resolver: Resolver<'a>,
-}
-
-impl PendingTransaction<'_> {
-    /// Hash of the pending transaction.
-    pub fn tx_hash(&self) -> Hash {
-        self.tx_hash
-    }
-}
-
-impl<'a, P: ethers::providers::JsonRpcClient> From<ethers::providers::PendingTransaction<'a, P>>
-    for PendingTransaction<'a>
-{
-    fn from(value: ethers::providers::PendingTransaction<'a, P>) -> Self {
-        let tx_hash = Hash::from(value.tx_hash());
-        Self {
-            tx_hash,
-            resolver: Box::new(value.map(move |result| match result {
-                Ok(Some(tx)) => Ok(TransactionReceipt::from(tx)),
-                Ok(None) => Err(TransactionDropped(tx_hash.to_string())),
-                Err(err) => Err(ProviderError(err)),
-            })),
-        }
-    }
-}
-
-impl Display for PendingTransaction<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "pending tx {}", self.tx_hash)
-    }
-}
-
-impl<'a> IntoFuture for PendingTransaction<'a> {
-    type Output = Result<TransactionReceipt>;
-    type IntoFuture = Pin<Resolver<'a>>;
-
-    fn into_future(self) -> Self::IntoFuture {
-        Box::into_pin(self.resolver)
-    }
-}
-
 /// Represents the on-chain status for the Node Safe module.
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub struct NodeSafeModuleStatus {
@@ -368,19 +256,33 @@ pub trait HoprRpcOperations {
     /// Retrieves the timestamp from the given block number.
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
 
-    /// Retrieves the node's account balance of the given type.
-    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
+    /// Retrieves on-chain xdai balance of the given address.
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance>;
+
+    /// Retrieves on-chain wxHOPR token balance of the given address.
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance>;
+
+    /// Retrieves the wxHOPR token allowance for the given owner and spender.
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance>;
+
+    /// Retrieves the minimum incoming ticket winning probability by directly
+    /// calling the network's winning probability oracle.
+    async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability>;
+
+    /// Retrieves the minimum ticket prices by directly calling the network's
+    /// ticket price oracle.
+    async fn get_minimum_network_ticket_price(&self) -> Result<HoprBalance>;
 
     /// Retrieves the node's eligibility status
     async fn get_eligibility_status(&self, address: Address) -> Result<bool>;
 
-    /// Retrieves info of the given node module's target.
+    /// Retrieves information of the given node module's target.
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
 
-    /// Retrieves safe address of the given node address from the registry.
+    /// Retrieves the safe address of the given node address from the registry.
     async fn get_safe_from_node_safe_registry(&self, node: Address) -> Result<Address>;
 
-    /// Retrieves target address of the node module.
+    /// Retrieves the target address of the node module.
     async fn get_module_target_address(&self) -> Result<Address>;
 
     /// Retrieves the notice period of channel closure from the Channels contract.
@@ -390,7 +292,7 @@ pub trait HoprRpcOperations {
     async fn check_node_safe_module_status(&self, node_address: Address) -> Result<NodeSafeModuleStatus>;
 
     /// Sends transaction to the RPC provider.
-    async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction>;
+    async fn send_transaction(&self, tx: TransactionRequest) -> Result<PendingTransaction>;
 }
 
 /// Structure containing filtered logs that all belong to the same block.
@@ -421,19 +323,70 @@ impl BlockWithLogs {
 }
 
 /// Trait with RPC provider functionality required by the Indexer.
-#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
-    /// Starts streaming logs from the given `start_block_number`.
-    /// If no `start_block_number` is given, the stream starts from the latest block.
-    /// The given `filter` are applied to retrieve the logs, the function fails if the filter is empty.
-    /// The streaming stops only when the corresponding channel is closed by the returned receiver.
+    /// Queries the HOPR token allowance between owner and spender addresses.
+    ///
+    /// This method queries the HOPR token contract to determine how many tokens
+    /// the owner has approved the spender to transfer on their behalf.
+    ///
+    /// # Arguments
+    /// * `owner` - The address that owns the tokens and grants the allowance
+    /// * `spender` - The address that is approved to spend the tokens
+    ///
+    /// # Returns
+    /// * `Result<HoprBalance>` - The current allowance amount
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance>;
+
+    /// Queries the xDAI (native token) balance for a specific address.
+    ///
+    /// This method queries the current xDAI balance of the specified address
+    /// from the blockchain.
+    ///
+    /// # Arguments
+    /// * `address` - The Ethereum address to query the balance for
+    ///
+    /// # Returns
+    /// * `Result<XDaiBalance>` - The current xDAI balance
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance>;
+
+    /// Queries the HOPR token balance for a specific address.
+    ///
+    /// This method directly queries the HOPR token contract to get the current
+    /// token balance of the specified address.
+    ///
+    /// # Arguments
+    /// * `address` - The Ethereum address to query the balance for
+    ///
+    /// # Returns
+    /// * `Result<HoprBalance>` - The current HOPR token balance
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance>;
+
+    /// Streams blockchain logs using selective filtering based on synchronization state.
+    ///
+    /// This method intelligently selects which log filters to use based on whether
+    /// the indexer is currently syncing historical data or processing live events.
+    /// During initial sync, it uses `no_token` filters to exclude irrelevant token
+    /// events. When synced, it uses all filters to capture complete event data.
+    ///
+    /// # Arguments
+    /// * `start_block_number` - Starting block number for log retrieval
+    /// * `filters` - Set of categorized filters (all, token, no_token)
+    /// * `is_synced` - Whether the indexer has completed initial synchronization
+    ///
+    /// # Returns
+    /// * `impl Stream<Item = Result<Log>>` - Stream of blockchain logs
+    ///
+    /// # Behavior
+    /// * When `is_synced` is `false`: Uses `filter_set.no_token` to reduce log volume
+    /// * When `is_synced` is `true`: Uses `filter_set.all` for complete coverage
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filter: LogFilter,
+        filters: FilterSet,
+        is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
 }

@@ -1,24 +1,25 @@
 use async_trait::async_trait;
 use futures::TryFutureExt;
+use hopr_crypto_types::prelude::Hash;
+use hopr_db_api::info::*;
+use hopr_db_entity::{
+    chain_info, global_settings, node_info,
+    prelude::{Account, Announcement, ChainInfo, Channel, NetworkEligibility, NetworkRegistry, NodeInfo},
+};
+use hopr_internal_types::prelude::WinningProbability;
+use hopr_primitive_types::prelude::*;
 use sea_orm::{
     ActiveModelBehavior, ActiveModelTrait, ColumnTrait, EntityOrSelect, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter, Set,
 };
 use tracing::trace;
 
-use hopr_crypto_types::prelude::Hash;
-use hopr_db_api::info::*;
-use hopr_db_entity::prelude::{
-    Account, Announcement, ChainInfo, Channel, NetworkEligibility, NetworkRegistry, NodeInfo,
+use crate::{
+    HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID, TargetDb,
+    cache::{CachedValue, CachedValueDiscriminants},
+    db::HoprDb,
+    errors::{DbSqlError, DbSqlError::MissingFixedTableEntry, Result},
 };
-use hopr_db_entity::{chain_info, global_settings, node_info};
-use hopr_primitive_types::prelude::*;
-
-use crate::cache::{CachedValue, CachedValueDiscriminants};
-use crate::db::HoprDb;
-use crate::errors::DbSqlError::MissingFixedTableEntry;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx, TargetDb, SINGULAR_TABLE_FIXED_ID};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct IndexerStateInfo {
@@ -34,16 +35,17 @@ pub struct IndexerStateInfo {
 ///
 /// $H$ denotes Keccak256 hash function and $||$  byte string concatenation.
 ///
-/// For a block $b_1$ containing logs $L_1, L_2, \ldots L_n$ corresponding to tx hashes $Tx_1, Tx_2, \ldots Tx_n$, a block hash is computed as:
-///```math
+/// For a block $b_1$ containing logs $L_1, L_2, \ldots L_n$ corresponding to tx hashes $Tx_1, Tx_2, \ldots Tx_n$, a
+/// block hash is computed as:
+///
+/// ```math
 /// H_{b_1} = H(Tx_1 || Tx_2 || \ldots || Tx_n)
-///```
+/// ```
 /// Given $C_0 = H(0x00...0)$ , the checksum $C_{k+1}$ after processing block $b_{k+1}$ is given as follows:
 ///
 /// ```math
 /// C_{k+1} = H(C_k || H_{b_{k+1}})
 /// ```
-///
 #[async_trait]
 pub trait HoprDbInfoOperations {
     /// Checks if the index is empty.
@@ -61,16 +63,16 @@ pub trait HoprDbInfoOperations {
     async fn clear_index_db<'a>(&'a self, tx: OptTx<'a>) -> Result<()>;
 
     /// Gets node's Safe balance of HOPR tokens.
-    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
+    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<HoprBalance>;
 
     /// Sets node's Safe balance of HOPR tokens.
-    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()>;
+    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: HoprBalance) -> Result<()>;
 
     /// Gets node's Safe allowance of HOPR tokens.
-    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
+    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<HoprBalance>;
 
     /// Sets node's Safe allowance of HOPR tokens.
-    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()>;
+    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: HoprBalance) -> Result<()>;
 
     /// Gets node's Safe addresses info.
     async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>>;
@@ -92,12 +94,16 @@ pub trait HoprDbInfoOperations {
 
     /// Sets the minimum required winning probability for incoming tickets.
     /// The value must be between zero and 1.
-    async fn set_minimum_incoming_ticket_win_prob<'a>(&'a self, tx: OptTx<'a>, win_prob: f64) -> Result<()>;
+    async fn set_minimum_incoming_ticket_win_prob<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        win_prob: WinningProbability,
+    ) -> Result<()>;
 
     /// Updates the ticket price.
     /// To retrieve the stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`],
     /// note that this setter should invalidate the cache.
-    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
+    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: HoprBalance) -> Result<()>;
 
     /// Gets the indexer state info.
     async fn get_indexer_state_info<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerStateInfo>;
@@ -181,7 +187,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
+    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<HoprBalance> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -190,13 +196,13 @@ impl HoprDbInfoOperations for HoprDb {
                         .one(tx.as_ref())
                         .await?
                         .ok_or(MissingFixedTableEntry("node_info".into()))
-                        .map(|m| BalanceType::HOPR.balance_bytes(m.safe_balance))
+                        .map(|m| HoprBalance::from_be_bytes(m.safe_balance))
                 })
             })
             .await
     }
 
-    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()> {
+    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: HoprBalance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -204,7 +210,7 @@ impl HoprDbInfoOperations for HoprDb {
                     Ok::<_, DbSqlError>(
                         node_info::ActiveModel {
                             id: Set(SINGULAR_TABLE_FIXED_ID),
-                            safe_balance: Set(new_balance.amount().to_be_bytes().into()),
+                            safe_balance: Set(new_balance.to_be_bytes().into()),
                             ..Default::default()
                         }
                         .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
@@ -217,7 +223,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
+    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<HoprBalance> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -226,13 +232,13 @@ impl HoprDbInfoOperations for HoprDb {
                         .one(tx.as_ref())
                         .await?
                         .ok_or(MissingFixedTableEntry("node_info".into()))
-                        .map(|m| BalanceType::HOPR.balance_bytes(m.safe_allowance))
+                        .map(|m| HoprBalance::from_be_bytes(m.safe_allowance))
                 })
             })
             .await
     }
 
-    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()> {
+    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: HoprBalance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -352,8 +358,9 @@ impl HoprDbInfoOperations for HoprDb {
                                     ledger_dst,
                                     safe_registry_dst,
                                     channels_dst,
-                                    ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
-                                    minimum_incoming_ticket_winning_prob: model.min_incoming_ticket_win_prob as f64,
+                                    ticket_price: model.ticket_price.map(HoprBalance::from_be_bytes),
+                                    minimum_incoming_ticket_winning_prob: (model.min_incoming_ticket_win_prob as f64)
+                                        .try_into()?,
                                     nr_enabled: model.network_registry_enabled,
                                 }))
                             })
@@ -402,20 +409,18 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn set_minimum_incoming_ticket_win_prob<'a>(&'a self, tx: OptTx<'a>, win_prob: f64) -> Result<()> {
-        if !(0.0..=1.0).contains(&win_prob) {
-            return Err(DbSqlError::LogicalError(
-                "winning probability must be between 0 and 1".into(),
-            ));
-        }
-
+    async fn set_minimum_incoming_ticket_win_prob<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        win_prob: WinningProbability,
+    ) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     chain_info::ActiveModel {
                         id: Set(SINGULAR_TABLE_FIXED_ID),
-                        min_incoming_ticket_win_prob: Set(win_prob as f32),
+                        min_incoming_ticket_win_prob: Set(win_prob.as_f64() as f32),
                         ..Default::default()
                     }
                     .update(tx.as_ref())
@@ -433,14 +438,14 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()> {
+    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: HoprBalance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     chain_info::ActiveModel {
                         id: Set(SINGULAR_TABLE_FIXED_ID),
-                        ticket_price: Set(Some(price.amount().to_be_bytes().into())),
+                        ticket_price: Set(Some(price.to_be_bytes().into())),
                         ..Default::default()
                     }
                     .update(tx.as_ref())
@@ -582,30 +587,30 @@ impl HoprDbInfoOperations for HoprDb {
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
+    use hopr_primitive_types::{balance::HoprBalance, prelude::Address};
 
-    use hopr_primitive_types::prelude::{Address, BalanceType};
-
-    use crate::db::HoprDb;
-    use crate::info::{HoprDbInfoOperations, SafeInfo};
+    use crate::{
+        db::HoprDb,
+        info::{HoprDbInfoOperations, SafeInfo},
+    };
 
     lazy_static::lazy_static! {
         static ref ADDR_1: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));
         static ref ADDR_2: Address = Address::from(hex!("4c8bbd047c2130e702badb23b6b97a88b6562324"));
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_balance() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             db.get_safe_hopr_balance(None).await?,
             "balance must be 0"
         );
 
-        let balance = BalanceType::HOPR.balance(10_000);
+        let balance = HoprBalance::from(10_000);
         db.set_safe_hopr_balance(None, balance).await?;
 
         assert_eq!(
@@ -616,17 +621,17 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_allowance() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             db.get_safe_hopr_allowance(None).await?,
             "balance must be 0"
         );
 
-        let balance = BalanceType::HOPR.balance(10_000);
+        let balance = HoprBalance::from(10_000);
         db.set_safe_hopr_allowance(None, balance).await?;
 
         assert_eq!(
@@ -638,17 +643,17 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_indexer_data() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let data = db.get_indexer_data(None).await?;
         assert_eq!(data.ticket_price, None);
 
-        let price = BalanceType::HOPR.balance(10);
+        let price = HoprBalance::from(10);
         db.update_ticket_price(None, price).await?;
 
-        db.set_minimum_incoming_ticket_win_prob(None, 0.5).await?;
+        db.set_minimum_incoming_ticket_win_prob(None, 0.5.try_into()?).await?;
 
         let data = db.get_indexer_data(None).await?;
 
@@ -657,7 +662,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_safe_info_with_cache() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -674,7 +679,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_safe_info() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -692,7 +697,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_global_setting() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 

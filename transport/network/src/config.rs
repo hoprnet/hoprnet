@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
+use serde_with::{DurationSeconds, serde_as};
 use smart_default::SmartDefault;
 use validator::Validate;
 
-/// Network quality threshold since which a node is considered
+/// Network quality threshold since when a node is considered
 /// available enough to be used
 pub const DEFAULT_NETWORK_OFFLINE_QUALITY_THRESHOLD: f64 = 0.0;
 pub const DEFAULT_NETWORK_BAD_QUALITY_THRESHOLD: f64 = 0.1;
@@ -13,6 +13,10 @@ pub const DEFAULT_NETWORK_QUALITY_STEP: f64 = 0.1;
 pub const DEFAULT_NETWORK_QUALITY_AVERAGE_WINDOW_SIZE: u32 = 25;
 pub const DEFAULT_NETWORK_BACKOFF_EXPONENT: f64 = 1.5;
 pub const DEFAULT_NETWORK_BACKOFF_MIN: f64 = 2.0;
+
+pub const DEFAULT_AUTO_PATH_QUALITY_THRESHOLD: f64 = 0.95;
+
+pub const DEFAULT_MAX_FIRST_HOP_LATENCY_THRESHOLD: Duration = Duration::from_millis(250);
 
 /// Configuration for the [`crate::network::Network`] object
 #[serde_as]
@@ -38,6 +42,14 @@ pub struct NetworkConfig {
     #[serde(default = "quality_offline_threshold")]
     #[default(quality_offline_threshold())]
     pub quality_offline_threshold: f64,
+
+    #[serde(default = "node_score_auto_path_threshold")]
+    #[default(node_score_auto_path_threshold())]
+    pub node_score_auto_path_threshold: f64,
+
+    #[serde(default = "max_first_hop_latency_threshold")]
+    #[default(max_first_hop_latency_threshold())]
+    pub max_first_hop_latency_threshold: Option<Duration>,
 
     #[serde(default = "quality_step")]
     #[default(quality_step())]
@@ -84,6 +96,13 @@ impl Validate for NetworkConfig {
             );
         }
 
+        if !(0.0..=1.0).contains(&self.node_score_auto_path_threshold) {
+            errors.add(
+                "node_score_auto_path_threshold",
+                validator::ValidationError::new("node_score_auto_path_threshold must be between 0 and 1"),
+            );
+        }
+
         // #[validate(range(min = 0.0, max = 1.0))]
         if !(0.0..=1.0).contains(&self.quality_offline_threshold) {
             errors.add(
@@ -115,6 +134,14 @@ impl Validate for NetworkConfig {
             );
         }
 
+        // #[validate(range(min = 0.0))]
+        if self.backoff_min < 0.0 {
+            errors.add(
+                "backoff_min",
+                validator::ValidationError::new("backoff_min must be greater or equal 0"),
+            );
+        }
+
         if self.backoff_min >= self.backoff_max {
             errors.add(
                 "backoff_min and backoff_max",
@@ -122,11 +149,7 @@ impl Validate for NetworkConfig {
             );
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 }
 
@@ -148,6 +171,16 @@ fn quality_bad_threshold() -> f64 {
 #[inline]
 fn quality_offline_threshold() -> f64 {
     DEFAULT_NETWORK_OFFLINE_QUALITY_THRESHOLD
+}
+
+#[inline]
+fn node_score_auto_path_threshold() -> f64 {
+    DEFAULT_AUTO_PATH_QUALITY_THRESHOLD
+}
+
+#[inline]
+fn max_first_hop_latency_threshold() -> Option<Duration> {
+    Some(DEFAULT_MAX_FIRST_HOP_LATENCY_THRESHOLD)
 }
 
 #[inline]

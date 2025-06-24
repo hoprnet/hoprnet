@@ -1,24 +1,25 @@
+use std::fmt::Debug;
+
 use digest::Digest;
 use generic_array::{ArrayLength, GenericArray};
+use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::prelude::*;
 use sha2::Sha512;
-use std::fmt::Debug;
 use subtle::{Choice, ConstantTimeEq};
-use zeroize::ZeroizeOnDrop;
 
-use hopr_crypto_random::random_bytes;
-
-use crate::errors;
-use crate::errors::CryptoError::InvalidInputValue;
-use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
-use crate::utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes, SecretValue};
+use crate::{
+    errors,
+    errors::CryptoError::InvalidInputValue,
+    types::{CompressedPublicKey, OffchainPublicKey, PublicKey},
+    utils::{SecretValue, k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes},
+};
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
 /// Must be comparable in constant time and zeroized on drop.
-pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
+pub trait Keypair: ConstantTimeEq + Sized {
     /// Represents the type of the private (secret) key
-    type SecretLen: ArrayLength<u8>;
+    type SecretLen: ArrayLength;
 
     /// Represents the type of the public key
     type Public: BytesRepresentable + Clone + PartialEq;
@@ -42,12 +43,12 @@ pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
 }
 
 /// Represents a keypair consisting of an Ed25519 private and public key
-#[derive(Clone, ZeroizeOnDrop)]
-pub struct OffchainKeypair(SecretValue<typenum::U32>, #[zeroize(skip)] OffchainPublicKey);
+#[derive(Clone)]
+pub struct OffchainKeypair(SecretValue<typenum::U32>, OffchainPublicKey);
 
 impl Keypair for OffchainKeypair {
-    type SecretLen = typenum::U32;
     type Public = OffchainPublicKey;
+    type SecretLen = typenum::U32;
 
     fn random() -> Self {
         // Safe to unwrap here, as the random bytes length is exact
@@ -56,7 +57,7 @@ impl Keypair for OffchainKeypair {
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
         Ok(Self(
-            bytes.try_into().map_err(|_| InvalidInputValue)?,
+            bytes.try_into().map_err(|_| InvalidInputValue("bytes"))?,
             OffchainPublicKey::from_privkey(bytes)?,
         ))
     }
@@ -85,7 +86,7 @@ impl ConstantTimeEq for OffchainKeypair {
 impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
     /// Transforms the secret to be equivalent with the EdDSA public key used for signing.
     /// This is required so that the secret keys used to generate Sphinx shared secrets
-    /// are corresponding to the public keys we obtain from the Ed25519 peer ids.
+    /// correspond to the public keys we get from the Ed25519 peer ids.
     fn from(value: &OffchainKeypair) -> Self {
         let mut h: Sha512 = Sha512::default();
         h.update(&value.0);
@@ -111,12 +112,12 @@ impl From<&OffchainKeypair> for libp2p_identity::PeerId {
 }
 
 /// Represents a keypair consisting of a secp256k1 private and public key
-#[derive(Clone, ZeroizeOnDrop)]
-pub struct ChainKeypair(SecretValue<typenum::U32>, #[zeroize(skip)] CompressedPublicKey);
+#[derive(Clone)]
+pub struct ChainKeypair(SecretValue<typenum::U32>, CompressedPublicKey);
 
 impl Keypair for ChainKeypair {
-    type SecretLen = typenum::U32;
     type Public = CompressedPublicKey;
+    type SecretLen = typenum::U32;
 
     fn random() -> Self {
         let (secret, public) = random_group_element();
@@ -129,7 +130,10 @@ impl Keypair for ChainKeypair {
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
         let compressed = PublicKey::from_privkey(bytes).map(CompressedPublicKey)?;
 
-        Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, compressed))
+        Ok(Self(
+            bytes.try_into().map_err(|_| InvalidInputValue("bytes"))?,
+            compressed,
+        ))
     }
 
     fn secret(&self) -> &SecretValue<typenum::U32> {
@@ -168,9 +172,10 @@ impl From<&ChainKeypair> for Address {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use libp2p_identity::PeerId;
     use subtle::ConstantTimeEq;
+
+    use super::*;
 
     #[test]
     fn test_offchain_keypair() {

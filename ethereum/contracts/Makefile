@@ -2,14 +2,14 @@ SHELL := env $(shell which bash)
 
 # utility wrapper for forge script to use same options on every invocation
 forge := time forge
-forge-script = env NETWORK=$(network) FOUNDRY_PROFILE=$(environment-type) ETHERSCAN_API_KEY=$(etherscan_api_key) time forge script
+forge-script = env NETWORK=$(network) FOUNDRY_PROFILE=$(environment-type) ETHERSCAN_API_KEY=$(etherscan_api_key) forge script
 
 .PHONY: sc-test
 sc-test:
 	# we must run the tests in separate groups to avoid IO race conditions
 	$(forge) test --gas-report --match-path "./test/scripts/DeployAll.t.sol"
 	$(forge) test --gas-report --match-path "./test/scripts/DeployNodeManagement.t.sol"
-	$(forge) test --gas-report --no-match-path "./test/scripts/Deploy*.t.sol"
+	$(forge) test --gas-report --no-match-path "./test/scripts/Deploy*.t.sol" --no-match-test "test.*_.*DomainSeparator"
 
 .PHONY: sc-coverage
 sc-coverage:

@@ -32,6 +32,7 @@
     - [Nix flake outputs](#nix-flake-outputs)
     - [Code Formatting](#code-formatting)
     - [Code Linting](#code-linting)
+    - [Generate the Python SDK](#generate-the-python-sdk)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)
@@ -93,8 +94,8 @@ where:
 
 Pull the container image with `docker`:
 
-```shell
-$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
+```bash
+docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -105,23 +106,23 @@ WARNING: This setup should only be used for development or advanced usage withou
 
 Clone and initialize the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository:
 
-```shell
-$ git clone https://github.com/hoprnet/hoprnet
-$ cd hoprnet
+```bash
+git clone https://github.com/hoprnet/hoprnet
+cd hoprnet
 ```
 
 Build and install the `hoprd` binary, e.g. on a UNIX platform:
 
-```shell
-$ nix build
-$ sudo cp result/bin/* /usr/local/bin/
+```bash
+nix build
+sudo cp result/bin/* /usr/local/bin/
 ```
 
 ## Usage
 
 `hoprd` provides various command-line switches to configure its behaviour. For reference these are documented here as well:
 
-```shell
+```bash
 $ hoprd --help
 HOPR node executable.
 
@@ -144,30 +145,28 @@ Options:
           Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
       --apiPort <PORT>
           Set port to which the API server will bind [env: HOPRD_API_PORT=]
+      --defaultSessionListenHost <DEFAULT_SESSION_LISTEN_HOST>
+          Default Session listening host for Session IP forwarding [env: HOPRD_DEFAULT_SESSION_LISTEN_HOST=]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
-      --disableUnrealizedBalanceCheck...
-          Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
+      --noKeepLogs...
+          Disables keeping RPC logs in the logs database after they were processed. [env: HOPRD_INDEXER_DISABLE_KEEP_LOGS=]
+      --noFastSync...
+          Disables using fast sync at node start. [env: HOPRD_INDEXER_DISABLE_FAST_SYNC=]
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
-          Maximum number of RPC requestes that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
+          Maximum number of RPC requests that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
       --init...
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit...
           initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
-      --inbox-capacity <INBOX_CAPACITY>
-          Set maximum capacity of the HOPRd inbox [env: HOPRD_INBOX_CAPACITY=]
-      --heartbeatInterval <MILLISECONDS>
-          Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL=]
-      --heartbeatThreshold <MILLISECONDS>
-          Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD=]
-      --heartbeatVariance <MILLISECONDS>
-          Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE=]
+      --probeRecheckThreshold <SECONDS>
+          Timeframe in seconds after which it is reasonable to recheck the nearest neighbor [env: HOPRD_PROBE_RECHECK_THRESHOLD=]
       --networkQualityThreshold <THRESHOLD>
           Minimum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=]
       --configurationFilePath <CONFIG_FILE_PATH>
@@ -177,23 +176,9 @@ Options:
       --safeAddress <HOPRD_SAFE_ADDR>
           Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
       --moduleAddress <HOPRD_MODULE_ADDR>
-          Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
+          Address of the node management module [env: HOPRD_MODULE_ADDRESS=]
       --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
           Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
-      --dryRun
-          DEPRECATED [env: HOPRD_DRY_RUN=]
-      --healthCheck
-          DEPRECATED
-      --healthCheckHost <HEALTH_CHECK_HOST>
-          DEPRECATED
-      --healthCheckPort <HEALTH_CHECK_PORT>
-          DEPRECATED
-      --defaultStrategy <DEFAULT_STRATEGY>
-          DEPRECATED [env: HOPRD_DEFAULT_STRATEGY=] [possible values: promiscuous, aggregating, auto_redeeming, auto_funding, closure_finalizer, multi, passive]
-      --maxAutoChannels <MAX_AUTO_CHANNELS>
-          DEPRECATED [env: HOPRD_MAX_AUTO_CHANNELS=]
-      --disableTicketAutoRedeem...
-          DEPRECATED [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS=]
   -h, --help
           Print help
   -V, --version
@@ -204,21 +189,24 @@ Options:
 
 On top of the default configuration options generated for the command line, the following environment variables can be used in order to tweak the node functionality:
 
+- `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
 - `HOPRD_USE_OPENTELEMETRY` - enable the opentelemetry output for this node
 - `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
-- `HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS` - the maximum number of used yamux streams
-- `HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS` - the maximum number of used outbound and inbound streams for the `msg` and `ack` protocols
 - `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
 - `HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS` - cutoff duration from now to not retain the peers with older records in the peers database (e.g. after a restart)
 - `HOPR_INTERNAL_REST_API_MAX_CONCURRENT_WEBSOCKET_COUNT` - the maximum number of concurrent websocket opened through the REST API
 - `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
 - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
 - `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
-- `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
-- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
+- `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in SURB balancer (default: `0.6`)
+- `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in SURB balancer (default: `0.7`)
+- `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in SURB balancer (default: `0.2`)
+- `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
+- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
+- `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
 
 ### Example execution
 
@@ -226,13 +214,13 @@ Running the node without any command-line argument might not work depending on t
 
 Some basic reasonable setup uses a custom identity and enables the REST API of the `hoprd`:
 
-```sh
+```bash
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network doufur
 ```
 
 Here is a short breakdown of each argument.
 
-```sh
+```bash
 hoprd
   # store your node identity information in the persisted database folder
   --identity /app/hoprd-db/.hopr-identity
@@ -284,7 +272,7 @@ Either setup `nix` and `flake` to use the nix environment, or [install Rust tool
 
 ### Nix environment setup
 
-Install `nix`` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
+Install `nix` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
 
 Create a nix configuration file at `~/.config/nix/nix.conf` with the following content:
 
@@ -294,20 +282,20 @@ experimental-features = nix-command flakes
 
 Install the `nix-direnv` package to introduce the `direnv`:
 
-```shell
-$ nix-env -i nix-direnv
+```bash
+nix-env -i nix-direnv
 ```
 
 Append the following line to the shell rc file (depending on the shell used it can be `~\.zshrc`, `~\.bashrc`, `~\.cshrc`, etc.). Modify the `<shell>` variable inside the below command with the currently used (`zsh`, `bash`, `csh`, etc.):
 
-```shell
-$ eval "$(direnv hook <shell>)"
+```bash
+eval "$(direnv hook <shell>)"
 ```
 
 From within the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository's directory, execute the following command.
 
 ```bash
-$ direnv allow .
+direnv allow .
 ```
 
 #### Nix flake outputs
@@ -315,15 +303,15 @@ $ direnv allow .
 We provide a couple of packages, apps and shells to make building and
 development easier, to get the full list execute:. You may get the full list like so:
 
-```shell
-$ nix flake show
+```bash
+nix flake show
 ```
 
 #### Code Formatting
 
 All nix, rust, solidity and python code can be automatically formatted:
 
-```shell
+```bash
 nix fmt
 ```
 
@@ -333,23 +321,37 @@ These formatters are also automatically run as a Git pre-commit check.
 
 All linters can be executed via a Nix flake helper app:
 
-```shell
+```bash
 nix run .#lint
 ```
 
 This will in particular run `clippy` for the entire Rust codebase.
 
+#### Generate the Python SDK
+
+No Python SDK is available to connect to the HOPRd API. However, you can generate one using the [generate-python-sdk.sh](/scripts/generate-python-sdk.sh) script.
+
+Prerequisites:
+
+- swagger-codegen3
+- build the repository to get the `hoprd-api-schema` generated
+
+The generated SDK will be available in the `/tmp/hoprd-sdk-python/` directory. Modify the script to generate SDKs for different programming languages supported by swagger-codegen3.
+
+For usage examples of the generated SDK, refer to the generated README.md file in the SDK directory.
+
 ### Local node with safe staking service (local network)
 
 Running one node in test mode, with safe and module attached (in an `anvil-localhost` network)
 
-```shell
+```bash
+nix run .#lint
 # clean up, e.g.
 # make kill-anvil
 # make clean
 
-# build deps and HOPRd code
-make -j deps && make -j build
+# build HOPRd code
+cargo build
 
 # starting network
 make run-anvil args="-p"
@@ -382,9 +384,9 @@ make run-hopr-admin &
 
 Running one node in test mode, with safe and module attached (in dufour network)
 
-````shell
-# build deps and HOPRd code
-make -j deps && make -j build
+```bash
+# HOPRd code
+cargo build
 
 # Fill out the `ethereum/contract/.env` from the `ethereum/contracts/example.env`
 #
@@ -394,9 +396,9 @@ make -j deps && make -j build
 # Please use the deployer private key as DEPLOYER_PRIVATE_KEY
 # The Ethereum address to the DEPLOYER_PRIVATE_KEY should be a "manager" of the network registry.
 # Role can be checked in the explorer:
-# ```
+
 # echo "https://gnosisscan.io/address/$(jq '.networks.dufour.addresses.network_registry' ./ethereum/contracts/contracts-addresses.json)\#readContract"
-# ```
+
 source ./ethereum/contracts/.env
 
 export HOPR_NETWORK="dufour"
@@ -407,7 +409,7 @@ bash scripts/generate-identity.sh
 
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &
-````
+```
 
 ## Local cluster
 
@@ -419,7 +421,7 @@ The best way to test with multiple HOPR nodes is by using a [local cluster of in
 
 Tests both the Rust and Solidity code.
 
-```shell
+```bash
 make test
 ```
 
@@ -431,8 +433,8 @@ Docker environment.
 
 E.g. running the build workflow:
 
-```shell
-$ act -j build
+```bash
+act -j build
 ```
 
 For more information please refer to [act][2]'s documentation.
@@ -445,28 +447,12 @@ Tests are using the `pytest` infrastructure.
 
 #### Running Tests Locally
 
-##### Testing environment
-
-If not using `nix`, setup the `pytest` environment:
-
-```shell
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -r tests/requirements.txt
-```
-
-To deactivate the activated testing environment if no longer needed:
-
-```shell
-deactivate
-```
-
 ##### Test execution
 
 With the environment activated, execute the tests locally:
 
-```shell
-make smoke-tests
+```bash
+just run-smoke-test integration
 ```
 
 ## Using Fast Sync
@@ -494,10 +480,12 @@ The following files in the node's database folder are required:
 
 1. Place the pre-built logs database files in the node's database folder
 2. Enable fast sync mode (enabled by default):
-   - Set `hopr -> chain -> fast_sync` to `true` in the configuration file
+
+- Set `hopr -> chain -> fast_sync` to `true` in the configuration file
+
 3. Remove any existing index data:
 
-   ```shell
+   ```bash
    rm hopr_index.db*
    ```
 
@@ -523,7 +511,7 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 
 ## Contact
 
-- [Twitter](https://twitter.com/hoprnet)
+- [X](https://x.com/hoprnet)
 - [Telegram](https://t.me/hoprnet)
 - [Medium](https://medium.com/hoprnet)
 - [Reddit](https://www.reddit.com/r/HOPR/)

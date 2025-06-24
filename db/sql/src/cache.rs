@@ -1,18 +1,31 @@
-use crate::errors::DbSqlError;
+use std::{
+    sync::{Arc, Mutex, atomic::AtomicU64},
+    time::Duration,
+};
+
+use dashmap::{DashMap, Entry};
+use hopr_crypto_packet::{
+    HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener,
+    prelude::{HoprSenderId, HoprSurbId},
+};
 use hopr_crypto_types::prelude::*;
+use hopr_db_api::{
+    info::{IndexerData, SafeInfo},
+    prelude::DbError,
+};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::{Address, Balance};
-use moka::future::Cache;
-use moka::Expiry;
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
-use std::time::Duration;
+use hopr_primitive_types::{
+    balance::HoprBalance,
+    prelude::{Address, KeyIdent, U256},
+};
+use moka::{Expiry, future::Cache};
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 
-use hopr_db_api::info::{IndexerData, SafeInfo};
+use crate::errors::DbSqlError;
 
-/// Enumerates all singular data that can be cached and
-/// cannot be represented by a key. These values can be cached for long term.
-#[derive(Debug, Clone, PartialEq, strum::EnumDiscriminants)]
+/// Lists all singular data that can be cached and
+/// cannot be represented by a key. These values can be cached for the long term.
+#[derive(Debug, Clone, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(Hash))]
 pub enum CachedValue {
     /// Cached [IndexerData].
@@ -54,16 +67,71 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
+/// Ring buffer containing SURBs along with their IDs.
+/// All these SURBs usually belong to the same pseudonym.
+#[derive(Clone, Debug)]
+pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<(HoprSurbId, HoprSurb)>>>);
+
+impl Default for SurbRingBuffer {
+    fn default() -> Self {
+        // With the current packet size, this is roughly for 7 MB of data budget in SURBs
+        Self::new(10_000)
+    }
+}
+
+impl SurbRingBuffer {
+    pub fn new(capacity: usize) -> Self {
+        Self(Arc::new(Mutex::new(AllocRingBuffer::new(capacity))))
+    }
+
+    /// Push all SURBs with their IDs into the RB.
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, HoprSurb)>>(&self, surbs: I) -> Result<(), DbError> {
+        self.0
+            .lock()
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
+            .extend(surbs);
+        Ok(())
+    }
+
+    /// Pop the latest SURB and its IDs from the RB.
+    pub fn pop_one(&self) -> Result<(HoprSurbId, HoprSurb), DbError> {
+        self.0
+            .lock()
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
+            .dequeue()
+            .ok_or(DbError::NoSurbAvailable("no more surbs".into()))
+    }
+
+    /// Check if the next SURB has the given ID and pop it from the RB.
+    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, HoprSurb), DbError> {
+        let mut rb = self
+            .0
+            .lock()
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
+        if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
+            rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))
+        } else {
+            Err(DbError::NoSurbAvailable("surb does not match the given id".into()))
+        }
+    }
+}
+
 /// Contains all caches used by the [crate::db::HoprDb].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct HoprDbCaches {
     pub(crate) single_values: Cache<CachedValueDiscriminants, CachedValue>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
-    pub(crate) unrealized_value: Cache<Hash, Balance>,
+    // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
+    // include tickets from other epochs
+    pub(crate) unrealized_value: Cache<(Hash, U256), HoprBalance>,
     pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
+    // KeyIdMapper must be synchronous because it is used from a sync context.
+    pub(crate) key_id_mapper: CacheKeyMapper,
+    pub(crate) pseudonym_openers: moka::sync::Cache<HoprSenderId, ReplyOpener>,
+    pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer>,
 }
 
 impl Default for HoprDbCaches {
@@ -80,17 +148,31 @@ impl Default for HoprDbCaches {
         let unrealized_value = Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build();
 
         let chain_to_offchain = Cache::builder()
-            .time_to_live(Duration::from_secs(600))
+            .time_to_idle(Duration::from_secs(600))
             .max_capacity(100_000)
             .build();
 
         let offchain_to_chain = Cache::builder()
-            .time_to_live(Duration::from_secs(600))
+            .time_to_idle(Duration::from_secs(600))
             .max_capacity(100_000)
             .build();
 
         let src_dst_to_channel = Cache::builder()
             .time_to_live(Duration::from_secs(600))
+            .max_capacity(10_000)
+            .build();
+
+        // SURB openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
+        // and therefore, there's more but with a shorter lifetime
+        let pseudonym_openers = moka::sync::Cache::builder()
+            .time_to_live(Duration::from_secs(60))
+            .max_capacity(100_000)
+            .build();
+
+        // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
+        // For each Pseudonym, there's an RB of SURBs and their IDs.
+        let surbs_per_pseudonym = Cache::builder()
+            .time_to_idle(Duration::from_secs(600))
             .max_capacity(10_000)
             .build();
 
@@ -102,6 +184,9 @@ impl Default for HoprDbCaches {
             chain_to_offchain,
             offchain_to_chain,
             src_dst_to_channel,
+            pseudonym_openers,
+            surbs_per_pseudonym,
+            key_id_mapper: CacheKeyMapper::with_capacity(10_000),
         }
     }
 }
@@ -115,5 +200,81 @@ impl HoprDbCaches {
         self.chain_to_offchain.invalidate_all();
         self.offchain_to_chain.invalidate_all();
         self.src_dst_to_channel.invalidate_all();
+        // NOTE: key_id_mapper intentionally not invalidated
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct CacheKeyMapper(
+    DashMap<KeyIdent<4>, OffchainPublicKey>,
+    DashMap<OffchainPublicKey, KeyIdent<4>>,
+);
+
+impl CacheKeyMapper {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(DashMap::with_capacity(capacity), DashMap::with_capacity(capacity))
+    }
+
+    /// Creates key id mapping for a public key of an [account](AccountEntry).
+    ///
+    /// Does nothing if the binding already exists. Returns error if an existing binding
+    /// is not consistent.
+    pub fn update_key_id_binding(&self, account: &AccountEntry) -> Result<(), DbSqlError> {
+        let id = account.key_id();
+        let key = account.public_key;
+
+        // Lock entries in the maps to avoid concurrent modifications
+        let id_entry = self.0.entry(id);
+        let key_entry = self.1.entry(key);
+
+        match (id_entry, key_entry) {
+            (Entry::Vacant(v_id), Entry::Vacant(v_key)) => {
+                v_id.insert_entry(key);
+                v_key.insert_entry(id);
+                tracing::debug!(%id, %key, "inserted key-id binding");
+                Ok(())
+            }
+            (Entry::Occupied(v_id), Entry::Occupied(v_key)) => {
+                // Check if the existing binding is consistent with the new one.
+                if v_id.get() != v_key.key() {
+                    Err(DbSqlError::LogicalError(format!(
+                        "attempt to insert key {key} with key-id {id}, but key-id already maps to key {} while {} is \
+                         expected",
+                        v_id.get(),
+                        v_key.key(),
+                    )))
+                } else {
+                    Ok(())
+                }
+            }
+            // This only happens on re-announcements:
+            // The re-announcement uses the same packet key and chain-key, but the block number (published at)
+            // is different, and therefore the id_entry will be vacant.
+            (Entry::Vacant(_), Entry::Occupied(v_key)) => {
+                tracing::debug!(
+                    "attempt to insert key {key} with key-id {id} failed because key is already set as {}",
+                    v_key.get()
+                );
+                Err(DbSqlError::LogicalError("inconsistent key-id binding".into()))
+            }
+            // This should never happen.
+            (Entry::Occupied(v_id), Entry::Vacant(_)) => {
+                tracing::debug!(
+                    "attempt to insert key {key} with key-id {id} failed because key-id is already set as {}",
+                    v_id.get()
+                );
+                Err(DbSqlError::LogicalError("inconsistent key-id binding".into()))
+            }
+        }
+    }
+}
+
+impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for CacheKeyMapper {
+    fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<KeyIdent> {
+        self.1.get(key).map(|k| *k.value())
+    }
+
+    fn map_id_to_public(&self, id: &KeyIdent) -> Option<OffchainPublicKey> {
+        self.0.get(id).map(|k| *k.value())
     }
 }

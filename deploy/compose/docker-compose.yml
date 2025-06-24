@@ -6,7 +6,6 @@ networks:
 volumes:
   prometheus_data: {}
   grafana_data: {}
-  hoprd_data: {}
 
 services:
   hoprd:
@@ -23,17 +22,21 @@ services:
       - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/tcp"
       - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/udp"
       - "${HOPRD_API_PORT}:3001"
+      # forward range of session ports, needed if you plan to use session based apps like GnosisVPN
+      # - 1421-1430:1421-1430/tcp
+      # - 1421-1430:1421-1430/udp
     env_file:
       - .env-secrets
     environment:
       - "RUST_LOG=${HOPRD_LOG_LEVEL}"
       - RUST_BACKTRACE=full
-      - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
+      - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd/conf/hoprd.cfg.yaml
       - "HOPRD_USE_OPENTELEMETRY=${HOPRD_USE_OPENTELEMETRY}"
       - "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME}"
       - "OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}"
     volumes:
-      - ./hoprd_data:/app
+      - ./hoprd/data:/app/hoprd/data
+      - ./hoprd/conf:/app/hoprd/conf
     deploy:
       resources:
         reservations:

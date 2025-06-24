@@ -22,10 +22,16 @@ on:
       duration:
         type: number
         required: true
-      rate:
+      echo_service_replicas:
         type: number
         required: true
-      vu:
+      payload_size:
+        type: number
+        required: true
+      download_throughput:
+        type: number
+        required: true
+      upload_throughput:
         type: number
         required: true
   workflow_dispatch:
@@ -37,7 +43,8 @@ on:
       cluster_nodes:
         type: choice
         options:
-          - core
+          - core-rotsee
+          - core-dufour
           - uhttp
           - team
         required: true
@@ -45,10 +52,10 @@ on:
       topology:
         type: choice
         options:
+          - receiver
           - many2many
           - sender
           - relayer
-          - receiver
         required: true
         description: 'Nodes channel topology'
       workload:
@@ -66,17 +73,26 @@ on:
         default: 30
         required: true
         description: 'Test duration in minutes'
-      vu:
+      echo_service_replicas:
         type: number
         default: 1
         required: true
-        description: 'Virtual Users per route'
-      rate:
+        description: 'Echo service replicas'
+      payload_size:
         type: number
-        default: 20
+        default: 10485760
         required: true
-        description: 'Messages per seconds per Virtual User per routes'
-
+        description: 'Payload size in bytes'
+      download_throughput:
+        type: number
+        default: 1048576
+        required: true
+        description: 'Download throughput in bytes per second'
+      upload_throughput:
+        type: number
+        default: 524288
+        required: true
+        description: 'Upload throughput in bytes per second'
 
 concurrency:
   group: load-tests
@@ -87,6 +103,12 @@ jobs:
     name: Load Tests
     runs-on: self-hosted-hoprnet-small
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Set environment variables
         id: vars
         run: |
@@ -98,8 +120,10 @@ jobs:
               echo "K6_TOPOLOGY_NAME=${{ inputs.topology }}"
               echo "K6_WORKLOAD_NAME=${{ inputs.workload }}"
               echo "K6_TEST_DURATION=${{ inputs.duration }}"
-              echo "K6_VU_PER_ROUTE=${{ inputs.vu }}"
-              echo "K6_REQUESTS_PER_SECOND_PER_VU=${{inputs.rate }}"
+              echo "K6_ECHO_SERVERS_REPLICAS=${{ inputs.echo_service_replicas }}"
+              echo "K6_PAYLOAD_SIZE=${{ inputs.payload_size }}"
+              echo "K6_DOWNLOAD_THROUGHPUT=${{ inputs.download_throughput }}"
+              echo "K6_UPLOAD_THROUGHPUT=${{ inputs.upload_throughput }}"
             } >> $GITHUB_ENV
           else
             echo "The workflow is triggered manually"
@@ -109,20 +133,23 @@ jobs:
               echo "K6_TOPOLOGY_NAME=${{ github.event.inputs.topology }}"
               echo "K6_WORKLOAD_NAME=${{ github.event.inputs.workload }}"
               echo "K6_TEST_DURATION=${{ github.event.inputs.duration }}"
-              echo "K6_VU_PER_ROUTE=${{ github.event.inputs.vu }}"
-              echo "K6_REQUESTS_PER_SECOND_PER_VU=${{ github.event.inputs.rate }}"
+              echo "K6_ECHO_SERVERS_REPLICAS=${{ github.event.inputs.echo_service_replicas }}"
+              echo "K6_PAYLOAD_SIZE=${{ github.event.inputs.payload_size }}"
+              echo "K6_DOWNLOAD_THROUGHPUT=${{ github.event.inputs.download_throughput }}"
+              echo "K6_UPLOAD_THROUGHPUT=${{ github.event.inputs.upload_throughput }}"
             } >> $GITHUB_ENV
           fi
 
       - name: Checkout hoprd-test repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          persist-credentials: false
           repository: hoprnet/hoprd-test
           ref: main # Use different branch if needed to test a new development
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
         with:
           google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
           login-artifact-registry: 'true'
@@ -131,7 +158,7 @@ jobs:
           project: hopr-staging
 
       - name: Setup NodeJs
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
 
@@ -144,21 +171,13 @@ jobs:
       - name: Setup Load Testing environment
         run: |
           npm install
-          npm run setup:${K6_TOPOLOGY_NAME}
+          npm run setup
         working-directory: "./k6"
 
       - name: Run Load test
         run: |
           kubectl delete -f k6-test-run.yaml 2> /dev/null || true
+          echo "Execution parameters:"
+          env | grep K6_
           kubectl apply -f k6-test-run.yaml
-          echo "Waiting for test to bootstrap..."
-          sleep 2m # Wait for test to bootstrap
-          echo "Waiting for test to finish..."
-          sleep ${K6_TEST_DURATION}m # wait for the test to finish
-        working-directory: "./k6"
-
-      - name: Collect Load test results
-        run: |
-          kubectl delete -f k6-test-results.yaml 2> /dev/null || true
-          kubectl apply -f k6-test-results.yaml
         working-directory: "./k6"

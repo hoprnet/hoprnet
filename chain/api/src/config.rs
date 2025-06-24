@@ -1,12 +1,11 @@
 use std::str::FromStr;
 
+use hopr_chain_types::ContractAddresses;
+use hopr_primitive_types::primitives::Address;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
-
-use chain_types::ContractAddresses;
-use hopr_primitive_types::primitives::Address;
 
 use crate::errors::HoprChainError;
 
@@ -34,7 +33,8 @@ pub struct ChainOptions {
     pub default_provider: String,
     /// a valid HTTP url pointing at a RPC endpoint
     pub etherscan_api_url: Option<String>,
-    /// The absolute maximum you are willing to pay per unit of gas to get your transaction included in a block, e.g. '10 gwei'
+    /// The absolute maximum you are willing to pay per unit of gas to get your transaction included in a block, e.g.
+    /// '10 gwei'
     pub max_fee_per_gas: String,
     /// Tips paid directly to miners, e.g. '2 gwei'
     pub max_priority_fee_per_gas: String,

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "0.4.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -10,46 +10,53 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
-prometheus = ["dep:hopr-metrics", "core-path/prometheus"]
+prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
-async-lock = { workspace = true }
 futures = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
+moka = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+tokio-util = { workspace = true, default-features = false, features = [
+  "codec",
+  "compat",
+] }
 tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-async-runtime = { workspace = true }
+hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-crypto-packet = { workspace = true }
 hopr-db-api = { workspace = true }
-hopr-internal-types = { workspace = true }
+hopr-internal-types = { workspace = true, features = ["serde"] }
+hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
-core-path = { workspace = true }
+hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-transport-bloom = { workspace = true, features = ["persistent"] }
 hopr-transport-identity = { workspace = true }
+hopr-transport-packet = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
-async-std = { workspace = true }
+tokio = { workspace = true }
+async-channel = { workspace = true }
+async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
-criterion = { workspace = true, features = ["async_futures", "async_std"] }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 more-asserts = { workspace = true }
-parameterized = { workspace = true }
 serial_test = { workspace = true }
 tracing-test = { workspace = true }
 hopr-transport-mixer = { workspace = true }

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-api"
-version = "0.6.0"
+version = "0.9.1"
 edition = "2021"
 description = "API interface specifying the desired implementation details of the HOPR database."
 homepage = "https://hoprnet.org/"
@@ -20,9 +20,8 @@ strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-network-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-internal-types = { workspace = true }
-
-[dev-dependencies]
-tracing-test = { workspace = true }

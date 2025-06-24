@@ -1,32 +1,21 @@
+use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
+
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-use chrono::{DateTime, Utc};
-use futures::StreamExt;
-use std::collections::HashMap;
-use std::fmt::Formatter;
-use std::str::FromStr;
-use std::{sync::Arc, time::SystemTime};
+use futures::{StreamExt, future::AbortHandle};
+use hopr_lib::{HoprLibProcesses, ToHex};
+use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
+use hoprd_api::{ListenerJoinHandles, RestApiParameters, serve_api};
+use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+use signal_hook::low_level;
+use tracing::{error, info, warn};
+use tracing_subscriber::prelude::*;
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
     opentelemetry_otlp::WithExportConfig as _,
     opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
 };
-
-use signal_hook::low_level;
-use tracing::{error, info, trace, warn};
-use tracing_subscriber::prelude::*;
-
-use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
-use hopr_lib::{AsUnixTimestamp, HoprLibProcesses, ToHex};
-use hopr_platform::file::native::join;
-use hoprd::cli::CliArgs;
-use hoprd::errors::HoprdError;
-use hoprd_api::{serve_api, ListenerJoinHandles, RestApiParameters};
-use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
-use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-
-use hoprd::exit::HoprServerIpForwardingReactor;
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -38,7 +27,6 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
             .add_directive("libp2p_dns=info".parse()?)
             .add_directive("multistream_select=info".parse()?)
             .add_directive("isahc=error".parse()?)
-            .add_directive("surf::middleware::logger::native=error".parse()?)
             .add_directive("sea_orm=warn".parse()?)
             .add_directive("sqlx=warn".parse()?)
             .add_directive("hyper_util=warn".parse()?),
@@ -85,16 +73,19 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_timeout(std::time::Duration::from_secs(5))
                     .build()?;
 
-                let tracer = opentelemetry_sdk::trace::TracerProvider::builder()
-                    .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+                let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+                    .with_batch_exporter(exporter)
                     .with_sampler(Sampler::AlwaysOn)
                     .with_id_generator(RandomIdGenerator::default())
                     .with_max_events_per_span(64)
                     .with_max_attributes_per_span(16)
-                    .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
-                        "service.name",
-                        std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
-                    )]))
+                    .with_resource(
+                        opentelemetry_sdk::Resource::builder()
+                            .with_service_name(
+                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
+                            )
+                            .build(),
+                    )
                     .build()
                     .tracer(env!("CARGO_PKG_NAME"));
 
@@ -114,10 +105,9 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 enum HoprdProcesses {
-    HoprLib(HoprLibProcesses, JoinHandle<()>),
-    Inbox(JoinHandle<()>),
+    HoprLib(HoprLibProcesses, AbortHandle),
     ListenerSockets(ListenerJoinHandles),
-    RestApi(JoinHandle<()>),
+    RestApi(AbortHandle),
 }
 
 // Manual implementation needed, since Strum does not support skipping arguments
@@ -125,7 +115,6 @@ impl std::fmt::Display for HoprdProcesses {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             HoprdProcesses::HoprLib(p, _) => write!(f, "HoprLib process: {p}"),
-            HoprdProcesses::Inbox(_) => write!(f, "Inbox"),
             HoprdProcesses::ListenerSockets(_) => write!(f, "SessionListenerSockets"),
             HoprdProcesses::RestApi(_) => write!(f, "RestApi"),
         }
@@ -139,13 +128,16 @@ impl std::fmt::Debug for HoprdProcesses {
     }
 }
 
-#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
-#[cfg_attr(feature = "runtime-async-std", async_std::main)]
+#[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
     if hopr_crypto_random::is_rng_fixed() {
         warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
+    }
+
+    if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
+        warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
     }
 
     let args = <CliArgs as clap::Parser>::parse();
@@ -192,14 +184,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Node public identifiers"
     );
 
-    // TODO: the following check can be removed once [PR](https://github.com/hoprnet/hoprnet/pull/5665) is merged
-    if hopr_lib::Keypair::public(&hopr_keys.packet_key)
-        .to_string()
-        .starts_with("0xff")
-    {
-        warn!("This node uses an invalid packet key type and will not be able to become an effective relay node, please create a new identity!");
-    }
-
     // Create the node instance
     info!("Creating the HOPRd node instance from hopr-lib");
     let node = Arc::new(hopr_lib::Hopr::new(
@@ -208,51 +192,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &hopr_keys.chain_key,
     )?);
 
-    // Create the message inbox
-    let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(
-        hoprd_inbox::inbox::MessageInbox::new_with_time(cfg.inbox.clone(), || {
-            hopr_platform::time::native::current_time().as_unix_timestamp()
-        }),
-    ));
-
-    // Create the metadata database
-    let db_path: String = join(&[&cfg.hopr.db.data, "db"]).expect("Could not create a db storage path");
-
-    let hoprd_db = match hoprd_db_api::db::HoprdDb::new(db_path.clone()).await {
-        Ok(db) => {
-            info!("Metadata database created successfully");
-            Arc::new(db)
-        }
-        Err(e) => {
-            error!(error = %e, "Failed to create the metadata database");
-            return Err(e.into());
-        }
-    };
-
-    // Ensures that "OWN_ALIAS" is set as alias
-    match hoprd_db
-        .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
-        .await
-    {
-        Ok(_) => {
-            info!("Own alias set successfully");
-        }
-        Err(hoprd_db_api::errors::DbError::ReAliasingSelfNotAllowed) => {
-            info!("Own alias already set");
-        }
-        Err(e) => {
-            error!(error = %e, "Failed to set the alias for the node");
-        }
-    }
-
-    let inbox_clone = inbox.clone();
-
     let node_clone = node.clone();
 
     let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
-        let node_cfg_str = cfg.as_redacted_string()?;
+        let node_cfg_value =
+            serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
+
         let api_cfg = cfg.api.clone();
 
         let listen_address = match &cfg.api.host.address {
@@ -270,48 +217,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let session_listener_sockets = Arc::new(RwLock::new(HashMap::new()));
 
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
-        processes.push(HoprdProcesses::RestApi(spawn(async move {
-            if let Err(e) = serve_api(RestApiParameters {
-                listener: api_listener,
-                hoprd_cfg: node_cfg_str,
-                cfg: api_cfg,
-                hopr: node_clone,
-                hoprd_db,
-                inbox,
-                session_listener_sockets,
-                default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
-            })
-            .await
-            {
-                error!(error = %e, "the REST API server could not start")
-            }
-        })));
+
+        processes.push(HoprdProcesses::RestApi(hopr_async_runtime::spawn_as_abortable(
+            async move {
+                if let Err(e) = serve_api(RestApiParameters {
+                    listener: api_listener,
+                    hoprd_cfg: node_cfg_value,
+                    cfg: api_cfg,
+                    hopr: node_clone,
+                    session_listener_sockets,
+                    default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
+                })
+                .await
+                {
+                    error!(error = %e, "the REST API server could not start")
+                }
+            },
+        )));
     }
 
-    let (hopr_socket, hopr_processes) = node
+    let (_hopr_socket, hopr_processes) = node
         .run(HoprServerIpForwardingReactor::new(
             hopr_keys.packet_key.clone(),
-            Default::default(),
+            cfg.session_ip_forwarding,
         ))
         .await?;
-
-    // process extracting the received data from the socket
-    let mut ingress = hopr_socket.reader();
-    processes.push(HoprdProcesses::Inbox(spawn(async move {
-        while let Some(data) = ingress.next().await {
-            let tag = data.application_tag;
-
-            trace!(
-                ?tag,
-                receiged_at = DateTime::<Utc>::from(SystemTime::now()).to_rfc3339(),
-                "received message"
-            );
-
-            if !inbox_clone.write().await.push(data).await {
-                warn!(?tag, "Received a message with an ignored Inbox tag",)
-            }
-        }
-    })));
 
     processes.extend(hopr_processes.into_iter().map(|(k, v)| HoprdProcesses::HoprLib(k, v)));
 
@@ -325,20 +255,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 info!("Received the INT signal... tearing down the node");
                 futures::stream::iter(processes)
                     .then(|process| async move {
-                        let mut join_handles: Vec<JoinHandle<()>> = Vec::new();
+                        let mut abort_handles: Vec<AbortHandle> = Vec::new();
                         info!("Stopping process '{process}'");
                         match process {
-                            HoprdProcesses::HoprLib(_, jh)
-                            | HoprdProcesses::Inbox(jh)
-                            | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
-                            HoprdProcesses::ListenerSockets(jhs) => {
-                                join_handles.extend(jhs.write().await.drain().map(|(_, entry)| entry.jh));
+                            HoprdProcesses::HoprLib(_, ah) | HoprdProcesses::RestApi(ah) => abort_handles.push(ah),
+                            HoprdProcesses::ListenerSockets(ahs) => {
+                                abort_handles
+                                    .extend(ahs.write_arc().await.drain().map(|(_, entry)| entry.abort_handle));
                             }
                         }
-                        futures::stream::iter(join_handles)
+                        futures::stream::iter(abort_handles)
                     })
                     .flatten()
-                    .for_each_concurrent(None, cancel_join_handle)
+                    .for_each_concurrent(None, |ah| async move { ah.abort() })
                     .await;
 
                 info!("All processes stopped... emulating the default handler...");

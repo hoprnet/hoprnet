@@ -1,76 +1,71 @@
 pub mod topics {
-    use bindings::{
-        hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
-        hopr_channels::{
-            ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
-            DomainSeparatorUpdatedFilter, LedgerDomainSeparatorUpdatedFilter, OutgoingChannelClosureInitiatedFilter,
-            TicketRedeemedFilter,
+    use alloy::{primitives::B256, sol_types::SolEvent};
+    use hopr_bindings::{
+        hoprannouncementsevents::HoprAnnouncementsEvents::{AddressAnnouncement, KeyBinding, RevokeAnnouncement},
+        hoprchannels::HoprChannels::LedgerDomainSeparatorUpdated,
+        hoprchannelsevents::HoprChannelsEvents::{
+            ChannelBalanceDecreased, ChannelBalanceIncreased, ChannelClosed, ChannelOpened, DomainSeparatorUpdated,
+            OutgoingChannelClosureInitiated, TicketRedeemed,
         },
-        hopr_network_registry::{
-            DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter,
-            NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter, RequirementUpdatedFilter,
+        hoprnetworkregistryevents::HoprNetworkRegistryEvents::{
+            Deregistered, DeregisteredByManager, EligibilityUpdated, NetworkRegistryStatusUpdated, Registered,
+            RegisteredByManager, RequirementUpdated,
         },
-        hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
-        hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
-        hopr_token::{ApprovalFilter, TransferFilter},
-        hopr_winning_probability_oracle::WinProbUpdatedFilter,
+        hoprnodesaferegistryevents::HoprNodeSafeRegistryEvents::{DergisteredNodeSafe, RegisteredNodeSafe},
+        hoprticketpriceoracleevents::HoprTicketPriceOracleEvents::TicketPriceUpdated,
+        hoprwinningprobabilityoracleevents::HoprWinningProbabilityOracleEvents::WinProbUpdated,
     };
-    use ethers::{contract::EthEvent, types::TxHash};
 
-    pub fn channel() -> Vec<TxHash> {
+    pub fn channel() -> Vec<B256> {
         vec![
-            ChannelBalanceDecreasedFilter::signature(),
-            ChannelBalanceIncreasedFilter::signature(),
-            ChannelClosedFilter::signature(),
-            ChannelOpenedFilter::signature(),
-            OutgoingChannelClosureInitiatedFilter::signature(),
-            TicketRedeemedFilter::signature(),
-            DomainSeparatorUpdatedFilter::signature(),
-            LedgerDomainSeparatorUpdatedFilter::signature(),
+            ChannelBalanceDecreased::SIGNATURE_HASH,
+            ChannelBalanceIncreased::SIGNATURE_HASH,
+            ChannelClosed::SIGNATURE_HASH,
+            ChannelOpened::SIGNATURE_HASH,
+            OutgoingChannelClosureInitiated::SIGNATURE_HASH,
+            TicketRedeemed::SIGNATURE_HASH,
+            DomainSeparatorUpdated::SIGNATURE_HASH,
+            LedgerDomainSeparatorUpdated::SIGNATURE_HASH,
         ]
     }
 
-    pub fn token() -> Vec<TxHash> {
-        vec![TransferFilter::signature(), ApprovalFilter::signature()]
-    }
-
-    pub fn network_registry() -> Vec<TxHash> {
+    pub fn network_registry() -> Vec<B256> {
         vec![
-            DeregisteredByManagerFilter::signature(),
-            DeregisteredFilter::signature(),
-            EligibilityUpdatedFilter::signature(),
-            NetworkRegistryStatusUpdatedFilter::signature(),
-            RegisteredByManagerFilter::signature(),
-            RegisteredFilter::signature(),
-            RequirementUpdatedFilter::signature(),
+            DeregisteredByManager::SIGNATURE_HASH,
+            Deregistered::SIGNATURE_HASH,
+            EligibilityUpdated::SIGNATURE_HASH,
+            NetworkRegistryStatusUpdated::SIGNATURE_HASH,
+            RegisteredByManager::SIGNATURE_HASH,
+            Registered::SIGNATURE_HASH,
+            RequirementUpdated::SIGNATURE_HASH,
         ]
     }
 
-    pub fn announcement() -> Vec<TxHash> {
+    pub fn announcement() -> Vec<B256> {
         vec![
-            AddressAnnouncementFilter::signature(),
-            KeyBindingFilter::signature(),
-            RevokeAnnouncementFilter::signature(),
+            AddressAnnouncement::SIGNATURE_HASH,
+            KeyBinding::SIGNATURE_HASH,
+            RevokeAnnouncement::SIGNATURE_HASH,
         ]
     }
 
-    pub fn node_safe_registry() -> Vec<TxHash> {
+    pub fn node_safe_registry() -> Vec<B256> {
         vec![
-            RegisteredNodeSafeFilter::signature(),
-            DergisteredNodeSafeFilter::signature(),
-            bindings::hopr_node_safe_registry::DomainSeparatorUpdatedFilter::signature(),
+            RegisteredNodeSafe::SIGNATURE_HASH,
+            DergisteredNodeSafe::SIGNATURE_HASH,
+            hopr_bindings::hoprnodesaferegistryevents::HoprNodeSafeRegistryEvents::DomainSeparatorUpdated::SIGNATURE_HASH,
         ]
     }
 
-    pub fn ticket_price_oracle() -> Vec<TxHash> {
-        vec![TicketPriceUpdatedFilter::signature()]
+    pub fn ticket_price_oracle() -> Vec<B256> {
+        vec![TicketPriceUpdated::SIGNATURE_HASH]
     }
 
-    pub fn winning_prob_oracle() -> Vec<TxHash> {
-        vec![WinProbUpdatedFilter::signature()]
+    pub fn winning_prob_oracle() -> Vec<B256> {
+        vec![WinProbUpdated::SIGNATURE_HASH]
     }
 
-    pub fn module_implementation() -> Vec<TxHash> {
+    pub fn module_implementation() -> Vec<B256> {
         vec![]
     }
 }

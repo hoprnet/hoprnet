@@ -1,6 +1,6 @@
 [package]
-name = "bindings"
-version = "0.1.1"
+name = "hopr-bindings"
+version = "0.2.0"
 edition = "2021"
 description = "This package only exists to automate the export and generation of Rust bindings into the HOPR project"
 
@@ -8,5 +8,5 @@ description = "This package only exists to automate the export and generation of
 anyhow = { workspace = true }
 
 [dependencies]
-ethers = { workspace = true, default-features = false, features = ["abigen"] }
-serde = { workspace = true }
+alloy = { workspace = true, default-features = false, features = ["contract"] }
+serde = { workspace = true, features = ["derive"] }

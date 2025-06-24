@@ -1,0 +1,130 @@
+---
+#################################################################################
+# Pipeline triggered on pull request approval to check benchmark results 
+#################################################################################
+name: Benchmarks
+
+env:
+  RUST_BACKTRACE: "1"
+
+on:
+  workflow_call: # This workflow is called from other workflow
+    inputs:
+      branch:
+        required: true
+        type: string
+      type:
+        required: true
+        type: string
+  workflow_dispatch: # This workflow is triggered manually
+
+concurrency:
+  group: bencher
+  cancel-in-progress: false
+
+jobs:
+  bencher:
+    name: Bencher
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 150
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Set environment variables
+        id: vars
+        run: |
+          # Safely get branch name without template injection
+          if [ -n "$INPUT_BRANCH" ]; then
+            BRANCH_NAME="$INPUT_BRANCH"
+          else
+            BRANCH_NAME="$GITHUB_REF_NAME"
+          fi
+          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+          FORMATTED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
+          echo "FORMATTED_BRANCH=$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
+        env:
+          INPUT_BRANCH: ${{ inputs.branch }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.vars.outputs.BRANCH_NAME }}
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Set Bencher Testbed
+        id: testbed
+        env:
+          IS_MERGE: ${{ inputs.type == 'merge' }}
+          IS_SCHEDULED: ${{ inputs.type == 'scheduled' }}
+          FORMATTED_BRANCH: ${{ steps.vars.outputs.FORMATTED_BRANCH }}
+        run: |
+          # Check if branch is allowed (master or release-*)
+          if [[ "$FORMATTED_BRANCH" == "master" || "$FORMATTED_BRANCH" =~ ^release- ]]; then
+            if [ "$IS_MERGE" = "true" ]; then
+              echo Testbed is set to baseline-$FORMATTED_BRANCH
+              echo "BENCHER_TESTBED=baseline-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
+            elif [ "$IS_SCHEDULED" = "true" ]; then
+              echo Testbed is set to nightly-$FORMATTED_BRANCH
+              echo "BENCHER_TESTBED=nightly-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
+            else
+              echo Testbed is set to manual-$FORMATTED_BRANCH
+              echo "BENCHER_TESTBED=manual-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo Testbed is set to branch-$FORMATTED_BRANCH
+            echo "BENCHER_TESTBED=branch-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Bencher
+        uses: bencherdev/bencher@v0.5.1
+
+      - name: Execute benchmarks
+        run: |
+          export BENCHER_API_TOKEN=${BENCHER_API_TOKEN}
+          export BENCHER_BRANCH=${BRANCH_NAME}
+          export BENCHER_TESTBED=${BENCHER_TESTBED}
+          export BENCHER_PROJECT=hoprnet
+          export GITHUB_ACTIONS=${GITHUB_TOKEN}
+          export BENCHER_ADAPTER=rust_criterion
+          export THRESHOLD_TEST=t_test
+          export THRESHOLD_MEASURE=throughput
+          export THRESHOLD_LOWER_BOUNDARY=0.05
+          # nix develop -c bencher run --hash ${COMMIT_HASH} --err "cargo bench --package hopr-crypto-packet packet_forwarding"
+          nix develop -c bencher run --hash ${COMMIT_HASH} --err "cargo bench"
+        env:
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ steps.vars.outputs.BRANCH_NAME }}
+          COMMIT_HASH: ${{ github.sha }}
+          BENCHER_TESTBED: ${{ steps.testbed.outputs.BENCHER_TESTBED }}
+
+      - name: Notify drop in performance
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        if: failure()
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Core"
+          content: |
+            The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ github.sha }}) have dropped by more than 5%.
+            Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.

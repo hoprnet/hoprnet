@@ -31,10 +31,10 @@ pub enum HoprLibError {
     TransportError(#[from] hopr_transport::errors::HoprTransportError),
 
     #[error(transparent)]
-    ChainError(#[from] chain_actions::errors::ChainActionsError),
+    ChainError(#[from] hopr_chain_actions::errors::ChainActionsError),
 
     #[error(transparent)]
-    ChainApi(#[from] chain_api::errors::HoprChainError),
+    ChainApi(#[from] hopr_chain_api::errors::HoprChainError),
 
     #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),

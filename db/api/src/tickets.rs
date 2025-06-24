@@ -1,12 +1,12 @@
-use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
-use std::ops::{Bound, RangeBounds};
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+use std::{
+    collections::HashSet,
+    fmt::{Display, Formatter},
+    ops::{Bound, RangeBounds},
+    sync::{Arc, atomic::AtomicU64},
+};
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -42,7 +42,7 @@ impl Display for TicketIndexSelector {
 /// Allows selecting multiple tickets (if `index` does not contain a single value)
 /// or a single ticket (with unitary `index`) in the given channel and epoch.
 /// The selection can be further restricted to select ticket only in the given `state`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct TicketSelector {
     /// Channel ID and Epoch pairs.
     pub channel_identifiers: Vec<(Hash, U256)>,
@@ -52,10 +52,10 @@ pub struct TicketSelector {
     pub index: TicketIndexSelector,
     /// If given, the tickets are further restricted to the ones with a winning probability
     /// in this range.
-    pub win_prob: (Bound<EncodedWinProb>, Bound<EncodedWinProb>),
+    pub win_prob: (Bound<WinningProbability>, Bound<WinningProbability>),
     /// If given, the tickets are further restricted to the ones with an amount
     /// in this range.
-    pub amount: (Bound<Balance>, Bound<Balance>),
+    pub amount: (Bound<HoprBalance>, Bound<HoprBalance>),
     /// Further restriction to tickets with the given state.
     pub state: Option<AcknowledgedTicketStatus>,
     /// Further restrict to only aggregated tickets.
@@ -182,13 +182,13 @@ impl TicketSelector {
     }
 
     /// Returns this instance with a winning probability range bounds set.
-    pub fn with_winning_probability<T: RangeBounds<EncodedWinProb>>(mut self, range: T) -> Self {
+    pub fn with_winning_probability<T: RangeBounds<WinningProbability>>(mut self, range: T) -> Self {
         self.win_prob = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }
 
     /// Returns this instance with the ticket amount range bounds set.
-    pub fn with_amount<T: RangeBounds<Balance>>(mut self, range: T) -> Self {
+    pub fn with_amount<T: RangeBounds<HoprBalance>>(mut self, range: T) -> Self {
         self.amount = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }
@@ -320,7 +320,7 @@ pub trait HoprDbTicketOperations {
     /// Counts the tickets matching the given `selector` and their total value.
     ///
     /// The optional transaction `tx` must be in the database.
-    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)>;
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance)>;
 
     /// Sets the stored outgoing ticket index to `index`, only if the currently stored value
     /// is less than `index`. This ensures the stored value can only be growing.
@@ -384,26 +384,17 @@ pub trait HoprDbTicketOperations {
         acked_tickets: Vec<TransferableWinningTicket>,
         me: &ChainKeypair,
     ) -> Result<VerifiedTicket>;
+
+    /// Fix the next ticket state if it's out-of-sync in all this node's channels.
+    async fn fix_channels_next_ticket_state(&self) -> Result<()>;
 }
 
 /// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub struct ChannelTicketStatistics {
     pub winning_tickets: u128,
-    pub neglected_value: Balance,
-    pub redeemed_value: Balance,
-    pub unredeemed_value: Balance,
-    pub rejected_value: Balance,
-}
-
-impl Default for ChannelTicketStatistics {
-    fn default() -> Self {
-        Self {
-            winning_tickets: 0,
-            neglected_value: BalanceType::HOPR.zero(),
-            redeemed_value: BalanceType::HOPR.zero(),
-            unredeemed_value: BalanceType::HOPR.zero(),
-            rejected_value: BalanceType::HOPR.zero(),
-        }
-    }
+    pub neglected_value: HoprBalance,
+    pub redeemed_value: HoprBalance,
+    pub unredeemed_value: HoprBalance,
+    pub rejected_value: HoprBalance,
 }

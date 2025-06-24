@@ -11,10 +11,10 @@ from .cluster import Cluster
 from .constants import (
     ANVIL_CONFIG_FILE,
     ANVIL_FOLDER,
+    BASE_PORT,
     CONTRACTS_ADDRESSES,
     MAIN_DIR,
     NETWORK,
-    PORT_BASE,
     logging,
 )
 from .snapshot import Snapshot
@@ -24,7 +24,12 @@ random.seed(SEED)
 
 
 async def bringup(
-    config: str, test_mode: bool = False, fully_connected: bool = False
+    config: str,
+    test_mode: bool = False,
+    fully_connected: bool = False,
+    use_nat: bool = False,
+    exposed: bool = False,
+    base_port: int = BASE_PORT,
 ) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
@@ -35,13 +40,26 @@ async def bringup(
     with open(config, "r") as f:
         config = yaml.safe_load(f)
 
-    cluster = Cluster(config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"))
-    anvil = Anvil(ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"))
+    cluster = Cluster(
+        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port
+    )
+    anvil = Anvil(
+        ANVIL_FOLDER.joinpath("anvil.log"),
+        ANVIL_CONFIG_FILE,
+        ANVIL_FOLDER.joinpath("anvil.state.json"),
+        base_port,
+        not test_mode,
+    )
 
-    snapshot = Snapshot(PORT_BASE, MAIN_DIR, cluster)
+    snapshot = Snapshot(base_port, MAIN_DIR, cluster)
 
     # STOP OLD LOCAL ANVIL SERVER
     anvil.kill()
+
+    # Remove old logs
+    for f in MAIN_DIR.glob("*/*.log"):
+        logging.debug(f"Removing log file: {f}")
+        f.unlink(missing_ok=True)
 
     if not snapshot.usable:
         logging.info("Snapshot not usable")
@@ -62,16 +80,18 @@ async def bringup(
         # wait before contract deployments are finalized
         await asyncio.sleep(2.5)
 
-        # BRING UP NODES (with funding)
-        await cluster.shared_bringup(skip_funding=False)
-
-        anvil.kill()
-        cluster.clean_up()
-
-        # delay to ensure anvil is stopped and state file closed
+        # enable network registry
+        cluster.enable_network_registry()
         await asyncio.sleep(1)
 
-        snapshot.create(ANVIL_FOLDER.joinpath("anvil.state.json"))
+        # fund nodes
+        cluster.fund_nodes()
+
+        # delay to ensure anvil is stopped and state file closed
+        anvil.kill()
+        await asyncio.sleep(1)
+
+        snapshot.create()
 
     snapshot.reuse()
 
@@ -80,22 +100,28 @@ async def bringup(
     # SETUP NODES USING STORED IDENTITIES
     cluster.copy_identities()
     cluster.load_addresses()
+    cluster.load_native_addresses()
+
+    # add nodes to network registry
+    cluster.add_nodes_to_network_registry()
+    await asyncio.sleep(2.5)
 
     # wait before contract deployments are finalized
     await asyncio.sleep(2.5)
 
-    # BRING UP NODES (without funding)
+    # BRING UP NODES
     try:
-        await cluster.shared_bringup(skip_funding=True)
+        await cluster.shared_bringup()
     except asyncio.TimeoutError as e:
         logging.error(f"Timeout error: {e}")
         return cluster, anvil
+    except RuntimeError as e:
+        cluster.clean_up()
+        anvil.kill()
+        raise e
 
-    if not test_mode:
-        await cluster.alias_peers()
-
-        if fully_connected:
-            await cluster.connect_peers()
+    if not test_mode and fully_connected:
+        await cluster.connect_peers()
 
     logging.info("All nodes ready")
 

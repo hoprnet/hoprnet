@@ -1,26 +1,28 @@
 ---
 hopr:
   # run heartbeats more frequently
-  heartbeat:
-    interval: 10
-    threshold: 10
-    variance: 1
+  probe:
+    timeout: 1
+    max_parallel_probes: 10
+    recheck_threshold: 1
   network_options:
     # ignore for shorter than heartbeat cycle
-    ignore_timeframe: 5
+    ignore_timeframe: 0
   strategy:
     on_fail_continue: true
     execution_interval: 1
     strategies:
       - !AutoFunding
-        funding_amount: "10000000000000000000 HOPR"
-        min_stake_threshold: "1000000000000000000 HOPR"
+        funding_amount: "10 wxHOPR"
+        min_stake_threshold: "1 wxHOPR"
       - !Aggregating
         aggregation_threshold: 100
         unrealized_balance_ratio: 0.9
-        aggregation_timeout: 60
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
-        minimum_redeem_ticket_value: "0 HOPR"
-        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
+        minimum_redeem_ticket_value: "0 wxHOPR"
+  protocol:
+    outgoing_ticket_winning_prob: 1.0
+session_ip_forwarding:
+  use_target_allow_list: false

@@ -1,5 +1,5 @@
-//! This module contains arguments and functions to interact with the Winning Probability contract for a privileged account.
-//! It can set the global minimum winning probability and read the current global minimum winning probability.
+//! This module contains arguments and functions to interact with the Winning Probability contract for a privileged
+//! account. It can set the global minimum winning probability and read the current global minimum winning probability.
 //! Some sample commands:
 //! - Set winning probability:
 //! ```text
@@ -17,16 +17,17 @@
 //!     --contracts-root "../ethereum/contracts" \
 //!     --provider-url "http://localhost:8545"
 //! ```
-use crate::key_pair::ArgEnvReader;
+use alloy::primitives::aliases::U56;
+use clap::Parser;
+use hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle;
+use hopr_internal_types::{prelude::WinningProbability, tickets::EncodedWinProb};
+use tracing::{debug, info};
+
 use crate::{
     environment_config::NetworkProviderArgs,
-    key_pair::PrivateKeyArgs,
+    key_pair::{ArgEnvReader, PrivateKeyArgs},
     utils::{Cmd, HelperErrors},
 };
-use bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
-use clap::Parser;
-use hopr_internal_types::prelude::{f64_to_win_prob, win_prob_to_f64};
-use tracing::{debug, info};
 
 /// CLI arguments for `hopli win-prob`
 #[derive(Clone, Debug, Parser)]
@@ -70,32 +71,27 @@ impl WinProbSubcommands {
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
         let hopr_win_prob = HoprWinningProbabilityOracle::new(
-            contract_addresses.addresses.winning_probability_oracle,
+            contract_addresses.addresses.winning_probability_oracle.into(),
             rpc_provider.clone(),
         );
 
         // convert the winning probability to the format required by the contract
-        let winning_probability = f64_to_win_prob(winning_probability).map_err(|_| {
+        let winning_probability_val = WinningProbability::try_from(winning_probability).map_err(|_| {
             HelperErrors::ParseError("Failed to convert winning probability to the required format".into())
         })?;
 
-        // convert the new winning probability
-        let mut win_prob_param = [0u8; 8];
-        win_prob_param[1..].copy_from_slice(&winning_probability);
-        let win_prob_param = u64::from_be_bytes(win_prob_param);
-
         info!(
-            "Setting the global minimum winning probability to {:?} ({:?} in uint56 format)",
-            winning_probability, win_prob_param
+            winning_probability = %winning_probability_val,
+            win_prob_uint56 = %winning_probability,
+            "Setting the global minimum winning probability"
         );
 
         hopr_win_prob
-            .set_win_prob(win_prob_param)
+            .setWinProb(U56::from_be_slice(&winning_probability_val.as_encoded()))
             .send()
-            .await
-            .map_err(|e| HelperErrors::MiddlewareError(format!("Failed in broadcasting transactions {:?}", e)))?
-            .await
-            .map_err(|e| HelperErrors::MiddlewareError(format!("Failed in getting receipt {:?}", e)))?;
+            .await?
+            .watch()
+            .await?;
         Ok(())
     }
 
@@ -105,23 +101,25 @@ impl WinProbSubcommands {
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
         let hopr_win_prob = HoprWinningProbabilityOracle::new(
-            contract_addresses.addresses.winning_probability_oracle,
+            contract_addresses.addresses.winning_probability_oracle.into(),
             rpc_provider.clone(),
         );
 
         // get winning probability from the contract
-        let current_win_prob = hopr_win_prob
-            .current_win_prob()
-            .await
-            .map_err(|e| HelperErrors::MiddlewareError(format!("Failed to get current winning probability: {}", e)))?;
+        let current_win_prob =
+            hopr_win_prob.currentWinProb().call().await.map_err(|e| {
+                HelperErrors::MiddlewareError(format!("Failed to get current winning probability: {}", e))
+            })?;
 
         // convert into f64
-        let mut tmp = [0u8; 7];
-        tmp.copy_from_slice(&current_win_prob.to_be_bytes()[1..]);
-        let current_win_prob_f64 = win_prob_to_f64(&tmp);
+        let mut tmp: EncodedWinProb = Default::default();
+        tmp.copy_from_slice(&current_win_prob.to_be_bytes::<7>());
+        let current_win_prob = WinningProbability::from(tmp);
+        let current_win_prob_f64 = current_win_prob.as_f64();
         info!(
-            "Current global minimum winning probability is {:?} ({:?} in uint56 format)",
-            current_win_prob_f64, current_win_prob
+            current_win_prob_f64 = %current_win_prob_f64,
+            current_win_prob_uint56 = %current_win_prob,
+            "Current global minimum winning probability"
         );
         Ok(current_win_prob_f64)
     }

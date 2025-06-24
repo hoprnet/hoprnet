@@ -1,14 +1,12 @@
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use validator::{Validate, ValidationError};
-
-pub use hopr_strategy::StrategyConfig;
-pub use hopr_transport::config::{
-    validate_external_host, HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig,
-};
-
 use hopr_primitive_types::prelude::*;
+pub use hopr_strategy::StrategyConfig;
 use hopr_transport::config::SessionGlobalConfig;
+pub use hopr_transport::config::{
+    HostConfig, HostType, NetworkConfig, ProbeConfig, ProtocolConfig, TransportConfig, validate_external_host,
+};
+use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, serde_as};
+use validator::{Validate, ValidationError};
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
 pub const DEFAULT_HOST: &str = "0.0.0.0";
@@ -49,10 +47,7 @@ pub struct Chain {
     #[serde(default)]
     pub max_rpc_requests_per_sec: Option<u32>,
     #[serde(default)]
-    pub protocols: chain_api::config::ProtocolsConfig,
-    #[serde(default = "just_true")]
-    #[default = true]
-    pub check_unrealized_balance: bool,
+    pub protocols: hopr_chain_api::config::ProtocolsConfig,
     #[serde(default = "just_true")]
     #[default = true]
     pub keep_logs: bool,
@@ -134,7 +129,7 @@ pub struct HoprLibConfig {
     /// Configuration of the protocol heartbeat mechanism
     #[validate(nested)]
     #[serde(default)]
-    pub heartbeat: HeartbeatConfig,
+    pub probe: ProbeConfig,
     /// Configuration of network properties
     #[validate(nested)]
     #[serde(default)]

@@ -1,17 +1,17 @@
-use std::collections::HashSet;
-use std::net::{IpAddr, SocketAddr};
-use std::str::FromStr;
-use std::time::Duration;
+use std::{
+    collections::HashSet,
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    time::Duration,
+};
 
-use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
+use hopr_lib::{Address, HostConfig, HostType, ProtocolsConfig, config::HoprLibConfig};
 use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
-use hoprd_inbox::config::MessageInboxConfiguration;
-
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use tracing::{debug, warn};
+use tracing::debug;
 use validator::{Validate, ValidationError};
 
 use crate::errors::HoprdError;
@@ -93,7 +93,6 @@ impl std::fmt::Debug for Identity {
 ///
 /// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/hoprd/example_cfg.yaml)
 /// which is always in the root of this crate.
-///
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct HoprdConfig {
@@ -105,10 +104,6 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub identity: Identity,
-    /// Configuration of the underlying database engine
-    #[validate(nested)]
-    #[serde(default)]
-    pub inbox: MessageInboxConfiguration,
     /// Configuration relevant for the API of the node
     #[validate(nested)]
     #[serde(default)]
@@ -171,11 +166,6 @@ impl HoprdConfig {
             cfg.hopr.db.force_initialize = true;
         }
 
-        // inbox
-        if let Some(x) = cli_args.inbox_capacity {
-            cfg.inbox.capacity = x;
-        }
-
         // api
         if cli_args.api > 0 {
             cfg.api.enable = true;
@@ -195,15 +185,9 @@ impl HoprdConfig {
             cfg.api.host.port = x
         };
 
-        // heartbeat
-        if let Some(x) = cli_args.heartbeat_interval {
-            cfg.hopr.heartbeat.interval = std::time::Duration::from_secs(x)
-        };
-        if let Some(x) = cli_args.heartbeat_threshold {
-            cfg.hopr.heartbeat.threshold = std::time::Duration::from_secs(x)
-        };
-        if let Some(x) = cli_args.heartbeat_variance {
-            cfg.hopr.heartbeat.variance = std::time::Duration::from_secs(x)
+        // probe
+        if let Some(x) = cli_args.probe_recheck_threshold {
+            cfg.hopr.probe.recheck_threshold = std::time::Duration::from_secs(x)
         };
 
         // network options
@@ -221,33 +205,6 @@ impl HoprdConfig {
         if let Some(x) = cli_args.private_key {
             cfg.identity.private_key = Some(x)
         };
-
-        // TODO: strategy configuration from the CLI should be removed in 3.0!
-
-        // strategy
-        if cli_args.default_strategy.is_some() {
-            warn!(
-                "DEPRECATION: 'defaultStrategy' (HOPRD_DEFAULT_STRATEGY) option is now deprecated \
-            and has no effect. It will be removed in future releases, please use configuration file \
-            to configure strategies"
-            );
-        }
-
-        if cli_args.auto_redeem_tickets == 1 {
-            warn!(
-                "DEPRECATION: 'disableTicketAutoRedeem' (HOPRD_DISABLE_AUTO_REDEEM_TICKETS) \
-            option is now deprecated and has no effect. It will be removed in future releases, \
-            please use configuration file to configure strategies"
-            );
-        }
-
-        if cli_args.max_auto_channels.is_some() {
-            warn!(
-                "DEPRECATION: 'maxAutoChannels' (HOPRD_MAX_AUTO_CHANNELS) option is now deprecated \
-            and has no effect. It will be removed in future releases, please use configuration file \
-            to configure strategies"
-            );
-        }
 
         // chain
         if cli_args.announce > 0 {
@@ -285,7 +242,6 @@ impl HoprdConfig {
         // it means they have not been specified on the CLI and thus the
         // corresponding config value should be enabled.
 
-        cfg.hopr.chain.check_unrealized_balance = cli_args.no_check_unrealized_balance == 0;
         cfg.hopr.chain.fast_sync = cli_args.no_fast_sync == 0;
         cfg.hopr.chain.keep_logs = cli_args.no_keep_logs == 0;
 
@@ -345,23 +301,25 @@ impl HoprdConfig {
         }
     }
 
-    pub fn as_redacted_string(&self) -> crate::errors::Result<String> {
-        let mut redacted_cfg = self.clone();
-
+    pub fn as_redacted(&self) -> Self {
+        let mut ret = self.clone();
         // redacting sensitive information
-        match &mut redacted_cfg.api.auth {
+        match ret.api.auth {
             Auth::None => {}
-            Auth::Token(_) => redacted_cfg.api.auth = Auth::Token("<REDACTED>".to_owned()),
-        }
-        if redacted_cfg.identity.private_key.is_some() {
-            redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
+            Auth::Token(_) => ret.api.auth = Auth::Token("<REDACTED>".to_owned()),
         }
 
-        if redacted_cfg.identity.private_key.is_some() {
-            redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
+        if ret.identity.private_key.is_some() {
+            ret.identity.private_key = Some("<REDACTED>".to_owned());
         }
-        "<REDACTED>".clone_into(&mut redacted_cfg.identity.password);
 
+        "<REDACTED>".clone_into(&mut ret.identity.password);
+
+        ret
+    }
+
+    pub fn as_redacted_string(&self) -> crate::errors::Result<String> {
+        let redacted_cfg = self.as_redacted();
         serde_json::to_string(&redacted_cfg).map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))
     }
 }
@@ -378,20 +336,33 @@ fn default_max_tcp_target_retries() -> u32 {
     10
 }
 
+fn just_true() -> bool {
+    true
+}
+
 /// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`]) and the Entry node.
 #[serde_as]
 #[derive(
     Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize, validator::Validate,
 )]
 pub struct SessionIpForwardingConfig {
-    /// If specified, enforces only the given target addresses (after DNS resolution).
-    /// If `None` is specified, allows all targets.
+    /// Controls whether allowlisting should be done via `target_allow_list`.
+    /// If set to `false`, the node will act as an Exit node for any target.
     ///
-    /// Defaults to `None`.
+    /// Defaults to `true`.
+    #[serde(default = "just_true")]
+    #[default(true)]
+    pub use_target_allow_list: bool,
+
+    /// Enforces only the given target addresses (after DNS resolution).
+    ///
+    /// This is used only if `use_target_allow_list` is set to `true`.
+    /// If left empty (and `use_target_allow_list` is `true`), the node will not act as an Exit node.
+    ///
+    /// Defaults to empty.
     #[serde(default)]
-    #[default(None)]
-    #[serde_as(as = "Option<HashSet<serde_with::DisplayFromStr>>")]
-    pub target_allow_list: Option<HashSet<SocketAddr>>,
+    #[serde_as(as = "HashSet<serde_with::DisplayFromStr>")]
+    pub target_allow_list: HashSet<SocketAddr>,
 
     /// Delay between retries in seconds to reach a TCP target.
     ///
@@ -419,12 +390,14 @@ pub struct SessionIpForwardingConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::io::{Read, Write};
+
     use anyhow::Context;
     use clap::{Args, Command, FromArgMatches};
     use hopr_lib::HostType;
-    use std::io::{Read, Write};
     use tempfile::NamedTempFile;
+
+    use super::*;
 
     pub fn example_cfg() -> anyhow::Result<HoprdConfig> {
         let chain = hopr_lib::config::Chain {
@@ -445,8 +418,8 @@ mod tests {
                               "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
                               "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
                               "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
-                              "winning_probability_oracle": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
-                              "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+                              "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+                              "announcements": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
                               "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
                             },
                             "confirmations": 2,

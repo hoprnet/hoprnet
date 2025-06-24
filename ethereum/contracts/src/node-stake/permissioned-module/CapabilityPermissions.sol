@@ -355,15 +355,15 @@ library HoprCapabilityPermissions {
     {
         // check the first two evm slots of data payload
         // according to the following ABIs
-        //  - fundChannelSafe(address self, address account, Balance amount)  // src,dst
-        //  - redeemTicketSafe(address self, RedeemableTicket calldata redeemable) // dst,channelId
-        //  - initiateOutgoingChannelClosureSafe(address self, address destination) // src,dst
-        //  - closeIncomingChannelSafe(address self, address source) // dst,src
-        //  - finalizeOutgoingChannelClosureSafe(address self, address destination) // src,dst
-        //  - setCommitmentSafe(address self, address source, bytes32 newCommitment) // dst,src
-        address self = pluckOneStaticAddress(0, data);
-        // the first slot should always store the self address
-        if (self != msg.sender) {
+        //  - fundChannelSafe(address selfAddress, address account, Balance amount)  // src,dst
+        //  - redeemTicketSafe(address selfAddress, RedeemableTicket calldata redeemable) // dst,channelId
+        //  - initiateOutgoingChannelClosureSafe(address selfAddress, address destination) // src,dst
+        //  - closeIncomingChannelSafe(address selfAddress, address source) // dst,src
+        //  - finalizeOutgoingChannelClosureSafe(address selfAddress, address destination) // src,dst
+        //  - setCommitmentSafe(address selfAddress, address source, bytes32 newCommitment) // dst,src
+        address selfAddress = pluckOneStaticAddress(0, data);
+        // the first slot should always store the selfAddress address
+        if (selfAddress != msg.sender) {
             revert NodePermissionRejected();
         }
 
@@ -372,13 +372,13 @@ library HoprCapabilityPermissions {
             channelId = pluckOneBytes32(1, data);
         } else if (functionSig == CLOSE_INCOMING_CHANNEL_SELECTOR) {
             address source = pluckOneStaticAddress(1, data);
-            channelId = getChannelId(source, self);
+            channelId = getChannelId(source, selfAddress);
         } else if (
             functionSig == INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR
                 || functionSig == FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR || functionSig == FUND_CHANNEL_SELECTOR
         ) {
             address destination = pluckOneStaticAddress(1, data);
-            channelId = getChannelId(self, destination);
+            channelId = getChannelId(selfAddress, destination);
         } else {
             revert ParameterNotAllowed();
         }

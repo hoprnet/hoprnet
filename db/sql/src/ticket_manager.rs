@@ -1,20 +1,17 @@
-use futures::{future::BoxFuture, pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
+use std::sync::{Arc, OnceLock};
+
+use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::BoxFuture, pin_mut};
+use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
-use hopr_primitive_types::primitives::{Balance, BalanceType};
+use hopr_internal_types::{prelude::AcknowledgedTicketStatus, tickets::AcknowledgedTicket};
+use hopr_primitive_types::prelude::{HoprBalance, IntoEndian, ToHex};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
-use std::sync::{Arc, OnceLock};
 use tracing::{debug, error};
 
-use hopr_async_runtime::prelude::spawn;
-use hopr_internal_types::prelude::AcknowledgedTicketStatus;
-use hopr_internal_types::tickets::AcknowledgedTicket;
-use hopr_primitive_types::prelude::ToHex;
-
-use crate::cache::HoprDbCaches;
-use crate::prelude::DbSqlError;
-use crate::tickets::WrappedTicketSelector;
-use crate::{errors::Result, OpenTransaction};
+use crate::{
+    OpenTransaction, cache::HoprDbCaches, errors::Result, prelude::DbSqlError, tickets::WrappedTicketSelector,
+};
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///
@@ -111,7 +108,8 @@ impl TicketManager {
                                             // Update the ticket winning count in the statistics
                                             if let Some(model) = hopr_db_entity::ticket_statistics::Entity::find()
                                                 .filter(
-                                                    hopr_db_entity::ticket_statistics::Column::ChannelId.eq(channel_id.clone()),
+                                                    hopr_db_entity::ticket_statistics::Column::ChannelId
+                                                        .eq(channel_id.clone()),
                                                 )
                                                 .one(tx.as_ref())
                                                 .await?
@@ -135,10 +133,14 @@ impl TicketManager {
                                             let start_idx = ack_ticket.verified_ticket().index;
                                             let offset = ack_ticket.verified_ticket().index_offset as u64;
 
-                                            // Replace all BeingAggregated tickets with aggregated index range in this channel
-                                            let selector = TicketSelector::new(ack_ticket.verified_ticket().channel_id, ack_ticket.verified_ticket().channel_epoch)
-                                                .with_index_range(start_idx..start_idx + offset)
-                                                .with_state(AcknowledgedTicketStatus::BeingAggregated);
+                                            // Replace all BeingAggregated tickets with aggregated index range in this
+                                            // channel
+                                            let selector = TicketSelector::new(
+                                                ack_ticket.verified_ticket().channel_id,
+                                                ack_ticket.verified_ticket().channel_epoch,
+                                            )
+                                            .with_index_range(start_idx..start_idx + offset)
+                                            .with_state(AcknowledgedTicketStatus::BeingAggregated);
 
                                             let deleted = ticket::Entity::delete_many()
                                                 .filter(WrappedTicketSelector::from(selector))
@@ -147,7 +149,8 @@ impl TicketManager {
 
                                             if deleted.rows_affected > offset {
                                                 return Err(DbSqlError::LogicalError(format!(
-                                                    "deleted ticket count ({}) must not be more than the ticket index offset {offset}",
+                                                    "deleted ticket count ({}) must not be more than the ticket index \
+                                                     offset {offset}",
                                                     deleted.rows_affected,
                                                 )));
                                             }
@@ -219,7 +222,7 @@ impl TicketManager {
 
         self.caches
             .unrealized_value
-            .insert(channel, unrealized_value + value)
+            .insert((channel, epoch.into()), unrealized_value + value)
             .await;
 
         Ok(())
@@ -243,7 +246,7 @@ impl TicketManager {
     }
 
     /// Get unrealized value for a channel
-    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<Balance> {
+    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance> {
         if !selector.is_single_channel() {
             return Err(crate::DbSqlError::LogicalError(
                 "selector must represent a single channel".into(),
@@ -251,6 +254,7 @@ impl TicketManager {
         }
 
         let channel_id = selector.channel_identifiers[0].0;
+        let channel_epoch = selector.channel_identifiers[0].1;
         let selector: WrappedTicketSelector = selector.into();
 
         let transaction = OpenTransaction(
@@ -265,7 +269,7 @@ impl TicketManager {
         Ok(self
             .caches
             .unrealized_value
-            .try_get_with_by_ref(&channel_id, async move {
+            .try_get_with_by_ref(&(channel_id, channel_epoch), async move {
                 transaction
                     .perform(|tx| {
                         Box::pin(async move {
@@ -275,8 +279,8 @@ impl TicketManager {
                                 .await
                                 .map_err(crate::errors::DbSqlError::from)?
                                 .map_err(crate::errors::DbSqlError::from)
-                                .try_fold(BalanceType::HOPR.zero(), |value, t| async move {
-                                    Ok(value + BalanceType::HOPR.balance_bytes(t.amount))
+                                .try_fold(HoprBalance::zero(), |value, t| async move {
+                                    Ok(value + HoprBalance::from_be_bytes(t.amount))
                                 })
                                 .await
                         })
@@ -312,15 +316,15 @@ impl TicketManager {
 mod tests {
     use futures::StreamExt;
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::info::DomainSeparator;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
-    use crate::accounts::HoprDbAccountOperations;
-    use crate::channels::HoprDbChannelOperations;
-    use crate::db::HoprDb;
-    use crate::info::HoprDbInfoOperations;
+    use crate::{
+        accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
@@ -342,6 +346,7 @@ mod tests {
                     public_key: *peer_offchain.public(),
                     chain_addr: peer_onchain.public().to_address(),
                     entry_type: AccountType::NotAnnounced,
+                    published_at: 0,
                 },
             )
             .await?
@@ -369,7 +374,7 @@ mod tests {
         Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -386,16 +391,16 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             1.into(),
             ChannelStatus::Open,
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel.clone()).await?;
+        db.upsert_channel(None, channel).await?;
 
         assert_eq!(
-            Balance::zero(BalanceType::HOPR),
+            HoprBalance::zero(),
             db.ticket_manager.unrealized_value((&channel).into()).await?
         );
 

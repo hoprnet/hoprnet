@@ -1,17 +1,18 @@
-use bindings::hopr_channels::RedeemTicketCall;
-use ethers::contract::EthCall;
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter},
+};
+
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
 
-use crate::errors;
-use crate::errors::CoreTypesError;
-use crate::prelude::CoreTypesError::InvalidInputData;
-use crate::prelude::{generate_channel_id, DEFAULT_OUTGOING_TICKET_WIN_PROB};
+use crate::{
+    errors,
+    errors::CoreTypesError,
+    prelude::{CoreTypesError::InvalidInputData, generate_channel_id},
+};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -22,27 +23,222 @@ const ENCODED_TICKET_LENGTH: usize = 64;
 /// convertible to IEEE754 double-precision and vice versa
 const ENCODED_WIN_PROB_LENGTH: usize = 7;
 
+/// Define the selector for the redeemTicketCall to avoid importing
+/// the entire hopr-bindings crate for one single constant.
+/// This value should be updated with the function interface changes.
+pub const REDEEM_CALL_SELECTOR: [u8; 4] = [252, 183, 121, 111];
+
 /// Winning probability encoded in 7-byte representation
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
-/// Encodes 100% winning probability
-pub const ALWAYS_WINNING: EncodedWinProb = hex!("ffffffffffffff");
+/// Represents a ticket winning probability.
+///
+/// It holds the modified IEEE-754 but behaves like a reduced precision float.
+/// It intentionally does not implement `Ord` or `Eq`, as
+/// it can be only [approximately compared](WinningProbability::approx_cmp).
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WinningProbability(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] EncodedWinProb);
 
-/// Encodes 0% winning probability
-pub const NEVER_WINNING: EncodedWinProb = hex!("00000000000000");
+impl WinningProbability {
+    /// 100% winning probability
+    pub const ALWAYS: Self = Self([0xff; ENCODED_WIN_PROB_LENGTH]);
+    // This value can no longer be represented with the winning probability encoding
+    // and is equal to 0
+    pub const EPSILON: f64 = 0.00000001;
+    /// 0% winning probability.
+    pub const NEVER: Self = Self([0u8; ENCODED_WIN_PROB_LENGTH]);
+
+    /// Converts winning probability to an unsigned integer (luck).
+    pub fn as_luck(&self) -> u64 {
+        let mut tmp = [0u8; 8];
+        tmp[1..].copy_from_slice(&self.0);
+        u64::from_be_bytes(tmp)
+    }
+
+    /// Convenience function to convert to internal probability representation.
+    pub fn as_encoded(&self) -> EncodedWinProb {
+        self.0
+    }
+
+    /// Convert probability to a float.
+    pub fn as_f64(&self) -> f64 {
+        if self.0.eq(&Self::NEVER.0) {
+            return 0.0;
+        }
+
+        if self.0.eq(&Self::ALWAYS.0) {
+            return 1.0;
+        }
+
+        let mut tmp = [0u8; 8];
+        tmp[1..].copy_from_slice(&self.0);
+
+        let tmp = u64::from_be_bytes(tmp);
+
+        // project interval [0x0fffffffffffff, 0x0000000000000f] to [0x00000000000010, 0x10000000000000]
+        let significand: u64 = tmp + 1;
+
+        f64::from_bits((1023u64 << 52) | (significand >> 4)) - 1.0
+    }
+
+    /// Tries to get probability from a float.
+    pub fn try_from_f64(win_prob: f64) -> errors::Result<Self> {
+        // Also makes sure the input value is not NaN or infinite.
+        if !(0.0..=1.0).contains(&win_prob) {
+            return Err(InvalidInputData("winning probability must be in [0.0, 1.0]".into()));
+        }
+
+        if f64_approx_eq(0.0, win_prob, Self::EPSILON) {
+            return Ok(Self::NEVER);
+        }
+
+        if f64_approx_eq(1.0, win_prob, Self::EPSILON) {
+            return Ok(Self::ALWAYS);
+        }
+
+        let tmp: u64 = (win_prob + 1.0).to_bits();
+
+        // // clear sign and exponent
+        let significand: u64 = tmp & 0x000fffffffffffffu64;
+
+        // project interval [0x10000000000000, 0x00000000000010] to [0x0000000000000f, 0x0fffffffffffff]
+        let encoded = ((significand - 1) << 4) | 0x000000000000000fu64;
+
+        let mut res = [0u8; 7];
+        res.copy_from_slice(&encoded.to_be_bytes()[1..]);
+
+        Ok(Self(res))
+    }
+
+    /// Performs approximate comparison up to [`Self::EPSILON`].
+    pub fn approx_cmp(&self, other: &Self) -> Ordering {
+        let a = self.as_f64();
+        let b = other.as_f64();
+        if !f64_approx_eq(a, b, Self::EPSILON) {
+            a.partial_cmp(&b).expect("finite non-NaN f64 comparison cannot fail")
+        } else {
+            Ordering::Equal
+        }
+    }
+
+    /// Performs approximate equality comparison up to [`Self::EPSILON`].
+    pub fn approx_eq(&self, other: &Self) -> bool {
+        self.approx_cmp(other) == Ordering::Equal
+    }
+
+    /// Gets the minimum of two winning probabilities.
+    pub fn min(&self, other: &Self) -> Self {
+        if self.approx_cmp(other) == Ordering::Less {
+            *self
+        } else {
+            *other
+        }
+    }
+
+    /// Gets the maximum of two winning probabilities.
+    pub fn max(&self, other: &Self) -> Self {
+        if self.approx_cmp(other) == Ordering::Greater {
+            *self
+        } else {
+            *other
+        }
+    }
+}
+
+impl Default for WinningProbability {
+    fn default() -> Self {
+        Self::ALWAYS
+    }
+}
+
+impl Display for WinningProbability {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.8}", self.as_f64())
+    }
+}
+
+impl From<EncodedWinProb> for WinningProbability {
+    fn from(value: EncodedWinProb) -> Self {
+        Self(value)
+    }
+}
+
+impl<'a> From<&'a EncodedWinProb> for WinningProbability {
+    fn from(value: &'a EncodedWinProb) -> Self {
+        Self(*value)
+    }
+}
+
+impl From<WinningProbability> for EncodedWinProb {
+    fn from(value: WinningProbability) -> Self {
+        value.0
+    }
+}
+
+impl From<u64> for WinningProbability {
+    fn from(value: u64) -> Self {
+        let mut ret = Self::default();
+        ret.0.copy_from_slice(&value.to_be_bytes()[1..]);
+        ret
+    }
+}
+
+impl TryFrom<f64> for WinningProbability {
+    type Error = CoreTypesError;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        Self::try_from_f64(value)
+    }
+}
+
+impl From<WinningProbability> for f64 {
+    fn from(value: WinningProbability) -> Self {
+        value.as_f64()
+    }
+}
+
+impl PartialEq<f64> for WinningProbability {
+    fn eq(&self, other: &f64) -> bool {
+        f64_approx_eq(self.as_f64(), *other, Self::EPSILON)
+    }
+}
+
+impl PartialEq<WinningProbability> for f64 {
+    fn eq(&self, other: &WinningProbability) -> bool {
+        f64_approx_eq(*self, other.as_f64(), WinningProbability::EPSILON)
+    }
+}
+
+impl AsRef<[u8]> for WinningProbability {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for WinningProbability {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(Self)
+            .map_err(|_| GeneralError::ParseError("WinningProbability".into()))
+    }
+}
+
+impl BytesRepresentable for WinningProbability {
+    const SIZE: usize = ENCODED_WIN_PROB_LENGTH;
+}
 
 /// Helper function checks if the given ticket values belong to a winning ticket.
 pub(crate) fn check_ticket_win(
     ticket_hash: &Hash,
     ticket_signature: &Signature,
-    win_prob: &EncodedWinProb,
+    win_prob: &WinningProbability,
     response: &Response,
     vrf_params: &VrfParameters,
 ) -> bool {
-    // Signed winning probability
-    let mut signed_ticket_luck = [0u8; 8];
-    signed_ticket_luck[1..].copy_from_slice(win_prob);
-
     // Computed winning probability
     let mut computed_ticket_luck = [0u8; 8];
     computed_ticket_luck[1..].copy_from_slice(
@@ -55,7 +251,7 @@ pub(crate) fn check_ticket_win(
         .as_ref()[0..7],
     );
 
-    u64::from_be_bytes(computed_ticket_luck) <= u64::from_be_bytes(signed_ticket_luck)
+    u64::from_be_bytes(computed_ticket_luck) <= win_prob.as_luck()
 }
 
 /// Builder for [Ticket] and [VerifiedTicket].
@@ -68,16 +264,14 @@ pub(crate) fn check_ticket_win(
 pub struct TicketBuilder {
     channel_id: Option<Hash>,
     amount: Option<U256>,
-    balance: Option<Balance>,
+    balance: Option<HoprBalance>,
     #[default = 0]
     index: u64,
     #[default = 1]
     index_offset: u32,
     #[default = 1]
     channel_epoch: u32,
-    #[default(Some(DEFAULT_OUTGOING_TICKET_WIN_PROB))]
-    win_prob: Option<f64>,
-    win_prob_enc: Option<EncodedWinProb>,
+    win_prob: WinningProbability,
     challenge: Option<EthereumChallenge>,
     signature: Option<Signature>,
 }
@@ -90,7 +284,7 @@ impl TicketBuilder {
             index: 0,
             amount: Some(U256::zero()),
             index_offset: 1,
-            win_prob: Some(0.0),
+            win_prob: WinningProbability::NEVER,
             channel_epoch: 0,
             ..Default::default()
         }
@@ -132,7 +326,7 @@ impl TicketBuilder {
     /// Sets the ticket amount as HOPR balance.
     /// This or [TicketBuilder::amount] must be set and be less or equal to 10^25.
     #[must_use]
-    pub fn balance(mut self, balance: Balance) -> Self {
+    pub fn balance(mut self, balance: HoprBalance) -> Self {
         self.balance = Some(balance);
         self.amount = None;
         self
@@ -166,26 +360,14 @@ impl TicketBuilder {
     }
 
     /// Sets the ticket winning probability.
-    /// Mutually exclusive with [TicketBuilder::win_prob_encoded].
     /// Defaults to 1.0
     #[must_use]
-    pub fn win_prob(mut self, win_prob: f64) -> Self {
-        self.win_prob = Some(win_prob);
-        self.win_prob_enc = None;
+    pub fn win_prob(mut self, win_prob: WinningProbability) -> Self {
+        self.win_prob = win_prob;
         self
     }
 
-    /// Sets the encoded ticket winning probability.
-    /// Mutually exclusive with [TicketBuilder::win_prob].
-    /// Defaults to [ALWAYS_WINNING].
-    #[must_use]
-    pub fn win_prob_encoded(mut self, win_prob: EncodedWinProb) -> Self {
-        self.win_prob = None;
-        self.win_prob_enc = Some(win_prob);
-        self
-    }
-
-    /// Sets the [EthereumChallenge] for Proof of Relay.
+    /// Sets the [EthereumChallenge] for the Proof of Relay.
     /// Must be set.
     #[must_use]
     pub fn challenge(mut self, challenge: EthereumChallenge) -> Self {
@@ -206,22 +388,18 @@ impl TicketBuilder {
     /// was set.
     pub fn build(self) -> errors::Result<Ticket> {
         let amount = match (self.amount, self.balance) {
-            (Some(amount), None) if amount.lt(&10_u128.pow(25).into()) => BalanceType::HOPR.balance(amount),
-            (None, Some(balance))
-                if balance.balance_type() == BalanceType::HOPR && balance.amount().lt(&10_u128.pow(25).into()) =>
-            {
-                balance
-            }
+            (Some(amount), None) if amount.lt(&10_u128.pow(25).into()) => HoprBalance::from(amount),
+            (None, Some(balance)) if balance.amount().lt(&10_u128.pow(25).into()) => balance,
             (None, None) => return Err(InvalidInputData("missing ticket amount".into())),
             (Some(_), Some(_)) => {
                 return Err(InvalidInputData(
                     "either amount or balance must be set but not both".into(),
-                ))
+                ));
             }
             _ => {
                 return Err(InvalidInputData(
                     "tickets may not have more than 1% of total supply".into(),
-                ))
+                ));
             }
         };
 
@@ -232,13 +410,6 @@ impl TicketBuilder {
         if self.channel_epoch > (1_u32 << 24) {
             return Err(InvalidInputData("cannot hold channel epoch larger than 2^24".into()));
         }
-
-        let encoded_win_prob = match (self.win_prob, self.win_prob_enc) {
-            (Some(win_prob), None) => f64_to_win_prob(win_prob)?,
-            (None, Some(win_prob)) => win_prob,
-            (Some(_), Some(_)) => return Err(InvalidInputData("conflicting winning probabilities".into())),
-            (None, None) => return Err(InvalidInputData("missing ticket winning probability".into())),
-        };
 
         if self.index_offset < 1 {
             return Err(InvalidInputData(
@@ -251,7 +422,7 @@ impl TicketBuilder {
             amount,
             index: self.index,
             index_offset: self.index_offset,
-            encoded_win_prob,
+            encoded_win_prob: self.win_prob.into(),
             channel_epoch: self.channel_epoch,
             challenge: self
                 .challenge
@@ -270,7 +441,7 @@ impl TicketBuilder {
         }
     }
 
-    /// Validates all input and builds the [VerifiedTicket] by **assuming** the previously
+    /// Validates all inputs and builds the [VerifiedTicket] by **assuming** the previously
     /// set [signature](TicketBuilder::signature) is valid and belongs to the given ticket `hash`.
     /// It does **not** check whether `hash` matches the input data nor that the signature verifies
     /// the given hash.
@@ -293,8 +464,7 @@ impl From<&Ticket> for TicketBuilder {
             index: value.index,
             index_offset: value.index_offset,
             channel_epoch: value.channel_epoch,
-            win_prob: None,
-            win_prob_enc: Some(value.encoded_win_prob),
+            win_prob: value.encoded_win_prob.into(),
             challenge: Some(value.challenge),
             signature: None,
         }
@@ -315,8 +485,8 @@ impl From<Ticket> for TicketBuilder {
 ///
 /// # Ticket state machine
 /// See the entire state machine describing the relations of different ticket types below:
-///```mermaid
-///flowchart TB
+/// ```mermaid
+/// flowchart TB
 ///     A[Ticket] -->|verify| B(VerifiedTicket)
 ///     B --> |leak| A
 ///     A --> |sign| B
@@ -327,15 +497,16 @@ impl From<Ticket> for TicketBuilder {
 ///     D --> |into_transferable| F(TransferableWinningTicket)
 ///     E --> |into_transferable| F
 ///     F --> |into_redeemable| E
-///```
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ticket {
     /// Channel ID.
     /// See [generate_channel_id] for how this value is generated.
     pub channel_id: Hash,
     /// Amount of HOPR tokens this ticket is worth.
     /// Always between 0 and 2^92.
-    pub amount: Balance, // 92 bits
+    pub amount: HoprBalance, // 92 bits
     /// Ticket index.
     /// Always between 0 and 2^48.
     pub index: u64, // 48 bits
@@ -348,7 +519,7 @@ pub struct Ticket {
     /// Epoch of the channel this ticket belongs to.
     /// Always between 0 and 2^24.
     pub channel_epoch: u32, // 24 bits
-    /// Represent the Proof of Relay challenge encoded as Ethereum address.
+    /// Represent the Proof of Relay challenge encoded as an Ethereum address.
     pub challenge: EthereumChallenge,
     /// ECDSA secp256k1 signature of all the above values.
     pub signature: Option<Signature>,
@@ -380,8 +551,8 @@ impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ticket #{}, offset {}, epoch {} in channel {}",
-            self.index, self.index_offset, self.channel_epoch, self.channel_id
+            "ticket #{}, amount {}, offset {}, epoch {} in channel {}",
+            self.index, self.amount, self.index_offset, self.channel_epoch, self.channel_id
         )
     }
 }
@@ -421,7 +592,7 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[self.encode_without_signature().as_ref()]); // cannot fail
-        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_ref()]);
+        let hash_struct = Hash::create(&[&REDEEM_CALL_SELECTOR, &[0u8; 28], ticket_hash.as_ref()]);
         Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 
@@ -464,8 +635,8 @@ impl Ticket {
     }
 
     /// Returns the decoded winning probability of the ticket
-    pub fn win_prob(&self) -> f64 {
-        win_prob_to_f64(&self.encoded_win_prob)
+    pub fn win_prob(&self) -> WinningProbability {
+        WinningProbability(self.encoded_win_prob)
     }
 }
 
@@ -510,9 +681,8 @@ impl TryFrom<&[u8]> for Ticket {
             channel_epoch[1..4].copy_from_slice(&value[offset..offset + 3]);
             offset += 3;
 
-            let mut encoded_win_prob = [0u8; 7];
-            encoded_win_prob.copy_from_slice(&value[offset..offset + 7]);
-            offset += 7;
+            let win_prob = WinningProbability::try_from(&value[offset..offset + WinningProbability::SIZE])?;
+            offset += WinningProbability::SIZE;
 
             debug_assert_eq!(offset, ENCODED_TICKET_LENGTH);
 
@@ -524,11 +694,11 @@ impl TryFrom<&[u8]> for Ticket {
             // Validate the boundaries of the parsed values
             TicketBuilder::default()
                 .channel_id(channel_id)
-                .amount(amount)
+                .amount(U256::from_big_endian(&amount))
                 .index(u64::from_be_bytes(index))
                 .index_offset(u32::from_be_bytes(index_offset))
                 .channel_epoch(u32::from_be_bytes(channel_epoch))
-                .win_prob_encoded(encoded_win_prob)
+                .win_prob(win_prob)
                 .challenge(challenge)
                 .signature(signature)
                 .build()
@@ -546,12 +716,13 @@ impl BytesEncodable<TICKET_SIZE> for Ticket {}
 /// Holds a ticket that has been already verified.
 /// This structure guarantees that [`Ticket::get_hash()`] of [`VerifiedTicket::verified_ticket()`]
 /// is always equal to [`VerifiedTicket::verified_hash`]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerifiedTicket(Ticket, Hash, Address);
 
 impl VerifiedTicket {
     /// Returns the verified encoded winning probability of the ticket
-    pub fn win_prob(&self) -> f64 {
+    pub fn win_prob(&self) -> WinningProbability {
         self.0.win_prob()
     }
 
@@ -580,7 +751,7 @@ impl VerifiedTicket {
                     .signature
                     .as_ref()
                     .expect("verified ticket have always a signature"),
-                &self.0.encoded_win_prob,
+                &self.0.win_prob(),
                 response,
                 &vrf_params,
             )
@@ -588,20 +759,6 @@ impl VerifiedTicket {
             error!("cannot derive vrf parameters for {self}");
             false
         }
-    }
-
-    /// Based on the price of this ticket, determines the path position (hop number) this ticket
-    /// relates to.
-    ///
-    /// This is done by first determining the amount of tokens the ticket is worth
-    /// if it were a win and redeemed on-chain.
-    ///
-    /// Does not support path lengths greater than 255.
-    pub fn get_path_position(&self, price_per_packet: U256) -> errors::Result<u8> {
-        let pos = self.0.amount.amount() / price_per_packet.div_f64(self.win_prob())?;
-        pos.as_u64()
-            .try_into() // convert to u8 = makes sure it's < 256
-            .map_err(|_| CoreTypesError::ArithmeticError(format!("Cannot convert {pos} to u8")))
     }
 
     /// Ticket with already verified signature.
@@ -635,7 +792,7 @@ impl VerifiedTicket {
         self.0
     }
 
-    /// Creates new unacknowledged ticket from the [VerifiedTicket],
+    /// Creates a new unacknowledged ticket from the [VerifiedTicket],
     /// given our own part of the PoR challenge.
     pub fn into_unacknowledged(self, own_key: HalfKey) -> UnacknowledgedTicket {
         UnacknowledgedTicket { ticket: self, own_key }
@@ -670,61 +827,11 @@ impl Ord for VerifiedTicket {
     }
 }
 
-/// Decodes [0x00000000000000, 0xffffffffffffff] to [0.0f64, 1.0f64]
-pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
-    if encoded_win_prob.eq(&NEVER_WINNING) {
-        return 0.0;
-    }
-
-    if encoded_win_prob.eq(&ALWAYS_WINNING) {
-        return 1.0;
-    }
-
-    let mut tmp = [0u8; 8];
-    tmp[1..].copy_from_slice(encoded_win_prob);
-
-    let tmp = u64::from_be_bytes(tmp);
-
-    // project interval [0x0fffffffffffff, 0x0000000000000f] to [0x00000000000010, 0x10000000000000]
-    let significand: u64 = tmp + 1;
-
-    f64::from_bits(1023u64 << 52 | significand >> 4) - 1.0
-}
-
-/// Encodes [0.0f64, 1.0f64] to [0x00000000000000, 0xffffffffffffff]
-pub fn f64_to_win_prob(win_prob: f64) -> errors::Result<EncodedWinProb> {
-    if !(0.0..=1.0).contains(&win_prob) {
-        return Err(CoreTypesError::InvalidInputData(
-            "Winning probability must be in [0.0, 1.0]".into(),
-        ));
-    }
-
-    if win_prob == 0.0 {
-        return Ok(NEVER_WINNING);
-    }
-
-    if win_prob == 1.0 {
-        return Ok(ALWAYS_WINNING);
-    }
-
-    let tmp: u64 = (win_prob + 1.0).to_bits();
-
-    // // clear sign and exponent
-    let significand: u64 = tmp & 0x000fffffffffffffu64;
-
-    // project interval [0x10000000000000, 0x00000000000010] to [0x0000000000000f, 0x0fffffffffffff]
-    let encoded = ((significand - 1) << 4) | 0x000000000000000fu64;
-
-    let mut res = [0u8; 7];
-    res.copy_from_slice(&encoded.to_be_bytes()[1..]);
-
-    Ok(res)
-}
-
 /// Represents a [VerifiedTicket] with an unknown other part of the [HalfKey].
 /// Once the other [HalfKey] is known (forming a [Response]),
 /// it can be [acknowledged](UnacknowledgedTicket::acknowledge).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UnacknowledgedTicket {
     pub ticket: VerifiedTicket,
     pub(crate) own_key: HalfKey,
@@ -742,7 +849,7 @@ impl UnacknowledgedTicket {
     /// the received acknowledgement of the forwarded packet.
     pub fn acknowledge(self, acknowledgement: &HalfKey) -> crate::errors::Result<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
-        debug!("acknowledging ticket using response {}", response.to_hex());
+        debug!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
 
         if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
             Ok(self.ticket.into_acknowledged(response))
@@ -761,13 +868,12 @@ impl UnacknowledgedTicket {
     Default,
     Eq,
     PartialEq,
-    Serialize,
-    Deserialize,
     strum::Display,
     strum::EnumString,
     num_enum::IntoPrimitive,
     num_enum::TryFromPrimitive,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[strum(serialize_all = "PascalCase")]
 pub enum AcknowledgedTicketStatus {
     /// The ticket is available for redeeming or aggregating
@@ -780,9 +886,10 @@ pub enum AcknowledgedTicketStatus {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AcknowledgedTicket {
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub status: AcknowledgedTicketStatus,
     pub ticket: VerifiedTicket,
     pub response: Response,
@@ -853,8 +960,9 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-/// Represents a winning ticket that can be successfully redeemed on chain.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Represents a winning ticket that can be successfully redeemed on-chain.
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RedeemableTicket {
     /// Verified ticket that can be redeemed.
     pub ticket: VerifiedTicket,
@@ -903,7 +1011,8 @@ impl From<RedeemableTicket> for AcknowledgedTicket {
 /// information about verification.
 /// [TransferableWinningTicket] can be attempted to be converted back to [RedeemableTicket] only
 /// when verified via [`TransferableWinningTicket::into_redeemable`] again.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransferableWinningTicket {
     pub ticket: Ticket,
     pub response: Response,
@@ -915,7 +1024,7 @@ impl TransferableWinningTicket {
     /// Attempts to transform this ticket back into a [RedeemableTicket].
     ///
     /// Verifies that the `signer` matches the `expected_issuer` and that the
-    /// ticket has valid signature from the `signer`.
+    /// ticket has a valid signature from the `signer`.
     /// Then it verifies if the ticket is winning and therefore if it can be successfully
     /// redeemed on-chain.
     pub fn into_redeemable(
@@ -937,7 +1046,7 @@ impl TransferableWinningTicket {
         if check_ticket_win(
             verified_ticket.verified_hash(),
             verified_ticket.verified_signature(),
-            &verified_ticket.verified_ticket().encoded_win_prob,
+            &verified_ticket.verified_ticket().win_prob(),
             &self.response,
             &self.vrf_params,
         ) {
@@ -980,55 +1089,74 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use crate::tickets::AcknowledgedTicket;
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, Response},
     };
-    use hopr_primitive_types::prelude::UnitaryFloatOps;
-    use hopr_primitive_types::primitives::{Address, BalanceType, EthereumChallenge, U256};
+    use hopr_primitive_types::{
+        prelude::UnitaryFloatOps,
+        primitives::{Address, EthereumChallenge, U256},
+    };
+
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be constructible");
     }
 
+    #[cfg(feature = "serde")]
+    const BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+        .with_little_endian()
+        .with_variable_int_encoding();
+
     #[test]
-    pub fn test_win_prob_to_f64() {
+    pub fn test_win_prob_to_f64() -> anyhow::Result<()> {
+        assert_eq!(0.0f64, WinningProbability::NEVER.as_f64());
+
+        assert_eq!(1.0f64, WinningProbability::ALWAYS.as_f64());
+
         let mut test_bit_string = [0xffu8; 7];
-
-        assert_eq!(0.0f64, super::win_prob_to_f64(&[0u8; 7]));
-
-        assert_eq!(1.0f64, super::win_prob_to_f64(&test_bit_string));
-
         test_bit_string[0] = 0x7f;
-        assert_eq!(0.5f64, super::win_prob_to_f64(&test_bit_string));
+        assert_eq!(0.5f64, WinningProbability::from(&test_bit_string).as_f64());
 
         test_bit_string[0] = 0x3f;
-        assert_eq!(0.25f64, super::win_prob_to_f64(&test_bit_string));
+        assert_eq!(0.25f64, WinningProbability::from(&test_bit_string).as_f64());
 
         test_bit_string[0] = 0x1f;
-        assert_eq!(0.125f64, super::win_prob_to_f64(&test_bit_string));
+        assert_eq!(0.125f64, WinningProbability::from(&test_bit_string).as_f64());
+
+        Ok(())
     }
 
     #[test]
     pub fn test_f64_to_win_prob() -> anyhow::Result<()> {
+        assert_eq!([0u8; 7], WinningProbability::try_from(0.0f64)?.as_encoded());
+
         let mut test_bit_string = [0xffu8; 7];
-
-        assert_eq!([0u8; 7], super::f64_to_win_prob(0.0f64)?);
-
-        assert_eq!(test_bit_string, super::f64_to_win_prob(1.0f64)?);
+        assert_eq!(test_bit_string, WinningProbability::try_from(1.0f64)?.as_encoded());
 
         test_bit_string[0] = 0x7f;
-        assert_eq!(test_bit_string, super::f64_to_win_prob(0.5f64)?);
+        assert_eq!(test_bit_string, WinningProbability::try_from(0.5f64)?.as_encoded());
 
         test_bit_string[0] = 0x3f;
-        assert_eq!(test_bit_string, super::f64_to_win_prob(0.25f64)?);
+        assert_eq!(test_bit_string, WinningProbability::try_from(0.25f64)?.as_encoded());
 
         test_bit_string[0] = 0x1f;
-        assert_eq!(test_bit_string, super::f64_to_win_prob(0.125f64)?);
+        assert_eq!(test_bit_string, WinningProbability::try_from(0.125f64)?.as_encoded());
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_win_prob_approx_eq() -> anyhow::Result<()> {
+        let wp_0 = WinningProbability(hex!("0020C49BBFFFFF"));
+        let wp_1 = WinningProbability(hex!("0020C49BA5E34F"));
+
+        assert_ne!(wp_0.as_ref(), wp_1.as_ref());
+        assert_eq!(wp_0, wp_1.as_f64());
 
         Ok(())
     }
@@ -1036,9 +1164,33 @@ pub mod tests {
     #[test]
     pub fn test_win_prob_back_and_forth() -> anyhow::Result<()> {
         for float in [0.1f64, 0.002f64, 0.00001f64, 0.7311111f64, 1.0f64, 0.0f64] {
-            assert!((float - super::win_prob_to_f64(&super::f64_to_win_prob(float)?)).abs() < f64::EPSILON);
+            assert!((float - WinningProbability::try_from_f64(float)?.as_f64()).abs() < f64::EPSILON);
         }
 
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_win_prob_must_be_correctly_ordered() {
+        let increment = WinningProbability::EPSILON * 100.0; // Testing the entire range would take too long
+        let mut prev = WinningProbability::NEVER;
+        while let Ok(next) = WinningProbability::try_from_f64(prev.as_f64() + increment) {
+            assert!(prev.approx_cmp(&next).is_lt());
+            prev = next;
+        }
+    }
+
+    #[test]
+    pub fn test_win_prob_epsilon_must_be_never() -> anyhow::Result<()> {
+        assert!(WinningProbability::NEVER.approx_eq(&WinningProbability::try_from_f64(WinningProbability::EPSILON)?));
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_win_prob_bounds_must_be_eq() -> anyhow::Result<()> {
+        let bound = 0.1 + WinningProbability::EPSILON;
+        let other = 0.1;
+        assert!(WinningProbability::try_from_f64(bound)?.approx_eq(&WinningProbability::try_from_f64(other)?));
         Ok(())
     }
 
@@ -1049,7 +1201,7 @@ pub mod tests {
             .challenge(Default::default())
             .build()?;
         assert_eq!(0, ticket.index);
-        assert_eq!(0.0, ticket.win_prob());
+        assert_eq!(0.0, ticket.win_prob().as_f64());
         assert_eq!(0, ticket.channel_epoch);
         assert_eq!(
             generate_channel_id(&ALICE.public().to_address(), &BOB.public().to_address()),
@@ -1062,10 +1214,10 @@ pub mod tests {
     pub fn test_ticket_serialize_deserialize() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
@@ -1081,20 +1233,25 @@ pub mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     pub fn test_ticket_serialize_deserialize_serde() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert_eq!(
             initial_ticket,
-            bincode::deserialize(&bincode::serialize(&initial_ticket)?)?
+            bincode::serde::decode_from_slice(
+                &bincode::serde::encode_to_vec(&initial_ticket, BINCODE_CONFIGURATION)?,
+                BINCODE_CONFIGURATION
+            )
+            .map(|v| v.0)?
         );
         Ok(())
     }
@@ -1103,10 +1260,10 @@ pub mod tests {
     pub fn test_ticket_sign_verify() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
@@ -1119,64 +1276,18 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_path_position() -> anyhow::Result<()> {
-        let builder = TicketBuilder::default()
-            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
-            .index(0)
-            .index_offset(1)
-            .win_prob(1.0)
-            .channel_epoch(1)
-            .challenge(Default::default());
-
-        let ticket = builder.clone().build_signed(&ALICE, &Default::default())?;
-
-        assert_eq!(1u8, ticket.get_path_position(1_u32.into())?);
-
-        let ticket = builder
-            .clone()
-            .amount(34_u64)
-            .build_signed(&ALICE, &Default::default())?;
-
-        assert_eq!(2u8, ticket.get_path_position(17_u64.into())?);
-
-        let ticket = builder
-            .clone()
-            .amount(30_u64)
-            .win_prob(0.2)
-            .build_signed(&ALICE, &Default::default())?;
-
-        assert_eq!(2u8, ticket.get_path_position(3_u64.into())?);
-        Ok(())
-    }
-
-    #[test]
-    pub fn test_path_position_mismatch() -> anyhow::Result<()> {
-        let ticket = TicketBuilder::default()
-            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .amount(256)
-            .index(0)
-            .index_offset(1)
-            .win_prob(1.0)
-            .channel_epoch(1)
-            .challenge(Default::default())
-            .build_signed(&ALICE, &Default::default())?;
-
-        assert!(ticket.get_path_position(1_u64.into()).is_err());
-        Ok(())
-    }
-
-    #[test]
     pub fn test_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
-        assert!(ticket
-            .leak()
-            .verify(&ALICE.public().to_address(), &Hash::default())
-            .is_ok());
+        assert!(
+            ticket
+                .leak()
+                .verify(&ALICE.public().to_address(), &Hash::default())
+                .is_ok()
+        );
         Ok(())
     }
 
@@ -1195,7 +1306,7 @@ pub mod tests {
             .amount(price_per_packet.div_f64(win_prob)? * U256::from(path_pos))
             .index(0)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(4)
             .challenge(challenge.unwrap_or_default())
             .build_signed(pk, &domain_separator.unwrap_or_default())?)
@@ -1226,7 +1337,8 @@ pub mod tests {
     }
 
     #[test]
-    fn test_acknowledged_ticket() -> anyhow::Result<()> {
+    #[cfg(feature = "serde")]
+    fn test_acknowledged_ticket_serde() -> anyhow::Result<()> {
         let response =
             Response::try_from(hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").as_ref())?;
 
@@ -1241,7 +1353,11 @@ pub mod tests {
 
         let acked_ticket = ticket.into_acknowledged(response);
 
-        let mut deserialized_ticket = bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket)?)?;
+        let mut deserialized_ticket = bincode::serde::decode_from_slice(
+            &bincode::serde::encode_to_vec(&acked_ticket, BINCODE_CONFIGURATION)?,
+            BINCODE_CONFIGURATION,
+        )
+        .map(|v| v.0)?;
         assert_eq!(acked_ticket, deserialized_ticket);
 
         assert!(deserialized_ticket.is_winning(&BOB, &dst));
@@ -1250,7 +1366,11 @@ pub mod tests {
 
         assert_eq!(
             deserialized_ticket,
-            bincode::deserialize(&bincode::serialize(&deserialized_ticket)?)?
+            bincode::serde::decode_from_slice(
+                &bincode::serde::encode_to_vec(&deserialized_ticket, BINCODE_CONFIGURATION)?,
+                BINCODE_CONFIGURATION,
+            )
+            .map(|v| v.0)?
         );
         Ok(())
     }
@@ -1263,10 +1383,10 @@ pub mod tests {
 
         let verified = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(resp.to_challenge().to_ethereum_challenge())
             .build_signed(&ALICE, &Default::default())?;

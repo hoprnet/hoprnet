@@ -1,6 +1,6 @@
-use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use std::sync::Arc;
 
+use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use hopr_lib::HoprState;
 
 use crate::AppState;
@@ -9,6 +9,7 @@ use crate::AppState;
 #[utoipa::path(
         get,
         path = "/startedz",
+        description="Check whether the node is started",
         responses(
             (status = 200, description = "The node is started and running"),
             (status = 412, description = "The node is not started and running"),
@@ -23,6 +24,7 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
 #[utoipa::path(
         get,
         path = "/readyz",
+        description="Check whether the node is ready to accept connections",
         responses(
             (status = 200, description = "The node is ready to accept connections"),
             (status = 412, description = "The node is not ready to accept connections"),
@@ -37,6 +39,7 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
 #[utoipa::path(
         get,
         path = "/healthyz",
+        description="Check whether the node is healthy",
         responses(
             (status = 200, description = "The node is healthy"),
             (status = 412, description = "The node is not healthy"),
@@ -57,6 +60,7 @@ fn is_running(state: Arc<AppState>) -> impl IntoResponse {
 #[utoipa::path(
         get,
         path = "/eligiblez",
+        description="Check whether the node is eligible in the network",
         responses(
             (status = 200, description = "The node is allowed in the network"),
             (status = 412, description = "The node is not allowed in the network"),
@@ -73,8 +77,9 @@ pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoRe
         Err(hopr_lib::errors::HoprLibError::ChainApi(e)) => {
             // The "division by zero" error is caused by the self-registration,
             // which is forbidden to the public and thus returns false
+            // therefore the eligibility check should be ignored
             let err_str = e.to_string();
-            if err_str.to_lowercase().contains("division by zero") {
+            if err_str.to_lowercase().contains("division or modulo by zero") {
                 (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response()
             } else {
                 (StatusCode::INTERNAL_SERVER_ERROR, err_str).into_response()

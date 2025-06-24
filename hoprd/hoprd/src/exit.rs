@@ -1,9 +1,8 @@
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::{transfer_session, HoprOffchainKeypair, ServiceId};
-use hopr_network_types::prelude::ForeignDataMode;
-use hopr_network_types::udp::UdpStreamParallelism;
-use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use std::net::SocketAddr;
+
+use hopr_lib::{HoprOffchainKeypair, ServiceId, errors::HoprLibError, transfer_session};
+use hopr_network_types::{prelude::ForeignDataMode, udp::UdpStreamParallelism};
+use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 use crate::config::SessionIpForwardingConfig;
 
@@ -30,12 +29,16 @@ impl HoprServerIpForwardingReactor {
     }
 
     fn all_ips_allowed(&self, addrs: &[SocketAddr]) -> bool {
-        addrs.iter().all(|addr| {
-            self.cfg
-                .target_allow_list
-                .as_ref()
-                .map_or(true, |list| list.contains(addr))
-        })
+        if self.cfg.use_target_allow_list {
+            for addr in addrs {
+                if !self.cfg.target_allow_list.contains(addr) {
+                    tracing::error!(%addr, "address not allowed by the target allow list, denying the target");
+                    return false;
+                }
+                tracing::debug!(%addr, "address allowed by the target allow list, accepting the target");
+            }
+        }
+        true
     }
 }
 

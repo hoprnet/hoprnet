@@ -1,3 +1,23 @@
+[project]
+name = "hoprnet"
+version = "3.0.0"
+description = "HOPR network"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = ["sdk-localcluster", "sdk-api"]
+
+[tool.uv.sources]
+sdk-localcluster = { workspace = true }
+sdk-api = { workspace = true }
+tests = { workspace = true }
+
+[tool.uv.workspace]
+members = ["sdk/python/localcluster", "sdk/python/api", "tests"]
+
+[dependency-groups]
+dev = ["ruff>=0.11.13", "tests"]
+lint = ["black==25.1.0"]
+
 [tool.black]
 line-length = 120
 target-version = ['py310']
@@ -8,29 +28,3 @@ line-length = 120
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
 lint.select = ["E", "F"]
 lint.ignore = []
-
-# Exclude a variety of commonly ignored directories.
-exclude = [
-  ".bzr",
-  ".direnv",
-  ".eggs",
-  ".git",
-  ".hg",
-  ".mypy_cache",
-  ".nox",
-  ".pants.d",
-  ".pytype",
-  ".ruff_cache",
-  ".svn",
-  ".tox",
-  ".venv",
-  "__pypackages__",
-  "_build",
-  "buck-out",
-  "build",
-  "dist",
-  "node_modules",
-  "venv",
-  "vendor",
-  "ethereum/contracts/lib",
-]

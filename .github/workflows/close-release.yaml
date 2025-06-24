@@ -11,7 +11,7 @@ on:
       next_release_type:
         type: choice
         required: true
-        description: 'Next release type to create'
+        description: "Next release type to create"
         options:
           - ReleaseCandidate
           - Patch
@@ -20,7 +20,7 @@ on:
       release_name:
         type: choice
         required: true
-        description: 'Name of the release'
+        description: "Name of the release"
         options:
           - singapore
           - kaunas
@@ -33,19 +33,27 @@ jobs:
     name: Close Release
     runs-on: self-hosted-hoprnet-small
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v29
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 
@@ -68,7 +76,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Close release ${{ steps.template.outputs.current_version }}"
@@ -85,8 +93,8 @@ jobs:
         run: |
           git fetch
           git checkout bot/close-${{ steps.template.outputs.current_version }}
+          gh pr edit --add-reviewer "hoprnet/hopr-development"
           gh pr ready
-          gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 

@@ -1,5 +1,6 @@
-use crate::initiation::StartErrorReason;
 use thiserror::Error;
+
+use crate::initiation::StartErrorReason;
 
 /// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]
@@ -7,14 +8,16 @@ pub enum TransportSessionError {
     #[error("connection timed out")]
     Timeout,
 
-    #[error("application tag from disallowed range")]
-    Tag,
-
     #[error("incorrect data size")]
     PayloadSize,
 
-    #[error("serializer error: {0}")]
-    Serializer(#[from] bincode::Error),
+    #[cfg(feature = "serde")]
+    #[error("serializer encoding error: {0}")]
+    SerializerEncoding(#[from] bincode::error::EncodeError),
+
+    #[cfg(feature = "serde")]
+    #[error("serializer decoding error: {0}")]
+    SerializerDecoding(#[from] bincode::error::DecodeError),
 
     #[error("invalid peer id")]
     PeerId,
@@ -22,11 +25,17 @@ pub enum TransportSessionError {
     #[error("impossible transport path")]
     Path,
 
+    #[error("no surb available for sending reply data")]
+    OutOfSurbs,
+
     #[error("the other party rejected session initiation with error: {0}")]
     Rejected(StartErrorReason),
 
     #[error("received data for an unregistered session")]
     UnknownData,
+
+    #[error("session establishment protocol error: {0}")]
+    StartProtocolError(String),
 
     #[error(transparent)]
     Manager(#[from] SessionManagerError),
@@ -44,10 +53,12 @@ pub enum SessionManagerError {
     NotStarted,
     #[error("manager is already started")]
     AlreadyStarted,
-    #[error("no session backrouting information was given")]
-    NoBackRoutingInfo,
     #[error("all challenge slots are occupied")]
     NoChallengeSlots,
+    #[error("session with the given id does not exist")]
+    NonExistingSession,
+    #[error("loopback sessions are not allowed")]
+    Loopback,
     #[error("non-specific session manager error: {0}")]
     Other(String),
 }

@@ -207,5 +207,5 @@ vendor/cargo/.DS_Store
 /docs/*/workspace.json
 
 # nix generated files
-/result
+result
 .pre-commit-config.yaml
