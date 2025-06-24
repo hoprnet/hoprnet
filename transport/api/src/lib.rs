@@ -618,6 +618,11 @@ where
         Ok(self.smgr.new_session(destination, target, cfg).await?)
     }
 
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn probe_session(&self, id: &SessionId) -> errors::Result<()> {
+        Ok(self.smgr.ping_session(id).await?)
+    }
+
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
     pub async fn send_message(&self, msg: Box<[u8]>, routing: DestinationRouting, tag: Tag) -> errors::Result<()> {
         if let Tag::Reserved(reserved_tag) = tag {
