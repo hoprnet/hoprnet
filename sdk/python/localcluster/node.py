@@ -6,6 +6,8 @@ from pathlib import Path
 from subprocess import STDOUT, Popen, run
 from typing import Optional
 
+from api_lib.headers.authorization import Bearer
+
 from ..api import HoprdAPI
 from . import utils
 from .constants import (
@@ -82,7 +84,7 @@ class Node:
 
     @property
     def api(self):
-        return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", self.api_token)
+        return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", Bearer(self.api_token), "/api/v4")
 
     def prepare(self):
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")

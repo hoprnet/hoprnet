@@ -64,7 +64,7 @@ class TestWinProbWithSwarm:
         win_prob = await swarm7[peer].api.ticket_min_win_prob()
 
         assert win_prob is not None
-        assert 0.0 <= round(win_prob.value, 5) <= 1.0
+        assert 0.0 <= win_prob.value <= 1.0
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
 
@@ -195,8 +195,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / Decimal(win_prob)),
-                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / win_prob),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / win_prob),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -380,9 +380,7 @@ class TestWinProbWithSwarm:
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
-    async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(
-        self, route, swarm7: dict[str, Node], base_port: int
-    ):
+    async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(self, route, swarm7: dict[str, Node]):
         ticket_price = await get_ticket_price(swarm7[route[0]])
         win_prob = Decimal("0.1")
 

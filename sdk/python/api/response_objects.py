@@ -1,183 +1,117 @@
-from dataclasses import dataclass, field, fields
 from decimal import Decimal
+
+from api_lib.objects.response import (
+    APIfield,
+    APImetric,
+    APIobject,
+    JsonResponse,
+    MetricResponse,
+)
 
 from .balance import Balance
 from .channelstatus import ChannelStatus
 
 
-class ApiResponseObject:
-    def __init__(self, data: dict):
-        for f in fields(self):
-            path = f.metadata.get("path", f.name)
-            v = data
-            for subkey in path.split("/"):
-                v = v.get(subkey, None)
-                if v is None:
-                    break
-
-            setattr(self, f.name, f.type(v))
-
-        self.post_init()
-
-    def post_init(self):
-        pass
-
-    @property
-    def is_null(self):
-        return all(getattr(self, key) is None for key in [f.name for f in fields(self)])
-
-    @property
-    def as_dict(self) -> dict:
-        return {key: getattr(self, key) for key in [f.name for f in fields(self)]}
-
-    def __str__(self):
-        return str(self.__dict__)
-
-    def __repr__(self):
-        return str(self)
-
-    def __eq__(self, other):
-        return all(getattr(self, key) == getattr(other, key) for key in [f.name for f in fields(self)])
+@APIobject
+class Addresses(JsonResponse):
+    native: str = APIfield()
 
 
-class ApiMetricResponseObject(ApiResponseObject):
-    def __init__(self, data: str):
-        self.data = data.split("\n")
-
-        for f in fields(self):
-            values = {}
-            labels = f.metadata.get("labels", [])
-
-            for line in self.data:
-                if not line.startswith(f.name):
-                    continue
-
-                value = line.split(" ")[-1]
-
-                if len(labels) == 0:
-                    setattr(self, f.name, f.type(value) + getattr(self, f.name, 0))
-                else:
-                    labels_values = {
-                        pair.split("=")[0].strip('"'): pair.split("=")[1].strip('"')
-                        for pair in line.split("{")[1].split("}")[0].split(",")
-                    }
-
-                    dict_path = [labels_values[label] for label in labels]
-                    current = values
-
-                    for part in dict_path[:-1]:
-                        if part not in current:
-                            current[part] = {}
-                        current = current[part]
-                    if dict_path[-1] not in current:
-                        current[dict_path[-1]] = Decimal("0")
-                    current[dict_path[-1]] += Decimal(value)
-
-            if len(labels) > 0:
-                setattr(self, f.name, f.type(values))
+@APIobject
+class Balances(JsonResponse):
+    hopr: Balance = APIfield()
+    native: Balance = APIfield()
+    safe_native: Balance = APIfield("safeNative")
+    safe_hopr: Balance = APIfield("safeHopr")
+    safe_hopr_allowance: Balance = APIfield("safeHoprAllowance")
 
 
-@dataclass(init=False)
-class Addresses(ApiResponseObject):
-    native: str = field()
+@APIobject
+class Infos(JsonResponse):
+    hopr_node_safe: bool = APIfield("hoprNodeSafe")
 
 
-@dataclass(init=False)
-class Balances(ApiResponseObject):
-    hopr: Balance = field()
-    native: Balance = field()
-    safe_native: Balance = field(metadata={"path": "safeNative"})
-    safe_hopr: Balance = field(metadata={"path": "safeHopr"})
-    safe_hopr_allowance: Balance = field(metadata={"path": "safeHoprAllowance"})
+@APIobject
+class ConnectedPeer(JsonResponse):
+    address: str = APIfield()
+    version: str = APIfield("reportedVersion")
+    quality: float = APIfield()
 
 
-@dataclass(init=False)
-class Infos(ApiResponseObject):
-    hopr_node_safe: bool = field(metadata={"path": "hoprNodeSafe"})
+@APIobject
+class Channel(JsonResponse):
+    balance: Balance = APIfield()
+    channel_epoch: int = APIfield("channelEpoch")
+    id: str = APIfield("channelId")
+    closure_time: int = APIfield("closureTime")
+    destination: str = APIfield()
+    source: str = APIfield()
+    status: ChannelStatus = APIfield()
+    ticket_index: int = APIfield("ticketIndex")
 
 
-@dataclass(init=False)
-class ConnectedPeer(ApiResponseObject):
-    address: str = field()
-    version: str = field(metadata={"path": "reportedVersion"})
-    quality: str = field()
+@APIobject
+class Ticket(JsonResponse):
+    amount: Balance = APIfield()
+    channel_epoch: int = APIfield("channelEpoch")
+    channel_id: str = APIfield("channelId")
+    index: int = APIfield()
+    index_offset: int = APIfield("indexOffset")
+    signature: str = APIfield()
+    winn_prob: Decimal = APIfield("winProb")
 
 
-@dataclass(init=False)
-class Channel(ApiResponseObject):
-    balance: Balance = field()
-    channel_epoch: int = field(metadata={"path": "channelEpoch"})
-    id: str = field(metadata={"path": "channelId"})
-    closure_time: int = field(metadata={"path": "closureTime"})
-    destination: str = field()
-    source: str = field()
-    status: ChannelStatus = field()
-    ticket_index: int = field(metadata={"path": "ticketIndex"})
+@APIobject
+class TicketPrice(JsonResponse):
+    value: Balance = APIfield("price")
 
 
-@dataclass(init=False)
-class Ticket(ApiResponseObject):
-    amount: Balance = field()
-    channel_epoch: int = field(metadata={"path": "channelEpoch"})
-    channel_id: str = field(metadata={"path": "channelId"})
-    index: int = field()
-    index_offset: int = field(metadata={"path": "indexOffset"})
-    signature: str = field()
-    winn_prob: Decimal = field(metadata={"path": "winProb"})
+@APIobject
+class TicketProbability(JsonResponse):
+    value: Decimal = APIfield("probability")
 
 
-@dataclass(init=False)
-class TicketPrice(ApiResponseObject):
-    value: Balance = field()
+@APIobject
+class TicketStatistics(JsonResponse):
+    neglected_value: Balance = APIfield("neglectedValue")
+    redeemed_value: Balance = APIfield("redeemedValue")
+    rejected_value: Balance = APIfield("rejectedValue")
+    unredeemed_value: Balance = APIfield("unredeemedValue")
+    winning_count: int = APIfield("winningCount")
 
 
-@dataclass(init=False)
-class TicketProbability(ApiResponseObject):
-    value: Decimal = field()
+@APIobject
+class Configuration(JsonResponse):
+    safe_address: str = APIfield("hopr/safe_module/safe_address")
+    module_address: str = APIfield("hopr/safe_module/module_address")
 
 
-@dataclass(init=False)
-class TicketStatistics(ApiResponseObject):
-    neglected_value: Balance = field(metadata={"path": "neglectedValue"})
-    redeemed_value: Balance = field(metadata={"path": "redeemedValue"})
-    rejected_value: Balance = field(metadata={"path": "rejectedValue"})
-    unredeemed_value: Balance = field(metadata={"path": "unredeemedValue"})
-    winning_count: int = field(metadata={"path": "winningCount"})
+@APIobject
+class OpenedChannel(JsonResponse):
+    id: str = APIfield("channelId")
 
 
-@dataclass(init=False)
-class Configuration(ApiResponseObject):
-    safe_address: str = field(metadata={"path": "hopr/safe_module/safe_address"})
-    module_address: str = field(metadata={"path": "hopr/safe_module/module_address"})
+@APIobject
+class Ping(JsonResponse):
+    latency: float = APIfield()
+    version: str = APIfield("reportedVersion")
 
 
-@dataclass(init=False)
-class OpenedChannel(ApiResponseObject):
-    id: str = field(metadata={"path": "channelId"})
-    receipt: str = field(metadata={"path": "transactionReceipt"})
+@APIobject
+class Session(JsonResponse):
+    destination: str = APIfield()
+    ip: str = APIfield()
+    port: int = APIfield()
+    protocol: str = APIfield()
+    target: str = APIfield()
+    forward_path: str = APIfield("forwardPath")
+    return_path: str = APIfield("returnPath")
+    mtu: int = APIfield()
 
 
-@dataclass(init=False)
-class Ping(ApiResponseObject):
-    latency: float = field()
-    version: str = field(metadata={"path": "reportedVersion"})
-
-
-@dataclass(init=False)
-class Session(ApiResponseObject):
-    destination: str = field()
-    ip: str = field()
-    port: int = field()
-    protocol: str = field()
-    target: str = field()
-    forward_path: str = field(metadata={"path": "forwardPath"})
-    return_path: str = field(metadata={"path": "returnPath"})
-    mtu: int = field()
-
-
-@dataclass(init=False)
-class Metrics(ApiMetricResponseObject):
-    hopr_tickets_incoming_statistics: dict = field(metadata={"labels": ["statistic"]})
+@APIobject
+class Metrics(MetricResponse):
+    hopr_tickets_incoming_statistics: dict = APImetric(["statistic"])
 
 
 class Channels:

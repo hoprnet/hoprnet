@@ -1,95 +1,66 @@
-from dataclasses import dataclass, field, fields
-from typing import Any, List, Optional, Union
+from dataclasses import dataclass
+from typing import Any, List, Union
 
-
-def api_field(api_key: str, default: Optional[Any] = None, **kwargs):
-    metadata = kwargs.pop("metadata", {})
-    metadata["api_key"] = api_key
-
-    if default is None:
-        return field(metadata=metadata, **kwargs)
-    else:
-        return field(default=default, metadata=metadata, **kwargs)
-
-
-class ApiRequestObject:
-    @property
-    def as_dict(self) -> dict:
-        result = {}
-        for f in fields(self):
-            api_key = f.metadata.get("api_key", f.name)
-            result[api_key] = getattr(self, f.name)
-        return result
-
-    @property
-    def as_header_string(self) -> str:
-        return "&".join([f"{k}={v}" for k, v in self.as_dict.items()])
+from api_lib.objects.request import APIfield, RequestData
 
 
 @dataclass
-class OpenChannelBody(ApiRequestObject):
-    amount: str = api_field("amount")
-    destination: str = api_field("destination")
+class OpenChannelBody(RequestData):
+    amount: str = APIfield("amount")
+    destination: str = APIfield("destination")
 
 
 @dataclass
-class FundChannelBody(ApiRequestObject):
-    amount: str = api_field("amount")
+class FundChannelBody(RequestData):
+    amount: str = APIfield("amount")
 
 
 @dataclass
-class GetChannelsBody(ApiRequestObject):
-    full_topology: bool = api_field("fullTopology", False)
-    including_closed: bool = api_field("includingClosed", False)
+class GetChannelsBody(RequestData):
+    full_topology: bool = APIfield("fullTopology", False)
+    including_closed: bool = APIfield("includingClosed", False)
 
 
 @dataclass
-class GetPeersBody(ApiRequestObject):
-    quality: float = api_field("quality")
+class GetPeersBody(RequestData):
+    quality: float = APIfield("quality")
 
 
 @dataclass
-class CreateSessionBody(ApiRequestObject):
-    capabilities: List[Any] = api_field("capabilities")
-    destination: str = api_field("destination")
-    listen_host: str = api_field("listenHost")
-    forward_path: Union[str, dict] = api_field("forwardPath")
-    return_path: Union[str, dict] = api_field("returnPath")
-    target: Union[str, dict] = api_field("target")
-    response_buffer: str = api_field("responseBuffer")
+class CreateSessionBody(RequestData):
+    capabilities: List[Any] = APIfield("capabilities")
+    destination: str = APIfield("destination")
+    listen_host: str = APIfield("listenHost")
+    forward_path: Union[str, dict] = APIfield("forwardPath")
+    return_path: Union[str, dict] = APIfield("returnPath")
+    target: Union[str, dict] = APIfield("target")
+    response_buffer: str = APIfield("responseBuffer")
 
 
 @dataclass
-class SessionCapabilitiesBody(ApiRequestObject):
-    retransmission: bool = api_field("Retransmission", False)
-    segmentation: bool = api_field("Segmentation", False)
-    retransmission_ack_only: bool = api_field("RetransmissionAckOnly", False)
-    no_delay: bool = api_field("NoDelay", False)
-
-    @property
-    def as_array(self) -> list:
-        return [f.metadata["api_key"] for f in fields(self) if getattr(self, f.name)]
+class SessionCapabilitiesBody(RequestData):
+    retransmission: bool = APIfield("Retransmission", False)
+    segmentation: bool = APIfield("Segmentation", False)
+    retransmission_ack_only: bool = APIfield("RetransmissionAckOnly", False)
+    no_delay: bool = APIfield("NoDelay", False)
 
 
 @dataclass
-class SessionPathBodyRelayers(ApiRequestObject):
-    relayers: List[str] = api_field("IntermediatePath")
+class SessionPathBodyRelayers(RequestData):
+    relayers: List[str] = APIfield("IntermediatePath")
 
 
 @dataclass
-class SessionPathBodyHops(ApiRequestObject):
-    hops: int = api_field("Hops")
-
-    def post_init(self):
-        self.hops = int(self.hops)
+class SessionPathBodyHops(RequestData):
+    hops: int = APIfield("Hops")
 
 
 @dataclass
-class SessionTargetBody(ApiRequestObject):
-    service: int = api_field("Service")
+class SessionTargetBody(RequestData):
+    service: int = APIfield("Service")
 
 
 @dataclass
-class WithdrawBody(ApiRequestObject):
-    address: str = api_field("address")
-    amount: str = api_field("amount")
+class WithdrawBody(RequestData):
+    address: str = APIfield("address")
+    amount: str = APIfield("amount")

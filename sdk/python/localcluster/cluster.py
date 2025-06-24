@@ -16,7 +16,7 @@ from .constants import (
 )
 from .node import Node
 
-GLOBAL_TIMEOUT = 200
+GLOBAL_TIMEOUT = 60
 
 
 class Cluster:
