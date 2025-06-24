@@ -240,7 +240,7 @@ where
     S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    let elem = StartProtocol::KeepAlive(session_id);
+    let elem = StartProtocol::KeepAlive(session_id.into());
 
     // The stream is suspended until the caller sets a rate via the Controller
     let (ka_stream, controller) = futures::stream::repeat(elem).rate_limit_per_unit(0, Duration::from_secs(1));
@@ -688,12 +688,14 @@ where
             Ok(self
                 .msg_sender
                 .get()
+                .cloned()
                 .ok_or(SessionManagerError::NotStarted)?
-                .send_message(
-                    StartProtocol::KeepAlive((*id).into()).try_into()?,
+                .send((
                     session_data.routing_opts.clone(),
-                )
-                .await?)
+                    StartProtocol::KeepAlive((*id).into()).try_into()?,
+                ))
+                .await
+                .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?)
         } else {
             Err(SessionManagerError::NonExistingSession.into())
         }

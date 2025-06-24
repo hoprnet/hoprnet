@@ -16,7 +16,7 @@ use crate::{
     session::{
         frames::{FrameId, FrameInspector, Segment, SegmentId, SeqNum},
         protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
-        socket::state::{SocketComponents},
+        socket::state::SocketComponents,
     },
 };
 

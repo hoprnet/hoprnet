@@ -14,8 +14,8 @@ use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, Hopr, HoprSession, SESSION_MTU, ServiceId, SessionCapabilities, SessionClientConfig,
-    SessionTarget, SurbBalancerConfig, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, SESSION_MTU, ServiceId, SessionCapabilities, SessionClientConfig, SessionTarget,
+    SurbBalancerConfig, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
