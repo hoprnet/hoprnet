@@ -78,7 +78,7 @@ use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_packet::prelude::ApplicationData;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use tracing::{error, trace, warn};
+use tracing::{Instrument, error, trace, warn};
 
 use crate::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 pub use crate::{processor::DEFAULT_PRICE_PER_PACKET, timer::execute_on_tick};
@@ -405,7 +405,8 @@ where
                 })
                 .map(Ok)
                 .forward(api.0)
-                .await;
+                .await
+                .instrument(tracing::trace_span!("incoming message processing"));
         }),
     );
 
