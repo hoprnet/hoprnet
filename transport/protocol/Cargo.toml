@@ -32,6 +32,7 @@ tokio-util = { workspace = true, default-features = false, features = [
   "compat",
 ] }
 tracing = { workspace = true }
+tracing-futures = { workspace = true }
 validator = { workspace = true }
 
 hopr-async-runtime = { workspace = true }
