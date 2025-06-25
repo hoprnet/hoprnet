@@ -176,11 +176,10 @@ hopr:
         # this number of seconds.
         max_closure_overdue: 300
 
-  # Configuration of the heartbeat mechanism for probing
-  # other nodes in the HOPR network.
+  # Configuration of the heartbeat mechanism for probing other nodes in the HOPR network.
   probe:
     # The maximum time in seconds to wait for a probe to finish
-    timeout: 10
+    timeout: 3
     # The maximum number of concurrent heartbeat probes
     max_parallel_probes: 50
     # The time interval for which to consider peer reprobing in seconds
