@@ -5,7 +5,6 @@ use std::{
     task::{Context, Poll},
     time::{Duration, Instant},
 };
-
 use futures_time::future::Timer;
 use tracing::instrument;
 
@@ -22,7 +21,7 @@ pub struct Sequencer<S: futures::Stream> {
     next_id: FrameId,
     last_emitted: Instant,
     max_wait: Duration,
-    is_closed: bool,
+    state: State,
 }
 
 impl<S> Sequencer<S>
@@ -39,9 +38,13 @@ where
             next_id: 1,
             last_emitted: Instant::now(),
             max_wait,
-            is_closed: false,
+            state: State::Polling,
         }
     }
+}
+
+enum State {
+    Polling, Ready, Done
 }
 
 impl<S> futures::Stream for Sequencer<S>
@@ -55,6 +58,35 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         loop {
+            if *this.next_id == 0 {
+                tracing::trace!("sequencer has reached the end of the frame sequence");
+                return Poll::Ready(None);
+            }
+
+            // Try to drain the buffer
+            if let Some(next) = this.buffer.peek().map(|next| &next.0) {
+                if next.eq(this.next_id) {
+                    *this.next_id = this.next_id.wrapping_add(1);
+                    *this.last_emitted = Instant::now();
+
+                    tracing::trace!("emit next frame");
+                    return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
+                } else if this.last_emitted.elapsed() >= *this.max_wait
+                    || *this.is_closed
+                    || this.buffer.len() == this.buffer.capacity()
+                {
+                    let discarded = *this.next_id;
+                    *this.next_id = this.next_id.wrapping_add(1);
+                    *this.last_emitted = Instant::now();
+
+                    this.buffer.pop();
+                    tracing::trace!("discard frame");
+                    return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
+                }
+            } else if *this.is_closed {
+                return Poll::Ready(None);
+            }
+
             if this.buffer.len() < this.buffer.capacity() && !*this.is_closed {
                 // Poll the timer only if the buffer is not empty
                 let timer_poll = if !this.buffer.is_empty() {
@@ -76,35 +108,16 @@ where
                         this.buffer.push(std::cmp::Reverse(next));
                         tracing::trace!("new frame");
                     }
-                    (Poll::Ready(None), _) => *this.is_closed = true,
+                    (Poll::Ready(None), _) => {
+                        tracing::trace!("stream closed");
+                        *this.is_closed = true
+                    },
                     (Poll::Pending, Poll::Ready(_)) => {
                         this.timer.as_mut().reset_timer();
                         tracing::trace!("timer reset");
                     }
                     (Poll::Pending, Poll::Pending) => return Poll::Pending,
                 }
-            }
-
-            if let Some(next) = this.buffer.peek().map(|next| &next.0) {
-                if next.eq(this.next_id) {
-                    *this.next_id += 1;
-                    *this.last_emitted = Instant::now();
-
-                    tracing::trace!("emit next frame");
-                    return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
-                } else if this.last_emitted.elapsed() >= *this.max_wait
-                    || *this.is_closed
-                    || this.buffer.len() == this.buffer.capacity()
-                {
-                    let discarded = *this.next_id;
-                    *this.next_id += 1;
-                    *this.last_emitted = Instant::now();
-
-                    tracing::trace!("discard frame");
-                    return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
-                }
-            } else if *this.is_closed {
-                return Poll::Ready(None);
             }
         }
     }
@@ -304,6 +317,25 @@ mod tests {
         assert!(matches!(rx.next().await, Some(Ok(6))));
         assert!(matches!(rx.next().await, Some(Ok(7))));
         assert!(matches!(rx.next().await, Some(Ok(8))));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn sequencer_must_terminate_on_last_frame_id() -> anyhow::Result<()> {
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+
+        pin_mut!(tx);
+        tx.send_all(&mut futures::stream::iter([FrameId::MAX - 1, FrameId::MAX, 1, 2]).map(Ok)).await?;
+
+        let mut rx = rx.sequencer(Duration::from_millis(10), 1024);
+        rx.next_id = FrameId::MAX - 1;
+        pin_mut!(rx);
+
+        const LAST_ID: FrameId = FrameId::MAX - 1;
+        assert!(matches!(rx.next().await, Some(Ok(LAST_ID))));
+        assert!(matches!(rx.next().await, Some(Ok(FrameId::MAX))));
+        assert!(matches!(rx.next().await, None));
 
         Ok(())
     }

@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
 use futures::{FutureExt, StreamExt, channel::mpsc::UnboundedSender};
@@ -217,6 +218,7 @@ pub struct AcknowledgementState<const C: usize> {
     id: String,
     cfg: AcknowledgementStateConfig,
     context: Option<AcknowledgementStateContext<C>>,
+    started: std::sync::Arc<AtomicBool>,
 }
 
 impl<const C: usize> AcknowledgementState<C> {
@@ -225,6 +227,7 @@ impl<const C: usize> AcknowledgementState<C> {
             id: session_id.to_string(),
             cfg: cfg.normalize(),
             context: Default::default(),
+            started: std::sync::Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -236,7 +239,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
 
     #[tracing::instrument(name = "AcknowledgementState", skip(self, socket_components), fields(session_id = self.id))]
     fn run(&mut self, socket_components: SocketComponents<C>) -> Result<(), SessionError> {
-        if self.context.is_some() {
+        if self.started.load(std::sync::atomic::Ordering::Relaxed) && self.context.is_some() {
             return Err(SessionError::InvalidState("state is already running".into()));
         }
 
@@ -291,6 +294,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     }
                 })
                 .ready_chunks(SegmentRequest::<C>::MAX_ENTRIES)
+                .inspect(|r| tracing::trace!(req = ?r, "requesting segments resend"))
                 .map(|a| Ok(SessionMessage::<C>::Request(a.into_iter().collect())))
                 .forward(ctl_tx_clone)
                 .map(move |res| match res {
@@ -309,6 +313,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 .buffer(futures_time::time::Duration::from(ack_delay))
                 .flat_map(|acks| futures::stream::iter(FrameAcknowledgements::<C>::new_multiple(acks)))
                 .filter(|acks| futures::future::ready(!acks.is_empty()))
+                .inspect(|acks| tracing::trace!(?acks, "acknowledgements sent"))
                 .map(|acks| Ok(SessionMessage::<C>::Acknowledge(acks)))
                 .forward(ctl_tx_clone)
                 .map(move |res| match res {
@@ -326,7 +331,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         hopr_async_runtime::prelude::spawn(
             outgoing_frame_retries_rx
                 .map(move |rf: RetriedFrameId| {
-                    // Find out if the frame can be retried
+                    // Find out if the frame can be retried again in the future
                     let frame_id = rf.frame_id;
                     if let Some(next) = rf.next() {
                         // Register the next retry if still possible
@@ -340,6 +345,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     } else {
                         tracing::debug!(frame_id, "last outgoing retry of frame");
                     }
+                    tracing::trace!(frame_id, "going to re-send entire frame");
                     frame_id
                 })
                 .flat_map(move |frame_id| {
@@ -361,10 +367,12 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         );
 
         tracing::debug!("acknowledgement state has been started");
+        self.started.store(true, std::sync::atomic::Ordering::Relaxed);
+
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState", skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::stop", skip(self), fields(session_id = self.id))]
     fn stop(&mut self) -> Result<(), SessionError> {
         if let Some(mut ctx) = self.context.take() {
             ctx.outgoing_frame_retries_tx.force_close();
@@ -372,6 +380,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             ctx.ack_tx.close_channel();
             ctx.ctl_tx.close_channel();
 
+            self.started.store(false, std::sync::atomic::Ordering::Relaxed);
             tracing::debug!("state has been stopped");
         } else {
             tracing::warn!("cannot be stopped, because it is not running");
@@ -380,11 +389,16 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState",skip(self), fields(session_id = self.id, frame_id = seg_id.0))]
+    #[tracing::instrument(name = "AcknowledgementState::incoming_segment", skip(self), fields(session_id = self.id, frame_id = seg_id.0))]
     fn incoming_segment(&mut self, seg_id: &SegmentId, _segment_count: SeqNum) -> Result<(), SessionError> {
         tracing::trace!("segment received");
 
-        let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
+        let ctx = self
+            .started
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| self.context.as_mut())
+            .flatten()
+            .ok_or(SessionError::StateNotRunning)?;
 
         // Register future requesting of segments for this frame
         if self.cfg.mode.is_partial_ack_enabled() {
@@ -400,13 +414,18 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState",skip(self, request), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::incoming_retransmission_request", skip(self, request), fields(session_id = self.id))]
     fn incoming_retransmission_request(&mut self, request: SegmentRequest<C>) -> Result<(), SessionError> {
         // The state will respond to segment retransmission requests even
         // if it has this feature disabled in the config.
         tracing::trace!(count = request.len(), "segment retransmission requested");
 
-        let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
+        let ctx = self
+            .started
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| self.context.as_mut())
+            .flatten()
+            .ok_or(SessionError::StateNotRunning)?;
 
         let (mut missing_seg_ids, mut missing_frame_ids): (Vec<_>, Vec<_>) =
             request.into_iter().map(|s| (s, s.0)).unzip();
@@ -453,11 +472,16 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             .map_err(|e| SessionError::ProcessingError(e.to_string()))
     }
 
-    #[tracing::instrument(name = "AcknowledgementState",skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::incoming_acknowledged_frames", skip(self), fields(session_id = self.id))]
     fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
         tracing::trace!(count = ack.len(), "frame acknowledgements received");
 
-        let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
+        let ctx = self
+            .started
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| self.context.as_mut())
+            .flatten()
+            .ok_or(SessionError::StateNotRunning)?;
 
         // Frame acknowledged, we will not need to resend it
         if self.cfg.mode.is_full_ack_enabled() {
@@ -473,11 +497,16 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState",skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::frame_complete", skip(self), fields(session_id = self.id))]
     fn frame_complete(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
         tracing::trace!("frame complete");
 
-        let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
+        let ctx = self
+            .started
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| self.context.as_mut())
+            .flatten()
+            .ok_or(SessionError::StateNotRunning)?;
 
         // Since the frame has been completed, push its ID into the acknowledgement queue
         if let Err(error) = ctx.ack_tx.try_send(frame_id) {
@@ -497,17 +526,28 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState",skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::frame_emitted", skip(self), fields(session_id = self.id))]
     fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError> {
         tracing::trace!("frame emitted");
+        let _ = self
+            .started
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| self.context.as_mut())
+            .flatten()
+            .ok_or(SessionError::StateNotRunning)?;
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState", skip(self), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState::frame_discarded", skip(self), fields(session_id = self.id))]
     fn frame_discarded(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
         tracing::trace!("frame discarded");
 
-        let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
+        let ctx = self
+            .started
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| self.context.as_mut())
+            .flatten()
+            .ok_or(SessionError::StateNotRunning)?;
 
         if self.cfg.mode.is_partial_ack_enabled() {
             // No more requesting of segment retransmissions from frames that were discarded
@@ -522,11 +562,16 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         Ok(())
     }
 
-    #[tracing::instrument(name = "AcknowledgementState", skip(self, segment), fields(session_id = self.id, frame_id = segment.frame_id, seq_idx = segment.seq_idx))]
+    #[tracing::instrument(name = "AcknowledgementState::segment_sent", skip(self, segment), fields(session_id = self.id, frame_id = segment.frame_id, seq_idx = segment.seq_idx))]
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError> {
         tracing::trace!("segment sent");
 
-        let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
+        let ctx = self
+            .started
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .then(|| self.context.as_mut())
+            .flatten()
+            .ok_or(SessionError::StateNotRunning)?;
 
         // Since segments are re-sent via Control stream, they are not later fed again
         // into the ring buffer.

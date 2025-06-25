@@ -47,7 +47,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
 impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, M> {
     type Item = Result<Frame, SessionError>;
 
-    #[instrument(name = "Reassembler::poll_next", level = "trace", skip(self, cx), ret)]
+    #[instrument(name = "Reassembler::poll_next", level = "trace", skip(self, cx), fields(num_incomplete = self.incomplete_frames.len()), ret)]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         loop {
@@ -93,11 +93,14 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                         *this.last_expiration = Instant::now();
                     }
 
+                    tracing::trace!(frame_id = item.frame_id, seq_idx = item.seq_idx, seq_len = item.seq_len, "received segment");
+
                     match this.incomplete_frames.entry(item.frame_id) {
                         FrameMapEntry::Occupied(mut e) => {
                             let builder = e.get_builder_mut();
                             match builder.add_segment(item) {
                                 Ok(_) => {
+                                    tracing::trace!(frame_id = builder.frame_id(), "added segment");
                                     if builder.is_complete() {
                                         tracing::trace!(frame_id = builder.frame_id(), "frame is complete");
                                         return Poll::Ready(Some(e.finalize().try_into()));
@@ -114,6 +117,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                                 tracing::trace!(frame_id = builder.frame_id(), "segment frame is complete");
                                 return Poll::Ready(Some(builder.try_into()));
                             } else {
+                                tracing::trace!(frame_id = builder.frame_id(), "added segment for new frame");
                                 e.insert_builder(builder);
                             }
                         }

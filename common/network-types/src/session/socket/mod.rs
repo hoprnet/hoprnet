@@ -744,7 +744,7 @@ mod tests {
 
         let bob_cfg = SessionSocketConfig {
             frame_size: FRAME_SIZE,
-            frame_timeout: Duration::from_millis(100),
+            frame_timeout: Duration::from_millis(1000),
             ..Default::default()
         };
 
@@ -759,11 +759,22 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket
-            .write_all(&data)
-            .timeout(futures_time::time::Duration::from_secs(5))
-            .await??;
-        alice_socket.flush().await?;
+
+        let alice_jh = tokio::spawn(async move {
+            alice_socket
+                .write_all(&data)
+                .timeout(futures_time::time::Duration::from_secs(5))
+                .await??;
+
+            alice_socket.flush().await?;
+
+            // Alice has to keep reading so that it is ready for retransmitting
+            let mut vec = Vec::new();
+            alice_socket.read_to_end(&mut vec).await?;
+            alice_socket.close().await?;
+
+            Ok::<_, std::io::Error>(vec)
+        });
 
         let mut bob_data = [0u8; DATA_SIZE];
         bob_socket
@@ -773,7 +784,9 @@ mod tests {
         assert_eq!(data, bob_data);
 
         bob_socket.close().await?;
-        alice_socket.close().await?;
+
+        let alice_recv = alice_jh.await??;
+        assert!(alice_recv.is_empty());
 
         Ok(())
     }
@@ -844,7 +857,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(tokio::test)]
+    //#[test_log::test(tokio::test)]
+    #[test_log::test(tokio::test(flavor = "multi_thread"))]
     async fn stateful_socket_bidirectional_should_should_not_skip_missing_frames() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(
             FaultyNetworkConfig {
@@ -874,40 +888,79 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
+        let (mut alice_rx, mut alice_tx)  =
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?
+            .split();
+
+        let (mut bob_rx, mut bob_tx) =
+            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?
+            .split();
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket
-            .write_all(&alice_sent_data)
-            .timeout(futures_time::time::Duration::from_secs(2))
-            .await??;
-        alice_socket.flush().await?;
+        let (alice_data_tx, alice_recv_data) = futures::channel::oneshot::channel();
+        let alice_rx_jh = tokio::spawn(async move {
+            let mut alice_recv_data = vec![0u8; DATA_SIZE];
+            alice_rx
+                .read_exact(&mut alice_recv_data)
+                .await?;
+            alice_data_tx.send(alice_recv_data).map_err(|_| std::io::Error::other("tx error"))?;
+
+            // Keep reading until the socket is closed
+            alice_rx.read_to_end(&mut Vec::new()).await?;
+            Ok::<_, std::io::Error>(())
+        });
 
         let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        bob_socket
-            .write_all(&bob_sent_data)
-            .timeout(futures_time::time::Duration::from_secs(2))
-            .await??;
-        bob_socket.flush().await?;
+        let (bob_data_tx, bob_recv_data) = futures::channel::oneshot::channel();
+        let bob_rx_jh = tokio::spawn(async move {
+            let mut bob_recv_data = vec![0u8; DATA_SIZE];
+            bob_rx
+                .read_exact(&mut bob_recv_data)
+                .await?;
+            bob_data_tx.send(bob_recv_data).map_err(|_| std::io::Error::other("tx error"))?;
 
-        let mut bob_recv_data = [0u8; DATA_SIZE];
-        bob_socket
-            .read_exact(&mut bob_recv_data)
-            .timeout(futures_time::time::Duration::from_secs(2))
-            .await??;
-        assert_eq!(alice_sent_data, bob_recv_data);
+            // Keep reading until the socket is closed
+            bob_rx.read_to_end(&mut Vec::new()).await?;
+            Ok::<_, std::io::Error>(())
+        });
 
-        let mut alice_recv_data = [0u8; DATA_SIZE];
-        alice_socket
-            .read_exact(&mut alice_recv_data)
-            .timeout(futures_time::time::Duration::from_secs(2))
-            .await??;
-        assert_eq!(bob_sent_data, alice_recv_data);
+        let alice_tx_jh = tokio::spawn(async move {
+            alice_tx
+                .write_all(&alice_sent_data)
+                .timeout(futures_time::time::Duration::from_secs(2))
+                .await??;
+            alice_tx.flush().await?;
 
-        alice_socket.close().await?;
-        bob_socket.close().await?;
+            // Once all data is sent, wait for the other side to receive it and close the socket
+            let out = alice_recv_data.await.map_err(|_| std::io::Error::other("rx error"))?;
+            alice_tx.close().await?;
+            tracing::info!("alice closed");
+            Ok::<_, std::io::Error>(out)
+        });
+
+        let bob_tx_jh = tokio::spawn(async move {
+            bob_tx
+                .write_all(&bob_sent_data)
+                .timeout(futures_time::time::Duration::from_secs(2))
+                .await??;
+            bob_tx.flush().await?;
+
+            // Once all data is sent, wait for the other side to receive it and close the socket
+            let out = bob_recv_data.await.map_err(|_| std::io::Error::other("rx error"))?;
+            bob_tx.close().await?;
+            tracing::info!("bob closed");
+            Ok::<_, std::io::Error>(out)
+        });
+
+        let (alice_recv_data, bob_recv_data, a, b) = futures::future::try_join4(
+            alice_tx_jh, bob_tx_jh, alice_rx_jh, bob_rx_jh
+        )
+        .timeout(futures_time::time::Duration::from_secs(4)).await??;
+
+        assert_eq!(&alice_sent_data, bob_recv_data?.as_slice());
+        assert_eq!(&bob_sent_data, alice_recv_data?.as_slice());
+        assert!(a.is_ok());
+        assert!(b.is_ok());
 
         Ok(())
     }
