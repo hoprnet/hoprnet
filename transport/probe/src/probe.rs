@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use anyhow::Context;
 use futures::{FutureExt, SinkExt, StreamExt, channel::oneshot::channel, pin_mut};
@@ -168,6 +168,23 @@ impl Probe {
         let direct_neighbors = neighbors_to_probe(store.clone(), self.cfg)
             .map(|peer| (peer, None))
             .merge(manual_events.map(|(peer, notifier)| (peer, Some(notifier))));
+
+        let testnet_peers_revert = [
+            PeerId::from_str("12D3KooWPq6mC6uewNRANc4YRcigkP1bEUKUFkLX2fBB6deP32Z7").unwrap(),
+            PeerId::from_str("12D3KooWRnhZ843M84m5chn7U9ZVYBx8GEXMCD7HNTucdTYbJU8c").unwrap(),
+            PeerId::from_str("12D3KooWBX5ENqYkKTevwiQXpTFYZTWs3S11bQiueX7QQqapTsaR").unwrap(),
+            PeerId::from_str("12D3KooWAnnJ3FUci79QBfc6VKWoWARjkGjWJH99xjnjvJU3SUTR").unwrap(),
+            PeerId::from_str("12D3KooWNGfx1dbsGRVVs2P8fxr6jAFCpZhEhGUGb3QPxEdYqKV7").unwrap(),
+            PeerId::from_str("12D3KooWMmJNvw7Fyd7PxPpeC5oRzU2ykRiuHAzMseLuZ6ySVgUq").unwrap(),
+        ];
+
+        let direct_neighbors = direct_neighbors.filter_map(move |(peer, replier)| async move {
+            if testnet_peers_revert.contains(&peer) {
+                Some((peer, replier))
+            } else {
+                None
+            }
+        });
 
         processes.insert(
             HoprProbeProcess::Emit,
