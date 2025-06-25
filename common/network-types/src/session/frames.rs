@@ -68,7 +68,7 @@ impl AsRef<[u8]> for Frame {
 }
 
 /// Wrapper for [`Frame`] that implements comparison and total ordering based on [`FrameId`].
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct OrderedFrame(pub Frame);
 
 impl Eq for OrderedFrame {}

@@ -1,10 +1,12 @@
 use std::{
+    cmp::Reverse,
     collections::BinaryHeap,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
     time::{Duration, Instant},
 };
+
 use futures_time::future::Timer;
 use tracing::instrument;
 
@@ -43,8 +45,11 @@ where
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum State {
-    Polling, Ready, Done
+    Polling,
+    BufferUpdated,
+    Done,
 }
 
 impl<S> futures::Stream for Sequencer<S>
@@ -54,69 +59,114 @@ where
 {
     type Item = Result<S::Item, SessionError>;
 
-    #[instrument(name = "Sequencer::poll_next", level = "trace", skip(self, cx), fields(next_frame_id = self.next_id))]
+    #[instrument(name = "Sequencer::poll_next", level = "trace", skip(self, cx), fields(next_frame_id = self.next_id, state = ?self.state))]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
+        if *this.next_id == 0 {
+            tracing::debug!("end of frame sequence reached");
+            return Poll::Ready(None);
+        }
+
         loop {
-            if *this.next_id == 0 {
-                tracing::trace!("sequencer has reached the end of the frame sequence");
-                return Poll::Ready(None);
-            }
+            match *this.state {
+                State::Polling => {
+                    if this.buffer.len() < this.buffer.capacity() {
+                        // We still have capacity available, poll the underlying stream
+                        let stream_poll = this.inner.as_mut().poll_next(cx);
 
-            // Try to drain the buffer
-            if let Some(next) = this.buffer.peek().map(|next| &next.0) {
-                if next.eq(this.next_id) {
-                    *this.next_id = this.next_id.wrapping_add(1);
-                    *this.last_emitted = Instant::now();
+                        // Only poll timer if there's something in the buffer
+                        let timer_poll = if !this.buffer.is_empty() {
+                            let poll = this.timer.as_mut().poll(cx);
+                            if poll.is_ready() {
+                                this.timer.as_mut().reset_timer();
+                            }
+                            poll
+                        } else {
+                            Poll::Pending
+                        };
 
-                    tracing::trace!("emit next frame");
-                    return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
-                } else if this.last_emitted.elapsed() >= *this.max_wait
-                    || *this.is_closed
-                    || this.buffer.len() == this.buffer.capacity()
-                {
-                    let discarded = *this.next_id;
-                    *this.next_id = this.next_id.wrapping_add(1);
-                    *this.last_emitted = Instant::now();
-
-                    this.buffer.pop();
-                    tracing::trace!("discard frame");
-                    return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
+                        match (stream_poll, timer_poll) {
+                            (Poll::Pending, Poll::Pending) => {
+                                tracing::trace!("pending");
+                                *this.state = State::Polling;
+                                return Poll::Pending;
+                            }
+                            (_, Poll::Ready(_)) => {
+                                // Simulate buffer update when timer elapses
+                                tracing::trace!("timer elapsed");
+                                *this.state = State::BufferUpdated;
+                            }
+                            (Poll::Ready(Some(item)), _) => {
+                                if item.lt(this.next_id) {
+                                    // Do not accept older frame ids
+                                    tracing::trace!("old item");
+                                    *this.state = State::Polling;
+                                } else {
+                                    // Push new item to the buffer
+                                    tracing::trace!("new item");
+                                    this.buffer.push(Reverse(item));
+                                    *this.state = State::BufferUpdated;
+                                }
+                            }
+                            (Poll::Ready(None), _) => {
+                                tracing::trace!(len = this.buffer.len(), "stream is done");
+                                *this.state = State::Done
+                            }
+                        }
+                    } else {
+                        // Simulate buffer update when at capacity
+                        tracing::warn!("sequencer buffer is full");
+                        *this.state = State::BufferUpdated;
+                    }
                 }
-            } else if *this.is_closed {
-                return Poll::Ready(None);
-            }
+                State::BufferUpdated => {
+                    if let Some(next) = this.buffer.peek().map(|item| &item.0) {
+                        if next.eq(this.next_id) {
+                            *this.next_id = this.next_id.wrapping_add(1);
+                            *this.last_emitted = Instant::now();
+                            *this.state = State::BufferUpdated;
 
-            if this.buffer.len() < this.buffer.capacity() && !*this.is_closed {
-                // Poll the timer only if the buffer is not empty
-                let timer_poll = if !this.buffer.is_empty() {
-                    this.timer.as_mut().poll(cx)
-                } else {
-                    Poll::Pending
-                };
+                            tracing::trace!("emit next frame");
 
-                match (this.inner.as_mut().poll_next(cx), timer_poll) {
-                    (Poll::Ready(Some(next)), timer) => {
-                        if timer.is_ready() {
-                            this.timer.as_mut().reset_timer();
-                            tracing::trace!("new frame and timer reset");
+                            return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
+                        } else if this.last_emitted.elapsed() >= *this.max_wait
+                            || this.buffer.len() == this.buffer.capacity()
+                        {
+                            let discarded = *this.next_id;
+                            *this.next_id = this.next_id.wrapping_add(1);
+                            *this.last_emitted = Instant::now();
+                            *this.state = State::BufferUpdated;
+
+                            tracing::trace!(discarded, "discard frame");
+
+                            return Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))));
                         }
-                        if next < *this.next_id {
-                            tracing::trace!("old frame skipped");
+                    } else {
+                        tracing::trace!("buffer is empty");
+                    }
+
+                    *this.state = State::Polling;
+                }
+                State::Done => {
+                    return if let Some(next) = this.buffer.peek().map(|item| &item.0) {
+                        if next.lt(this.next_id) {
+                            tracing::trace!("old item");
+                            this.buffer.pop();
                             continue;
+                        } else if next.eq(this.next_id) {
+                            *this.next_id = this.next_id.wrapping_add(1);
+                            tracing::trace!("emit next frame when done");
+                            return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
+                        } else {
+                            let discarded = *this.next_id;
+                            *this.next_id = this.next_id.wrapping_add(1);
+                            tracing::trace!(discarded, "discard frame when done");
+                            Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))))
                         }
-                        this.buffer.push(std::cmp::Reverse(next));
-                        tracing::trace!("new frame");
-                    }
-                    (Poll::Ready(None), _) => {
-                        tracing::trace!("stream closed");
-                        *this.is_closed = true
-                    },
-                    (Poll::Pending, Poll::Ready(_)) => {
-                        this.timer.as_mut().reset_timer();
-                        tracing::trace!("timer reset");
-                    }
-                    (Poll::Pending, Poll::Pending) => return Poll::Pending,
+                    } else {
+                        tracing::trace!("buffer is empty and done");
+                        Poll::Ready(None)
+                    };
                 }
             }
         }
@@ -326,7 +376,8 @@ mod tests {
         let (tx, rx) = futures::channel::mpsc::unbounded();
 
         pin_mut!(tx);
-        tx.send_all(&mut futures::stream::iter([FrameId::MAX - 1, FrameId::MAX, 1, 2]).map(Ok)).await?;
+        tx.send_all(&mut futures::stream::iter([FrameId::MAX - 1, FrameId::MAX, 1, 2]).map(Ok))
+            .await?;
 
         let mut rx = rx.sequencer(Duration::from_millis(10), 1024);
         rx.next_id = FrameId::MAX - 1;

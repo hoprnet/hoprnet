@@ -888,22 +888,20 @@ mod tests {
             ..Default::default()
         };
 
-        let (mut alice_rx, mut alice_tx)  =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?
-            .split();
+        let (mut alice_rx, mut alice_tx) =
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?.split();
 
         let (mut bob_rx, mut bob_tx) =
-            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?
-            .split();
+            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?.split();
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         let (alice_data_tx, alice_recv_data) = futures::channel::oneshot::channel();
         let alice_rx_jh = tokio::spawn(async move {
             let mut alice_recv_data = vec![0u8; DATA_SIZE];
-            alice_rx
-                .read_exact(&mut alice_recv_data)
-                .await?;
-            alice_data_tx.send(alice_recv_data).map_err(|_| std::io::Error::other("tx error"))?;
+            alice_rx.read_exact(&mut alice_recv_data).await?;
+            alice_data_tx
+                .send(alice_recv_data)
+                .map_err(|_| std::io::Error::other("tx error"))?;
 
             // Keep reading until the socket is closed
             alice_rx.read_to_end(&mut Vec::new()).await?;
@@ -914,10 +912,10 @@ mod tests {
         let (bob_data_tx, bob_recv_data) = futures::channel::oneshot::channel();
         let bob_rx_jh = tokio::spawn(async move {
             let mut bob_recv_data = vec![0u8; DATA_SIZE];
-            bob_rx
-                .read_exact(&mut bob_recv_data)
-                .await?;
-            bob_data_tx.send(bob_recv_data).map_err(|_| std::io::Error::other("tx error"))?;
+            bob_rx.read_exact(&mut bob_recv_data).await?;
+            bob_data_tx
+                .send(bob_recv_data)
+                .map_err(|_| std::io::Error::other("tx error"))?;
 
             // Keep reading until the socket is closed
             bob_rx.read_to_end(&mut Vec::new()).await?;
@@ -952,10 +950,10 @@ mod tests {
             Ok::<_, std::io::Error>(out)
         });
 
-        let (alice_recv_data, bob_recv_data, a, b) = futures::future::try_join4(
-            alice_tx_jh, bob_tx_jh, alice_rx_jh, bob_rx_jh
-        )
-        .timeout(futures_time::time::Duration::from_secs(4)).await??;
+        let (alice_recv_data, bob_recv_data, a, b) =
+            futures::future::try_join4(alice_tx_jh, bob_tx_jh, alice_rx_jh, bob_rx_jh)
+                .timeout(futures_time::time::Duration::from_secs(4))
+                .await??;
 
         assert_eq!(&alice_sent_data, bob_recv_data?.as_slice());
         assert_eq!(&bob_sent_data, alice_recv_data?.as_slice());

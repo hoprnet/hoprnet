@@ -1,5 +1,7 @@
-use std::sync::atomic::AtomicBool;
-use std::time::{Duration, Instant};
+use std::{
+    sync::atomic::AtomicBool,
+    time::{Duration, Instant},
+};
 
 use futures::{FutureExt, StreamExt, channel::mpsc::UnboundedSender};
 use futures_time::stream::StreamExt as TimeStreamExt;
@@ -396,7 +398,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ctx = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
-            .then(|| self.context.as_mut())
+            .then_some(self.context.as_mut())
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 
@@ -423,7 +425,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ctx = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
-            .then(|| self.context.as_mut())
+            .then_some(self.context.as_mut())
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 
@@ -479,7 +481,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ctx = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
-            .then(|| self.context.as_mut())
+            .then_some(self.context.as_mut())
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 
@@ -504,7 +506,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ctx = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
-            .then(|| self.context.as_mut())
+            .then_some(self.context.as_mut())
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 
@@ -532,7 +534,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let _ = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
-            .then(|| self.context.as_mut())
+            .then_some(self.context.as_mut())
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
         Ok(())
@@ -545,7 +547,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ctx = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
-            .then(|| self.context.as_mut())
+            .then_some(self.context.as_mut())
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 
@@ -569,7 +571,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ctx = self
             .started
             .load(std::sync::atomic::Ordering::Relaxed)
-            .then(|| self.context.as_mut())
+            .then_some(self.context.as_mut())
             .flatten()
             .ok_or(SessionError::StateNotRunning)?;
 

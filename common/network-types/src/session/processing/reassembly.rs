@@ -93,7 +93,12 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                         *this.last_expiration = Instant::now();
                     }
 
-                    tracing::trace!(frame_id = item.frame_id, seq_idx = item.seq_idx, seq_len = item.seq_len, "received segment");
+                    tracing::trace!(
+                        frame_id = item.frame_id,
+                        seq_idx = item.seq_idx,
+                        seq_len = item.seq_len,
+                        "received segment"
+                    );
 
                     match this.incomplete_frames.entry(item.frame_id) {
                         FrameMapEntry::Occupied(mut e) => {
