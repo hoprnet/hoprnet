@@ -6,9 +6,8 @@ pub struct FixedLengthCodec<const SIZE: usize>;
 impl<const SIZE: usize> Encoder<Box<[u8]>> for FixedLengthCodec<SIZE> {
     type Error = std::io::Error;
 
+    #[tracing::instrument(level = "trace", skip(self, item, dst), name = "encode data", fields(size = item.len(), protocol = "msg"), ret, err)]
     fn encode(&mut self, item: Box<[u8]>, dst: &mut tokio_util::bytes::BytesMut) -> Result<(), Self::Error> {
-        tracing::trace!(size = item.len(), protocol = "msg", "Encoding data");
-
         dst.extend_from_slice(&item);
         Ok(())
     }
@@ -18,12 +17,12 @@ impl<const SIZE: usize> Decoder for FixedLengthCodec<SIZE> {
     type Error = std::io::Error;
     type Item = Box<[u8]>;
 
+    #[tracing::instrument(level = "trace", skip(self, src), name = "decode data", fields(size = src.len(), protocol = "msg"), ret(Debug), err)]
     fn decode(&mut self, src: &mut tokio_util::bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let len = src.len();
         if len >= SIZE {
             let packet = src.split_to(SIZE).freeze();
 
-            tracing::trace!(size = packet.len(), protocol = "msg", "Decoding data");
             Ok(Some(Box::from_iter(packet)))
         } else {
             tracing::trace!(

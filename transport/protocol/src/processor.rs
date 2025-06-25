@@ -50,7 +50,7 @@ where
 {
     type Input = ApplicationData;
 
-    #[tracing::instrument(level = "trace", skip(self, data))]
+    #[tracing::instrument(level = "trace", skip(self, data), ret(Debug), err)]
     async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket> {
         let packet = self
             .db
