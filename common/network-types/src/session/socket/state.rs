@@ -2,7 +2,7 @@ use futures::channel::mpsc::UnboundedSender;
 
 use crate::session::{
     errors::SessionError,
-    frames::{FrameId, FrameInspector, Segment, SegmentId, SeqNum},
+    frames::{FrameId, FrameInspector, Segment, SegmentId, SeqIndicator},
     protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
 };
 
@@ -35,7 +35,7 @@ pub trait SocketState<const C: usize>: Send {
 
     /// Called when the Socket receives a new segment from Downstream.
     /// When the error is returned, the incoming segment is not passed Upstream.
-    fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqNum) -> Result<(), SessionError>;
+    fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqIndicator) -> Result<(), SessionError>;
 
     /// Called when [segment retransmission request](SegmentRequest) is received from Downstream.
     fn incoming_retransmission_request(&mut self, request: SegmentRequest<C>) -> Result<(), SessionError>;
@@ -82,7 +82,7 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
         Ok(())
     }
 
-    fn incoming_segment(&mut self, _: &SegmentId, _: SeqNum) -> Result<(), SessionError> {
+    fn incoming_segment(&mut self, _: &SegmentId, _: SeqIndicator) -> Result<(), SessionError> {
         Ok(())
     }
 
@@ -136,7 +136,7 @@ mod tests {
             fn session_id(&self) -> &str;
             fn run(&mut self, components: SocketComponents<MTU>) -> Result<(), SessionError>;
             fn stop(&mut self) -> Result<(), SessionError>;
-            fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqNum) -> Result<(), SessionError>;
+            fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqIndicator) -> Result<(), SessionError>;
             fn incoming_retransmission_request(&mut self, request: SegmentRequest<MTU>) -> Result<(), SessionError>;
             fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<MTU>) -> Result<(), SessionError>;
             fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError>;
@@ -171,7 +171,7 @@ mod tests {
             self.0.lock().unwrap().stop()
         }
 
-        fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqNum) -> Result<(), SessionError> {
+        fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqIndicator) -> Result<(), SessionError> {
             tracing::debug!(id = self.1, "incoming_segment called");
             self.0.lock().unwrap().incoming_segment(id, segment_count)
         }

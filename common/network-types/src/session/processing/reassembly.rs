@@ -96,23 +96,24 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                     tracing::trace!(
                         frame_id = item.frame_id,
                         seq_idx = item.seq_idx,
-                        seq_len = item.seq_len,
+                        seq_len = %item.seq_len,
                         "received segment"
                     );
 
                     match this.incomplete_frames.entry(item.frame_id) {
                         FrameMapEntry::Occupied(mut e) => {
                             let builder = e.get_builder_mut();
+                            let seg_id = item.id();
                             match builder.add_segment(item) {
                                 Ok(_) => {
-                                    tracing::trace!(frame_id = builder.frame_id(), "added segment");
+                                    tracing::trace!(frame_id = builder.frame_id(), %seg_id, "added segment");
                                     if builder.is_complete() {
                                         tracing::trace!(frame_id = builder.frame_id(), "frame is complete");
                                         return Poll::Ready(Some(e.finalize().try_into()));
                                     }
                                 }
                                 Err(error) => {
-                                    tracing::error!(%error, "encountered invalid segment");
+                                    tracing::error!(%error, %seg_id, "encountered invalid segment");
                                 }
                             }
                         }
@@ -219,6 +220,7 @@ mod tests {
             .map(|frame_id| Frame {
                 frame_id,
                 data: hopr_crypto_random::random_bytes::<100>().into(),
+                is_terminating: false,
             })
             .collect::<Vec<_>>();
 
@@ -256,6 +258,7 @@ mod tests {
             .map(|frame_id| Frame {
                 frame_id,
                 data: hopr_crypto_random::random_bytes::<100>().into(),
+                is_terminating: false,
             })
             .collect::<Vec<_>>();
 
@@ -272,45 +275,30 @@ mod tests {
         let mut rng = StdRng::from_seed(RNG_SEED);
         segments.shuffle(&mut rng);
 
-        let seg_count = segments.len();
-        let jh = hopr_async_runtime::prelude::spawn(
-            futures::stream::iter(segments)
-                .enumerate()
-                .then(move |(i, s)| {
-                    async move {
-                        // Delay the very last segment,
-                        // so the incomplete frame gets a chance to expire
-                        if i == seg_count - 1 {
-                            futures::future::ok(s)
-                                .delay(futures_time::time::Duration::from_millis(55))
-                                .await
-                        } else {
-                            Ok(s)
-                        }
-                    }
-                })
-                .forward(r_sink),
-        );
+        pin_mut!(r_sink);
+        r_sink.send_all(&mut futures::stream::iter(segments).map(Ok)).await?;
 
-        let mut actual = r_stream
-            .collect::<Vec<_>>()
-            .timeout(futures_time::time::Duration::from_secs(5))
-            .await?;
-
-        assert_eq!(actual.len(), expected.len());
+        let mut actual = Vec::new();
+        pin_mut!(r_stream);
+        for _ in 0..expected.len() {
+            actual.push(r_stream.next().await.ok_or(anyhow!("missing frame"))?);
+        }
+        r_sink.close().await?;
+        assert_eq!(None, r_stream.try_next().await?);
 
         actual.sort_by(result_comparator);
+
+        assert_eq!(actual.len(), expected.len());
 
         for i in 0..expected.len() {
             if i != 1 {
                 assert!(matches!(&actual[i], Ok(f) if *f == expected[i]));
             } else {
-                // Frame 2 had a missing segment, therefore there should be an error
+                // Frame 2 had a missing segment; therefore, there should be an error
                 assert!(matches!(actual[i], Err(SessionError::FrameDiscarded(2))));
             }
         }
 
-        let _ = jh.await?;
         Ok(())
     }
 
@@ -320,6 +308,7 @@ mod tests {
             .map(|frame_id| Frame {
                 frame_id,
                 data: hopr_crypto_random::random_bytes::<100>().into(),
+                is_terminating: false,
             })
             .collect::<Vec<_>>();
 
@@ -367,6 +356,7 @@ mod tests {
             .map(|frame_id| Frame {
                 frame_id,
                 data: hopr_crypto_random::random_bytes::<30>().into(),
+                is_terminating: false,
             })
             .collect::<Vec<_>>();
 

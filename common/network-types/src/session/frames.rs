@@ -5,6 +5,8 @@ use std::{
     time::Instant,
 };
 
+use hopr_primitive_types::prelude::GeneralError;
+
 use crate::{prelude::errors::SessionError, session::protocol::MissingSegmentsBitmap};
 
 /// ID of a [Frame].
@@ -38,6 +40,8 @@ pub struct Frame {
     pub frame_id: FrameId,
     /// Frame data.
     pub data: Box<[u8]>,
+    /// Indicates whether the frame is the last one of the frame sequence.
+    pub is_terminating: bool,
 }
 
 impl Debug for Frame {
@@ -57,6 +61,7 @@ impl Debug for Frame {
             .field("frame_id", &self.frame_id)
             .field("len", &self.data.len())
             .field("data", &excerpt)
+            .field("is_terminating", &self.is_terminating)
             .finish()
     }
 }
@@ -115,6 +120,65 @@ impl From<OrderedFrame> for Frame {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
+pub struct SeqIndicator(SeqNum);
+
+impl SeqIndicator {
+    pub const MAX: SeqNum = 0b0011_1111;
+
+    #[inline]
+    pub const fn new_with_flags(seq_num: SeqNum, is_terminating: bool) -> Self {
+        let flags = ((is_terminating as u8) << 7) | (seq_num & Self::MAX);
+        Self(flags)
+    }
+
+    pub const fn new(seq_num: SeqNum) -> Self {
+        Self::new_with_flags(seq_num, false)
+    }
+
+    const fn new_unchecked(seq_num: SeqNum) -> Self {
+        Self(seq_num)
+    }
+
+    pub fn with_terminating_bit(self, is_terminating: bool) -> Self {
+        Self::new_with_flags(self.0, is_terminating)
+    }
+
+    #[inline]
+    pub const fn is_terminating(&self) -> bool {
+        self.0 & 0b1000_0000 != 0
+    }
+
+    #[inline]
+    pub const fn seq_num(&self) -> SeqNum {
+        self.0 & Self::MAX
+    }
+
+    #[inline]
+    pub const fn value(&self) -> SeqNum {
+        self.0
+    }
+}
+
+impl Display for SeqIndicator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.seq_num(), if self.is_terminating() { "*" } else { "" })
+    }
+}
+
+impl TryFrom<SeqNum> for SeqIndicator {
+    type Error = GeneralError;
+
+    fn try_from(value: SeqNum) -> Result<Self, Self::Error> {
+        if value <= Self::MAX {
+            Ok(Self(value))
+        } else {
+            Err(GeneralError::InvalidInput)
+        }
+    }
+}
+
 /// Represents a frame segment.
 /// Besides the data, a segment carries information about the total number of
 /// segments in the original frame, its index within the frame and
@@ -126,8 +190,8 @@ pub struct Segment {
     pub frame_id: FrameId,
     /// Index of this segment within the segment sequence.
     pub seq_idx: SeqNum,
-    /// Total number of segments within this segment sequence.
-    pub seq_len: SeqNum,
+    /// Total number of segments within this segment sequence and flags.
+    pub seq_len: SeqIndicator,
     /// Data in this segment.
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     pub data: Box<[u8]>,
@@ -153,7 +217,7 @@ impl Segment {
     /// Indicates whether this segment is the last one from the frame.
     #[inline]
     pub fn is_last(&self) -> bool {
-        self.seq_idx == self.seq_len - 1
+        self.seq_idx == self.seq_len.seq_num() - 1
     }
 }
 
@@ -188,7 +252,7 @@ impl From<Segment> for Vec<u8> {
         let mut ret = Vec::with_capacity(Segment::HEADER_SIZE + value.data.len());
         ret.extend_from_slice(value.frame_id.to_be_bytes().as_ref());
         ret.extend_from_slice(value.seq_idx.to_be_bytes().as_ref());
-        ret.extend_from_slice(value.seq_len.to_be_bytes().as_ref());
+        ret.push(value.seq_len.value());
         ret.extend_from_slice(value.data.as_ref());
         ret
     }
@@ -202,10 +266,10 @@ impl TryFrom<&[u8]> for Segment {
         let segment = Segment {
             frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| SessionError::InvalidSegment)?),
             seq_idx: SeqNum::from_be_bytes(header[4..5].try_into().map_err(|_| SessionError::InvalidSegment)?),
-            seq_len: SeqNum::from_be_bytes(header[5..6].try_into().map_err(|_| SessionError::InvalidSegment)?),
+            seq_len: SeqIndicator::new_unchecked(header[5]),
             data: data.into(),
         };
-        (segment.frame_id > 0 && segment.seq_idx < segment.seq_len)
+        (segment.frame_id > 0 && segment.seq_idx < segment.seq_len.seq_num())
             .then_some(segment)
             .ok_or(SessionError::InvalidSegment)
     }
@@ -224,9 +288,9 @@ impl From<Segment> for FrameBuilder {
     fn from(value: Segment) -> Self {
         let idx = value.seq_idx;
         let mut ret = Self {
-            segments: vec![None; value.seq_len as usize],
+            segments: vec![None; value.seq_len.seq_num() as usize],
             frame_id: value.frame_id,
-            seg_remaining: value.seq_len - 1,
+            seg_remaining: value.seq_len.seq_num() - 1,
             recv_bytes: value.data.len(),
             last_recv: Instant::now(),
         };
@@ -241,12 +305,14 @@ impl TryFrom<FrameBuilder> for Frame {
     type Error = SessionError;
 
     fn try_from(value: FrameBuilder) -> Result<Self, Self::Error> {
+        let mut is_terminating = false;
         value
             .segments
             .into_iter()
             .try_fold(Vec::with_capacity(value.recv_bytes), |mut acc, segment| match segment {
                 Some(segment) => {
                     acc.extend_from_slice(&segment.data);
+                    is_terminating = is_terminating || segment.seq_len.is_terminating();
                     Ok(acc)
                 }
                 None => Err(SessionError::IncompleteFrame(value.frame_id)),
@@ -254,6 +320,7 @@ impl TryFrom<FrameBuilder> for Frame {
             .map(|data| Frame {
                 frame_id: value.frame_id,
                 data: data.into_boxed_slice(),
+                is_terminating,
             })
     }
 }
@@ -263,7 +330,7 @@ impl FrameBuilder {
         let idx = segment.seq_idx;
         if segment.frame_id != self.frame_id
             || idx as usize >= self.segments.len()
-            || segment.seq_len as usize != self.segments.len()
+            || segment.seq_len.seq_num() as usize != self.segments.len()
             || self.seg_remaining == 0
             || self.segments[idx as usize].is_some()
         {
@@ -504,25 +571,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn segment_should_serialize_and_deserialize() -> anyhow::Result<()> {
+        let seg_1 = Segment {
+            frame_id: 10,
+            seq_idx: 0,
+            seq_len: 2.try_into()?,
+            data: Box::new([123u8]),
+        };
+
+        let seg_2 = Segment::try_from(Vec::from(seg_1.clone()).as_slice())?;
+        assert_eq!(seg_1, seg_2);
+        Ok(())
+    }
+
+    #[test]
     fn frame_builder_should_return_ordered_segments() -> anyhow::Result<()> {
         let mut fb = FrameBuilder::from(Segment {
             frame_id: 1,
             seq_idx: 1,
-            seq_len: 3,
+            seq_len: 3.try_into()?,
             data: (*b" new ").into(),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 2,
-            seq_len: 3,
+            seq_len: 3.try_into()?,
             data: (*b"world").into(),
         })?;
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 0,
-            seq_len: 3,
+            seq_len: 3.try_into()?,
             data: (*b"hello").into(),
         })?;
 
@@ -541,14 +622,14 @@ mod tests {
         let mut fb = FrameBuilder::from(Segment {
             frame_id: 1,
             seq_idx: 0,
-            seq_len: 2,
+            seq_len: 2.try_into()?,
             data: (*b"hello world").into(),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 3,
-            seq_len: 2,
+            seq_len: 2.try_into()?,
             data: (*b"foo").into(),
         })
         .expect_err("should not accept invalid segment");
@@ -556,7 +637,7 @@ mod tests {
         fb.add_segment(Segment {
             frame_id: 2,
             seq_idx: 1,
-            seq_len: 2,
+            seq_len: 2.try_into()?,
             data: (*b"foo").into(),
         })
         .expect_err("should not accept segment from another frame");
@@ -564,7 +645,7 @@ mod tests {
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 1,
-            seq_len: 3,
+            seq_len: 3.try_into()?,
             data: (*b"foo").into(),
         })
         .expect_err("should not accept invalid segment");
@@ -577,14 +658,14 @@ mod tests {
         let mut fb = FrameBuilder::from(Segment {
             frame_id: 1,
             seq_idx: 0,
-            seq_len: 1,
+            seq_len: 1.try_into()?,
             data: (*b"hello world").into(),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 0,
-            seq_len: 1,
+            seq_len: 1.try_into()?,
             data: (*b"foo").into(),
         })
         .expect_err("should not accept segment when complete");
@@ -597,14 +678,14 @@ mod tests {
         let mut fb = FrameBuilder::from(Segment {
             frame_id: 1,
             seq_idx: 0,
-            seq_len: 2,
+            seq_len: 2.try_into()?,
             data: (*b"hello world").into(),
         });
 
         fb.add_segment(Segment {
             frame_id: 1,
             seq_idx: 0,
-            seq_len: 2,
+            seq_len: 2.try_into()?,
             data: (*b"foo").into(),
         })
         .expect_err("should not accept duplicate segment");

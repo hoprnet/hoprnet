@@ -17,7 +17,7 @@ use crate::{
         },
     },
     session::{
-        frames::{FrameId, FrameInspector, Segment, SegmentId, SeqNum},
+        frames::{FrameId, FrameInspector, Segment, SegmentId, SeqIndicator},
         protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
         socket::state::SocketComponents,
     },
@@ -392,7 +392,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     }
 
     #[tracing::instrument(name = "AcknowledgementState::incoming_segment", skip(self), fields(session_id = self.id, frame_id = seg_id.0))]
-    fn incoming_segment(&mut self, seg_id: &SegmentId, _segment_count: SeqNum) -> Result<(), SessionError> {
+    fn incoming_segment(&mut self, seg_id: &SegmentId, _segment_count: SeqIndicator) -> Result<(), SessionError> {
         tracing::trace!("segment received");
 
         let ctx = self
@@ -592,7 +592,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 // once all its segments (seq_len) are sent,
                 // and the acknowledgement also comes back to us.
                 // Therefore, RTO_BASE_SENDER = latency * (seq_len + 1)
-                self.cfg.expected_packet_latency * (segment.seq_len + 1) as u32,
+                self.cfg.expected_packet_latency * (segment.seq_len.seq_num() + 1) as u32,
             )) {
                 tracing::error!(%error, "failed to insert outgoing retry of a frame");
             }
@@ -608,7 +608,7 @@ mod tests {
 
     use super::*;
     use crate::session::{
-        frames::{FrameBuilder, FrameDashMap, FrameMap},
+        frames::{FrameBuilder, FrameDashMap, FrameMap, SeqNum},
         utils::test::segment,
     };
 
@@ -925,7 +925,7 @@ mod tests {
             ctl_tx,
         })?;
 
-        state.incoming_segment(&segments[0].id(), segments.len() as SeqNum)?;
+        state.incoming_segment(&segments[0].id(), (segments.len() as SeqNum).try_into()?)?;
 
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
@@ -971,7 +971,7 @@ mod tests {
             ctl_tx,
         })?;
 
-        state.incoming_segment(&segments[0].id(), segments.len() as SeqNum)?;
+        state.incoming_segment(&segments[0].id(), (segments.len() as SeqNum).try_into()?)?;
 
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
@@ -1014,7 +1014,7 @@ mod tests {
             ctl_tx,
         })?;
 
-        state.incoming_segment(&segments[0].id(), segments.len() as SeqNum)?;
+        state.incoming_segment(&segments[0].id(), (segments.len() as SeqNum).try_into()?)?;
 
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
@@ -1026,7 +1026,7 @@ mod tests {
             .get_mut()
             .add_segment(segments[1].clone())?;
 
-        state.incoming_segment(&segments[1].id(), segments.len() as SeqNum)?;
+        state.incoming_segment(&segments[1].id(), (segments.len() as SeqNum).try_into()?)?;
 
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
@@ -1081,7 +1081,7 @@ mod tests {
         })?;
 
         // Segment 2
-        state.incoming_segment(&segments[0].id(), segments.len() as SeqNum)?;
+        state.incoming_segment(&segments[0].id(), (segments.len() as SeqNum).try_into()?)?;
 
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
@@ -1093,7 +1093,7 @@ mod tests {
             .get_mut()
             .add_segment(segments[1].clone())?;
 
-        state.incoming_segment(&segments[1].id(), segments.len() as SeqNum)?;
+        state.incoming_segment(&segments[1].id(), (segments.len() as SeqNum).try_into()?)?;
 
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
@@ -1106,7 +1106,7 @@ mod tests {
             .get_mut()
             .add_segment(segments[2].clone())?;
 
-        state.incoming_segment(&segments[2].id(), segments.len() as SeqNum)?;
+        state.incoming_segment(&segments[2].id(), (segments.len() as SeqNum).try_into()?)?;
         state.frame_complete(1)?;
 
         tokio::time::sleep(cfg.acknowledgement_delay * 2).await;

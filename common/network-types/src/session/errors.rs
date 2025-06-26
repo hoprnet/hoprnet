@@ -1,3 +1,4 @@
+use hopr_primitive_types::prelude::GeneralError;
 use thiserror::Error;
 
 use crate::session::frames::FrameId;
@@ -57,6 +58,9 @@ pub enum SessionError {
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    GeneralError(#[from] GeneralError),
 }
 
 pub type Result<T> = std::result::Result<T, SessionError>;

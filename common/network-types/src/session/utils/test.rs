@@ -16,7 +16,7 @@ use rand::{
 use rand_distr::Normal;
 use tracing::instrument;
 
-use crate::utils::DuplexIO;
+use crate::{session::frames::SeqIndicator, utils::DuplexIO};
 
 // Using static RNG seed to make tests reproducible between different runs
 // const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
@@ -47,7 +47,7 @@ pub fn segment<T: AsRef<[u8]>>(
 
     let chunks = data.chunks(max_segment_size);
 
-    let seq_len = chunks.len() as SeqNum;
+    let seq_len = SeqIndicator::try_from(chunks.len() as SeqNum)?;
     Ok(chunks
         .enumerate()
         .map(|(idx, data)| crate::session::frames::Segment {

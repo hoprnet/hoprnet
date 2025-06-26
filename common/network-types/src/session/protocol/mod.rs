@@ -6,6 +6,7 @@ use bytes::{Buf, BufMut, BytesMut};
 pub use messages::{FrameAcknowledgements, SegmentRequest, MissingSegmentsBitmap};
 
 use crate::session::{errors::SessionError, frames::Segment};
+use crate::session::frames::SeqIndicator;
 
 /// Contains all messages of the Session sub-protocol.
 ///
@@ -41,8 +42,6 @@ impl<const C: usize> SessionMessage<C> {
     /// This is equal to the typical Ethernet MTU size minus [`Self::SEGMENT_OVERHEAD`].
     // TODO: parameterize this
     pub const MAX_MESSAGE_SIZE: usize = 1492 - Self::SEGMENT_OVERHEAD;
-    /// Maximum number of segments per frame.
-    pub const MAX_SEGMENTS_PER_FRAME: usize = SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME;
     /// Size of the overhead that's added to the raw payload of each [`Segment`].
     ///
     /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
@@ -57,6 +56,11 @@ impl<const C: usize> SessionMessage<C> {
             + Segment::MINIMUM_SIZE
                 .min(SegmentRequest::<C>::SIZE)
                 .min(FrameAcknowledgements::<C>::SIZE)
+    }
+
+    /// Maximum number of segments per frame.
+    pub fn max_segments_per_frame() -> usize {
+        SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min(SeqIndicator::MAX as usize + 1)
     }
 
     /// Convenience method to encode the session message.
@@ -176,7 +180,7 @@ mod tests {
         assert_eq!(1, SessionMessage::<0>::VERSION);
         assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
         assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
-        assert_eq!(8, SessionMessage::<0>::MAX_SEGMENTS_PER_FRAME);
+        assert_eq!(8, SessionMessage::<0>::max_segments_per_frame());
 
         const _: () = {
             assert!(SessionMessage::<0>::MAX_MESSAGE_SIZE < 2048);

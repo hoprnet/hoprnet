@@ -31,6 +31,7 @@ mod tests {
             .map(|frame_id| Frame {
                 frame_id,
                 data: hopr_crypto_random::random_bytes::<100>().into(),
+                is_terminating: false,
             })
             .collect::<Vec<_>>();
 
@@ -72,6 +73,7 @@ mod tests {
             .map(|frame_id| Frame {
                 frame_id,
                 data: hopr_crypto_random::random_bytes::<100>().into(),
+                is_terminating: false,
             })
             .collect::<Vec<_>>();
 
