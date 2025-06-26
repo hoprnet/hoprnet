@@ -98,14 +98,6 @@ class Balance:
         else:
             return Balance(f"{self.value / Decimal(other)} {self.unit}")
 
-    def __div__(self, other):
-        if isinstance(other, Balance):
-            if self.unit != other.unit:
-                raise TypeError(f"Cannot divide balances with different units: {self.unit} and {other.unit}")
-            return self.value / other.value
-        else:
-            return Balance(f"{self.value / Decimal(other)} {self.unit}")
-
     def __rtruediv__(self, other):
         if isinstance(other, Balance):
             raise TypeError("Cannot divide two Balance objects directly")

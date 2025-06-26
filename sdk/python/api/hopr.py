@@ -1,10 +1,8 @@
-import asyncio
 import base64
 import logging
 import random
 from typing import Optional
 
-import aiohttp
 import base58
 import nacl.bindings
 import nacl.public
@@ -260,14 +258,14 @@ class HoprdAPI(ApiLib):
         """
         return await self.try_req(Method.GET, "/network/probability", TicketProbability)
 
-    async def withdraw(self, amount: Balance, receipient: str):
+    async def withdraw(self, amount: Balance, recipient: str):
         """
-        Withdraws the given amount of token (Native or HOPR) to the given receipient.
+        Withdraws the given amount of token (Native or HOPR) to the given recipient.
         :param: amount: str
-        :param: receipient: str
+        :param: recipient: str
         :return:
         """
-        data = WithdrawBody(receipient, amount=amount.as_str)
+        data = WithdrawBody(recipient, amount=amount.as_str)
         return await self.try_req(Method.POST, "/account/withdraw", data=data, return_state=True)
 
     async def metrics(self) -> Optional[Metrics]:
@@ -346,13 +344,13 @@ class HoprdAPI(ApiLib):
         """
         Checks if the node is ready. Return True if `readyz` returns 200 after max `timeout` seconds.
         """
-        return await self.timeout_check_success(f"/readyz", timeout)
+        return await self.timeout_check_success("/readyz", timeout)
 
     async def healthyz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is healthy. Return True if `healthyz` returns 200 after max `timeout` seconds.
         """
-        return await self.timeout_check_success(f"/healthyz", timeout)
+        return await self.timeout_check_success("/healthyz", timeout)
 
     async def startedz(self, timeout: int = 20) -> bool:
         """
