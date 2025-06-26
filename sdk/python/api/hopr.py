@@ -46,6 +46,7 @@ MESSAGE_TAG = 0x1245
 
 
 def getlogger():
+    logging.getLogger("api-lib").setLevel(logging.CRITICAL)
     logger = logging.getLogger("hopr-api")
     logger.setLevel(logging.ERROR)
 
@@ -345,42 +346,22 @@ class HoprdAPI(ApiLib):
         """
         Checks if the node is ready. Return True if `readyz` returns 200 after max `timeout` seconds.
         """
-        return await HoprdAPI.is_url_returning_200(f"{self.host}/readyz", timeout)
+        return await self.timeout_check_success(f"/readyz", timeout)
 
     async def healthyz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is healthy. Return True if `healthyz` returns 200 after max `timeout` seconds.
         """
-        return await HoprdAPI.is_url_returning_200(f"{self.host}/healthyz", timeout)
+        return await self.timeout_check_success(f"/healthyz", timeout)
 
     async def startedz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is started. Return True if `startedz` returns 200 after max `timeout` seconds.
         """
-        return await HoprdAPI.is_url_returning_200(f"{self.host}/startedz", timeout)
+        return await self.timeout_check_success("/startedz", timeout)
 
     async def eligiblez(self, timeout: int = 20) -> bool:
         """
         Checks if the node is eligible. Return True if `eligiblez` returns 200 after max `timeout` seconds.
         """
-        return await HoprdAPI.is_url_returning_200(f"{self.host}/eligiblez", timeout)
-
-    @classmethod
-    async def is_url_returning_200(cls, url, timeout):
-        async def check_url():
-            ready = False
-
-            async with aiohttp.ClientSession() as s:
-                while not ready:
-                    try:
-                        ready = (await s.get(url, timeout=0.3)).status == 200
-                        await asyncio.sleep(0.5)
-                    except Exception:
-                        await asyncio.sleep(0.2)
-
-                return ready
-
-        try:
-            return await asyncio.wait_for(check_url(), timeout=timeout)
-        except Exception:
-            return False
+        return await self.timeout_check_success("/eligiblez", timeout)
