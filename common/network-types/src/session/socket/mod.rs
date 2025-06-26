@@ -7,7 +7,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-
+use std::sync::atomic::AtomicBool;
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future};
 use futures_concurrency::stream::Merge;
 use state::SocketState;
@@ -82,7 +82,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
 
-        // Messages incoming from Upstream
+        // Pipeline: Data incoming from Upstream
         let upstream_frames_in = packets_out
             .with(|segment| future::ok(SessionMessage::<C>::Segment(segment)))
             .segmenter::<C>(cfg.frame_size);
@@ -90,10 +90,14 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
-        // Packets incoming from Downstream
-        // - if the State requires it, packets passed by-ref into the State
-        // - Packets that represent Segments (filtered out) are passed to the Reconstructor
+        let downstream_terminated = Arc::new(AtomicBool::new(false));
+        let downstream_terminated_clone = downstream_terminated.clone();
+
+        // Pipeline: Packets incoming from Downstream
         let downstream_frames_out = packets_in
+            // Continue receiving packets from downstream, unless we received a terminating frame
+            .take_while(move |_| futures::future::ready(!downstream_terminated.load(std::sync::atomic::Ordering::Relaxed)))
+            // Filter-out segments that we've seen already
             .filter_map(move |packet| {
                 futures::future::ready(match packet {
                     Ok(packet) => packet
@@ -105,7 +109,9 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     }
                 })
             })
+            // Reassemble the segments into frames
             .reassembler(cfg.frame_timeout, cfg.capacity)
+            // Discard frames that we could not reassemble
             .filter_map(|maybe_frame| {
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => Some(OrderedFrame(frame)),
@@ -115,11 +121,14 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     }
                 })
             })
+            // Put the frames into the correct sequence by Frame Ids
             .sequencer(cfg.frame_timeout, cfg.capacity)
+            // Discard frames missing from the sequence
             .filter_map(move |maybe_frame| {
                 future::ready(match maybe_frame {
                     Ok(frame) => {
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
+                        downstream_terminated_clone.store(frame.0.is_terminating, std::sync::atomic::Ordering::Relaxed);
                         Some(Ok(frame.0))
                     }
                     // Downstream skips discarded frames
@@ -165,8 +174,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             ctl_tx,
         })?;
 
-        // Messages incoming from Upstream and from the State go downstream as Packets
-        // Segmented data coming from Upstream go out right away.
+        // Pipeline: Data incoming from Upstream
         let (segments_tx, segments_rx) = futures::channel::mpsc::channel(cfg.capacity);
         let mut st_1 = state.clone();
         let upstream_frames_in = segments_tx
@@ -203,13 +211,17 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
-        // Packets incoming from Downstream:
-        // - if the State requires it, packets passed by-ref into the State
-        // - Packets that represent Segments (filtered out) are passed to the Reconstructor
+        let downstream_terminated = Arc::new(AtomicBool::new(false));
+        let downstream_terminated_clone = downstream_terminated.clone();
+
+        // Pipeline: Packets incoming from Downstream
         let mut st_1 = state.clone();
         let mut st_2 = state.clone();
         let mut st_3 = state.clone();
         let downstream_frames_out = packets_in
+            // Continue receiving packets from downstream, unless we received a terminating frame
+            .take_while(move |_| futures::future::ready(!downstream_terminated.load(std::sync::atomic::Ordering::Relaxed)))
+            // Filter out Session control messages and update the State, pass only Segments onwards
             .filter_map(move |packet| {
                 futures::future::ready(match packet {
                     Ok(packet) => {
@@ -220,6 +232,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         } {
                             tracing::debug!(%error, "incoming message state update failed");
                         }
+                        // Filter old frame ids to save space in the Reassembler
                         packet
                             .try_as_segment()
                             .filter(|s| s.frame_id > last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed))
@@ -230,7 +243,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     }
                 })
             })
+            // Reassemble segments into frames
             .reassembler_with_inspector(cfg.frame_timeout, cfg.capacity, inspector)
+            // Notify State once a frame has been reassembled, discard frames that we could not reassemble
             .filter_map(move |maybe_frame| {
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => {
@@ -245,7 +260,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     }
                 })
             })
+            // Put the frames into the correct sequence by Frame Ids
             .sequencer(cfg.frame_timeout, cfg.frame_size)
+            // Discard frames missing from the sequence and
+            // notify the State about emitted or discarded frames
             .filter_map(move |maybe_frame| {
                 // Filter out discarded Frames and dispatch events to the State if needed
                 future::ready(match maybe_frame {
@@ -254,6 +272,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             tracing::error!(%error, "frame received state update failed");
                         }
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
+                        downstream_terminated_clone.store(frame.0.is_terminating, std::sync::atomic::Ordering::Relaxed);
                         Some(Ok(frame.0))
                     }
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {

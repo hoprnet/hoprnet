@@ -53,7 +53,7 @@ impl<const C: usize> SessionMessage<C> {
     pub fn minimum_message_size() -> usize {
         // Make this a "const fn" once "min" is const fn too
         Self::HEADER_SIZE
-            + Segment::MINIMUM_SIZE
+            + Segment::HEADER_SIZE
                 .min(SegmentRequest::<C>::SIZE)
                 .min(FrameAcknowledgements::<C>::SIZE)
     }
@@ -94,8 +94,8 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
 pub struct SessionCodec<const C: usize>;
 
 impl<const C: usize> Encoder for SessionCodec<C> {
-    type Error = SessionError;
     type Item<'a> = SessionMessage<C>;
+    type Error = SessionError;
 
     fn encode(&mut self, item: Self::Item<'_>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let disc = SessionMessageDiscriminants::from(&item) as u8;
@@ -118,8 +118,8 @@ impl<const C: usize> Encoder for SessionCodec<C> {
 }
 
 impl<const C: usize> Decoder for SessionCodec<C> {
-    type Error = SessionError;
     type Item = SessionMessage<C>;
+    type Error = SessionError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         tracing::trace!(msg_len = src.len(), "decoding message");

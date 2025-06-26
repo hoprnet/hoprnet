@@ -24,6 +24,7 @@ pub struct Segmenter<const C: usize, S> {
     frame_size: usize,
     closed: bool,
     flush_each_segment: bool,
+    send_terminating_segment: bool,
 }
 
 impl<const C: usize, S> Segmenter<C, S>
@@ -47,12 +48,15 @@ where
             tx: inner,
             frame_size,
             flush_each_segment: false,
+            send_terminating_segment: false, // TODO: resolve this
         }
     }
 
     #[instrument(name = "Segmenter::poll_flush_segments", level = "trace", skip(self, cx), fields(frame_id = self.next_frame_id, seq_len = self.ready_segments.len()))]
     fn poll_flush_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SessionError>> {
         let seq_len = self.ready_segments.len();
+        debug_assert!(seq_len <= SeqIndicator::MAX as usize);
+
         let mut this = self.project();
         tracing::trace!("flushing segments");
 
@@ -107,6 +111,15 @@ where
         );
 
         this.ready_segments.push(new_segment);
+    }
+
+    fn create_terminating_segment(self: Pin<&mut Self>) {
+        let this = self.project();
+        if let Some(last_segment) = this.ready_segments.last_mut() {
+            last_segment.seq_len = last_segment.seq_len.with_terminating_bit(true);
+        } else {
+            this.ready_segments.push(Segment::terminating(*this.next_frame_id));
+        }
     }
 }
 
@@ -221,6 +234,10 @@ where
                 "partial frame"
             );
             self.as_mut().complete_segment();
+        }
+
+        if self.send_terminating_segment {
+            self.as_mut().create_terminating_segment();
         }
 
         ready!(self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other))?;

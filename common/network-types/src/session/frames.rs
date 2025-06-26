@@ -128,17 +128,17 @@ impl SeqIndicator {
     pub const MAX: SeqNum = 0b0011_1111;
 
     #[inline]
-    pub const fn new_with_flags(seq_num: SeqNum, is_terminating: bool) -> Self {
-        let flags = ((is_terminating as u8) << 7) | (seq_num & Self::MAX);
+    pub const fn new_with_flags(seq_len: SeqNum, is_terminating: bool) -> Self {
+        let flags = ((is_terminating as u8) << 7) | (seq_len & Self::MAX);
         Self(flags)
     }
 
-    pub const fn new(seq_num: SeqNum) -> Self {
-        Self::new_with_flags(seq_num, false)
+    pub const fn new(seq_len: SeqNum) -> Self {
+        Self::new_with_flags(seq_len, false)
     }
 
-    const fn new_unchecked(seq_num: SeqNum) -> Self {
-        Self(seq_num)
+    const fn new_unchecked(seq_ind: SeqNum) -> Self {
+        Self(seq_ind)
     }
 
     pub fn with_terminating_bit(self, is_terminating: bool) -> Self {
@@ -200,8 +200,6 @@ pub struct Segment {
 impl Segment {
     /// Size of the segment header.
     pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<SeqNum>();
-    /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + 1 byte of data.
-    pub const MINIMUM_SIZE: usize = Self::HEADER_SIZE + 1;
 
     /// Returns the [SegmentId] for this segment.
     pub fn id(&self) -> SegmentId {
@@ -218,6 +216,16 @@ impl Segment {
     #[inline]
     pub fn is_last(&self) -> bool {
         self.seq_idx == self.seq_len.seq_num() - 1
+    }
+
+    /// Creates an empty `Segment` with the terminating flag set.
+    pub fn terminating(frame_id: FrameId) -> Self {
+        Self {
+            frame_id,
+            seq_idx: 0,
+            seq_len: SeqIndicator::new_with_flags(1, true),
+            data: Box::default(),
+        }
     }
 }
 
@@ -613,6 +621,81 @@ mod tests {
         let reassembled: Frame = fb.try_into()?;
         assert_eq!(1, reassembled.frame_id);
         assert_eq!(b"hello new world", reassembled.data.as_ref());
+
+        Ok(())
+    }
+
+    #[test]
+    fn frame_builder_should_correctly_mark_terminating_flag() -> anyhow::Result<()> {
+        let mut fb = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 1,
+            seq_len: 3.try_into()?,
+            data: (*b" new ").into(),
+        });
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 2,
+            seq_len: SeqIndicator::new_with_flags(3, true),
+            data: (*b"world").into(),
+        })?;
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_len: 3.try_into()?,
+            data: (*b"hello").into(),
+        })?;
+
+        assert!(fb.is_complete());
+        assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
+
+        let reassembled: Frame = fb.try_into()?;
+        assert_eq!(1, reassembled.frame_id);
+        assert_eq!(b"hello new world", reassembled.data.as_ref());
+        assert!(reassembled.is_terminating);
+
+        Ok(())
+    }
+
+    #[test]
+    fn frame_builder_should_correctly_allow_empty_segments() -> anyhow::Result<()> {
+        let mut fb = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 1,
+            seq_len: 4.try_into()?,
+            data: (*b" new ").into(),
+        });
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 2,
+            seq_len: 4.try_into()?,
+            data: (*b"world").into(),
+        })?;
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_len: 4.try_into()?,
+            data: (*b"hello").into(),
+        })?;
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 3,
+            seq_len: SeqIndicator::new_with_flags(4, true),
+            data: Box::new([]),
+        })?;
+
+        assert!(fb.is_complete());
+        assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
+
+        let reassembled: Frame = fb.try_into()?;
+        assert_eq!(1, reassembled.frame_id);
+        assert_eq!(b"hello new world", reassembled.data.as_ref());
+        assert!(reassembled.is_terminating);
 
         Ok(())
     }
