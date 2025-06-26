@@ -36,7 +36,7 @@ where
     /// Creates a new instance, wrapping the given `inner` Segment sink.
     ///
     /// The `frame_size` value will be clamped into the `[C, C * SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME]` interval.
-    pub fn new(inner: S, frame_size: usize) -> Self {
+    pub fn new(inner: S, frame_size: usize, send_terminating_segment: bool, flush_each_segment: bool) -> Self {
         let frame_size = frame_size.clamp(C, C * SessionMessage::<C>::max_segments_per_frame());
 
         Self {
@@ -47,8 +47,8 @@ where
             closed: false,
             tx: inner,
             frame_size,
-            flush_each_segment: false,
-            send_terminating_segment: false, // TODO: resolve this
+            flush_each_segment,
+            send_terminating_segment,
         }
     }
 
@@ -63,7 +63,7 @@ where
         let all_segments = this.ready_segments.drain(..).collect::<Vec<_>>();
         for (i, mut seg) in all_segments.into_iter().enumerate() {
             seg.seq_idx = i as SeqNum;
-            seg.seq_len = SeqIndicator::new(seq_len as SeqNum);
+            seg.seq_flags = SeqIndicator::new_with_flags(seq_len as SeqNum, seg.seq_flags.is_terminating());
 
             ready!(this.tx.as_mut().poll_ready(cx))?;
 
@@ -96,7 +96,7 @@ where
         let new_segment = Segment {
             frame_id: *this.next_frame_id,
             seq_idx: 0,
-            seq_len: SeqIndicator::new(0),
+            seq_flags: SeqIndicator::default(),
             data: this.seg_buffer.clone().into_boxed_slice(),
         };
         this.seg_buffer.clear();
@@ -116,7 +116,7 @@ where
     fn create_terminating_segment(self: Pin<&mut Self>) {
         let this = self.project();
         if let Some(last_segment) = this.ready_segments.last_mut() {
-            last_segment.seq_len = last_segment.seq_len.with_terminating_bit(true);
+            last_segment.seq_flags = last_segment.seq_flags.with_terminating_bit(true);
         } else {
             this.ready_segments.push(Segment::terminating(*this.next_frame_id));
         }
@@ -255,7 +255,14 @@ pub trait SegmenterExt: futures::Sink<Segment, Error = SessionError> {
     where
         Self: Sized,
     {
-        Segmenter::new(self, frame_size)
+        Segmenter::new(self, frame_size, false, false)
+    }
+
+    fn segmenter_with_terminating_segment<const C: usize>(self, frame_size: usize) -> Segmenter<C, Self>
+    where
+        Self: Sized,
+    {
+        Segmenter::new(self, frame_size, false, true)
     }
 }
 
@@ -288,7 +295,7 @@ mod tests {
             let frame_id = i / SEGMENTS_PER_FRAME + start_frame_id;
             assert_eq!(frame_id as FrameId, seg.frame_id);
             assert_eq!((i % SEGMENTS_PER_FRAME) as SeqNum, seg.seq_idx);
-            assert_eq!((FRAME_SIZE / MTU + 1) as SeqNum, seg.seq_len.seq_num());
+            assert_eq!((FRAME_SIZE / MTU + 1) as SeqNum, seg.seq_flags.seq_num());
             if i % SEGMENTS_PER_FRAME == 0 {
                 assert_eq!(SMTU, seg.data.len());
                 assert_eq!(
@@ -329,7 +336,7 @@ mod tests {
 
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(1, seg.frame_id);
-        assert_eq!(1, seg.seq_len.seq_num());
+        assert_eq!(1, seg.seq_flags.seq_num());
         assert_eq!(0, seg.seq_idx);
         assert_eq!(b"test", seg.data.as_ref());
 
@@ -388,6 +395,54 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    async fn segmenter_full_frame_segmentation_must_also_include_terminating_segment() -> anyhow::Result<()> {
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
+
+        writer.send_terminating_segment = true;
+
+        let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
+
+        writer.write_all(&data).await?;
+        writer.close().await?;
+
+        // Segmenter already takes into account the SessionMessage overhead
+        let mut expected = segment(&data, SMTU, 1)?;
+        expected.push(Segment::terminating(2));
+        let actual = segments.collect::<Vec<_>>().await;
+
+        assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn segmenter_partial_frame_segmentation_must_also_include_terminating_segment() -> anyhow::Result<()> {
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
+
+        writer.send_terminating_segment = true;
+
+        let data = hopr_crypto_random::random_bytes::<{ FRAME_SIZE - 1 }>();
+
+        writer.write_all(&data).await?;
+        writer.close().await?;
+
+        // Segmenter already takes into account the SessionMessage overhead
+        let mut expected = segment(&data, SMTU, 1)?;
+        expected.last_mut().unwrap().seq_flags = expected.last_mut().unwrap().seq_flags.with_terminating_bit(true);
+        let actual = segments.collect::<Vec<_>>().await;
+
+        assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     async fn segmenter_should_segment_complete_frame_with_misaligned_mtu() -> anyhow::Result<()> {
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
         let mut writer = segments_tx
@@ -412,7 +467,7 @@ mod tests {
             let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
             assert_eq!(1, seg.frame_id);
             assert_eq!(i as SeqNum, seg.seq_idx);
-            assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_len.seq_num());
+            assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_flags.seq_num());
             assert_eq!(SMTU, seg.data.len());
             assert_eq!(&data[i * SMTU..i * SMTU + SMTU], seg.data.as_ref());
         }
@@ -420,7 +475,7 @@ mod tests {
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(1, seg.frame_id);
         assert_eq!((FRAME_SIZE / SMTU) as SeqNum, seg.seq_idx);
-        assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_len.seq_num());
+        assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_flags.seq_num());
         assert_eq!(FRAME_SIZE % SMTU, seg.data.len());
         assert_eq!(&data[FRAME_SIZE - FRAME_SIZE % SMTU..], seg.data.as_ref());
 
@@ -454,7 +509,7 @@ mod tests {
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(2, seg.frame_id);
         assert_eq!(0, seg.seq_idx);
-        assert_eq!(1, seg.seq_len.seq_num());
+        assert_eq!(1, seg.seq_flags.seq_num());
         assert_eq!(4, seg.data.len());
         assert_eq!(&data[FRAME_SIZE..], seg.data.as_ref());
 
@@ -489,7 +544,7 @@ mod tests {
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(2, seg.frame_id);
         assert_eq!(0, seg.seq_idx);
-        assert_eq!(1, seg.seq_len.seq_num());
+        assert_eq!(1, seg.seq_flags.seq_num());
         assert_eq!(4, seg.data.len());
         assert_eq!(&data[FRAME_SIZE..], seg.data.as_ref());
 

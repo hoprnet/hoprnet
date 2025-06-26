@@ -3,11 +3,14 @@ pub mod state;
 
 use std::{
     pin::Pin,
-    sync::{Arc, atomic::AtomicU32},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU32},
+    },
     task::{Context, Poll},
     time::Duration,
 };
-use std::sync::atomic::AtomicBool;
+
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future};
 use futures_concurrency::stream::Merge;
 use state::SocketState;
@@ -96,7 +99,9 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Pipeline: Packets incoming from Downstream
         let downstream_frames_out = packets_in
             // Continue receiving packets from downstream, unless we received a terminating frame
-            .take_while(move |_| futures::future::ready(!downstream_terminated.load(std::sync::atomic::Ordering::Relaxed)))
+            .take_while(move |_| {
+                futures::future::ready(!downstream_terminated.load(std::sync::atomic::Ordering::Relaxed))
+            })
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
                 futures::future::ready(match packet {
@@ -220,13 +225,15 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let mut st_3 = state.clone();
         let downstream_frames_out = packets_in
             // Continue receiving packets from downstream, unless we received a terminating frame
-            .take_while(move |_| futures::future::ready(!downstream_terminated.load(std::sync::atomic::Ordering::Relaxed)))
+            .take_while(move |_| {
+                futures::future::ready(!downstream_terminated.load(std::sync::atomic::Ordering::Relaxed))
+            })
             // Filter out Session control messages and update the State, pass only Segments onwards
             .filter_map(move |packet| {
                 futures::future::ready(match packet {
                     Ok(packet) => {
                         if let Err(error) = match &packet {
-                            SessionMessage::Segment(s) => st_1.incoming_segment(&s.id(), s.seq_len),
+                            SessionMessage::Segment(s) => st_1.incoming_segment(&s.id(), s.seq_flags),
                             SessionMessage::Request(r) => st_1.incoming_retransmission_request(r.clone()),
                             SessionMessage::Acknowledge(a) => st_1.incoming_acknowledged_frames(a.clone()),
                         } {

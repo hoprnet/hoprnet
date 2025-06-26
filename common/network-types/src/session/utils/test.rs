@@ -52,7 +52,7 @@ pub fn segment<T: AsRef<[u8]>>(
         .enumerate()
         .map(|(idx, data)| crate::session::frames::Segment {
             frame_id,
-            seq_len,
+            seq_flags: seq_len,
             seq_idx: idx as u8,
             data: data.into(),
         })

@@ -96,7 +96,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                     tracing::trace!(
                         frame_id = item.frame_id,
                         seq_idx = item.seq_idx,
-                        seq_len = %item.seq_len,
+                        seq_len = %item.seq_flags,
                         "received segment"
                     );
 
