@@ -1,0 +1,911 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `hopli/src/safe_module.rs`."><title>safe_module.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-84e720fa.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hopli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.89.0-nightly (5526a2f47 2025-06-20)" data-channel="nightly" data-search-js="search-343419c9.js" data-settings-js="settings-5514c975.js" ><script src="../../static.files/storage-4e99c027.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-fd3af306.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hopli/</div>safe_module.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! This module contains arguments and functions to manage safe and module.
+<a href=#2 id=2 data-nosnippet>2</a>//! [SafeModuleSubcommands] defines three subcommands: create, move, and migrate.
+<a href=#3 id=3 data-nosnippet>3</a>//! - [SafeModuleSubcommands::Create] creates staking wallets (safe and node management module) and execute necessary
+<a href=#4 id=4 data-nosnippet>4</a>//!   on-chain transactions to setup a HOPR node. Detailed breakdown of the steps:
+<a href=#5 id=5 data-nosnippet>5</a>//!     - create a Safe proxy instance and HOPR node management module proxy instance
+<a href=#6 id=6 data-nosnippet>6</a>//!     - include nodes configure default permissions on the created module proxy
+<a href=#7 id=7 data-nosnippet>7</a>//!     - fund the node and Safe with some native tokens and HOPR tokens respectively
+<a href=#8 id=8 data-nosnippet>8</a>//!     - approve HOPR tokens to be transferred from the Safe proxy instaces by Channels contract
+<a href=#9 id=9 data-nosnippet>9</a>//!     - Use manager wallet to add nodes and staking safes to the Network Registry contract
+<a href=#10 id=10 data-nosnippet>10</a>//! - [SafeModuleSubcommands::Move] moves a node from to an existing Safe. Note that the Safe should has a node
+<a href=#11 id=11 data-nosnippet>11</a>//!   management module attached and configured. Note that the admin key of the old and new safes are the same. This
+<a href=#12 id=12 data-nosnippet>12</a>//!   command does not support moving nodes to safes controled by a different admin key. Note that all the safes
+<a href=#13 id=13 data-nosnippet>13</a>//!   involved (old and new) should have a threshold of 1 Detailed breakdown of the steps:
+<a href=#14 id=14 data-nosnippet>14</a>//!     - use old safes to deregister nodes from Node-safe registry
+<a href=#15 id=15 data-nosnippet>15</a>//!     - use the new safe to include nodes to the module
+<a href=#16 id=16 data-nosnippet>16</a>//!     - use manager wallet to deregister nodes from the network registry
+<a href=#17 id=17 data-nosnippet>17</a>//!     - use manager wallet to register nodes with new safes to the network regsitry
+<a href=#18 id=18 data-nosnippet>18</a>//! - [SafeModuleSubcommands::Migrate] migrates a node to a different network. It performs the following steps:
+<a href=#19 id=19 data-nosnippet>19</a>//!     - add the Channel contract of the new network to the module as target and set default permissions.
+<a href=#20 id=20 data-nosnippet>20</a>//!     - add the Announcement contract as target to the module
+<a href=#21 id=21 data-nosnippet>21</a>//!     - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
+<a href=#22 id=22 data-nosnippet>22</a>//!     - Use the manager wallet to add nodes and Safes to the Network Registry contract of the new network.
+<a href=#23 id=23 data-nosnippet>23</a>//! - [SafeModuleSubcommands::Debug] goes through a series of checks to debug the setup of a node and safe.
+<a href=#24 id=24 data-nosnippet>24</a>//!
+<a href=#25 id=25 data-nosnippet>25</a>//! It checks the following:
+<a href=#26 id=26 data-nosnippet>26</a>//!     - node xDAI balance
+<a href=#27 id=27 data-nosnippet>27</a>//!     - If node has been included on Network Registry
+<a href=#28 id=28 data-nosnippet>28</a>//!     - If node and safe are associated on Node Safe Registry
+<a href=#29 id=29 data-nosnippet>29</a>//!     - If Safe is owned by the correct owner(s)
+<a href=#30 id=30 data-nosnippet>30</a>//!     - Safe’s wxHOPR balance and allowance
+<a href=#31 id=31 data-nosnippet>31</a>//!     - if the module is enabled
+<a href=#32 id=32 data-nosnippet>32</a>//!     - if node is included in the module
+<a href=#33 id=33 data-nosnippet>33</a>//!     - Get all the targets of the safe (then check if channel and announcement are there)
+<a href=#34 id=34 data-nosnippet>34</a>//!     - Get the owner of the module
+<a href=#35 id=35 data-nosnippet>35</a>//!
+<a href=#36 id=36 data-nosnippet>36</a>//! You need to enable the INFO level of the tracing logger to see the output of the debug command.
+<a href=#37 id=37 data-nosnippet>37</a>//!
+<a href=#38 id=38 data-nosnippet>38</a>//! Some sample commands
+<a href=#39 id=39 data-nosnippet>39</a>//! - Express creation of a safe and a module
+<a href=#40 id=40 data-nosnippet>40</a>//! ```text
+<a href=#41 id=41 data-nosnippet>41</a>//! hopli safe-module create \
+<a href=#42 id=42 data-nosnippet>42</a>//!     --network anvil-localhost \
+<a href=#43 id=43 data-nosnippet>43</a>//!     --contracts-root "../ethereum/contracts" \
+<a href=#44 id=44 data-nosnippet>44</a>//!     --identity-directory "./test" \
+<a href=#45 id=45 data-nosnippet>45</a>//!     --password-path "./test/pwd" \
+<a href=#46 id=46 data-nosnippet>46</a>//!     --admin-address 0x47f2710069F01672D01095cA252018eBf08bF85e,0x0D07Eb66Deb54D48D004765E13DcC028cf56592b \
+<a href=#47 id=47 data-nosnippet>47</a>//!     --allowance 10.5 \
+<a href=#48 id=48 data-nosnippet>48</a>//!     --hopr-amount 10 \
+<a href=#49 id=49 data-nosnippet>49</a>//!     --native-amount 0.1 \
+<a href=#50 id=50 data-nosnippet>50</a>//!     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+<a href=#51 id=51 data-nosnippet>51</a>//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+<a href=#52 id=52 data-nosnippet>52</a>//!     --provider-url "http://localhost:8545"
+<a href=#53 id=53 data-nosnippet>53</a>//! ```
+<a href=#54 id=54 data-nosnippet>54</a>//!
+<a href=#55 id=55 data-nosnippet>55</a>//! - Migrate nodes and safe to a new network
+<a href=#56 id=56 data-nosnippet>56</a>//! ```text
+<a href=#57 id=57 data-nosnippet>57</a>//! hopli safe-module migrate \
+<a href=#58 id=58 data-nosnippet>58</a>//!     --network anvil-localhost2 \
+<a href=#59 id=59 data-nosnippet>59</a>//!     --contracts-root "../ethereum/contracts" \
+<a href=#60 id=60 data-nosnippet>60</a>//!     --identity-directory "./test" \
+<a href=#61 id=61 data-nosnippet>61</a>//!     --password-path "./test/pwd" \
+<a href=#62 id=62 data-nosnippet>62</a>//!     --safe-address 0x6a64fe01c3aba5bdcd04b81fef375369ca47326f \
+<a href=#63 id=63 data-nosnippet>63</a>//!     --module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
+<a href=#64 id=64 data-nosnippet>64</a>//!     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+<a href=#65 id=65 data-nosnippet>65</a>//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+<a href=#66 id=66 data-nosnippet>66</a>//!     --provider-url "http://localhost:8545"
+<a href=#67 id=67 data-nosnippet>67</a>//! ```
+<a href=#68 id=68 data-nosnippet>68</a>//!
+<a href=#69 id=69 data-nosnippet>69</a>//! - Move registered nodes to a different set of safe and module
+<a href=#70 id=70 data-nosnippet>70</a>//! ```text
+<a href=#71 id=71 data-nosnippet>71</a>//! hopli safe-module move \
+<a href=#72 id=72 data-nosnippet>72</a>//!     --network anvil-localhost \
+<a href=#73 id=73 data-nosnippet>73</a>//!     --contracts-root "../ethereum/contracts"  \
+<a href=#74 id=74 data-nosnippet>74</a>//!     --old-module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
+<a href=#75 id=75 data-nosnippet>75</a>//!     --new-safe-address 0xce66d19a86600f3c6eb61edd6c431ded5cc92b21 \
+<a href=#76 id=76 data-nosnippet>76</a>//!     --new-module-address 0x3086c20265cf742b169b05cd0eae1941455e4e9f \
+<a href=#77 id=77 data-nosnippet>77</a>//!     --node-address 0x93a50B0fFF7b4ED36A3C6445e280E72AC2AEFc51,0x58033D3074D001a32bF379801eaf8969817fFfCf,0xeEDaab91158928647a9270Fe290897eBB1230250 \
+<a href=#78 id=78 data-nosnippet>78</a>//!     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+<a href=#79 id=79 data-nosnippet>79</a>//!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
+<a href=#80 id=80 data-nosnippet>80</a>//!     --provider-url "http://localhost:8545"
+<a href=#81 id=81 data-nosnippet>81</a>//!
+<a href=#82 id=82 data-nosnippet>82</a>//! - Debug nodes and safe
+<a href=#83 id=83 data-nosnippet>83</a>//! ```text
+<a href=#84 id=84 data-nosnippet>84</a>//! hopli safe-module debug \
+<a href=#85 id=85 data-nosnippet>85</a>//!     --network anvil-localhost2 \
+<a href=#86 id=86 data-nosnippet>86</a>//!     --contracts-root "../ethereum/contracts" \
+<a href=#87 id=87 data-nosnippet>87</a>//!     --identity-directory "./test" \
+<a href=#88 id=88 data-nosnippet>88</a>//!     --password-path "./test/pwd" \
+<a href=#89 id=89 data-nosnippet>89</a>//!     --safe-address 0x6a64fe01c3aba5bdcd04b81fef375369ca47326f \
+<a href=#90 id=90 data-nosnippet>90</a>//!     --module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
+<a href=#91 id=91 data-nosnippet>91</a>//!     --provider-url "http://localhost:8545"
+<a href=#92 id=92 data-nosnippet>92</a>//! ```
+<a href=#93 id=93 data-nosnippet>93</a></span><span class="kw">use </span>std::str::FromStr;
+<a href=#94 id=94 data-nosnippet>94</a>
+<a href=#95 id=95 data-nosnippet>95</a><span class="kw">use </span>alloy::primitives::{Address, U256, utils::parse_units};
+<a href=#96 id=96 data-nosnippet>96</a><span class="kw">use </span>clap::{Parser, builder::RangedU64ValueParser};
+<a href=#97 id=97 data-nosnippet>97</a><span class="kw">use </span>hopr_bindings::{
+<a href=#98 id=98 data-nosnippet>98</a>    hoprnetworkregistry::HoprNetworkRegistry, hoprnodesaferegistry::HoprNodeSafeRegistry,
+<a href=#99 id=99 data-nosnippet>99</a>    hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
+<a href=#100 id=100 data-nosnippet>100</a>};
+<a href=#101 id=101 data-nosnippet>101</a><span class="kw">use </span>hopr_crypto_types::keypairs::Keypair;
+<a href=#102 id=102 data-nosnippet>102</a><span class="kw">use </span>tracing::{info, warn};
+<a href=#103 id=103 data-nosnippet>103</a>
+<a href=#104 id=104 data-nosnippet>104</a><span class="kw">use crate</span>::{
+<a href=#105 id=105 data-nosnippet>105</a>    environment_config::NetworkProviderArgs,
+<a href=#106 id=106 data-nosnippet>106</a>    key_pair::{ArgEnvReader, IdentityFileArgs, ManagerPrivateKeyArgs, PrivateKeyArgs},
+<a href=#107 id=107 data-nosnippet>107</a>    methods::{
+<a href=#108 id=108 data-nosnippet>108</a>        SafeSingleton, debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries,
+<a href=#109 id=109 data-nosnippet>109</a>        deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
+<a href=#110 id=110 data-nosnippet>110</a>        include_nodes_to_module, migrate_nodes, register_safes_and_nodes_on_network_registry, transfer_native_tokens,
+<a href=#111 id=111 data-nosnippet>111</a>        transfer_or_mint_tokens,
+<a href=#112 id=112 data-nosnippet>112</a>    },
+<a href=#113 id=113 data-nosnippet>113</a>    utils::{Cmd, HelperErrors},
+<a href=#114 id=114 data-nosnippet>114</a>};
+<a href=#115 id=115 data-nosnippet>115</a>
+<a href=#116 id=116 data-nosnippet>116</a><span class="doccomment">/// CLI arguments for `hopli safe-module`
+<a href=#117 id=117 data-nosnippet>117</a></span><span class="attr">#[derive(Clone, Debug, Parser)]
+<a href=#118 id=118 data-nosnippet>118</a></span><span class="kw">pub enum </span>SafeModuleSubcommands {
+<a href=#119 id=119 data-nosnippet>119</a>    <span class="doccomment">/// Create safe and module proxy if nothing exists
+<a href=#120 id=120 data-nosnippet>120</a>    </span><span class="attr">#[command(visible_alias = <span class="string">"cr"</span>)]
+<a href=#121 id=121 data-nosnippet>121</a>    </span>Create {
+<a href=#122 id=122 data-nosnippet>122</a>        <span class="doccomment">/// Network name, contracts config file root, and customized provider, if available
+<a href=#123 id=123 data-nosnippet>123</a>        </span><span class="attr">#[command(flatten)]
+<a href=#124 id=124 data-nosnippet>124</a>        </span>network_provider: NetworkProviderArgs,
+<a href=#125 id=125 data-nosnippet>125</a>
+<a href=#126 id=126 data-nosnippet>126</a>        <span class="doccomment">/// Arguments to locate identity file(s) of HOPR node(s)
+<a href=#127 id=127 data-nosnippet>127</a>        </span><span class="attr">#[command(flatten)]
+<a href=#128 id=128 data-nosnippet>128</a>        </span>local_identity: IdentityFileArgs,
+<a href=#129 id=129 data-nosnippet>129</a>
+<a href=#130 id=130 data-nosnippet>130</a>        <span class="doccomment">/// node addresses
+<a href=#131 id=131 data-nosnippet>131</a>        </span><span class="attr">#[clap(
+<a href=#132 id=132 data-nosnippet>132</a>            help = <span class="string">"Comma separated node Ethereum addresses"</span>,
+<a href=#133 id=133 data-nosnippet>133</a>            long,
+<a href=#134 id=134 data-nosnippet>134</a>            short = <span class="string">'o'</span>,
+<a href=#135 id=135 data-nosnippet>135</a>            default_value = <span class="prelude-val">None
+<a href=#136 id=136 data-nosnippet>136</a>        </span>)]
+<a href=#137 id=137 data-nosnippet>137</a>        </span>node_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#138 id=138 data-nosnippet>138</a>
+<a href=#139 id=139 data-nosnippet>139</a>        <span class="doccomment">/// admin addresses
+<a href=#140 id=140 data-nosnippet>140</a>        </span><span class="attr">#[clap(
+<a href=#141 id=141 data-nosnippet>141</a>            help = <span class="string">"Comma separated node Ethereum addresses"</span>,
+<a href=#142 id=142 data-nosnippet>142</a>            long,
+<a href=#143 id=143 data-nosnippet>143</a>            short = <span class="string">'a'</span>,
+<a href=#144 id=144 data-nosnippet>144</a>            default_value = <span class="prelude-val">None
+<a href=#145 id=145 data-nosnippet>145</a>        </span>)]
+<a href=#146 id=146 data-nosnippet>146</a>        </span>admin_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#147 id=147 data-nosnippet>147</a>
+<a href=#148 id=148 data-nosnippet>148</a>        <span class="doccomment">/// Threshold for the generated safe
+<a href=#149 id=149 data-nosnippet>149</a>        </span><span class="attr">#[clap(
+<a href=#150 id=150 data-nosnippet>150</a>            help = <span class="string">"Threshold for the generated safe, e.g. 1"</span>,
+<a href=#151 id=151 data-nosnippet>151</a>            long,
+<a href=#152 id=152 data-nosnippet>152</a>            short,
+<a href=#153 id=153 data-nosnippet>153</a>            value_parser = RangedU64ValueParser::&lt;u32&gt;::new().range(<span class="number">1</span>..),
+<a href=#154 id=154 data-nosnippet>154</a>            default_value_t = <span class="number">1
+<a href=#155 id=155 data-nosnippet>155</a>        </span>)]
+<a href=#156 id=156 data-nosnippet>156</a>        </span>threshold: u32,
+<a href=#157 id=157 data-nosnippet>157</a>
+<a href=#158 id=158 data-nosnippet>158</a>        <span class="doccomment">/// Allowance of the channel contract to manage HOPR tokens on behalf of deployed safe
+<a href=#159 id=159 data-nosnippet>159</a>        </span><span class="attr">#[clap(
+<a href=#160 id=160 data-nosnippet>160</a>            help = <span class="string">"Provide the allowance of the channel contract to manage HOPR tokens on behalf of deployed safe. Value in ether, e.g. 10"</span>,
+<a href=#161 id=161 data-nosnippet>161</a>            long,
+<a href=#162 id=162 data-nosnippet>162</a>            short = <span class="string">'l'</span>,
+<a href=#163 id=163 data-nosnippet>163</a>            value_parser = <span class="macro">clap::value_parser!</span>(f64),
+<a href=#164 id=164 data-nosnippet>164</a>        )]
+<a href=#165 id=165 data-nosnippet>165</a>        </span>allowance: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+<a href=#166 id=166 data-nosnippet>166</a>
+<a href=#167 id=167 data-nosnippet>167</a>        <span class="doccomment">/// The amount of HOPR tokens (in floating number) to be funded to the new safe
+<a href=#168 id=168 data-nosnippet>168</a>        </span><span class="attr">#[clap(
+<a href=#169 id=169 data-nosnippet>169</a>            help = <span class="string">"Hopr amount in ether, e.g. 10"</span>,
+<a href=#170 id=170 data-nosnippet>170</a>            long,
+<a href=#171 id=171 data-nosnippet>171</a>            short = <span class="string">'m'</span>,
+<a href=#172 id=172 data-nosnippet>172</a>            value_parser = <span class="macro">clap::value_parser!</span>(f64),
+<a href=#173 id=173 data-nosnippet>173</a>        )]
+<a href=#174 id=174 data-nosnippet>174</a>        </span>hopr_amount: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+<a href=#175 id=175 data-nosnippet>175</a>
+<a href=#176 id=176 data-nosnippet>176</a>        <span class="doccomment">/// The amount of native tokens (in floating number) to be funded per node
+<a href=#177 id=177 data-nosnippet>177</a>        </span><span class="attr">#[clap(
+<a href=#178 id=178 data-nosnippet>178</a>            help = <span class="string">"Native token amount in ether, e.g. 1"</span>,
+<a href=#179 id=179 data-nosnippet>179</a>            long,
+<a href=#180 id=180 data-nosnippet>180</a>            short = <span class="string">'g'</span>,
+<a href=#181 id=181 data-nosnippet>181</a>            value_parser = <span class="macro">clap::value_parser!</span>(f64),
+<a href=#182 id=182 data-nosnippet>182</a>        )]
+<a href=#183 id=183 data-nosnippet>183</a>        </span>native_amount: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+<a href=#184 id=184 data-nosnippet>184</a>
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="doccomment">/// Access to the private key, of which the wallet either contains sufficient assets
+<a href=#186 id=186 data-nosnippet>186</a>        /// as the source of funds or it can mint necessary tokens
+<a href=#187 id=187 data-nosnippet>187</a>        </span><span class="attr">#[command(flatten)]
+<a href=#188 id=188 data-nosnippet>188</a>        </span>private_key: PrivateKeyArgs,
+<a href=#189 id=189 data-nosnippet>189</a>
+<a href=#190 id=190 data-nosnippet>190</a>        <span class="doccomment">/// Access to the private key, of which the wallet has `MANAGER_ROLE` of network registry
+<a href=#191 id=191 data-nosnippet>191</a>        /// If provided, this wallet will grant the created safe access to the network registry
+<a href=#192 id=192 data-nosnippet>192</a>        </span><span class="attr">#[command(flatten, name = <span class="string">"manager_private_key"</span>)]
+<a href=#193 id=193 data-nosnippet>193</a>        </span>manager_private_key: ManagerPrivateKeyArgs,
+<a href=#194 id=194 data-nosnippet>194</a>    },
+<a href=#195 id=195 data-nosnippet>195</a>
+<a href=#196 id=196 data-nosnippet>196</a>    <span class="doccomment">/// Migrate safe and module to a new network
+<a href=#197 id=197 data-nosnippet>197</a>    </span><span class="attr">#[command(visible_alias = <span class="string">"mg"</span>)]
+<a href=#198 id=198 data-nosnippet>198</a>    </span>Migrate {
+<a href=#199 id=199 data-nosnippet>199</a>        <span class="doccomment">/// Network name, contracts config file root, and customized provider, if available
+<a href=#200 id=200 data-nosnippet>200</a>        </span><span class="attr">#[command(flatten)]
+<a href=#201 id=201 data-nosnippet>201</a>        </span>network_provider: NetworkProviderArgs,
+<a href=#202 id=202 data-nosnippet>202</a>
+<a href=#203 id=203 data-nosnippet>203</a>        <span class="doccomment">/// Arguments to locate identity file(s) of HOPR node(s)
+<a href=#204 id=204 data-nosnippet>204</a>        </span><span class="attr">#[command(flatten)]
+<a href=#205 id=205 data-nosnippet>205</a>        </span>local_identity: IdentityFileArgs,
+<a href=#206 id=206 data-nosnippet>206</a>
+<a href=#207 id=207 data-nosnippet>207</a>        <span class="doccomment">/// node addresses
+<a href=#208 id=208 data-nosnippet>208</a>        </span><span class="attr">#[clap(
+<a href=#209 id=209 data-nosnippet>209</a>             help = <span class="string">"Comma separated node Ethereum addresses"</span>,
+<a href=#210 id=210 data-nosnippet>210</a>             long,
+<a href=#211 id=211 data-nosnippet>211</a>             short = <span class="string">'o'</span>,
+<a href=#212 id=212 data-nosnippet>212</a>             default_value = <span class="prelude-val">None
+<a href=#213 id=213 data-nosnippet>213</a>         </span>)]
+<a href=#214 id=214 data-nosnippet>214</a>        </span>node_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#215 id=215 data-nosnippet>215</a>
+<a href=#216 id=216 data-nosnippet>216</a>        <span class="doccomment">/// safe address that the nodes move to
+<a href=#217 id=217 data-nosnippet>217</a>        </span><span class="attr">#[clap(help = <span class="string">"New managing safe to which all the nodes move"</span>, long, short = <span class="string">'s'</span>)]
+<a href=#218 id=218 data-nosnippet>218</a>        </span>safe_address: String,
+<a href=#219 id=219 data-nosnippet>219</a>
+<a href=#220 id=220 data-nosnippet>220</a>        <span class="doccomment">/// module address that the nodes move to
+<a href=#221 id=221 data-nosnippet>221</a>        </span><span class="attr">#[clap(help = <span class="string">"New managing module to which all the nodes move"</span>, long, short = <span class="string">'m'</span>)]
+<a href=#222 id=222 data-nosnippet>222</a>        </span>module_address: String,
+<a href=#223 id=223 data-nosnippet>223</a>
+<a href=#224 id=224 data-nosnippet>224</a>        <span class="doccomment">/// Allowance of the channel contract to manage HOPR tokens on behalf of deployed safe
+<a href=#225 id=225 data-nosnippet>225</a>        </span><span class="attr">#[clap(
+<a href=#226 id=226 data-nosnippet>226</a>            help = <span class="string">"Provide the allowance of the channel contract to manage HOPR tokens on behalf of deployed safe. Value in ether, e.g. 10"</span>,
+<a href=#227 id=227 data-nosnippet>227</a>            long,
+<a href=#228 id=228 data-nosnippet>228</a>            short = <span class="string">'l'</span>,
+<a href=#229 id=229 data-nosnippet>229</a>            value_parser = <span class="macro">clap::value_parser!</span>(f64),
+<a href=#230 id=230 data-nosnippet>230</a>        )]
+<a href=#231 id=231 data-nosnippet>231</a>        </span>allowance: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+<a href=#232 id=232 data-nosnippet>232</a>
+<a href=#233 id=233 data-nosnippet>233</a>        <span class="doccomment">/// Access to the private key, of which the wallet either contains sufficient assets
+<a href=#234 id=234 data-nosnippet>234</a>        /// as the source of funds or it can mint necessary tokens
+<a href=#235 id=235 data-nosnippet>235</a>        </span><span class="attr">#[command(flatten)]
+<a href=#236 id=236 data-nosnippet>236</a>        </span>private_key: PrivateKeyArgs,
+<a href=#237 id=237 data-nosnippet>237</a>
+<a href=#238 id=238 data-nosnippet>238</a>        <span class="doccomment">/// Access to the private key, of which the wallet has `MANAGER_ROLE` of network registry
+<a href=#239 id=239 data-nosnippet>239</a>        /// If provided, this wallet will grant the created safe access to the network registry
+<a href=#240 id=240 data-nosnippet>240</a>        </span><span class="attr">#[command(flatten, name = <span class="string">"manager_private_key"</span>)]
+<a href=#241 id=241 data-nosnippet>241</a>        </span>manager_private_key: ManagerPrivateKeyArgs,
+<a href=#242 id=242 data-nosnippet>242</a>    },
+<a href=#243 id=243 data-nosnippet>243</a>
+<a href=#244 id=244 data-nosnippet>244</a>    <span class="doccomment">/// Move nodes to one single safe and module pair
+<a href=#245 id=245 data-nosnippet>245</a>    </span><span class="attr">#[command(visible_alias = <span class="string">"mv"</span>)]
+<a href=#246 id=246 data-nosnippet>246</a>    </span>Move {
+<a href=#247 id=247 data-nosnippet>247</a>        <span class="doccomment">/// Network name, contracts config file root, and customized provider, if available
+<a href=#248 id=248 data-nosnippet>248</a>        </span><span class="attr">#[command(flatten)]
+<a href=#249 id=249 data-nosnippet>249</a>        </span>network_provider: NetworkProviderArgs,
+<a href=#250 id=250 data-nosnippet>250</a>
+<a href=#251 id=251 data-nosnippet>251</a>        <span class="doccomment">/// Arguments to locate identity file(s) of HOPR node(s)
+<a href=#252 id=252 data-nosnippet>252</a>        </span><span class="attr">#[command(flatten)]
+<a href=#253 id=253 data-nosnippet>253</a>        </span>local_identity: IdentityFileArgs,
+<a href=#254 id=254 data-nosnippet>254</a>
+<a href=#255 id=255 data-nosnippet>255</a>        <span class="doccomment">/// node addresses
+<a href=#256 id=256 data-nosnippet>256</a>        </span><span class="attr">#[clap(
+<a href=#257 id=257 data-nosnippet>257</a>             help = <span class="string">"Comma separated node Ethereum addresses"</span>,
+<a href=#258 id=258 data-nosnippet>258</a>             long,
+<a href=#259 id=259 data-nosnippet>259</a>             short = <span class="string">'o'</span>,
+<a href=#260 id=260 data-nosnippet>260</a>             default_value = <span class="prelude-val">None
+<a href=#261 id=261 data-nosnippet>261</a>         </span>)]
+<a href=#262 id=262 data-nosnippet>262</a>        </span>node_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#263 id=263 data-nosnippet>263</a>
+<a href=#264 id=264 data-nosnippet>264</a>        <span class="doccomment">/// old module addresses
+<a href=#265 id=265 data-nosnippet>265</a>        </span><span class="attr">#[clap(help = <span class="string">"Comma separated old module addresses"</span>, long, short = <span class="string">'u'</span>)]
+<a href=#266 id=266 data-nosnippet>266</a>        </span>old_module_address: String,
+<a href=#267 id=267 data-nosnippet>267</a>
+<a href=#268 id=268 data-nosnippet>268</a>        <span class="doccomment">/// safe address that the nodes move to
+<a href=#269 id=269 data-nosnippet>269</a>        </span><span class="attr">#[clap(help = <span class="string">"New managing safe to which all the nodes move"</span>, long, short = <span class="string">'s'</span>)]
+<a href=#270 id=270 data-nosnippet>270</a>        </span>new_safe_address: String,
+<a href=#271 id=271 data-nosnippet>271</a>
+<a href=#272 id=272 data-nosnippet>272</a>        <span class="doccomment">/// module address that the nodes move to
+<a href=#273 id=273 data-nosnippet>273</a>        </span><span class="attr">#[clap(help = <span class="string">"New managing module to which all the nodes move"</span>, long, short = <span class="string">'m'</span>)]
+<a href=#274 id=274 data-nosnippet>274</a>        </span>new_module_address: String,
+<a href=#275 id=275 data-nosnippet>275</a>
+<a href=#276 id=276 data-nosnippet>276</a>        <span class="doccomment">/// Access to the private key, of which the wallet either contains sufficient assets
+<a href=#277 id=277 data-nosnippet>277</a>        /// as the source of funds or it can mint necessary tokens
+<a href=#278 id=278 data-nosnippet>278</a>        </span><span class="attr">#[command(flatten)]
+<a href=#279 id=279 data-nosnippet>279</a>        </span>private_key: PrivateKeyArgs,
+<a href=#280 id=280 data-nosnippet>280</a>
+<a href=#281 id=281 data-nosnippet>281</a>        <span class="doccomment">/// Access to the private key, of which the wallet has `MANAGER_ROLE` of network registry
+<a href=#282 id=282 data-nosnippet>282</a>        /// If provided, this wallet will grant the created safe access to the network registry
+<a href=#283 id=283 data-nosnippet>283</a>        </span><span class="attr">#[command(flatten, name = <span class="string">"manager_private_key"</span>)]
+<a href=#284 id=284 data-nosnippet>284</a>        </span>manager_private_key: ManagerPrivateKeyArgs,
+<a href=#285 id=285 data-nosnippet>285</a>    },
+<a href=#286 id=286 data-nosnippet>286</a>
+<a href=#287 id=287 data-nosnippet>287</a>    <span class="doccomment">/// Debug safe and module setup
+<a href=#288 id=288 data-nosnippet>288</a>    </span><span class="attr">#[command(visible_alias = <span class="string">"dg"</span>)]
+<a href=#289 id=289 data-nosnippet>289</a>    </span>Debug {
+<a href=#290 id=290 data-nosnippet>290</a>        <span class="doccomment">/// Network name, contracts config file root, and customized provider, if available
+<a href=#291 id=291 data-nosnippet>291</a>        </span><span class="attr">#[command(flatten)]
+<a href=#292 id=292 data-nosnippet>292</a>        </span>network_provider: NetworkProviderArgs,
+<a href=#293 id=293 data-nosnippet>293</a>
+<a href=#294 id=294 data-nosnippet>294</a>        <span class="doccomment">/// Arguments to locate identity file(s) of HOPR node(s)
+<a href=#295 id=295 data-nosnippet>295</a>        </span><span class="attr">#[command(flatten)]
+<a href=#296 id=296 data-nosnippet>296</a>        </span>local_identity: IdentityFileArgs,
+<a href=#297 id=297 data-nosnippet>297</a>
+<a href=#298 id=298 data-nosnippet>298</a>        <span class="doccomment">/// node addresses
+<a href=#299 id=299 data-nosnippet>299</a>        </span><span class="attr">#[clap(
+<a href=#300 id=300 data-nosnippet>300</a>             help = <span class="string">"Comma separated node Ethereum addresses"</span>,
+<a href=#301 id=301 data-nosnippet>301</a>             long,
+<a href=#302 id=302 data-nosnippet>302</a>             short = <span class="string">'o'</span>,
+<a href=#303 id=303 data-nosnippet>303</a>             default_value = <span class="prelude-val">None
+<a href=#304 id=304 data-nosnippet>304</a>         </span>)]
+<a href=#305 id=305 data-nosnippet>305</a>        </span>node_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#306 id=306 data-nosnippet>306</a>
+<a href=#307 id=307 data-nosnippet>307</a>        <span class="doccomment">/// safe address that the nodes move to
+<a href=#308 id=308 data-nosnippet>308</a>        </span><span class="attr">#[clap(help = <span class="string">"New managing safe to which all the nodes move"</span>, long, short = <span class="string">'s'</span>)]
+<a href=#309 id=309 data-nosnippet>309</a>        </span>safe_address: String,
+<a href=#310 id=310 data-nosnippet>310</a>
+<a href=#311 id=311 data-nosnippet>311</a>        <span class="doccomment">/// module address that the nodes move to
+<a href=#312 id=312 data-nosnippet>312</a>        </span><span class="attr">#[clap(help = <span class="string">"New managing module to which all the nodes move"</span>, long, short = <span class="string">'m'</span>)]
+<a href=#313 id=313 data-nosnippet>313</a>        </span>module_address: String,
+<a href=#314 id=314 data-nosnippet>314</a>    },
+<a href=#315 id=315 data-nosnippet>315</a>}
+<a href=#316 id=316 data-nosnippet>316</a>
+<a href=#317 id=317 data-nosnippet>317</a><span class="kw">impl </span>SafeModuleSubcommands {
+<a href=#318 id=318 data-nosnippet>318</a>    <span class="doccomment">/// Execute the command, which quickly create necessary staking wallets
+<a href=#319 id=319 data-nosnippet>319</a>    /// and execute necessary on-chain transactions to setup a HOPR node.
+<a href=#320 id=320 data-nosnippet>320</a>    ///
+<a href=#321 id=321 data-nosnippet>321</a>    /// 1. Create a safe instance and a node management module instance:
+<a href=#322 id=322 data-nosnippet>322</a>    /// 2. Set default permissions for the module
+<a href=#323 id=323 data-nosnippet>323</a>    /// 3. Include node as a member with restricted permission on sending assets
+<a href=#324 id=324 data-nosnippet>324</a>    /// 4. transfer some HOPR token to the new safe (directly)
+<a href=#325 id=325 data-nosnippet>325</a>    /// 5. transfer some native tokens to nodes
+<a href=#326 id=326 data-nosnippet>326</a>    </span><span class="attr">#[allow(clippy::too_many_arguments)]
+<a href=#327 id=327 data-nosnippet>327</a>    </span><span class="kw">pub async fn </span>execute_safe_module_creation(
+<a href=#328 id=328 data-nosnippet>328</a>        network_provider: NetworkProviderArgs,
+<a href=#329 id=329 data-nosnippet>329</a>        local_identity: IdentityFileArgs,
+<a href=#330 id=330 data-nosnippet>330</a>        node_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#331 id=331 data-nosnippet>331</a>        admin_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#332 id=332 data-nosnippet>332</a>        threshold: u32,
+<a href=#333 id=333 data-nosnippet>333</a>        allowance: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+<a href=#334 id=334 data-nosnippet>334</a>        hopr_amount: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+<a href=#335 id=335 data-nosnippet>335</a>        native_amount: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+<a href=#336 id=336 data-nosnippet>336</a>        private_key: PrivateKeyArgs,
+<a href=#337 id=337 data-nosnippet>337</a>        manager_private_key: ManagerPrivateKeyArgs,
+<a href=#338 id=338 data-nosnippet>338</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), HelperErrors&gt; {
+<a href=#339 id=339 data-nosnippet>339</a>        <span class="comment">// read all the node addresses
+<a href=#340 id=340 data-nosnippet>340</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>node_eth_addresses: Vec&lt;Address&gt; = Vec::new();
+<a href=#341 id=341 data-nosnippet>341</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(addresses) = node_address {
+<a href=#342 id=342 data-nosnippet>342</a>            node_eth_addresses.extend(
+<a href=#343 id=343 data-nosnippet>343</a>                addresses
+<a href=#344 id=344 data-nosnippet>344</a>                    .split(<span class="string">','</span>)
+<a href=#345 id=345 data-nosnippet>345</a>                    .map(|addr| {
+<a href=#346 id=346 data-nosnippet>346</a>                        Address::from_str(addr)
+<a href=#347 id=347 data-nosnippet>347</a>                            .map_err(|e| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Invalid node address: {:?}"</span>, e)))
+<a href=#348 id=348 data-nosnippet>348</a>                    })
+<a href=#349 id=349 data-nosnippet>349</a>                    .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>,
+<a href=#350 id=350 data-nosnippet>350</a>            );
+<a href=#351 id=351 data-nosnippet>351</a>        }
+<a href=#352 id=352 data-nosnippet>352</a>        <span class="comment">// if local identity dirs/path is provided, read addresses from identity files
+<a href=#353 id=353 data-nosnippet>353</a>        </span>node_eth_addresses.extend(
+<a href=#354 id=354 data-nosnippet>354</a>            local_identity
+<a href=#355 id=355 data-nosnippet>355</a>                .to_addresses()
+<a href=#356 id=356 data-nosnippet>356</a>                .map_err(|e| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Invalid node address: {:?}"</span>, e)))<span class="question-mark">?
+<a href=#357 id=357 data-nosnippet>357</a>                </span>.into_iter()
+<a href=#358 id=358 data-nosnippet>358</a>                .map(Address::from),
+<a href=#359 id=359 data-nosnippet>359</a>        );
+<a href=#360 id=360 data-nosnippet>360</a>
+<a href=#361 id=361 data-nosnippet>361</a>        <span class="kw">let </span>node_addresses = <span class="kw">if </span>node_eth_addresses.is_empty() {
+<a href=#362 id=362 data-nosnippet>362</a>            <span class="prelude-val">None
+<a href=#363 id=363 data-nosnippet>363</a>        </span>} <span class="kw">else </span>{
+<a href=#364 id=364 data-nosnippet>364</a>            <span class="prelude-val">Some</span>(node_eth_addresses.clone())
+<a href=#365 id=365 data-nosnippet>365</a>        };
+<a href=#366 id=366 data-nosnippet>366</a>
+<a href=#367 id=367 data-nosnippet>367</a>        <span class="comment">// get allowance
+<a href=#368 id=368 data-nosnippet>368</a>        </span><span class="kw">let </span>token_allowance: U256 = <span class="kw">match </span>allowance {
+<a href=#369 id=369 data-nosnippet>369</a>            <span class="prelude-val">Some</span>(allw) =&gt; parse_units(<span class="kw-2">&amp;</span>allw.to_string(), <span class="string">"ether"</span>)
+<a href=#370 id=370 data-nosnippet>370</a>                .map_err(|<span class="kw">_</span>| HelperErrors::ParseError(<span class="string">"Failed to parse allowance units"</span>.into()))<span class="question-mark">?
+<a href=#371 id=371 data-nosnippet>371</a>                </span>.into(),
+<a href=#372 id=372 data-nosnippet>372</a>            <span class="prelude-val">None </span>=&gt; U256::MAX,
+<a href=#373 id=373 data-nosnippet>373</a>        };
+<a href=#374 id=374 data-nosnippet>374</a>
+<a href=#375 id=375 data-nosnippet>375</a>        <span class="comment">// read private key
+<a href=#376 id=376 data-nosnippet>376</a>        </span><span class="kw">let </span>signer_private_key = private_key.read_default()<span class="question-mark">?</span>;
+<a href=#377 id=377 data-nosnippet>377</a>        <span class="comment">// get RPC provider for the given network and environment
+<a href=#378 id=378 data-nosnippet>378</a>        </span><span class="kw">let </span>rpc_provider = network_provider.get_provider_with_signer(<span class="kw-2">&amp;</span>signer_private_key).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#379 id=379 data-nosnippet>379</a>        <span class="kw">let </span>contract_addresses = network_provider.get_network_details_from_name()<span class="question-mark">?</span>;
+<a href=#380 id=380 data-nosnippet>380</a>
+<a href=#381 id=381 data-nosnippet>381</a>        <span class="comment">// read all the admin addresses
+<a href=#382 id=382 data-nosnippet>382</a>        </span><span class="kw">let </span>admin_eth_addresses: Vec&lt;Address&gt; = <span class="kw">match </span>admin_address {
+<a href=#383 id=383 data-nosnippet>383</a>            <span class="prelude-val">Some</span>(admin_address_str) =&gt; admin_address_str
+<a href=#384 id=384 data-nosnippet>384</a>                .split(<span class="string">','</span>)
+<a href=#385 id=385 data-nosnippet>385</a>                .map(|addr| Address::from_str(addr).unwrap())
+<a href=#386 id=386 data-nosnippet>386</a>                .collect(),
+<a href=#387 id=387 data-nosnippet>387</a>            <span class="prelude-val">None </span>=&gt; <span class="macro">vec!</span>[signer_private_key.clone().public().to_address().into()],
+<a href=#388 id=388 data-nosnippet>388</a>        };
+<a href=#389 id=389 data-nosnippet>389</a>
+<a href=#390 id=390 data-nosnippet>390</a>        <span class="comment">// within one multicall, as an owner of the safe
+<a href=#391 id=391 data-nosnippet>391</a>        // deploy a safe proxy instance and a module proxy instance with multicall as an owner
+<a href=#392 id=392 data-nosnippet>392</a>        // add announcement as a permitted target in the deployed module proxy
+<a href=#393 id=393 data-nosnippet>393</a>        // approve token transfer to be done for the safe by channel contracts
+<a href=#394 id=394 data-nosnippet>394</a>        // if node addresses are known, include nodes to the module by safe
+<a href=#395 id=395 data-nosnippet>395</a>        // transfer safe ownership to actual admins
+<a href=#396 id=396 data-nosnippet>396</a>        // set desired threshold
+<a href=#397 id=397 data-nosnippet>397</a>        </span><span class="kw">let </span>hopr_stake_factory = HoprNodeStakeFactory::new(
+<a href=#398 id=398 data-nosnippet>398</a>            contract_addresses.addresses.node_stake_v2_factory.into(),
+<a href=#399 id=399 data-nosnippet>399</a>            rpc_provider.clone(),
+<a href=#400 id=400 data-nosnippet>400</a>        );
+<a href=#401 id=401 data-nosnippet>401</a>
+<a href=#402 id=402 data-nosnippet>402</a>        <span class="kw">let </span>(safe, node_module) = deploy_safe_module_with_targets_and_nodes(
+<a href=#403 id=403 data-nosnippet>403</a>            hopr_stake_factory,
+<a href=#404 id=404 data-nosnippet>404</a>            contract_addresses.addresses.token.into(),
+<a href=#405 id=405 data-nosnippet>405</a>            contract_addresses.addresses.channels.into(),
+<a href=#406 id=406 data-nosnippet>406</a>            contract_addresses.addresses.module_implementation.into(),
+<a href=#407 id=407 data-nosnippet>407</a>            contract_addresses.addresses.announcements.into(),
+<a href=#408 id=408 data-nosnippet>408</a>            token_allowance,
+<a href=#409 id=409 data-nosnippet>409</a>            node_addresses,
+<a href=#410 id=410 data-nosnippet>410</a>            admin_eth_addresses,
+<a href=#411 id=411 data-nosnippet>411</a>            U256::from(threshold),
+<a href=#412 id=412 data-nosnippet>412</a>        )
+<a href=#413 id=413 data-nosnippet>413</a>        .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#414 id=414 data-nosnippet>414</a>
+<a href=#415 id=415 data-nosnippet>415</a>        <span class="macro">println!</span>(<span class="string">"safe {:?}"</span>, safe.address());
+<a href=#416 id=416 data-nosnippet>416</a>        <span class="macro">println!</span>(<span class="string">"node_module {:?}"</span>, node_module.address());
+<a href=#417 id=417 data-nosnippet>417</a>
+<a href=#418 id=418 data-nosnippet>418</a>        <span class="comment">// direct transfer of some HOPR tokens to the safe
+<a href=#419 id=419 data-nosnippet>419</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(hopr_amount_for_safe) = hopr_amount {
+<a href=#420 id=420 data-nosnippet>420</a>            <span class="kw">let </span>hopr_token = HoprToken::new(contract_addresses.addresses.token.into(), rpc_provider.clone());
+<a href=#421 id=421 data-nosnippet>421</a>            <span class="kw">let </span>hopr_to_be_transferred: U256 = parse_units(<span class="kw-2">&amp;</span>hopr_amount_for_safe.to_string(), <span class="string">"ether"</span>)
+<a href=#422 id=422 data-nosnippet>422</a>                .map_err(|<span class="kw">_</span>| HelperErrors::ParseError(<span class="string">"Failed to parse HOPR amount units"</span>.into()))<span class="question-mark">?
+<a href=#423 id=423 data-nosnippet>423</a>                </span>.into();
+<a href=#424 id=424 data-nosnippet>424</a>
+<a href=#425 id=425 data-nosnippet>425</a>            transfer_or_mint_tokens(hopr_token, <span class="macro">vec!</span>[<span class="kw-2">*</span>safe.address()], <span class="macro">vec!</span>[hopr_to_be_transferred]).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#426 id=426 data-nosnippet>426</a>            <span class="macro">info!</span>(
+<a href=#427 id=427 data-nosnippet>427</a>                <span class="string">"safe {:?} has received {:?} HOPR tokens"</span>,
+<a href=#428 id=428 data-nosnippet>428</a>                safe.address(),
+<a href=#429 id=429 data-nosnippet>429</a>                hopr_amount_for_safe
+<a href=#430 id=430 data-nosnippet>430</a>            );
+<a href=#431 id=431 data-nosnippet>431</a>        }
+<a href=#432 id=432 data-nosnippet>432</a>
+<a href=#433 id=433 data-nosnippet>433</a>        <span class="comment">// distribute some native tokens to the nodes
+<a href=#434 id=434 data-nosnippet>434</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(native_amount_for_node) = native_amount {
+<a href=#435 id=435 data-nosnippet>435</a>            <span class="kw">let </span>native_to_be_transferred: U256 = parse_units(<span class="kw-2">&amp;</span>native_amount_for_node.to_string(), <span class="string">"ether"</span>)
+<a href=#436 id=436 data-nosnippet>436</a>                .map_err(|<span class="kw">_</span>| HelperErrors::ParseError(<span class="string">"Failed to parse HOPR amount units"</span>.into()))<span class="question-mark">?
+<a href=#437 id=437 data-nosnippet>437</a>                </span>.into();
+<a href=#438 id=438 data-nosnippet>438</a>            <span class="kw">let </span>native_amounts = <span class="macro">vec!</span>[native_to_be_transferred; node_eth_addresses.len()];
+<a href=#439 id=439 data-nosnippet>439</a>            transfer_native_tokens(rpc_provider.clone(), node_eth_addresses.clone(), native_amounts).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#440 id=440 data-nosnippet>440</a>            <span class="macro">info!</span>(
+<a href=#441 id=441 data-nosnippet>441</a>                <span class="string">"each node in {:?} has received {:?} native tokens"</span>,
+<a href=#442 id=442 data-nosnippet>442</a>                node_eth_addresses, native_amount_for_node
+<a href=#443 id=443 data-nosnippet>443</a>            );
+<a href=#444 id=444 data-nosnippet>444</a>        }
+<a href=#445 id=445 data-nosnippet>445</a>
+<a href=#446 id=446 data-nosnippet>446</a>        <span class="comment">// action around network registry
+<a href=#447 id=447 data-nosnippet>447</a>        </span><span class="kw">if </span>node_eth_addresses.is_empty() {
+<a href=#448 id=448 data-nosnippet>448</a>            <span class="macro">info!</span>(<span class="string">"No nodes provided. Skip actions around network registry"</span>);
+<a href=#449 id=449 data-nosnippet>449</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+<a href=#450 id=450 data-nosnippet>450</a>        }
+<a href=#451 id=451 data-nosnippet>451</a>
+<a href=#452 id=452 data-nosnippet>452</a>        <span class="comment">// read private key
+<a href=#453 id=453 data-nosnippet>453</a>        </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(manager_private_key) = manager_private_key.read_default() {
+<a href=#454 id=454 data-nosnippet>454</a>            <span class="comment">// get RPC provider for the given network and environment
+<a href=#455 id=455 data-nosnippet>455</a>            </span><span class="kw">let </span>manager_rpc_provider = network_provider.get_provider_with_signer(<span class="kw-2">&amp;</span>manager_private_key).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#456 id=456 data-nosnippet>456</a>            <span class="kw">let </span>hopr_network_registry = HoprNetworkRegistry::new(
+<a href=#457 id=457 data-nosnippet>457</a>                contract_addresses.addresses.network_registry.into(),
+<a href=#458 id=458 data-nosnippet>458</a>                manager_rpc_provider.clone(),
+<a href=#459 id=459 data-nosnippet>459</a>            );
+<a href=#460 id=460 data-nosnippet>460</a>            <span class="comment">// Overwrite any past registration of provided nodes in the network registry.
+<a href=#461 id=461 data-nosnippet>461</a>            // This action is the same as calling `hopli network-registry manager-register`
+<a href=#462 id=462 data-nosnippet>462</a>            </span><span class="kw">let </span>(removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
+<a href=#463 id=463 data-nosnippet>463</a>                hopr_network_registry,
+<a href=#464 id=464 data-nosnippet>464</a>                <span class="macro">vec!</span>[<span class="kw-2">*</span>safe.address(); node_eth_addresses.len()],
+<a href=#465 id=465 data-nosnippet>465</a>                node_eth_addresses.clone(),
+<a href=#466 id=466 data-nosnippet>466</a>            )
+<a href=#467 id=467 data-nosnippet>467</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#468 id=468 data-nosnippet>468</a>            <span class="macro">info!</span>(
+<a href=#469 id=469 data-nosnippet>469</a>                <span class="string">"{:?} pairs have been removed and {:?} pairs have been added to the network registry."</span>,
+<a href=#470 id=470 data-nosnippet>470</a>                removed_pairs_num, added_pairs_num
+<a href=#471 id=471 data-nosnippet>471</a>            );
+<a href=#472 id=472 data-nosnippet>472</a>        } <span class="kw">else </span>{
+<a href=#473 id=473 data-nosnippet>473</a>            <span class="macro">info!</span>(<span class="string">"skipping inclusion to the network registry as no manager private key has been provided."</span>);
+<a href=#474 id=474 data-nosnippet>474</a>        }
+<a href=#475 id=475 data-nosnippet>475</a>
+<a href=#476 id=476 data-nosnippet>476</a>        <span class="prelude-val">Ok</span>(())
+<a href=#477 id=477 data-nosnippet>477</a>    }
+<a href=#478 id=478 data-nosnippet>478</a>
+<a href=#479 id=479 data-nosnippet>479</a>    <span class="doccomment">/// Execute the command, which moves nodes to a new managing safe and module pair
+<a href=#480 id=480 data-nosnippet>480</a>    /// Note that it does not register the node with the new safe on NodeSafeRegistry,
+<a href=#481 id=481 data-nosnippet>481</a>    /// because it is an action that nodes need to do on-start.
+<a href=#482 id=482 data-nosnippet>482</a>    </span><span class="attr">#[allow(clippy::too_many_arguments)]
+<a href=#483 id=483 data-nosnippet>483</a>    </span><span class="kw">pub async fn </span>execute_safe_module_moving(
+<a href=#484 id=484 data-nosnippet>484</a>        network_provider: NetworkProviderArgs,
+<a href=#485 id=485 data-nosnippet>485</a>        local_identity: IdentityFileArgs,
+<a href=#486 id=486 data-nosnippet>486</a>        node_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#487 id=487 data-nosnippet>487</a>        old_module_address: String,
+<a href=#488 id=488 data-nosnippet>488</a>        new_safe_address: String,
+<a href=#489 id=489 data-nosnippet>489</a>        new_module_address: String,
+<a href=#490 id=490 data-nosnippet>490</a>        private_key: PrivateKeyArgs,
+<a href=#491 id=491 data-nosnippet>491</a>        manager_private_key: ManagerPrivateKeyArgs,
+<a href=#492 id=492 data-nosnippet>492</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), HelperErrors&gt; {
+<a href=#493 id=493 data-nosnippet>493</a>        <span class="comment">// read all the node addresses
+<a href=#494 id=494 data-nosnippet>494</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>node_eth_addresses: Vec&lt;Address&gt; = Vec::new();
+<a href=#495 id=495 data-nosnippet>495</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(addresses) = node_address {
+<a href=#496 id=496 data-nosnippet>496</a>            node_eth_addresses.extend(
+<a href=#497 id=497 data-nosnippet>497</a>                addresses
+<a href=#498 id=498 data-nosnippet>498</a>                    .split(<span class="string">','</span>)
+<a href=#499 id=499 data-nosnippet>499</a>                    .map(|addr| {
+<a href=#500 id=500 data-nosnippet>500</a>                        Address::from_str(addr)
+<a href=#501 id=501 data-nosnippet>501</a>                            .map_err(|e| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Invalid node address: {:?}"</span>, e)))
+<a href=#502 id=502 data-nosnippet>502</a>                    })
+<a href=#503 id=503 data-nosnippet>503</a>                    .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>,
+<a href=#504 id=504 data-nosnippet>504</a>            );
+<a href=#505 id=505 data-nosnippet>505</a>        }
+<a href=#506 id=506 data-nosnippet>506</a>        <span class="comment">// if local identity dirs/path is provided, read addresses from identity files
+<a href=#507 id=507 data-nosnippet>507</a>        </span>node_eth_addresses.extend(
+<a href=#508 id=508 data-nosnippet>508</a>            local_identity
+<a href=#509 id=509 data-nosnippet>509</a>                .to_addresses()
+<a href=#510 id=510 data-nosnippet>510</a>                .map_err(|e| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Invalid node address: {:?}"</span>, e)))<span class="question-mark">?
+<a href=#511 id=511 data-nosnippet>511</a>                </span>.into_iter()
+<a href=#512 id=512 data-nosnippet>512</a>                .map(Address::from),
+<a href=#513 id=513 data-nosnippet>513</a>        );
+<a href=#514 id=514 data-nosnippet>514</a>
+<a href=#515 id=515 data-nosnippet>515</a>        <span class="comment">// parse safe and module addresses
+<a href=#516 id=516 data-nosnippet>516</a>        </span><span class="kw">let </span>safe_addr = Address::from_str(<span class="kw-2">&amp;</span>new_safe_address)
+<a href=#517 id=517 data-nosnippet>517</a>            .map_err(|<span class="kw">_</span>| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Cannot parse safe address {:?}"</span>, new_safe_address)))<span class="question-mark">?</span>;
+<a href=#518 id=518 data-nosnippet>518</a>        <span class="kw">let </span>module_addr = Address::from_str(<span class="kw-2">&amp;</span>new_module_address).map_err(|<span class="kw">_</span>| {
+<a href=#519 id=519 data-nosnippet>519</a>            HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Cannot parse module address {:?}"</span>, new_module_address))
+<a href=#520 id=520 data-nosnippet>520</a>        })<span class="question-mark">?</span>;
+<a href=#521 id=521 data-nosnippet>521</a>        <span class="kw">let </span>old_module_addr: Vec&lt;Address&gt; = old_module_address
+<a href=#522 id=522 data-nosnippet>522</a>            .split(<span class="string">','</span>)
+<a href=#523 id=523 data-nosnippet>523</a>            .map(|addr| Address::from_str(addr).unwrap())
+<a href=#524 id=524 data-nosnippet>524</a>            .collect();
+<a href=#525 id=525 data-nosnippet>525</a>
+<a href=#526 id=526 data-nosnippet>526</a>        <span class="comment">// read private key
+<a href=#527 id=527 data-nosnippet>527</a>        </span><span class="kw">let </span>signer_private_key = private_key.read_default()<span class="question-mark">?</span>;
+<a href=#528 id=528 data-nosnippet>528</a>        <span class="comment">// get RPC provider for the given network and environment
+<a href=#529 id=529 data-nosnippet>529</a>        </span><span class="kw">let </span>rpc_provider = network_provider.get_provider_with_signer(<span class="kw-2">&amp;</span>signer_private_key).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#530 id=530 data-nosnippet>530</a>        <span class="kw">let </span>contract_addresses = network_provider.get_network_details_from_name()<span class="question-mark">?</span>;
+<a href=#531 id=531 data-nosnippet>531</a>
+<a href=#532 id=532 data-nosnippet>532</a>        <span class="comment">// 1. Deregister the old node-safe from node-safe registry
+<a href=#533 id=533 data-nosnippet>533</a>        // 2. Remove nodes from the old module
+<a href=#534 id=534 data-nosnippet>534</a>        // 3. Include node to the new module
+<a href=#535 id=535 data-nosnippet>535</a>        // 4. Remove node from network registry
+<a href=#536 id=536 data-nosnippet>536</a>        // 5. Include node to network registry
+<a href=#537 id=537 data-nosnippet>537</a>        </span><span class="kw">let </span>hopr_node_safe_registry = HoprNodeSafeRegistry::new(
+<a href=#538 id=538 data-nosnippet>538</a>            contract_addresses.addresses.node_safe_registry.into(),
+<a href=#539 id=539 data-nosnippet>539</a>            rpc_provider.clone(),
+<a href=#540 id=540 data-nosnippet>540</a>        );
+<a href=#541 id=541 data-nosnippet>541</a>        <span class="kw">let </span>safe = SafeSingleton::new(safe_addr, rpc_provider.clone());
+<a href=#542 id=542 data-nosnippet>542</a>
+<a href=#543 id=543 data-nosnippet>543</a>        <span class="kw">if </span>!node_eth_addresses.is_empty() {
+<a href=#544 id=544 data-nosnippet>544</a>            <span class="comment">// first deregister nodes from their old safe
+<a href=#545 id=545 data-nosnippet>545</a>            </span><span class="kw">match </span>deregister_nodes_from_node_safe_registry_and_remove_from_module(
+<a href=#546 id=546 data-nosnippet>546</a>                hopr_node_safe_registry.clone(),
+<a href=#547 id=547 data-nosnippet>547</a>                node_eth_addresses.clone(),
+<a href=#548 id=548 data-nosnippet>548</a>                old_module_addr,
+<a href=#549 id=549 data-nosnippet>549</a>                signer_private_key.clone(),
+<a href=#550 id=550 data-nosnippet>550</a>            )
+<a href=#551 id=551 data-nosnippet>551</a>            .<span class="kw">await
+<a href=#552 id=552 data-nosnippet>552</a>            </span>{
+<a href=#553 id=553 data-nosnippet>553</a>                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
+<a href=#554 id=554 data-nosnippet>554</a>                    <span class="macro">info!</span>(<span class="string">"Nodes are deregistered from old safes"</span>);
+<a href=#555 id=555 data-nosnippet>555</a>                }
+<a href=#556 id=556 data-nosnippet>556</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#557 id=557 data-nosnippet>557</a>                    <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+<a href=#558 id=558 data-nosnippet>558</a>                }
+<a href=#559 id=559 data-nosnippet>559</a>            };
+<a href=#560 id=560 data-nosnippet>560</a>
+<a href=#561 id=561 data-nosnippet>561</a>            <span class="comment">// then include nodes to module
+<a href=#562 id=562 data-nosnippet>562</a>            </span><span class="kw">match </span>include_nodes_to_module(
+<a href=#563 id=563 data-nosnippet>563</a>                safe.clone(),
+<a href=#564 id=564 data-nosnippet>564</a>                node_eth_addresses.clone(),
+<a href=#565 id=565 data-nosnippet>565</a>                module_addr,
+<a href=#566 id=566 data-nosnippet>566</a>                signer_private_key,
+<a href=#567 id=567 data-nosnippet>567</a>            )
+<a href=#568 id=568 data-nosnippet>568</a>            .<span class="kw">await
+<a href=#569 id=569 data-nosnippet>569</a>            </span>{
+<a href=#570 id=570 data-nosnippet>570</a>                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {
+<a href=#571 id=571 data-nosnippet>571</a>                    <span class="macro">info!</span>(<span class="string">"Nodes are included to the new module"</span>);
+<a href=#572 id=572 data-nosnippet>572</a>                }
+<a href=#573 id=573 data-nosnippet>573</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#574 id=574 data-nosnippet>574</a>                    <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+<a href=#575 id=575 data-nosnippet>575</a>                }
+<a href=#576 id=576 data-nosnippet>576</a>            };
+<a href=#577 id=577 data-nosnippet>577</a>        };
+<a href=#578 id=578 data-nosnippet>578</a>
+<a href=#579 id=579 data-nosnippet>579</a>        <span class="comment">// action around network registry
+<a href=#580 id=580 data-nosnippet>580</a>        </span><span class="kw">if </span>node_eth_addresses.is_empty() {
+<a href=#581 id=581 data-nosnippet>581</a>            <span class="macro">info!</span>(<span class="string">"No nodes provided. Skip actions around network registry"</span>);
+<a href=#582 id=582 data-nosnippet>582</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+<a href=#583 id=583 data-nosnippet>583</a>        }
+<a href=#584 id=584 data-nosnippet>584</a>
+<a href=#585 id=585 data-nosnippet>585</a>        <span class="comment">// read private key of network registry manager
+<a href=#586 id=586 data-nosnippet>586</a>        </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(manager_private_key) = manager_private_key.read_default() {
+<a href=#587 id=587 data-nosnippet>587</a>            <span class="comment">// get RPC provider for the given network and environment
+<a href=#588 id=588 data-nosnippet>588</a>            </span><span class="kw">let </span>manager_rpc_provider = network_provider.get_provider_with_signer(<span class="kw-2">&amp;</span>manager_private_key).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#589 id=589 data-nosnippet>589</a>            <span class="kw">let </span>hopr_network_registry = HoprNetworkRegistry::new(
+<a href=#590 id=590 data-nosnippet>590</a>                contract_addresses.addresses.network_registry.into(),
+<a href=#591 id=591 data-nosnippet>591</a>                manager_rpc_provider.clone(),
+<a href=#592 id=592 data-nosnippet>592</a>            );
+<a href=#593 id=593 data-nosnippet>593</a>            <span class="comment">// Overwrite any past registration of provided nodes in the network registry.
+<a href=#594 id=594 data-nosnippet>594</a>            // This action is the same as calling `hopli network-registry manager-register`
+<a href=#595 id=595 data-nosnippet>595</a>            </span><span class="kw">let </span>(removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
+<a href=#596 id=596 data-nosnippet>596</a>                hopr_network_registry,
+<a href=#597 id=597 data-nosnippet>597</a>                <span class="macro">vec!</span>[<span class="kw-2">*</span>safe.address(); node_eth_addresses.len()],
+<a href=#598 id=598 data-nosnippet>598</a>                node_eth_addresses.clone(),
+<a href=#599 id=599 data-nosnippet>599</a>            )
+<a href=#600 id=600 data-nosnippet>600</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#601 id=601 data-nosnippet>601</a>            <span class="macro">info!</span>(
+<a href=#602 id=602 data-nosnippet>602</a>                <span class="string">"{:?} pairs have been removed and {:?} pairs have been added to the network registry."</span>,
+<a href=#603 id=603 data-nosnippet>603</a>                removed_pairs_num, added_pairs_num
+<a href=#604 id=604 data-nosnippet>604</a>            );
+<a href=#605 id=605 data-nosnippet>605</a>        } <span class="kw">else </span>{
+<a href=#606 id=606 data-nosnippet>606</a>            <span class="macro">info!</span>(<span class="string">"skipping inclusion to the network registry as no manager private key has been provided."</span>);
+<a href=#607 id=607 data-nosnippet>607</a>        }
+<a href=#608 id=608 data-nosnippet>608</a>
+<a href=#609 id=609 data-nosnippet>609</a>        <span class="prelude-val">Ok</span>(())
+<a href=#610 id=610 data-nosnippet>610</a>    }
+<a href=#611 id=611 data-nosnippet>611</a>
+<a href=#612 id=612 data-nosnippet>612</a>    <span class="doccomment">/// Execute the command, which migrates nodes to a new network
+<a href=#613 id=613 data-nosnippet>613</a>    /// Note that it does not register the node with the new safe on NodeSafeRegistry,
+<a href=#614 id=614 data-nosnippet>614</a>    /// because it is an action that nodes need to do on-start.
+<a href=#615 id=615 data-nosnippet>615</a>    </span><span class="attr">#[allow(clippy::too_many_arguments)]
+<a href=#616 id=616 data-nosnippet>616</a>    </span><span class="kw">pub async fn </span>execute_safe_module_migration(
+<a href=#617 id=617 data-nosnippet>617</a>        network_provider: NetworkProviderArgs,
+<a href=#618 id=618 data-nosnippet>618</a>        local_identity: IdentityFileArgs,
+<a href=#619 id=619 data-nosnippet>619</a>        node_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#620 id=620 data-nosnippet>620</a>        safe_address: String,
+<a href=#621 id=621 data-nosnippet>621</a>        module_address: String,
+<a href=#622 id=622 data-nosnippet>622</a>        allowance: <span class="prelude-ty">Option</span>&lt;f64&gt;,
+<a href=#623 id=623 data-nosnippet>623</a>        private_key: PrivateKeyArgs,
+<a href=#624 id=624 data-nosnippet>624</a>        manager_private_key: ManagerPrivateKeyArgs,
+<a href=#625 id=625 data-nosnippet>625</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), HelperErrors&gt; {
+<a href=#626 id=626 data-nosnippet>626</a>        <span class="comment">// read all the node addresses
+<a href=#627 id=627 data-nosnippet>627</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>node_eth_addresses: Vec&lt;Address&gt; = Vec::new();
+<a href=#628 id=628 data-nosnippet>628</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(addresses) = node_address {
+<a href=#629 id=629 data-nosnippet>629</a>            node_eth_addresses.extend(
+<a href=#630 id=630 data-nosnippet>630</a>                addresses
+<a href=#631 id=631 data-nosnippet>631</a>                    .split(<span class="string">','</span>)
+<a href=#632 id=632 data-nosnippet>632</a>                    .map(|addr| {
+<a href=#633 id=633 data-nosnippet>633</a>                        Address::from_str(addr)
+<a href=#634 id=634 data-nosnippet>634</a>                            .map_err(|e| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Invalid node address: {:?}"</span>, e)))
+<a href=#635 id=635 data-nosnippet>635</a>                    })
+<a href=#636 id=636 data-nosnippet>636</a>                    .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>,
+<a href=#637 id=637 data-nosnippet>637</a>            );
+<a href=#638 id=638 data-nosnippet>638</a>        }
+<a href=#639 id=639 data-nosnippet>639</a>        <span class="comment">// if local identity dirs/path is provided, read addresses from identity files
+<a href=#640 id=640 data-nosnippet>640</a>        </span>node_eth_addresses.extend(
+<a href=#641 id=641 data-nosnippet>641</a>            local_identity
+<a href=#642 id=642 data-nosnippet>642</a>                .to_addresses()
+<a href=#643 id=643 data-nosnippet>643</a>                .map_err(|e| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Invalid node address: {:?}"</span>, e)))<span class="question-mark">?
+<a href=#644 id=644 data-nosnippet>644</a>                </span>.into_iter()
+<a href=#645 id=645 data-nosnippet>645</a>                .map(Address::from),
+<a href=#646 id=646 data-nosnippet>646</a>        );
+<a href=#647 id=647 data-nosnippet>647</a>
+<a href=#648 id=648 data-nosnippet>648</a>        <span class="comment">// get allowance
+<a href=#649 id=649 data-nosnippet>649</a>        </span><span class="kw">let </span>token_allowance: U256 = <span class="kw">match </span>allowance {
+<a href=#650 id=650 data-nosnippet>650</a>            <span class="prelude-val">Some</span>(allw) =&gt; parse_units(<span class="kw-2">&amp;</span>allw.to_string(), <span class="string">"ether"</span>)
+<a href=#651 id=651 data-nosnippet>651</a>                .map_err(|<span class="kw">_</span>| HelperErrors::ParseError(<span class="string">"Failed to parse allowance units"</span>.into()))<span class="question-mark">?
+<a href=#652 id=652 data-nosnippet>652</a>                </span>.into(),
+<a href=#653 id=653 data-nosnippet>653</a>            <span class="prelude-val">None </span>=&gt; U256::MAX,
+<a href=#654 id=654 data-nosnippet>654</a>        };
+<a href=#655 id=655 data-nosnippet>655</a>
+<a href=#656 id=656 data-nosnippet>656</a>        <span class="comment">// parse safe and module addresses
+<a href=#657 id=657 data-nosnippet>657</a>        </span><span class="kw">let </span>safe_addr = Address::from_str(<span class="kw-2">&amp;</span>safe_address)
+<a href=#658 id=658 data-nosnippet>658</a>            .map_err(|<span class="kw">_</span>| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Cannot parse safe address {:?}"</span>, safe_address)))<span class="question-mark">?</span>;
+<a href=#659 id=659 data-nosnippet>659</a>        <span class="kw">let </span>module_addr = Address::from_str(<span class="kw-2">&amp;</span>module_address)
+<a href=#660 id=660 data-nosnippet>660</a>            .map_err(|<span class="kw">_</span>| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Cannot parse module address {:?}"</span>, module_address)))<span class="question-mark">?</span>;
+<a href=#661 id=661 data-nosnippet>661</a>
+<a href=#662 id=662 data-nosnippet>662</a>        <span class="comment">// read private key
+<a href=#663 id=663 data-nosnippet>663</a>        </span><span class="kw">let </span>signer_private_key = private_key.read_default()<span class="question-mark">?</span>;
+<a href=#664 id=664 data-nosnippet>664</a>        <span class="comment">// get RPC provider for the given network and environment
+<a href=#665 id=665 data-nosnippet>665</a>        </span><span class="kw">let </span>rpc_provider = network_provider.get_provider_with_signer(<span class="kw-2">&amp;</span>signer_private_key).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#666 id=666 data-nosnippet>666</a>        <span class="kw">let </span>contract_addresses = network_provider.get_network_details_from_name()<span class="question-mark">?</span>;
+<a href=#667 id=667 data-nosnippet>667</a>
+<a href=#668 id=668 data-nosnippet>668</a>        <span class="kw">let </span>safe = SafeSingleton::new(safe_addr, rpc_provider.clone());
+<a href=#669 id=669 data-nosnippet>669</a>
+<a href=#670 id=670 data-nosnippet>670</a>        <span class="comment">// Create a Safe tx to Multisend contract,
+<a href=#671 id=671 data-nosnippet>671</a>        // 1. scope the Channel contract of the new network to the module as target and set default permissions.
+<a href=#672 id=672 data-nosnippet>672</a>        // 2. scope the Announcement contract as target to the module
+<a href=#673 id=673 data-nosnippet>673</a>        // 3. approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
+<a href=#674 id=674 data-nosnippet>674</a>        </span>migrate_nodes(
+<a href=#675 id=675 data-nosnippet>675</a>            safe.clone(),
+<a href=#676 id=676 data-nosnippet>676</a>            module_addr,
+<a href=#677 id=677 data-nosnippet>677</a>            contract_addresses.addresses.channels.into(),
+<a href=#678 id=678 data-nosnippet>678</a>            contract_addresses.addresses.token.into(),
+<a href=#679 id=679 data-nosnippet>679</a>            contract_addresses.addresses.announcements.into(),
+<a href=#680 id=680 data-nosnippet>680</a>            token_allowance,
+<a href=#681 id=681 data-nosnippet>681</a>            signer_private_key,
+<a href=#682 id=682 data-nosnippet>682</a>        )
+<a href=#683 id=683 data-nosnippet>683</a>        .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#684 id=684 data-nosnippet>684</a>        <span class="macro">info!</span>(<span class="string">"a new network has been included due to the migration"</span>);
+<a href=#685 id=685 data-nosnippet>685</a>
+<a href=#686 id=686 data-nosnippet>686</a>        <span class="comment">// action around network registry
+<a href=#687 id=687 data-nosnippet>687</a>        </span><span class="kw">if </span>node_eth_addresses.is_empty() {
+<a href=#688 id=688 data-nosnippet>688</a>            <span class="macro">info!</span>(<span class="string">"No nodes provided. Skip actions around network registry"</span>);
+<a href=#689 id=689 data-nosnippet>689</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+<a href=#690 id=690 data-nosnippet>690</a>        }
+<a href=#691 id=691 data-nosnippet>691</a>
+<a href=#692 id=692 data-nosnippet>692</a>        <span class="comment">// read private key of network registry manager
+<a href=#693 id=693 data-nosnippet>693</a>        </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(manager_private_key) = manager_private_key.read_default() {
+<a href=#694 id=694 data-nosnippet>694</a>            <span class="comment">// get RPC provider for the given network and environment
+<a href=#695 id=695 data-nosnippet>695</a>            </span><span class="kw">let </span>manager_rpc_provider = network_provider.get_provider_with_signer(<span class="kw-2">&amp;</span>manager_private_key).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#696 id=696 data-nosnippet>696</a>            <span class="kw">let </span>hopr_network_registry = HoprNetworkRegistry::new(
+<a href=#697 id=697 data-nosnippet>697</a>                contract_addresses.addresses.network_registry.into(),
+<a href=#698 id=698 data-nosnippet>698</a>                manager_rpc_provider.clone(),
+<a href=#699 id=699 data-nosnippet>699</a>            );
+<a href=#700 id=700 data-nosnippet>700</a>            <span class="comment">// Overwrite any past registration of provided nodes in the network registry.
+<a href=#701 id=701 data-nosnippet>701</a>            // This action is the same as calling `hopli network-registry manager-register`
+<a href=#702 id=702 data-nosnippet>702</a>            </span><span class="kw">let </span>(removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
+<a href=#703 id=703 data-nosnippet>703</a>                hopr_network_registry,
+<a href=#704 id=704 data-nosnippet>704</a>                <span class="macro">vec!</span>[<span class="kw-2">*</span>safe.address(); node_eth_addresses.len()],
+<a href=#705 id=705 data-nosnippet>705</a>                node_eth_addresses.clone(),
+<a href=#706 id=706 data-nosnippet>706</a>            )
+<a href=#707 id=707 data-nosnippet>707</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#708 id=708 data-nosnippet>708</a>            <span class="macro">info!</span>(
+<a href=#709 id=709 data-nosnippet>709</a>                <span class="string">"{:?} pairs have been removed and {:?} pairs have been added to the network registry."</span>,
+<a href=#710 id=710 data-nosnippet>710</a>                removed_pairs_num, added_pairs_num
+<a href=#711 id=711 data-nosnippet>711</a>            );
+<a href=#712 id=712 data-nosnippet>712</a>        } <span class="kw">else </span>{
+<a href=#713 id=713 data-nosnippet>713</a>            <span class="macro">info!</span>(<span class="string">"skipping inclusion to the network registry as no manager private key has been provided."</span>);
+<a href=#714 id=714 data-nosnippet>714</a>        }
+<a href=#715 id=715 data-nosnippet>715</a>        <span class="prelude-val">Ok</span>(())
+<a href=#716 id=716 data-nosnippet>716</a>    }
+<a href=#717 id=717 data-nosnippet>717</a>
+<a href=#718 id=718 data-nosnippet>718</a>    <span class="doccomment">/// Execute the command to debug the following:
+<a href=#719 id=719 data-nosnippet>719</a>    /// 1. node xDAI balance
+<a href=#720 id=720 data-nosnippet>720</a>    /// 2. If node has been included on Network Registry
+<a href=#721 id=721 data-nosnippet>721</a>    /// 3. If node and safe are associated on Node Safe Registry
+<a href=#722 id=722 data-nosnippet>722</a>    /// 4. If Safe is owned by the correct owner(s)
+<a href=#723 id=723 data-nosnippet>723</a>    /// 5. Safe’s wxHOPR balance and allowance
+<a href=#724 id=724 data-nosnippet>724</a>    /// 6. if node is included in the module
+<a href=#725 id=725 data-nosnippet>725</a>    /// 7. If the channel contract is included as a target
+<a href=#726 id=726 data-nosnippet>726</a>    /// 8. If the announce contract is included as a target
+<a href=#727 id=727 data-nosnippet>727</a>    /// 9. If safe is the owner of the module
+<a href=#728 id=728 data-nosnippet>728</a>    </span><span class="attr">#[allow(clippy::too_many_arguments)]
+<a href=#729 id=729 data-nosnippet>729</a>    </span><span class="kw">pub async fn </span>execute_safe_module_debugging(
+<a href=#730 id=730 data-nosnippet>730</a>        network_provider: NetworkProviderArgs,
+<a href=#731 id=731 data-nosnippet>731</a>        local_identity: IdentityFileArgs,
+<a href=#732 id=732 data-nosnippet>732</a>        node_address: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#733 id=733 data-nosnippet>733</a>        safe_address: String,
+<a href=#734 id=734 data-nosnippet>734</a>        module_address: String,
+<a href=#735 id=735 data-nosnippet>735</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), HelperErrors&gt; {
+<a href=#736 id=736 data-nosnippet>736</a>        <span class="comment">// read all the node addresses
+<a href=#737 id=737 data-nosnippet>737</a>        </span><span class="macro">info!</span>(<span class="string">"Reading all the node addresses..."</span>);
+<a href=#738 id=738 data-nosnippet>738</a>        <span class="kw">let </span><span class="kw-2">mut </span>node_eth_addresses: Vec&lt;Address&gt; = Vec::new();
+<a href=#739 id=739 data-nosnippet>739</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(addresses) = node_address {
+<a href=#740 id=740 data-nosnippet>740</a>            node_eth_addresses.extend(
+<a href=#741 id=741 data-nosnippet>741</a>                addresses
+<a href=#742 id=742 data-nosnippet>742</a>                    .split(<span class="string">','</span>)
+<a href=#743 id=743 data-nosnippet>743</a>                    .map(|addr| {
+<a href=#744 id=744 data-nosnippet>744</a>                        Address::from_str(addr)
+<a href=#745 id=745 data-nosnippet>745</a>                            .map_err(|e| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Invalid node address: {:?}"</span>, e)))
+<a href=#746 id=746 data-nosnippet>746</a>                    })
+<a href=#747 id=747 data-nosnippet>747</a>                    .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>,
+<a href=#748 id=748 data-nosnippet>748</a>            );
+<a href=#749 id=749 data-nosnippet>749</a>        }
+<a href=#750 id=750 data-nosnippet>750</a>        <span class="comment">// if local identity dirs/path is provided, read addresses from identity files
+<a href=#751 id=751 data-nosnippet>751</a>        </span>node_eth_addresses.extend(
+<a href=#752 id=752 data-nosnippet>752</a>            local_identity
+<a href=#753 id=753 data-nosnippet>753</a>                .to_addresses()
+<a href=#754 id=754 data-nosnippet>754</a>                .map_err(|e| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Invalid node address: {:?}"</span>, e)))<span class="question-mark">?
+<a href=#755 id=755 data-nosnippet>755</a>                </span>.into_iter()
+<a href=#756 id=756 data-nosnippet>756</a>                .map(Address::from),
+<a href=#757 id=757 data-nosnippet>757</a>        );
+<a href=#758 id=758 data-nosnippet>758</a>
+<a href=#759 id=759 data-nosnippet>759</a>        <span class="comment">// parse safe and module addresses
+<a href=#760 id=760 data-nosnippet>760</a>        </span><span class="kw">let </span>safe_addr = Address::from_str(<span class="kw-2">&amp;</span>safe_address)
+<a href=#761 id=761 data-nosnippet>761</a>            .map_err(|<span class="kw">_</span>| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Cannot parse safe address {:?}"</span>, safe_address)))<span class="question-mark">?</span>;
+<a href=#762 id=762 data-nosnippet>762</a>        <span class="kw">let </span>module_addr = Address::from_str(<span class="kw-2">&amp;</span>module_address)
+<a href=#763 id=763 data-nosnippet>763</a>            .map_err(|<span class="kw">_</span>| HelperErrors::InvalidAddress(<span class="macro">format!</span>(<span class="string">"Cannot parse module address {:?}"</span>, module_address)))<span class="question-mark">?</span>;
+<a href=#764 id=764 data-nosnippet>764</a>
+<a href=#765 id=765 data-nosnippet>765</a>        <span class="comment">// get RPC provider for the given network and environment
+<a href=#766 id=766 data-nosnippet>766</a>        </span><span class="kw">let </span>rpc_provider = network_provider.get_provider_without_signer().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#767 id=767 data-nosnippet>767</a>        <span class="kw">let </span>contract_addresses = network_provider.get_network_details_from_name()<span class="question-mark">?</span>;
+<a href=#768 id=768 data-nosnippet>768</a>
+<a href=#769 id=769 data-nosnippet>769</a>        <span class="kw">let </span>hopr_token = HoprToken::new(contract_addresses.addresses.token.into(), rpc_provider.clone());
+<a href=#770 id=770 data-nosnippet>770</a>        <span class="kw">let </span>network_registry = HoprNetworkRegistry::new(
+<a href=#771 id=771 data-nosnippet>771</a>            contract_addresses.addresses.network_registry.into(),
+<a href=#772 id=772 data-nosnippet>772</a>            rpc_provider.clone(),
+<a href=#773 id=773 data-nosnippet>773</a>        );
+<a href=#774 id=774 data-nosnippet>774</a>        <span class="kw">let </span>node_safe_registry = HoprNodeSafeRegistry::new(
+<a href=#775 id=775 data-nosnippet>775</a>            contract_addresses.addresses.node_safe_registry.into(),
+<a href=#776 id=776 data-nosnippet>776</a>            rpc_provider.clone(),
+<a href=#777 id=777 data-nosnippet>777</a>        );
+<a href=#778 id=778 data-nosnippet>778</a>
+<a href=#779 id=779 data-nosnippet>779</a>        <span class="comment">// loop through all the nodes and debug
+<a href=#780 id=780 data-nosnippet>780</a>        </span><span class="kw">for </span>node <span class="kw">in </span>node_eth_addresses {
+<a href=#781 id=781 data-nosnippet>781</a>            <span class="macro">info!</span>(<span class="string">"Starting debug checks for node: {:?}"</span>, node);
+<a href=#782 id=782 data-nosnippet>782</a>            <span class="macro">info!</span>(<span class="string">"Checking node registration with network registry..."</span>);
+<a href=#783 id=783 data-nosnippet>783</a>            <span class="kw">let </span>registered_safe = debug_node_safe_module_setup_on_balance_and_registries(
+<a href=#784 id=784 data-nosnippet>784</a>                network_registry.clone(),
+<a href=#785 id=785 data-nosnippet>785</a>                node_safe_registry.clone(),
+<a href=#786 id=786 data-nosnippet>786</a>                <span class="kw-2">&amp;</span>node,
+<a href=#787 id=787 data-nosnippet>787</a>            )
+<a href=#788 id=788 data-nosnippet>788</a>            .<span class="kw">await
+<a href=#789 id=789 data-nosnippet>789</a>            </span>.map_err(HelperErrors::MulticallError)<span class="question-mark">?</span>;
+<a href=#790 id=790 data-nosnippet>790</a>
+<a href=#791 id=791 data-nosnippet>791</a>            <span class="comment">// compare the registered safe with the provided safe
+<a href=#792 id=792 data-nosnippet>792</a>            </span><span class="kw">if </span>registered_safe != safe_addr {
+<a href=#793 id=793 data-nosnippet>793</a>                <span class="macro">warn!</span>(
+<a href=#794 id=794 data-nosnippet>794</a>                    <span class="string">"Node {:?} is not registered with the provided safe {:?}"</span>,
+<a href=#795 id=795 data-nosnippet>795</a>                    node, safe_addr
+<a href=#796 id=796 data-nosnippet>796</a>                );
+<a href=#797 id=797 data-nosnippet>797</a>            }
+<a href=#798 id=798 data-nosnippet>798</a>            <span class="macro">info!</span>(<span class="string">"Checking node and safe association in node-safe registry..."</span>);
+<a href=#799 id=799 data-nosnippet>799</a>            debug_node_safe_module_setup_main(
+<a href=#800 id=800 data-nosnippet>800</a>                hopr_token.clone(),
+<a href=#801 id=801 data-nosnippet>801</a>                <span class="kw-2">&amp;</span>module_addr,
+<a href=#802 id=802 data-nosnippet>802</a>                <span class="kw-2">&amp;</span>node,
+<a href=#803 id=803 data-nosnippet>803</a>                <span class="kw-2">&amp;</span>safe_addr,
+<a href=#804 id=804 data-nosnippet>804</a>                <span class="kw-2">&amp;</span>contract_addresses.addresses.channels.into(),
+<a href=#805 id=805 data-nosnippet>805</a>                <span class="kw-2">&amp;</span>contract_addresses.addresses.announcements.into(),
+<a href=#806 id=806 data-nosnippet>806</a>            )
+<a href=#807 id=807 data-nosnippet>807</a>            .<span class="kw">await
+<a href=#808 id=808 data-nosnippet>808</a>            </span>.map_err(HelperErrors::MulticallError)<span class="question-mark">?</span>;
+<a href=#809 id=809 data-nosnippet>809</a>        }
+<a href=#810 id=810 data-nosnippet>810</a>        <span class="prelude-val">Ok</span>(())
+<a href=#811 id=811 data-nosnippet>811</a>    }
+<a href=#812 id=812 data-nosnippet>812</a>}
+<a href=#813 id=813 data-nosnippet>813</a>
+<a href=#814 id=814 data-nosnippet>814</a><span class="kw">impl </span>Cmd <span class="kw">for </span>SafeModuleSubcommands {
+<a href=#815 id=815 data-nosnippet>815</a>    <span class="doccomment">/// Run the execute_safe_module_creation function
+<a href=#816 id=816 data-nosnippet>816</a>    </span><span class="kw">fn </span>run(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), HelperErrors&gt; {
+<a href=#817 id=817 data-nosnippet>817</a>        <span class="comment">// self.execute_safe_module_creation()
+<a href=#818 id=818 data-nosnippet>818</a>        </span><span class="prelude-val">Ok</span>(())
+<a href=#819 id=819 data-nosnippet>819</a>    }
+<a href=#820 id=820 data-nosnippet>820</a>
+<a href=#821 id=821 data-nosnippet>821</a>    <span class="kw">async fn </span>async_run(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), HelperErrors&gt; {
+<a href=#822 id=822 data-nosnippet>822</a>        <span class="kw">match </span><span class="self">self </span>{
+<a href=#823 id=823 data-nosnippet>823</a>            SafeModuleSubcommands::Create {
+<a href=#824 id=824 data-nosnippet>824</a>                network_provider,
+<a href=#825 id=825 data-nosnippet>825</a>                local_identity,
+<a href=#826 id=826 data-nosnippet>826</a>                node_address,
+<a href=#827 id=827 data-nosnippet>827</a>                admin_address,
+<a href=#828 id=828 data-nosnippet>828</a>                threshold,
+<a href=#829 id=829 data-nosnippet>829</a>                allowance,
+<a href=#830 id=830 data-nosnippet>830</a>                hopr_amount,
+<a href=#831 id=831 data-nosnippet>831</a>                native_amount,
+<a href=#832 id=832 data-nosnippet>832</a>                private_key,
+<a href=#833 id=833 data-nosnippet>833</a>                manager_private_key,
+<a href=#834 id=834 data-nosnippet>834</a>            } =&gt; {
+<a href=#835 id=835 data-nosnippet>835</a>                SafeModuleSubcommands::execute_safe_module_creation(
+<a href=#836 id=836 data-nosnippet>836</a>                    network_provider,
+<a href=#837 id=837 data-nosnippet>837</a>                    local_identity,
+<a href=#838 id=838 data-nosnippet>838</a>                    node_address,
+<a href=#839 id=839 data-nosnippet>839</a>                    admin_address,
+<a href=#840 id=840 data-nosnippet>840</a>                    threshold,
+<a href=#841 id=841 data-nosnippet>841</a>                    allowance,
+<a href=#842 id=842 data-nosnippet>842</a>                    hopr_amount,
+<a href=#843 id=843 data-nosnippet>843</a>                    native_amount,
+<a href=#844 id=844 data-nosnippet>844</a>                    private_key,
+<a href=#845 id=845 data-nosnippet>845</a>                    manager_private_key,
+<a href=#846 id=846 data-nosnippet>846</a>                )
+<a href=#847 id=847 data-nosnippet>847</a>                .<span class="kw">await
+<a href=#848 id=848 data-nosnippet>848</a>            </span>}
+<a href=#849 id=849 data-nosnippet>849</a>            SafeModuleSubcommands::Move {
+<a href=#850 id=850 data-nosnippet>850</a>                network_provider,
+<a href=#851 id=851 data-nosnippet>851</a>                local_identity,
+<a href=#852 id=852 data-nosnippet>852</a>                node_address,
+<a href=#853 id=853 data-nosnippet>853</a>                old_module_address,
+<a href=#854 id=854 data-nosnippet>854</a>                new_safe_address,
+<a href=#855 id=855 data-nosnippet>855</a>                new_module_address,
+<a href=#856 id=856 data-nosnippet>856</a>                private_key,
+<a href=#857 id=857 data-nosnippet>857</a>                manager_private_key,
+<a href=#858 id=858 data-nosnippet>858</a>            } =&gt; {
+<a href=#859 id=859 data-nosnippet>859</a>                SafeModuleSubcommands::execute_safe_module_moving(
+<a href=#860 id=860 data-nosnippet>860</a>                    network_provider,
+<a href=#861 id=861 data-nosnippet>861</a>                    local_identity,
+<a href=#862 id=862 data-nosnippet>862</a>                    node_address,
+<a href=#863 id=863 data-nosnippet>863</a>                    old_module_address,
+<a href=#864 id=864 data-nosnippet>864</a>                    new_safe_address,
+<a href=#865 id=865 data-nosnippet>865</a>                    new_module_address,
+<a href=#866 id=866 data-nosnippet>866</a>                    private_key,
+<a href=#867 id=867 data-nosnippet>867</a>                    manager_private_key,
+<a href=#868 id=868 data-nosnippet>868</a>                )
+<a href=#869 id=869 data-nosnippet>869</a>                .<span class="kw">await
+<a href=#870 id=870 data-nosnippet>870</a>            </span>}
+<a href=#871 id=871 data-nosnippet>871</a>            SafeModuleSubcommands::Migrate {
+<a href=#872 id=872 data-nosnippet>872</a>                network_provider,
+<a href=#873 id=873 data-nosnippet>873</a>                local_identity,
+<a href=#874 id=874 data-nosnippet>874</a>                node_address,
+<a href=#875 id=875 data-nosnippet>875</a>                safe_address,
+<a href=#876 id=876 data-nosnippet>876</a>                module_address,
+<a href=#877 id=877 data-nosnippet>877</a>                allowance,
+<a href=#878 id=878 data-nosnippet>878</a>                private_key,
+<a href=#879 id=879 data-nosnippet>879</a>                manager_private_key,
+<a href=#880 id=880 data-nosnippet>880</a>            } =&gt; {
+<a href=#881 id=881 data-nosnippet>881</a>                SafeModuleSubcommands::execute_safe_module_migration(
+<a href=#882 id=882 data-nosnippet>882</a>                    network_provider,
+<a href=#883 id=883 data-nosnippet>883</a>                    local_identity,
+<a href=#884 id=884 data-nosnippet>884</a>                    node_address,
+<a href=#885 id=885 data-nosnippet>885</a>                    safe_address,
+<a href=#886 id=886 data-nosnippet>886</a>                    module_address,
+<a href=#887 id=887 data-nosnippet>887</a>                    allowance,
+<a href=#888 id=888 data-nosnippet>888</a>                    private_key,
+<a href=#889 id=889 data-nosnippet>889</a>                    manager_private_key,
+<a href=#890 id=890 data-nosnippet>890</a>                )
+<a href=#891 id=891 data-nosnippet>891</a>                .<span class="kw">await
+<a href=#892 id=892 data-nosnippet>892</a>            </span>}
+<a href=#893 id=893 data-nosnippet>893</a>            SafeModuleSubcommands::Debug {
+<a href=#894 id=894 data-nosnippet>894</a>                network_provider,
+<a href=#895 id=895 data-nosnippet>895</a>                local_identity,
+<a href=#896 id=896 data-nosnippet>896</a>                node_address,
+<a href=#897 id=897 data-nosnippet>897</a>                safe_address,
+<a href=#898 id=898 data-nosnippet>898</a>                module_address,
+<a href=#899 id=899 data-nosnippet>899</a>            } =&gt; {
+<a href=#900 id=900 data-nosnippet>900</a>                SafeModuleSubcommands::execute_safe_module_debugging(
+<a href=#901 id=901 data-nosnippet>901</a>                    network_provider,
+<a href=#902 id=902 data-nosnippet>902</a>                    local_identity,
+<a href=#903 id=903 data-nosnippet>903</a>                    node_address,
+<a href=#904 id=904 data-nosnippet>904</a>                    safe_address,
+<a href=#905 id=905 data-nosnippet>905</a>                    module_address,
+<a href=#906 id=906 data-nosnippet>906</a>                )
+<a href=#907 id=907 data-nosnippet>907</a>                .<span class="kw">await
+<a href=#908 id=908 data-nosnippet>908</a>            </span>}
+<a href=#909 id=909 data-nosnippet>909</a>        }
+<a href=#910 id=910 data-nosnippet>910</a>    }
+<a href=#911 id=911 data-nosnippet>911</a>}</code></pre></div></section></main></body></html>
