@@ -674,6 +674,16 @@
               solcDefault
               ;
           };
+          ciTestDevShell = import ./nix/ciTestShell.nix {
+            inherit
+              pkgs
+              config
+              crane
+              solcDefault
+              ;
+            hoprd = hoprd-dev;
+            hopli = hopli-dev;
+          };
           ciTestShell = import ./nix/ciTestShell.nix {
             inherit
               pkgs
@@ -908,6 +918,7 @@
           devShells.ci = ciShell;
           devShells.test = testShell;
           devShells.citest = ciTestShell;
+          devShells.citestdev = ciTestDevShell;
           devShells.docs = docsShell;
 
           formatter = config.treefmt.build.wrapper;
