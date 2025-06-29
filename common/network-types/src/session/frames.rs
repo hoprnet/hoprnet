@@ -1,0 +1,780 @@
+use std::{
+    cmp::Ordering,
+    fmt::{Debug, Display, Formatter},
+    mem,
+    time::Instant,
+};
+
+use hopr_primitive_types::prelude::GeneralError;
+
+use crate::{prelude::errors::SessionError, session::protocol::MissingSegmentsBitmap};
+
+/// ID of a [Frame].
+pub type FrameId = u32;
+/// Type representing the sequence numbers in a [Frame].
+pub type SeqNum = u8;
+
+/// Convenience type that identifies a segment within a frame.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
+pub struct SegmentId(pub FrameId, pub SeqNum);
+
+impl From<&Segment> for SegmentId {
+    fn from(value: &Segment) -> Self {
+        value.id()
+    }
+}
+
+impl Display for SegmentId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "seg({},{})", self.0, self.1)
+    }
+}
+
+/// Data frame of arbitrary length.
+/// The frame can be segmented into [segments](Segment) and reassembled back
+/// via [`FrameBuilder`].
+#[derive(Clone, PartialEq, Eq)]
+pub struct Frame {
+    /// Identifier of this frame.
+    pub frame_id: FrameId,
+    /// Frame data.
+    pub data: Box<[u8]>,
+    /// Indicates whether the frame is the last one of the frame sequence.
+    pub is_terminating: bool,
+}
+
+impl Debug for Frame {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        const DBG_LEN: usize = 16;
+        let excerpt = if self.data.len() > DBG_LEN {
+            format!(
+                "{}..{}",
+                hex::encode(&self.data[0..DBG_LEN / 2]),
+                hex::encode(&self.data[self.data.len() - DBG_LEN / 2..])
+            )
+        } else {
+            hex::encode(&self.data)
+        };
+
+        f.debug_struct("Frame")
+            .field("frame_id", &self.frame_id)
+            .field("len", &self.data.len())
+            .field("data", &excerpt)
+            .field("is_terminating", &self.is_terminating)
+            .finish()
+    }
+}
+
+impl AsRef<[u8]> for Frame {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+/// Wrapper for [`Frame`] that implements comparison and total ordering based on [`FrameId`].
+#[derive(Clone, Debug)]
+pub struct OrderedFrame(pub Frame);
+
+impl Eq for OrderedFrame {}
+
+impl PartialEq<Self> for OrderedFrame {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.frame_id == other.0.frame_id
+    }
+}
+
+impl PartialEq<FrameId> for OrderedFrame {
+    fn eq(&self, other: &FrameId) -> bool {
+        self.0.frame_id == *other
+    }
+}
+
+impl PartialOrd<Self> for OrderedFrame {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialOrd<FrameId> for OrderedFrame {
+    fn partial_cmp(&self, other: &FrameId) -> Option<Ordering> {
+        Some(self.0.frame_id.cmp(other))
+    }
+}
+
+impl Ord for OrderedFrame {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.frame_id.cmp(&other.0.frame_id)
+    }
+}
+
+impl From<Frame> for OrderedFrame {
+    fn from(value: Frame) -> Self {
+        Self(value)
+    }
+}
+
+impl From<OrderedFrame> for Frame {
+    fn from(value: OrderedFrame) -> Self {
+        value.0
+    }
+}
+
+/// Carries segment flags and the length of the segment sequence.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
+pub struct SeqIndicator(SeqNum);
+
+impl SeqIndicator {
+    /// Maximum length of a segment sequence.
+    pub const MAX: SeqNum = 0b0011_1111;
+
+    #[inline]
+    pub const fn new_with_flags(seq_len: SeqNum, is_terminating: bool) -> Self {
+        let flags = ((is_terminating as u8) << 7) | (seq_len & Self::MAX);
+        Self(flags)
+    }
+
+    pub const fn new(seq_len: SeqNum) -> Self {
+        Self::new_with_flags(seq_len, false)
+    }
+
+    const fn new_unchecked(seq_ind: SeqNum) -> Self {
+        Self(seq_ind)
+    }
+
+    pub fn with_terminating_bit(self, is_terminating: bool) -> Self {
+        Self::new_with_flags(self.0, is_terminating)
+    }
+
+    #[inline]
+    pub const fn is_terminating(&self) -> bool {
+        self.0 & 0b1000_0000 != 0
+    }
+
+    #[inline]
+    pub const fn seq_num(&self) -> SeqNum {
+        self.0 & Self::MAX
+    }
+
+    #[inline]
+    pub const fn value(&self) -> SeqNum {
+        self.0
+    }
+}
+
+impl Display for SeqIndicator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.seq_num(), if self.is_terminating() { "*" } else { "" })
+    }
+}
+
+impl TryFrom<SeqNum> for SeqIndicator {
+    type Error = GeneralError;
+
+    fn try_from(value: SeqNum) -> Result<Self, Self::Error> {
+        if value <= Self::MAX {
+            Ok(Self(value))
+        } else {
+            Err(GeneralError::InvalidInput)
+        }
+    }
+}
+
+/// Represents a frame segment.
+/// Besides the data, a segment carries information about the total number of
+/// segments in the original frame, its index within the frame and
+/// ID of that frame.
+#[derive(Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
+pub struct Segment {
+    /// ID of the [Frame] this segment belongs to.
+    pub frame_id: FrameId,
+    /// Index of this segment within the segment sequence.
+    pub seq_idx: SeqNum,
+    /// Flags of the segment sequence (includes sequence length).
+    pub seq_flags: SeqIndicator,
+    /// Data in this segment.
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    pub data: Box<[u8]>,
+}
+
+impl Segment {
+    /// Size of the segment header.
+    pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<SeqNum>();
+
+    /// Returns the [SegmentId] for this segment.
+    pub fn id(&self) -> SegmentId {
+        SegmentId(self.frame_id, self.seq_idx)
+    }
+
+    /// Length of the segment data plus header.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        Self::HEADER_SIZE + self.data.len()
+    }
+
+    /// Indicates whether this segment is the last one from the frame.
+    #[inline]
+    pub fn is_last(&self) -> bool {
+        self.seq_idx == self.seq_flags.seq_num() - 1
+    }
+
+    /// Creates an empty `Segment` with the terminating flag set.
+    pub fn terminating(frame_id: FrameId) -> Self {
+        Self {
+            frame_id,
+            seq_idx: 0,
+            seq_flags: SeqIndicator::new_with_flags(1, true),
+            data: Box::default(),
+        }
+    }
+}
+
+impl Debug for Segment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Segment")
+            .field("frame_id", &self.frame_id)
+            .field("seq_id", &self.seq_idx)
+            .field("seq_len", &self.seq_flags)
+            .field("data", &hex::encode(&self.data))
+            .finish()
+    }
+}
+
+impl PartialOrd<Segment> for Segment {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Segment {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.frame_id.cmp(&other.frame_id) {
+            std::cmp::Ordering::Equal => self.seq_idx.cmp(&other.seq_idx),
+            cmp => cmp,
+        }
+    }
+}
+
+impl From<Segment> for Vec<u8> {
+    fn from(value: Segment) -> Self {
+        let mut ret = Vec::with_capacity(Segment::HEADER_SIZE + value.data.len());
+        ret.extend_from_slice(value.frame_id.to_be_bytes().as_ref());
+        ret.extend_from_slice(value.seq_idx.to_be_bytes().as_ref());
+        ret.push(value.seq_flags.value());
+        ret.extend_from_slice(value.data.as_ref());
+        ret
+    }
+}
+
+impl TryFrom<&[u8]> for Segment {
+    type Error = SessionError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let (header, data) = value.split_at(Self::HEADER_SIZE);
+        let segment = Segment {
+            frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| SessionError::InvalidSegment)?),
+            seq_idx: SeqNum::from_be_bytes(header[4..5].try_into().map_err(|_| SessionError::InvalidSegment)?),
+            seq_flags: SeqIndicator::new_unchecked(header[5]),
+            data: data.into(),
+        };
+        (segment.frame_id > 0 && segment.seq_idx < segment.seq_flags.seq_num())
+            .then_some(segment)
+            .ok_or(SessionError::InvalidSegment)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct FrameBuilder {
+    segments: Vec<Option<Segment>>,
+    frame_id: FrameId,
+    seg_remaining: SeqNum,
+    recv_bytes: usize,
+    pub(crate) last_recv: Instant,
+}
+
+impl From<Segment> for FrameBuilder {
+    fn from(value: Segment) -> Self {
+        let idx = value.seq_idx;
+        let mut ret = Self {
+            segments: vec![None; value.seq_flags.seq_num() as usize],
+            frame_id: value.frame_id,
+            seg_remaining: value.seq_flags.seq_num() - 1,
+            recv_bytes: value.data.len(),
+            last_recv: Instant::now(),
+        };
+
+        ret.segments[idx as usize] = Some(value);
+
+        ret
+    }
+}
+
+impl TryFrom<FrameBuilder> for Frame {
+    type Error = SessionError;
+
+    fn try_from(value: FrameBuilder) -> Result<Self, Self::Error> {
+        let mut is_terminating = false;
+        value
+            .segments
+            .into_iter()
+            .try_fold(Vec::with_capacity(value.recv_bytes), |mut acc, segment| match segment {
+                Some(segment) => {
+                    acc.extend_from_slice(&segment.data);
+                    is_terminating = is_terminating || segment.seq_flags.is_terminating();
+                    Ok(acc)
+                }
+                None => Err(SessionError::IncompleteFrame(value.frame_id)),
+            })
+            .map(|data| Frame {
+                frame_id: value.frame_id,
+                data: data.into_boxed_slice(),
+                is_terminating,
+            })
+    }
+}
+
+impl FrameBuilder {
+    pub fn add_segment(&mut self, segment: Segment) -> Result<(), SessionError> {
+        let idx = segment.seq_idx;
+        if segment.frame_id != self.frame_id
+            || idx as usize >= self.segments.len()
+            || segment.seq_flags.seq_num() as usize != self.segments.len()
+            || self.seg_remaining == 0
+            || self.segments[idx as usize].is_some()
+        {
+            return Err(SessionError::InvalidSegment);
+        }
+
+        self.recv_bytes += segment.data.len();
+        self.seg_remaining -= 1;
+        self.segments[idx as usize] = Some(segment);
+        self.last_recv = Instant::now();
+        Ok(())
+    }
+
+    pub fn as_missing(&self) -> MissingSegmentsBitmap {
+        let mut ret = MissingSegmentsBitmap::ZERO;
+        self.segments
+            .iter()
+            .take(SeqNum::BITS as usize)
+            .enumerate()
+            .for_each(|(i, v)| ret.set(i, v.is_none()));
+        ret
+    }
+
+    #[inline]
+    pub fn frame_id(&self) -> FrameId {
+        self.frame_id
+    }
+
+    #[inline]
+    pub fn is_complete(&self) -> bool {
+        self.seg_remaining == 0
+    }
+}
+
+// Must use only FrameDashMap, others cannot be reference-cloned
+#[derive(Clone, Debug)]
+pub struct FrameInspector(pub(crate) FrameDashMap);
+
+impl FrameInspector {
+    /// Indicates how many incomplete frames there could be per one complete/discarded frame.
+    pub const INCOMPLETE_FRAME_RATIO: usize = 2;
+
+    pub fn new(capacity: usize) -> Self {
+        Self(FrameDashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1))
+    }
+
+    /// Returns a [`MissingSegmentsBitmap`] of missing segments in a frame.
+    pub fn missing_segments(&self, frame_id: &FrameId) -> Option<MissingSegmentsBitmap> {
+        self.0.0.get(frame_id).map(|f| f.as_missing())
+    }
+}
+
+pub(crate) trait FrameMapOccupiedEntry {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder;
+
+    #[allow(unused)]
+    fn frame_id(&self) -> &FrameId;
+
+    fn finalize(self) -> FrameBuilder;
+}
+
+pub(crate) trait FrameMapVacantEntry {
+    fn insert_builder(self, value: FrameBuilder);
+}
+
+#[derive(strum::EnumTryAs)]
+pub(crate) enum FrameMapEntry<O: FrameMapOccupiedEntry, V: FrameMapVacantEntry> {
+    Occupied(O),
+    Vacant(V),
+}
+
+pub(crate) trait FrameMap {
+    type ExistingEntry<'a>: FrameMapOccupiedEntry
+    where
+        Self: 'a;
+    type VacantEntry<'a>: FrameMapVacantEntry
+    where
+        Self: 'a;
+
+    fn with_capacity(capacity: usize) -> Self;
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>>;
+
+    fn len(&self) -> usize;
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool);
+}
+
+impl FrameMapOccupiedEntry for dashmap::OccupiedEntry<'_, FrameId, FrameBuilder> {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder {
+        self.get_mut()
+    }
+
+    fn frame_id(&self) -> &FrameId {
+        self.key()
+    }
+
+    fn finalize(self) -> FrameBuilder {
+        self.remove()
+    }
+}
+
+impl FrameMapVacantEntry for dashmap::VacantEntry<'_, FrameId, FrameBuilder> {
+    fn insert_builder(self, value: FrameBuilder) {
+        self.insert(value);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct FrameDashMap(std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>);
+
+impl FrameMap for FrameDashMap {
+    type ExistingEntry<'a> = dashmap::OccupiedEntry<'a, FrameId, FrameBuilder>;
+    type VacantEntry<'a> = dashmap::VacantEntry<'a, FrameId, FrameBuilder>;
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self(std::sync::Arc::new(dashmap::DashMap::with_capacity(capacity)))
+    }
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
+        match self.0.entry(frame_id) {
+            dashmap::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
+            dashmap::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
+        self.0.retain(f)
+    }
+}
+
+#[cfg(not(feature = "hashbrown"))]
+pub(crate) struct FrameHashMap(std::collections::HashMap<FrameId, FrameBuilder>);
+
+#[cfg(not(feature = "hashbrown"))]
+impl FrameMapOccupiedEntry for std::collections::hash_map::OccupiedEntry<'_, FrameId, FrameBuilder> {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder {
+        self.get_mut()
+    }
+
+    fn frame_id(&self) -> &FrameId {
+        self.key()
+    }
+
+    fn finalize(self) -> FrameBuilder {
+        self.remove()
+    }
+}
+
+#[cfg(not(feature = "hashbrown"))]
+impl FrameMapVacantEntry for std::collections::hash_map::VacantEntry<'_, FrameId, FrameBuilder> {
+    fn insert_builder(self, value: FrameBuilder) {
+        self.insert(value);
+    }
+}
+
+#[cfg(not(feature = "hashbrown"))]
+impl FrameMap for FrameHashMap {
+    type ExistingEntry<'a> = std::collections::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder>;
+    type VacantEntry<'a> = std::collections::hash_map::VacantEntry<'a, FrameId, FrameBuilder>;
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self(std::collections::HashMap::with_capacity(capacity))
+    }
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
+        match self.0.entry(frame_id) {
+            std::collections::hash_map::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
+            std::collections::hash_map::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
+        self.0.retain(f)
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+pub(crate) struct FrameHashMap(hashbrown::HashMap<FrameId, FrameBuilder>);
+
+#[cfg(feature = "hashbrown")]
+impl FrameMapOccupiedEntry for hashbrown::hash_map::OccupiedEntry<'_, FrameId, FrameBuilder> {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder {
+        self.get_mut()
+    }
+
+    fn frame_id(&self) -> &FrameId {
+        self.key()
+    }
+
+    fn finalize(self) -> FrameBuilder {
+        self.remove()
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+impl FrameMapVacantEntry for hashbrown::hash_map::VacantEntry<'_, FrameId, FrameBuilder> {
+    fn insert_builder(self, value: FrameBuilder) {
+        self.insert(value);
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+impl FrameMap for FrameHashMap {
+    type ExistingEntry<'a> = hashbrown::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder>;
+    type VacantEntry<'a> = hashbrown::hash_map::VacantEntry<'a, FrameId, FrameBuilder>;
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self(hashbrown::HashMap::with_capacity(capacity))
+    }
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
+        match self.0.entry(frame_id) {
+            hashbrown::hash_map::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
+            hashbrown::hash_map::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
+        self.0.retain(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn segment_should_serialize_and_deserialize() -> anyhow::Result<()> {
+        let seg_1 = Segment {
+            frame_id: 10,
+            seq_idx: 0,
+            seq_flags: 2.try_into()?,
+            data: Box::new([123u8]),
+        };
+
+        let seg_2 = Segment::try_from(Vec::from(seg_1.clone()).as_slice())?;
+        assert_eq!(seg_1, seg_2);
+        Ok(())
+    }
+
+    #[test]
+    fn frame_builder_should_return_ordered_segments() -> anyhow::Result<()> {
+        let mut fb = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 1,
+            seq_flags: 3.try_into()?,
+            data: (*b" new ").into(),
+        });
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 2,
+            seq_flags: 3.try_into()?,
+            data: (*b"world").into(),
+        })?;
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: 3.try_into()?,
+            data: (*b"hello").into(),
+        })?;
+
+        assert!(fb.is_complete());
+        assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
+
+        let reassembled: Frame = fb.try_into()?;
+        assert_eq!(1, reassembled.frame_id);
+        assert_eq!(b"hello new world", reassembled.data.as_ref());
+
+        Ok(())
+    }
+
+    #[test]
+    fn frame_builder_should_correctly_mark_terminating_flag() -> anyhow::Result<()> {
+        let mut fb = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 1,
+            seq_flags: 3.try_into()?,
+            data: (*b" new ").into(),
+        });
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 2,
+            seq_flags: SeqIndicator::new_with_flags(3, true),
+            data: (*b"world").into(),
+        })?;
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: 3.try_into()?,
+            data: (*b"hello").into(),
+        })?;
+
+        assert!(fb.is_complete());
+        assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
+
+        let reassembled: Frame = fb.try_into()?;
+        assert_eq!(1, reassembled.frame_id);
+        assert_eq!(b"hello new world", reassembled.data.as_ref());
+        assert!(reassembled.is_terminating);
+
+        Ok(())
+    }
+
+    #[test]
+    fn frame_builder_should_correctly_allow_empty_segments() -> anyhow::Result<()> {
+        let mut fb = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 1,
+            seq_flags: 4.try_into()?,
+            data: (*b" new ").into(),
+        });
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 2,
+            seq_flags: 4.try_into()?,
+            data: (*b"world").into(),
+        })?;
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: 4.try_into()?,
+            data: (*b"hello").into(),
+        })?;
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 3,
+            seq_flags: SeqIndicator::new_with_flags(4, true),
+            data: Box::new([]),
+        })?;
+
+        assert!(fb.is_complete());
+        assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
+
+        let reassembled: Frame = fb.try_into()?;
+        assert_eq!(1, reassembled.frame_id);
+        assert_eq!(b"hello new world", reassembled.data.as_ref());
+        assert!(reassembled.is_terminating);
+
+        Ok(())
+    }
+
+    #[test]
+    fn frame_builder_should_not_accept_invalid_segments() -> anyhow::Result<()> {
+        let mut fb = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: 2.try_into()?,
+            data: (*b"hello world").into(),
+        });
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 3,
+            seq_flags: 2.try_into()?,
+            data: (*b"foo").into(),
+        })
+        .expect_err("should not accept invalid segment");
+
+        fb.add_segment(Segment {
+            frame_id: 2,
+            seq_idx: 1,
+            seq_flags: 2.try_into()?,
+            data: (*b"foo").into(),
+        })
+        .expect_err("should not accept segment from another frame");
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 1,
+            seq_flags: 3.try_into()?,
+            data: (*b"foo").into(),
+        })
+        .expect_err("should not accept invalid segment");
+
+        Ok(())
+    }
+
+    #[test]
+    fn frame_builder_should_not_accept_segments_when_complete() -> anyhow::Result<()> {
+        let mut fb = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: 1.try_into()?,
+            data: (*b"hello world").into(),
+        });
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: 1.try_into()?,
+            data: (*b"foo").into(),
+        })
+        .expect_err("should not accept segment when complete");
+
+        Ok(())
+    }
+
+    #[test]
+    fn frame_builder_should_not_accept_duplicate_segment() -> anyhow::Result<()> {
+        let mut fb = FrameBuilder::from(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: 2.try_into()?,
+            data: (*b"hello world").into(),
+        });
+
+        fb.add_segment(Segment {
+            frame_id: 1,
+            seq_idx: 0,
+            seq_flags: 2.try_into()?,
+            data: (*b"foo").into(),
+        })
+        .expect_err("should not accept duplicate segment");
+
+        Ok(())
+    }
+}
