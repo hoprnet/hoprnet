@@ -124,7 +124,7 @@ impl std::fmt::Display for HoprdProcesses {
 impl std::fmt::Debug for HoprdProcesses {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // Intentionally same as Display
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 

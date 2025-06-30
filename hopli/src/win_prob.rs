@@ -108,7 +108,7 @@ impl WinProbSubcommands {
         // get winning probability from the contract
         let current_win_prob =
             hopr_win_prob.currentWinProb().call().await.map_err(|e| {
-                HelperErrors::MiddlewareError(format!("Failed to get current winning probability: {}", e))
+                HelperErrors::MiddlewareError(format!("Failed to get current winning probability: {e}"))
             })?;
 
         // convert into f64

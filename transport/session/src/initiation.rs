@@ -285,8 +285,7 @@ mod tests {
         let len = msg.encode()?.1.len();
         assert!(
             HoprPacket::max_surbs_with_message(len) >= 1,
-            "KeepAlive message size ({}) must allow for at least 1 SURBs in packet",
-            len,
+            "KeepAlive message size ({len}) must allow for at least 1 SURBs in packet",
         );
 
         Ok(())

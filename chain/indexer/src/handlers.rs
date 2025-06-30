@@ -1216,7 +1216,7 @@ mod tests {
                 stake_factory: Default::default(),
             }),
             chain_key: SELF_CHAIN_KEY.clone(),
-            safe_address: STAKE_ADDRESS.clone(),
+            safe_address: *STAKE_ADDRESS,
             db,
             rpc_operations,
         }
@@ -1548,7 +1548,7 @@ mod tests {
         rpc_operations
             .expect_get_hopr_balance()
             .times(1)
-            .return_once(move |_| Ok(target_hopr_balance.clone()));
+            .return_once(move |_| Ok(target_hopr_balance));
         rpc_operations
             .expect_get_hopr_allowance()
             .times(1)
@@ -1649,7 +1649,7 @@ mod tests {
         rpc_operations
             .expect_get_hopr_allowance()
             .times(2)
-            .returning(move |_, _| Ok(target_allowance.clone()));
+            .returning(move |_, _| Ok(target_allowance));
         let clonable_rpc_operations = ClonableMockOperations {
             inner: Arc::new(rpc_operations),
         };
@@ -2080,7 +2080,7 @@ mod tests {
         rpc_operations
             .expect_get_hopr_balance()
             .times(1)
-            .return_once(move |_| Ok(target_hopr_balance.clone()));
+            .return_once(move |_| Ok(target_hopr_balance));
         rpc_operations
             .expect_get_hopr_allowance()
             .times(1)
@@ -2200,7 +2200,7 @@ mod tests {
         rpc_operations
             .expect_get_hopr_balance()
             .times(1)
-            .return_once(move |_| Ok(target_hopr_balance.clone()));
+            .return_once(move |_| Ok(target_hopr_balance));
         let clonable_rpc_operations = ClonableMockOperations {
             inner: Arc::new(rpc_operations),
         };
