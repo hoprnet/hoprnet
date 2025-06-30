@@ -17,6 +17,7 @@ on:
 permissions:
   actions: read
   security-events: write
+  contents: read
 
 concurrency:
   group: ${{ github.ref }}-checks
