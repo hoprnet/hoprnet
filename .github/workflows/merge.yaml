@@ -14,7 +14,7 @@ on:
     types:
       - closed
       - synchronize
-# debugging
+# debuggin
 
 concurrency:
   group: merge
