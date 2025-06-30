@@ -24,9 +24,6 @@ concurrency:
   group: ${{ github.ref }}-lint
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 jobs:
   lint:
     name: Lint
