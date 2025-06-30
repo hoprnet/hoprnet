@@ -1538,7 +1538,7 @@ mod tests {
             )
             .await;
 
-        println!("{:?}", alice_session);
+        println!("{alice_session:?}");
         assert!(matches!(
             alice_session,
             Err(TransportSessionError::Manager(SessionManagerError::Loopback))
