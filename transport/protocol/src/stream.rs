@@ -68,23 +68,16 @@ where
             let (send, recv) = channel::<<C as Decoder>::Item>(1000);
             let cache_internal = cache.clone();
 
-            hopr_async_runtime::prelude::spawn(
-                recv.inspect(move |_data| tracing::trace!(%peer, "Sending message to the transport stream"))
-                    .map(Ok)
-                    .forward({
-                        let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
-                        fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
-                        fw
-                    }),
-            );
+            hopr_async_runtime::prelude::spawn(recv.map(Ok).forward({
+                let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
+                fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
+                fw
+            }));
             hopr_async_runtime::prelude::spawn(async move {
                 if let Err(error) = FramedRead::new(stream_rx.compat(), codec)
                     .filter_map(move |v| async move {
                         match v {
-                            Ok(v) => {
-                                tracing::trace!(%peer, "Received a new message");
-                                Some((peer, v))
-                            }
+                            Ok(v) => Some((peer, v)),
                             Err(error) => {
                                 tracing::error!(%error, "Error decoding object from the underlying stream");
                                 None
@@ -118,7 +111,6 @@ where
                     tracing::error!(%peer, %error, "Error sending message to peer from the cached connection");
                     cache.invalidate(&peer).await;
                 } else {
-                    tracing::trace!(%peer, "Message sent over an existing transport stream");
                     return;
                 }
             }
@@ -134,23 +126,16 @@ where
                     let (stream_rx, stream_tx) = stream.split();
                     let (send, recv) = channel::<<C as Decoder>::Item>(1000);
 
-                    hopr_async_runtime::prelude::spawn(
-                        recv.inspect(move |_data| tracing::trace!(%peer, "Sending message to the transport stream"))
-                            .map(Ok)
-                            .forward({
-                                let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
-                                fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
-                                fw
-                            }),
-                    );
+                    hopr_async_runtime::prelude::spawn(recv.map(Ok).forward({
+                        let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
+                        fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
+                        fw
+                    }));
                     hopr_async_runtime::prelude::spawn(
                         FramedRead::new(stream_rx.compat(), codec)
                             .filter_map(move |v| async move {
                                 match v {
-                                    Ok(v) => {
-                                        tracing::trace!(%peer, "Received a new message");
-                                        Some((peer, v))
-                                    }
+                                    Ok(v) => Some((peer, v)),
                                     Err(error) => {
                                         tracing::error!(%error, "Error decoding object from the underlying stream");
                                         None

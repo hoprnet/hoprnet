@@ -247,9 +247,11 @@ impl Probe {
                                             Ok(path) => {
                                                 tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
                                             let message = Message::Probe(NeighborProbe::Pong(ping));
-                                                let _ = push_to_network.send_message(path, message).await;
+                                                if let Err(error) = push_to_network.send_message(path, message).await {
+                                                    tracing::error!(%pseudonym, %error, "failed to send back a pong");
+                                                }
                                             },
-                                            Err(error) => tracing::error!(%pseudonym, %error, "failed to get a SURB, cannot send pong"),
+                                            Err(error) => tracing::error!(%pseudonym, %error, "failed to get a SURB, cannot send back a pong"),
                                         }
                                     },
                                     Message::Probe(NeighborProbe::Pong(pong)) => {

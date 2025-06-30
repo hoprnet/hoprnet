@@ -226,8 +226,8 @@ where
                 .filter_map(|v| async move { v })
                 .map(Ok)
                 .forward(msg_to_send_tx)
-                .await
-                .instrument(tracing::trace_span!("msg protocol processing - outgoing"));
+                .instrument(tracing::trace_span!("msg protocol processing - outgoing"))
+                .await;
         }),
     );
 
@@ -406,8 +406,8 @@ where
                 })
                 .map(Ok)
                 .forward(api.0)
-                .await
-                .instrument(tracing::trace_span!("msg protocol processing - incoming"));
+                .instrument(tracing::trace_span!("msg protocol processing - incoming"))
+                .await;
         }),
     );
 
