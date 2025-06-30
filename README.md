@@ -137,6 +137,7 @@ Uninstall:
 sudo dpkg --purge --force-remove-reinstreq hoprd
 ```
 
+
 ### Install via Red Hat package manager
 
 Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
