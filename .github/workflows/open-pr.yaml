@@ -72,6 +72,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - uses: actions/labeler@6463cdb00ee92c05bec55dffc4e1fce250301945 # main on 20.02.2025
         with:
