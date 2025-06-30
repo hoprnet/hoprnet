@@ -253,7 +253,7 @@ start_service() {
 
 # Function to show the HOPR node address
 show_node_address() {
-  node_address=$(hopli identity read -d /etc/hoprd/ | grep "Identity addresses:" | awk -F '[\\[\\]]' '{print $2}')
+  node_address=$(IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity read -d /etc/hoprd/ | grep "Identity addresses:" | awk -F '[\\[\\]]' '{print $2}')
   echo "HOPR node address: ${node_address}"
   echo "Finish the onboarding of this node at https://hub.hoprnet.org by registering it and adding it to your safe."
 }
