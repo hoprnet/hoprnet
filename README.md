@@ -145,10 +145,10 @@ Download the latest package from https://github.com/hoprnet/hoprnet/releases/lat
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
 curl -s -L -o hoprd-${arch}-linux.rpm https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.rpm
 # You can the Safe address and the Module addres from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=
-export HOPRD_MODULE_ADDRESS=
+export HOPRD_SAFE_ADDRESS=0xeEBdDCCd08AC75DA6058828af6E3DaBD5D0ef6A5
+export HOPRD_MODULE_ADDRESS=0x92aDd04d72d30418C81b53B4b17Facf09B7E4F24
 # Choose your own local RPC provider or any from http://chainlist.org/chain/100
-export HOPRD_PROVIDER=
+export HOPRD_PROVIDER=https://gnosis.drpc.org
 sudo -E dnf install -y ./hoprd-${arch}-linux.rpm
 ```
 
