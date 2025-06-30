@@ -60,8 +60,9 @@ permissions:
 
 jobs:
   binary:
-    # if: >-
-    #   github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
+      # github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
+    if: >-
+      github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && inputs.target != '')
     runs-on: ${{ github.event.inputs.runner || inputs.runner }}
     timeout-minutes: 60
     steps:
