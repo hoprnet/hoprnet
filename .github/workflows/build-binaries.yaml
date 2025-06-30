@@ -52,7 +52,7 @@ on:
         description: 'Architecture to build for'
 
 concurrency:
-  group: ${{ github.ref }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
+  group: ${{ inputs.source_branch || github.ref_name }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
   cancel-in-progress: true
 
 permissions:
