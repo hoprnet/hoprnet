@@ -82,7 +82,6 @@ jobs:
             echo "❌ Unsupported base branch: ${base_branch}" >&2
             exit 1
           fi
-          fi
           git tag --force "${release_name}"
           git push --force origin "${release_name}"
           echo "release_name=${release_name}" >> $GITHUB_OUTPUT
