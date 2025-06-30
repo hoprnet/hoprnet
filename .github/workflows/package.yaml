@@ -24,7 +24,7 @@ concurrency:
 jobs:
   package:
     runs-on: self-hosted-hoprnet-small
-    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
+    if: github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
     steps:
 
       - name: Checkout hoprnet repository

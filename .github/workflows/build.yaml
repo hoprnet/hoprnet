@@ -25,22 +25,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
-  debug:
-    runs-on: self-hosted-hoprnet-small
-    timeout-minutes: 60
-    steps:
-      - name: Debugging
-        run: |
-          echo "Event Name: ${{ github.event_name }}"
-          echo "Pull Request Labels: ${{ toJson(github.event.pull_request.labels) }}"
-          echo "Inputs: ${{ toJson(inputs) }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Ref Name: ${{ github.ref_name }}"
-          echo "Test 1: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request') }}"
-          echo "Pull Request Labels Names: ${{ toJson(github.event.pull_request.labels.*.name) }}"
-
-
   build-docker:
     strategy:
       matrix:

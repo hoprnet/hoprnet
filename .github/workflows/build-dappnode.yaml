@@ -37,7 +37,7 @@ concurrency:
 jobs:
   build:
     # The original event_name registered is 'pull_request' even the trigger action is 'workflow_call'
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.dappnode_repository)))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && contains(inputs.labels, format('package:{0},',inputs.dappnode_repository)))
     name: Build package
     runs-on: ubuntu-latest
     steps:
@@ -50,7 +50,7 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
             echo "The workflow is triggered by other pipeline"
             echo "source_repo=${{ inputs.source_repo }}" | tee -a $GITHUB_OUTPUT
             echo "source_branch=${{ inputs.source_branch }}"  | tee -a $GITHUB_OUTPUT
@@ -155,7 +155,7 @@ jobs:
           DEVELOPER_ADDRESS: "0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E"
 
       - name: Create comment
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request_target'
         uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4.0.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
