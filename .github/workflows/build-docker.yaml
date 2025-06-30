@@ -35,14 +35,6 @@ jobs:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     steps:
-      - name: Debugging
-        run: |
-          echo "Event Name: ${{ github.event_name }}"
-          echo "Pull Request Labels: ${{ toJson(github.event.pull_request.labels) }}"
-          echo "Inputs: ${{ toJson(inputs) }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Ref Name: ${{ github.ref_name }}"
-          echo "Pull Request Labels Names: ${{ toJson(github.event.pull_request.labels.*.name) }}"
       - name: Harden Runner
         uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
         with:
