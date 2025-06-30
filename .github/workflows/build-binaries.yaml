@@ -8,7 +8,10 @@ name: Build binaries
 on:
   workflow_call:
     inputs:
-      branch:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
         required: true
         type: string
       binary:
@@ -63,7 +66,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -73,11 +76,13 @@ jobs:
           declare branch binary target package_suffix runner_needs_nix_setup
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo "The workflow is triggered by other pipeline"
-            branch=${{ inputs.branch }}
+            repo=${{ inputs.source_repo }}
+            branch=${{ inputs.source_branch }}
             binary=${{ inputs.binary }}
             target=${{ inputs.target }}
           else
             echo "The workflow is triggered manually"
+            repo=${{ github.repository }}
             branch=${{ github.ref_name }}
             binary=${{ github.event.inputs.binary }}
             target=${{ github.event.inputs.target }}
@@ -101,7 +106,8 @@ jobs:
             ;;
           esac
           echo "Invocation parameters:"
-          echo "branch=${branch}" | tee -a $GITHUB_OUTPUT
+          echo "source_repo=${repo}" | tee -a $GITHUB_OUTPUT
+          echo "source_branch=${branch}" | tee -a $GITHUB_OUTPUT
           echo "binary=${binary}" | tee -a $GITHUB_OUTPUT
           echo "target=${target}" | tee -a $GITHUB_OUTPUT
           echo "package_suffix=${package_suffix}" | tee -a $GITHUB_OUTPUT
@@ -112,7 +118,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          ref: ${{ steps.vars.outputs.branch }}
+          repository: ${{ steps.vars.outputs.source_repo }}
+          ref: ${{ steps.vars.outputs.source_branch }}
 
       - name: Install Nix
         if: steps.vars.outputs.runner_needs_nix_setup == 'true'

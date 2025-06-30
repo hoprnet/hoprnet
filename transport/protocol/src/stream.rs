@@ -63,10 +63,11 @@ where
             let (send, recv) = channel::<<C as Decoder>::Item>(1000);
             let cache_internal = cache.clone();
 
-            hopr_async_runtime::prelude::spawn(
-                recv.map(Ok)
-                    .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
-            );
+            hopr_async_runtime::prelude::spawn(recv.map(Ok).forward({
+                let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
+                fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
+                fw
+            }));
             hopr_async_runtime::prelude::spawn(async move {
                 if let Err(error) = FramedRead::new(stream_rx.compat(), codec)
                     .filter_map(move |v| async move {
@@ -105,6 +106,7 @@ where
                     tracing::error!(peer = %peer_id, %error, "Error sending message to peer from the cached connection");
                     cache.invalidate(&peer_id).await;
                 } else {
+                    tracing::trace!(peer = %peer_id, "Message sent over an existing transport stream");
                     return;
                 }
             }

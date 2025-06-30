@@ -368,12 +368,12 @@ where
                 addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Allow(peer))
+                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
+                    .send(PeerDiscovery::Allow(peer))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
             }
@@ -616,6 +616,11 @@ where
         cfg: SessionClientConfig,
     ) -> errors::Result<Session> {
         Ok(self.smgr.new_session(destination, target, cfg).await?)
+    }
+
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub async fn probe_session(&self, id: &SessionId) -> errors::Result<()> {
+        Ok(self.smgr.ping_session(id).await?)
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]

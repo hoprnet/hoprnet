@@ -432,7 +432,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         sender: Arc<CountingSendMsg<S>>,
         routing: DestinationRouting,
     ) -> (KeepAliveController, AbortHandle) {
-        let elem = StartProtocol::KeepAlive(session_id);
+        let elem = StartProtocol::KeepAlive(session_id.into());
 
         // The stream is suspended until the caller sets a rate via the Controller
         let (ka_stream, controller) = futures::stream::repeat(elem).rate_limit_per_unit(0, Duration::from_secs(1));
@@ -697,6 +697,25 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         }
     }
 
+    /// Sends a keep-alive packet with the given [`SessionId`].
+    ///
+    /// This currently "fires & forgets" and does not expect nor await any "pong" response.
+    pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
+        if let Some(session_data) = self.sessions.get(id).await {
+            Ok(self
+                .msg_sender
+                .get()
+                .ok_or(SessionManagerError::NotStarted)?
+                .send_message(
+                    StartProtocol::KeepAlive((*id).into()).try_into()?,
+                    session_data.routing_opts.clone(),
+                )
+                .await?)
+        } else {
+            Err(SessionManagerError::NonExistingSession.into())
+        }
+    }
+
     /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
@@ -924,7 +943,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     _ => {}
                 }
             }
-            StartProtocol::KeepAlive(session_id) => {
+            StartProtocol::KeepAlive(msg) => {
+                let session_id = msg.id;
                 if self.sessions.get(&session_id).await.is_some() {
                     trace!(?session_id, "received keep-alive request");
                 } else {

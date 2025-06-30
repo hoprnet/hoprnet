@@ -141,7 +141,7 @@ def fetch_data(url: str):
         response = requests.get(url, verify=False)
         response.raise_for_status()
         return response
-    except requests.exceptions.RequestException as e:
+    except requests.RequestException as e:
         logging.error(f"HTTP request failed: {e}")
         return None
 
