@@ -110,13 +110,13 @@ k256 = { version = "0.13.4", features = [
   "serde",
 ] }
 lazy_static = "1.5.0"
-libp2p = { git = "https://github.com/libp2p/rust-libp2p.git", rev = "f47e38e0a1571224e6d2b44cf221deb4e8ed259d" }
-libp2p-identity = { version = "0.2.11", features = [
+libp2p = { version = "0.56.0" }
+libp2p-identity = { version = "0.2.12", features = [
   "peerid",
   "ed25519",
   "rand",
 ] }
-libp2p-stream = { git = "https://github.com/libp2p/rust-libp2p.git", rev = "f47e38e0a1571224e6d2b44cf221deb4e8ed259d" }
+libp2p-stream = { version = "0.4.0-alpha" }
 mockall = "0.13.1"
 mockito = "1.7.0"
 moka = { version = "0.12.10", features = ["future"] }
