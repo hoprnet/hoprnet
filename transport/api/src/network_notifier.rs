@@ -119,7 +119,7 @@ where
             error!("encountered invalid peer id");
         }
 
-        if let Err(error) = self.network.update(peer, result, None).await {
+        if let Err(error) = self.network.update(peer, result).await {
             error!(%error, "Encountered error on on updating the collected ping data")
         }
     }

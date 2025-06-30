@@ -103,7 +103,7 @@ where
             me: my_peer_id,
             me_addresses: my_multiaddresses,
             am_i_public: true,
-            cfg: cfg.clone(),
+            cfg,
             db,
             #[cfg(all(feature = "prometheus", not(test)))]
             started_at: current_time().as_unix_timestamp(),
@@ -111,6 +111,7 @@ where
     }
 
     /// Check whether the PeerId is present in the network.
+    #[tracing::instrument(level = "debug", skip(self), ret(Display))]
     pub async fn has(&self, peer: &PeerId) -> bool {
         peer == &self.me || self.db.get_network_peer(peer).await.is_ok_and(|p| p.is_some())
     }
@@ -118,6 +119,7 @@ where
     /// Add a new peer into the network.
     ///
     /// Each peer must have an origin specification.
+    #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn add(&self, peer: &PeerId, origin: PeerOrigin, mut addrs: Vec<Multiaddr>) -> Result<()> {
         if peer == &self.me {
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
@@ -159,6 +161,7 @@ where
     }
 
     /// Get peer information and status.
+    #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         if peer == &self.me {
             Ok(Some({
@@ -172,6 +175,7 @@ where
     }
 
     /// Remove peer from the network
+    #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn remove(&self, peer: &PeerId) -> Result<()> {
         if peer == &self.me {
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
@@ -198,12 +202,8 @@ where
     /// - `Ok(Some(NetworkTriggeredEvent))` if the peer's status changed and an event should be triggered.
     /// - `Ok(None)` if the peer is unknown.
     /// - `Err(NetworkingError)` if the operation is disallowed or a database error occurs.
-    pub async fn update(
-        &self,
-        peer: &PeerId,
-        ping_result: std::result::Result<Duration, ()>,
-        version: Option<String>,
-    ) -> Result<()> {
+    #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
+    pub async fn update(&self, peer: &PeerId, ping_result: std::result::Result<Duration, ()>) -> Result<()> {
         if peer == &self.me {
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
@@ -214,7 +214,7 @@ where
             }
 
             entry.heartbeats_sent += 1;
-            entry.peer_version = version;
+            entry.peer_version = None;
 
             if let Ok(latency) = ping_result {
                 entry.last_seen = current_time();
@@ -305,6 +305,7 @@ where
     ///
     /// # Returns
     /// A vector of peer IDs that should be pinged.
+    #[tracing::instrument(level = "debug", skip(self, threshold), ret(level = "trace"), err, fields(since = ?threshold))]
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> Result<Vec<PeerId>> {
         let stream = self
             .db
@@ -351,23 +352,9 @@ where
     }
 }
 
-impl<T> Network<T>
-where
-    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
-{
-    #[cfg(test)]
-    /// Checks if the peer is present in the network, but it is being currently ignored.
-    async fn is_ignored(&self, peer: &PeerId) -> bool {
-        peer != &self.me
-            && self
-                .get(peer)
-                .await
-                .is_ok_and(|ps| ps.is_some_and(|p| p.is_ignored(current_time(), self.cfg.ignore_timeframe)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::{ops::Add, time::Duration};
 
     use anyhow::Context;
@@ -379,6 +366,20 @@ mod tests {
 
     use super::*;
     use crate::network::{Health, Network, NetworkConfig, PeerOrigin};
+
+    impl<T> Network<T>
+    where
+        T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    {
+        /// Checks if the peer is present in the network, but it is being currently ignored.
+        async fn is_ignored(&self, peer: &PeerId) -> bool {
+            peer != &self.me
+                && self
+                    .get(peer)
+                    .await
+                    .is_ok_and(|ps| ps.is_some_and(|p| p.is_ignored(current_time(), self.cfg.ignore_timeframe)))
+        }
+    }
 
     #[test]
     fn test_network_health_should_serialize_to_a_proper_string() {
@@ -489,9 +490,7 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        peers
-            .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-            .await?;
+        peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
 
         assert_eq!(
             0,
@@ -518,7 +517,7 @@ mod tests {
         let latency = 123u64;
 
         peers
-            .update(&peer, Ok(std::time::Duration::from_millis(latency)), None)
+            .update(&peer, Ok(std::time::Duration::from_millis(latency)))
             .await?;
 
         let actual = peers.get(&peer).await?.expect("peer record should be present");
@@ -537,29 +536,25 @@ mod tests {
 
         let peers = basic_network(&me).await?;
 
-        let expected_version = Some("1.2.4".to_string());
+        let ts = Duration::from_millis(100);
 
         {
             peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
-            peers
-                .update(&peer, Ok(current_time().as_unix_timestamp()), expected_version.clone())
-                .await?;
+            peers.update(&peer, Ok(ts)).await?;
 
             let status = peers.get(&peer).await?.context("peer should be present")?;
 
-            assert_eq!(status.peer_version, expected_version);
+            assert_eq!(status.last_seen_latency, ts);
         }
 
-        let ts = current_time().as_unix_timestamp();
+        let ts = Duration::from_millis(200);
 
         {
-            let expected_version = Some("2.0.0".to_string());
-
-            peers.update(&peer, Ok(ts), expected_version.clone()).await?;
+            peers.update(&peer, Ok(ts)).await?;
 
             let status = peers.get(&peer).await?.context("peer should be present")?;
 
-            assert_eq!(status.peer_version, expected_version);
+            assert_eq!(status.last_seen_latency, ts);
         }
 
         Ok(())
@@ -575,15 +570,11 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
-        peers
-            .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-            .await?;
-        peers
-            .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-            .await?;
-        peers.update(&peer, Err(()), None).await?; // should drop to ignored
+        peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
+        peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
+        peers.update(&peer, Err(())).await?; // should drop to ignored
 
-        peers.update(&peer, Err(()), None).await.expect("no error should occur"); // should drop from network
+        peers.update(&peer, Err(())).await.expect("no error should occur"); // should drop from network
 
         assert!(peers.is_ignored(&peer).await);
 
@@ -607,16 +598,16 @@ mod tests {
         // Needs to do 3 pings, so we get over the ignore threshold limit
         // when doing the 4th failed ping
         peers
-            .update(&peer, Ok(std::time::Duration::from_millis(123_u64)), None)
+            .update(&peer, Ok(std::time::Duration::from_millis(123_u64)))
             .await?;
         peers
-            .update(&peer, Ok(std::time::Duration::from_millis(200_u64)), None)
+            .update(&peer, Ok(std::time::Duration::from_millis(200_u64)))
             .await?;
         peers
-            .update(&peer, Ok(std::time::Duration::from_millis(200_u64)), None)
+            .update(&peer, Ok(std::time::Duration::from_millis(200_u64)))
             .await?;
 
-        peers.update(&peer, Err(()), None).await?;
+        peers.update(&peer, Err(())).await?;
 
         let actual = peers.get(&peer).await?.expect("the peer record should be present");
 
@@ -638,7 +629,7 @@ mod tests {
 
         for latency in [123_u64, 200_u64, 200_u64] {
             peers
-                .update(&peer, Ok(std::time::Duration::from_millis(latency)), None)
+                .update(&peer, Ok(std::time::Duration::from_millis(latency)))
                 .await?;
         }
 
@@ -649,11 +640,11 @@ mod tests {
                 break;
             }
 
-            peers.update(&peer, Err(()), None).await?;
+            peers.update(&peer, Err(())).await?;
         }
 
         // perform one more failing heartbeat update and ensure max backoff is not exceeded
-        peers.update(&peer, Err(()), None).await?;
+        peers.update(&peer, Err(())).await?;
         let actual = peers.get(&peer).await?.expect("the peer record should be present");
 
         assert_eq!(actual.backoff, peers.cfg.backoff_max);
@@ -679,10 +670,10 @@ mod tests {
         expected.sort();
 
         peers
-            .update(&first, Ok(std::time::Duration::from_millis(latency)), None)
+            .update(&first, Ok(std::time::Duration::from_millis(latency)))
             .await?;
         peers
-            .update(&second, Ok(std::time::Duration::from_millis(latency)), None)
+            .update(&second, Ok(std::time::Duration::from_millis(latency)))
             .await?;
 
         // assert_eq!(
@@ -765,9 +756,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
-        peers
-            .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-            .await?;
+        peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
 
         assert_eq!(peers.health().await, Health::Orange);
 
@@ -794,7 +783,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
-        assert!(peers.update(&peer, Err(()), None).await.is_ok());
+        assert!(peers.update(&peer, Err(())).await.is_ok());
 
         assert!(peers.is_ignored(&public).await);
 
@@ -822,9 +811,7 @@ mod tests {
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
         for _ in 0..3 {
-            peers
-                .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-                .await?;
+            peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
         }
 
         assert_eq!(peers.health().await, Health::Green);
@@ -854,12 +841,8 @@ mod tests {
         peers.add(&peer2, PeerOrigin::IncomingConnection, vec![]).await?;
 
         for _ in 0..3 {
-            peers
-                .update(&peer2, Ok(current_time().as_unix_timestamp()), None)
-                .await?;
-            peers
-                .update(&peer, Ok(current_time().as_unix_timestamp()), None)
-                .await?;
+            peers.update(&peer2, Ok(current_time().as_unix_timestamp())).await?;
+            peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
         }
 
         assert_eq!(peers.health().await, Health::Green);

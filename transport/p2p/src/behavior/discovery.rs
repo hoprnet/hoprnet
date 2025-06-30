@@ -9,10 +9,7 @@ use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
     core::Endpoint,
-    swarm::{
-        CloseConnection, ConnectionDenied, ConnectionId, NetworkBehaviour, ToSwarm, dial_opts::DialOpts,
-        dummy::ConnectionHandler,
-    },
+    swarm::{CloseConnection, ConnectionDenied, ConnectionId, NetworkBehaviour, ToSwarm, dummy::ConnectionHandler},
 };
 
 #[derive(Debug)]
@@ -222,13 +219,6 @@ impl NetworkBehaviour for Behaviour {
                         }
 
                         self.all_peers.insert(peer, multiaddresses.clone());
-
-                        if self.allowed_peers.contains(&peer) {
-                            // the dial is performed to create a first connection some time before the heartbeat mechanism
-                            // kicks in, otherwise the heartbeat is likely to fail on the first try due to dial and protocol
-                            // negotiation taking longer than the request response timeout
-                            self.pending_events.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(peer).addresses(multiaddresses).build()});
-                        }
                     }
                 }
             },
