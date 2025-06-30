@@ -177,7 +177,7 @@ jobs:
       - load_test
       - build_dappnode
       - docs
-      # - bencher
+      - bencher
     if: ${{ failure() }}
     runs-on: ubuntu-latest
     steps:
