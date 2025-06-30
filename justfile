@@ -22,3 +22,34 @@ run-smoke-test-all:
 # run a single smoke test
 run-smoke-test TEST:
     nix develop .#citest -c uv run --frozen -m pytest tests/test_{{TEST}}.py
+
+package-packager packager arch:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    RELEASE_VERSION=$(./scripts/get-current-version.sh)
+    case "{{arch}}" in
+        x86_64-linux)
+            ARCHITECTURE="amd64"
+            ;;
+        aarch64-linux)
+            ARCHITECTURE="arm64"
+            ;;
+        armv7l-linux)
+            ARCHITECTURE="armhf"
+            ;;
+        *)
+            echo "Unsupported architecture: {{arch}}"
+            exit 1
+            ;;
+    esac
+    export RELEASE_VERSION ARCHITECTURE
+    envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
+    mkdir -p dist/packages
+    nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
+
+package arch:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    just package-packager deb {{arch}}
+    just package-packager rpm {{arch}}
+    just package-packager apk {{arch}}
