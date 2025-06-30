@@ -28,7 +28,7 @@ on:
         description: 'Build for production'
 
 concurrency:
-  group: ${{ github.ref }}-build-docker-${{ inputs.package }}
+  group: ${{ inputs.source_branch || github.ref_name }}-build-docker-${{ inputs.package }}
   cancel-in-progress: true
 jobs:
   docker:

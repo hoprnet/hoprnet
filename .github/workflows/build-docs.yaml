@@ -23,7 +23,7 @@ on:
         description: 'Publish the docs'
 
 concurrency:
-  group: ${{ github.ref }}-docs
+  group: ${{ inputs.source_branch || github.ref_name }}-docs
   cancel-in-progress: true
 
 permissions:

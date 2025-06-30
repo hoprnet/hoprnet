@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.ref }}-checks
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-checks
   cancel-in-progress: true
 
 jobs:
