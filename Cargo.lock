@@ -6178,7 +6178,7 @@ dependencies = [
  "libp2p-noise",
  "libp2p-quic",
  "libp2p-request-response",
- "libp2p-swarm",
+ "libp2p-swarm 0.47.0",
  "libp2p-tcp",
  "libp2p-upnp",
  "libp2p-yamux",
@@ -6196,7 +6196,7 @@ checksum = "d16ccf824ee859ca83df301e1c0205270206223fd4b1f2e512a693e1912a8f4a"
 dependencies = [
  "libp2p-core",
  "libp2p-identity",
- "libp2p-swarm",
+ "libp2p-swarm 0.47.0",
 ]
 
 [[package]]
@@ -6214,7 +6214,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "libp2p-request-response",
- "libp2p-swarm",
+ "libp2p-swarm 0.47.0",
  "quick-protobuf",
  "quick-protobuf-codec",
  "rand 0.8.5",
@@ -6232,7 +6232,7 @@ checksum = "a18b8b607cf3bfa2f8c57db9c7d8569a315d5cc0a282e6bfd5ebfc0a9840b2a0"
 dependencies = [
  "libp2p-core",
  "libp2p-identity",
- "libp2p-swarm",
+ "libp2p-swarm 0.47.0",
 ]
 
 [[package]]
@@ -6306,7 +6306,7 @@ dependencies = [
  "if-watch",
  "libp2p-core",
  "libp2p-identity",
- "libp2p-swarm",
+ "libp2p-swarm 0.47.0",
  "rand 0.8.5",
  "smallvec",
  "socket2 0.5.10",
@@ -6370,7 +6370,7 @@ dependencies = [
  "futures-bounded",
  "libp2p-core",
  "libp2p-identity",
- "libp2p-swarm",
+ "libp2p-swarm 0.47.0",
  "rand 0.8.5",
  "smallvec",
  "tracing",
@@ -6385,9 +6385,29 @@ dependencies = [
  "futures",
  "libp2p-core",
  "libp2p-identity",
- "libp2p-swarm",
+ "libp2p-swarm 0.46.0",
  "rand 0.8.5",
  "tracing",
+]
+
+[[package]]
+name = "libp2p-swarm"
+version = "0.47.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6aa762e5215919a34e31c35d4b18bf2e18566ecab7f8a3d39535f4a3068f8b62"
+dependencies = [
+ "either",
+ "fnv",
+ "futures",
+ "futures-timer",
+ "libp2p-core",
+ "libp2p-identity",
+ "lru 0.12.5",
+ "multistream-select",
+ "rand 0.8.5",
+ "smallvec",
+ "tracing",
+ "web-time",
 ]
 
 [[package]]
@@ -6468,7 +6488,7 @@ dependencies = [
  "futures-timer",
  "igd-next",
  "libp2p-core",
- "libp2p-swarm",
+ "libp2p-swarm 0.47.0",
  "tokio",
  "tracing",
 ]
