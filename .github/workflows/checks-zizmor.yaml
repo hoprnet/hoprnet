@@ -17,7 +17,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.ref }}-zizmor
+  group: ${{ inputs.source_branch || github.ref_name }}-zizmor
   cancel-in-progress: true
 
 permissions: {}

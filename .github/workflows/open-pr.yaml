@@ -54,7 +54,7 @@ jobs:
             bot
             ignore-semantic-pull-request
   label:
-    name: Add labels
+    name: PR / Add labels
     runs-on: self-hosted-hoprnet-small
     permissions:
       contents: read

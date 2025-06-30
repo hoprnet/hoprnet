@@ -21,7 +21,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.ref }}-lint
+  group: ${{ inputs.source_branch || github.ref_name }}-lint
   cancel-in-progress: true
 
 permissions:
