@@ -30,6 +30,8 @@ jobs:
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    permissions:
+      contents: read
     secrets: inherit
 
   lint:
@@ -48,4 +50,6 @@ jobs:
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    permissions:
+      contents: read
     secrets: inherit
