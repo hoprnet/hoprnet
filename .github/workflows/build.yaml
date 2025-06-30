@@ -8,7 +8,7 @@ on:
   merge_group:
     types: [checks_requested]
   pull_request_target:
-  pull_request:
+  # pull_request:
     types:
       - opened
       - synchronize
