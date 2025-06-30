@@ -22,6 +22,8 @@
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
   - [Install via debian package manager](#install-via-debian-package-manager)
+  - [Install via Red Hat package manager](#install-via-red-hat-package-manager)
+  - [Install via Alpine package manager](#install-via-alpine-package-manager)
 - [Usage](#usage)
   - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
@@ -135,7 +137,7 @@ Uninstall:
 sudo dpkg --purge --force-remove-reinstreq hoprd
 ```
 
-### Install via RPM package manager
+### Install via Red Hat package manager
 
 Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
 

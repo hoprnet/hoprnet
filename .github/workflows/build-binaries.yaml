@@ -74,7 +74,7 @@ jobs:
         id: vars
         run: |
           declare branch binary target package_suffix runner_needs_nix_setup
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
             echo "The workflow is triggered by other pipeline"
             repo=${{ inputs.source_repo }}
             branch=${{ inputs.source_branch }}
