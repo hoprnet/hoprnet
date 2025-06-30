@@ -4,6 +4,7 @@
 #################################################################################
 name: Open PR
 
+# Testing the PR title and adding labels to the PR.
 on:
   pull_request_target:
     types:
