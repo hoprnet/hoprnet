@@ -3,6 +3,7 @@ import random
 
 import pytest
 
+from sdk.python.api.balance import Balance
 from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes
@@ -25,7 +26,7 @@ class TestRedeemingWithSwarm:
     ):
         statistics = await swarm7[peer].api.get_tickets_statistics()
 
-        assert statistics.unredeemed_value == 0
+        assert statistics.unredeemed_value == Balance.zero("wxHOPR")
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("route", make_routes([1], barebone_nodes()))
@@ -58,7 +59,7 @@ class TestRedeemingWithSwarm:
 
             # No remaining unredeemed tickets
             ticket_statistics = await relay.api.get_tickets_statistics()
-            assert ticket_statistics.unredeemed_value == 0
+            assert ticket_statistics.unredeemed_value == Balance.zero("wxHOPR")
 
             # No tickets in both channels
             assert await relay.api.channel_get_tickets(channels.fwd_channels[0].id) == []
@@ -96,7 +97,7 @@ class TestRedeemingWithSwarm:
 
             # No remaining unredeemed tickets
             ticket_statistics = await relay.api.get_tickets_statistics()
-            assert ticket_statistics.unredeemed_value == 0
+            assert ticket_statistics.unredeemed_value == Balance.zero("wxHOPR")
 
             # No tickets in both channels
             assert await relay.api.channel_get_tickets(channels.fwd_channels[0].id) == []
