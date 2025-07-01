@@ -27,6 +27,7 @@ mod m20250603_000024_index_reset;
 mod m20250603_000025_peers_reset;
 mod m20250603_000026_logs_reset;
 mod m20250604_000027_index_initial_seed;
+mod m20250701_000028_peers_deprecate_fields;
 
 #[derive(PartialEq)]
 pub enum BackendType {

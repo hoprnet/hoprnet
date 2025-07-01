@@ -5080,7 +5080,6 @@ dependencies = [
  "lazy_static",
  "mockall",
  "rand 0.8.5",
- "semver 1.0.26",
  "serde",
  "serde_with",
  "smart-default",

@@ -96,14 +96,12 @@ impl PeerSelector {
 pub struct PeerStatus {
     pub id: (OffchainPublicKey, PeerId),
     pub origin: PeerOrigin,
-    pub is_public: bool,
     pub last_seen: SystemTime,
     pub last_seen_latency: Duration,
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
     pub ignored: Option<SystemTime>,
-    pub peer_version: Option<String>,
     pub multiaddresses: Vec<Multiaddr>,
     // Should be public(crate) but the separation through traits does not allow direct SQL ORM serde
     pub quality: f64,
@@ -116,7 +114,6 @@ impl PeerStatus {
         PeerStatus {
             id: (OffchainPublicKey::try_from(&id).expect("invalid peer id given"), id),
             origin,
-            is_public: true,
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
             last_seen: SystemTime::UNIX_EPOCH,
@@ -124,7 +121,6 @@ impl PeerStatus {
             ignored: None,
             backoff,
             quality: 0.0,
-            peer_version: None,
             quality_avg: SingleSumSMA::new(quality_window as usize),
             multiaddresses: vec![],
         }

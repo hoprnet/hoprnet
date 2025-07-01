@@ -133,11 +133,9 @@ impl HoprDbPeersOperations for HoprDb {
                     .into(),
             );
             peer_data.origin = sea_orm::ActiveValue::Set(new_status.origin as i8);
-            peer_data.version = sea_orm::ActiveValue::Set(new_status.peer_version);
             peer_data.last_seen = sea_orm::ActiveValue::Set(DateTime::<Utc>::from(new_status.last_seen));
             peer_data.last_seen_latency = sea_orm::ActiveValue::Set(new_status.last_seen_latency.as_millis() as i32);
             peer_data.ignored = sea_orm::ActiveValue::Set(new_status.ignored.map(DateTime::<Utc>::from));
-            peer_data.public = sea_orm::ActiveValue::Set(new_status.is_public);
             peer_data.quality = sea_orm::ActiveValue::Set(new_status.quality);
             peer_data.quality_sma = sea_orm::ActiveValue::Set(Some(
                 bincode::serde::encode_to_vec(&new_status.quality_avg, DB_BINCODE_CONFIGURATION)
@@ -282,14 +280,12 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
         Ok(PeerStatus {
             id: (key, key.into()),
             origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::DecodingError)?,
-            is_public: value.public,
             last_seen: value.last_seen.into(),
             last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,
             heartbeats_succeeded: value.heartbeats_successful.unwrap_or_default() as u64,
             backoff: value.backoff.unwrap_or(1.0f64),
             ignored: value.ignored.map(|v| v.into()),
-            peer_version: value.version,
             multiaddresses: {
                 if let sea_orm::query::JsonValue::Array(mas) = value.multi_addresses {
                     mas.into_iter()
@@ -448,7 +444,6 @@ mod tests {
         peer_status.multiaddresses = vec![ma_1, ma_2];
         peer_status.backoff = 2.0;
         peer_status.ignored = None;
-        peer_status.peer_version = Some("1.2.3".into());
         for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
@@ -478,7 +473,6 @@ mod tests {
         peer_status.last_seen_latency = Duration::from_secs(2);
         peer_status.backoff = 2.0;
         peer_status.ignored = None;
-        peer_status.peer_version = Some("1.2.3".into());
         peer_status.multiaddresses = vec![];
         for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
@@ -543,7 +537,6 @@ mod tests {
                 peer_status.heartbeats_succeeded = 4;
                 peer_status.backoff = 1.0;
                 peer_status.ignored = None;
-                peer_status.peer_version = Some("1.2.3".into());
                 for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
                     peer_status.update_quality(i);
                 }
@@ -617,7 +610,6 @@ mod tests {
         peer_status.heartbeats_succeeded = 4;
         peer_status.backoff = 1.0;
         peer_status.ignored = None;
-        peer_status.peer_version = Some("1.2.3".into());
         for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
@@ -640,12 +632,10 @@ mod tests {
         peer_status.last_seen = SystemTime::UNIX_EPOCH.add(Duration::from_secs(2));
         peer_status.last_seen_latency = Duration::from_secs(2);
         peer_status.multiaddresses = vec![];
-        peer_status.is_public = false;
         peer_status.heartbeats_sent = 3;
         peer_status.heartbeats_succeeded = 4;
         peer_status.backoff = 2.0;
         peer_status.ignored = None;
-        peer_status.peer_version = Some("1.2.3".into());
 
         db.update_network_peer(peer_status).await?;
 

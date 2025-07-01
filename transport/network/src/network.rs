@@ -214,7 +214,6 @@ where
             }
 
             entry.heartbeats_sent += 1;
-            entry.peer_version = None;
 
             if let Ok(latency) = ping_result {
                 entry.last_seen = current_time();

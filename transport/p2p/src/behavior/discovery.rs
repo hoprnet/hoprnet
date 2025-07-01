@@ -29,7 +29,7 @@ pub struct Behaviour {
             <<Self as NetworkBehaviour>::ConnectionHandler as libp2p::swarm::ConnectionHandler>::FromBehaviour,
         >,
     >,
-    all_peers: HashMap<PeerId, Vec<Multiaddr>>,
+    bootstrap_peers: HashMap<PeerId, Vec<Multiaddr>>,
     allowed_peers: HashSet<PeerId>,
     connected_peers: HashMap<PeerId, usize>,
 }
@@ -42,7 +42,7 @@ impl Behaviour {
         Self {
             me,
             events: Box::pin(onchain_events.map(DiscoveryInput::Indexer)),
-            all_peers: HashMap::new(),
+            bootstrap_peers: HashMap::new(),
             pending_events: VecDeque::new(),
             allowed_peers: HashSet::new(),
             connected_peers: HashMap::new(),
@@ -103,7 +103,10 @@ impl NetworkBehaviour for Behaviour {
 
             if self.allowed_peers.contains(&peer) {
                 // inject the multiaddress of the peer for possible dial usage by stream protocols
-                return Ok(self.all_peers.get(&peer).map_or(vec![], |addresses| addresses.clone()));
+                return Ok(self
+                    .bootstrap_peers
+                    .get(&peer)
+                    .map_or(vec![], |addresses| addresses.clone()));
             } else {
                 return Err(libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(
                     format!("Connection to '{peer}' is not allowed"),
@@ -182,7 +185,7 @@ impl NetworkBehaviour for Behaviour {
                 PeerDiscovery::Allow(peer) => {
                     let inserted_into_allow_list = self.allowed_peers.insert(peer);
 
-                    let multiaddresses = self.all_peers.get(&peer);
+                    let multiaddresses = self.bootstrap_peers.get(&peer);
                     if let Some(multiaddresses) = multiaddresses {
                         for address in multiaddresses {
                             self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
@@ -192,7 +195,7 @@ impl NetworkBehaviour for Behaviour {
                         }
                     }
 
-                    tracing::debug!(%peer, inserted_into_allow_list, emitted_libp2p_address_announce = multiaddresses.is_some_and(|v| !v.is_empty()), "Network registry allow");
+                    tracing::debug!(%peer, state = "allow", inserted_into_allow_list, emitted_libp2p_address_announce = multiaddresses.is_some_and(|v| !v.is_empty()), "Network registry");
                 }
                 PeerDiscovery::Ban(peer) => {
                     let was_allowed = self.allowed_peers.remove(&peer);
@@ -205,7 +208,7 @@ impl NetworkBehaviour for Behaviour {
                         });
                     }
 
-                    tracing::debug!(%peer, was_allowed, will_close_active_connection = is_connected, "Network registry ban");
+                    tracing::debug!(%peer, state = "ban", was_allowed, will_close_active_connection = is_connected, "Network registry");
                 }
                 PeerDiscovery::Announce(peer, multiaddresses) => {
                     if peer != self.me {
@@ -218,7 +221,7 @@ impl NetworkBehaviour for Behaviour {
                             });
                         }
 
-                        self.all_peers.insert(peer, multiaddresses.clone());
+                        self.bootstrap_peers.insert(peer, multiaddresses.clone());
                     }
                 }
             },
