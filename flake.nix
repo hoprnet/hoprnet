@@ -616,6 +616,12 @@
               };
             };
             tools = pkgs;
+            excludes = [
+              "vendor/*"
+              "ethereum/contracts/*"
+              "ethereum/bindings/src/codegen*"
+              ".gcloudignore"
+            ];
           };
 
           check-bindings =
