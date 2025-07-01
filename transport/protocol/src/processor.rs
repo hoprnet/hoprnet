@@ -14,6 +14,8 @@ use hopr_transport_identity::PeerId;
 use hopr_transport_packet::prelude::ApplicationData;
 use tracing::error;
 
+use crate::capture::PacketCapture;
+
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
     pub static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
@@ -41,6 +43,8 @@ where
 {
     db: Db,
     cfg: PacketInteractionConfig,
+    #[cfg(feature = "capture")]
+    capture: PacketCapture,
 }
 
 #[async_trait::async_trait]
@@ -63,6 +67,9 @@ where
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
+        #[cfg(feature = "capture")]
+        let _ = self.capture.capture_outgoing(&packet);
+
         Ok(packet)
     }
 }
@@ -79,7 +86,8 @@ where
         let previous_hop = OffchainPublicKey::try_from(peer)
             .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
 
-        self.db
+        let packet = self
+            .db
             .from_recv(
                 data,
                 &self.cfg.packet_keypair,
@@ -96,7 +104,14 @@ where
                     })
                 }
                 _ => PacketError::PacketConstructionError(e.to_string()),
-            })
+            })?;
+
+        #[cfg(feature = "capture")]
+        if let Some(incoming) = &packet {
+            let _ = self.capture.capture_incoming(incoming);
+        }
+
+        Ok(packet)
     }
 }
 
@@ -106,7 +121,12 @@ where
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Db, cfg: PacketInteractionConfig) -> Self {
-        Self { db, cfg }
+        Self {
+            db,
+            cfg,
+            #[cfg(feature = "capture")]
+            capture: PacketCapture::default(),
+        }
     }
 
     // NOTE: as opposed to the winning probability, the ticket price does not have

@@ -66,6 +66,10 @@ pub mod processor;
 pub mod stream;
 
 pub mod timer;
+
+#[cfg(feature = "capture")]
+mod capture;
+
 use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
