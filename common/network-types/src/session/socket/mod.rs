@@ -192,7 +192,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 }
                 future::ok(SessionMessage::<C>::Segment(segment))
             })
-            .segmenter::<C>(cfg.frame_size);
+            .segmenter_with_terminating_segment::<C>(cfg.frame_size);
 
         // We have to merge the streams here and spawn a special task for it
         // Since the control messages from the State can come independent of Upstream writes.
@@ -280,6 +280,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         }
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
                         downstream_terminated_clone.store(frame.0.is_terminating, std::sync::atomic::Ordering::Relaxed);
+                        if frame.0.is_terminating {
+                            tracing::warn!("terminating frame received");
+                        }
                         Some(Ok(frame.0))
                     }
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {

@@ -262,7 +262,7 @@ pub trait SegmenterExt: futures::Sink<Segment, Error = SessionError> {
     where
         Self: Sized,
     {
-        Segmenter::new(self, frame_size, false, true)
+        Segmenter::new(self, frame_size, true, false)
     }
 }
 
