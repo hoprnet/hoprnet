@@ -1,8 +1,7 @@
 use std::fs::File;
 
-use futures::{StreamExt, future::Either, pin_mut};
+use futures::{FutureExt, StreamExt};
 use hopr_db_api::prelude::{IncomingPacket, OutgoingPacket};
-use hopr_primitive_types::errors::GeneralError;
 use pcap_file::{
     DataLink,
     pcapng::{
@@ -13,104 +12,132 @@ use pcap_file::{
         },
     },
 };
-use uuid::Uuid;
 
 use crate::HOPR_PACKET_SIZE;
 
-type CaptureSender = std::sync::Arc<std::sync::Mutex<futures::channel::mpsc::Sender<Either<Box<[u8]>, Box<[u8]>>>>>;
+#[derive(Copy, Clone, Debug, strum::Display)]
+enum PacketDirection {
+    Incoming,
+    Outgoing,
+}
+
+trait PacketWriter {
+    fn write_packet(&mut self, packet: &[u8], direction: PacketDirection) -> std::io::Result<()>;
+}
+
+struct PcapPacketWriter(PcapNgWriter<File>);
+
+impl PcapPacketWriter {
+    pub fn new(file: File) -> std::io::Result<Self> {
+        let mut writer = PcapNgWriter::new(file).map_err(std::io::Error::other)?;
+
+        writer
+            .write_pcapng_block(InterfaceDescriptionBlock {
+                linktype: DataLink::ETHERNET,
+                snaplen: 0,
+                options: vec![],
+            })
+            .map_err(std::io::Error::other)?;
+
+        Ok(Self(writer))
+    }
+}
+
+impl PacketWriter for PcapPacketWriter {
+    fn write_packet(&mut self, packet: &[u8], direction: PacketDirection) -> std::io::Result<()> {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+        self
+            .0
+            .write_pcapng_block(EnhancedPacketBlock {
+                interface_id: 0,
+                timestamp,
+                original_len: HOPR_PACKET_SIZE as u32,
+                data: packet.into(),
+                options: vec![EnhancedPacketOption::Comment(direction.to_string().into())],
+            })
+            .map(|_| ())
+            .map_err(std::io::Error::other)
+    }
+}
+
+struct UdpPacketDump(std::net::UdpSocket);
+
+impl UdpPacketDump {
+    pub fn new(addr: std::net::SocketAddr) -> std::io::Result<Self> {
+        Ok(Self(std::net::UdpSocket::bind(addr)?))
+    }
+}
+
+impl PacketWriter for UdpPacketDump {
+    fn write_packet(&mut self, packet: &[u8], _direction: PacketDirection) -> std::io::Result<()> {
+        let mut remaining = packet.len();
+        while remaining > 0 {
+            remaining -= self.0.send(packet)?;
+        }
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct PacketCapture {
-    capture_tx: CaptureSender,
-}
-
-impl Default for PacketCapture {
-    fn default() -> Self {
-        let (capture_tx, capture_rx) = futures::channel::mpsc::channel::<Either<Box<[u8]>, Box<[u8]>>>(20000);
-        hopr_async_runtime::prelude::spawn(async move {
-            match File::create_new(format!("{}.pcap", Uuid::new_v4()))
-                .and_then(|f| PcapNgWriter::new(f).map_err(std::io::Error::other))
-            {
-                Ok(pcap_writer) => {
-                    let pcap_writer = std::sync::Arc::new(std::sync::Mutex::new(pcap_writer));
-
-                    let pcap_writer_clone = pcap_writer.clone();
-                    hopr_async_runtime::prelude::spawn_blocking(move || {
-                        let _ = pcap_writer_clone
-                            .lock()
-                            .map_err(|_| std::io::Error::other("lock error"))
-                            .and_then(|mut w| {
-                                w.write_pcapng_block(InterfaceDescriptionBlock {
-                                    linktype: DataLink::ETHERNET,
-                                    snaplen: 0,
-                                    options: vec![],
-                                })
-                                .map_err(std::io::Error::other)
-                            });
-                    });
-
-                    pin_mut!(capture_rx);
-                    while let Some(packet) = capture_rx.next().await {
-                        let timestamp = std::time::SystemTime::now()
-                            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                            .unwrap();
-                        let block = match packet {
-                            Either::Left(outgoing) => EnhancedPacketBlock {
-                                interface_id: 0,
-                                timestamp,
-                                original_len: HOPR_PACKET_SIZE as u32,
-                                data: outgoing.into_vec().into(),
-                                options: vec![EnhancedPacketOption::Comment("outgoing".into())],
-                            },
-                            Either::Right(incoming) => EnhancedPacketBlock {
-                                interface_id: 0,
-                                timestamp,
-                                original_len: HOPR_PACKET_SIZE as u32,
-                                data: incoming.into_vec().into(),
-                                options: vec![EnhancedPacketOption::Comment("incoming".into())],
-                            },
-                        };
-
-                        let pcap_writer_clone = pcap_writer.clone();
-                        hopr_async_runtime::prelude::spawn_blocking(move || {
-                            let _ = pcap_writer_clone
-                                .lock()
-                                .map_err(|_| std::io::Error::other("lock error"))
-                                .and_then(|mut w| w.write_pcapng_block(block).map_err(std::io::Error::other));
-                        });
-                    }
-                }
-                Err(error) => tracing::error!(%error, "capture could not be created"),
-            }
-        });
-
-        Self {
-            capture_tx: std::sync::Arc::new(std::sync::Mutex::new(capture_tx)),
-        }
-    }
+    capture_tx: futures::channel::mpsc::Sender<(PacketDirection, Box<[u8]>)>,
 }
 
 impl PacketCapture {
-    pub fn capture_incoming(&self, packet: &IncomingPacket) -> crate::errors::Result<()> {
-        Ok(self
-            .capture_tx
-            .lock()
-            .map_err(|_| GeneralError::NonSpecificError("capture: cannot lock".into()))
-            .and_then(|mut tx| {
-                tx.try_send(Either::Right(encode_incoming_packet_capture(packet)))
-                    .map_err(|_| GeneralError::NonSpecificError("capture: cannot send packet".into()))
-            })?)
+    fn start_queue<W: PacketWriter + Send + 'static>(
+        writer: W,
+        capture_rx: futures::channel::mpsc::Receiver<(PacketDirection, Box<[u8]>)>,
+    ) {
+        let writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
+        hopr_async_runtime::prelude::spawn(capture_rx.for_each(move |(dir, data)| {
+            let writer = writer.clone();
+            hopr_async_runtime::prelude::spawn_blocking(move || {
+                writer
+                    .lock()
+                    .map_err(|_| std::io::Error::other("lock poisoned"))
+                    .and_then(|mut w| w.write_packet(&data, dir))
+            })
+            .map(|_| ())
+        }));
     }
 
-    pub fn capture_outgoing(&self, packet: &OutgoingPacket) -> crate::errors::Result<()> {
-        Ok(self
-            .capture_tx
-            .lock()
-            .map_err(|_| GeneralError::NonSpecificError("capture: cannot lock".into()))
-            .and_then(|mut tx| {
-                tx.try_send(Either::Left(encode_outgoing_packet_capture(packet)))
-                    .map_err(|_| GeneralError::NonSpecificError("capture: cannot send packet".into()))
-            })?)
+    pub fn new_file(file: File) -> std::io::Result<Self> {
+        let (capture_tx, capture_rx) = futures::channel::mpsc::channel(20000);
+
+        let pcap = PcapPacketWriter::new(file)?;
+        Self::start_queue(pcap, capture_rx);
+
+        tracing::debug!("packet capture started to a file");
+        Ok(Self { capture_tx })
+    }
+
+    pub fn new_udp<A: std::net::ToSocketAddrs>(addr: A) -> std::io::Result<Self> {
+        let (capture_tx, capture_rx) = futures::channel::mpsc::channel(20000);
+
+        let addr = addr
+            .to_socket_addrs()?
+            .next()
+            .ok_or(std::io::Error::other("no address to bind"))?;
+        let udp = UdpPacketDump::new(addr)?;
+
+        Self::start_queue(udp, capture_rx);
+
+        tracing::debug!(%addr, "packet capture started to udp socket");
+        Ok(Self { capture_tx })
+    }
+
+    pub fn capture_incoming(&mut self, packet: &IncomingPacket) -> std::io::Result<()> {
+        self.capture_tx
+            .try_send((PacketDirection::Incoming, encode_incoming_packet_capture(packet)))
+            .map_err(std::io::Error::other)
+    }
+
+    pub fn capture_outgoing(&mut self, packet: &OutgoingPacket) -> std::io::Result<()> {
+        self.capture_tx
+            .try_send((PacketDirection::Outgoing, encode_outgoing_packet_capture(packet)))
+            .map_err(std::io::Error::other)
     }
 }
 

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use futures::{Sink, SinkExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
 pub use hopr_crypto_packet::errors::PacketError;
@@ -12,7 +14,7 @@ use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::PeerId;
 use hopr_transport_packet::prelude::ApplicationData;
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::capture::PacketCapture;
 
@@ -44,7 +46,7 @@ where
     db: Db,
     cfg: PacketInteractionConfig,
     #[cfg(feature = "capture")]
-    capture: PacketCapture,
+    capture: Option<std::sync::Arc<std::sync::Mutex<PacketCapture>>>,
 }
 
 #[async_trait::async_trait]
@@ -68,7 +70,12 @@ where
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
         #[cfg(feature = "capture")]
-        let _ = self.capture.capture_outgoing(&packet);
+        if let Some(capture) = &self.capture {
+            let _ = capture
+                .lock()
+                .map_err(|_| std::io::Error::other("lock error"))
+                .and_then(|mut c| c.capture_outgoing(&packet));
+        }
 
         Ok(packet)
     }
@@ -108,7 +115,12 @@ where
 
         #[cfg(feature = "capture")]
         if let Some(incoming) = &packet {
-            let _ = self.capture.capture_incoming(incoming);
+            if let Some(capture) = &self.capture {
+                let _ = capture
+                    .lock()
+                    .map_err(|_| std::io::Error::other("lock error"))
+                    .and_then(|mut c| c.capture_incoming(incoming));
+            }
         }
 
         Ok(packet)
@@ -121,11 +133,32 @@ where
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Db, cfg: PacketInteractionConfig) -> Self {
+        #[cfg(feature = "capture")]
+        let capture = if let Ok(desc) = std::env::var("HOPR_CAPTURE_PACKETS") {
+            if let Ok(sock_addr) = std::net::SocketAddr::from_str(&desc) {
+                PacketCapture::new_udp(sock_addr)
+                    .map(|c| std::sync::Arc::new(std::sync::Mutex::new(c)))
+                    .inspect_err(|error| error!(%error, "failed to create packet capture"))
+                    .ok()
+            } else if let Ok(file) = std::fs::File::open(&desc) {
+                PacketCapture::new_file(file)
+                    .map(|c| std::sync::Arc::new(std::sync::Mutex::new(c)))
+                    .inspect_err(|error| error!(%error, "failed to create packet capture"))
+                    .ok()
+            } else {
+                error!(desc, "failed to create packet capture: invalid socket address or file");
+                None
+            }
+        } else {
+            warn!("no packet capture specified");
+            None
+        };
+
         Self {
             db,
             cfg,
             #[cfg(feature = "capture")]
-            capture: PacketCapture::default(),
+            capture,
         }
     }
 
