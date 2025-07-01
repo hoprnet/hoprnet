@@ -13,11 +13,11 @@ on:
         required: true
         type: string
 concurrency:
-  group: ${{ inputs.source_branch || github.ref_name }}-audit
+  group: ${{ inputs.source_branch || github.ref_name }}-pre-commit
   cancel-in-progress: true
 
 jobs:
-  cargo-audit:
+  pre-commit:
     name: Pre-commit
     runs-on: self-hosted-hoprnet-small
     steps:
@@ -47,4 +47,4 @@ jobs:
           USER: runner
 
       - name: Run Pre-commit
-        run: nix develop -c "pre-commit"
+        run: nix develop --command bash -c "pre-commit run --all-files --show-diff-on-failure"
