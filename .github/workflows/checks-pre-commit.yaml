@@ -47,4 +47,4 @@ jobs:
           USER: runner
 
       - name: Run Pre-commit
-        run: nix develop --command bash -c "pre-commit run --all-files --show-diff-on-failure"
+        run: nix build -L .#pre-commit-check
