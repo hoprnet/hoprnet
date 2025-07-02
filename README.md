@@ -402,7 +402,7 @@ For usage examples of the generated SDK, refer to the generated README.md file i
 
 ### Building a Docker image
 
-Docker images can be build using the respective nix flake outputs.
+Docker images can be built using the respective nix flake outputs.
 The available images can be listed with:
 
 ```bash
