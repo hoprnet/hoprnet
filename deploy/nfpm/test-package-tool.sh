@@ -4,33 +4,33 @@ set -Eeuo pipefail
 
 PROJECT_ID="hopr-staging"
 ZONE="europe-west3-a"
-MACHINE_TYPE_x86="e2-medium" # GCP's x86_64 instances
-MACHINE_TYPE_ARM="t2a-standard-2"  # GCP's ARM instances
+MACHINE_TYPE_x86="e2-medium"      # GCP's x86_64 instances
+MACHINE_TYPE_ARM="t2a-standard-2" # GCP's ARM instances
 NETWORK="vpc-network"
 SUBNET="private-subnet"
 
 get_vm_image() {
-    case "${DISTRIBUTION}" in
-        deb)
-            echo "projects/debian-cloud/global/images/family/debian-12"
-            ;;
-        rpm)
-            echo "projects/centos-cloud/global/images/family/centos-stream-9"
-            ;;
-        archlinux)
-            # https://github.com/GoogleCloudPlatform/compute-archlinux-image-builder
-            echo "projects/arch-linux-gce/global/images/family/arch"
-            ;;
-        *)
-            echo "Unsupported distribution: ${DISTRIBUTION}. Supported distributions are: deb, rpm, archlinux."
-            exit 1
-            ;;
-    esac
+  case "${DISTRIBUTION}" in
+  deb)
+    echo "projects/debian-cloud/global/images/family/debian-12"
+    ;;
+  rpm)
+    echo "projects/centos-cloud/global/images/family/centos-stream-9"
+    ;;
+  archlinux)
+    # https://github.com/GoogleCloudPlatform/compute-archlinux-image-builder
+    echo "projects/arch-linux-gce/global/images/family/arch"
+    ;;
+  *)
+    echo "Unsupported distribution: ${DISTRIBUTION}. Supported distributions are: deb, rpm, archlinux."
+    exit 1
+    ;;
+  esac
 }
 
 create_action() {
   image=$(get_vm_image "${DISTRIBUTION}")
-  
+
   echo "Creating VM for distribution: $DISTRIBUTION, architecture: $ARCHITECTURE"
   if [ "${ARCHITECTURE}" == "aarch64" ]; then
     machine_type="$MACHINE_TYPE_ARM"
@@ -111,26 +111,26 @@ check_parameters() {
 
 main() {
   case "$ACTION" in
-    create)
-      create_action
-      ;;
-    copy)
-      copy_action
-      ;;
-    install)
-      install_action
-      ;;
-    delete)
-      delete_action
-      ;;
-    *)
-      echo "Invalid action specified. Use 'create' or 'delete'."
-      exit 1
-      ;;
+  create)
+    create_action
+    ;;
+  copy)
+    copy_action
+    ;;
+  install)
+    install_action
+    ;;
+  delete)
+    delete_action
+    ;;
+  *)
+    echo "Invalid action specified. Use 'create' or 'delete'."
+    exit 1
+    ;;
   esac
 }
 
-ACTION="$1" # e.g., "create", "copy", "install", "delete"
+ACTION="$1"       # e.g., "create", "copy", "install", "delete"
 DISTRIBUTION="$2" # e.g., "deb", "rpm", "archlinux"
 ARCHITECTURE="$3" # e.g., "x86_64-linux", "aarch64-linux"
 INSTANCE_NAME="hoprd-node-${DISTRIBUTION}-${ARCHITECTURE/_/-}"
