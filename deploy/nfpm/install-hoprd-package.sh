@@ -10,20 +10,20 @@ export HOPRD_PROVIDER="$5"
 
 # Install the package based on the distribution
 case "$DISTRIBUTION" in
-  deb)
-    apt-get update
-    apt install -y "/tmp/hoprd.${DISTRIBUTION}"
-    ;;
-  rpm)
-    sudo -E dnf install -y "/tmp/hoprd.${DISTRIBUTION}"
-    ;;
-  archlinux)
-    pacman --noconfirm -U "/tmp/hoprd.${DISTRIBUTION}" # --verbose --debug
-    ;;
-  *)
-    echo "Unsupported distribution: $DISTRIBUTION"
-    exit 1
-    ;;
+deb)
+  apt-get update
+  apt install -y "/tmp/hoprd.${DISTRIBUTION}"
+  ;;
+rpm)
+  sudo -E dnf install -y "/tmp/hoprd.${DISTRIBUTION}"
+  ;;
+archlinux)
+  pacman --noconfirm -U "/tmp/hoprd.${DISTRIBUTION}" # --verbose --debug
+  ;;
+*)
+  echo "Unsupported distribution: $DISTRIBUTION"
+  exit 1
+  ;;
 esac
 
 # Check the health status of the hoprd service
