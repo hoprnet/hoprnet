@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeo pipefail
 
+trap 'echo "Error occurred during package installation. Pausing for manual inspection..."; sleep 600' ERR
+
 #set -x
 DISTRIBUTION="${1:?Error: DISTRIBUTION parameter is required}"
 export HOPRD_PASSWORD="$2"
