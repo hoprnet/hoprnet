@@ -53,3 +53,7 @@ package arch:
     just package-packager deb {{arch}}
     just package-packager rpm {{arch}}
     just package-packager apk {{arch}}
+
+# list all available docker image targets which can be built
+list-docker-images:
+    nix flake show --json | jq '.packages | to_entries | .[0].value | to_entries[] | select(.key | endswith("docker")) | .key'
