@@ -377,6 +377,7 @@ mod tests {
     use libp2p_identity::PeerId;
     use more_asserts::*;
 
+    use super::*;
     use crate::network::{Health, Network, NetworkConfig, PeerOrigin};
 
     #[test]

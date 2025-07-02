@@ -1,10 +1,12 @@
-#![allow(clippy::too_many_arguments)]
 //! This module contains all the methods used for onchain interaction, especially with Safe instance, Mutlicall, and
 //! Multisend contracts.
 //!
 //! [SafeTxOperation] corresponds to the `Operation` Enum used in Safe smart contract.
 //!
 //! [MultisendTransaction] struct is used for building transactions interacting with Multisend contract
+
+#![allow(clippy::too_many_arguments)]
+
 use std::{ops::Add, str::FromStr, sync::Arc};
 
 use IMulticall3Extract::IMulticall3ExtractInstance;
