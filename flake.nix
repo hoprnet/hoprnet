@@ -9,8 +9,7 @@
     crane.url = "github:ipetkov/crane/v0.20.1";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
-    # use change to add solc 0.8.24
-    solc.url = "github:hoprnet/solc.nix/tb/20240129-solc-0.8.24";
+    solc.url = "github:hellwolf/solc.nix";
     pre-commit.url = "github:cachix/git-hooks.nix";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     flake-root.url = "github:srid/flake-root";
@@ -936,7 +935,9 @@
       # platforms which are supported as build environments
       systems = [
         "x86_64-linux"
-        "aarch64-linux"
+        # NOTE: blocked by missing support in solc, see
+        # https://github.com/ethereum/solidity/issues/11351
+        # "aarch64-linux"
         "aarch64-darwin"
         "x86_64-darwin"
       ];
