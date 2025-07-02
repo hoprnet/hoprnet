@@ -71,7 +71,9 @@ copy_action() {
   echo "Copying artifacts on ${INSTANCE_NAME}"
   script_dir=$(cd "$(dirname "$0")" && pwd)
   gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="sudo mkdir -p /etc/hoprd && sudo chmod 777 /etc/hoprd"
-  gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/hopr.id" "${INSTANCE_NAME}":/etc/hoprd/hopr.id
+  if [ -f "${script_dir}/hopr.id" ]; then
+    gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/hopr.id" "${INSTANCE_NAME}":/etc/hoprd/hopr.id
+  fi
   gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/install-hoprd-package.sh" "${INSTANCE_NAME}":/tmp/install-hoprd-package.sh
   gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/../../dist/packages/hoprd-${ARCHITECTURE}.${DISTRIBUTION}" "${INSTANCE_NAME}":/tmp/hoprd."${DISTRIBUTION}"
   echo "Artifacts successfully copied on ${INSTANCE_NAME}"
