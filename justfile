@@ -59,3 +59,7 @@ test-package packager arch:
     deploy/nfpm/test-package-tool.sh copy {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
     deploy/nfpm/test-package-tool.sh install {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
     echo "Package installed successfully on {{packager}}-{{arch}}."
+
+# list all available docker image targets which can be built
+list-docker-images:
+    nix flake show --json | jq '.packages | to_entries | .[0].value | to_entries[] | select(.key | endswith("docker")) | .key'
