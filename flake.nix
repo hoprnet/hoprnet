@@ -11,7 +11,7 @@
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     # use change to add solc 0.8.24
     solc.url = "github:hoprnet/solc.nix/tb/20240129-solc-0.8.24";
-    pre-commit.url = "github:cachix/pre-commit-hooks.nix";
+    pre-commit.url = "github:cachix/git-hooks.nix";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     flake-root.url = "github:srid/flake-root";
 
@@ -616,6 +616,12 @@
               };
             };
             tools = pkgs;
+            excludes = [
+              "vendor/"
+              "ethereum/contracts/"
+              "ethereum/bindings/src/codegen"
+              ".gcloudignore"
+            ];
           };
 
           check-bindings =

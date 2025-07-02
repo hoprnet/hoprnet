@@ -9,25 +9,11 @@ maintainer: Hoprnet <contact@hoprnet.org>
 description: HOPR is a privacy-preserving messaging protocol which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
 license: GNU Lesser General Public License v3.0
 homepage: https://hoprnet.org
-overrides:
-  deb:
-    depends:
-      - systemd
-      - curl
-      - gettext
-      - logrotate
-  rpm:
-    depends:
-      - systemd
-      - curl
-      - gettext
-      - logrotate
-  apk:
-    depends:
-      - openrc
-      - curl
-      - gettext
-      - logrotate
+depends:
+  - systemd
+  - curl
+  - gettext
+  - logrotate
 
 contents:
   # Binaries
@@ -42,14 +28,8 @@ contents:
     dst: /etc/hoprd/hoprd-sample.cfg.yaml
     type: config
   - src: ./deploy/nfpm/hoprd.service
-    dst: /etc/systemd/system/hoprd.service
-    packager: deb
-  - src: ./deploy/nfpm/hoprd.service
-    dst: /etc/systemd/system/hoprd.service
-    packager: rpm
-  - src: ./deploy/nfpm/hoprd.initd
-    dst: /etc/init.d/hoprd
-    packager: apk
+    dst: /usr/lib/systemd/system/hoprd.service
+
 
 scripts:
   postinstall: ./deploy/nfpm/package-post-install.sh
