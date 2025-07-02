@@ -29,6 +29,7 @@ get_vm_image() {
 }
 
 create_action() {
+  local image
   image=$(get_vm_image "${DISTRIBUTION}")
 
   echo "Creating VM for distribution: $DISTRIBUTION, architecture: $ARCHITECTURE"
