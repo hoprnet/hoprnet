@@ -177,7 +177,7 @@ sudo pacman --noconfirm -U hoprd-${arch}-linux.pkg.tar.zst
 Uninstall:
 
 ```bash
-pacman del hoprd
+sudo pacman del hoprd
 ```
 
 ## Usage
