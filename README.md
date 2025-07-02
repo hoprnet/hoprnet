@@ -415,7 +415,7 @@ The following command builds the `hoprd` image for the host platform:
 nix build .#hoprd-docker
 ```
 
-If needed images for other platforms can be build by specifying the target
+If needed images for other platforms can be built by specifying the target
 platform. For example, to build the `hoprd` image for the `x86_64-linux`
 platform, while being on a Darwin host system, use the following command:
 
