@@ -423,7 +423,7 @@ platform, while being on a Darwin host system, use the following command:
 nix build .#packages.x86_64-linux.hoprd-docker
 ```
 
-NOTE: Building for different platform requires nix distributed builds to be
+NOTE: Building for different platforms requires nix distributed builds to be
 set up properly.
 See [Nix documentation](https://nix.dev/manual/nix/2.28/advanced-topics/distributed-builds.html)
 for more information.
