@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 stop_service() {
   systemctl disable hoprd.service || true
