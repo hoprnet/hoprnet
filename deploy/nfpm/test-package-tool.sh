@@ -18,6 +18,7 @@ get_vm_image() {
             echo "projects/centos-cloud/global/images/family/centos-stream-9"
             ;;
         archlinux)
+            # https://github.com/GoogleCloudPlatform/compute-archlinux-image-builder
             echo "projects/arch-linux-gce/global/images/family/arch"
             ;;
         *)
@@ -28,7 +29,7 @@ get_vm_image() {
 }
 
 create_action() {
-  local image=$(get_vm_image ${DISTRIBUTION})
+  image=$(get_vm_image "${DISTRIBUTION}")
   
   echo "Creating VM for distribution: $DISTRIBUTION, architecture: $ARCHITECTURE"
   if [ "${ARCHITECTURE}" == "aarch64" ]; then
@@ -53,11 +54,10 @@ create_action() {
     --metadata=startup-script='#! /bin/bash
       mkdir -p /etc/hoprd
       sudo chmod 777 /etc/hoprd
-      ( sleep 3600 && gcloud compute instances delete "$INSTANCE_NAME" --zone="$ZONE" --quiet ) &
     '
   sleep 15
   # Automatically delete the VM after 1 hour
-  while ! gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} ${INSTANCE_NAME} --command="echo SSH is accessible" --quiet; do
+  while ! gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="echo SSH is accessible" --quiet; do
     echo "Waiting for SSH to become accessible..."
     sleep 5
   done
@@ -69,23 +69,22 @@ create_action() {
 copy_action() {
   echo "Copying artifacts on ${INSTANCE_NAME}"
   script_dir=$(cd "$(dirname "$0")" && pwd)
-  gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} ${INSTANCE_NAME} --command="sudo mkdir -p /etc/hoprd && sudo chmod 777 /etc/hoprd"
-  gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/hopr.id" ${INSTANCE_NAME}:/etc/hoprd/hopr.id
-  gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/install-hoprd-package.sh" ${INSTANCE_NAME}:/tmp/install-hoprd-package.sh
-  gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/../../dist/packages/hoprd-${ARCHITECTURE}.${DISTRIBUTION}" ${INSTANCE_NAME}:/tmp/hoprd.${DISTRIBUTION}
+  gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="sudo mkdir -p /etc/hoprd && sudo chmod 777 /etc/hoprd"
+  gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/hopr.id" "${INSTANCE_NAME}":/etc/hoprd/hopr.id
+  gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/install-hoprd-package.sh" "${INSTANCE_NAME}":/tmp/install-hoprd-package.sh
+  gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/../../dist/packages/hoprd-${ARCHITECTURE}.${DISTRIBUTION}" "${INSTANCE_NAME}":/tmp/hoprd."${DISTRIBUTION}"
   echo "Artifacts successfully copied on ${INSTANCE_NAME}"
 }
 
 install_action() {
   echo "Installing hoprd package on ${INSTANCE_NAME}"
-  gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} ${INSTANCE_NAME} --command="sudo bash /tmp/install-hoprd-package.sh ${DISTRIBUTION} ${HOPRD_PASSWORD} ${HOPRD_SAFE_ADDRESS} ${HOPRD_MODULE_ADDRESS} ${HOPRD_PROVIDER}"
+  gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="sudo bash /tmp/install-hoprd-package.sh ${DISTRIBUTION} ${HOPRD_PASSWORD} ${HOPRD_SAFE_ADDRESS} ${HOPRD_MODULE_ADDRESS} ${HOPRD_PROVIDER}"
   echo "Package installed successfully on ${DISTRIBUTION}-${ARCHITECTURE}."
 }
 
 delete_action() {
   echo "Deleting VM for distribution: $DISTRIBUTION, architecture: $ARCHITECTURE"
-  gcloud compute instances delete "${INSTANCE_NAME}" --project=${PROJECT_ID} --zone=${ZONE} --quiet
-  if [ $? -ne 0 ]; then
+  if ! gcloud compute instances delete "${INSTANCE_NAME}" --project=${PROJECT_ID} --zone=${ZONE} --quiet; then
     echo "Failed to delete VM ${INSTANCE_NAME}. It may not exist or there was an error."
     exit 1
   fi
