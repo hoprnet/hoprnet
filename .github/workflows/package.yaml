@@ -27,6 +27,14 @@ jobs:
     if: github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
     steps:
 
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        with:
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -82,6 +90,18 @@ jobs:
       - name: Package binaries
         run: nix develop -c just package ${{ inputs.target }}
 
+      - name: Test Package debian
+        run: |
+          nix develop -c just test-package deb ${{ inputs.target }}
+
+      - name: Test Package centos
+        run: |
+          nix develop -c just test-package rpm ${{ inputs.target }}
+
+      - name: Test Package archlinux
+        run: |
+          nix develop -c just test-package archlinux ${{ inputs.target }}
+
       - name: Upload debian packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -94,8 +114,8 @@ jobs:
           name: hoprd-${{ inputs.target }}.rpm
           path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.rpm
 
-      - name: Upload alpine packaged artifact
+      - name: Upload archlinux packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: hoprd-${{ inputs.target }}.apk
-          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.apk
+          name: hoprd-${{ inputs.target }}.pkg.tar.zst
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.archlinux

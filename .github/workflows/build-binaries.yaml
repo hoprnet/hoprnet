@@ -47,7 +47,6 @@ on:
           - aarch64-linux
           - aarch64-darwin
           - x86_64-darwin
-          - armv7l-linux
         required: true
         description: 'Architecture to build for'
 
@@ -94,10 +93,6 @@ jobs:
               ;;
           "aarch64-linux")
             package_suffix="-aarch64-linux"
-            runner_needs_nix_setup=false
-            ;;
-          "armv7l-linux")
-            package_suffix="-armv7l-linux"
             runner_needs_nix_setup=false
             ;;
           *)

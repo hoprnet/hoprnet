@@ -23,7 +23,7 @@
   - [Install via Nix package manager](#install-via-nix-package-manager)
   - [Install via debian package manager](#install-via-debian-package-manager)
   - [Install via Red Hat package manager](#install-via-red-hat-package-manager)
-  - [Install via Alpine package manager](#install-via-alpine-package-manager)
+  - [Install via Archlinux package manager](#install-via-archlinux-package-manager)
 - [Usage](#usage)
   - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
@@ -158,25 +158,25 @@ Uninstall:
 sudo dnf remove -y hoprd
 ```
 
-### Install via Alpine package manager
+### Install via Archlinux package manager
 
 Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
 
 ```bash
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.apk https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.apk
+curl -s -L -o hoprd-${arch}-linux.pkg.tar.zst https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.pkg.tar.zst
 # You can the Safe address and the Module addres from https://hub.hoprnet.org
 export HOPRD_SAFE_ADDRESS=
 export HOPRD_MODULE_ADDRESS=
 # Choose your own local RPC provider or any from http://chainlist.org/chain/100
 export HOPRD_PROVIDER=
-sudo apk add --allow-untrusted hoprd-${arch}-linux.apk
+sudo pacman --noconfirm -U hoprd-${arch}-linux.pkg.tar.zst
 ```
 
 Uninstall:
 
 ```bash
-apk del hoprd
+pacman del hoprd
 ```
 
 ## Usage

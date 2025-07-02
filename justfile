@@ -34,9 +34,6 @@ package-packager packager arch:
         aarch64-linux)
             ARCHITECTURE="arm64"
             ;;
-        armv7l-linux)
-            ARCHITECTURE="armhf"
-            ;;
         *)
             echo "Unsupported architecture: {{arch}}"
             exit 1
@@ -52,4 +49,13 @@ package arch:
     set -o errexit -o nounset -o pipefail
     just package-packager deb {{arch}}
     just package-packager rpm {{arch}}
-    just package-packager apk {{arch}}
+    just package-packager archlinux {{arch}}
+
+test-package packager arch:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    trap 'deploy/nfpm/test-package-tool.sh delete {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log' EXIT
+    deploy/nfpm/test-package-tool.sh create {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log
+    deploy/nfpm/test-package-tool.sh copy {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
+    deploy/nfpm/test-package-tool.sh install {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
+    echo "Package installed successfully on {{packager}}-{{arch}}."

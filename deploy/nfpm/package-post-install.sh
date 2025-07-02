@@ -203,6 +203,7 @@ generate_identity_file() {
     chmod 700 /etc/hoprd/
     IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/
     mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
+    show_node_address
   else
     echo "The identity file located at /etc/hoprd/hopr.id already exists. Skipping generation."
   fi
@@ -235,20 +236,26 @@ create_user_group() {
 
 # Function to start the HOPR node service
 start_service() {
-  systemctl daemon-reexec
-  systemctl daemon-reload
-  systemctl enable hoprd.service
-  systemctl start hoprd.service
-  echo "HOPR node installed successfully."
-  # Wait for a few seconds to allow the service to initialize
-  echo "Waiting for the HOPR node service to start..."
-  sleep 30
-  # Check the status of the service
-  if ! systemctl is-active --quiet hoprd.service; then
-    echo "Error: HOPR node service is not running. Please check the logs for more details."
-    echo "You can check the logs with: journalctl -xeu hoprd.service -f"
-    exit 1
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reexec
+    systemctl daemon-reload
+    systemctl enable hoprd.service
+    systemctl start hoprd.service
+    echo "HOPR node installed successfully."
+    # Wait for a few seconds to allow the service to initialize
+    echo "Waiting for the HOPR node service to start..."
+    sleep 30
+    # Check the status of the service
+    if ! systemctl is-active --quiet hoprd.service; then
+      echo "Error: HOPR node service is not running. Please check the logs for more details."
+      echo "You can check the logs with: journalctl -xeu hoprd.service -f"
+      exit 1
+    fi
+  else
+    echo "Systemd not found, using service command to start HOPR node."
+    echo "Starting HOPR node manually..."
   fi
+
 }
 
 # Function to show the HOPR node address
@@ -265,5 +272,4 @@ generate_config_file
 generate_identity_file
 create_user_group
 start_service
-show_node_address
 echo "HOPR package installation completed successfully."
