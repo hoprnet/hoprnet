@@ -1,5 +1,5 @@
 #!/bin/bash
-set -o errexit -Eeo pipefail
+set -Eeuo pipefail
 #set -x
 
 PROJECT_ID="hopr-staging"
@@ -22,7 +22,7 @@ get_vm_image() {
             echo "projects/arch-linux-gce/global/images/family/arch"
             ;;
         *)
-            echo "Unsupported distribution: $1. Supported distributions are: deb, rpm, archlinux."
+            echo "Unsupported distribution: ${DISTRIBUTION}. Supported distributions are: deb, rpm, archlinux."
             exit 1
             ;;
     esac
