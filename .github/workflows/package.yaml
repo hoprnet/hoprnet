@@ -91,7 +91,7 @@ jobs:
       - name: Test Package debian
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
         run: |
-          cat ${{ secrets.TEST_OS_PACKAGE_HOPR_IDENTITY_FILE }} > ${{ github.workspace }}/deploy/nfpm/hopr.id
+          cat ${{ secrets.TEST_OS_PACKAGE_HOPR_IDENTITY_FILE }} | base64 -d > ${{ github.workspace }}/deploy/nfpm/hopr.id
           chmod 600 ${{ github.workspace }}/deploy/nfpm/hopr.id
           nix develop -c just test-package deb ${{ inputs.target }}
         env:
