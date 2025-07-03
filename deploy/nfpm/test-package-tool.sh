@@ -33,7 +33,7 @@ create_action() {
   image=$(get_vm_image "${DISTRIBUTION}")
 
   echo "Creating VM for distribution: $DISTRIBUTION, architecture: $ARCHITECTURE"
-  if [ "${ARCHITECTURE}" == "aarch64" ]; then
+  if [ "${ARCHITECTURE}" == "aarch64-linux" ]; then
     machine_type="$MACHINE_TYPE_ARM"
   else
     machine_type="$MACHINE_TYPE_x86"
@@ -126,7 +126,7 @@ main() {
     delete_action
     ;;
   *)
-    echo "Invalid action specified. Use 'create' or 'delete'."
+    echo "Invalid action specified. Use 'create', 'copy', 'install', or 'delete'."
     exit 1
     ;;
   esac

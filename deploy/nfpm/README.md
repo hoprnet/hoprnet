@@ -13,13 +13,13 @@ Download the latest package from https://github.com/hoprnet/hoprnet/releases/lat
 ```bash
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
 curl -s -L -o hoprd-${arch}-linux.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.deb
-sudo -E dpkg -i hoprd-${arch}-linux.deb
+sudo -E apt install -y hoprd-${arch}-linux.deb
 ```
 
 Uninstall:
 
 ```bash
-sudo dpkg --purge --force-remove-reinstreq hoprd
+sudo apt remove -y hoprd
 ```
 
 ## Install via Centos package manager
@@ -61,7 +61,7 @@ sudo pacman --noconfirm -U hoprd-${arch}-linux.pkg.tar.zst
 Uninstall:
 
 ```bash
-sudo pacman del hoprd
+sudo pacman -Rns hoprd
 ```
 
 ## Development
