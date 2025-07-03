@@ -517,7 +517,7 @@
             '';
             config = {
               Env = [
-                "LD_LIBRARY_PATH=${pkgs.openssl.out}/lib"
+                "LD_LIBRARY_PATH=${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH"
               ];
               Cmd = [
                 "/bin/tini"
