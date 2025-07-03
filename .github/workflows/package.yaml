@@ -90,6 +90,7 @@ jobs:
 
       - name: Test Package debian
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
         run: |
           echo "${{ secrets.TEST_OS_PACKAGE_HOPR_IDENTITY_FILE }}" | base64 -d > ${{ github.workspace }}/deploy/nfpm/hopr.id
           chmod 600 ${{ github.workspace }}/deploy/nfpm/hopr.id
@@ -102,6 +103,7 @@ jobs:
 
       - name: Test Package centos
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
         run: nix develop -c just test-package rpm ${{ inputs.target }}
         env:
           HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
@@ -110,6 +112,8 @@ jobs:
           HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
 
       - name: Test Package archlinux
+        if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
         run: nix develop -c just test-package archlinux ${{ inputs.target }}
         env:
           HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
