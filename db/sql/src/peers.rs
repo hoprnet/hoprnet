@@ -223,43 +223,23 @@ impl HoprDbPeersOperations for HoprDb {
             good_quality_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
                     sea_orm::Condition::all()
-                        .add(hopr_db_entity::network_peer::Column::Public.eq(true))
                         .add(hopr_db_entity::network_peer::Column::Ignored.is_null())
                         .add(hopr_db_entity::network_peer::Column::Quality.gt(quality_threshold)),
                 )
                 .count(&self.peers_db)
                 .await
                 .map_err(DbSqlError::from)? as u32,
-            good_quality_non_public: hopr_db_entity::network_peer::Entity::find()
-                .filter(
-                    sea_orm::Condition::all()
-                        .add(hopr_db_entity::network_peer::Column::Public.eq(false))
-                        .add(hopr_db_entity::network_peer::Column::Ignored.is_null())
-                        .add(hopr_db_entity::network_peer::Column::Quality.gt(quality_threshold)),
-                )
-                .count(&self.peers_db)
-                .await
-                .map_err(DbSqlError::from)? as u32,
+            good_quality_non_public: 0u32, // TODO: Only public peers supported in v3
             bad_quality_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
                     sea_orm::Condition::all()
-                        .add(hopr_db_entity::network_peer::Column::Public.eq(true))
                         .add(hopr_db_entity::network_peer::Column::Ignored.is_null())
                         .add(hopr_db_entity::network_peer::Column::Quality.lte(quality_threshold)),
                 )
                 .count(&self.peers_db)
                 .await
                 .map_err(DbSqlError::from)? as u32,
-            bad_quality_non_public: hopr_db_entity::network_peer::Entity::find()
-                .filter(
-                    sea_orm::Condition::all()
-                        .add(hopr_db_entity::network_peer::Column::Public.eq(false))
-                        .add(hopr_db_entity::network_peer::Column::Ignored.is_null())
-                        .add(hopr_db_entity::network_peer::Column::Quality.lte(quality_threshold)),
-                )
-                .count(&self.peers_db)
-                .await
-                .map_err(DbSqlError::from)? as u32,
+            bad_quality_non_public: 0u32, // TODO: Only public peers supported in v3
         })
     }
 }
@@ -628,38 +608,15 @@ mod tests {
             "stats must be equal"
         );
 
-        let mut peer_status = PeerStatus::new(peer_id_2, PeerOrigin::IncomingConnection, 0.2, 25);
-        peer_status.last_seen = SystemTime::UNIX_EPOCH.add(Duration::from_secs(2));
-        peer_status.last_seen_latency = Duration::from_secs(2);
-        peer_status.multiaddresses = vec![];
-        peer_status.heartbeats_sent = 3;
-        peer_status.heartbeats_succeeded = 4;
-        peer_status.backoff = 2.0;
-        peer_status.ignored = None;
-
-        db.update_network_peer(peer_status).await?;
-
-        let stats = db.network_peer_stats(0.2).await?;
-        assert_eq!(
-            Stats {
-                good_quality_public: 1,
-                bad_quality_public: 0,
-                good_quality_non_public: 0,
-                bad_quality_non_public: 1,
-            },
-            stats,
-            "stats must be equal"
-        );
-
         db.remove_network_peer(&peer_id_1).await?;
 
         let stats = db.network_peer_stats(0.2).await?;
         assert_eq!(
             Stats {
                 good_quality_public: 0,
-                bad_quality_public: 0,
+                bad_quality_public: 1,
                 good_quality_non_public: 0,
-                bad_quality_non_public: 1,
+                bad_quality_non_public: 0,
             },
             stats,
             "stats must be equal"
