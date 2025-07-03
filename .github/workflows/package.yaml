@@ -26,13 +26,19 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     if: github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
     steps:
-
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
           ref: ${{ inputs.branch }}
 
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        with:
+          google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
       - name: Download artifacts from parent workflow run
         run: |
           set -euo pipefail  # Enable strict error handling
@@ -82,20 +88,53 @@ jobs:
       - name: Package binaries
         run: nix develop -c just package ${{ inputs.target }}
 
+      - name: Test Package debian
+        if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
+        run: |
+          echo "${{ secrets.TEST_OS_PACKAGE_HOPR_IDENTITY_FILE }}" | base64 -d > ${{ github.workspace }}/deploy/nfpm/hopr.id
+          chmod 600 ${{ github.workspace }}/deploy/nfpm/hopr.id
+          nix develop -c just test-package deb ${{ inputs.target }}
+        env:
+          HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
+          HOPRD_SAFE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_SAFE_ADDRESS }}
+          HOPRD_MODULE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_MODULE_ADDRESS }}
+          HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
+
+      - name: Test Package centos
+        if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
+        run: nix develop -c just test-package rpm ${{ inputs.target }}
+        env:
+          HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
+          HOPRD_SAFE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_SAFE_ADDRESS }}
+          HOPRD_MODULE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_MODULE_ADDRESS }}
+          HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
+
+      - name: Test Package archlinux
+        if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
+        run: nix develop -c just test-package archlinux ${{ inputs.target }}
+        env:
+          HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
+          HOPRD_SAFE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_SAFE_ADDRESS }}
+          HOPRD_MODULE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_MODULE_ADDRESS }}
+          HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
+
       - name: Upload debian packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.deb
           path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.deb
 
-      - name: Upload rpm packaged artifact
+      - name: Upload centos packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.rpm
           path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.rpm
 
-      - name: Upload alpine packaged artifact
+      - name: Upload archlinux packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: hoprd-${{ inputs.target }}.apk
-          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.apk
+          name: hoprd-${{ inputs.target }}.pkg.tar.zst
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.archlinux

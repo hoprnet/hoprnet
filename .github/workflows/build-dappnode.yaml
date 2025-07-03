@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   build:
-    # The original event_name registered is 'pull_request' even the trigger action is 'workflow_call'
+    # The original event_name registered is 'pull_request_target' even the trigger action is 'workflow_call'
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && contains(inputs.labels, format('package:{0},',inputs.dappnode_repository)))
     name: Build package
     runs-on: ubuntu-latest

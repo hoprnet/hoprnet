@@ -21,7 +21,7 @@
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
-  - [Install via debian package manager](#install-via-debian-package-manager)
+  - [Install via Linux package manager](#install-via-linux-package-manager)
 - [Usage](#usage)
   - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
@@ -120,63 +120,10 @@ nix build
 sudo cp result/bin/* /usr/local/bin/
 ```
 
-### Install via debian package manager
+### Install via linux package manager
 
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
-
-```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.deb
-sudo -E dpkg -i hoprd-${arch}-linux.deb
-```
-
-Uninstall:
-
-```bash
-sudo dpkg --purge --force-remove-reinstreq hoprd
-```
-
-### Install via Red Hat package manager
-
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
-
-```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.rpm https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.rpm
-# You can the Safe address and the Module addres from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=
-export HOPRD_MODULE_ADDRESS=
-# Choose your own local RPC provider or any from http://chainlist.org/chain/100
-export HOPRD_PROVIDER=
-sudo -E dnf install -y ./hoprd-${arch}-linux.rpm
-```
-
-Uninstall:
-
-```bash
-sudo dnf remove -y hoprd
-```
-
-### Install via Alpine package manager
-
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
-
-```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.apk https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.apk
-# You can the Safe address and the Module addres from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=
-export HOPRD_MODULE_ADDRESS=
-# Choose your own local RPC provider or any from http://chainlist.org/chain/100
-export HOPRD_PROVIDER=
-sudo apk add --allow-untrusted hoprd-${arch}-linux.apk
-```
-
-Uninstall:
-
-```bash
-apk del hoprd
-```
+Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+To install on specific distribution, see [detailed information](./deploy/nfpm/README.md)
 
 ## Usage
 

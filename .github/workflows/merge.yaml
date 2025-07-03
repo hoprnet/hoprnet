@@ -191,7 +191,7 @@ jobs:
           to: "HOPRd"
           topic: "Core"
           content: |
-            The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }})
+            The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/hoprnet/hoprnet/actions/workflows/merge.yaml?query=is%3Afailure)
 
   notify:
     name: Notify Changes
