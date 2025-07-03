@@ -7,7 +7,10 @@ use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 use hopr_path::channel_graph::ChannelGraph;
-use hopr_transport_network::{HoprDbPeersOperations, network::Network};
+use hopr_transport_network::{
+    HoprDbPeersOperations,
+    network::{Network, UpdateFailure},
+};
 use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
 use tracing::{debug, error};
 
@@ -97,11 +100,12 @@ where
 
                 Ok(*duration)
             }
-            Err(_) => {
+            Err(error) => {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_PROBE_COUNT.increment(&["false"]);
 
-                Err(())
+                tracing::trace!(%error, "Encountered timeout on peer ping");
+                Err(UpdateFailure::Timeout)
             }
         };
 

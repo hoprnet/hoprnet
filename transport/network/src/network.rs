@@ -68,6 +68,14 @@ fn health_from_stats(stats: &Stats, is_public: bool) -> Health {
     health
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum UpdateFailure {
+    /// Check timed out
+    Timeout,
+    /// Dial failure
+    DialFailure,
+}
+
 /// The network object storing information about the running observed state of the network,
 /// including peers, connection qualities and updates for other parts of the system.
 #[derive(Debug)]
@@ -203,7 +211,7 @@ where
     /// - `Ok(None)` if the peer is unknown.
     /// - `Err(NetworkingError)` if the operation is disallowed or a database error occurs.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
-    pub async fn update(&self, peer: &PeerId, ping_result: std::result::Result<Duration, ()>) -> Result<()> {
+    pub async fn update(&self, peer: &PeerId, ping_result: std::result::Result<Duration, UpdateFailure>) -> Result<()> {
         if peer == &self.me {
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
@@ -570,9 +578,12 @@ mod tests {
 
         peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
         peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
-        peers.update(&peer, Err(())).await?; // should drop to ignored
+        peers.update(&peer, Err(UpdateFailure::Timeout)).await?; // should drop to ignored
 
-        peers.update(&peer, Err(())).await.expect("no error should occur"); // should drop from network
+        peers
+            .update(&peer, Err(UpdateFailure::Timeout))
+            .await
+            .expect("no error should occur"); // should drop from network
 
         assert!(peers.is_ignored(&peer).await);
 
@@ -605,7 +616,7 @@ mod tests {
             .update(&peer, Ok(std::time::Duration::from_millis(200_u64)))
             .await?;
 
-        peers.update(&peer, Err(())).await?;
+        peers.update(&peer, Err(UpdateFailure::Timeout)).await?;
 
         let actual = peers.get(&peer).await?.expect("the peer record should be present");
 
@@ -638,11 +649,11 @@ mod tests {
                 break;
             }
 
-            peers.update(&peer, Err(())).await?;
+            peers.update(&peer, Err(UpdateFailure::Timeout)).await?;
         }
 
         // perform one more failing heartbeat update and ensure max backoff is not exceeded
-        peers.update(&peer, Err(())).await?;
+        peers.update(&peer, Err(UpdateFailure::Timeout)).await?;
         let actual = peers.get(&peer).await?.expect("the peer record should be present");
 
         assert_eq!(actual.backoff, peers.cfg.backoff_max);
@@ -781,7 +792,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
-        assert!(peers.update(&peer, Err(())).await.is_ok());
+        assert!(peers.update(&peer, Err(UpdateFailure::Timeout)).await.is_ok());
 
         assert!(peers.is_ignored(&public).await);
 

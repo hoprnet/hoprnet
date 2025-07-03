@@ -796,8 +796,8 @@ mod tests {
         // - There are max 3 channels and also 3 are currently opened.
         // - Strategy will close channel to peer 5, because it has quality 0.1
         // - Because of the closure, this means there can be 1 additional channel opened:
-        // - Strategy can open channel either to peer 3, 4 or 10 (with qualities 0.8, 0.98 and 1.0 respectively)
-        // - It will ignore peer 10 even though it has the highest quality, but does not meet minimum node version
+        // - Strategy can open channel either to peer 3, 4 or 9 (with qualities 0.8, 0.98 and 1.0 respectively)
+        // - It will ignore peer 9 even though it has the highest quality, but does not meet minimum node version
         // - It will prefer peer 4 because it has higher quality than node 3
 
         let mut actions = MockChannelAct::new();
@@ -811,7 +811,7 @@ mod tests {
         actions
             .expect_open_channel()
             .times(1)
-            .withf(move |dst, b| PEERS[4].0.eq(dst) && new_stake.eq(b))
+            .withf(move |dst, b| PEERS[9].0.eq(dst) && new_stake.eq(b))
             .return_once(move |_, _| Ok(ok(mock_action_confirmation_opening(PEERS[4].0, new_stake)).boxed()));
 
         let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, actions);
