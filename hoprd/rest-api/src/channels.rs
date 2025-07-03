@@ -283,7 +283,7 @@ pub(crate) struct OpenChannelResponse {
             (status = 400, description = "Invalid counterparty address or stake amount.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to open the channel because of insufficient HOPR balance or allowance.", body = ApiError),
-            (status = 409, description = "Failed to open the channel because the channel between this nodes already exists.", body = ApiError),
+            (status = 409, description = "Failed to open the channel because the channel between these nodes already exists.", body = ApiError),
             (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-async-runtime"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Feature-selected async executor for HOPR"
@@ -17,5 +17,9 @@ runtime-async-std = ["dep:async-std"]
 runtime-tokio = ["dep:tokio"]
 
 [dependencies]
-async-std = { workspace = true, optional = true }
+async-std = { version = "1.13.1", features = [
+  "attributes",
+  "unstable",
+], optional = true }
 tokio = { workspace = true, optional = true }
+futures = { workspace = true }

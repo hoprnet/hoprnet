@@ -22,7 +22,7 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -42,7 +42,8 @@ jobs:
         run: make -j build-yellowpaper
 
       - name: Commit & Push changes
-        run: ./scripts/commit-and-push-all-changes.sh
-        env:
-          HOPR_GIT_MSG: 'chore(build): update yellowpaper'
-          HOPR_GITHUB_REF: ${{ github.ref }}
+        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # v9.1.4
+        with:
+          new_branch: ${{ github.ref }}
+          message: 'chore(build): update yellowpaper'
+          pathspec_error_handling: exitImmediately

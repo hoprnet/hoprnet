@@ -8,9 +8,6 @@ pub enum TransportSessionError {
     #[error("connection timed out")]
     Timeout,
 
-    #[error("application tag from disallowed range")]
-    Tag,
-
     #[error("incorrect data size")]
     PayloadSize,
 
@@ -37,6 +34,9 @@ pub enum TransportSessionError {
     #[error("received data for an unregistered session")]
     UnknownData,
 
+    #[error("session establishment protocol error: {0}")]
+    StartProtocolError(String),
+
     #[error(transparent)]
     Manager(#[from] SessionManagerError),
 
@@ -55,6 +55,8 @@ pub enum SessionManagerError {
     AlreadyStarted,
     #[error("all challenge slots are occupied")]
     NoChallengeSlots,
+    #[error("session with the given id does not exist")]
+    NonExistingSession,
     #[error("loopback sessions are not allowed")]
     Loopback,
     #[error("non-specific session manager error: {0}")]

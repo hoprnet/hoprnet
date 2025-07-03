@@ -4,11 +4,11 @@ pub mod config;
 mod account;
 mod channels;
 mod checks;
+mod middleware;
 mod network;
 mod node;
 mod peers;
-mod preconditions;
-mod prometheus;
+mod root;
 mod session;
 mod tickets;
 
@@ -30,7 +30,6 @@ use axum::{
     Router,
     extract::Json,
     http::{Method, header::AUTHORIZATION, status::StatusCode},
-    middleware,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
@@ -56,7 +55,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{config::Auth, session::StoredSessionEntry};
 
-pub(crate) const BASE_PATH: &str = "/api/v3";
+pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -72,7 +71,7 @@ pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
-    pub hoprd_cfg: String,
+    pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub websocket_active_count: Arc<AtomicU16>,
@@ -105,6 +104,7 @@ pub(crate) struct InternalState {
         node::version,
         peers::ping_peer,
         peers::show_peer_info,
+        root::metrics,
         session::create_client,
         session::list_clients,
         session::close_client,
@@ -142,6 +142,7 @@ pub(crate) struct InternalState {
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
         (name = "Session", description = "HOPR node session management endpoints"),
         (name = "Tickets", description = "HOPR node ticket management endpoints"),
+        (name = "Metrics", description = "HOPR node metrics endpoints"),
     )
 )]
 pub struct ApiDoc;
@@ -178,7 +179,7 @@ impl Modify for SecurityAddon {
 /// Parameters needed to construct the Rest API via [`serve_api`].
 pub struct RestApiParameters {
     pub listener: TcpListener,
-    pub hoprd_cfg: String,
+    pub hoprd_cfg: serde_json::Value,
     pub cfg: crate::config::Api,
     pub hopr: Arc<hopr_lib::Hopr>,
     pub session_listener_sockets: ListenerJoinHandles,
@@ -209,7 +210,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
 
 #[allow(clippy::too_many_arguments)]
 async fn build_api(
-    hoprd_cfg: String,
+    hoprd_cfg: serde_json::Value,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     open_listeners: ListenerJoinHandles,
@@ -237,18 +238,27 @@ async fn build_api(
                 .route("/readyz", get(checks::readyz))
                 .route("/healthyz", get(checks::healthyz))
                 .route("/eligiblez", get(checks::eligiblez))
+                .layer(
+                    ServiceBuilder::new().layer(
+                        CorsLayer::new()
+                            .allow_methods([Method::GET])
+                            .allow_origin(Any)
+                            .allow_headers(Any)
+                            .max_age(std::time::Duration::from_secs(86400)),
+                    ),
+                )
                 .with_state(state.into()),
         )
         .merge(
             Router::new()
-                .route("/metrics", get(node::metrics))
-                .layer(middleware::from_fn_with_state(
+                .route("/metrics", get(root::metrics))
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::authenticate,
+                    middleware::preconditions::authenticate,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::cap_websockets,
+                    middleware::preconditions::cap_websockets,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -260,7 +270,7 @@ async fn build_api(
                                 .allow_headers(Any)
                                 .max_age(std::time::Duration::from_secs(86400)),
                         )
-                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(axum::middleware::from_fn(middleware::prometheus::record))
                         .layer(CompressionLayer::new())
                         .layer(ValidateRequestHeaderLayer::accept("text/plain"))
                         .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
@@ -305,13 +315,13 @@ async fn build_api(
                 .route("/session/{protocol}", get(session::list_clients))
                 .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))
                 .with_state(inner_state.clone().into())
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::authenticate,
+                    middleware::preconditions::authenticate,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::cap_websockets,
+                    middleware::preconditions::cap_websockets,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -323,7 +333,7 @@ async fn build_api(
                                 .allow_headers(Any)
                                 .max_age(std::time::Duration::from_secs(86400)),
                         )
-                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(axum::middleware::from_fn(middleware::prometheus::record))
                         .layer(CompressionLayer::new())
                         .layer(ValidateRequestHeaderLayer::accept("application/json"))
                         .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),

@@ -13,6 +13,7 @@ use hopr_network_types::{
 };
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
 use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
+use hopr_transport_packet::prelude::ApplicationData;
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
@@ -94,7 +95,7 @@ where
         destination: Address,
         options: RoutingOptions,
     ) -> crate::errors::Result<ValidatedPath> {
-        let cg = self.channel_graph.read().await;
+        let cg = self.channel_graph.read_arc().await;
         let path = match options {
             RoutingOptions::IntermediatePath(path) => {
                 trace!(?path, "resolving a specific path");

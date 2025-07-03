@@ -1,5 +1,6 @@
-#![allow(clippy::all)]
 //! This lib re-exports abigen! generated bindings for solidity contracts.
+
+#![allow(clippy::all)]
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 mod codegen;

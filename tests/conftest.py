@@ -9,10 +9,11 @@ from subprocess import PIPE, STDOUT, CalledProcessError, Popen
 
 import pytest
 
-from .find_port import find_available_port_block
 from sdk.python import localcluster
 from sdk.python.localcluster.constants import PWD
 from sdk.python.localcluster.node import Node
+
+from .find_port import find_available_port_block
 
 # prepend the timestamp in front of any log line
 logging.basicConfig(format="%(asctime)s %(message)s")
@@ -146,7 +147,7 @@ async def base_port(request):
         base_port = int(base_port_env)
 
     if base_port is None:
-        pytest.fail("No available base port found")
+        pytest.fail("No available base port found")  # ty: ignore[call-non-callable]
     logging.info(f"Using base port: {base_port}")
     yield base_port
 
@@ -156,7 +157,7 @@ async def swarm7(request, base_port):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
     try:
         cluster, anvil = await localcluster.bringup(
-            params_path, test_mode=True, fully_connected=False, use_nat=True, base_port=base_port
+            params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port
         )
 
         yield cluster.nodes
@@ -164,7 +165,7 @@ async def swarm7(request, base_port):
         cluster.clean_up()
         anvil.kill()
     except RuntimeError:
-        pytest.fail("Failed to bring up the cluster")
+        pytest.fail("Failed to bring up the cluster")  # ty: ignore[call-non-callable]
 
 
 @pytest.fixture(scope="function")
@@ -179,7 +180,7 @@ async def swarm7_reset(swarm7: dict[str, Node]):
 
 
 def to_ws_url(host, port, args: list[tuple[str, str]]):
-    return f"ws://{host}:{port}/api/v3/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)
+    return f"ws://{host}:{port}/api/v4/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)
 
 
 def run_hopli_cmd(cmd: list[str], custom_env):
@@ -187,8 +188,8 @@ def run_hopli_cmd(cmd: list[str], custom_env):
     proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0, cwd=PWD)
     # filter out ansi color codes
     color_regex = re.compile(r"\x1b\[\d{,3}m")
-    with proc.stdout:
-        for line in iter(proc.stdout.readline, b""):
+    with proc.stdout:  # ty: ignore[invalid-context-manager]
+        for line in iter(proc.stdout.readline, b""):  # ty: ignore[possibly-unbound-attribute]
             logging.debug("[Hopli] %r", color_regex.sub("", line.decode("utf-8")[:-1]))
     retcode = proc.wait()
     if retcode:

@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use hopr_crypto_types::types::PacketTag;
-use hopr_internal_types::protocol::TagBloomFilter;
 use hopr_platform::file::native::{read_file, write};
 use tracing::{debug, error, info};
+
+use crate::raw::TagBloomFilter;
 
 #[derive(Debug, Clone)]
 pub struct WrappedTagBloomFilter {
@@ -46,12 +47,12 @@ impl WrappedTagBloomFilter {
     }
 
     pub async fn with_write_lock<T>(&self, f: impl FnOnce(&mut TagBloomFilter) -> T) -> T {
-        let mut tbf = self.tbf.write().await;
+        let mut tbf = self.tbf.write_arc().await;
         f(&mut tbf)
     }
 
     pub async fn save(&self) {
-        let bloom = self.tbf.read().await.clone(); // Clone to immediately release the lock
+        let bloom = self.tbf.read_arc().await.clone(); // Clone to immediately release the lock
 
         if let Err(e) = bincode::serde::encode_to_vec(&bloom, Self::TAGBLOOM_BINCODE_CONFIGURATION)
             .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))

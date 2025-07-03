@@ -7,7 +7,8 @@ use std::{
 };
 
 use hopr_transport_identity::Multiaddr;
-pub use hopr_transport_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
+pub use hopr_transport_network::config::NetworkConfig;
+pub use hopr_transport_probe::config::ProbeConfig;
 pub use hopr_transport_protocol::config::ProtocolConfig;
 use hopr_transport_session::MIN_BALANCER_SAMPLING_INTERVAL;
 use proc_macro_regex::regex;
@@ -19,9 +20,9 @@ use crate::errors::HoprTransportError;
 
 pub struct HoprTransportConfig {
     pub transport: TransportConfig,
-    pub network: hopr_transport_network::config::NetworkConfig,
-    pub protocol: hopr_transport_protocol::config::ProtocolConfig,
-    pub heartbeat: hopr_transport_network::heartbeat::HeartbeatConfig,
+    pub network: NetworkConfig,
+    pub protocol: ProtocolConfig,
+    pub probe: ProbeConfig,
     pub session: SessionGlobalConfig,
 }
 
@@ -338,7 +339,9 @@ mod tests {
     #[cfg(feature = "transport-quic")]
     #[test]
     fn test_multiaddress_on_non_dappnode_default() {
-        assert_eq!(default_multiaddr_transport(1234), "udp/1234/quic-v1");
+        temp_env::with_vars([("DAPPNODE", Some("false")), ("HOPRD_NAT", Some("false"))], || {
+            assert_eq!(default_multiaddr_transport(1234), "udp/1234/quic-v1");
+        });
     }
 
     #[cfg(not(feature = "transport-quic"))]

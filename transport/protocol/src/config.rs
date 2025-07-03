@@ -15,9 +15,6 @@ pub struct ProtocolConfig {
     #[serde_as(as = "Option<DisplayFromStr>")]
     /// Possible override of the network outgoing ticket price.
     pub outgoing_ticket_price: Option<HoprBalance>,
-    /// `heartbeat` protocol config
-    #[serde(default)]
-    pub heartbeat: crate::heartbeat::config::HeartbeatProtocolConfig,
     /// auto-nat server port
     #[serde(default)]
     pub autonat_port: Option<u16>,
