@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["PacketError"],"struct":["DEFAULT_PRICE_PER_PACKET","MsgSender","PacketInteractionConfig","PacketProcessor","PacketSendAwaiter","PacketSendFinalizer"],"trait":["PacketUnwrapping","PacketWrapping"],"type":["SendMsgInput"]};
