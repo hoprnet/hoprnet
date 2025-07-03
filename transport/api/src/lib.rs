@@ -36,7 +36,7 @@ use futures::{
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
 };
 use helpers::PathPlanner;
-use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
+use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -463,7 +463,39 @@ where
         let _mixing_process_before_sending_out =
             hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
 
-        processes.insert(HoprTransportProcess::Medium, spawn_as_abortable(transport_layer.run()));
+        let (transport_events_tx, transport_events_rx) =
+            futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
+
+        let network_clone = self.network.clone();
+        spawn(transport_events_rx.for_each(move |event| {
+            let network = network_clone.clone();
+
+            async move {
+                match event {
+                    hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
+                        if let Err(error) = network
+                            .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
+                            .await
+                        {
+                            tracing::error!(%peer, %error, "Failed to add incoming connection peer");
+                        }
+                    }
+                    hopr_transport_p2p::DiscoveryEvent::FailedDial(peer) => {
+                        if let Err(error) = network
+                            .update(&peer, Err(hopr_transport_network::network::UpdateFailure::DialFailure))
+                            .await
+                        {
+                            tracing::error!(%peer, %error, "Failed to update peer status after failed dial");
+                        }
+                    }
+                }
+            }
+        }));
+
+        processes.insert(
+            HoprTransportProcess::Medium,
+            spawn_as_abortable(transport_layer.run(transport_events_tx)),
+        );
 
         // -- msg-ack protocol over the wire transport
         let packet_cfg = PacketInteractionConfig {

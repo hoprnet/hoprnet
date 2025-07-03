@@ -349,7 +349,7 @@ mod tests {
                 heartbeats_sent: 1,
                 heartbeats_succeeded: 1,
                 backoff: 1.0,
-                ignored: None,
+                ignored_until: None,
                 multiaddresses: vec![ma_1.clone(), ma_2.clone()],
                 quality: 1.0,
                 quality_avg: SingleSumSMA::new(2),

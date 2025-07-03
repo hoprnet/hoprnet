@@ -5,7 +5,7 @@ use std::{
 
 use futures::StreamExt;
 pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
-use hopr_platform::time::native::current_time;
+use hopr_platform::time::current_time;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
@@ -134,17 +134,20 @@ where
         }
 
         if let Some(mut peer_status) = self.db.get_network_peer(peer).await? {
-            if !peer_status.is_ignored(current_time(), self.cfg.ignore_timeframe) {
-                peer_status.ignored = None;
-                peer_status.multiaddresses.append(&mut addrs);
-                peer_status.multiaddresses = peer_status
-                    .multiaddresses
-                    .into_iter()
-                    .collect::<HashSet<_>>()
-                    .into_iter()
-                    .collect::<Vec<_>>();
-                self.db.update_network_peer(peer_status).await?;
+            debug!(%peer, %origin, multiaddresses = ?addrs, "Updating existing peer in the store");
+
+            if !peer_status.is_ignored() || matches!(origin, PeerOrigin::IncomingConnection) {
+                peer_status.ignored_until = None;
             }
+
+            peer_status.multiaddresses.append(&mut addrs);
+            peer_status.multiaddresses = peer_status
+                .multiaddresses
+                .into_iter()
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
+            self.db.update_network_peer(peer_status).await?;
         } else {
             debug!(%peer, %origin, multiaddresses = ?addrs, "Adding peer to the store");
 
@@ -217,30 +220,44 @@ where
         }
 
         if let Some(mut entry) = self.db.get_network_peer(peer).await? {
-            if !entry.is_ignored(current_time(), self.cfg.ignore_timeframe) {
-                entry.ignored = None;
-            }
-
             entry.heartbeats_sent += 1;
 
-            if let Ok(latency) = ping_result {
-                entry.last_seen = current_time();
-                entry.last_seen_latency = latency;
-                entry.heartbeats_succeeded += 1;
-                // reset backoff in case of a successful ping
-                entry.backoff = self.cfg.backoff_min;
-                entry.update_quality(1.0_f64.min(entry.get_quality() + self.cfg.quality_step));
-            } else {
-                // increase backoff in case of a failed ping, but cap it at the max backoff to
-                // prevent entries from being shut out
-                entry.backoff = self.cfg.backoff_max.min(entry.backoff.powf(self.cfg.backoff_exponent));
-                entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
-
-                let q = entry.get_quality();
-
-                if q < self.cfg.quality_bad_threshold {
-                    entry.ignored = Some(current_time());
+            match ping_result {
+                Ok(latency) => {
+                    if !entry.is_ignored() {
+                        entry.ignored_until = None;
+                    }
+                    entry.last_seen = current_time();
+                    entry.last_seen_latency = latency;
+                    entry.heartbeats_succeeded += 1;
+                    // reset backoff in case of a successful ping
+                    entry.backoff = self.cfg.backoff_min;
+                    entry.update_quality(1.0_f64.min(entry.get_quality() + self.cfg.quality_step));
                 }
+                Err(error) => match error {
+                    UpdateFailure::Timeout => {
+                        tracing::trace!("Update failed with timeout");
+                        // increase backoff in case of a failed ping, but cap it at the max backoff to
+                        // prevent entries from being shut out
+                        entry.backoff = self.cfg.backoff_max.min(entry.backoff.powf(self.cfg.backoff_exponent));
+                        entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
+
+                        let q = entry.get_quality();
+
+                        if q < self.cfg.quality_bad_threshold {
+                            entry.ignored_until = Some(current_time() + self.cfg.ignore_timeframe);
+                        }
+                    }
+                    UpdateFailure::DialFailure => {
+                        tracing::trace!("Update failed with dial failure");
+                        entry.update_quality(0.0_f64);
+                        entry.ignored_until = Some(
+                            current_time()
+                                + crate::config::DEFAULT_CANNOT_DIAL_PENALTY
+                                + std::time::Duration::from_secs(hopr_crypto_random::random_integer(0, Some(600))),
+                        );
+                    }
+                },
             }
 
             self.db.update_network_peer(entry).await?;
@@ -325,7 +342,7 @@ where
                     return None;
                 }
 
-                if let Some(ignore_start) = v.ignored {
+                if let Some(ignore_start) = v.ignored_until {
                     let should_be_ignored = ignore_start
                         .checked_add(self.cfg.ignore_timeframe)
                         .is_some_and(|v| v > threshold);
@@ -379,11 +396,7 @@ mod tests {
     {
         /// Checks if the peer is present in the network, but it is being currently ignored.
         async fn is_ignored(&self, peer: &PeerId) -> bool {
-            peer != &self.me
-                && self
-                    .get(peer)
-                    .await
-                    .is_ok_and(|ps| ps.is_some_and(|p| p.is_ignored(current_time(), self.cfg.ignore_timeframe)))
+            peer != &self.me && self.get(peer).await.is_ok_and(|ps| ps.is_some_and(|p| p.is_ignored()))
         }
     }
 
@@ -567,14 +580,43 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time()
+    async fn network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time()
     -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
         let peers = basic_network(&me).await?;
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
+        peers.add(&peer, PeerOrigin::NetworkRegistry, vec![]).await?;
+
+        peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
+        peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
+        peers.update(&peer, Err(UpdateFailure::Timeout)).await?; // should drop to ignored
+
+        peers
+            .update(&peer, Err(UpdateFailure::Timeout))
+            .await
+            .expect("no error should occur"); // should drop from network
+
+        assert!(peers.is_ignored(&peer).await);
+
+        // peer should remain ignored and not be added
+        peers.add(&peer, PeerOrigin::ManualPing, vec![]).await?;
+
+        assert!(peers.is_ignored(&peer).await);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn network_should_stop_ignoring_a_peer_that_has_reached_lower_thresholds_but_connected_back()
+    -> anyhow::Result<()> {
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        let peers = basic_network(&me).await?;
+
+        peers.add(&peer, PeerOrigin::NetworkRegistry, vec![]).await?;
 
         peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
         peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
@@ -590,7 +632,28 @@ mod tests {
         // peer should remain ignored and not be added
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
+        assert!(!peers.is_ignored(&peer).await);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn network_should_ignore_a_peer_that_could_not_be_dialed() -> anyhow::Result<()> {
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        let peers = basic_network(&me).await?;
+
+        peers.add(&peer, PeerOrigin::NetworkRegistry, vec![]).await?;
+
+        peers.update(&peer, Ok(current_time().as_unix_timestamp())).await?;
+        peers.update(&peer, Err(UpdateFailure::DialFailure)).await?; // should drop to ignored
+
         assert!(peers.is_ignored(&peer).await);
+
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
+
+        assert!(!peers.is_ignored(&peer).await);
 
         Ok(())
     }
@@ -773,7 +836,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_should_allow_the_quality_to_go_to_0() -> anyhow::Result<()> {
+    async fn network_should_allow_the_quality_to_go_to_0() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let public = peer;
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -790,7 +853,7 @@ mod tests {
             hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
-        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
+        peers.add(&peer, PeerOrigin::NetworkRegistry, vec![]).await?;
 
         assert!(peers.update(&peer, Err(UpdateFailure::Timeout)).await.is_ok());
 

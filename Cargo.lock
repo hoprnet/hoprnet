@@ -4776,6 +4776,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-network-types",
+ "hopr-platform",
  "hopr-primitive-types",
  "libp2p-identity",
  "multiaddr",
@@ -5190,6 +5191,7 @@ version = "0.8.0"
 dependencies = [
  "anyhow",
  "futures",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-api",
  "hopr-db-sql",

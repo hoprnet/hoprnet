@@ -101,7 +101,8 @@ pub struct PeerStatus {
     pub heartbeats_sent: u64,
     pub heartbeats_succeeded: u64,
     pub backoff: f64,
-    pub ignored: Option<SystemTime>,
+    /// Until when the peer should be ignored.
+    pub ignored_until: Option<SystemTime>,
     pub multiaddresses: Vec<Multiaddr>,
     // Should be public(crate) but the separation through traits does not allow direct SQL ORM serde
     pub quality: f64,
@@ -118,7 +119,7 @@ impl PeerStatus {
             heartbeats_succeeded: 0,
             last_seen: SystemTime::UNIX_EPOCH,
             last_seen_latency: Duration::default(),
-            ignored: None,
+            ignored_until: None,
             backoff,
             quality: 0.0,
             quality_avg: SingleSumSMA::new(quality_window as usize),
@@ -146,11 +147,12 @@ impl PeerStatus {
         self.quality
     }
 
-    /// Determines whether the peer is ignored due to quality concerns, given the current time
-    /// and maximum peer ignore period.
+    /// Determines whether the peer is ignored due to quality concerns, given the current time.
     #[inline]
-    pub fn is_ignored(&self, now: SystemTime, max_ignore: Duration) -> bool {
-        self.ignored.is_some_and(|t| now.saturating_sub(t) <= max_ignore)
+    pub fn is_ignored(&self) -> bool {
+        let now = hopr_platform::time::current_time();
+        self.ignored_until
+            .is_some_and(|t| now.saturating_sub(t) == std::time::Duration::from_secs(0))
     }
 }
 

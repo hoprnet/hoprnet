@@ -48,7 +48,7 @@ impl MigrationTrait for Migration {
                                     .not_null()
                                     .default(0),
                             )
-                            .col(ColumnDef::new(NetworkPeer::Ignored).timestamp().null())
+                            .col(ColumnDef::new(NetworkPeer::IgnoredUntil).timestamp().null())
                             .col(ColumnDef::new(NetworkPeer::Quality).double().not_null().default(0.0))
                             .col(ColumnDef::new(NetworkPeer::QualitySma).binary().null())
                             .col(ColumnDef::new(NetworkPeer::Backoff).double().null())
@@ -75,6 +75,7 @@ impl MigrationTrait for Migration {
                             .table(NetworkPeer::Table)
                             .drop_column(NetworkPeer::Public)
                             .drop_column(NetworkPeer::Version)
+                            .drop_column(NetworkPeer::Ignored)
                             .to_owned(),
                     )
                     .await
@@ -99,6 +100,7 @@ impl MigrationTrait for Migration {
                             .table(NetworkPeer::Table)
                             .add_column(ColumnDef::new(NetworkPeer::Public).boolean().not_null().default(true))
                             .add_column(ColumnDef::new(NetworkPeer::Version).string_len(50))
+                            .add_column(ColumnDef::new(NetworkPeer::Ignored).timestamp().null())
                             .to_owned(),
                     )
                     .await
@@ -118,6 +120,7 @@ pub(crate) enum NetworkPeer {
     LastSeen,
     LastSeenLatency,
     Ignored,
+    IgnoredUntil,
     Public,
     Quality,
     QualitySma,

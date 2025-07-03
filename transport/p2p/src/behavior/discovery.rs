@@ -9,7 +9,10 @@ use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
     core::Endpoint,
-    swarm::{CloseConnection, ConnectionDenied, ConnectionId, NetworkBehaviour, ToSwarm, dummy::ConnectionHandler},
+    swarm::{
+        CloseConnection, ConnectionDenied, ConnectionId, DialFailure, NetworkBehaviour, ToSwarm,
+        dummy::ConnectionHandler,
+    },
 };
 
 #[derive(Debug)]
@@ -18,7 +21,10 @@ pub enum DiscoveryInput {
 }
 
 #[derive(Debug)]
-pub enum Event {}
+pub enum Event {
+    IncomingConnection(PeerId, Multiaddr),
+    FailedDial(PeerId),
+}
 
 pub struct Behaviour {
     me: PeerId,
@@ -74,6 +80,14 @@ impl NetworkBehaviour for Behaviour {
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         let is_allowed = self.allowed_peers.contains(&peer);
         tracing::trace!(%is_allowed, direction = "outbound", "Handling peer connection");
+
+        if is_allowed {
+            self.pending_events
+                .push_back(ToSwarm::GenerateEvent(Event::IncomingConnection(
+                    peer,
+                    remote_addr.clone(),
+                )));
+        }
 
         is_allowed.then_some(Self::ConnectionHandler {}).ok_or_else(|| {
             libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(format!(
@@ -152,6 +166,14 @@ impl NetworkBehaviour for Behaviour {
                 if *v > 0 {
                     *v -= 1;
                 };
+            }
+            libp2p::swarm::FromSwarm::DialFailure(DialFailure { peer_id, error, .. }) => {
+                tracing::debug!(?peer_id, %error, "Failed to dial peer");
+
+                if let Some(peer) = peer_id {
+                    self.pending_events
+                        .push_back(ToSwarm::GenerateEvent(Event::FailedDial(peer)));
+                }
             }
             _ => {}
         }

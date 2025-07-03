@@ -1,11 +1,10 @@
 use alloy::transports::{http::Http, utils::guess_local_url};
 use async_trait::async_trait;
-use url::Url;
-
 #[cfg(feature = "runtime-tokio")]
 pub use reqwest::Client as ReqwestClient;
 #[cfg(feature = "runtime-tokio")]
 use tracing::{debug, trace};
+use url::Url;
 
 use crate::errors::HttpRequestError;
 
