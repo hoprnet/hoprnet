@@ -469,6 +469,7 @@
               hopli
               jq
               lsof
+              openssl
               plutoSrc
               python313
               runtimeShellPackage
@@ -515,6 +516,9 @@
 
             '';
             config = {
+              Env = [
+                "LD_LIBRARY_PATH=${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH"
+              ];
               Cmd = [
                 "/bin/tini"
                 "--"
@@ -523,7 +527,7 @@
               ];
               ExposedPorts = {
                 "8545/tcp" = { };
-                "3001-3006/tcp" = { };
+                "3003-3018/tcp" = { };
                 "10001-10101/tcp" = { };
               };
             };
