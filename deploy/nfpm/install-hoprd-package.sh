@@ -20,6 +20,20 @@ rpm)
   sudo -E dnf install -y "/tmp/hoprd.${DISTRIBUTION}"
   ;;
 archlinux)
+  # Archlinux mirrors conf in the GCP image is outdated by default
+  tee /etc/pacman.conf <<EOF
+[options]
+Architecture = auto
+CheckSpace
+SigLevel = Never
+
+[core]
+Include = /etc/pacman.d/mirrorlist
+
+[extra]
+Include = /etc/pacman.d/mirrorlist
+EOF
+  pacman -Syy
   pacman --noconfirm -U "/tmp/hoprd.${DISTRIBUTION}" # --verbose --debug
   ;;
 *)

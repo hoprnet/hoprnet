@@ -58,7 +58,7 @@ create_action() {
     '
   sleep 15
   # Automatically delete the VM after 1 hour
-  while ! gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="echo SSH is accessible" --quiet; do
+  while ! gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="sudo mkdir -p /etc/hoprd && sudo chmod 777 /etc/hoprd && echo SSH is accessible" --quiet 2>/dev/null; do
     echo "Waiting for SSH to become accessible..."
     sleep 5
   done
@@ -70,7 +70,6 @@ create_action() {
 copy_action() {
   echo "Copying artifacts on ${INSTANCE_NAME}"
   script_dir=$(cd "$(dirname "$0")" && pwd)
-  gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="sudo mkdir -p /etc/hoprd && sudo chmod 777 /etc/hoprd"
   if [ -f "${script_dir}/hopr.id" ]; then
     gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/hopr.id" "${INSTANCE_NAME}":/etc/hoprd/hopr.id
   fi

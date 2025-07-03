@@ -21,9 +21,7 @@
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
-  - [Install via debian package manager](#install-via-debian-package-manager)
-  - [Install via Red Hat package manager](#install-via-red-hat-package-manager)
-  - [Install via Archlinux package manager](#install-via-archlinux-package-manager)
+  - [Install via Linux package manager](#install-via-linux-package-manager)
 - [Usage](#usage)
   - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
@@ -122,63 +120,10 @@ nix build
 sudo cp result/bin/* /usr/local/bin/
 ```
 
-### Install via debian package manager
+### Install via linux package manager
 
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
-
-```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.deb
-sudo -E dpkg -i hoprd-${arch}-linux.deb
-```
-
-Uninstall:
-
-```bash
-sudo dpkg --purge --force-remove-reinstreq hoprd
-```
-
-### Install via Red Hat package manager
-
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
-
-```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.rpm https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.rpm
-# You can the Safe address and the Module addres from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=0xeEBdDCCd08AC75DA6058828af6E3DaBD5D0ef6A5
-export HOPRD_MODULE_ADDRESS=0x92aDd04d72d30418C81b53B4b17Facf09B7E4F24
-# Choose your own local RPC provider or any from http://chainlist.org/chain/100
-export HOPRD_PROVIDER=https://gnosis.drpc.org
-sudo -E dnf install -y ./hoprd-${arch}-linux.rpm
-```
-
-Uninstall:
-
-```bash
-sudo dnf remove -y hoprd
-```
-
-### Install via Archlinux package manager
-
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
-
-```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.pkg.tar.zst https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.pkg.tar.zst
-# You can the Safe address and the Module addres from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=
-export HOPRD_MODULE_ADDRESS=
-# Choose your own local RPC provider or any from http://chainlist.org/chain/100
-export HOPRD_PROVIDER=
-sudo pacman --noconfirm -U hoprd-${arch}-linux.pkg.tar.zst
-```
-
-Uninstall:
-
-```bash
-sudo pacman del hoprd
-```
+Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+To install on specific distribution, see [detailed information](./deploy/nfpm/README.md)
 
 ## Usage
 

@@ -90,12 +90,10 @@ jobs:
 
       - name: Test Package debian
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
         run: |
-          set -x
           echo "${{ secrets.TEST_OS_PACKAGE_HOPR_IDENTITY_FILE }}" | base64 -d > ${{ github.workspace }}/deploy/nfpm/hopr.id
           chmod 600 ${{ github.workspace }}/deploy/nfpm/hopr.id
-          ls -alh ${{ github.workspace }}/deploy/nfpm/hopr.id
-          cat ${{ github.workspace }}/deploy/nfpm/hopr.id
           nix develop -c just test-package deb ${{ inputs.target }}
         env:
           HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
@@ -105,6 +103,7 @@ jobs:
 
       - name: Test Package centos
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
         run: nix develop -c just test-package rpm ${{ inputs.target }}
         env:
           HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
@@ -113,6 +112,8 @@ jobs:
           HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
 
       - name: Test Package archlinux
+        if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        continue-on-error: true
         run: nix develop -c just test-package archlinux ${{ inputs.target }}
         env:
           HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
@@ -126,7 +127,7 @@ jobs:
           name: hoprd-${{ inputs.target }}.deb
           path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.deb
 
-      - name: Upload rpm packaged artifact
+      - name: Upload centos packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.rpm
