@@ -123,6 +123,7 @@ impl MigratorTrait for MigratorPeers {
             )),
             Box::new(m20250528_000023_peers_reset::Migration),
             Box::new(m20250603_000025_peers_reset::Migration),
+            Box::new(m20250701_000028_peers_deprecate_fields::Migration(BackendType::SQLite)),
         ]
     }
 }
