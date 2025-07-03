@@ -1,21 +1,28 @@
 ---
-name: Audit PR
+name: Audit
 
 on:
   merge_group:
     types: [checks_requested]
-  pull_request:
-    types:
-      - synchronize
-      - ready_for_review
+  workflow_call:
+    inputs:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
+        required: true
+        type: string
+concurrency:
+  group: ${{ inputs.source_branch || github.ref_name }}-audit
+  cancel-in-progress: true
 
 jobs:
   cargo-audit:
-    name: Cargo Audit
+    name: Audit
     runs-on: self-hosted-hoprnet-big
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -24,9 +31,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_branch }}
 
       - name: Install Nix
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 

@@ -2,8 +2,7 @@ use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-use futures::StreamExt;
-use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, spawn};
+use futures::{StreamExt, future::AbortHandle};
 use hopr_lib::{HoprLibProcesses, ToHex};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{ListenerJoinHandles, RestApiParameters, serve_api};
@@ -106,9 +105,9 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 enum HoprdProcesses {
-    HoprLib(HoprLibProcesses, JoinHandle<()>),
+    HoprLib(HoprLibProcesses, AbortHandle),
     ListenerSockets(ListenerJoinHandles),
-    RestApi(JoinHandle<()>),
+    RestApi(AbortHandle),
 }
 
 // Manual implementation needed, since Strum does not support skipping arguments
@@ -198,7 +197,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
-        let node_cfg_str = cfg.as_redacted_string()?;
+        let node_cfg_value =
+            serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
+
         let api_cfg = cfg.api.clone();
 
         let listen_address = match &cfg.api.host.address {
@@ -216,20 +217,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let session_listener_sockets = Arc::new(RwLock::new(HashMap::new()));
 
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
-        processes.push(HoprdProcesses::RestApi(spawn(async move {
-            if let Err(e) = serve_api(RestApiParameters {
-                listener: api_listener,
-                hoprd_cfg: node_cfg_str,
-                cfg: api_cfg,
-                hopr: node_clone,
-                session_listener_sockets,
-                default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
-            })
-            .await
-            {
-                error!(error = %e, "the REST API server could not start")
-            }
-        })));
+
+        processes.push(HoprdProcesses::RestApi(hopr_async_runtime::spawn_as_abortable(
+            async move {
+                if let Err(e) = serve_api(RestApiParameters {
+                    listener: api_listener,
+                    hoprd_cfg: node_cfg_value,
+                    cfg: api_cfg,
+                    hopr: node_clone,
+                    session_listener_sockets,
+                    default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
+                })
+                .await
+                {
+                    error!(error = %e, "the REST API server could not start")
+                }
+            },
+        )));
     }
 
     let (_hopr_socket, hopr_processes) = node
@@ -251,18 +255,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 info!("Received the INT signal... tearing down the node");
                 futures::stream::iter(processes)
                     .then(|process| async move {
-                        let mut join_handles: Vec<JoinHandle<()>> = Vec::new();
+                        let mut abort_handles: Vec<AbortHandle> = Vec::new();
                         info!("Stopping process '{process}'");
                         match process {
-                            HoprdProcesses::HoprLib(_, jh) | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
-                            HoprdProcesses::ListenerSockets(jhs) => {
-                                join_handles.extend(jhs.write().await.drain().map(|(_, entry)| entry.jh));
+                            HoprdProcesses::HoprLib(_, ah) | HoprdProcesses::RestApi(ah) => abort_handles.push(ah),
+                            HoprdProcesses::ListenerSockets(ahs) => {
+                                abort_handles
+                                    .extend(ahs.write_arc().await.drain().map(|(_, entry)| entry.abort_handle));
                             }
                         }
-                        futures::stream::iter(join_handles)
+                        futures::stream::iter(abort_handles)
                     })
                     .flatten()
-                    .for_each_concurrent(None, cancel_join_handle)
+                    .for_each_concurrent(None, |ah| async move { ah.abort() })
                     .await;
 
                 info!("All processes stopped... emulating the default handler...");

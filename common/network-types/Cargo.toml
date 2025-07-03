@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "0.6.2"
+version = "0.7.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition = "2021"
@@ -82,6 +82,8 @@ tokio-util = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
 
 [[bench]]
 name = "session"

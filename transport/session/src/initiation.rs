@@ -1,10 +1,8 @@
 //! This module defines the Start sub-protocol used for HOPR Session initiation and management.
 
-use std::collections::HashSet;
+use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 
-use hopr_internal_types::prelude::ApplicationData;
-
-use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
+use crate::{Capabilities, errors::TransportSessionError, types::SessionTarget};
 
 /// Challenge that identifies a Start initiation protocol message.
 pub type StartChallenge = u64;
@@ -39,7 +37,7 @@ pub struct StartInitiation {
     /// [Target](SessionTarget) of the session, i.e., what should the other party do with the traffic.
     pub target: SessionTarget,
     /// Capabilities of the session.
-    pub capabilities: HashSet<Capability>,
+    pub capabilities: Capabilities,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.
@@ -89,7 +87,27 @@ pub enum StartProtocol<T> {
     /// Counterparty has closed the session.
     CloseSession(T),
     /// A ping message to keep the session alive.
-    KeepAlive(T),
+    KeepAlive(KeepAliveMessage<T>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KeepAliveMessage<T> {
+    /// Session ID.
+    pub id: T,
+    /// Reserved for future use, always zero currently.
+    pub flags: u8,
+}
+
+impl<T> From<T> for KeepAliveMessage<T> {
+    fn from(value: T) -> Self {
+        Self { id: value, flags: 0 }
+    }
+}
+
+impl<T> StartProtocol<T> {
+    pub(crate) const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
+    const START_PROTOCOL_VERSION: u8 = 0x01;
 }
 
 // TODO: implement this without Serde, see #7145
@@ -101,49 +119,70 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
 
     /// Serialize the message into a message tag and message data.
     /// Data is serialized using `bincode`.
-    pub fn encode(self) -> crate::errors::Result<(u16, Box<[u8]>)> {
-        let disc = StartProtocolDiscriminants::from(&self) as u8 + 1;
-        let inner = match self {
+    pub fn encode(self) -> crate::errors::Result<(Tag, Box<[u8]>)> {
+        let mut out = Vec::with_capacity(ApplicationData::PAYLOAD_SIZE);
+        out.push(Self::START_PROTOCOL_VERSION);
+        out.push(StartProtocolDiscriminants::from(&self) as u8);
+
+        match self {
             StartProtocol::StartSession(init) => {
-                bincode::serde::encode_to_vec(&init, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::encode_into_std_write(&init, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
             }
             StartProtocol::SessionEstablished(est) => {
-                bincode::serde::encode_to_vec(&est, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::encode_into_std_write(&est, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
             }
-            StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(err, Self::SESSION_BINCODE_CONFIGURATION),
-            StartProtocol::CloseSession(id) => bincode::serde::encode_to_vec(&id, Self::SESSION_BINCODE_CONFIGURATION),
-            StartProtocol::KeepAlive(id) => bincode::serde::encode_to_vec(&id, Self::SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::SessionError(err) => {
+                bincode::serde::encode_into_std_write(err, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
+            }
+            StartProtocol::CloseSession(id) => {
+                bincode::serde::encode_into_std_write(&id, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
+            }
+            StartProtocol::KeepAlive(msg) => {
+                bincode::serde::encode_into_std_write(&msg, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
+            }
         }?;
 
-        Ok((disc as u16, inner.into_boxed_slice()))
+        Ok((Self::START_PROTOCOL_MESSAGE_TAG, out.into_boxed_slice()))
     }
 
     /// Deserialize the message from message tag and message data.
     /// Data is deserialized using `bincode`.
-    pub fn decode(tag: u16, data: &[u8]) -> crate::errors::Result<Self> {
-        if tag == 0 {
-            return Err(TransportSessionError::Tag);
+    pub fn decode(tag: Tag, data: &[u8]) -> crate::errors::Result<Self> {
+        if tag != Self::START_PROTOCOL_MESSAGE_TAG {
+            return Err(TransportSessionError::StartProtocolError("unknown message tag".into()));
         }
 
-        match StartProtocolDiscriminants::from_repr(tag as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
+        if data.len() < 3 {
+            return Err(TransportSessionError::StartProtocolError("message too short".into()));
+        }
+
+        if data[0] != Self::START_PROTOCOL_VERSION {
+            return Err(TransportSessionError::StartProtocolError(
+                "unknown message version".into(),
+            ));
+        }
+
+        match StartProtocolDiscriminants::from_repr(data[1])
+            .ok_or(TransportSessionError::StartProtocolError("unknown message".into()))?
+        {
             StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::SessionEstablished => Ok(StartProtocol::SessionEstablished(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::KeepAlive => Ok(StartProtocol::KeepAlive(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
         }
@@ -209,11 +248,12 @@ impl<T> TryFrom<ApplicationData> for StartProtocol<T> {
 mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
-    use hopr_internal_types::prelude::{HoprPseudonym, Tag};
+    use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_network_types::prelude::SealedHost;
+    use hopr_transport_packet::prelude::Tag;
 
     use super::*;
-    use crate::SessionId;
+    use crate::{Capability, SessionId};
 
     #[cfg(feature = "serde")]
     #[test]
@@ -225,7 +265,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::StartSession as Tag + 1, tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -260,7 +301,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::SessionEstablished as Tag + 1, tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -277,7 +319,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::SessionError as Tag + 1, tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -291,7 +334,8 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::CloseSession(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::CloseSession as Tag + 1, tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -302,10 +346,11 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn start_protocol_keep_alive_message_should_encode_and_decode() -> anyhow::Result<()> {
-        let msg_1 = StartProtocol::<i32>::KeepAlive(10);
+        let msg_1 = StartProtocol::<i32>::KeepAlive(10.into());
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::KeepAlive as Tag + 1, tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -321,7 +366,7 @@ mod tests {
             target: SessionTarget::TcpStream(SealedHost::Plain(
                 "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
             )),
-            capabilities: HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]),
+            capabilities: Capability::RetransmissionAck | Capability::RetransmissionNack | Capability::Segmentation,
         });
 
         assert!(
@@ -332,7 +377,7 @@ mod tests {
 
         let msg = StartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            session_id: SessionId::new(u16::MAX, HoprPseudonym::random()),
+            session_id: SessionId::new(Tag::MAX, HoprPseudonym::random()),
         });
 
         assert!(
@@ -352,14 +397,14 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::CloseSession(SessionId::new(Tag::MAX, HoprPseudonym::random()));
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "CloseSession must fit within {}",
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::KeepAlive(SessionId::new(u16::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()).into());
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "KeepAlive must fit within {}",
@@ -371,7 +416,7 @@ mod tests {
 
     #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        let msg = StartProtocol::KeepAlive(SessionId::new(u16::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()).into());
         let len = msg.encode()?.1.len();
         assert!(
             HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,

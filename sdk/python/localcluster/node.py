@@ -1,9 +1,12 @@
 import asyncio
 import logging
 import os
-from decimal import Decimal
+import tempfile
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
+from typing import Optional
+
+from api_lib.headers.authorization import Bearer
 
 from ..api import HoprdAPI
 from . import utils
@@ -42,8 +45,9 @@ class Node:
         identity_path: str,
         cfg_file: str,
         base_port: int,
-        api_addr: str = None,
+        api_addr: Optional[str] = None,
         use_nat: bool = False,
+        remove_temp_data: bool = True,
     ):
         # initialized
         self.id = id
@@ -52,7 +56,9 @@ class Node:
         self.network: str = network
         self.identity_path: str = identity_path
         self.use_nat: bool = use_nat
+        self.remove_temp_data: bool = remove_temp_data
         self.base_port: int = base_port
+        self.temp_data_dir = tempfile.TemporaryDirectory(prefix=f"{NODE_NAME_PREFIX}_{self.id}_")
 
         # optional
         self.cfg_file: str = cfg_file
@@ -78,7 +84,7 @@ class Node:
 
     @property
     def api(self):
-        return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", self.api_token)
+        return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", Bearer(self.api_token), "/api/v4")
 
     def prepare(self):
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
@@ -95,6 +101,35 @@ class Node:
             + f"tokio console {self.tokio_console_port}, "
             + f"anvil {self.anvil_port}"
         )
+
+    def load_native_address(self):
+        logging.debug(f"Reading node_id {self}")
+
+        safe_custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "PATH": os.environ["PATH"],
+        }
+
+        res = run(
+            [
+                "hopli",
+                "identity",
+                "read",
+                "--identity-from-path",
+                self.dir.joinpath("hoprd.id"),
+            ],
+            env=os.environ | safe_custom_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            cwd=PWD,
+        )
+
+        for el in res.stdout.split("\n"):
+            if el.startswith("Identity addresses:"):
+                logging.debug(f"Node {self.id} identity read line: {el}")
+                self.address = el.split("[")[-1].rstrip("]")
 
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))
@@ -163,7 +198,7 @@ class Node:
         logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
         return False
 
-    def setup(self, password: str, config_file: Path, dir: Path):
+    def setup(self, password: str, config_file: Path, dir: Path, log_tag: str):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
         log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
 
@@ -172,15 +207,15 @@ class Node:
             "RUST_LOG": ",".join(
                 [
                     log_level,
-                    "libp2p_swarm=info",
-                    "multistream_select=info",
-                    "isahc=error",
-                    "sea_orm=warn",
-                    "sqlx=warn",
                     "hyper_util=warn",
+                    "hickory_resolver=warn",
+                    "isahc=error",
+                    "libp2p_swarm=info",
                     "libp2p_tcp=info",
                     "libp2p_dns=info",
-                    "hickory_resolver=warn",
+                    "multistream_select=info",
+                    "sea_orm=warn",
+                    "sqlx=warn",
                 ]
             ),
             "RUST_BACKTRACE": "full",
@@ -201,7 +236,7 @@ class Node:
             "--testPreferLocalAddresses",
             f"--apiHost={self.api_addr}",
             f"--apiPort={self.api_port}",
-            f"--data={self.dir}",
+            f"--data={self.temp_data_dir.name}",
             f"--host={self.host_addr}:{self.p2p_port}",
             f"--identity={self.dir.joinpath('hoprd.id')}",
             f"--network={self.network}",
@@ -212,8 +247,9 @@ class Node:
         ]
         if self.cfg_file_path is not None:
             cmd += [f"--configurationFilePath={self.cfg_file_path}"]
+        log_file_name = f"hoprd.{log_tag}.log" if log_tag else "hoprd.log"
 
-        with open(self.dir.joinpath("hoprd.log"), "w") as log_file:
+        with open(self.dir.joinpath(log_file_name), "w") as log_file:
             self.proc = Popen(
                 cmd,
                 stdout=log_file,
@@ -251,6 +287,11 @@ class Node:
 
     def clean_up(self):
         self.proc.kill()
+        if self.remove_temp_data:
+            try:
+                self.temp_data_dir.cleanup()
+            except OSError as e:
+                logging.warning(f"Failed to cleanup temporary directory for node {self.id}: {e}")
 
     @classmethod
     def fromConfig(

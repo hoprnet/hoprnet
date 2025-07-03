@@ -21,7 +21,7 @@ usage() {
   msg
   msg "This script can be used to run a local Anvil instance at 0.0.0.0:PORT"
   msg
-  msg "Usage: $0 [-h|--help] [-f] [-l <log_file>] [-c <cfg_file>] [-p <port>] [-ls <state_file>] [-ds <state_file>] [-s]"
+  msg "Usage: $0 [-h|--help] [-f] [-l <log_file>] [-c <cfg_file>] [-p <port>] [-ls <state_file>] [-ds <state_file>] [-s] [-sp]"
   msg
   msg "Options:"
   msg
@@ -33,6 +33,7 @@ usage() {
   msg "-p <port>: Use particular port; default is 8545"
   msg "-ds <state_file>: Use particular state file to dump state on exit"
   msg "-ls <state_file>: Use particular state file to load state on startup"
+  msg "-sp: Use staking proxy. If not supplied, the script will use the dummy proxy."
   msg
 }
 
@@ -51,6 +52,7 @@ declare foreground="false"
 declare skip_deploy="false"
 declare dump_state_file=""
 declare load_state_file=""
+declare use_staking_proxy="false"
 
 while (("$#")); do
   case "$1" in
@@ -90,6 +92,11 @@ while (("$#")); do
   -ls)
     load_state_file="$2"
     shift
+    shift
+    ;;
+  -sp)
+    # use staking proxy
+    use_staking_proxy="true"
     shift
     ;;
   -* | --*=)
@@ -168,6 +175,7 @@ if [ "${skip_deploy}" != "true" ]; then
     FOUNDRY_ETH_RPC_URL="http://127.0.0.1:${port}" \
     ETH_RPC_URL="http://127.0.0.1:${port}" \
     DEPLOYER_PRIVATE_KEY=${deployer_private_key} \
+    USE_STAKING_PROXY=${use_staking_proxy} \
     make -C "${mydir}"/../ethereum/contracts/ anvil-deploy-all
   log "Deploying contracts finished"
 fi

@@ -11,7 +11,7 @@ on:
       next_release_type:
         type: choice
         required: true
-        description: 'Next release type to create'
+        description: "Next release type to create"
         options:
           - ReleaseCandidate
           - Patch
@@ -20,7 +20,7 @@ on:
       release_name:
         type: choice
         required: true
-        description: 'Name of the release'
+        description: "Name of the release"
         options:
           - singapore
           - kaunas
@@ -34,7 +34,7 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -45,7 +45,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -53,7 +53,7 @@ jobs:
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 
@@ -84,7 +84,7 @@ jobs:
           body-path: .github/files/${{ steps.template.outputs.pr_template }}
           branch: bot/close-${{ steps.template.outputs.current_version }}
           delete-branch: true
-          labels: release,load_tests,component:hopli,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin,binary:armv7l-linux
+          labels: release,load_tests,component:hopli,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin
           draft: true
           assignees: ${{ github.actor }}
           team-reviewers: "@hoprnet/hopr-development"
@@ -93,8 +93,8 @@ jobs:
         run: |
           git fetch
           git checkout bot/close-${{ steps.template.outputs.current_version }}
+          gh pr edit --add-reviewer "hoprnet/hopr-development"
           gh pr ready
-          gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 

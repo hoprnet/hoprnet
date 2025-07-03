@@ -545,7 +545,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "hopr_up{job=~\"${pod_name}\"}*1000",
+          "expr": "hopr_start_time{job=~\"${pod_name}\"}*1000",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -621,7 +621,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(changes(hopr_up{job=~\"${pod_name}\"}[$__range]))",
+          "expr": "sum(changes(hopr_start_time{job=~\"${pod_name}\"}[$__range]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -4390,7 +4390,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(hopr_up,job)",
+        "definition": "label_values(hopr_start_time,job)",
         "description": "Hoprd Node name",
         "hide": 0,
         "includeAll": false,
@@ -4400,7 +4400,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(hopr_up,job)",
+          "query": "label_values(hopr_start_time,job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -4419,7 +4419,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(hopr_up{job=\"${pod_name}\"},instance)",
+        "definition": "label_values(hopr_start_time{job=\"${pod_name}\"},instance)",
         "hide": 2,
         "includeAll": false,
         "multi": false,
@@ -4427,7 +4427,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(hopr_up{job=\"${pod_name}\"},instance)",
+          "query": "label_values(hopr_start_time{job=\"${pod_name}\"},instance)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -4446,7 +4446,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(hopr_up{job=~\"$pod_name\"},hoprd_address)",
+        "definition": "label_values(hopr_start_time{job=~\"$pod_name\"},hoprd_address)",
         "description": "Hoprd Node address",
         "hide": 2,
         "includeAll": false,
@@ -4455,7 +4455,7 @@
         "name": "native_address",
         "options": [],
         "query": {
-          "query": "label_values(hopr_up{job=~\"$pod_name\"},hoprd_address)",
+          "query": "label_values(hopr_start_time{job=~\"$pod_name\"},hoprd_address)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -4474,14 +4474,14 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(hopr_up{job=~\"$pod_name\"},namespace)",
+        "definition": "label_values(hopr_start_time{job=~\"$pod_name\"},namespace)",
         "hide": 2,
         "includeAll": false,
         "multi": false,
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(hopr_up{job=~\"$pod_name\"},namespace)",
+          "query": "label_values(hopr_start_time{job=~\"$pod_name\"},namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -4500,7 +4500,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(hopr_up{job=~\"$pod_name\"},hoprd_network)",
+        "definition": "label_values(hopr_start_time{job=~\"$pod_name\"},hoprd_network)",
         "hide": 2,
         "includeAll": false,
         "multi": false,
@@ -4508,7 +4508,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(hopr_up{job=~\"$pod_name\"},hoprd_network)",
+          "query": "label_values(hopr_start_time{job=~\"$pod_name\"},hoprd_network)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,

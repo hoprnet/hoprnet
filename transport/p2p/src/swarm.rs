@@ -8,8 +8,7 @@ use hopr_transport_identity::{
     Multiaddr, PeerId,
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
 };
-use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
-use hopr_transport_protocol::{PeerDiscovery, config::ProtocolConfig};
+use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     autonat,
     multiaddr::Protocol,
@@ -18,10 +17,7 @@ use libp2p::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{
-    HOPR_HEARTBEAT_PROTOCOL_V_0_2_0, HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong, constants,
-    errors::Result,
-};
+use crate::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Result};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -36,10 +32,7 @@ lazy_static::lazy_static! {
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
 async fn build_p2p_network<T>(
     me: libp2p::identity::Keypair,
-    network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
     indexer_update_input: T,
-    heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
-    protocol_cfg: ProtocolConfig,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>>
 where
     T: Stream<Item = PeerDiscovery> + Send + 'static,
@@ -64,15 +57,7 @@ where
 
     Ok(swarm
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_behaviour(|_key| {
-            HoprNetworkBehavior::new(
-                me_peerid,
-                network_update_input,
-                indexer_update_input,
-                heartbeat_requests,
-                protocol_cfg.heartbeat.timeout,
-            )
-        })
+        .with_behaviour(|_key| HoprNetworkBehavior::new(me_peerid, indexer_update_input))
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_swarm_config(|cfg| {
             cfg.with_dial_concurrency_factor(
@@ -117,24 +102,15 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
 impl HoprSwarm {
     pub async fn new<T>(
         identity: libp2p::identity::Keypair,
-        network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
         indexer_update_input: T,
-        heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
         my_multiaddresses: Vec<Multiaddr>,
-        protocol_cfg: ProtocolConfig,
     ) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
-        let mut swarm = build_p2p_network(
-            identity,
-            network_update_input,
-            indexer_update_input,
-            heartbeat_requests,
-            protocol_cfg,
-        )
-        .await
-        .expect("swarm must be constructible");
+        let mut swarm = build_p2p_network(identity, indexer_update_input)
+            .await
+            .expect("swarm must be constructible");
 
         for multiaddress in my_multiaddresses.iter() {
             match resolve_dns_if_any(multiaddress) {
@@ -192,73 +168,12 @@ impl HoprSwarm {
     /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
     ///
     /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run(self, version: String) {
+    pub async fn run(self) {
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.into();
-
-        // NOTE: an improvement would be a forgetting cache for the active requests
-        let active_pings: moka::future::Cache<libp2p::request_response::OutboundRequestId, PingQueryReplier> =
-            moka::future::CacheBuilder::new(1000)
-                .time_to_live(std::time::Duration::from_secs(40))
-                .build();
 
         loop {
             select! {
                 event = swarm.select_next_some() => match event {
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(event)) => {
-                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol", protocol = HOPR_HEARTBEAT_PROTOCOL_V_0_2_0);
-                        match event {
-                            libp2p::request_response::Event::<Ping,Pong>::Message {
-                                peer,
-                                message,
-                                connection_id
-                            } => {
-                                match message {
-                                    libp2p::request_response::Message::<Ping,Pong>::Request {
-                                        request_id, request, channel
-                                    } => {
-                                        trace!(%peer, %request_id, %connection_id, "Received a heartbeat Ping");
-
-                                        if let Ok(challenge_response) = ControlMessage::generate_pong_response(&request.0)
-                                        {
-                                            if swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response, version.clone())).is_err() {
-                                                error!(%peer, %request_id, %connection_id, "Failed to reply to a Ping request");
-                                            };
-                                        }
-                                    },
-                                    libp2p::request_response::Message::<Ping,Pong>::Response {
-                                        request_id, response
-                                    } => {
-                                        if let Some(replier) = active_pings.remove(&request_id).await {
-                                            active_pings.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside
-                                            trace!(%peer, %request_id, "Processing manual ping response");
-                                            replier.notify(response.0, response.1)
-                                        } else {
-                                            debug!(%peer, %request_id, "Failed to find heartbeat replier");
-                                        }
-                                    }
-                                }
-                            },
-                            libp2p::request_response::Event::<Ping,Pong>::OutboundFailure {
-                                peer, request_id, error, connection_id
-                            } => {
-                                active_pings.invalidate(&request_id).await;
-                                if matches!(error, libp2p::request_response::OutboundFailure::DialFailure) {
-                                    trace!(%peer, %request_id, %connection_id, %error, "Peer is offline");
-                                } else {
-                                    error!(%peer, %request_id, %connection_id, %error, "Failed heartbeat protocol on outbound");
-                                }
-                            },
-                            libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
-                                peer, request_id, error, connection_id
-                            } => {
-                                warn!(%peer, %request_id, %connection_id, "Failed to receive a Pong request: {error}");
-                            },
-                            libp2p::request_response::Event::<Ping,Pong>::ResponseSent {..} => {
-                                // trace!("Discarded messages not relevant for the protocol!");
-                            },
-                        }
-                    }
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {}
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatClient(autonat::v2::client::Event {
                         server,
@@ -277,18 +192,6 @@ impl HoprSwarm {
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatServer(event)) => {
                         warn!(?event, "Autonat server event");
-                    }
-
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::HeartbeatGenerator(event)) => {
-                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="heartbeat generator");
-
-                        trace!(event = tracing::field::debug(&event), "Received a heartbeat event");
-                        match event {
-                            crate::behavior::heartbeat::Event::ToProbe((peer, replier)) => {
-                                let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
-                                active_pings.insert(req_id, replier).await;
-                            },
-                        }
                     }
                     SwarmEvent::ConnectionEstablished {
                         peer_id,
@@ -394,6 +297,7 @@ impl HoprSwarm {
                     SwarmEvent::NewExternalAddrOfPeer {
                         peer_id, address
                     } => {
+                        swarm.add_peer_address(peer_id, address.clone());
                         trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "New peer stored in swarm")
                     },
                     _ => trace!(transport="libp2p", "Unsupported enum option detected")
@@ -450,26 +354,6 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
         num_peers,
         num_incoming, num_outgoing, "swarm network status after {event}"
     );
-}
-
-/// Composition of all inputs allowing to produce a single stream of
-/// input events passed into the swarm processing logic.
-#[derive(Debug)]
-pub enum Inputs {
-    Message((PeerId, Box<[u8]>)),
-    Acknowledgement((PeerId, Acknowledgement)),
-}
-
-impl From<(PeerId, Acknowledgement)> for Inputs {
-    fn from(value: (PeerId, Acknowledgement)) -> Self {
-        Self::Acknowledgement(value)
-    }
-}
-
-impl From<(PeerId, Box<[u8]>)> for Inputs {
-    fn from(value: (PeerId, Box<[u8]>)) -> Self {
-        Self::Message(value)
-    }
 }
 
 pub type TicketAggregationRequestType = OutboundRequestId;

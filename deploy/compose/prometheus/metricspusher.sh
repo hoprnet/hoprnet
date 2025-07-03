@@ -21,14 +21,14 @@ fi
 while true; do
   echo Publishing metrics ...
   # Add timeout and retry with backoff
-  if ! metrics=$(curl -s --max-time 10 -H "X-Auth-Token: ${HOPRD_API_TOKEN}" "http://hoprd:3001/api/v3/node/metrics"); then
+  if ! metrics=$(curl -s --max-time 10 -H "X-Auth-Token: ${HOPRD_API_TOKEN}" "http://hoprd:3001/api/v4/node/metrics"); then
     echo "Error: Failed to fetch metrics from Hoprd API"
     sleep 5
     continue
   fi
 
   # Push metrics with timeout
-  if ! echo "${metrics}" | curl -s --max-time 10 -u ${METRICS_PUSH_KEY} --data-binary @- "${METRICS_PUSH_URL}"; then
+  if ! echo "${metrics}" | curl -s --max-time 10 -u "${METRICS_PUSH_KEY}" --data-binary @- "${METRICS_PUSH_URL}"; then
     echo "Error: Failed to push metrics to ${METRICS_PUSH_URL}"
   fi
   sleep 15

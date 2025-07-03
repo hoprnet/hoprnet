@@ -31,7 +31,7 @@ use std::{
     sync::Arc,
 };
 
-use async_lock::RwLock;
+use async_lock::{RwLock, RwLockUpgradableReadGuardArc};
 use async_trait::async_trait;
 use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_crypto_types::prelude::Hash;
@@ -203,12 +203,12 @@ where
 
                 // Wait until we're added to the aggregation tasks table
                 let _ = can_remove_rx.await;
-                if let Some((done, _)) = agg_tasks_clone.write().await.get_mut(&channel_id) {
+                if let Some((done, _)) = agg_tasks_clone.write_arc().await.get_mut(&channel_id) {
                     *done = true;
                 }
             });
 
-            self.agg_tasks.write().await.insert(channel_id, (false, task));
+            self.agg_tasks.write_arc().await.insert(channel_id, (false, task));
             let _ = can_remove_tx.send(()); // Allow the task to mark itself as done
         } else {
             warn!(channel = %channel_id, "this strategy already aggregates in channel");
@@ -218,11 +218,14 @@ where
     }
 
     async fn is_strategy_aggregating_in_channel(&self, channel_id: Hash) -> bool {
-        let existing = self.agg_tasks.read().await.get(&channel_id).map(|(done, _)| *done);
+        let tasks_read_locked = self.agg_tasks.upgradable_read_arc().await;
+        let existing = tasks_read_locked.get(&channel_id).map(|(done, _)| *done);
         if let Some(done) = existing {
             // Task exists, check if it has been completed
             if done {
-                if let Some((_, task)) = self.agg_tasks.write().await.remove(&channel_id) {
+                let mut tasks_write_locked = RwLockUpgradableReadGuardArc::upgrade(tasks_read_locked).await;
+
+                if let Some((_, task)) = tasks_write_locked.remove(&channel_id) {
                     // Task has been completed, remove it and await its join handle
                     let _ = task.await;
                     false

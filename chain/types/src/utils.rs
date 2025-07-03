@@ -1,7 +1,9 @@
-#![allow(clippy::too_many_arguments)]
 //! Chain utilities used for testing.
 //!
 //! This used in unit and integration tests.
+
+#![allow(clippy::too_many_arguments)]
+
 use std::str::FromStr;
 
 use SafeContract::SafeContractInstance;
