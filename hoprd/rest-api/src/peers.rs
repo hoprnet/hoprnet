@@ -92,7 +92,6 @@ pub(super) async fn show_peer_info(
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
     "latency": 200,
-    "reportedVersion": "2.1.0"
 }))]
 #[serde(rename_all = "camelCase")]
 /// Contains the latency and the reported version of a peer that has been pinged.
@@ -100,8 +99,6 @@ pub(crate) struct PingResponse {
     #[serde_as(as = "DurationMilliSeconds<u64>")]
     #[schema(value_type = u64, example = 200)]
     latency: std::time::Duration,
-    #[schema(example = "2.1.0")]
-    reported_version: String,
 }
 
 /// Directly pings the given peer.
@@ -137,11 +134,8 @@ pub(super) async fn ping_peer(
 
     match hopr.peer_resolver().resolve_packet_key(&destination).await {
         Ok(Some(offchain_key)) => match hopr.ping(&PeerId::from(offchain_key)).await {
-            Ok((latency, status)) => {
-                let resp = Json(PingResponse {
-                    latency: latency / 2,
-                    reported_version: status.peer_version.unwrap_or("unknown".into()),
-                });
+            Ok((latency, _status)) => {
+                let resp = Json(PingResponse { latency: latency / 2 });
                 Ok((StatusCode::OK, resp).into_response())
             }
             Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {

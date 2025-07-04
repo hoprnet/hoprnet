@@ -1,6 +1,6 @@
 use std::{net::Ipv4Addr, num::NonZeroU8};
 
-use futures::{Stream, StreamExt, select};
+use futures::{Sink, SinkExt, Stream, StreamExt, select};
 use hopr_internal_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -168,13 +168,21 @@ impl HoprSwarm {
     /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
     ///
     /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run(self) {
+    pub async fn run<T>(self, events: T)
+    where
+        T: Sink<crate::behavior::discovery::Event> + Send + 'static,
+    {
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.into();
+        futures::pin_mut!(events);
 
         loop {
             select! {
                 event = swarm.select_next_some() => match event {
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => {
+                        if let Err(_error) = events.send(event).await {
+                            tracing::error!("Failed to send discovery event from the transport layer");
+                        }
+                    }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatClient(autonat::v2::client::Event {
                         server,
                         tested_addr,
@@ -185,8 +193,8 @@ impl HoprSwarm {
                             Ok(_) => {
                                 debug!(%server, %tested_addr, %bytes_sent, "Autonat server successfully tested");
                             }
-                            Err(e) => {
-                                warn!(%server, %tested_addr, %bytes_sent, %e, "Autonat server test failed");
+                            Err(error) => {
+                                warn!(%server, %tested_addr, %bytes_sent, %error, "Autonat server test failed");
                             }
                         }
                     }
@@ -240,8 +248,9 @@ impl HoprSwarm {
                         connection_id,
                         error,
                         send_back_addr,
+                        peer_id
                     } => {
-                        error!(%local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error");
+                        error!(?peer_id, %local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error");
 
                         print_network_info(swarm.network_info(), "incoming connection error");
                     }

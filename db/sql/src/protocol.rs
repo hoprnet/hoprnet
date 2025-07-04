@@ -301,6 +301,7 @@ impl HoprDbProtocolOperations for HoprDb {
         })?)
     }
 
+    #[tracing::instrument(level = "trace", skip(self, matcher))]
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)> {
         let pseudonym = matcher.pseudonym();
         let surbs_for_pseudonym = self
@@ -599,6 +600,7 @@ impl HoprDbProtocolOperations for HoprDb {
 }
 
 impl HoprDb {
+    #[tracing::instrument(level = "trace", skip(self, channel))]
     async fn create_multihop_ticket(
         &self,
         channel: ChannelEntry,

@@ -1,6 +1,8 @@
 use alloy::transports::{http::Http, utils::guess_local_url};
 use async_trait::async_trait;
+#[cfg(feature = "runtime-tokio")]
 pub use reqwest::Client as ReqwestClient;
+#[cfg(feature = "runtime-tokio")]
 use tracing::{debug, trace};
 use url::Url;
 
@@ -71,6 +73,7 @@ impl<T: Clone> From<HttpWrapper<T>> for Http<T> {
     }
 }
 
+#[cfg(feature = "runtime-tokio")]
 #[async_trait]
 impl HttpRequestor for ReqwestClient {
     #[inline]

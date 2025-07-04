@@ -113,6 +113,7 @@ impl Probe {
         Up: futures::Sink<(HoprPseudonym, ApplicationData)> + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
+        let interval_between_rounds = self.cfg.interval;
 
         // For each probe target a cached version of transport routing is stored
         let cache_peer_routing: moka::future::Cache<PeerId, ResolvedTransportRouting> = moka::future::Cache::builder()
@@ -170,7 +171,10 @@ impl Probe {
 
         processes.insert(
             HoprProbeProcess::Emit,
-            hopr_async_runtime::spawn_as_abortable(direct_neighbors
+            hopr_async_runtime::spawn_as_abortable(async move {
+                hopr_async_runtime::prelude::sleep(2 * interval_between_rounds).await;   // delay to allow network to stabilize
+
+                direct_neighbors
                 .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                     let db = db.clone();
                     let cache_peer_routing = cache_peer_routing.clone();
@@ -212,8 +216,8 @@ impl Probe {
                             Err(error) => tracing::error!(%peer, %error, "failed to resolve transport routing"),
                         };
                     }
-                })
-            )
+                }).await;
+            })
         );
 
         // -- Process probes --
@@ -241,10 +245,13 @@ impl Probe {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
                                         match db.find_surb(SurbMatcher::Pseudonym(pseudonym)).await.map(|(sender_id, surb)| ResolvedTransportRouting::Return(sender_id, surb)) {
                                             Ok(path) => {
-                                                let message = Message::Probe(NeighborProbe::Pong(ping));
-                                                let _ = push_to_network.send_message(path, message).await;
+                                                tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
+                                            let message = Message::Probe(NeighborProbe::Pong(ping));
+                                                if let Err(error) = push_to_network.send_message(path, message).await {
+                                                    tracing::error!(%pseudonym, %error, "failed to send back a pong");
+                                                }
                                             },
-                                            Err(error) => tracing::error!(%pseudonym, %error, "failed to get a SURB, cannot send pong"),
+                                            Err(error) => tracing::error!(%pseudonym, %error, "failed to get a SURB, cannot send back a pong"),
                                         }
                                     },
                                     Message::Probe(NeighborProbe::Pong(pong)) => {
@@ -466,6 +473,7 @@ mod tests {
     async fn probe_should_record_value_for_manual_neighbor_probe() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(5),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
@@ -505,6 +513,7 @@ mod tests {
     async fn probe_should_record_failure_on_manual_fail() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(5),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
@@ -543,6 +552,7 @@ mod tests {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(20),
             max_parallel_probes: NEIGHBOURS.len(),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
@@ -595,6 +605,7 @@ mod tests {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(10),
             max_parallel_probes: NEIGHBOURS.len(),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 
@@ -648,6 +659,7 @@ mod tests {
     async fn probe_should_pass_through_non_associated_tags() -> anyhow::Result<()> {
         let cfg = ProbeConfig {
             timeout: std::time::Duration::from_millis(20),
+            interval: std::time::Duration::from_secs(0),
             ..Default::default()
         };
 

@@ -23,5 +23,6 @@ tracing = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-network-types = { workspace = true }
+hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-internal-types = { workspace = true }
