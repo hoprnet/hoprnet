@@ -166,6 +166,9 @@ impl Default for HoprDbCaches {
         // and therefore, there's more but with a shorter lifetime
         let pseudonym_openers = moka::sync::Cache::builder()
             .time_to_live(Duration::from_secs(60))
+            .eviction_listener(|sender_id, _reply_opener, cause| {
+                tracing::trace!(?sender_id, ?cause, "Evicting SURB reply opener for sender");
+            })
             .max_capacity(100_000)
             .build();
 
