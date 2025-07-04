@@ -136,59 +136,41 @@ pub struct HoprDbCaches {
 
 impl Default for HoprDbCaches {
     fn default() -> Self {
-        let single_values = Cache::builder().time_to_idle(Duration::from_secs(1800)).build();
-
-        let unacked_tickets = Cache::builder()
-            .time_to_live(Duration::from_secs(30))
-            .max_capacity(1_000_000_000)
-            .build();
-
-        let ticket_index = Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build();
-
-        let unrealized_value = Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build();
-
-        let chain_to_offchain = Cache::builder()
-            .time_to_idle(Duration::from_secs(600))
-            .max_capacity(100_000)
-            .build();
-
-        let offchain_to_chain = Cache::builder()
-            .time_to_idle(Duration::from_secs(600))
-            .max_capacity(100_000)
-            .build();
-
-        let src_dst_to_channel = Cache::builder()
-            .time_to_live(Duration::from_secs(600))
-            .max_capacity(10_000)
-            .build();
-
-        // SURB openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
-        // and therefore, there's more but with a shorter lifetime
-        let pseudonym_openers = moka::sync::Cache::builder()
-            .time_to_live(Duration::from_secs(60))
-            .eviction_listener(|sender_id, _reply_opener, cause| {
-                tracing::trace!(?sender_id, ?cause, "Evicting SURB reply opener for sender");
-            })
-            .max_capacity(100_000)
-            .build();
-
-        // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
-        // For each Pseudonym, there's an RB of SURBs and their IDs.
-        let surbs_per_pseudonym = Cache::builder()
-            .time_to_idle(Duration::from_secs(600))
-            .max_capacity(10_000)
-            .build();
-
         Self {
-            single_values,
-            unacked_tickets,
-            ticket_index,
-            unrealized_value,
-            chain_to_offchain,
-            offchain_to_chain,
-            src_dst_to_channel,
-            pseudonym_openers,
-            surbs_per_pseudonym,
+            single_values: Cache::builder().time_to_idle(Duration::from_secs(1800)).build(),
+            unacked_tickets: Cache::builder()
+                .time_to_live(Duration::from_secs(30))
+                .max_capacity(1_000_000_000)
+                .build(),
+            ticket_index: Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build(),
+            unrealized_value: Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build(),
+            chain_to_offchain: Cache::builder()
+                .time_to_idle(Duration::from_secs(600))
+                .max_capacity(100_000)
+                .build(),
+            offchain_to_chain: Cache::builder()
+                .time_to_idle(Duration::from_secs(600))
+                .max_capacity(100_000)
+                .build(),
+            src_dst_to_channel: Cache::builder()
+                .time_to_live(Duration::from_secs(600))
+                .max_capacity(10_000)
+                .build(),
+            // SURB openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
+            // and therefore, there's more but with a shorter lifetime
+            pseudonym_openers: moka::sync::Cache::builder()
+                .time_to_live(Duration::from_secs(60))
+                .eviction_listener(|sender_id, _reply_opener, cause| {
+                    tracing::trace!(?sender_id, ?cause, "Evicting SURB reply opener for sender");
+                })
+                .max_capacity(100_000)
+                .build(),
+            // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
+            // For each Pseudonym, there's an RB of SURBs and their IDs.
+            surbs_per_pseudonym: Cache::builder()
+                .time_to_idle(Duration::from_secs(600))
+                .max_capacity(10_000)
+                .build(),
             key_id_mapper: CacheKeyMapper::with_capacity(10_000),
         }
     }
