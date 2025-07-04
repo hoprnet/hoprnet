@@ -41,6 +41,9 @@ package-packager packager arch:
     esac
     export RELEASE_VERSION ARCHITECTURE
     envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
+    ./scripts/generate-changelog.sh "${RELEASE_VERSION}" "{{packager}}" true > ./deploy/nfpm/changelog
+    [[ "{{packager}}" == "deb" ]] && cat ./deploy/nfpm/changelog | gzip -9 > ./deploy/nfpm/changelog.gz
+    [[ "{{packager}}" == "deb" ]] && sed -i.backup '/^license:.*/d' deploy/nfpm/nfpm.generated.yaml && rm deploy/nfpm/nfpm.generated.yaml.backup
     mkdir -p dist/packages
     nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
 

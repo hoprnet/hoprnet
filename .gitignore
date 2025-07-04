@@ -210,3 +210,4 @@ vendor/cargo/.DS_Store
 result
 .pre-commit-config.yaml
 deploy/nfpm/nfpm.generated.yaml
+deploy/nfpm/changelog*

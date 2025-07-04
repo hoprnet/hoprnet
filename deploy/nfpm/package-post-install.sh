@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -Eeo pipefail
 
 env_data=""
@@ -89,32 +89,10 @@ add_api_token_var() {
   append_env_data "HOPRD_API_TOKEN=${HOPRD_API_TOKEN}\n"
 }
 
-# Function to add the HOPRD_SAFE_ADDRESS environment variable
-add_safe_address_var() {
-  if [ -z "${HOPRD_SAFE_ADDRESS}" ]; then
-    echo "Safe address (HOPRD_SAFE_ADDRESS) is required. You can get it from https://hub.hoprnet.org"
-    read -r -p "Enter HOPRD_SAFE_ADDRESS: " HOPRD_SAFE_ADDRESS
-    # Validate that HOPRD_SAFE_ADDRESS is a valid Ethereum address
-    if ! echo "$HOPRD_SAFE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
-      echo "Invalid Safe Ethereum address format. Please enter a valid address."
-      exit 1
-    fi
-  fi
+# Function to add the HOPRD_SAFE_ADDRESS and HOPRD_MODULE_ADDRESS environment variable
+add_safe_addresses_var() {
   append_env_data "# HOPRD_SAFE_ADDRESS is ethereum address link to your safe"
   append_env_data "HOPRD_SAFE_ADDRESS=${HOPRD_SAFE_ADDRESS}\n"
-}
-
-# Function to add the HOPRD_MODULE_ADDRESS environment variable
-add_module_address_var() {
-  if [ -z "${HOPRD_MODULE_ADDRESS}" ]; then
-    echo "Safe module address (HOPRD_MODULE_ADDRESS) is required. You can get it from https://hub.hoprnet.org"
-    read -r -p "Enter HOPRD_MODULE_ADDRESS: " HOPRD_MODULE_ADDRESS
-    # Validate that HOPRD_MODULE_ADDRESS is a valid Ethereum address
-    if ! echo "$HOPRD_MODULE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
-      echo "Invalid Safe Module Ethereum address format. Please enter a valid address."
-      exit 1
-    fi
-  fi
   append_env_data "# HOPRD_MODULE_ADDRESS is ethereum address link to your safe module"
   append_env_data "HOPRD_MODULE_ADDRESS=${HOPRD_MODULE_ADDRESS}\n"
 }
@@ -122,12 +100,8 @@ add_module_address_var() {
 # Function to add the RPC provider environment variable
 add_rpc_provider_var() {
   if [ -z "${HOPRD_PROVIDER}" ]; then
-    echo "RPC provider (HOPRD_PROVIDER) is required. You can get it from http://chainlist.org/chain/100"
-    read -r -p "Enter URL of RPC provider: " HOPRD_PROVIDER
-    if ! echo "$HOPRD_PROVIDER" | grep -Eq "^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/.*)?$"; then
-      echo "Invalid URL format. Please enter a valid URL."
-      exit 1
-    fi
+    # Default to a local RPC provider if not set
+    HOPRD_PROVIDER="http://localhost:8545"
   fi
   append_env_data "# HOPRD_PROVIDER is the RPC provider URL"
   append_env_data "HOPRD_PROVIDER=${HOPRD_PROVIDER}\n"
@@ -169,15 +143,16 @@ generate_env_file() {
     add_host_address_env_var
     add_hoprd_password_var
     add_api_token_var
-    add_safe_address_var
-    add_module_address_var
+    add_safe_addresses_var
     add_rpc_provider_var
     add_hoprd_api_host_var
     add_hoprd_api_port_var
     add_network
     # Write collected data to the environment file
+    mkdir -p "$(dirname "${HOPRD_ENV_FILE}")"
+    chmod 750 "$(dirname "${HOPRD_ENV_FILE}")"
     printf '%b\n' "$env_data" >"${HOPRD_ENV_FILE}"
-    chmod 600 "${HOPRD_ENV_FILE}"
+    chmod 640 "${HOPRD_ENV_FILE}"
   else
     echo "The environment file located at ${HOPRD_ENV_FILE} already exists. Skipping generation."
   fi
@@ -189,7 +164,6 @@ generate_config_file() {
   if [ ! -f "${HOPRD_CONFIG_FILE}" ]; then
     echo "Generating HOPR node config file at ${HOPRD_CONFIG_FILE}..."
     cp /etc/hoprd/hoprd-sample.cfg.yaml "${HOPRD_CONFIG_FILE}"
-    chmod 600 "${HOPRD_CONFIG_FILE}"
   else
     echo "The config file located at ${HOPRD_CONFIG_FILE} already exists. Some default config attributes might have changed in the new version. You might need to update it manually from sample config file located at /etc/hoprd/hoprd-sample.cfg.yaml"
   fi
@@ -200,12 +174,17 @@ generate_identity_file() {
   # If the identity file not exists, automatically create it
   if [ ! -f "/etc/hoprd/hopr.id" ]; then
     echo "Generating HOPR node identity file at /etc/hoprd/hopr.id..."
-    chmod 700 /etc/hoprd/
     IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/
-    mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
+    mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id 
+    chmod 640 /etc/hoprd/hopr.id
     show_node_address
   else
-    echo "The identity file located at /etc/hoprd/hopr.id already exists. Skipping generation."
+    if IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity read --identity-from-path /etc/hoprd/hopr.id | grep "^Identity addresses: \[\]" 2>&1 > /dev/null; then
+      echo "Could not read the identity file at /etc/hoprd/hopr.id. Please check the password set at HOPRD_PASSWORD for that identity file."
+      exit 1
+    else
+      echo "The identity file located at /etc/hoprd/hopr.id already exists and is valid, skipping generation."
+    fi
   fi
 }
 
@@ -217,10 +196,9 @@ create_user_group() {
     mkdir -p /var/lib/hoprd /var/log/hoprd
     useradd --system -g hoprd --home /var/lib/hoprd --shell /usr/sbin/nologin -c "HOPR Node User" hoprd
     echo "Setting ownership and permissions for hoprd files..."
-    chown -R hoprd:hoprd /etc/hoprd
-    chown -R hoprd:hoprd /var/lib/hoprd /var/log/hoprd
+    chown hoprd:hoprd /etc/hoprd
+    chown hoprd:hoprd /var/lib/hoprd /var/log/hoprd
     chown hoprd:hoprd /usr/bin/hoprd /usr/bin/hopli
-    chmod 770 /etc/hoprd
     chmod 755 /usr/bin/hoprd /usr/bin/hopli /var/log/hoprd
     # Add the logged-in user to the hoprd group
     if [ -n "$SUDO_USER" ]; then
@@ -237,16 +215,16 @@ create_user_group() {
 # Function to start the HOPR node service
 start_service() {
   if [ -d /run/systemd/system ]; then
-    systemctl daemon-reexec
-    systemctl daemon-reload
-    systemctl enable hoprd.service
-    systemctl start hoprd.service
+    deb-systemd-helper daemon-reexec
+    deb-systemd-helper daemon-reload
+    deb-systemd-helper enable hoprd.service
+    deb-systemd-helper start hoprd.service
     echo "HOPR node installed successfully."
     # Wait for a few seconds to allow the service to initialize
     echo "Waiting for the HOPR node service to start..."
     sleep 30
     # Check the status of the service
-    if ! systemctl is-active --quiet hoprd.service; then
+    if ! deb-systemd-helper is-active --quiet hoprd.service; then
       echo "Error: HOPR node service is not running. Please check the logs for more details."
       echo "You can check the logs with: journalctl -xeu hoprd.service -f"
       exit 1
@@ -267,9 +245,9 @@ show_node_address() {
 
 # Main script execution starts here
 echo "Starting HOPR node installation..."
+generate_identity_file
 generate_env_file
 generate_config_file
-generate_identity_file
 create_user_group
 start_service
 echo "HOPR package installation completed successfully."
