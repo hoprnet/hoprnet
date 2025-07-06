@@ -263,8 +263,7 @@ impl HoprKeys {
                     info!(file_path = %id_path, "found an existing identity file");
 
                     Err(KeyPairError::GeneralError(format!(
-                        "Cannot create identity file at {} because the file already exists.",
-                        id_path
+                        "Cannot create identity file at {id_path} because the file already exists."
                     )))
                 } else {
                     let keys: HoprKeys = HoprKeys {
