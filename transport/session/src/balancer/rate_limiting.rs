@@ -218,15 +218,13 @@ mod tests {
         // We use 300ms as a lower bound to account for processing time
         assert!(
             elapsed >= Duration::from_millis(300),
-            "Stream completed too quickly: {:?}",
-            elapsed
+            "Stream completed too quickly: {elapsed:?}"
         );
 
         // We use 600ms as an upper bound to allow for some overhead
         assert!(
             elapsed <= Duration::from_millis(600),
-            "Stream completed too slowly: {:?}",
-            elapsed
+            "Stream completed too slowly: {elapsed:?}"
         );
     }
 
@@ -379,25 +377,21 @@ mod tests {
         // The first 3 elements at 5 per second should take ~600ms (200 ms each)
         assert!(
             first_half_elapsed >= Duration::from_millis(600),
-            "First half too fast: {:?}",
-            first_half_elapsed
+            "First half too fast: {first_half_elapsed:?}"
         );
         assert!(
             first_half_elapsed <= Duration::from_millis(700),
-            "First half too slow: {:?}",
-            first_half_elapsed
+            "First half too slow: {first_half_elapsed:?}"
         );
 
         // The last 3 elements at 2 per second should take ~1500ms (500 ms each)
         assert!(
             second_half_elapsed >= Duration::from_millis(1500),
-            "Second half too fast: {:?}",
-            second_half_elapsed
+            "Second half too fast: {second_half_elapsed:?}"
         );
         assert!(
             second_half_elapsed <= Duration::from_millis(1600),
-            "Second half too slow: {:?}",
-            second_half_elapsed
+            "Second half too slow: {second_half_elapsed:?}"
         );
     }
 
@@ -425,14 +419,12 @@ mod tests {
         // but less than 150 ms (theoretical time would be ~99ms)
         assert!(
             elapsed >= Duration::from_millis(100),
-            "Very high rate stream took too long: {:?}",
-            elapsed
+            "Very high rate stream took too long: {elapsed:?}"
         );
 
         assert!(
             elapsed < Duration::from_millis(150),
-            "Very high rate stream took too long: {:?}",
-            elapsed
+            "Very high rate stream took too long: {elapsed:?}"
         );
     }
 

@@ -386,7 +386,7 @@ mod tests {
             let stake_caps = re_stake.captures(stake_str).unwrap();
 
             if stake_caps.get(0).is_none() {
-                panic!("no matching stake. got {}", stake_str);
+                panic!("no matching stake. got {stake_str}");
             }
             graph.update_channel(create_channel(
                 src,

@@ -3,7 +3,6 @@
 //! This used in unit and integration tests.
 
 #![allow(clippy::too_many_arguments)]
-
 use std::str::FromStr;
 
 use SafeContract::SafeContractInstance;
@@ -269,7 +268,7 @@ where
     // - TargetType: SEND
     // - TargetPermission: allow all
     // - NodeDefaultPermission: None
-    let node_target_permission = format!("{:?}010203000000000000000000", node_address);
+    let node_target_permission = format!("{node_address:?}010203000000000000000000");
 
     // Inner tx payload: include node to the module
     let inner_tx_data = HoprNodeManagementModule::includeNodeCall {
@@ -309,7 +308,7 @@ where
     // - TargetType: TOKEN
     // - TargetPermission: allow all
     // - NodeDefaultPermission: None
-    let announcement_target_permission = format!("{:?}010003000000000000000000", announcement_contract_address);
+    let announcement_target_permission = format!("{announcement_contract_address:?}010003000000000000000000");
 
     // Inner tx payload: include node to the module
     let inner_tx_data = HoprNodeManagementModule::scopeTargetTokenCall {
