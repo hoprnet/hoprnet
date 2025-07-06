@@ -6,6 +6,7 @@
 //! [MultisendTransaction] struct is used for building transactions interacting with Multisend contract
 
 #![allow(clippy::too_many_arguments)]
+
 use std::{ops::Add, str::FromStr, sync::Arc};
 
 use IMulticall3Extract::IMulticall3ExtractInstance;
