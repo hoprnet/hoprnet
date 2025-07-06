@@ -71,8 +71,6 @@ jobs:
             runner: macos-14 # M1 machine
           - name: x86_64-darwin
             runner: macos-13 # Intel machine
-          - name: armv7l-linux
-            runner: self-hosted-hoprnet-bigger
     name: ${{ matrix.binary }}-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:
@@ -81,6 +79,22 @@ jobs:
       binary: ${{ matrix.binary }}
       runner: ${{ matrix.target.runner }}
       target: ${{ matrix.target.name }}
+    secrets: inherit
+
+  package:
+    name: ${{ matrix.target }}
+    needs: build-binaries
+    strategy:
+      matrix:
+        target:
+          - x86_64-linux
+          - aarch64-linux
+
+    uses: ./.github/workflows/package.yaml
+    with:
+      branch: ${{ github.event.pull_request.head.ref }}
+      target: ${{ matrix.target }}
+      workflow_run_id: ${{ github.run_id }}
     secrets: inherit
 
   docs:

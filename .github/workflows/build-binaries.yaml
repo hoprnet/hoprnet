@@ -47,7 +47,6 @@ on:
           - aarch64-linux
           - aarch64-darwin
           - x86_64-darwin
-          - armv7l-linux
         required: true
         description: 'Architecture to build for'
 
@@ -61,7 +60,7 @@ permissions:
 jobs:
   binary:
     if: >-
-      github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
+      github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
     runs-on: ${{ github.event.inputs.runner || inputs.runner }}
     timeout-minutes: 60
     steps:
@@ -74,7 +73,7 @@ jobs:
         id: vars
         run: |
           declare branch binary target package_suffix runner_needs_nix_setup
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
             echo "The workflow is triggered by other pipeline"
             repo=${{ inputs.source_repo }}
             branch=${{ inputs.source_branch }}
@@ -94,10 +93,6 @@ jobs:
               ;;
           "aarch64-linux")
             package_suffix="-aarch64-linux"
-            runner_needs_nix_setup=false
-            ;;
-          "armv7l-linux")
-            package_suffix="-armv7l-linux"
             runner_needs_nix_setup=false
             ;;
           *)
@@ -143,4 +138,4 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
-          path: ${{ github.workspace }}/result/bin/*
+          path: ${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}

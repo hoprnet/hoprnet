@@ -21,6 +21,7 @@
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
+  - [Install via Linux package manager](#install-via-linux-package-manager)
 - [Usage](#usage)
   - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
@@ -33,6 +34,7 @@
     - [Code Formatting](#code-formatting)
     - [Code Linting](#code-linting)
     - [Generate the Python SDK](#generate-the-python-sdk)
+  - [Building a Docker image](#building-a-docker-image)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)
@@ -117,6 +119,11 @@ Build and install the `hoprd` binary, e.g. on a UNIX platform:
 nix build
 sudo cp result/bin/* /usr/local/bin/
 ```
+
+### Install via linux package manager
+
+Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+To install on specific distribution, see [detailed information](./deploy/nfpm/README.md)
 
 ## Usage
 
@@ -339,6 +346,34 @@ Prerequisites:
 The generated SDK will be available in the `/tmp/hoprd-sdk-python/` directory. Modify the script to generate SDKs for different programming languages supported by swagger-codegen3.
 
 For usage examples of the generated SDK, refer to the generated README.md file in the SDK directory.
+
+### Building a Docker image
+
+Docker images can be built using the respective nix flake outputs.
+The available images can be listed with:
+
+```bash
+just list-docker-images
+```
+
+The following command builds the `hoprd` image for the host platform:
+
+```bash
+nix build .#hoprd-docker
+```
+
+If needed images for other platforms can be built by specifying the target
+platform. For example, to build the `hoprd` image for the `x86_64-linux`
+platform, while being on a Darwin host system, use the following command:
+
+```bash
+nix build .#packages.x86_64-linux.hoprd-docker
+```
+
+NOTE: Building for different platforms requires nix distributed builds to be
+set up properly.
+See [Nix documentation](https://nix.dev/manual/nix/2.28/advanced-topics/distributed-builds.html)
+for more information.
 
 ### Local node with safe staking service (local network)
 

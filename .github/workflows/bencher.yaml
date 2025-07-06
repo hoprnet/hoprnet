@@ -41,7 +41,7 @@ jobs:
         id: vars
         run: |
           # Safely get branch name without template injection
-          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+          if [[ "${EVENT_NAME}" == "pull_request_target" ]]; then
             echo "The workflow is triggered by other pipeline"
             source_repo=${SOURCE_REPO}
             source_branch=${SOURCE_BRANCH}

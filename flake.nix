@@ -9,9 +9,8 @@
     crane.url = "github:ipetkov/crane/v0.20.1";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
-    # use change to add solc 0.8.24
-    solc.url = "github:hoprnet/solc.nix/tb/20240129-solc-0.8.24";
-    pre-commit.url = "github:cachix/pre-commit-hooks.nix";
+    solc.url = "github:hellwolf/solc.nix";
+    pre-commit.url = "github:cachix/git-hooks.nix";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     flake-root.url = "github:srid/flake-root";
 
@@ -470,6 +469,7 @@
               hopli
               jq
               lsof
+              openssl
               plutoSrc
               python313
               runtimeShellPackage
@@ -516,6 +516,9 @@
 
             '';
             config = {
+              Env = [
+                "LD_LIBRARY_PATH=${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH"
+              ];
               Cmd = [
                 "/bin/tini"
                 "--"
@@ -524,7 +527,7 @@
               ];
               ExposedPorts = {
                 "8545/tcp" = { };
-                "3001-3006/tcp" = { };
+                "3003-3018/tcp" = { };
                 "10001-10101/tcp" = { };
               };
             };
@@ -616,6 +619,12 @@
               };
             };
             tools = pkgs;
+            excludes = [
+              "vendor/"
+              "ethereum/contracts/"
+              "ethereum/bindings/src/codegen"
+              ".gcloudignore"
+            ];
           };
 
           check-bindings =
@@ -664,6 +673,10 @@
               pre-commit-check
               solcDefault
               ;
+            extraPackages = with pkgs; [
+              nfpm
+              envsubst
+            ];
           };
           ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
           testShell = import ./nix/testShell.nix {
@@ -926,7 +939,9 @@
       # platforms which are supported as build environments
       systems = [
         "x86_64-linux"
-        "aarch64-linux"
+        # NOTE: blocked by missing support in solc, see
+        # https://github.com/ethereum/solidity/issues/11351
+        # "aarch64-linux"
         "aarch64-darwin"
         "x86_64-darwin"
       ];
