@@ -169,6 +169,7 @@ impl HoprDb {
         Ok(fwd)
     }
 
+    #[instrument(level = "trace", skip(self, ack), err(Debug))]
     async fn validate_acknowledgement(
         &self,
         ack: &Acknowledgement,
@@ -239,7 +240,7 @@ impl HoprDb {
 
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
-    #[instrument(level = "trace", skip(self, ack))]
+    #[instrument(level = "trace", skip(self, ack), err(Debug), ret)]
     async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()> {
         let result = self.validate_acknowledgement(&ack).await?;
         match &result {
@@ -301,7 +302,7 @@ impl HoprDbProtocolOperations for HoprDb {
         })?)
     }
 
-    #[tracing::instrument(level = "trace", skip(self, matcher))]
+    #[tracing::instrument(level = "trace", skip(self, matcher), err)]
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)> {
         let pseudonym = matcher.pseudonym();
         let surbs_for_pseudonym = self
@@ -494,7 +495,7 @@ impl HoprDbProtocolOperations for HoprDb {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, data, pkt_keypair, sender), fields(sender = %sender))]
+    #[tracing::instrument(level = "trace", skip(self, data, pkt_keypair, sender), fields(sender = %sender), err)]
     async fn from_recv(
         &self,
         data: Box<[u8]>,
