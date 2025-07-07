@@ -494,7 +494,7 @@ where
 
         processes.insert(
             HoprTransportProcess::Medium,
-            spawn_as_abortable(transport_layer.run(transport_events_tx)),
+            spawn_as_abortable!(transport_layer.run(transport_events_tx)),
         );
 
         // -- msg-ack protocol over the wire transport
@@ -573,7 +573,7 @@ where
         let smgr = self.smgr.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
-            spawn_as_abortable(async move {
+            spawn_as_abortable!(async move {
                 let _the_process_should_not_end = StreamExt::filter_map(rx_from_probing, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {

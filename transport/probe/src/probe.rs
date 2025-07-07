@@ -171,7 +171,7 @@ impl Probe {
 
         processes.insert(
             HoprProbeProcess::Emit,
-            hopr_async_runtime::spawn_as_abortable(async move {
+            hopr_async_runtime::spawn_as_abortable!(async move {
                 hopr_async_runtime::prelude::sleep(2 * interval_between_rounds).await;   // delay to allow network to stabilize
 
                 direct_neighbors
@@ -223,7 +223,7 @@ impl Probe {
         // -- Process probes --
         processes.insert(
             HoprProbeProcess::Process,
-            hopr_async_runtime::spawn_as_abortable(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, data)| {
+            hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, data)| {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
                 let db = db_rx.clone();

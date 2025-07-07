@@ -177,7 +177,7 @@ where
         let tbf_2 = tbf.clone();
         processes.insert(
             ProtocolProcesses::BloomPersist,
-            spawn_as_abortable(Box::pin(execute_on_tick(
+            spawn_as_abortable!(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {
                     let tbf_clone = tbf_2.clone();
@@ -198,7 +198,7 @@ where
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
         ProtocolProcesses::MsgOut,
-        spawn_as_abortable(async move {
+        spawn_as_abortable!(async move {
             let _neverending = api
                 .1
                 .then_concurrent(|(data, routing, finalizer)| {
@@ -236,7 +236,7 @@ where
     let me_for_recv = me.clone();
     processes.insert(
         ProtocolProcesses::MsgIn,
-        spawn_as_abortable(async move {
+        spawn_as_abortable!(async move {
             let _neverending = wire_msg
                 .1
                 .then_concurrent(move |(peer, data)| {
