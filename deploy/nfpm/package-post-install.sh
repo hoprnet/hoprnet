@@ -215,16 +215,16 @@ create_user_group() {
 # Function to start the HOPR node service
 start_service() {
   if [ -d /run/systemd/system ]; then
-    deb-systemd-helper daemon-reexec
-    deb-systemd-helper daemon-reload
-    deb-systemd-helper enable hoprd.service
-    deb-systemd-helper start hoprd.service
+    systemctl daemon-reexec
+    systemctl daemon-reload
+    systemctl enable hoprd.service
+    systemctl start hoprd.service
     echo "HOPR node installed successfully."
     # Wait for a few seconds to allow the service to initialize
     echo "Waiting for the HOPR node service to start..."
     sleep 30
     # Check the status of the service
-    if ! deb-systemd-helper is-active --quiet hoprd.service; then
+    if ! systemctl is-active --quiet hoprd.service; then
       echo "Error: HOPR node service is not running. Please check the logs for more details."
       echo "You can check the logs with: journalctl -xeu hoprd.service -f"
       exit 1

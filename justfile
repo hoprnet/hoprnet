@@ -57,6 +57,10 @@ package arch:
 test-package packager arch:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
+    if [ "{{packager}}" == "archlinux" ] && [ "{{arch}}" == "aarch64-linux" ]; then
+        echo "Skipping test for archlinux aarch64-linux as it is not supported yet in GCP images."
+        exit 0
+    fi
     trap 'deploy/nfpm/test-package-tool.sh delete {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log' EXIT
     deploy/nfpm/test-package-tool.sh create {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log
     deploy/nfpm/test-package-tool.sh copy {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
