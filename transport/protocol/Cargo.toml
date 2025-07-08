@@ -9,10 +9,10 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["capture"]
+default = []
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
-capture = ["dep:pcap-file", "dep:uuid"]
+capture = ["dep:pcap-file"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -50,7 +50,6 @@ hopr-primitive-types = { workspace = true }
 hopr-transport-bloom = { workspace = true, features = ["persistent"] }
 hopr-transport-identity = { workspace = true }
 hopr-transport-packet = { workspace = true }
-uuid = { workspace = true, features = ["v4"], optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

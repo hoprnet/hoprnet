@@ -70,7 +70,7 @@ pub mod timer;
 #[cfg(feature = "capture")]
 mod capture;
 
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
@@ -191,6 +191,7 @@ where
 
     #[cfg(feature = "capture")]
     let capture = {
+        use std::str::FromStr;
         let writer: Box<dyn capture::PacketWriter + Send + 'static> =
             if let Ok(desc) = std::env::var("HOPR_CAPTURE_PACKETS") {
                 if let Ok(udp_writer) = std::net::SocketAddr::from_str(&desc)
