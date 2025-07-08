@@ -48,7 +48,7 @@ pub trait HoprDbProtocolOperations {
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-    ) -> Result<Option<IncomingPacket>>;
+    ) -> Result<IncomingPacket>;
 }
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
@@ -67,6 +67,12 @@ pub enum IncomingPacket {
         previous_hop: OffchainPublicKey,
         next_hop: OffchainPublicKey,
         data: Box<[u8]>,
+        ack: Acknowledgement,
+    },
+    /// The packet contains an acknowledgement of a delivered packet.
+    Acknowledgement {
+        packet_tag: PacketTag,
+        previous_hop: OffchainPublicKey,
         ack: Acknowledgement,
     },
 }

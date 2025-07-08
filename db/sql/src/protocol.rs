@@ -503,7 +503,7 @@ impl HoprDbProtocolOperations for HoprDb {
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-    ) -> Result<Option<IncomingPacket>> {
+    ) -> Result<IncomingPacket> {
         let offchain_keypair = pkt_keypair.clone();
         let myself = self.clone();
 
@@ -530,35 +530,40 @@ impl HoprDbProtocolOperations for HoprDb {
                         .value()
                         .push(incoming.surbs)?;
 
-                    tracing::trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
+                    trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
                 }
 
-                if let Some(ack_key) = incoming.ack_key {
-                    Ok(Some(IncomingPacket::Final {
+                Ok(match incoming.ack_key {
+                    None => {
+                        // The contained payload represents an Acknowledgement
+                        IncomingPacket::Acknowledgement {
+                            packet_tag: incoming.packet_tag,
+                            previous_hop: incoming.previous_hop,
+                            ack: incoming
+                                .plain_text
+                                .as_ref()
+                                .try_into()
+                                .map_err(|_| DbSqlError::DecodingError)
+                                .and_then(|ack: Acknowledgement| {
+                                    ack.validate(&incoming.previous_hop)
+                                        .map_err(|e| DbSqlError::AcknowledgementValidationError(e.to_string()))
+                                })
+                                .inspect_err(|error| {
+                                    tracing::error!(%error, "failed to decode the acknowledgement");
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_RECEIVED_ACKS.increment(&["false"]);
+                                })?,
+                        }
+                    }
+                    Some(ack_key) => IncomingPacket::Final {
                         packet_tag: incoming.packet_tag,
                         previous_hop: incoming.previous_hop,
                         sender: incoming.sender,
                         plain_text: incoming.plain_text,
                         ack_key,
-                    }))
-                } else {
-                    // The contained payload represents an Acknowledgement
-                    let ack: Acknowledgement = incoming.plain_text.as_ref().try_into().map_err(|error| {
-                        tracing::error!(%error, "failed to decode the acknowledgement");
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_RECEIVED_ACKS.increment(&["false"]);
-
-                        DbSqlError::DecodingError
-                    })?;
-
-                    let ack = ack
-                        .validate(&incoming.previous_hop)
-                        .map_err(|e| crate::errors::DbSqlError::AcknowledgementValidationError(e.to_string()))?;
-                    self.handle_acknowledgement(ack).await?;
-
-                    Ok(None)
-                }
+                    },
+                })
             }
             HoprPacket::Forwarded(fwd) => {
                 match self
@@ -570,13 +575,13 @@ impl HoprDbProtocolOperations for HoprDb {
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        Ok(Some(IncomingPacket::Forwarded {
+                        Ok(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
                             ack: Acknowledgement::new(fwd.ack_key, pkt_keypair),
-                        }))
+                        })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;

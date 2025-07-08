@@ -30,7 +30,7 @@ pub trait PacketWrapping {
 pub trait PacketUnwrapping {
     type Packet;
 
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Option<Self::Packet>>;
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet>;
 }
 
 /// Implements protocol acknowledgement logic for msg packets
@@ -75,7 +75,7 @@ where
     type Packet = IncomingPacket;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Option<Self::Packet>> {
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet> {
         let previous_hop = OffchainPublicKey::try_from(peer)
             .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
 

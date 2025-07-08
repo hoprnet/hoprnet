@@ -250,27 +250,29 @@ where
                         let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
                         let elapsed = now.elapsed();
                         if elapsed.as_millis() > SLOW_OP_MS {
-                            tracing::warn!("msg_processor.recv took {}ms", elapsed.as_millis());
+                            warn!(?elapsed, "msg_processor.recv took too long");
                         }
-                        if let Err((peer, e)) = &res {
+
+                        // If there was an error caused by interpretation of the packet data,
+                        // we must send a random acknowledgement back.
+                        if let Err((peer, error)) = &res {
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            if let hopr_crypto_packet::errors::PacketError::TicketValidation(_) = e {
+                            if let hopr_crypto_packet::errors::PacketError::TicketValidation(_) = error {
                                 METRIC_REJECTED_TICKETS_COUNT.increment();
                             }
 
-                            error!(peer = %peer, error = %e, "Failed to process the received message");
+                            error!(%peer, %error, "failed to process the received message");
 
                             let peer: OffchainPublicKey = match peer.try_into() {
                                 Ok(p) => p,
                                 Err(error) => {
-                                    tracing::warn!(%peer, %error, "Dropping packet – cannot convert peer id");
+                                    warn!(%peer, %error, "Dropping packet – cannot convert peer id");
                                     return None;
                                 }
                             };
 
                             // send random signed acknowledgement to give feedback to the sender
                             let ack = Acknowledgement::random(&me);
-
                             match db
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), peer)
                                 .await {
@@ -283,18 +285,18 @@ where
                                             ))
                                             .await
                                             .unwrap_or_else(|_e| {
-                                                error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer");
+                                                error!("failed to forward an acknowledgement for a failed packet recv to the transport layer");
                                             });
                                         let elapsed = now.elapsed();
                                         if elapsed.as_millis() > SLOW_OP_MS {
-                                            tracing::warn!("msg_to_send_tx.send took {}ms", elapsed.as_millis());
+                                            warn!(?elapsed," msg_to_send_tx.send took too long");
                                         }
                                     },
                                     Err(error) => tracing::error!(%error, "Failed to create random ack packet for a failed receive"),
                                 }
                         }
 
-                        res.ok().flatten()
+                        res.ok()
                     }
                 })
                 .filter_map(move |maybe_packet| {
@@ -303,10 +305,12 @@ where
                     async move {
                     if let Some(packet) = maybe_packet {
                         match packet {
-                            IncomingPacket::Final { packet_tag, previous_hop,.. }
-                            | IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
+                            IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
+                            IncomingPacket::Final { packet_tag, previous_hop,.. } |
+                            IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
                                 if tbf.is_tag_replay(&packet_tag).await {
-                                    warn!("replayed packet received from {previous_hop}");
+                                    warn!(%previous_hop, "replayed packet received");
+
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_REPLAYED_PACKET_COUNT.increment();
 
@@ -330,6 +334,23 @@ where
                     async move {
 
                     match packet {
+                        IncomingPacket::Acknowledgement {
+                            previous_hop,
+                            ack,
+                            ..
+                        } => {
+                            trace!(%previous_hop, "received a valid acknowledgement");
+                            match db.handle_acknowledgement(ack).await {
+                                Ok(_) => trace!(%previous_hop, "successfully processed a known acknowledgement"),
+                                // Eventually, we do not care here if the acknowledgement does not belong to any our
+                                // unacknowledged packets.
+                                Err(error) => trace!(%previous_hop, %error, "valid acknowledgement is unknown or error occurred while processing it"),
+                            }
+
+                            // We do not acknowledge back acknowledgements.
+
+                            None
+                        },
                         IncomingPacket::Final {
                             previous_hop,
                             sender,
@@ -337,12 +358,12 @@ where
                             ack_key,
                             ..
                         } => {
-                            trace!("acknowledging final packet to {previous_hop}");
+                            trace!(%previous_hop, "acknowledging final packet back");
                             let ack = Acknowledgement::new(ack_key, &me);
                             if let Ok(ack_packet) = db
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
                                 .await
-                                .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message"))
+                                .inspect_err(|error| error!(%error, "Failed to create ack packet for a received message"))
                                 {
                                     msg_to_send_tx
                                         .send((
@@ -364,21 +385,21 @@ where
                             ack,
                             ..
                         } => {
-                            trace!("acknowledging forwarded packet {previous_hop}->{next_hop}");
+                            trace!(%previous_hop, %next_hop, "acknowledging forwarded packet back");
                             msg_to_send_tx
                                 .send((
                                     next_hop.into(),
                                     data,
                                 ))
                                 .await
-                                .unwrap_or_else(|_e| {
-                                    error!("Failed to forward a packet to the transport layer");
+                                .unwrap_or_else(|_| {
+                                    error!("failed to forward a packet to the transport layer");
                                 });
 
                             if let Ok(ack_packet) = db
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
                                 .await
-                                .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a relayed message"))
+                                .inspect_err(|error| error!(%error, "Failed to create ack packet for a relayed message"))
                             {
                                 msg_to_send_tx
                                     .send((
@@ -386,8 +407,8 @@ where
                                         ack_packet.data,
                                     ))
                                     .await
-                                    .unwrap_or_else(|_e| {
-                                        error!("Failed to send an acknowledgement for a relayed packet to the transport layer");
+                                    .unwrap_or_else(|_| {
+                                        error!("failed to send an acknowledgement for a relayed packet to the transport layer");
                                     });
                             }
                             None
@@ -397,7 +418,7 @@ where
                 .filter_map(|maybe_data| async move {
                     if let Some((sender, data)) = maybe_data {
                         ApplicationData::from_bytes(data.as_ref())
-                            .inspect_err(|error| tracing::error!(error = %error, "Failed to decode application data"))
+                            .inspect_err(|error| tracing::error!(%error, "failed to decode application data"))
                             .ok()
                             .map(|data| (sender, data))
                     } else {
