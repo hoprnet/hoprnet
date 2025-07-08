@@ -1,3 +1,13 @@
+--[[
+    This is a dissector for HOPR protocol stack.
+    It however does not dissect raw network packets, but works only with custom
+    capture format enabled using the "capture" feature on this crate.
+
+    Installation:
+        mkdir -p /Users/$USER/.local/lib/wireshark/plugins/
+        cp hopr.lua /Users/$USER/.local/lib/wireshark/plugins/
+--]]
+
 -- HOPR Start Protocol Lua dissector
 
 local hopr_start = Proto("hopr_start", "HOPR Start Protocol")
@@ -161,6 +171,8 @@ local hopr_fields = {
         [0x00] = "Final",
         [0x01] = "Forwarded",
         [0x02] = "Outgoing",
+        [0x03] = "AcknowledgementIn",
+        [0x04] = "AcknowledgementOut",
     }),
 
     -- Common fields
@@ -298,7 +310,6 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = offset + prev_hop_peer_id:len() + 1
 
-
         fwd_tree:add(hopr_fields.next_hop, buffer(offset, 32))
         offset = offset + 32
 
@@ -307,7 +318,6 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         pinfo.cols.dst = next_hop_peer_id
 
         offset = offset + next_hop_peer_id:len() + 1
-
 
         fwd_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
         offset = offset + 96
@@ -339,6 +349,49 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = dissect_appdata(buffer, out_tree, offset, data_len, pinfo)
 
+    elseif pkt_type == 3 then -- AcknowledgementIn
+        if length < 1 + 16 + 32 + 96 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for AckIn")
+            return
+        end
+        pinfo.cols.info:set("Incoming, Acknowledgement")
+
+        local ack_in_tree = subtree:add("Acknowledgement")
+        ack_in_tree:add(hopr_fields.packet_tag, buffer(offset, 16))
+        offset = offset + 16
+
+        ack_in_tree:add(hopr_fields.previous_hop, buffer(offset, 32))
+        offset = offset + 32
+
+        local prev_hop_peer_id = buffer(offset):stringz()
+        ack_in_tree:add(hopr_fields.previous_hop_peer_id, prev_hop_peer_id)
+        pinfo.cols.src = prev_hop_peer_id
+
+        offset = offset + prev_hop_peer_id:len() + 1
+
+        ack_in_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
+        offset = offset + 96
+
+    elseif pkt_type == 4 then -- AcknowledgementOut
+            if length < 1 + 32 + 96 then
+                subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for AckOut")
+                return
+            end
+            pinfo.cols.info:set("Outgoing, Acknowledgement")
+
+            local ack_out_tree = subtree:add("Acknowledgement")
+
+            ack_out_tree:add(hopr_fields.next_hop, buffer(offset, 32))
+            offset = offset + 32
+
+            local next_hop_peer_id = buffer(offset):stringz()
+            ack_out_tree:add(hopr_fields.next_hop_peer_id, next_hop_peer_id)
+            pinfo.cols.dst = next_hop_peer_id
+
+            offset = offset + next_hop_peer_id:len() + 1
+
+            ack_out_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
+            offset = offset + 96
     else
         subtree:add_expert_info(PI_MALFORMED, PI_WARN, "Unknown packet type: " .. pkt_type)
     end
@@ -346,4 +399,4 @@ end
 
 -- Register dissector
 local ethertype_table = DissectorTable.get("ethertype")
-ethertype_table:add(0x1234, hopr_proto) 
+ethertype_table:add(0x1234, hopr_proto)
