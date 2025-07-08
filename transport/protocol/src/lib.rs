@@ -199,7 +199,7 @@ where
                     .and_then(capture::UdpPacketDump::new)
                 {
                     Box::new(udp_writer)
-                } else if let Ok(pcap_writer) = std::fs::File::open(&desc).and_then(capture::PcapPacketWriter::new) {
+                } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
                     Box::new(pcap_writer)
                 } else {
                     error!(desc, "failed to create packet capture: invalid socket address or file");
