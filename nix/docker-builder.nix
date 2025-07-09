@@ -1,8 +1,10 @@
 {
   Cmd ? [ ],
-  Entrypoint,
+  Entrypoint ? [ ],
   env ? [ ],
   extraContents ? [ ],
+  extraPorts ? { },
+  fakeRootCommands ? null,
   name,
   pkgs,
 }:
@@ -25,11 +27,15 @@ let
     "RUST_BACKTRACE=full"
     "LD_LIBRARY_PATH=${libPath}"
   ] ++ env;
+  ExposedPorts = extraPorts;
 in
-pkgs.dockerTools.buildLayeredImage {
+pkgs.dockerTools.buildLayeredImage ({
   inherit name contents;
   tag = "latest";
   # breaks binary reproducibility, but makes usage easier
   created = "now";
-  config = { inherit Cmd Entrypoint Env; };
-}
+  config = { inherit Cmd Entrypoint Env ExposedPorts; };
+} // (if fakeRootCommands != null then {
+  enableFakechroot = true;
+  inherit fakeRootCommands;
+} else {}))

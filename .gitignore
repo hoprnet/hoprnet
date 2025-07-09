@@ -3,6 +3,7 @@
 **/target
 **/.idea
 **/gha-creds-*.json
+.DS_Store
 
 openapi.spec.json
 
