@@ -541,7 +541,7 @@ pub(super) async fn fund_channel(
     responses(
         (status = 200, description = "Corrupted channels retrieved", body = Vec<NodeChannel>),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
-        (status = 404, description = "No corrupted channel found.", body = ApiError),
+        (status = 404, description = "No corrupted channels found.", body = ApiError),
         (status = 422, description = "Unknown failure", body = ApiError)
     ),
     security(

@@ -1326,7 +1326,7 @@ impl Hopr {
         Ok(self.hopr_chain_api.all_channels().await?)
     }
 
-    /// List all corrutped channels
+    /// List all corrupted channels
     pub async fn corrupted_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self.hopr_chain_api.corrupted_channels().await?)
     }
