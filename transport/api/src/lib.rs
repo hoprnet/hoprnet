@@ -514,7 +514,9 @@ where
             packet_cfg,
             self.db.clone(),
             Some(tbf_path),
-            (mixing_channel_tx, wire_msg_rx),
+            (
+                mixing_channel_tx.with(|(peer, msg)| trace!(%peer, len = msg.len(), "sending message to peer")),
+                wire_msg_rx.inspect(|(peer, msg)| trace!(%peer, len = msg.len(), "received message from peer"))),
             (tx_from_protocol, external_msg_rx),
         )
         .await
