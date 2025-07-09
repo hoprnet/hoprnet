@@ -79,7 +79,8 @@ where
         let previous_hop = OffchainPublicKey::try_from(peer)
             .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
 
-        self.db
+        let packet = self
+            .db
             .from_recv(
                 data,
                 &self.cfg.packet_keypair,
@@ -96,7 +97,9 @@ where
                     })
                 }
                 _ => PacketError::PacketConstructionError(e.to_string()),
-            })
+            })?;
+
+        Ok(packet)
     }
 }
 

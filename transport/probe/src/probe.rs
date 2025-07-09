@@ -51,16 +51,13 @@ where
 {
     #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
     async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
-        let message: ApplicationData = message
-            .try_into()
-            .map_err(|e: anyhow::Error| ProbeError::SendError(e.to_string()))?;
         let (packet_sent_tx, packet_sent_rx) = channel::<std::result::Result<(), PacketError>>();
 
         let push_to_network = self.downstream;
-        futures::pin_mut!(push_to_network);
+        pin_mut!(push_to_network);
         if push_to_network
             .as_mut()
-            .send((message, path, packet_sent_tx.into()))
+            .send((message.into(), path, packet_sent_tx.into()))
             .await
             .is_ok()
         {
@@ -231,7 +228,7 @@ impl Probe {
                 let move_up = move_up.clone();
 
                 async move {
-                    // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occuring on random tags
+                    // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occurring on random tags
                     if data.application_tag == ReservedTag::Ping.into() {
                         let message: anyhow::Result<Message> = data.try_into().map_err(|e| anyhow::anyhow!("failed to convert data into message: {e}"));
 

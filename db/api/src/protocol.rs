@@ -89,7 +89,7 @@ impl std::fmt::Debug for OutgoingPacket {
         f.debug_struct("OutgoingPacket")
             .field("next_hop", &self.next_hop)
             .field("ack_challenge", &self.ack_challenge)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
