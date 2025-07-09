@@ -307,6 +307,10 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_all_channels(None).await?)
     }
 
+    pub async fn corrupted_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
+        Ok(self.db.get_corrupted_channels(None).await?)
+    }
+
     pub async fn ticket_price(&self) -> errors::Result<Option<HoprBalance>> {
         Ok(self.db.get_indexer_data(None).await?.ticket_price)
     }

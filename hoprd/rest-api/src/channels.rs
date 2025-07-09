@@ -533,3 +533,34 @@ pub(super) async fn fund_channel(
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
+
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/channels/corrupted"),
+    description = "List corrupted channels due to poor indexing.",
+    responses(
+        (status = 200, description = "Corrupted channels retrieved", body = Vec<NodeChannel>),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 404, description = "No corrupted channel found.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Channels",
+)]
+pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    match hopr.corrupted_channels().await {
+        Ok(corrupted_channels) => {
+            if corrupted_channels.is_empty() {
+                (StatusCode::NOT_FOUND, ApiErrorStatus::NoCorruptedChannels).into_response()
+            } else {
+                (StatusCode::OK, Json(corrupted_channels)).into_response()
+            }
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}

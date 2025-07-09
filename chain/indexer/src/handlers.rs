@@ -388,10 +388,16 @@ where
                 let channel = if let Some(channel_edits) = maybe_channel {
                     // Check that we're not receiving the Open event without the channel being Close prior
                     if channel_edits.entry().status != ChannelStatus::Closed {
+                        let channel_id = channel_edits.entry().get_id();
+                        let channel_status = channel_edits.entry().status;
+
+                        self.db
+                            .finish_channel_update(tx.into(), channel_edits.set_corrupted())
+                            .await?;
+
                         return Err(CoreEthereumIndexerError::ProcessError(format!(
                             "trying to re-open channel {} which is not closed, but {}",
-                            channel_edits.entry().get_id(),
-                            channel_edits.entry().status,
+                            channel_id, channel_status,
                         )));
                     }
 
@@ -497,10 +503,17 @@ where
                                         entry = %channel_edits.entry(),
                                         "found tickets matching 'BeingRedeemed'",
                                     );
+
+                                    let entry_str = format!("{}", channel_edits.entry());
+
+                                    self.db
+                                        .finish_channel_update(tx.into(), channel_edits.set_corrupted())
+                                        .await?;
+
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
                                         ticket_redeemed.newTicketIndex.to::<u64>() - 1,
-                                        channel_edits.entry()
+                                        entry_str
                                     )));
                                 }
                             }
@@ -969,6 +982,7 @@ where
         } else if log.address.eq(&self.addresses.channels) {
             let event = HoprChannelsEvents::decode_log(&primitive_log)?;
             self.on_channel_event(tx, event.data, is_synced).await
+            // JEAN: HERE THE CHANNELS EVENTS ARE PROCESSED
         } else if log.address.eq(&self.addresses.network_registry) {
             let event = HoprNetworkRegistryEvents::decode_log(&primitive_log)?;
             self.on_network_registry_event(tx, event.data, is_synced).await

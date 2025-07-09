@@ -50,6 +50,12 @@ impl ChannelEditor {
         self
     }
 
+    /// Set the corrupted state.
+    pub fn set_corrupted(mut self) -> Self {
+        self.model.corrupted = Set(true);
+        self
+    }
+
     /// If set, the channel will be deleted, no other edits will be done.
     pub fn delete(mut self) -> Self {
         self.delete = true;
@@ -103,6 +109,9 @@ pub trait HoprDbChannelOperations {
 
     /// Retrieves all channel information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
+
+    /// Retrieves all corrupted channels from the DB.
+    async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
     /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>>;
@@ -285,6 +294,23 @@ impl HoprDbChannelOperations for HoprDb {
                         .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
                         .try_collect()
                         .await
+                })
+            })
+            .await
+    }
+
+    async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Channel::find()
+                        .filter(channel::Column::Corrupted.eq(true))
+                        .all(tx.as_ref())
+                        .await?
+                        .into_iter()
+                        .map(|x| ChannelEntry::try_from(x).map_err(DbSqlError::from))
+                        .collect::<Result<Vec<_>>>()
                 })
             })
             .await
