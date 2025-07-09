@@ -272,6 +272,7 @@ mod tests {
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::zero(),
+                    false,
                 ),
                 Some(ack.clone()),
             )),
@@ -390,6 +391,7 @@ mod tests {
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             4.into(),
+            false,
         );
 
         // Make the ticket worth exactly the threshold
@@ -488,6 +490,7 @@ mod tests {
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             4.into(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
