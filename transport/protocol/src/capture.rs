@@ -266,6 +266,7 @@ mod tests {
         protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
     };
     use hopr_transport_packet::prelude::ApplicationData;
+    use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
 
     use super::*;
 
@@ -376,10 +377,44 @@ mod tests {
             me,
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
-            data: ApplicationData::new(0u64, &hex!("cafebabe01"))
-                .to_bytes()
-                .into_vec()
-                .into(),
+            data: ApplicationData::from(hopr_transport_probe::content::Message::Telemetry(PathTelemetry {
+                id: hopr_crypto_random::random_bytes(),
+                path: hopr_crypto_random::random_bytes(),
+                timestamp: 123456789_u128,
+            }))
+            .to_bytes()
+            .to_vec()
+            .into(),
+        };
+
+        let _ = pcap.send(packet.into()).await;
+
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
+            next_hop: *OffchainKeypair::random().public(),
+            ack_challenge: hk.as_ref().into(),
+            data: ApplicationData::from(hopr_transport_probe::content::Message::Probe(
+                NeighborProbe::random_nonce(),
+            ))
+            .to_bytes()
+            .to_vec()
+            .into(),
+        };
+
+        let _ = pcap.send(packet.into()).await;
+
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
+            next_hop: *OffchainKeypair::random().public(),
+            ack_challenge: hk.as_ref().into(),
+            data: ApplicationData::from(hopr_transport_probe::content::Message::Probe(NeighborProbe::Pong(
+                hopr_crypto_random::random_bytes(),
+            )))
+            .to_bytes()
+            .to_vec()
+            .into(),
         };
 
         let _ = pcap.send(packet.into()).await;

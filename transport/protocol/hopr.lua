@@ -34,14 +34,105 @@ local function dissect_hopr_start(buffer, pinfo, tree)
 
     local offset = 0
     subtree:add(start_fields.version, buffer(offset,1))
-    local version = buffer(offset, 1):uint()
+    local version = buffer(offset,1):uint()
+
+    if version ~= 0x01 then
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unsupported Start version" .. version )
+        return offset
+    end
+
     offset = offset + 1
 
     subtree:add(start_fields.type, buffer(offset,1))
-    local msg_type = buffer(offset, 1):uint()
     offset = offset + 1
 
     subtree:add(start_fields.msg, buffer(offset))
+
+    return offset
+end
+
+---------------------------------------------------------------------------------------
+
+-- HOPR Probe Protocol Lua dissector
+
+local hopr_probe = Proto("hopr_probe", "HOPR Probe Protocol")
+
+-- Start protocol fields
+local probe_fields = {
+    version = ProtoField.uint8("hopr_probe.version", "Version", base.DEC),
+    type = ProtoField.uint8("hopr_probe.type", "Type", base.HEX, {
+        [0x00] = "Telemetry",
+        [0x01] = "Probe",
+    }),
+
+    probe_type = ProtoField.uint8("hopr_probe.probe.type", "Probe Type", base.HEX, {
+        [0x00] = "Ping",
+        [0x01] = "Pong",
+    }),
+    probe_nonce = ProtoField.bytes("hopr_probe.probe.nonce", "Probe Nonce"),
+
+    tele_id = ProtoField.bytes("hopr_probe.telemetry.id", "Telemetry ID"),
+    tele_path = ProtoField.bytes("hopr_probe.telemetry.path", "Telemetry Path"),
+    tele_ts = ProtoField.bytes("hopr_probe.telemetry.ts", "Telemetry Timestamp"),
+}
+
+hopr_probe.fields = probe_fields
+
+-- Dissector function
+local function dissect_hopr_probe(buffer, pinfo, tree)
+    local subtree = tree:add(hopr_probe, buffer())
+
+    local offset = 0
+    subtree:add(probe_fields.version, buffer(offset,1))
+    local version = buffer(offset,1):uint()
+
+    if version ~= 0x01 then
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unsupported Probe version" .. version )
+        return offset
+    end
+
+    offset = offset + 1
+
+    subtree:add(probe_fields.type, buffer(offset,1))
+    local msg_type = buffer(offset,1):uint()
+    offset = offset + 1
+
+    if msg_type == 0x00 then -- Telemetry
+        pinfo.cols.info:append(", Telemetry")
+
+        local tele_tree = subtree:add("Telemetry")
+        tele_tree:add(probe_fields.tele_id, buffer(offset, 10))
+        offset = offset + 10
+
+        tele_tree:add(probe_fields.tele_path, buffer(offset, 10))
+        offset = offset + 10
+
+        tele_tree:add(probe_fields.tele_ts, buffer(offset, 16))
+        offset = offset + 16
+    elseif msg_type == 0x01 then -- Probe
+
+        local probe_tree = subtree:add("Probe")
+        probe_tree:add(probe_fields.probe_type, buffer(offset, 1))
+
+        local probe_type = buffer(offset,1):uint()
+        if probe_type == 0x00 then
+            pinfo.cols.info:append(", Ping")
+        elseif probe_type == 0x01 then
+            pinfo.cols.info:append(", Pong")
+        else
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unknown Probe ping/pong type: " .. probe_type)
+            return offset
+        end
+
+        offset = offset + 1
+
+        probe_tree:add(probe_fields.probe_nonce, buffer(offset, 32))
+        offset = offset + 32
+    else
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unknown Probe message type: " .. msg_type)
+    end
+
+    return offset
 end
 
 ---------------------------------------------------------------------------------------
@@ -223,6 +314,7 @@ local function dissect_appdata(buffer, tree, offset, data_len, pinfo)
         if tag == UInt64(0) then
             pinfo.cols.info:append(", Probe")
             appdata_tree:add(hopr_fields.appdata_type, 0)
+            dissect_hopr_probe(data_field, pinfo, appdata_tree)
         elseif tag == UInt64(1) then
             pinfo.cols.info:append(", Start")
             appdata_tree:add(hopr_fields.appdata_type, 1)
@@ -428,14 +520,14 @@ function hopr_proto.dissector(buffer, pinfo, tree)
             offset = offset + next_hop_peer_id:len() + 1
 
             if buffer(offset, 1):uint() == 1 then
-                subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "This acknowledgement is random due to processing error on the node")
+                subtree:add_expert_info(PI_NOTE, PI_ERROR, "This acknowledgement is random due to processing error on the node")
             end
             offset = offset + 1
 
             ack_out_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
             offset = offset + 96
     else
-        subtree:add_expert_info(PI_NOTE, PI_WARN, "Unknown packet type: " .. pkt_type)
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unknown packet type: " .. pkt_type)
     end
 end
 
