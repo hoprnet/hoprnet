@@ -29,13 +29,28 @@ let
   ] ++ env;
   ExposedPorts = extraPorts;
 in
-pkgs.dockerTools.buildLayeredImage ({
-  inherit name contents;
-  tag = "latest";
-  # breaks binary reproducibility, but makes usage easier
-  created = "now";
-  config = { inherit Cmd Entrypoint Env ExposedPorts; };
-} // (if fakeRootCommands != null then {
-  enableFakechroot = true;
-  inherit fakeRootCommands;
-} else {}))
+pkgs.dockerTools.buildLayeredImage (
+  {
+    inherit name contents;
+    tag = "latest";
+    # breaks binary reproducibility, but makes usage easier
+    created = "now";
+    config = {
+      inherit
+        Cmd
+        Entrypoint
+        Env
+        ExposedPorts
+        ;
+    };
+  }
+  // (
+    if fakeRootCommands != null then
+      {
+        enableFakechroot = true;
+        inherit fakeRootCommands;
+      }
+    else
+      { }
+  )
+)
