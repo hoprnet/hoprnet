@@ -75,6 +75,7 @@ pub struct ChannelEntry {
     pub ticket_index: U256,
     pub status: ChannelStatus,
     pub channel_epoch: U256,
+    pub corrupted: bool,
     id: ChannelId,
 }
 
@@ -89,6 +90,7 @@ impl ChannelEntry {
         ticket_index: U256,
         status: ChannelStatus,
         channel_epoch: U256,
+        corrupted: bool,
     ) -> Self {
         ChannelEntry {
             source,
@@ -97,6 +99,7 @@ impl ChannelEntry {
             ticket_index,
             status,
             channel_epoch,
+            corrupted,
             id: generate_channel_id(&source, &destination),
         }
     }
@@ -302,6 +305,7 @@ mod tests {
             23u64.into(),
             ChannelStatus::Open,
             3u64.into(),
+            false,
         );
 
         assert!(

@@ -563,6 +563,7 @@ mod tests {
             1_u32.into(),
             ChannelStatus::Open,
             1u32.into(),
+            false,
         );
 
         db_alice.upsert_channel(None, channel_alice_bob).await?;
@@ -686,6 +687,7 @@ mod tests {
             CHANNEL_TICKET_IDX.into(),
             ChannelStatus::Open,
             1u32.into(),
+            false,
         );
 
         db_alice.upsert_channel(None, channel_alice_bob).await?;

@@ -1406,6 +1406,7 @@ mod tests {
             channel_ticket_index.unwrap_or(0u32).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -1738,6 +1739,7 @@ mod tests {
             0.into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -1770,6 +1772,7 @@ mod tests {
             0.into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         db.upsert_channel(None, channel_1).await?;
@@ -1781,6 +1784,7 @@ mod tests {
             0.into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         db.upsert_channel(None, channel_2).await?;
@@ -2004,6 +2008,7 @@ mod tests {
             2.into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 1, 1)];
@@ -2032,6 +2037,7 @@ mod tests {
             2.into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 1, 1)];
@@ -2061,6 +2067,7 @@ mod tests {
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
@@ -2103,6 +2110,7 @@ mod tests {
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
@@ -2137,6 +2145,7 @@ mod tests {
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
@@ -2170,6 +2179,7 @@ mod tests {
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
@@ -2201,6 +2211,7 @@ mod tests {
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
@@ -2232,6 +2243,7 @@ mod tests {
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
@@ -2263,6 +2275,7 @@ mod tests {
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
@@ -2294,6 +2307,7 @@ mod tests {
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let mut dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
@@ -2323,6 +2337,7 @@ mod tests {
             2.into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         // Single aggregated ticket exceeding the min_unaggregated_ratio
@@ -2894,6 +2909,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(120))),
             4_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -2979,6 +2995,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(120))),
             4_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3083,6 +3100,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(120))),
             4_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3117,6 +3135,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Closed,
             4_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3146,6 +3165,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3175,6 +3195,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3207,6 +3228,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3236,6 +3258,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3267,6 +3290,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3299,6 +3323,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;
@@ -3328,6 +3353,7 @@ mod tests {
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
+            false,
         );
 
         let db = init_db_with_channel(channel).await?;

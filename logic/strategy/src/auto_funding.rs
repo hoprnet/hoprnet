@@ -172,6 +172,7 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
+            false,
         );
 
         let c2 = ChannelEntry::new(
@@ -181,6 +182,7 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
+            false,
         );
 
         let c3 = ChannelEntry::new(
@@ -190,6 +192,7 @@ mod tests {
             0_u32.into(),
             ChannelStatus::PendingToClose(std::time::SystemTime::now()),
             0_u32.into(),
+            false,
         );
 
         let mut actions = MockChannelAct::new();

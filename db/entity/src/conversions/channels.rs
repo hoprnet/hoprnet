@@ -46,6 +46,7 @@ impl TryFrom<&channel::Model> for ChannelEntry {
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
         let status = value.try_into()?;
+
         Ok(ChannelEntry::new(
             value.source.parse()?,
             value.destination.parse()?,
@@ -53,6 +54,7 @@ impl TryFrom<&channel::Model> for ChannelEntry {
             U256::from_be_bytes(&value.ticket_index),
             status,
             U256::from_be_bytes(&value.epoch),
+            value.corrupted,
         ))
     }
 }
@@ -74,6 +76,7 @@ impl From<ChannelEntry> for channel::ActiveModel {
             balance: Set(value.balance.amount().to_be_bytes().into()),
             epoch: Set(value.channel_epoch.to_be_bytes().into()),
             ticket_index: Set(value.ticket_index.to_be_bytes().into()),
+            corrupted: Set(value.corrupted.into()),
             ..Default::default()
         };
         ret.set_status(value.status);

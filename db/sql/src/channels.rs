@@ -394,6 +394,7 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
+            false,
         );
 
         db.upsert_channel(None, ce).await?;
@@ -414,7 +415,7 @@ mod tests {
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
 
-        let ce = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into());
+        let ce = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into(), true);
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
@@ -455,6 +456,7 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
+            false,
         );
 
         db.upsert_channel(None, ce).await?;
@@ -484,6 +486,7 @@ mod tests {
             1_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
+            false,
         );
 
         let ce_2 = ChannelEntry::new(
@@ -493,6 +496,7 @@ mod tests {
             2_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
+            false,
         );
 
         let db_clone = db.clone();

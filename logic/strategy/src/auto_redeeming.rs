@@ -443,6 +443,7 @@ mod tests {
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             0.into(),
+            false,
         );
 
         // Make this ticket worth less than the threshold

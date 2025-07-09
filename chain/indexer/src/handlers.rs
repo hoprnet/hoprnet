@@ -387,18 +387,14 @@ where
 
                 let channel = if let Some(channel_edits) = maybe_channel {
                     // Check that we're not receiving the Open event without the channel being Close prior
-                    if channel_edits.entry().status != ChannelStatus::Closed {
-                        let channel_id = channel_edits.entry().get_id();
-                        let channel_status = channel_edits.entry().status;
 
-                        self.db
+                    if channel_edits.entry().status != ChannelStatus::Closed {
+                        let res = self
+                            .db
                             .finish_channel_update(tx.into(), channel_edits.set_corrupted())
                             .await?;
 
-                        return Err(CoreEthereumIndexerError::ProcessError(format!(
-                            "trying to re-open channel {} which is not closed, but {}",
-                            channel_id, channel_status,
-                        )));
+                        return Ok(Some(ChainEventType::ChannelOpened(res)));
                     }
 
                     trace!(%source, %destination, %channel_id, "on_channel_reopened_event");
@@ -436,6 +432,7 @@ where
                         0_u32.into(),
                         ChannelStatus::Open,
                         1_u32.into(),
+                        false,
                     );
 
                     self.db.upsert_channel(tx.into(), new_channel).await?;
@@ -982,7 +979,6 @@ where
         } else if log.address.eq(&self.addresses.channels) {
             let event = HoprChannelsEvents::decode_log(&primitive_log)?;
             self.on_channel_event(tx, event.data, is_synced).await
-            // JEAN: HERE THE CHANNELS EVENTS ARE PROCESSED
         } else if log.address.eq(&self.addresses.network_registry) {
             let event = HoprNetworkRegistryEvents::decode_log(&primitive_log)?;
             self.on_network_registry_event(tx, event.data, is_synced).await
@@ -2111,6 +2107,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2227,6 +2224,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2292,6 +2290,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2358,6 +2357,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2466,6 +2466,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Closed,
             3.into(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2531,6 +2532,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             3.into(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2553,7 +2555,15 @@ mod tests {
             .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log, true).await }))
             .await
-            .expect_err("should not re-open channel that is not Closed");
+            .context("Channel should stay open, with corrupted flag set")?;
+
+        let should_be_corrupted = db
+            .get_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
+
+        assert_eq!(should_be_corrupted.corrupted, true);
+
         Ok(())
     }
 
@@ -2606,6 +2616,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
@@ -2720,6 +2731,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
@@ -2832,6 +2844,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
@@ -2909,6 +2922,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2967,6 +2981,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -3025,6 +3040,7 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -3255,6 +3271,7 @@ mod tests {
             3_u32.into(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel_1).await?;
@@ -3278,6 +3295,7 @@ mod tests {
             3_u32.into(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
+            false,
         );
 
         db.upsert_channel(None, channel_2).await?;

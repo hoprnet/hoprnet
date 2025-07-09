@@ -330,6 +330,7 @@ mod tests {
                         U256::zero(),
                         ChannelStatus::Open,
                         channel_epoch.into(),
+                        false,
                     );
                     db_clone.upsert_channel(Some(tx), channel).await?;
                     Ok::<_, DbSqlError>(channel)
