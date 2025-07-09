@@ -37,7 +37,7 @@ local function dissect_hopr_start(buffer, pinfo, tree)
     local version = buffer(offset,1):uint()
 
     if version ~= 0x01 then
-        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unsupported Start version" .. version )
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unsupported Start version " .. version )
         return offset
     end
 
@@ -87,7 +87,7 @@ local function dissect_hopr_probe(buffer, pinfo, tree)
     local version = buffer(offset,1):uint()
 
     if version ~= 0x01 then
-        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unsupported Probe version" .. version )
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unsupported Probe version " .. version )
         return offset
     end
 
@@ -306,7 +306,7 @@ local function dissect_appdata(buffer, tree, offset, data_len, pinfo)
     offset = offset + 8
 
     -- Data (variable length)
-    if data_len > 0 then
+    if data_len > 8 then
         local data_field = buffer(offset, data_len - 8)
         if tag == UInt64(0) then
             pinfo.cols.info:append(", Probe")
@@ -417,7 +417,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = offset + next_hop_peer_id:len() + 1
 
-        local ack_subtree = ack_out_tree:add("Acknowledgement Data")
+        local ack_subtree = fwd_tree:add("Acknowledgement Data")
         ack_subtree:add(hopr_fields.ack_key, buffer(offset, 32))
         offset = offset + 32
         ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
@@ -488,7 +488,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = offset + next_hop_peer_id:len() + 1
 
-        local ack_subtree = ack_out_tree:add("Acknowledgement Data")
+        local ack_subtree = ack_in_tree:add("Acknowledgement Data")
         ack_subtree:add(hopr_fields.ack_key, buffer(offset, 32))
         offset = offset + 32
         ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
