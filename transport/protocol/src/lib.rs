@@ -75,10 +75,7 @@ use std::collections::HashMap;
 use futures::{SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_api::{
-    prelude::OutgoingPacket,
-    protocol::{HoprDbProtocolOperations, IncomingPacket},
-};
+use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
 use hopr_internal_types::{prelude::HoprPseudonym, protocol::Acknowledgement};
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
@@ -142,26 +139,21 @@ pub enum PeerDiscovery {
     Announce(PeerId, Vec<Multiaddr>),
 }
 
-pub enum OutgoingPacketOrAck {
-    Packet(OutgoingPacket),
-    Ack(OutgoingPacket),
-}
-
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
 /// overlayed on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
-pub async fn run_msg_ack_protocol<Db, Ew, Ea>(
+pub async fn run_msg_ack_protocol<Db>(
     packet_cfg: processor::PacketInteractionConfig,
     db: Db,
     bloom_filter_persistent_path: Option<String>,
     wire_msg: (
-        impl futures::Sink<(PeerId, Box<[u8]>), Error = Ew> + Clone + Unpin + Send + Sync + 'static,
+        impl futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + Sync + 'static,
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
     ),
     api: (
-        impl futures::Sink<(HoprPseudonym, ApplicationData), Error = Ea> + Send + Sync + 'static,
+        impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
         impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
         + Send
         + Sync
@@ -170,10 +162,11 @@ pub async fn run_msg_ack_protocol<Db, Ew, Ea>(
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
-    Ew: std::error::Error + Clone + Send + Sync + 'static,
-    Ea: std::error::Error + Clone + Send + Sync + 'static,
 {
     let me = packet_cfg.packet_keypair.clone();
+
+    #[cfg(feature = "capture")]
+    let me_pub = *hopr_crypto_types::keypairs::Keypair::public(&me);
 
     let mut processes = HashMap::new();
 
@@ -238,20 +231,9 @@ where
     let msg_processor_write = msg_processor_read.clone();
 
     #[cfg(feature = "capture")]
-    let mut capture_clone = capture.clone();
+    let capture_clone = capture.clone();
 
-    let out_packet_tx = wire_msg.0.with(move |out: OutgoingPacketOrAck| {
-        #[cfg(feature = "capture")]
-        let _ = capture_clone.try_send((&out).into());
-
-        match out {
-            OutgoingPacketOrAck::Ack(packet) | OutgoingPacketOrAck::Packet(packet) => {
-                futures::future::ok::<_, Ew>((packet.next_hop.into(), packet.data))
-            }
-        }
-    });
-
-    let msg_to_send_tx = out_packet_tx.clone();
+    let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
         ProtocolProcesses::MsgOut,
         spawn_as_abortable!(async move {
@@ -259,6 +241,9 @@ where
                 .1
                 .then_concurrent(|(data, routing, finalizer)| {
                     let msg_processor = msg_processor_write.clone();
+
+                    #[cfg(feature = "capture")]
+                    let (mut capture_clone, data_clone) = (capture_clone.clone(), data.clone());
 
                     async move {
                         match PacketWrapping::send(&msg_processor, data, routing).await {
@@ -269,7 +254,19 @@ where
                                     METRIC_PACKET_COUNT.increment(&["sent"]);
                                 }
                                 finalizer.finalize(Ok(()));
-                                Some(v)
+
+                                #[cfg(feature = "capture")]
+                                let _ = capture_clone.try_send(
+                                    capture::PacketBeforeTransit::OutgoingPacket {
+                                        me: me_pub,
+                                        next_hop: v.next_hop,
+                                        data: data_clone.to_bytes().into_vec().into(),
+                                        ack_challenge: v.ack_challenge.as_ref().into(),
+                                    }
+                                    .into(),
+                                );
+
+                                Some((v.next_hop.into(), v.data))
                             }
                             Err(e) => {
                                 finalizer.finalize(Err(e));
@@ -278,7 +275,7 @@ where
                         }
                     }
                 })
-                .filter_map(|v| futures::future::ready(v.map(OutgoingPacketOrAck::Packet)))
+                .filter_map(futures::future::ready)
                 .map(Ok)
                 .forward(msg_to_send_tx)
                 .instrument(tracing::trace_span!("msg protocol processing - outgoing"))
@@ -286,7 +283,7 @@ where
         }),
     );
 
-    let msg_to_send_tx = out_packet_tx.clone();
+    let msg_to_send_tx = wire_msg.0.clone();
     let db_for_recv = db.clone();
     let me_for_recv = me.clone();
 
@@ -302,6 +299,9 @@ where
                     let db = db_for_recv.clone();
                     let mut msg_to_send_tx = msg_to_send_tx.clone();
                     let me = me.clone();
+
+                    #[cfg(feature = "capture")]
+                    let mut capture_clone = capture.clone();
 
                     async move {
                         let now = std::time::Instant::now();
@@ -329,20 +329,35 @@ where
                                 }
                             };
 
-                            // send random signed acknowledgement to give feedback to the sender
+                            // Send random signed acknowledgement to give feedback to the sender
                             let ack = Acknowledgement::random(&me);
+
+                            #[cfg(feature = "capture")]
+                            let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
+                                me: me_pub,
+                                next_hop: peer,
+                                ack,
+                                is_random: true,
+                            }.into();
+
                             match db
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), peer)
                                 .await {
                                     Ok(ack_packet) => {
                                         let now = std::time::Instant::now();
-                                        if msg_to_send_tx.send(OutgoingPacketOrAck::Ack(ack_packet)).await.is_err() {
+                                        if msg_to_send_tx.send((
+                                                ack_packet.next_hop.into(),
+                                                ack_packet.data,
+                                            )).await.is_err() {
                                             error!("failed to forward an acknowledgement for a failed packet recv to the transport layer");
                                         }
                                         let elapsed = now.elapsed();
                                         if elapsed.as_millis() > SLOW_OP_MS {
                                             warn!(?elapsed," msg_to_send_tx.send took too long");
                                         }
+
+                                        #[cfg(feature = "capture")]
+                                        let _ = capture_clone.try_send(captured_packet);
                                     },
                                     Err(error) => tracing::error!(%error, "Failed to create random ack packet for a failed receive"),
                                 }
@@ -380,11 +395,17 @@ where
                 })
                 .then_concurrent(move |packet| {
                     #[cfg(feature = "capture")]
-                    let _ = capture_clone.try_send((&packet).into());
+                    let _ = capture_clone.try_send(capture::PacketBeforeTransit::IncomingPacket {
+                        me: me_pub,
+                        packet: &packet
+                    }.into());
 
-                    let mut msg_to_send_tx = out_packet_tx.clone();
+                    let mut msg_to_send_tx = wire_msg.0.clone();
                     let db = db.clone();
                     let me = me_for_recv.clone();
+
+                    #[cfg(feature = "capture")]
+                    let mut capture_clone = capture_clone.clone();
 
                     async move {
 
@@ -397,7 +418,7 @@ where
                             trace!(%previous_hop, "received a valid acknowledgement");
                             match db.handle_acknowledgement(ack).await {
                                 Ok(_) => trace!(%previous_hop, "successfully processed a known acknowledgement"),
-                                // Eventually, we do not care here if the acknowledgement does not belong to any our
+                                // Eventually, we do not care here if the acknowledgement does not belong to any
                                 // unacknowledged packets.
                                 Err(error) => trace!(%previous_hop, %error, "valid acknowledgement is unknown or error occurred while processing it"),
                             }
@@ -413,19 +434,29 @@ where
                             ack_key,
                             ..
                         } => {
+                            // Send acknowledgement back
                             trace!(%previous_hop, "acknowledging final packet back");
                             let ack = Acknowledgement::new(ack_key, &me);
+
+                            #[cfg(feature = "capture")]
+                            let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
+                                me: me_pub,
+                                next_hop: previous_hop,
+                                ack,
+                                is_random: false,
+                            }.into();
+
                             if let Ok(ack_packet) = db
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
                                 .await
-                                .inspect_err(|error| error!(%error, "Failed to create ack packet for a received message"))
+                                .inspect_err(|error| error!(%error, "failed to create ack packet for a received message"))
                                 {
-                                    if msg_to_send_tx
-                                        .send(OutgoingPacketOrAck::Ack(ack_packet))
-                                        .await
-                                        .is_err() {
-                                            error!("Failed to send an acknowledgement for a received packet to the transport layer");
-                                        }
+                                    if msg_to_send_tx.send((ack_packet.next_hop.into(), ack_packet.data)).await.is_err() {
+                                        error!("failed to send an acknowledgement for a received packet to the transport layer");
+                                    }
+
+                                    #[cfg(feature = "capture")]
+                                    let _ = capture_clone.try_send(captured_packet);
                                 }
 
                                 Some((sender, plain_text))
@@ -437,30 +468,50 @@ where
                             ack,
                             ..
                         } => {
-                            trace!(%previous_hop, %next_hop, "acknowledging forwarded packet back");
+                            // First, relay the packet to the next hop
+                            trace!(%previous_hop, %next_hop, "forwarding packet to the next hop");
+                            #[cfg(feature = "capture")]
+                            let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingPacket {
+                                me: me_pub,
+                                next_hop,
+                                data: data.as_ref().into(),
+                                ack_challenge: Default::default(),
+                            }.into();
+
                             msg_to_send_tx
-                                .send(OutgoingPacketOrAck::Packet(OutgoingPacket {
-                                    next_hop,
-                                    data,
-                                    // Can be defaulted here, because has no effect
-                                    ack_challenge: Default::default()
-                                }))
+                                .send((next_hop.into(), data))
                                 .await
                                 .unwrap_or_else(|_| {
                                     error!("failed to forward a packet to the transport layer");
                                 });
 
+                            #[cfg(feature = "capture")]
+                            let _ = capture_clone.try_send(captured_packet);
+
+                            // And then send acknowledgement to the previous hop
+                            trace!(%previous_hop, %next_hop, "acknowledging forwarded packet back");
+                            #[cfg(feature = "capture")]
+                            let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
+                                me: me_pub,
+                                next_hop: previous_hop,
+                                ack,
+                                is_random: false,
+                            }.into();
+
                             if let Ok(ack_packet) = db
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
                                 .await
-                                .inspect_err(|error| error!(%error, "Failed to create ack packet for a relayed message"))
+                                .inspect_err(|error| error!(%error, "failed to create ack packet for a relayed message"))
                             {
                                 msg_to_send_tx
-                                    .send(OutgoingPacketOrAck::Ack(ack_packet))
+                                    .send((ack_packet.next_hop.into(), ack_packet.data))
                                     .await
                                     .unwrap_or_else(|_| {
                                         error!("failed to send an acknowledgement for a relayed packet to the transport layer");
                                     });
+
+                                #[cfg(feature = "capture")]
+                                let _ = capture_clone.try_send(captured_packet);
                             }
                             None
                         }

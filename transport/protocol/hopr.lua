@@ -1,11 +1,11 @@
 --[[
     This is a dissector for HOPR protocol stack.
     It however does not dissect raw network packets, but works only with custom
-    capture format enabled using the "capture" feature on this crate.
+    diagnostic capture format enabled using the "capture" feature on this crate.
 
     Installation:
-        mkdir -p /Users/$USER/.local/lib/wireshark/plugins/
-        cp hopr.lua /Users/$USER/.local/lib/wireshark/plugins/
+        mkdir -p $HOME/.local/lib/wireshark/plugins/
+        cp hopr.lua $HOME/.local/lib/wireshark/plugins/
 --]]
 
 -- HOPR Start Protocol Lua dissector
@@ -258,7 +258,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
     -- Process based on packet type
     if pkt_type == 0 then -- FinalPacket
-        if length < 1 + 16 + 32 + 10 + 32 + 2 + 8 then
+        if length < 1 + 16 + 32 + 32 + 10 + 32 + 2 + 8 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for FinalPacket")
             return
         end
@@ -276,6 +276,15 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         pinfo.cols.src = prev_hop_peer_id
 
         offset = offset + prev_hop_peer_id:len() + 1
+
+        final_tree:add(hopr_fields.next_hop, buffer(offset, 32))
+        offset = offset + 32
+
+        local next_hop_peer_id = buffer(offset):stringz()
+        final_tree:add(hopr_fields.next_hop_peer_id, next_hop_peer_id)
+        pinfo.cols.dst = next_hop_peer_id
+
+        offset = offset + next_hop_peer_id:len() + 1
 
         final_tree:add(hopr_fields.sender_pseudonym, buffer(offset, 10))
         offset = offset + 10
@@ -323,13 +332,23 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         offset = offset + 96
 
     elseif pkt_type == 2 then -- OutgoingPacket
-        if length < 1 + 32 + 33 + 2 + 8 then
+        if length < 1 + 32 + 32 + 33 + 2 + 8 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for OutgoingPacket")
             return
         end
         pinfo.cols.info:set("Outgoing")
 
         local out_tree = subtree:add("OutgoingPacket")
+
+        out_tree:add(hopr_fields.previous_hop, buffer(offset, 32))
+        offset = offset + 32
+
+        local prev_hop_peer_id = buffer(offset):stringz()
+        out_tree:add(hopr_fields.previous_hop_peer_id, prev_hop_peer_id)
+        pinfo.cols.src = prev_hop_peer_id
+
+        offset = offset + prev_hop_peer_id:len() + 1
+
         out_tree:add(hopr_fields.next_hop, buffer(offset, 32))
         offset = offset + 32
 
@@ -350,7 +369,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         offset = dissect_appdata(buffer, out_tree, offset, data_len, pinfo)
 
     elseif pkt_type == 3 then -- AcknowledgementIn
-        if length < 1 + 16 + 32 + 96 then
+        if length < 1 + 16 + 32 + 32 + 96 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for AckIn")
             return
         end
@@ -369,17 +388,35 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = offset + prev_hop_peer_id:len() + 1
 
+        ack_in_tree:add(hopr_fields.next_hop, buffer(offset, 32))
+        offset = offset + 32
+
+        local next_hop_peer_id = buffer(offset):stringz()
+        ack_in_tree:add(hopr_fields.next_hop_peer_id, next_hop_peer_id)
+        pinfo.cols.dst = next_hop_peer_id
+
+        offset = offset + next_hop_peer_id:len() + 1
+
         ack_in_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
         offset = offset + 96
 
     elseif pkt_type == 4 then -- AcknowledgementOut
-            if length < 1 + 32 + 96 then
+            if length < 1 + 32 + 1 + 96 then
                 subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for AckOut")
                 return
             end
             pinfo.cols.info:set("Outgoing, Acknowledgement")
 
             local ack_out_tree = subtree:add("Acknowledgement")
+
+            ack_out_tree:add(hopr_fields.previous_hop, buffer(offset, 32))
+            offset = offset + 32
+
+            local prev_hop_peer_id = buffer(offset):stringz()
+            ack_out_tree:add(hopr_fields.previous_hop_peer_id, prev_hop_peer_id)
+            pinfo.cols.src = prev_hop_peer_id
+
+            offset = offset + prev_hop_peer_id:len() + 1
 
             ack_out_tree:add(hopr_fields.next_hop, buffer(offset, 32))
             offset = offset + 32
@@ -390,10 +427,15 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
             offset = offset + next_hop_peer_id:len() + 1
 
+            if buffer(offset, 1):uint() == 1 then
+                subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "This acknowledgement is random due to processing error on the node")
+            end
+            offset = offset + 1
+
             ack_out_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
             offset = offset + 96
     else
-        subtree:add_expert_info(PI_MALFORMED, PI_WARN, "Unknown packet type: " .. pkt_type)
+        subtree:add_expert_info(PI_NOTE, PI_WARN, "Unknown packet type: " .. pkt_type)
     end
 end
 

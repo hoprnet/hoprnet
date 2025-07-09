@@ -1,8 +1,10 @@
-use std::fs::File;
+use std::{borrow::Cow, fs::File};
 
 use futures::{FutureExt, StreamExt};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
+use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::prelude::IncomingPacket;
+use hopr_internal_types::prelude::Acknowledgement;
 use pcap_file::{
     DataLink,
     pcapng::{
@@ -14,7 +16,7 @@ use pcap_file::{
     },
 };
 
-use crate::{HOPR_PACKET_SIZE, OutgoingPacketOrAck};
+use crate::HOPR_PACKET_SIZE;
 
 #[derive(Copy, Clone, Debug, strum::Display)]
 pub enum PacketDirection {
@@ -116,35 +118,101 @@ enum PacketType {
     OutAck = 4,
 }
 
+pub enum PacketBeforeTransit<'a> {
+    OutgoingPacket {
+        me: OffchainPublicKey,
+        next_hop: OffchainPublicKey,
+        data: Cow<'a, [u8]>,
+        ack_challenge: Cow<'a, [u8]>,
+    },
+    OutgoingAck {
+        me: OffchainPublicKey,
+        next_hop: OffchainPublicKey,
+        ack: Acknowledgement,
+        is_random: bool,
+    },
+    IncomingPacket {
+        me: OffchainPublicKey,
+        packet: &'a IncomingPacket,
+    },
+}
+
 pub struct CapturedPacket(PacketDirection, Box<[u8]>);
 
-impl<'a> From<&'a IncomingPacket> for CapturedPacket {
-    fn from(value: &'a IncomingPacket) -> Self {
+impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
+    fn from(value: PacketBeforeTransit<'a>) -> Self {
         let mut out = Vec::new();
+        let mut direction = PacketDirection::Incoming;
         match value {
-            IncomingPacket::Final {
-                packet_tag,
-                previous_hop,
-                sender,
-                plain_text,
-                ack_key,
+            PacketBeforeTransit::OutgoingPacket {
+                me,
+                next_hop,
+                data,
+                ack_challenge,
+            } => {
+                out.push(PacketType::Outgoing as u8);
+                out.extend_from_slice(me.as_ref());
+                out.extend_from_slice(me.to_peerid_str().as_bytes());
+                out.push(0); // Add null terminator to the string
+                out.extend_from_slice(next_hop.as_ref());
+                out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
+                out.push(0); // Add null terminator to the string
+                out.extend_from_slice(ack_challenge.as_ref());
+                out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
+                out.extend_from_slice(data.as_ref());
+                direction = PacketDirection::Outgoing;
+            }
+            PacketBeforeTransit::OutgoingAck {
+                me,
+                next_hop,
+                ack,
+                is_random,
+            } => {
+                out.push(PacketType::OutAck as u8);
+                out.extend_from_slice(me.as_ref());
+                out.extend_from_slice(me.to_peerid_str().as_bytes());
+                out.push(0); // Add null terminator to the string
+                out.extend_from_slice(next_hop.as_ref());
+                out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
+                out.push(0); // Add null terminator to the string
+                out.push(if is_random { 1 } else { 0 });
+                out.extend_from_slice(ack.as_ref());
+                direction = PacketDirection::Outgoing;
+            }
+            PacketBeforeTransit::IncomingPacket {
+                me,
+                packet:
+                    IncomingPacket::Final {
+                        packet_tag,
+                        previous_hop,
+                        sender,
+                        plain_text,
+                        ack_key,
+                    },
             } => {
                 out.push(PacketType::Final as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
                 out.extend_from_slice(previous_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
+                out.extend_from_slice(me.as_ref());
+                out.extend_from_slice(me.to_peerid_str().as_bytes());
+                out.push(0); // Add null terminator to the string
                 out.extend_from_slice(sender.as_ref());
                 out.extend_from_slice(ack_key.as_ref());
                 out.extend_from_slice((plain_text.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(plain_text.as_ref());
             }
-            IncomingPacket::Forwarded {
-                packet_tag,
-                previous_hop,
-                next_hop,
-                data,
-                ack,
+            PacketBeforeTransit::IncomingPacket {
+                packet:
+                    IncomingPacket::Forwarded {
+                        packet_tag,
+                        previous_hop,
+                        next_hop,
+                        data,
+                        ack,
+                    },
+                ..
             } => {
                 out.push(PacketType::Forwarded as u8);
                 out.extend_from_slice(packet_tag);
@@ -158,45 +226,28 @@ impl<'a> From<&'a IncomingPacket> for CapturedPacket {
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
             }
-            IncomingPacket::Acknowledgement {
-                packet_tag,
-                previous_hop,
-                ack,
+            PacketBeforeTransit::IncomingPacket {
+                me,
+                packet:
+                    IncomingPacket::Acknowledgement {
+                        packet_tag,
+                        previous_hop,
+                        ack,
+                    },
             } => {
                 out.push(PacketType::InAck as u8);
                 out.extend_from_slice(packet_tag);
                 out.extend_from_slice(previous_hop.as_ref());
                 out.extend_from_slice(previous_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
+                out.extend_from_slice(me.as_ref());
+                out.extend_from_slice(me.to_peerid_str().as_bytes());
+                out.push(0); // Add null terminator to the string
                 out.extend_from_slice(ack.as_ref());
             }
         }
-        Self(PacketDirection::Incoming, out.into_boxed_slice())
-    }
-}
 
-impl<'a> From<&'a OutgoingPacketOrAck> for CapturedPacket {
-    fn from(value: &'a OutgoingPacketOrAck) -> Self {
-        let mut out = Vec::new();
-        match value {
-            OutgoingPacketOrAck::Packet(outgoing_packet) => {
-                out.push(PacketType::Outgoing as u8);
-                out.extend_from_slice(outgoing_packet.next_hop.as_ref());
-                out.extend_from_slice(outgoing_packet.next_hop.to_peerid_str().as_bytes());
-                out.push(0); // Add null terminator to the string
-                out.extend_from_slice(outgoing_packet.ack_challenge.as_ref());
-                out.extend_from_slice((outgoing_packet.data.len() as u16).to_be_bytes().as_ref());
-                out.extend_from_slice(outgoing_packet.data.as_ref());
-            }
-            OutgoingPacketOrAck::Ack(outgoing_packet) => {
-                out.push(PacketType::OutAck as u8);
-                out.extend_from_slice(outgoing_packet.next_hop.as_ref());
-                out.extend_from_slice(outgoing_packet.next_hop.to_peerid_str().as_bytes());
-                out.push(0); // Add null terminator to the string
-                out.extend_from_slice(outgoing_packet.data.as_ref());
-            }
-        }
-        Self(PacketDirection::Outgoing, out.into_boxed_slice())
+        Self(direction, out.into_boxed_slice())
     }
 }
 
@@ -209,7 +260,6 @@ mod tests {
         prelude::{Keypair, OffchainKeypair, SimplePseudonym},
         types::HalfKey,
     };
-    use hopr_db_api::prelude::OutgoingPacket;
     use hopr_internal_types::prelude::Acknowledgement;
     use hopr_network_types::prelude::{
         FrameInfo, Segment,
@@ -221,6 +271,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_file_capture() -> anyhow::Result<()> {
+        let me = *OffchainKeypair::random().public();
+
         let (pcap, ah) = packet_capture_channel(Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?));
         pin_mut!(pcap);
 
@@ -232,7 +284,9 @@ mod tests {
             ack_key: HalfKey::random(),
         };
 
-        let _ = pcap.send((&packet).into()).await;
+        let _ = pcap
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .await;
 
         let msg = SessionMessage::<1000>::Segment(Segment {
             frame_id: 1,
@@ -249,7 +303,9 @@ mod tests {
             ack_key: HalfKey::random(),
         };
 
-        let _ = pcap.send((&packet).into()).await;
+        let _ = pcap
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .await;
 
         let msg = SessionMessage::<1000>::Acknowledge(FrameAcknowledgements::from(vec![1, 2, 100]));
 
@@ -261,7 +317,9 @@ mod tests {
             ack_key: HalfKey::random(),
         };
 
-        let _ = pcap.send((&packet).into()).await;
+        let _ = pcap
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .await;
 
         let msg = SessionMessage::<1000>::Request(SegmentRequest::from_iter([
             FrameInfo {
@@ -286,7 +344,9 @@ mod tests {
             ack_key: HalfKey::random(),
         };
 
-        let _ = pcap.send((&packet).into()).await;
+        let _ = pcap
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .await;
 
         let kp = OffchainKeypair::random();
         let packet = IncomingPacket::Acknowledgement {
@@ -295,7 +355,9 @@ mod tests {
             ack: Acknowledgement::random(&kp),
         };
 
-        let _ = pcap.send((&packet).into()).await;
+        let _ = pcap
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .await;
 
         let packet = IncomingPacket::Forwarded {
             packet_tag: hopr_crypto_random::random_bytes(),
@@ -305,33 +367,55 @@ mod tests {
             ack: Acknowledgement::random(&OffchainKeypair::random()),
         };
 
-        let _ = pcap.send((&packet).into()).await;
+        let _ = pcap
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .await;
 
-        let packet = OutgoingPacket {
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
             next_hop: *OffchainKeypair::random().public(),
-            ack_challenge: HalfKey::random().to_challenge(),
-            data: ApplicationData::new(0u64, &hex!("cafebabe01")).to_bytes(),
+            ack_challenge: hk.as_ref().into(),
+            data: ApplicationData::new(0u64, &hex!("cafebabe01"))
+                .to_bytes()
+                .into_vec()
+                .into(),
         };
 
-        let _ = pcap.send((&OutgoingPacketOrAck::Packet(packet)).into()).await;
+        let _ = pcap.send(packet.into()).await;
 
-        let packet = OutgoingPacket {
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
             next_hop: *OffchainKeypair::random().public(),
-            ack_challenge: HalfKey::random().to_challenge(),
-            data: ApplicationData::new(1u64, &hex!("0004babe02")).to_bytes(),
+            ack_challenge: hk.as_ref().into(),
+            data: ApplicationData::new(1u64, &hex!("0004babe02"))
+                .to_bytes()
+                .into_vec()
+                .into(),
         };
 
-        let _ = pcap.send((&OutgoingPacketOrAck::Packet(packet)).into()).await;
+        let _ = pcap.send(packet.into()).await;
 
         let kp = OffchainKeypair::random();
 
-        let packet = OutgoingPacket {
+        let packet = PacketBeforeTransit::OutgoingAck {
+            me,
             next_hop: *kp.public(),
-            ack_challenge: HalfKey::random().to_challenge(),
-            data: Acknowledgement::random(&kp).as_ref().to_vec().into_boxed_slice(),
+            ack: Acknowledgement::random(&kp),
+            is_random: false,
         };
 
-        let _ = pcap.send((&OutgoingPacketOrAck::Ack(packet)).into()).await;
+        let _ = pcap.send(packet.into()).await;
+
+        let packet = PacketBeforeTransit::OutgoingAck {
+            me,
+            next_hop: *kp.public(),
+            ack: Acknowledgement::random(&kp),
+            is_random: true,
+        };
+
+        let _ = pcap.send(packet.into()).await;
 
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
