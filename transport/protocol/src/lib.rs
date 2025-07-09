@@ -191,8 +191,10 @@ where
                     .map_err(std::io::Error::other)
                     .and_then(capture::UdpPacketDump::new)
                 {
+                    warn!("udp packet capture initialized to {desc}");
                     Box::new(udp_writer)
                 } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
+                    warn!("pcap file packet capture initialized to {desc}");
                     Box::new(pcap_writer)
                 } else {
                     error!(desc, "failed to create packet capture: invalid socket address or file");

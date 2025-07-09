@@ -76,10 +76,13 @@ pub struct UdpPacketDump(std::net::UdpSocket);
 
 impl UdpPacketDump {
     pub fn new(addr: std::net::SocketAddr) -> std::io::Result<Self> {
-        Ok(Self(std::net::UdpSocket::bind(addr)?))
+        let sock = std::net::UdpSocket::bind(("0.0.0.0", 0))?;
+        sock.connect(addr)?;
+        Ok(Self(sock))
     }
 }
 
+#[cfg(feature = "runtime-tokio")]
 impl PacketWriter for UdpPacketDump {
     fn write_packet(&mut self, packet: &[u8], _direction: PacketDirection) -> std::io::Result<()> {
         let mut sent = 0;

@@ -275,14 +275,11 @@ local hopr_fields = {
     data_len = ProtoField.uint16("hopr.data_len", "Data Length"),
 
     -- FinalPacket specific
-    sender_pseudonym = ProtoField.bytes("hopr.final.sender_pseudonym", "Sender Pseudonym"),
-    ack_key = ProtoField.bytes("hopr.final.ack_key", "ACK Key"),
+    sender_pseudonym = ProtoField.bytes("hopr.sender_pseudonym", "Sender Pseudonym"),
 
-    -- ForwardedPacket specific
-    acknowledgement = ProtoField.bytes("hopr.forwarded.ack", "Acknowledgement"),
-
-    -- OutgoingPacket specific
-    challenge = ProtoField.bytes("hopr.outgoing.challenge", "Challenge"),
+    ack_key = ProtoField.bytes("hopr.ack.key", "ACK Key"),
+    ack_sig = ProtoField.bytes("hopr.ack.signature", "Signature"),
+    challenge = ProtoField.bytes("hopr.challenge", "Challenge"),
 
     -- ApplicationData
     appdata_tag = ProtoField.uint64("hopr.appdata.tag", "Tag", base.HEX),
@@ -420,9 +417,11 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = offset + next_hop_peer_id:len() + 1
 
-        fwd_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
-        offset = offset + 96
-
+        local ack_subtree = ack_out_tree:add("Acknowledgement Data")
+        ack_subtree:add(hopr_fields.ack_key, buffer(offset, 32))
+        offset = offset + 32
+        ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
+        offset = offset + 64
     elseif pkt_type == 2 then -- OutgoingPacket
         if length < 1 + 32 + 32 + 33 + 2 + 8 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for OutgoingPacket")
@@ -489,8 +488,11 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = offset + next_hop_peer_id:len() + 1
 
-        ack_in_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
-        offset = offset + 96
+        local ack_subtree = ack_out_tree:add("Acknowledgement Data")
+        ack_subtree:add(hopr_fields.ack_key, buffer(offset, 32))
+        offset = offset + 32
+        ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
+        offset = offset + 64
 
     elseif pkt_type == 4 then -- AcknowledgementOut
             if length < 1 + 32 + 1 + 96 then
@@ -524,8 +526,11 @@ function hopr_proto.dissector(buffer, pinfo, tree)
             end
             offset = offset + 1
 
-            ack_out_tree:add(hopr_fields.acknowledgement, buffer(offset, 96))
-            offset = offset + 96
+            local ack_subtree = ack_out_tree:add("Acknowledgement Data")
+            ack_subtree:add(hopr_fields.ack_key, buffer(offset, 32))
+            offset = offset + 32
+            ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
+            offset = offset + 64
     else
         subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unknown packet type: " .. pkt_type)
     end
