@@ -474,9 +474,9 @@
             pkgs = pkgs;
             extraContents = plutoDeps;
             extraPorts = {
-              "8545/tcp" = { };
-              "3003-3018/tcp" = { };
+              "3001-3006/tcp" = { };
               "10001-10101/tcp" = { };
+              "10001-10101/udp" = { };
             };
             Cmd = [
               "/bin/tini"

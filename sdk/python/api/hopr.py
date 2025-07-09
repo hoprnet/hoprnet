@@ -323,9 +323,7 @@ class HoprdAPI(ApiLib):
         actual_target = (
             {"Sealed": base64.b64encode(seal_with_address(destination, bytes(target, "utf-8"), 50)).decode("ascii")}
             if sealed_target
-            else {"Service": int(target)}
-            if service
-            else {"Plain": target}
+            else {"Service": int(target)} if service else {"Plain": target}
         )
 
         data = CreateSessionBody(
