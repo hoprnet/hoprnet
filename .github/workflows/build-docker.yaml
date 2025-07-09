@@ -107,7 +107,7 @@ jobs:
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
             echo "DOCKER_TAG_PR=${docker_tag_pr}" >> $GITHUB_OUTPUT
             echo "NIX_BUILD_TARGET=${{ inputs.package }}${nix_debug_option}-docker-build-and-upload" >> $GITHUB_OUTPUT
-            if [[ "${nix_profile_build}" = "true" ]]: then
+            if [[ "${nix_profile_build}" = "true" ]]; then
               echo "NIX_BUILD_TARGET_PROFILE=${{ inputs.package }}-profile-docker-build-and-upload" >> $GITHUB_OUTPUT
             fi
           fi
@@ -174,7 +174,7 @@ jobs:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:latest-profile
 
-      - name: Build and push ${{ inputs.package }} docker image - release-latest
+      - name: Build and push ${{ inputs.package }}-profile docker image - release-latest
         run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
         if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.production && steps.options.outputs.DOCKER_RELEASE_LATEST_TAG != ''
         env:

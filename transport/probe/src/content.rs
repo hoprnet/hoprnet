@@ -124,11 +124,11 @@ impl<'a> TryFrom<&'a [u8]> for PathTelemetry {
                     .map_err(|_| GeneralError::ParseError("PathTelemetry.id".into()))?,
                 path: (&value[10..20])
                     .try_into()
-                    .map_err(|_| GeneralError::ParseError("PathTelemetry.id".into()))?,
+                    .map_err(|_| GeneralError::ParseError("PathTelemetry.path".into()))?,
                 timestamp: u128::from_be_bytes(
                     (&value[20..36])
                         .try_into()
-                        .map_err(|_| GeneralError::ParseError("PathTelemetry.id".into()))?,
+                        .map_err(|_| GeneralError::ParseError("PathTelemetry.timestamp".into()))?,
                 ),
             })
         } else {

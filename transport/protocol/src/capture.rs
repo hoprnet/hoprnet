@@ -82,9 +82,9 @@ impl UdpPacketDump {
 
 impl PacketWriter for UdpPacketDump {
     fn write_packet(&mut self, packet: &[u8], _direction: PacketDirection) -> std::io::Result<()> {
-        let mut remaining = packet.len();
-        while remaining > 0 {
-            remaining -= self.0.send(packet)?;
+        let mut sent = 0;
+        while sent < packet.len() {
+            sent += self.0.send(&packet[sent..])?;
         }
         Ok(())
     }
