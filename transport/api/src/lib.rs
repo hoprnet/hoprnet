@@ -402,8 +402,10 @@ where
         // -- transport medium
         let mixer_cfg = build_mixer_cfg_from_env();
 
-        #[cfg(feature = "mixer-channel")]
-        let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
+        //#[cfg(feature = "mixer-channel")]
+        //let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
+
+        let (mixing_channel_tx, mixing_channel_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
         #[cfg(feature = "mixer-stream")]
         let (mixing_channel_tx, mixing_channel_rx) = {
@@ -517,7 +519,8 @@ where
             (
                 mixing_channel_tx.with(|(peer, msg): (PeerId, Box<[u8]>)| {
                     trace!(%peer, len = msg.len(), "sending message to peer");
-                    futures::future::ok::<_, hopr_transport_mixer::channel::SenderError>((peer, msg))
+                    //futures::future::ok::<_, hopr_transport_mixer::channel::SenderError>((peer, msg))
+                    futures::future::ok::<_, mpsc::SendError>((peer, msg))
                 }),
                 wire_msg_rx.inspect(|(peer, msg)| trace!(%peer, len = msg.len(), "received message from peer")),
             ),
