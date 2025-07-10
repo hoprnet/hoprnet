@@ -36,20 +36,11 @@ while IFS= read -r line; do
     echo "Downloaded binary file ${artifact_name}..."
   fi
   # Extract the zip file
-  # Check if artifact_name contains an extension (a dot)
-  if [[ $artifact_name == *.* ]]; then
+  # Check if artifact_name is a package (has an extension like .deb, .rpm, .pkg.tar.zst)
+  if [[ $artifact_name == *.deb || $artifact_name == *.rpm || $artifact_name == *.pkg.tar.zst ]]; then
     # Extract to ./dist/packages/${artifact_name}
     unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/packages"
   else
-    # Extract the platform (suffix after the first hyphen) and extract to ./dist/bin/${platform}
-    platform=$(echo "$artifact_name" | awk -F '-' '{print $2"-"$3}')
-    unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/bin/${platform}"
+    unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/bin"
   fi
 done <<<"$artifacts"
-
-# Group files by platform and create a single zip file for each platform
-platforms=$(ls -1 dist/bin/)
-for platform in $platforms; do
-  echo "Creating zip for platform: $platform"
-  zip -j "dist/binaries/hoprnet-binaries-${platform}.zip" ./dist/bin/${platform}/*
-done

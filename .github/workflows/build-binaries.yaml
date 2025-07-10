@@ -134,8 +134,11 @@ jobs:
       - name: Build ${{ steps.vars.outputs.binary }} binaries
         run: nix build -L .#${{ steps.vars.outputs.binary }}${{ steps.vars.outputs.package_suffix }}
 
-      - name: Upload ${{ steps.vars.outputs.binary }} binaries
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - name: Publish ${{ steps.vars.outputs.binary }} Artifact
+        uses: hoprnet/hopr-workflows/actions/publish-artifact@ausias/publish-gcp-artifact # master
         with:
-          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
-          path: ${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}
+          destination: 'github-workflow'
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          artifact-path: ${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}
+          artifact-name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
+

@@ -5,26 +5,76 @@ class Hoprd < Formula
 
   on_macos do
     on_arm do
-      url "file://#{ENV['HOME']}/Documents/github/hoprnet/dist/bin/hoprd-aarch64-darwin"
-      sha256 "60589aca5513b0528c10c9b5e728015279ba9eeef7122b6cf213bffe4bf1a054"
+      # url "file://#{ENV['HOME']}/Documents/github/hoprnet/dist/bin/hoprd-aarch64-darwin"
+      # sha256 "60589aca5513b0528c10c9b5e728015279ba9eeef7122b6cf213bffe4bf1a054"
+
+      url "https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-aarch64-darwin"
+      sha256 `curl -sL "https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-aarch64-darwin.sha256"`.strip
+
+      # Verify the signature of the binary
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-aarch64-darwin.sig -o hoprd-aarch64-darwin.sig"
+      system "gpg --verify hoprd-aarch64-darwin.sig hoprd-aarch64-darwin"
+
+      # Download and store the checksum file
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-aarch64-darwin.sha256 -o hoprd-aarch64-darwin.sha256"
+
+      # Verify the checksum file's authenticity
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-aarch64-darwin.sha256.asc -o hoprd-aarch64-darwin.sha256.asc"
+      system "gpg --verify hoprd-aarch64-darwin.sha256.asc hoprd-aarch64-darwin.sha256"
     end
 
     on_intel do
-      url "https://github.com/hoprnet/hoprd/releases/download/v#{version}/hoprd-x86_64-darwin"
-      sha256 "sha256-for-macos-x86_64-binary"
+      url "https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-x86_64-darwin"
+      sha256 `curl -sL "https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-x86_64-darwin.sha256"`.strip
+
+      # Verify the signature of the binary
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-x86_64-darwin.sig -o hoprd-x86_64-darwin.sig"
+      system "gpg --verify hoprd-x86_64-darwin.sig hoprd-x86_64-darwin"
+
+      # Download and store the checksum file
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-x86_64-darwin.sha256 -o hoprd-x86_64-darwin.sha256"
+
+      # Verify the checksum file's authenticity
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hoprd-x86_64-darwin.sha256.asc -o hoprd-x86_64-darwin.sha256.asc"
+      system "gpg --verify hoprd-x86_64-darwin.sha256.asc hoprd-x86_64-darwin.sha256"
     end
   end
 
   resource "hopli" do
     on_macos do
       on_arm do
-        url "file://#{ENV['HOME']}/Documents/github/hoprnet/dist/bin/hopli-aarch64-darwin"
-        sha256 "a863f7b7ab37ce3429c41102e78ad43c6d3bb5a4db22e6284c0ce3fdf8c7d8fd"
+        # url "file://#{ENV['HOME']}/Documents/github/hoprnet/dist/bin/hopli-aarch64-darwin"
+        # sha256 "a863f7b7ab37ce3429c41102e78ad43c6d3bb5a4db22e6284c0ce3fdf8c7d8fd"
+
+      url "https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-aarch64-darwin"
+      sha256 `curl -sL "https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-aarch64-darwin.sha256"`.strip
+
+      # Verify the signature of the binary
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-aarch64-darwin.sig -o hopli-aarch64-darwin.sig"
+      system "gpg --verify hopli-aarch64-darwin.sig hopli-aarch64-darwin"
+
+      # Download and store the checksum file
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-aarch64-darwin.sha256 -o hopli-aarch64-darwin.sha256"
+
+      # Verify the checksum file's authenticity
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-aarch64-darwin.sha256.asc -o hopli-aarch64-darwin.sha256.asc"
+      system "gpg --verify hopli-aarch64-darwin.sha256.asc hopli-aarch64-darwin.sha256"
       end
 
       on_intel do
-        url "https://github.com/hoprnet/hoprd/releases/download/v#{version}/hopli-x86_64-darwin"
-        sha256 "sha256-for-hopli-x86_64"
+      url "https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-x86_64-darwin"
+      sha256 `curl -sL "https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-x86_64-darwin.sha256"`.strip
+
+      # Verify the signature of the binary
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-x86_64-darwin.sig -o hopli-x86_64-darwin.sig"
+      system "gpg --verify hopli-x86_64-darwin.sig hopli-x86_64-darwin"
+
+      # Download and store the checksum file
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-x86_64-darwin.sha256 -o hopli-x86_64-darwin.sha256"
+
+      # Verify the checksum file's authenticity
+      system "curl -sL https://github.com/hoprnet/hoprnet/releases/download/v#{version}/hopli-x86_64-darwin.sha256.asc -o hopli-x86_64-darwin.sha256.asc"
+      system "gpg --verify hopli-x86_64-darwin.sha256.asc hopli-x86_64-darwin.sha256"
       end
     end
   end
