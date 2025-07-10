@@ -39,8 +39,8 @@ while IFS= read -r line; do
   unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/unzip"
   for artifact in dist/unzip/*; do
     case "$artifact" in
-      *.deb|*.rpm|*.pkg.tar.zst) mv "$artifact" dist/packages/ ;;
-      *)                         mv "$artifact" dist/bin/      ;;
+    *.deb | *.rpm | *.pkg.tar.zst) mv "$artifact" dist/packages/ ;;
+    *) mv "$artifact" dist/bin/ ;;
     esac
   done
 done <<<"$artifacts"
