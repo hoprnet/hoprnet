@@ -87,7 +87,7 @@ jobs:
             target=${{ github.event.inputs.target }}
           fi
           case "${target}" in
-            "x86_64-linux")
+          "x86_64-linux")
               package_suffix="-x86_64-linux"
               runner_needs_nix_setup=false
               ;;

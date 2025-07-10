@@ -91,9 +91,9 @@ add_api_token_var() {
 
 # Function to add the HOPRD_SAFE_ADDRESS and HOPRD_MODULE_ADDRESS environment variable
 add_safe_addresses_var() {
-  append_env_data "# HOPRD_SAFE_ADDRESS is ethereum address link to your safe"
+  append_env_data "# HOPRD_SAFE_ADDRESS is ethereum address link to your safe and shown in https://hub.hoprnet.org"
   append_env_data "HOPRD_SAFE_ADDRESS=${HOPRD_SAFE_ADDRESS}\n"
-  append_env_data "# HOPRD_MODULE_ADDRESS is ethereum address link to your safe module"
+  append_env_data "# HOPRD_MODULE_ADDRESS is ethereum address link to your safe module and shown in https://hub.hoprnet.org"
   append_env_data "HOPRD_MODULE_ADDRESS=${HOPRD_MODULE_ADDRESS}\n"
 }
 
@@ -134,6 +134,16 @@ add_hoprd_api_port_var() {
   append_env_data "HOPRD_API_PORT=${HOPRD_API_PORT}\n"
 }
 
+add_log_level_var() {
+  # Set the log level to info by default
+  if [ -z "${RUST_LOG}" ]; then
+    RUST_LOG="info"
+  fi
+  append_env_data "# RUST_LOG is the log level for the HOPR node"
+  append_env_data "RUST_LOG=${RUST_LOG}"
+  append_env_data "# RUST_LOG=debug,libp2p_swarm=debug,libp2p_mplex=debug,multistream_select=debug,libp2p_tcp=debug,libp2p_dns=info,sea_orm=info,sqlx=info\n"
+}
+
 # Function to generate the environment file
 generate_env_file() {
   # If the environment vars file not exists, automatically create it
@@ -148,6 +158,7 @@ generate_env_file() {
     add_hoprd_api_host_var
     add_hoprd_api_port_var
     add_network
+    add_log_level_var
     # Write collected data to the environment file
     mkdir -p "$(dirname "${HOPRD_ENV_FILE}")"
     chmod 750 "$(dirname "${HOPRD_ENV_FILE}")"
