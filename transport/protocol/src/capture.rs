@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fs::File, ops::Div};
+use std::{borrow::Cow, fs::File};
 
 use futures::{FutureExt, StreamExt};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};

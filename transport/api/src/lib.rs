@@ -515,7 +515,10 @@ where
             self.db.clone(),
             Some(tbf_path),
             (
-                mixing_channel_tx.with(|(peer, msg)| trace!(%peer, len = msg.len(), "sending message to peer")),
+                mixing_channel_tx.with(|(peer, msg): (PeerId, Box<[u8]>)| {
+                    trace!(%peer, len = msg.len(), "sending message to peer");
+                    futures::future::ok::<_, hopr_transport_mixer::channel::SenderError>((peer, msg))
+                }),
                 wire_msg_rx.inspect(|(peer, msg)| trace!(%peer, len = msg.len(), "received message from peer")),
             ),
             (tx_from_protocol, external_msg_rx),
