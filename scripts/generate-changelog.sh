@@ -5,12 +5,16 @@ set -Eeuo pipefail
 
 current_version=${1}
 milestone_number=$(gh api repos/:owner/:repo/milestones | jq -r --arg version "${current_version}" ' to_entries[] | select(.value.title | test($version)).value.number')
+if [ -z "${milestone_number}" ]; then
+  echo "[ERROR] No milestone found for version ${current_version}" >&2
+  exit 1
+fi
 changelog_format=${2:-github}
 include_open=${3:-false}
 
 # Decode the entry of a changelog
 jq_decode() {
-  echo ${1} | base64 --decode
+  echo "${1}" | base64 --decode
 }
 
 # Process entries and build the changelog array
@@ -68,7 +72,7 @@ github_format_changelog() {
       section_feature+="* ${title} by @${author} in #${id}\n"
       ;;
     "fix"*)
-      section_fix+="- ${title} by @${author} in #${id}\n"
+      section_fix+="* ${title} by @${author} in #${id}\n"
       ;;
     "refactor("* | "style("*)
       section_refactor+="* ${title} by @${author} in #${id}\n"
@@ -77,7 +81,7 @@ github_format_changelog() {
       section_documentation+="* ${title} by @${author} in #${id}\n"
       ;;
     "perf("*)
-      section_performance+"* ${title} by @${author} in #${id}\n"
+      section_performance+="* ${title} by @${author} in #${id}\n"
       ;;
     *)
       section_other+="* ${title} by @${author} in #${id}\n"
@@ -87,12 +91,12 @@ github_format_changelog() {
 
   # The exclamation mark (!) in ${!section} is used for indirect variable expansion in Bash. It allows you to reference the value of a variable whose name is stored in another variable.
   for section in section_feature section_fix section_refactor section_documentation section_performance section_other; do
-    if [[ ${!section} == *"-"* ]]; then
+    if [[ ${!section} == *" by "* ]]; then
       change_log_content+="${!section}\n"
     fi
   done
 
-  echo -e ${change_log_content}
+  echo -e "${change_log_content}"
 }
 
 # Build the changelog in JSON format

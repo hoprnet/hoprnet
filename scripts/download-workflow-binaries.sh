@@ -25,7 +25,7 @@ head_branch=${1}
 workflow_run_id=$(gh api repos/hoprnet/hoprnet/actions/workflows/build.yaml/runs | jq --arg head_branch "$head_branch" '[.workflow_runs[] | select(.head_branch == $head_branch and .conclusion == "success" and .status == "completed")] | first | .id')
 artifacts=$(gh api repos/hoprnet/hoprnet/actions/runs/${workflow_run_id}/artifacts | jq -r '.artifacts[] | "\(.name) \(.archive_download_url)"')
 rm -rf "${mydir}/dist"
-mkdir -p "${mydir}/dist/zip" "${mydir}/dist/bin" "${mydir}/dist/packages"
+mkdir -p "${mydir}/dist/zip" "${mydir}/dist/unzip" "${mydir}/dist/bin" "${mydir}/dist/packages"
 while IFS= read -r line; do
   artifact_name=$(echo $line | awk '{print $1}')
   artifact_url=$(echo $line | awk '{print $2}')
@@ -35,11 +35,12 @@ while IFS= read -r line; do
   else
     echo "Downloaded binary file ${artifact_name}..."
   fi
-  # Extract the zip file
-  # Check if artifact_name is a package (has an extension like .deb, .rpm, .pkg.tar.zst)
-  if [[ $artifact_name == *.deb || $artifact_name == *.rpm || $artifact_name == *.pkg.tar.zst ]]; then
-    unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/packages"
-  else
-    unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/bin"
-  fi
+  # Extract the zip file to its corresponding directory
+  unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/unzip"
+  for artifact in dist/unzip/*; do
+    case "$artifact" in
+    *.deb | *.rpm | *.pkg.tar.zst) mv "$artifact" dist/packages/ ;;
+    *) mv "$artifact" dist/bin/ ;;
+    esac
+  done
 done <<<"$artifacts"

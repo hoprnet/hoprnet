@@ -1,5 +1,5 @@
 #!/bin/bash
-set -Eeo pipefail
+set -Eeuo pipefail
 
 systemctl disable hoprd.service >/dev/null
 systemctl stop hoprd.service >/dev/null
