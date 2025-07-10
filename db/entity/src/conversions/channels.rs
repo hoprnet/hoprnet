@@ -90,11 +90,10 @@ impl TryFrom<&channel::Model> for CorruptedChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
-        let channel = ChannelEntry::try_from(value)
-            .map_err(|_| DbEntityError::ConversionError("failed to convert channel entry".into()))?;
+        let channel = ChannelEntry::try_from(value)?;
 
         Ok(CorruptedChannelEntry {
-            channel: channel.clone(),
+            channel,
         })
     }
 }
