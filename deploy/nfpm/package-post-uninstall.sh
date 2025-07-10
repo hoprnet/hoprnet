@@ -4,8 +4,10 @@ set -Eeo pipefail
 delete_user_group() {
   if id -u hoprd >/dev/null 2>&1; then
     echo "Deleting user and group for HOPR node..."
-    gpasswd -d "$SUDO_USER" hoprd >/dev/null
-    chown "$SUDO_USER:$SUDO_USER" /etc/hoprd >/dev/null
+    if [ -n "${SUDO_USER:-}" ]; then
+      gpasswd -d "$SUDO_USER" hoprd >/dev/null 2>&1 || true
+      chown "$SUDO_USER:$SUDO_USER" /etc/hoprd >/dev/null 2>&1 || true
+    fi
     userdel -r hoprd
   else
     echo "User and group for HOPR node already deleted."
