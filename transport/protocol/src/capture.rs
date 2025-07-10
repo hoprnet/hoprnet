@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fs::File};
+use std::{borrow::Cow, fs::File, ops::Div};
 
 use futures::{FutureExt, StreamExt};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
@@ -11,7 +11,7 @@ use pcap_file::{
         PcapNgWriter,
         blocks::{
             enhanced_packet::{EnhancedPacketBlock, EnhancedPacketOption},
-            interface_description::InterfaceDescriptionBlock,
+            interface_description::{InterfaceDescriptionBlock, InterfaceDescriptionOption},
         },
     },
 };
@@ -46,7 +46,7 @@ impl PcapPacketWriter {
             .write_pcapng_block(InterfaceDescriptionBlock {
                 linktype: DataLink::USER0,
                 snaplen: 0,
-                options: vec![],
+                options: vec![InterfaceDescriptionOption::IfTsResol(0x09)],
             })
             .map_err(std::io::Error::other)?;
 
@@ -82,7 +82,6 @@ impl UdpPacketDump {
     }
 }
 
-#[cfg(feature = "runtime-tokio")]
 impl PacketWriter for UdpPacketDump {
     fn write_packet(&mut self, packet: &[u8], _direction: PacketDirection) -> std::io::Result<()> {
         let mut sent = 0;
