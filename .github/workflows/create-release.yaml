@@ -133,6 +133,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Update Homebrew formula
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: hoprnet/homebrew-hoprd
+          event-type: create_release
+          client-payload: '{"version": "${{ steps.setup.outputs.current_version }}"}'
+
       - name: Close Milestone
         run: |
           gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
