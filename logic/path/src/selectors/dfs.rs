@@ -241,7 +241,7 @@ where
         destination: Address,
         min_hops: usize,
         max_hops: usize,
-        blacklist: Vec<ChannelEntry>,
+        blacklist: Vec<CorruptedChannelEntry>,
     ) -> Result<ChannelPath> {
         // The protocol does not support >3 hop paths and will presumably never do,
         // so we can exclude it here.
@@ -250,12 +250,13 @@ where
         }
 
         let graph = self.graph.read().await;
+        let bl_channels: Vec<_> = blacklist.into_iter().map(|c| c.channel).collect();
 
         // Populate the queue with possible initial path offsprings
         let mut queue = graph
             .open_channels_from(source)
             .filter(|(node, edge)| {
-                self.is_next_hop_usable(node, edge, &source, &destination, &[]) && !blacklist.contains(&edge.channel)
+                self.is_next_hop_usable(node, edge, &source, &destination, &[]) && !bl_channels.contains(&edge.channel)
             })
             .map(|(_, edge)| WeightedChannelPath::default().extend::<CW>(edge))
             .collect::<BinaryHeap<_>>();
@@ -294,7 +295,7 @@ where
                 .open_channels_from(last_peer)
                 .filter(|(next_hop, edge)| {
                     self.is_next_hop_usable(next_hop, edge, &source, &destination, &current.path)
-                        && !blacklist.contains(&edge.channel)
+                        && !bl_channels.contains(&edge.channel)
                 })
                 .peekable();
 
@@ -337,7 +338,7 @@ mod tests {
     };
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: HoprBalance) -> ChannelEntry {
-        ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero(), false)
+        ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
     }
 
     async fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
@@ -559,12 +560,12 @@ mod tests {
         )));
 
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
-        let blacklist = vec![create_channel(
+        let blacklist = vec![CorruptedChannelEntry::new(create_channel(
             ADDRESSES[0],
             ADDRESSES[1],
             ChannelStatus::Open,
             1.into(),
-        )];
+        ))];
 
         selector
             .select_path(ADDRESSES[0], ADDRESSES[2], 1, 1, blacklist)
@@ -582,12 +583,12 @@ mod tests {
         )));
 
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
-        let blacklist = vec![create_channel(
+        let blacklist = vec![CorruptedChannelEntry::new(create_channel(
             ADDRESSES[1],
             ADDRESSES[2],
             ChannelStatus::Open,
             1.into(),
-        )];
+        ))];
 
         selector
             .select_path(ADDRESSES[0], ADDRESSES[3], 2, 2, blacklist)

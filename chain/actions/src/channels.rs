@@ -316,15 +316,7 @@ mod tests {
             .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
-        let new_channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            false,
-        );
+        let new_channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker
@@ -364,15 +356,7 @@ mod tests {
     async fn test_should_not_open_channel_again() -> anyhow::Result<()> {
         let stake = 10_u32.into();
 
-        let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            false,
-        );
+        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel)).await?;
@@ -523,15 +507,7 @@ mod tests {
     async fn test_fund_channel() -> anyhow::Result<()> {
         let stake = 10_u32.into();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
-        let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            false,
-        );
+        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel)).await?;
@@ -586,7 +562,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
-            false,
         );
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -710,15 +685,7 @@ mod tests {
         let stake = 10_u32.into();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let mut channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            false,
-        );
+        let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
@@ -815,15 +782,7 @@ mod tests {
         let stake = 10_u32.into();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let channel = ChannelEntry::new(
-            *BOB,
-            *ALICE,
-            stake,
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-            false,
-        );
+        let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
@@ -884,7 +843,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             U256::zero(),
-            false,
         );
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -943,15 +901,7 @@ mod tests {
     #[tokio::test]
     async fn test_should_not_close_closed_channel() -> anyhow::Result<()> {
         let stake = 10_u32.into();
-        let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::Closed,
-            U256::zero(),
-            false,
-        );
+        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;

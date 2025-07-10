@@ -558,7 +558,11 @@ pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) 
             if corrupted_channels.is_empty() {
                 (StatusCode::NOT_FOUND, ApiErrorStatus::NoCorruptedChannels).into_response()
             } else {
-                (StatusCode::OK, Json(corrupted_channels)).into_response()
+                (
+                    StatusCode::OK,
+                    Json(corrupted_channels.into_iter().map(|c| c.channel).collect::<Vec<_>>()),
+                )
+                    .into_response()
             }
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),

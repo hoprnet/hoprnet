@@ -1,4 +1,7 @@
-use hopr_internal_types::{channels::ChannelStatus, prelude::ChannelEntry};
+use hopr_internal_types::{
+    channels::{ChannelStatus, CorruptedChannelEntry},
+    prelude::ChannelEntry,
+};
 use hopr_primitive_types::{
     balance::HoprBalance,
     prelude::{IntoEndian, ToHex, U256},
@@ -54,7 +57,6 @@ impl TryFrom<&channel::Model> for ChannelEntry {
             U256::from_be_bytes(&value.ticket_index),
             status,
             U256::from_be_bytes(&value.epoch),
-            value.corrupted,
         ))
     }
 }
@@ -76,10 +78,48 @@ impl From<ChannelEntry> for channel::ActiveModel {
             balance: Set(value.balance.amount().to_be_bytes().into()),
             epoch: Set(value.channel_epoch.to_be_bytes().into()),
             ticket_index: Set(value.ticket_index.to_be_bytes().into()),
-            corrupted: Set(value.corrupted.into()),
+            corrupted: Set(false),
             ..Default::default()
         };
         ret.set_status(value.status);
+        ret
+    }
+}
+
+impl TryFrom<&channel::Model> for CorruptedChannelEntry {
+    type Error = DbEntityError;
+
+    fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
+        let channel = ChannelEntry::try_from(value)
+            .map_err(|_| DbEntityError::ConversionError("failed to convert channel entry".into()))?;
+
+        Ok(CorruptedChannelEntry {
+            channel: channel.clone(),
+        })
+    }
+}
+
+impl TryFrom<channel::Model> for CorruptedChannelEntry {
+    type Error = DbEntityError;
+
+    fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl From<CorruptedChannelEntry> for channel::ActiveModel {
+    fn from(value: CorruptedChannelEntry) -> Self {
+        let mut ret = channel::ActiveModel {
+            channel_id: Set(value.channel.get_id().to_hex()),
+            source: Set(value.channel.source.to_hex()),
+            destination: Set(value.channel.destination.to_hex()),
+            balance: Set(value.channel.balance.amount().to_be_bytes().into()),
+            epoch: Set(value.channel.channel_epoch.to_be_bytes().into()),
+            ticket_index: Set(value.channel.ticket_index.to_be_bytes().into()),
+            corrupted: Set(true),
+            ..Default::default()
+        };
+        ret.set_status(value.channel.status);
         ret
     }
 }

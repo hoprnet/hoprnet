@@ -434,7 +434,6 @@ where
                         0_u32.into(),
                         ChannelStatus::Open,
                         1_u32.into(),
-                        false,
                     );
 
                     self.db.upsert_channel(tx.into(), new_channel).await?;
@@ -2109,7 +2108,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2226,7 +2224,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2292,7 +2289,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2359,7 +2355,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2468,7 +2463,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Closed,
             3.into(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2534,7 +2528,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             3.into(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2559,12 +2552,14 @@ mod tests {
             .await
             .context("Channel should stay open, with corrupted flag set")?;
 
-        let should_be_corrupted = db
-            .get_channel_by_id(None, &channel.get_id())
+        assert!(
+            db.get_channel_by_id(None, &channel.get_id()).await?.is_none(),
+            "channel should be deleted",
+        );
+
+        db.get_corrupted_channel_by_id(None, &channel.get_id())
             .await?
             .context("a value should be present")?;
-
-        assert_eq!(should_be_corrupted.corrupted, true);
 
         Ok(())
     }
@@ -2618,7 +2613,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
@@ -2733,7 +2727,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
@@ -2846,7 +2839,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
@@ -2924,7 +2916,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -2983,7 +2974,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -3042,7 +3032,6 @@ mod tests {
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;
@@ -3273,7 +3262,6 @@ mod tests {
             3_u32.into(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel_1).await?;
@@ -3297,7 +3285,6 @@ mod tests {
             3_u32.into(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
-            false,
         );
 
         db.upsert_channel(None, channel_2).await?;

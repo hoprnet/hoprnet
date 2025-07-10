@@ -71,6 +71,15 @@ pub trait HoprDbChannelOperations {
     /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>>;
 
+    /// Retrieves corrupted channel by its channel ID hash.
+    ///
+    /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
+    async fn get_corrupted_channel_by_id<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        id: &Hash,
+    ) -> Result<Option<CorruptedChannelEntry>>;
+
     /// Start changes to channel entry.
     /// If the channel with the given ID exists, the [ChannelEditor] is returned.
     /// Use [`HoprDbChannelOperations::finish_channel_update`] to commit edits to the DB when done.
@@ -111,7 +120,7 @@ pub trait HoprDbChannelOperations {
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
     /// Retrieves all corrupted channels from the DB.
-    async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
+    async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<CorruptedChannelEntry>>;
 
     /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>>;
@@ -131,6 +140,34 @@ impl HoprDbChannelOperations for HoprDb {
                     Ok::<_, DbSqlError>(
                         if let Some(model) = Channel::find()
                             .filter(channel::Column::ChannelId.eq(id_hex))
+                            .filter(channel::Column::Corrupted.eq(false))
+                            .one(tx.as_ref())
+                            .await?
+                        {
+                            Some(model.try_into()?)
+                        } else {
+                            None
+                        },
+                    )
+                })
+            })
+            .await
+    }
+
+    async fn get_corrupted_channel_by_id<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        id: &Hash,
+    ) -> Result<Option<CorruptedChannelEntry>> {
+        let id_hex = id.to_hex();
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Ok::<_, DbSqlError>(
+                        if let Some(model) = Channel::find()
+                            .filter(channel::Column::ChannelId.eq(id_hex))
+                            .filter(channel::Column::Corrupted.eq(true))
                             .one(tx.as_ref())
                             .await?
                         {
@@ -222,6 +259,7 @@ impl HoprDbChannelOperations for HoprDb {
                             if let Some(model) = Channel::find()
                                 .filter(channel::Column::Source.eq(src_hex))
                                 .filter(channel::Column::Destination.eq(dst_hex))
+                                .filter(channel::Column::Corrupted.eq(false))
                                 .one(tx.as_ref())
                                 .await?
                             {
@@ -262,6 +300,7 @@ impl HoprDbChannelOperations for HoprDb {
                             ChannelDirection::Incoming => channel::Column::Destination.eq(target_hex),
                             ChannelDirection::Outgoing => channel::Column::Source.eq(target_hex),
                         })
+                        .filter(channel::Column::Corrupted.eq(false))
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
@@ -288,6 +327,7 @@ impl HoprDbChannelOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     Channel::find()
+                        .filter(channel::Column::Corrupted.eq(false))
                         .stream(tx.as_ref())
                         .await?
                         .map_err(DbSqlError::from)
@@ -299,7 +339,7 @@ impl HoprDbChannelOperations for HoprDb {
             .await
     }
 
-    async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
+    async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<CorruptedChannelEntry>> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -309,7 +349,7 @@ impl HoprDbChannelOperations for HoprDb {
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
-                        .map(|x| ChannelEntry::try_from(x).map_err(DbSqlError::from))
+                        .map(|x| CorruptedChannelEntry::try_from(x).map_err(DbSqlError::from))
                         .collect::<Result<Vec<_>>>()
                 })
             })
@@ -394,7 +434,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            false,
         );
 
         db.upsert_channel(None, ce).await?;
@@ -415,7 +454,7 @@ mod tests {
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
 
-        let ce = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into(), true);
+        let ce = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into());
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
@@ -456,7 +495,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            false,
         );
 
         db.upsert_channel(None, ce).await?;
@@ -486,7 +524,6 @@ mod tests {
             1_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            false,
         );
 
         let ce_2 = ChannelEntry::new(
@@ -496,7 +533,6 @@ mod tests {
             2_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
-            false,
         );
 
         let db_clone = db.clone();

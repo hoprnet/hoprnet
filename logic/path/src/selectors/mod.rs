@@ -29,7 +29,7 @@ pub trait PathSelector {
         destination: Address,
         min_hops: usize,
         max_hops: usize,
-        blacklist: Vec<ChannelEntry>,
+        blacklist: Vec<CorruptedChannelEntry>,
     ) -> Result<ChannelPath>;
 
     /// Constructs a new valid packet `Path` from source to the given destination.
@@ -38,7 +38,7 @@ pub trait PathSelector {
         &self,
         source: Address,
         destination: Address,
-        blacklist: Vec<ChannelEntry>,
+        blacklist: Vec<CorruptedChannelEntry>,
     ) -> Result<ChannelPath> {
         self.select_path(source, destination, 1usize, INTERMEDIATE_HOPS, blacklist)
             .await

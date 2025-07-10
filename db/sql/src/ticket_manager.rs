@@ -395,7 +395,6 @@ mod tests {
             1.into(),
             ChannelStatus::Open,
             4_u32.into(),
-            false,
         );
 
         db.upsert_channel(None, channel).await?;

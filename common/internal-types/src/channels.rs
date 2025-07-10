@@ -75,7 +75,6 @@ pub struct ChannelEntry {
     pub ticket_index: U256,
     pub status: ChannelStatus,
     pub channel_epoch: U256,
-    pub corrupted: bool,
     id: ChannelId,
 }
 
@@ -90,7 +89,6 @@ impl ChannelEntry {
         ticket_index: U256,
         status: ChannelStatus,
         channel_epoch: U256,
-        corrupted: bool,
     ) -> Self {
         ChannelEntry {
             source,
@@ -99,7 +97,6 @@ impl ChannelEntry {
             ticket_index,
             status,
             channel_epoch,
-            corrupted,
             id: generate_channel_id(&source, &destination),
         }
     }
@@ -254,6 +251,19 @@ impl ChannelChange {
     }
 }
 
+// create a newtype, CorruptedChannelEntry, to represent a channel that is corrupted. It's a wrapper around channelentry
+// basically
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CorruptedChannelEntry {
+    pub channel: ChannelEntry,
+}
+
+impl CorruptedChannelEntry {
+    pub fn new(channel: ChannelEntry) -> Self {
+        CorruptedChannelEntry { channel }
+    }
+}
 #[cfg(test)]
 mod tests {
     use std::{
@@ -305,7 +315,6 @@ mod tests {
             23u64.into(),
             ChannelStatus::Open,
             3u64.into(),
-            false,
         );
 
         assert!(
