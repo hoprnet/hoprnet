@@ -2,7 +2,6 @@
 
 errors=""
 
-
 check_safe() {
   if [ -z "${HOPRD_SAFE_ADDRESS}" ]; then
     if ! grep -q "^HOPRD_SAFE_ADDRESS=" /etc/hoprd/hoprd.env; then
@@ -30,14 +29,14 @@ check_rpc_provider() {
     rpc_response=$(curl -s -X POST -H "Content-Type: application/json" \
       --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' http://localhost:8545)
 
-    if ! echo "$rpc_response" | jq -e '.result' > /dev/null; then
+    if ! echo "$rpc_response" | jq -e '.result' >/dev/null; then
       errors+="- The 'HOPRD_PROVIDER' environment variable is required. You can get it from https://docs.hoprnet.org/node/custom-rpc-provider\n"
     fi
   else
     # Validate that HOPRD_PROVIDER is a valid URL
     rpc_response=$(curl -s -X POST -H "Content-Type: application/json" \
       --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' "${HOPRD_PROVIDER}")
-    if ! echo "$rpc_response" | jq -e '.result' > /dev/null; then
+    if ! echo "$rpc_response" | jq -e '.result' >/dev/null; then
       errors+="- The 'HOPRD_PROVIDER' environment variable is not a valid RPC provider URL. Please check the URL and try again.\n"
     fi
   fi
@@ -46,7 +45,7 @@ check_rpc_provider() {
 
 check_network() {
   # Validate that HOPRD_NETWORK is either "dufour" or "rotsee"
-  if [ ! -z "${HOPRD_NETWORK}" ] && [[ "${HOPRD_NETWORK}" != "dufour" && "${HOPRD_NETWORK}" != "rotsee" ]]; then
+  if [ ! -z "${HOPRD_NETWORK}" ] && [[ ${HOPRD_NETWORK} != "dufour" && ${HOPRD_NETWORK} != "rotsee" ]]; then
     errors+="- The 'HOPRD_NETWORK' environment variable must be either 'dufour' or 'rotsee'.\n"
   fi
 }
@@ -54,7 +53,7 @@ check_network() {
 check_identity_password() {
   # If the file /etc/hoprd/hopr.id exists then HOPRD_PASSWORD is required
   if [ -f /etc/hoprd/hopr.id ] && [ -z "$HOPRD_PASSWORD" ]; then
-      errors+="- There is an existing identity file at /etc/hoprd/hopr.id from previous installation, You have to provide its password via 'HOPRD_PASSWORD' environment variable or delete the identity file.\n"
+    errors+="- There is an existing identity file at /etc/hoprd/hopr.id from previous installation, You have to provide its password via 'HOPRD_PASSWORD' environment variable or delete the identity file.\n"
   fi
 }
 

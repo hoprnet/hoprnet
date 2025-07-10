@@ -92,6 +92,8 @@ jobs:
 
       - name: Package binaries
         run: nix develop -c just package ${{ inputs.target }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Test Package debian
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'

@@ -186,11 +186,11 @@ generate_identity_file() {
   if [ ! -f "/etc/hoprd/hopr.id" ]; then
     echo "Generating HOPR node identity file at /etc/hoprd/hopr.id..."
     IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/
-    mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id 
+    mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
     chmod 640 /etc/hoprd/hopr.id
     show_node_address
   else
-    if IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity read --identity-from-path /etc/hoprd/hopr.id | grep "^Identity addresses: \[\]" 2>&1 > /dev/null; then
+    if IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity read --identity-from-path /etc/hoprd/hopr.id | grep "^Identity addresses: \[\]" 2>&1 >/dev/null; then
       echo "Could not read the identity file at /etc/hoprd/hopr.id. Please check the password set at HOPRD_PASSWORD for that identity file."
       exit 1
     else
