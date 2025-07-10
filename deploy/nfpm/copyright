@@ -5,13 +5,4 @@ Source: https://github.com/hoprnet/hoprnet
 Files: *
 Copyright: 2024 HOPR Association
 License: LGPL-3
-
-License: LGPL-3
- This package is free software; you can redistribute it and/or modify
- it under the terms of the GNU Lesser General Public License version 3
- as published by the Free Software Foundation.
- .
- On Debian systems, the complete text of the GNU Lesser General Public
- License version 3 can be found in "/usr/share/common-licenses/LGPL-3".
-
 Comment: Statically linked to libyaml to ensure compatibility across distributions.

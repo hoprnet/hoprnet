@@ -1,46 +1,57 @@
 #!/bin/bash
+set -euo pipefail
 
 errors=""
 
 check_safe() {
-  if [ -z "${HOPRD_SAFE_ADDRESS}" ]; then
-    if ! grep -q "^HOPRD_SAFE_ADDRESS=" /etc/hoprd/hoprd.env; then
-      errors+="- The 'HOPRD_SAFE_ADDRESS' environment variable is required. You can get it from https://hub.hoprnet.org\n"
-    fi
-  elif ! echo "$HOPRD_SAFE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
-    errors+="- Invalid Safe Ethereum address ('HOPRD_SAFE_ADDRESS') format. Please enter a valid address.\n"
-  fi
 
-  if [ -z "${HOPRD_MODULE_ADDRESS}" ]; then
-    if ! grep -q "^HOPRD_MODULE_ADDRESS=" /etc/hoprd/hoprd.env; then
-      errors+="- The 'HOPRD_MODULE_ADDRESS' environment variable is required. You can get it from https://hub.hoprnet.org\n"
+  if [ ! -f /etc/hoprd/hoprd.env ]; then
+    if [ -z "${HOPRD_SAFE_ADDRESS}" ]; then
+      errors+="- The 'HOPRD_SAFE_ADDRESS' environment variable is required. You can get it from https://hub.hoprnet.org\n"
+    elif ! echo "$HOPRD_SAFE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
+      errors+="- Invalid Safe Ethereum address ('HOPRD_SAFE_ADDRESS') format. Please enter a valid address.\n"
     fi
-  elif ! echo "$HOPRD_MODULE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
-    errors+="- Invalid Safe Module Ethereum address ('HOPRD_MODULE_ADDRESS') format. Please enter a valid address.\n"
+
+    if [ -z "${HOPRD_MODULE_ADDRESS}" ]; then
+      errors+="- The 'HOPRD_MODULE_ADDRESS' environment variable is required. You can get it from https://hub.hoprnet.org\n"
+    elif ! echo "$HOPRD_MODULE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
+      errors+="- Invalid Safe Module Ethereum address ('HOPRD_MODULE_ADDRESS') format. Please enter a valid address.\n"
+    fi
+  else
+    if ! grep -q "^HOPRD_SAFE_ADDRESS=" /etc/hoprd/hoprd.env 2>/dev/null; then
+      errors+="- The 'HOPRD_SAFE_ADDRESS' environment variable is required at /etc/hoprd/hoprd.env . You can get it from https://hub.hoprnet.org\n"
+    fi
+
+    if ! grep -q "^HOPRD_MODULE_ADDRESS=" /etc/hoprd/hoprd.env 2>/dev/null; then
+      errors+="- The 'HOPRD_MODULE_ADDRESS' environment variable is required at /etc/hoprd/hoprd.env. You can get it from https://hub.hoprnet.org\n"
+    fi
+  fi
+}
+
+test_rpc_provider() {
+  url=$1
+  rpc_response=$(curl -s --connect-timeout 3 --max-time 5 -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' "${url}")
+  if ! echo "$rpc_response" | jq -e '.result' >/dev/null; then
+    errors+="- The 'HOPRD_PROVIDER' environment variable is not a valid RPC provider URL. Please check the URL and try again.\n"
   fi
 }
 
 check_rpc_provider() {
 
-  if [ -f "/etc/hoprd/hoprd.env" ] && ! grep -q "^HOPRD_PROVIDER=" /etc/hoprd/hoprd.env; then
-    errors+="- The 'HOPRD_PROVIDER' environment variable is required. You can get it from https://docs.hoprnet.org/node/custom-rpc-provider\n"
-  elif [ -z "${HOPRD_PROVIDER}" ]; then
-    # Perform a POST request to check RPC provider
-    rpc_response=$(curl -s -X POST -H "Content-Type: application/json" \
-      --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' http://localhost:8545)
-
-    if ! echo "$rpc_response" | jq -e '.result' >/dev/null; then
-      errors+="- The 'HOPRD_PROVIDER' environment variable is required. You can get it from https://docs.hoprnet.org/node/custom-rpc-provider\n"
+  if [ ! -f "/etc/hoprd/hoprd.env" ]; then
+    if [ -z "${HOPRD_PROVIDER}" ]; then
+      test_rpc_provider http://localhost:8545
+    else
+      test_rpc_provider ${HOPRD_PROVIDER}
     fi
   else
-    # Validate that HOPRD_PROVIDER is a valid URL
-    rpc_response=$(curl -s -X POST -H "Content-Type: application/json" \
-      --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' "${HOPRD_PROVIDER}")
-    if ! echo "$rpc_response" | jq -e '.result' >/dev/null; then
-      errors+="- The 'HOPRD_PROVIDER' environment variable is not a valid RPC provider URL. Please check the URL and try again.\n"
+    if ! grep -q "^HOPRD_PROVIDER=" /etc/hoprd/hoprd.env 2>/dev/null; then
+      errors+="- The 'HOPRD_PROVIDER' environment variable is required at /etc/hoprd/hoprd.env. You can get it from https://docs.hoprnet.org/node/custom-rpc-provider\n"
+    else
+      test_rpc_provider $(grep "^HOPRD_PROVIDER=" /etc/hoprd/hoprd.env | cut -d'=' -f2-)
     fi
   fi
-
 }
 
 check_network() {

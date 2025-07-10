@@ -185,10 +185,19 @@ generate_identity_file() {
   # If the identity file not exists, automatically create it
   if [ ! -f "/etc/hoprd/hopr.id" ]; then
     echo "Generating HOPR node identity file at /etc/hoprd/hopr.id..."
-    IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/
-    mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
-    chmod 640 /etc/hoprd/hopr.id
-    show_node_address
+    if IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/; then
+      if [ -f /etc/hoprd/hopr0.id ]; then
+        mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
+        chmod 640 /etc/hoprd/hopr.id
+        show_node_address
+      else
+        echo "Error: Identity file was not created at expected location /etc/hoprd/hopr0.id"
+        exit 1
+      fi
+    else
+      echo "Error: Failed to create the identity file. Please check the HOPR_PASSWORD environment variable."
+      exit 1
+    fi
   else
     if IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity read --identity-from-path /etc/hoprd/hopr.id | grep "^Identity addresses: \[\]" 2>&1 >/dev/null; then
       echo "Could not read the identity file at /etc/hoprd/hopr.id. Please check the password set at HOPRD_PASSWORD for that identity file."
@@ -256,8 +265,8 @@ show_node_address() {
 
 # Main script execution starts here
 echo "Starting HOPR node installation..."
-generate_identity_file
 generate_env_file
+generate_identity_file
 generate_config_file
 create_user_group
 start_service

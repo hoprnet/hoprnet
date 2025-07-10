@@ -19,6 +19,7 @@ depends:
   - systemd
   - curl
   - logrotate
+  - jq
 
 contents:
   # Binaries
@@ -73,4 +74,4 @@ scripts:
   preinstall: ./deploy/nfpm/package-pre-install.sh
   postinstall: ./deploy/nfpm/package-post-install.sh
   preremove: ./deploy/nfpm/package-pre-uninstall.sh
-  postremove: ./deploy/nfpm/package-pre-uninstall.sh
+  postremove: ./deploy/nfpm/package-post-uninstall.sh
