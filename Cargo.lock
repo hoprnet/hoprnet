@@ -4793,7 +4793,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-entity"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4866,7 +4866,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5007,7 +5007,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-path"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -5100,7 +5100,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "async-lock 3.4.0",
  "async-trait",

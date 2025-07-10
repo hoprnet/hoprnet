@@ -191,7 +191,7 @@ mod tests {
         let max_closure_overdue = Duration::from_secs(600);
 
         // Should leave this channel opened
-        let c_open = ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into(), false);
+        let c_open = ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into());
 
         // Should leave this unfinalized, because the channel closure period has not yet elapsed
         let c_pending = ChannelEntry::new(
@@ -201,7 +201,6 @@ mod tests {
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
             0.into(),
-            false,
         );
 
         // Should finalize closure of this channel
@@ -212,7 +211,6 @@ mod tests {
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
             0.into(),
-            false,
         );
 
         // Should leave this unfinalized, because the channel closure is long overdue
@@ -223,7 +221,6 @@ mod tests {
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
             0.into(),
-            false,
         );
 
         let db_clone = db.clone();

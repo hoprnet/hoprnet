@@ -422,7 +422,6 @@ mod tests {
             0_u32.into(),
             ChannelStatus::Open,
             1u32.into(),
-            false,
         );
 
         Ok((acked_tickets, channel))

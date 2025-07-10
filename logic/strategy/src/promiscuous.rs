@@ -709,7 +709,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             U256::zero(),
-            false,
         );
         db.upsert_channel(None, channel).await?;
 
@@ -784,7 +783,6 @@ mod tests {
                 U256::zero(),
                 ChannelStatus::Open,
                 U256::zero(),
-                false,
             ))),
             action: Action::OpenChannel(address, balance),
         }

@@ -62,7 +62,6 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
         U256::zero(),
         ChannelStatus::Open,
         U256::zero(),
-        false,
     )
 }
 
@@ -324,7 +323,6 @@ pub async fn resolve_mock_path(
             0u32.into(),
             ChannelStatus::Open,
             0u32.into(),
-            false,
         );
         cg.update_channel(c);
         last_addr = *addr;

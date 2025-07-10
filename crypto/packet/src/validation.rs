@@ -128,7 +128,6 @@ mod tests {
             U256::zero(),
             ChannelStatus::Open,
             U256::one(),
-            false,
         )
     }
 
