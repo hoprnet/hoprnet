@@ -92,9 +92,7 @@ impl TryFrom<&channel::Model> for CorruptedChannelEntry {
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
         let channel = ChannelEntry::try_from(value)?;
 
-        Ok(CorruptedChannelEntry {
-            channel,
-        })
+        Ok(CorruptedChannelEntry { channel })
     }
 }
 
