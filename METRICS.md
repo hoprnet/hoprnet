@@ -6,7 +6,7 @@ the `api/v4/node/metrics` API endpoint.
 
 ## Example Prometheus configuration
 
-An example scrape config for Prometheus to collect HOPRd metrics:
+An example scrape config for Prometheus to collect HOPRd metrics in Prometheus:
 
 ```yaml
 scrape_configs:
