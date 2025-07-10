@@ -389,6 +389,8 @@ where
                     // Check that we're not receiving the Open event without the channel being Close prior
 
                     if channel_edits.entry().status != ChannelStatus::Closed {
+                        warn!(%source, %destination, %channel_id, "received Open event for a channel that is not Closed, marking it as corrupted");
+
                         let res = self
                             .db
                             .finish_channel_update(tx.into(), channel_edits.set_corrupted())
