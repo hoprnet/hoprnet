@@ -38,7 +38,6 @@ while IFS= read -r line; do
   # Extract the zip file
   # Check if artifact_name is a package (has an extension like .deb, .rpm, .pkg.tar.zst)
   if [[ $artifact_name == *.deb || $artifact_name == *.rpm || $artifact_name == *.pkg.tar.zst ]]; then
-    # Extract to ./dist/packages/${artifact_name}
     unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/packages"
   else
     unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/bin"
