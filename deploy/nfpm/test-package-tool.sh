@@ -15,7 +15,7 @@ get_vm_image() {
     if [ "${ARCHITECTURE}" == "aarch64-linux" ]; then
       echo "projects/debian-cloud/global/images/family/debian-12-arm64"
       return
-    else 
+    else
       echo "projects/debian-cloud/global/images/family/debian-12"
       return
     fi

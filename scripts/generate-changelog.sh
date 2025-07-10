@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 
 current_version=${1}
-milestone_number=$(gh api repos/:owner/:repo/milestones | jq -r --arg version "${current_version}"  ' to_entries[] | select(.value.title | test($version)).value.number')
+milestone_number=$(gh api repos/:owner/:repo/milestones | jq -r --arg version "${current_version}" ' to_entries[] | select(.value.title | test($version)).value.number')
 changelog_format=${2:-github}
 include_open=${3:-false}
 
@@ -30,7 +30,7 @@ process_entries() {
     state=$(echo "${item_decoded}" | jq -r '.state' | tr '[:upper:]' '[:lower:]')
     author=$(echo "${item_decoded}" | jq -r '.author.login')
     date=$(echo "${item_decoded}" | jq -r '.closedAt // empty' | awk -F 'T' '{print $1}')
-    if [[ -z "${date}" ]]; then
+    if [[ -z ${date} ]]; then
       date=$(date '+%Y-%m-%d') # Fallback to current date
     fi
     if [[ $state == "open" ]] && [[ $include_open == false ]]; then
@@ -59,19 +59,18 @@ github_format_changelog() {
   section_other="\n### 🌟 Other\n\n"
   local change_log_content="What's changed\n"
 
-
   for entry in "${changelog_entries[@]}"; do
     id=$(echo "$entry" | jq -r '.id')
     title=$(echo "$entry" | jq -r '.title')
     author=$(echo "$entry" | jq -r '.author')
     case ${title} in
-    "feat("*|"chore("*)
+    "feat("* | "chore("*)
       section_feature+="* ${title} by @${author} in #${id}\n"
       ;;
     "fix"*)
       section_fix+="- ${title} by @${author} in #${id}\n"
       ;;
-    "refactor("*|"style("*)
+    "refactor("* | "style("*)
       section_refactor+="* ${title} by @${author} in #${id}\n"
       ;;
     "docs("*)
@@ -188,7 +187,7 @@ rpm_format_changelog() {
     changelog_type=$(echo "$entry" | jq -r '.changelog_type')
     component=$(echo "$entry" | jq -r '.component')
 
-    if [[ "$date" != "$current_date" || "$author" != "$current_author" ]]; then
+    if [[ $date != "$current_date" || $author != "$current_author" ]]; then
       current_date="$date"
       current_author="$author"
       rpm_changelog+="* ${date} ${author} - ${current_version}\n"
@@ -201,7 +200,7 @@ rpm_format_changelog() {
     # clean_title=${clean_title:-"Untitled"}
 
     rpm_changelog+="- [${changelog_type}][${component}] ${clean_title} in #${id}\n"
-  done <<< "$(echo "${sorted_entries}" | jq -c '.[]')"
+  done <<<"$(echo "${sorted_entries}" | jq -c '.[]')"
 
   # Print the changelog
   echo -e "${rpm_changelog}"
@@ -220,26 +219,26 @@ process_entries "$prs"
 
 # Print the changelog in the requested format
 case $changelog_format in
-  github)
-    github_format_changelog
-    ;;
-  json)
-    json_format_changelog
-    ;;
-  deb|archlinux) # archlinux does not have a specific format, we will use the debian format
-    debian_format_changelog
-    ;;
-  rpm)
-    rpm_format_changelog
-    ;;
-  all)
-    json_format_changelog
-    github_format_changelog
-    debian_format_changelog
-    rpm_format_changelog
-    ;;
-  *)
-    echo "Unsupported format: ${changelog_format}" >>/dev/stderr
-    exit 1
-    ;;
+github)
+  github_format_changelog
+  ;;
+json)
+  json_format_changelog
+  ;;
+deb | archlinux) # archlinux does not have a specific format, we will use the debian format
+  debian_format_changelog
+  ;;
+rpm)
+  rpm_format_changelog
+  ;;
+all)
+  json_format_changelog
+  github_format_changelog
+  debian_format_changelog
+  rpm_format_changelog
+  ;;
+*)
+  echo "Unsupported format: ${changelog_format}" >>/dev/stderr
+  exit 1
+  ;;
 esac

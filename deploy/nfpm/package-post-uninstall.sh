@@ -1,7 +1,6 @@
 #!/bin/bash
 set -Eeo pipefail
 
-
 delete_user_group() {
   if id -u hoprd >/dev/null 2>&1; then
     echo "Deleting user and group for HOPR node..."
