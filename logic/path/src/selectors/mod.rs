@@ -29,11 +29,18 @@ pub trait PathSelector {
         destination: Address,
         min_hops: usize,
         max_hops: usize,
+        blacklist: Vec<ChannelEntry>,
     ) -> Result<ChannelPath>;
 
     /// Constructs a new valid packet `Path` from source to the given destination.
     /// This method uses `INTERMEDIATE_HOPS` as the maximum number of hops.
-    async fn select_auto_path(&self, source: Address, destination: Address) -> Result<ChannelPath> {
-        self.select_path(source, destination, 1usize, INTERMEDIATE_HOPS).await
+    async fn select_auto_path(
+        &self,
+        source: Address,
+        destination: Address,
+        blacklist: Vec<ChannelEntry>,
+    ) -> Result<ChannelPath> {
+        self.select_path(source, destination, 1usize, INTERMEDIATE_HOPS, blacklist)
+            .await
     }
 }

@@ -241,6 +241,7 @@ where
         destination: Address,
         min_hops: usize,
         max_hops: usize,
+        blacklist: Vec<ChannelEntry>,
     ) -> Result<ChannelPath> {
         // The protocol does not support >3 hop paths and will presumably never do,
         // so we can exclude it here.
@@ -253,7 +254,9 @@ where
         // Populate the queue with possible initial path offsprings
         let mut queue = graph
             .open_channels_from(source)
-            .filter(|(node, edge)| self.is_next_hop_usable(node, edge, &source, &destination, &[]))
+            .filter(|(node, edge)| {
+                self.is_next_hop_usable(node, edge, &source, &destination, &[]) && !blacklist.contains(&edge.channel)
+            })
             .map(|(_, edge)| WeightedChannelPath::default().extend::<CW>(edge))
             .collect::<BinaryHeap<_>>();
 
@@ -291,6 +294,7 @@ where
                 .open_channels_from(last_peer)
                 .filter(|(next_hop, edge)| {
                     self.is_next_hop_usable(next_hop, edge, &source, &destination, &current.path)
+                        && !blacklist.contains(&edge.channel)
                 })
                 .peekable();
 
@@ -477,7 +481,7 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 2)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 2, vec![])
             .await
             .expect_err("should not find a path");
     }
@@ -494,7 +498,7 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1, vec![])
             .await
             .expect_err("should not find a path");
     }
@@ -511,7 +515,7 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1, vec![])
             .await
             .expect_err("should not find a path");
     }
@@ -523,7 +527,7 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1, vec![])
             .await
             .expect_err("should not find a path");
     }
@@ -540,7 +544,53 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1, vec![])
+            .await
+            .expect_err("should not find a path");
+    }
+
+    #[tokio::test]
+    async fn test_should_not_find_path_with_own_blacklisted_channels() {
+        let graph = Arc::new(RwLock::new(define_graph(
+            "0 [1] -> 1, 1 [2] -> 2",
+            ADDRESSES[0],
+            |_| 1_f64,
+            |_, _| 0.0,
+        )));
+
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
+        let blacklist = vec![create_channel(
+            ADDRESSES[0],
+            ADDRESSES[1],
+            ChannelStatus::Open,
+            1.into(),
+        )];
+
+        selector
+            .select_path(ADDRESSES[0], ADDRESSES[2], 1, 1, blacklist)
+            .await
+            .expect_err("should not find a path");
+    }
+
+    #[tokio::test]
+    async fn test_should_not_find_path_with_second_layer_blacklisted_channels() {
+        let graph = Arc::new(RwLock::new(define_graph(
+            "0 [1] -> 1, 1 [1] -> 2",
+            ADDRESSES[0],
+            |_| 1_f64,
+            |_, _| 0.0,
+        )));
+
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
+        let blacklist = vec![create_channel(
+            ADDRESSES[1],
+            ADDRESSES[2],
+            ChannelStatus::Open,
+            1.into(),
+        )];
+
+        selector
+            .select_path(ADDRESSES[0], ADDRESSES[3], 2, 2, blacklist)
             .await
             .expect_err("should not find a path");
     }
@@ -557,7 +607,7 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(ADDRESSES[0], ADDRESSES[5], 2, 2)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 2, 2, vec![])
             .await
             .expect_err("should not find a path");
     }
@@ -574,7 +624,7 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(ADDRESSES[0], ADDRESSES[1], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[1], 1, 1, vec![])
             .await
             .expect_err("should not find a path");
     }
@@ -589,7 +639,7 @@ mod tests {
         )));
 
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
-        let path = selector.select_path(ADDRESSES[1], ADDRESSES[5], 1, 2).await?;
+        let path = selector.select_path(ADDRESSES[1], ADDRESSES[5], 1, 2, vec![]).await?;
 
         check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
         assert_eq!(2, path.num_hops(), "should have 2 hops");
@@ -607,7 +657,7 @@ mod tests {
         )));
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
-        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
+        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3, vec![]).await?;
         check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
         assert_eq!(3, path.num_hops(), "should have 3 hops");
 
@@ -624,7 +674,7 @@ mod tests {
         )));
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
-        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
+        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3, vec![]).await?;
         check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
         assert_eq!(3, path.num_hops(), "should have 3 hops");
 
@@ -641,7 +691,7 @@ mod tests {
         )));
         let selector = DfsPathSelector::<RandomizedEdgeWeighting>::new(graph.clone(), Default::default());
 
-        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
+        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3, vec![]).await?;
         check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
         assert_eq!(3, path.num_hops(), "should have 3 hops");
 
