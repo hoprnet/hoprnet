@@ -109,17 +109,8 @@ impl TryFrom<channel::Model> for CorruptedChannelEntry {
 
 impl From<CorruptedChannelEntry> for channel::ActiveModel {
     fn from(value: CorruptedChannelEntry) -> Self {
-        let mut ret = channel::ActiveModel {
-            channel_id: Set(value.channel.get_id().to_hex()),
-            source: Set(value.channel.source.to_hex()),
-            destination: Set(value.channel.destination.to_hex()),
-            balance: Set(value.channel.balance.amount().to_be_bytes().into()),
-            epoch: Set(value.channel.channel_epoch.to_be_bytes().into()),
-            ticket_index: Set(value.channel.ticket_index.to_be_bytes().into()),
-            corrupted: Set(true),
-            ..Default::default()
-        };
-        ret.set_status(value.channel.status);
+        let mut ret = channel::ActiveModel::from(value.channel);
+        ret.corrupted = Set(true);
         ret
     }
 }
