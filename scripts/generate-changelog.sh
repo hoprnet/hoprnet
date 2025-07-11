@@ -169,6 +169,9 @@ debian_format_changelog() {
     else
       # Calculate the maximum length for the title to fit within 80 characters
       max_title_length=$((80 - 2 - ${#entry_line} + ${#title}))
+      if (( max_title_length < 1 )); then
+          max_title_length=1
+      fi
       truncated_title=$(echo "${title}" | cut -c 1-${max_title_length})
       debian_changelog+="  * ${truncated_title}... by @${author} in #${id}\n"
     fi
