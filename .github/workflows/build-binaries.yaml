@@ -139,9 +139,10 @@ jobs:
         run: |
           nix develop .#citest -c bash -c '
           set -x
-          mv "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}" "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
+          tempdir=$(mktemp -d)
+          cp "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}" "${tempdir}/${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
           artifact_name="${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
-          artifact_path="${{ github.workspace }}/result/bin/${artifact_name}"
+          artifact_path="${tempdir}/${artifact_name}"
           echo "artifact_name=${artifact_name}" | tee -a $GITHUB_OUTPUT
           echo "artifact_path=${artifact_path}" | tee -a $GITHUB_OUTPUT
 
