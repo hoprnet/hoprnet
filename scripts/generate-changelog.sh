@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 
 current_version=${1}
-milestone_number=$(gh api repos/:owner/:repo/milestones | jq -r --arg version "${current_version}" ' to_entries[] | select(.value.title | test($version)).value.number')
+milestone_number=$(gh api repos/:owner/:repo/milestones | jq -r --arg version "${current_version}" ' to_entries[] | select(.value.title == $version).value.number')
 if [ -z "${milestone_number}" ]; then
   echo "[ERROR] No milestone found for version ${current_version}" >&2
   exit 1
@@ -178,7 +178,7 @@ rpm_format_changelog() {
   local rpm_changelog=""
 
   # Sort entries by date and then by author
-  sorted_entries=$(printf '%s\n' "${changelog_entries[@]}" | jq -s 'sort_by(.date, .author)')
+  sorted_entries=$(printf '%s\n' "${changelog_entries[@]}" | jq -s 'sort_by([.date, .author])')
 
   # Group entries by date and author, and build the changelog
   local current_date=""
