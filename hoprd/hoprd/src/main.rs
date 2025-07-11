@@ -218,7 +218,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
 
-        processes.push(HoprdProcesses::RestApi(hopr_async_runtime::spawn_as_abortable(
+        processes.push(HoprdProcesses::RestApi(hopr_async_runtime::spawn_as_abortable!(
             async move {
                 if let Err(e) = serve_api(RestApiParameters {
                     listener: api_listener,
@@ -232,7 +232,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     error!(error = %e, "the REST API server could not start")
                 }
-            },
+            }
         )));
     }
 

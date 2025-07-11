@@ -48,7 +48,7 @@ pub trait HoprDbProtocolOperations {
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-    ) -> Result<Option<IncomingPacket>>;
+    ) -> Result<IncomingPacket>;
 }
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
@@ -69,6 +69,12 @@ pub enum IncomingPacket {
         data: Box<[u8]>,
         ack: Acknowledgement,
     },
+    /// The packet contains an acknowledgement of a delivered packet.
+    Acknowledgement {
+        packet_tag: PacketTag,
+        previous_hop: OffchainPublicKey,
+        ack: Acknowledgement,
+    },
 }
 
 /// Packet that is being sent out by us
@@ -76,6 +82,15 @@ pub struct OutgoingPacket {
     pub next_hop: OffchainPublicKey,
     pub ack_challenge: HalfKeyChallenge,
     pub data: Box<[u8]>,
+}
+
+impl std::fmt::Debug for OutgoingPacket {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OutgoingPacket")
+            .field("next_hop", &self.next_hop)
+            .field("ack_challenge", &self.ack_challenge)
+            .finish_non_exhaustive()
+    }
 }
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects

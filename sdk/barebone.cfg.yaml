@@ -2,7 +2,7 @@
 hopr:
   # run heartbeats more frequently
   probe:
-    timeout: 1
+    timeout: 2
     max_parallel_probes: 10
     recheck_threshold: 1
   network_options:

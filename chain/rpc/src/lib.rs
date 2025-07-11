@@ -35,6 +35,7 @@ pub mod indexer;
 pub mod rpc;
 pub mod transport;
 
+#[cfg(feature = "runtime-tokio")]
 pub use crate::transport::ReqwestClient;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.

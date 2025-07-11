@@ -35,6 +35,7 @@ prometheus = [
   "hopr-network-types/prometheus",
   "hopr-strategy/prometheus",
 ]
+capture = ["hopr-transport/capture"]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [

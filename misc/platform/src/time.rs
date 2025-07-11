@@ -3,3 +3,5 @@ pub mod native {
         std::time::SystemTime::now()
     }
 }
+
+pub use native::current_time;

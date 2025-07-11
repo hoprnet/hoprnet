@@ -23,7 +23,7 @@ pub struct ProbeConfig {
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_probing_interval")]
     #[default(default_probing_interval())]
-    pub(crate) interval: std::time::Duration,
+    pub interval: std::time::Duration,
 
     /// The time threshold after which it is reasonable to recheck the nearest neighbor
     #[serde_as(as = "DurationSeconds<u64>")]
@@ -33,7 +33,7 @@ pub struct ProbeConfig {
 }
 
 /// The maximum time waiting for a reply from the probe
-const DEFAULT_MAX_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+const DEFAULT_MAX_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// The maximum number of parallel probes the heartbeat performs
 const DEFAULT_MAX_PARALLEL_PROBES: usize = 50;
