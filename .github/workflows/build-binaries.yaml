@@ -180,12 +180,3 @@ jobs:
         with:
           name: ${{ steps.signature.outputs.artifact_name }}.sha256.asc
           path: ${{ steps.signature.outputs.artifact_path }}.sha256.asc
-
-      - name: Update Homebrew formula
-        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
-        if: steps.vars.outputs.target == 'aarch64-darwin' && steps.vars.outputs.binary == 'hoprd'
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: hoprnet/homebrew-hoprd
-          event-type: create_release
-          client-payload: '{"version": "3.0.0"}'
