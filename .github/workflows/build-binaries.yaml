@@ -138,6 +138,7 @@ jobs:
         id: signature
         run: |
           nix develop .#ci -c bash -c '
+          set -euo pipefail
           tempdir=$(mktemp -d)
           cp "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}" "${tempdir}/${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
           artifact_name="${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
