@@ -49,7 +49,15 @@ process_entries() {
     changelog_type=${changelog_type:-"unknown"}
     component=${component:-"general"}
     #echo "[DEBUG] Processing entry: id=${id}, title=${title}, author=${author}, labels=${labels}, state=${state}, date=${date}, changelog_type=${changelog_type}, component=${component}" >>/dev/stderr
-    changelog_entries+=("{\"id\": \"${id}\", \"title\": \"${title}\", \"author\": \"${author}\", \"labels\": \"${labels}\", \"state\": \"${state}\", \"date\": \"${date}\", \"changelog_type\": \"${changelog_type}\", \"component\": \"${component}\"}")
+    changelog_entries+=("$(jq -nc --arg id "$id" \
+      --arg title "$title" \
+      --arg author "$author" \
+      --arg labels "$labels" \
+      --arg state "$state" \
+      --arg date "$date" \
+      --arg ctype "$changelog_type" \
+      --arg comp "$component" \
+      '{id:$id,title:$title,author:$author,labels:$labels,state:$state,date:$date,changelog_type:$ctype,component:$comp}')")
   done
 }
 
