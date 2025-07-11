@@ -109,15 +109,6 @@ jobs:
           echo "runner_needs_nix_setup=${runner_needs_nix_setup}" | tee -a $GITHUB_OUTPUT
           echo "runner=${{ inputs.runner || github.event.inputs.runner }}"
 
-      - name: Update Homebrew formula
-        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
-        if: steps.vars.outputs.binary == 'hopli' && steps.vars.outputs.target == 'x86_64-linux'
-        with:
-          token: ${{ secrets.GH_RUNNER_TOKEN }}
-          repository: hoprnet/homebrew-hoprd
-          event-type: create_release
-          client-payload: '{"version": "3.0.0"}'
-
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -147,7 +138,7 @@ jobs:
         id: signature
         run: |
           nix develop .#ci -c bash -c '
-          set -x
+          set -euo pipefail
           tempdir=$(mktemp -d)
           cp "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}" "${tempdir}/${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
           artifact_name="${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"

@@ -169,6 +169,9 @@ debian_format_changelog() {
     else
       # Calculate the maximum length for the title to fit within 80 characters
       max_title_length=$((80 - 2 - ${#entry_line} + ${#title}))
+      if (( max_title_length < 1 )); then
+          max_title_length=1
+      fi
       truncated_title=$(echo "${title}" | cut -c 1-${max_title_length})
       debian_changelog+="  * ${truncated_title}... by @${author} in #${id}\n"
     fi
@@ -186,7 +189,7 @@ rpm_format_changelog() {
   local rpm_changelog=""
 
   # Sort entries by date and then by author
-  sorted_entries=$(printf '%s\n' "${changelog_entries[@]}" | jq -s 'sort_by([.date, .author])')
+  sorted_entries=$(printf '%s\n' "${changelog_entries[@]}" | jq -s 'sort_by([.date, .author]) | reverse')
 
   # Group entries by date and author, and build the changelog
   local current_date=""
