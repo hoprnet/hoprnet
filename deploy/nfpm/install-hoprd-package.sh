@@ -14,7 +14,7 @@ export HOPRD_PROVIDER="$5"
 case "$DISTRIBUTION" in
 deb)
   apt-get update
-  apt install -y "/tmp/hoprd.${DISTRIBUTION}"
+  sudo -E apt install -y "/tmp/hoprd.${DISTRIBUTION}"
   ;;
 rpm)
   sudo -E dnf install -y "/tmp/hoprd.${DISTRIBUTION}"
