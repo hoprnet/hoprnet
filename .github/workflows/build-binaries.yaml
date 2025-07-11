@@ -144,10 +144,10 @@ jobs:
           artifact_path="${{ github.workspace }}/result/bin/${artifact_name}"
           echo "artifact_name=${artifact_name}" | tee -a $GITHUB_OUTPUT
           echo "artifact_path=${artifact_path}" | tee -a $GITHUB_OUTPUT
-          
+
           # Import the GPG private key
           echo "${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}" | gpg --batch --import
-          
+
           # Generate the SHA256 hash for the artifact
           shasum -a 256 "${artifact_path}" > "${artifact_path}.sha256"
 
@@ -167,7 +167,7 @@ jobs:
         with:
           name: ${{ steps.signature.outputs.artifact_name }}.sig
           path: ${{ steps.signature.outputs.artifact_path }}.sig
- 
+
       - name: Publish Github Workflow artifact hash
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

@@ -56,7 +56,7 @@ check_rpc_provider() {
 
 check_network() {
   # Validate that HOPRD_NETWORK is either "dufour" or "rotsee"
-  if [ -n "${HOPRD_NETWORK:-}" ] && [[ "${HOPRD_NETWORK:-}" != "dufour" && "${HOPRD_NETWORK:-}" != "rotsee" ]]; then
+  if [ -n "${HOPRD_NETWORK:-}" ] && [[ ${HOPRD_NETWORK:-} != "dufour" && ${HOPRD_NETWORK:-} != "rotsee" ]]; then
     errors+="- The 'HOPRD_NETWORK' environment variable must be either 'dufour' or 'rotsee'.\n"
   fi
 }
