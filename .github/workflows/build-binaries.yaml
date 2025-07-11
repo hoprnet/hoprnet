@@ -146,7 +146,8 @@ jobs:
           echo "artifact_name=${artifact_name}" | tee -a $GITHUB_OUTPUT
           echo "artifact_path=${artifact_path}" | tee -a $GITHUB_OUTPUT
 
-          # Import the GPG private key
+          # Import the GPG private key into an ephemeral keyring to avoid being used by other workflows
+          export GNUPGHOME="$(mktemp -d)" 
           echo "${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}" | gpg --batch --import
 
           # Generate the SHA256 hash for the artifact
@@ -154,7 +155,8 @@ jobs:
 
           # Sign binary and hash
           gpg --armor --output "${artifact_path}.sig" --detach-sign "${artifact_path}"
-          gpg --armor --output "${artifact_path}.sha256.asc" --sign ${artifact_path}.sha256
+          gpg --armor --output "${artifact_path}.sha256.asc" --sign "${artifact_path}.sha256"
+          rm -rf "${GNUPGHOME}"
           '
 
       - name: Publish Github Workflow artifact

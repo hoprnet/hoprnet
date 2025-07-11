@@ -89,11 +89,21 @@ jobs:
         target:
           - x86_64-linux
           - aarch64-linux
+        packager:
+          - package: deb
+            extension: deb
+          - package: rpm
+            extension: rpm
+          - package: archlinux
+            extension: pkg.tar.zst
+
 
     uses: ./.github/workflows/package.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
       target: ${{ matrix.target }}
+      packager: ${{ matrix.packager.package }}
+      extension: ${{ matrix.packager.extension }}
       workflow_run_id: ${{ github.run_id }}
     secrets: inherit
 
