@@ -17,6 +17,7 @@ let
     zizmor
     nfpm
     envsubst
+    gnupg
 
     # testing utilities
     cargo-audit

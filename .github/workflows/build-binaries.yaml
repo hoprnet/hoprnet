@@ -134,11 +134,57 @@ jobs:
       - name: Build ${{ steps.vars.outputs.binary }} binaries
         run: nix build -L .#${{ steps.vars.outputs.binary }}${{ steps.vars.outputs.package_suffix }}
 
-      - name: Publish ${{ steps.vars.outputs.binary }} Artifact
-        uses: hoprnet/hopr-workflows/actions/publish-artifact@ausias/publish-gcp-artifact # master
-        with:
-          destination: 'github-workflow'
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          artifact-path: ${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}
-          artifact-name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
+      - name: Create ${{ steps.vars.outputs.binary }} Signature
+        id: signature
+        run: |
+          nix develop .#citest -c bash -c '
+          set -x
+          mv "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}" "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
+          artifact_name="${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
+          artifact_path="${{ github.workspace }}/result/bin/${artifact_name}"
+          echo "artifact_name=${artifact_name}" | tee -a $GITHUB_OUTPUT
+          echo "artifact_path=${artifact_path}" | tee -a $GITHUB_OUTPUT
+          
+          # Import the GPG private key
+          echo "${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}" | gpg --batch --import
+          
+          # Generate the SHA256 hash for the artifact
+          shasum -a 256 "${artifact_path}" > "${artifact_path}.sha256"
 
+          # Sign binary and hash
+          gpg --armor --output "${artifact_path}.sig" --detach-sign "${artifact_path}"
+          gpg --armor --output "${artifact_path}.sha256.asc" --sign ${artifact_path}.sha256
+          '
+
+      - name: Publish Github Workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.signature.outputs.artifact_name }}
+          path: ${{ steps.signature.outputs.artifact_path }}
+
+      - name: Publish Github Workflow artifact signature
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.signature.outputs.artifact_name }}.sig
+          path: ${{ steps.signature.outputs.artifact_path }}.sig
+ 
+      - name: Publish Github Workflow artifact hash
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.signature.outputs.artifact_name }}.sha256
+          path: ${{ steps.signature.outputs.artifact_path }}.sha256
+
+      - name: Publish Github Workflow artifact hash signature
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.signature.outputs.artifact_name }}.sha256.asc
+          path: ${{ steps.signature.outputs.artifact_path }}.sha256.asc
+
+      - name: Update Homebrew formula
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        if: steps.vars.outputs.target == 'aarch64-darwin' && steps.vars.outputs.binary == 'hoprd'
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: hoprnet/homebrew-hoprd
+          event-type: create_release
+          client-payload: '{"version": "3.0.0"}'
