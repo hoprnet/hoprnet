@@ -6,13 +6,13 @@ errors=""
 check_safe() {
 
   if [ ! -f /etc/hoprd/hoprd.env ]; then
-    if [ -z "${HOPRD_SAFE_ADDRESS}" ]; then
+    if [ -z "${HOPRD_SAFE_ADDRESS:-}" ]; then
       errors+="- The 'HOPRD_SAFE_ADDRESS' environment variable is required. You can get it from https://hub.hoprnet.org\n"
     elif ! echo "$HOPRD_SAFE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
       errors+="- Invalid Safe Ethereum address ('HOPRD_SAFE_ADDRESS') format. Please enter a valid address.\n"
     fi
 
-    if [ -z "${HOPRD_MODULE_ADDRESS}" ]; then
+    if [ -z "${HOPRD_MODULE_ADDRESS:-}" ]; then
       errors+="- The 'HOPRD_MODULE_ADDRESS' environment variable is required. You can get it from https://hub.hoprnet.org\n"
     elif ! echo "$HOPRD_MODULE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
       errors+="- Invalid Safe Module Ethereum address ('HOPRD_MODULE_ADDRESS') format. Please enter a valid address.\n"
@@ -40,30 +40,30 @@ test_rpc_provider() {
 check_rpc_provider() {
 
   if [ ! -f "/etc/hoprd/hoprd.env" ]; then
-    if [ -z "${HOPRD_PROVIDER}" ]; then
-      test_rpc_provider http://localhost:8545
+    if [ -z "${HOPRD_PROVIDER:-}" ]; then
+      test_rpc_provider "http://localhost:8545"
     else
-      test_rpc_provider ${HOPRD_PROVIDER}
+      test_rpc_provider "${HOPRD_PROVIDER}"
     fi
   else
     if ! grep -q "^HOPRD_PROVIDER=" /etc/hoprd/hoprd.env 2>/dev/null; then
       errors+="- The 'HOPRD_PROVIDER' environment variable is required at /etc/hoprd/hoprd.env. You can get it from https://docs.hoprnet.org/node/custom-rpc-provider\n"
     else
-      test_rpc_provider $(grep "^HOPRD_PROVIDER=" /etc/hoprd/hoprd.env | cut -d'=' -f2-)
+      test_rpc_provider "$(grep "^HOPRD_PROVIDER=" /etc/hoprd/hoprd.env | cut -d'=' -f2-)"
     fi
   fi
 }
 
 check_network() {
   # Validate that HOPRD_NETWORK is either "dufour" or "rotsee"
-  if [ ! -z "${HOPRD_NETWORK}" ] && [[ ${HOPRD_NETWORK} != "dufour" && ${HOPRD_NETWORK} != "rotsee" ]]; then
+  if [ -n "${HOPRD_NETWORK:-}" ] && [[ ${HOPRD_NETWORK:-} != "dufour" && ${HOPRD_NETWORK:-} != "rotsee" ]]; then
     errors+="- The 'HOPRD_NETWORK' environment variable must be either 'dufour' or 'rotsee'.\n"
   fi
 }
 
 check_identity_password() {
   # If the file /etc/hoprd/hopr.id exists then HOPRD_PASSWORD is required
-  if [ -f /etc/hoprd/hopr.id ] && [ -z "$HOPRD_PASSWORD" ]; then
+  if [ -f /etc/hoprd/hopr.id ] && [ -z "{$HOPRD_PASSWORD:-}" ]; then
     errors+="- There is an existing identity file at /etc/hoprd/hopr.id from previous installation, You have to provide its password via 'HOPRD_PASSWORD' environment variable or delete the identity file.\n"
   fi
 }
