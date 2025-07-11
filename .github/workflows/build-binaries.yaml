@@ -137,7 +137,7 @@ jobs:
       - name: Create ${{ steps.vars.outputs.binary }} Signature
         id: signature
         run: |
-          nix develop .#citest -c bash -c '
+          nix develop .#ci -c bash -c '
           set -x
           tempdir=$(mktemp -d)
           cp "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}" "${tempdir}/${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}"
