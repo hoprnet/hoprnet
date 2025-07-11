@@ -12,16 +12,18 @@
 
 local hopr_start = Proto("hopr_start", "HOPR Start Protocol")
 
+local start_msg_types = {
+    [0x00] = "StartSession",
+    [0x01] = "SessionEstablished",
+    [0x02] = "SessionError",
+    [0x03] = "CloseSession",
+    [0x04] = "KeepAlive"
+}
+
 -- Start protocol fields
 local start_fields = {
     version = ProtoField.uint8("hopr_start.version", "Version", base.DEC),
-    type = ProtoField.uint8("hopr_start.type", "Type", base.HEX, {
-        [0x00] = "StartSession",
-        [0x01] = "SessionEstablished",
-        [0x02] = "SessionError",
-        [0x03] = "CloseSession",
-        [0x04] = "KeepAlive"
-    }),
+    type = ProtoField.uint8("hopr_start.type", "Type", base.HEX, start_msg_types),
 
     msg = ProtoField.bytes("hopr_start.message", "Bincode encoded message")
 }
@@ -44,6 +46,8 @@ local function dissect_hopr_start(buffer, pinfo, tree)
     offset = offset + 1
 
     subtree:add(start_fields.type, buffer(offset,1))
+    local type = buffer(offset, 1):uint()
+    pinfo.cols.info:append(", " .. start_msg_types[type] or "Unknown")
     offset = offset + 1
 
     subtree:add(start_fields.msg, buffer(offset))
@@ -57,18 +61,22 @@ end
 
 local hopr_probe = Proto("hopr_probe", "HOPR Probe Protocol")
 
+local probe_types = {
+    [0x00] = "Telemetry",
+    [0x01] = "Probe",
+}
+
+local probe_probe_types = {
+    [0x00] = "Ping",
+    [0x01] = "Pong",
+}
+
 -- Start protocol fields
 local probe_fields = {
     version = ProtoField.uint8("hopr_probe.version", "Version", base.DEC),
-    type = ProtoField.uint8("hopr_probe.type", "Type", base.HEX, {
-        [0x00] = "Telemetry",
-        [0x01] = "Probe",
-    }),
+    type = ProtoField.uint8("hopr_probe.type", "Type", base.HEX, probe_types),
 
-    probe_type = ProtoField.uint8("hopr_probe.probe.type", "Probe Type", base.HEX, {
-        [0x00] = "Ping",
-        [0x01] = "Pong",
-    }),
+    probe_type = ProtoField.uint8("hopr_probe.probe.type", "Probe Type", base.HEX, probe_probe_types),
     probe_nonce = ProtoField.bytes("hopr_probe.probe.nonce", "Probe Nonce"),
 
     tele_id = ProtoField.bytes("hopr_probe.telemetry.id", "Telemetry ID"),
@@ -115,14 +123,7 @@ local function dissect_hopr_probe(buffer, pinfo, tree)
         probe_tree:add(probe_fields.probe_type, buffer(offset, 1))
 
         local probe_type = buffer(offset,1):uint()
-        if probe_type == 0x00 then
-            pinfo.cols.info:append(", Ping")
-        elseif probe_type == 0x01 then
-            pinfo.cols.info:append(", Pong")
-        else
-            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unknown Probe ping/pong type: " .. probe_type)
-            return offset
-        end
+        pinfo.cols.info:append(", " .. probe_probe_types[probe_type] or "Unknown")
 
         offset = offset + 1
 
