@@ -381,7 +381,6 @@ enum ApiErrorStatus {
     TicketsNotFound,
     NotEnoughBalance,
     NotEnoughAllowance,
-    NoCorruptedChannels,
     ChannelAlreadyOpen,
     ChannelNotOpen,
     UnsupportedFeature,

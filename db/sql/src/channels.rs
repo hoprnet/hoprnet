@@ -66,7 +66,7 @@ impl ChannelEditor {
 /// Defines DB API for accessing information about HOPR payment channels.
 #[async_trait]
 pub trait HoprDbChannelOperations {
-    /// Retrieves channel by its channel ID hash.
+    /// Retrieves non-corrupted channel by its channel ID hash.
     ///
     /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>>;
@@ -116,10 +116,10 @@ pub trait HoprDbChannelOperations {
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Outgoing, my_node)`
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    /// Retrieves all channel information from the DB.
+    /// Retrieves all non-corrupted channels information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    /// Retrieves all corrupted channels from the DB.
+    /// Retrieves all corrupted channels information from the DB.
     async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<CorruptedChannelEntry>>;
 
     /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s

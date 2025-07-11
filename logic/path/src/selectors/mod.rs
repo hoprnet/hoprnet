@@ -1,6 +1,6 @@
 pub mod dfs;
 
-use std::ops::Add;
+use std::{collections::HashSet, ops::Add};
 
 use async_trait::async_trait;
 use hopr_internal_types::prelude::*;
@@ -29,7 +29,7 @@ pub trait PathSelector {
         destination: Address,
         min_hops: usize,
         max_hops: usize,
-        blacklist: Vec<CorruptedChannelEntry>,
+        blacklist: HashSet<SrcDstPair>,
     ) -> Result<ChannelPath>;
 
     /// Constructs a new valid packet `Path` from source to the given destination.
@@ -38,7 +38,7 @@ pub trait PathSelector {
         &self,
         source: Address,
         destination: Address,
-        blacklist: Vec<CorruptedChannelEntry>,
+        blacklist: HashSet<SrcDstPair>,
     ) -> Result<ChannelPath> {
         self.select_path(source, destination, 1usize, INTERMEDIATE_HOPS, blacklist)
             .await

@@ -541,7 +541,6 @@ pub(super) async fn fund_channel(
     responses(
         (status = 200, description = "Corrupted channels retrieved", body = Vec<NodeChannel>),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
-        (status = 404, description = "No corrupted channels found.", body = ApiError),
         (status = 422, description = "Unknown failure", body = ApiError)
     ),
     security(
@@ -554,17 +553,11 @@ pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) 
     let hopr = state.hopr.clone();
 
     match hopr.corrupted_channels().await {
-        Ok(corrupted_channels) => {
-            if corrupted_channels.is_empty() {
-                (StatusCode::NOT_FOUND, ApiErrorStatus::NoCorruptedChannels).into_response()
-            } else {
-                (
-                    StatusCode::OK,
-                    Json(corrupted_channels.into_iter().map(|c| c.channel).collect::<Vec<_>>()),
-                )
-                    .into_response()
-            }
-        }
+        Ok(corrupted_channels) => (
+            StatusCode::OK,
+            Json(corrupted_channels.into_iter().map(|c| *c.channel()).collect::<Vec<_>>()),
+        )
+            .into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

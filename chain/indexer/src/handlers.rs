@@ -502,7 +502,7 @@ where
                                         "found tickets matching 'BeingRedeemed'",
                                     );
 
-                                    let entry_str = format!("{}", channel_edits.entry());
+                                    let entry_str = channel_edits.entry().to_string();
 
                                     self.db
                                         .finish_channel_update(tx.into(), channel_edits.set_corrupted())

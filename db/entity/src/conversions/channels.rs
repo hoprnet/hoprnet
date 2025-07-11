@@ -91,8 +91,7 @@ impl TryFrom<&channel::Model> for CorruptedChannelEntry {
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
         let channel = ChannelEntry::try_from(value)?;
-
-        Ok(CorruptedChannelEntry { channel })
+        Ok(CorruptedChannelEntry::from(channel))
     }
 }
 
@@ -106,7 +105,7 @@ impl TryFrom<channel::Model> for CorruptedChannelEntry {
 
 impl From<CorruptedChannelEntry> for channel::ActiveModel {
     fn from(value: CorruptedChannelEntry) -> Self {
-        let mut ret = channel::ActiveModel::from(value.channel);
+        let mut ret = channel::ActiveModel::from(value.channel().clone());
         ret.corrupted = Set(true);
         ret
     }
