@@ -186,7 +186,7 @@ rpm_format_changelog() {
   local rpm_changelog=""
 
   # Sort entries by date and then by author
-  sorted_entries=$(printf '%s\n' "${changelog_entries[@]}" | jq -s 'sort_by([.date, .author])')
+  sorted_entries=$(printf '%s\n' "${changelog_entries[@]}" | jq -s 'sort_by([.date, .author]) | reverse')
 
   # Group entries by date and author, and build the changelog
   local current_date=""
