@@ -63,7 +63,7 @@ check_network() {
 
 check_identity_password() {
   # If the file /etc/hoprd/hopr.id exists then HOPRD_PASSWORD is required
-  if [ -f /etc/hoprd/hopr.id ] && [ -z "{$HOPRD_PASSWORD:-}" ]; then
+  if [ -f /etc/hoprd/hopr.id ] && [ -z "${HOPRD_PASSWORD:-}" ]; then
     errors+="- There is an existing identity file at /etc/hoprd/hopr.id from previous installation, You have to provide its password via 'HOPRD_PASSWORD' environment variable or delete the identity file.\n"
   fi
 }
