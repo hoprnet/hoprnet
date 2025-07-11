@@ -1,4 +1,7 @@
-use hopr_internal_types::{channels::ChannelStatus, prelude::ChannelEntry};
+use hopr_internal_types::{
+    channels::{ChannelStatus, CorruptedChannelEntry},
+    prelude::ChannelEntry,
+};
 use hopr_primitive_types::{
     balance::HoprBalance,
     prelude::{IntoEndian, ToHex, U256},
@@ -46,6 +49,7 @@ impl TryFrom<&channel::Model> for ChannelEntry {
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
         let status = value.try_into()?;
+
         Ok(ChannelEntry::new(
             value.source.parse()?,
             value.destination.parse()?,
@@ -74,9 +78,35 @@ impl From<ChannelEntry> for channel::ActiveModel {
             balance: Set(value.balance.amount().to_be_bytes().into()),
             epoch: Set(value.channel_epoch.to_be_bytes().into()),
             ticket_index: Set(value.ticket_index.to_be_bytes().into()),
+            corrupted: Set(false),
             ..Default::default()
         };
         ret.set_status(value.status);
+        ret
+    }
+}
+
+impl TryFrom<&channel::Model> for CorruptedChannelEntry {
+    type Error = DbEntityError;
+
+    fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
+        let channel = ChannelEntry::try_from(value)?;
+        Ok(CorruptedChannelEntry::from(channel))
+    }
+}
+
+impl TryFrom<channel::Model> for CorruptedChannelEntry {
+    type Error = DbEntityError;
+
+    fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl From<CorruptedChannelEntry> for channel::ActiveModel {
+    fn from(value: CorruptedChannelEntry) -> Self {
+        let mut ret = channel::ActiveModel::from(value.channel().clone());
+        ret.corrupted = Set(true);
         ret
     }
 }

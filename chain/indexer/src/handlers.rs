@@ -387,12 +387,16 @@ where
 
                 let channel = if let Some(channel_edits) = maybe_channel {
                     // Check that we're not receiving the Open event without the channel being Close prior
+
                     if channel_edits.entry().status != ChannelStatus::Closed {
-                        return Err(CoreEthereumIndexerError::ProcessError(format!(
-                            "trying to re-open channel {} which is not closed, but {}",
-                            channel_edits.entry().get_id(),
-                            channel_edits.entry().status,
-                        )));
+                        warn!(%source, %destination, %channel_id, "received Open event for a channel that is not Closed, marking it as corrupted");
+
+                        let res = self
+                            .db
+                            .finish_channel_update(tx.into(), channel_edits.set_corrupted())
+                            .await?;
+
+                        return Ok(Some(ChainEventType::ChannelOpened(res)));
                     }
 
                     trace!(%source, %destination, %channel_id, "on_channel_reopened_event");
@@ -497,10 +501,17 @@ where
                                         entry = %channel_edits.entry(),
                                         "found tickets matching 'BeingRedeemed'",
                                     );
+
+                                    let entry_str = channel_edits.entry().to_string();
+
+                                    self.db
+                                        .finish_channel_update(tx.into(), channel_edits.set_corrupted())
+                                        .await?;
+
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
                                         ticket_redeemed.newTicketIndex.to::<u64>() - 1,
-                                        channel_edits.entry()
+                                        entry_str
                                     )));
                                 }
                             }
@@ -2539,7 +2550,17 @@ mod tests {
             .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log, true).await }))
             .await
-            .expect_err("should not re-open channel that is not Closed");
+            .context("Channel should stay open, with corrupted flag set")?;
+
+        assert!(
+            db.get_channel_by_id(None, &channel.get_id()).await?.is_none(),
+            "channel should be deleted",
+        );
+
+        db.get_corrupted_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
+
         Ok(())
     }
 

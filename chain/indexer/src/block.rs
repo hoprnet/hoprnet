@@ -16,7 +16,7 @@ use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations};
 use hopr_primitive_types::prelude::*;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     IndexerConfig,
@@ -525,6 +525,10 @@ where
                             panic!("failed to mark log as processed, panicking to prevent data loss")
                         }
                     },
+                    Err(CoreEthereumIndexerError::ProcessError(error)) => {
+                        warn!(block_id, %error, "failed to process log into event, continuing indexing");
+                        None
+                    }
                     Err(error) => {
                         error!(block_id, %error, "failed to process log into event, panicking to prevent data loss");
                         panic!("failed to process log into event, panicking to prevent data loss")
