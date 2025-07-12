@@ -187,7 +187,7 @@ Options:
       --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
           Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
   -h, --help
-          Print help
+          Print this help
   -V, --version
           Print version
 ```
