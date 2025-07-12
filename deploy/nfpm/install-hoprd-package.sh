@@ -13,7 +13,7 @@ export HOPRD_PROVIDER="$5"
 # Install the package based on the distribution
 case "$DISTRIBUTION" in
 deb)
-  apt-get update
+  sudo apt-get update
   sudo -E apt install -y "/tmp/hoprd.${DISTRIBUTION}"
   ;;
 rpm)
