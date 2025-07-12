@@ -82,7 +82,7 @@ jobs:
     secrets: inherit
 
   package:
-    name: ${{ matrix.target }}
+    name: ${{ matrix.target }}-${{ matrix.packager.package }}
     needs: build-binaries
     strategy:
       matrix:
