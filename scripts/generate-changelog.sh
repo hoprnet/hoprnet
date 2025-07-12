@@ -22,7 +22,7 @@ process_entries() {
   # Sanitize and validate entries to ensure proper JSON formatting
   entries=${1}
   for item_encoded in ${entries}; do
-    item_decoded=$(jq_decode ${item_encoded})
+    item_decoded=$(jq_decode "${item_encoded}")
     # Validate JSON format
     if ! echo "${item_decoded}" | jq empty; then
       echo "[ERROR] Invalid JSON record: ${item_decoded}" >>/dev/stderr
@@ -30,7 +30,7 @@ process_entries() {
     fi
     id=$(echo "${item_decoded}" | jq -r '.number')
     title=$(echo "${item_decoded}" | jq -r '.title')
-    labels=$(echo "${item_decoded}" | jq -r '.labels[].name' | tr '\n' ',' | sed 's/,$//')
+    labels=$(echo "${item_decoded}" | jq -r '.labels[]?.name' | tr '\n' ',' | sed 's/,$//')
     state=$(echo "${item_decoded}" | jq -r '.state' | tr '[:upper:]' '[:lower:]')
     author=$(echo "${item_decoded}" | jq -r '.author.login')
     date=$(echo "${item_decoded}" | jq -r '.closedAt // empty' | awk -F 'T' '{print $1}')
