@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 #set -x
 
-PROJECT_ID="hoprassociation"
+PROJECT_ID="${GCP_PROJECT:hoprassociation}"
 ZONE="europe-west4-a"
 MACHINE_TYPE_x86="e2-medium"      # GCP's x86_64 instances
 MACHINE_TYPE_ARM="t2a-standard-2" # GCP's ARM instances
