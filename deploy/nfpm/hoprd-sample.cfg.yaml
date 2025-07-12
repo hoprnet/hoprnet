@@ -1,7 +1,7 @@
 ---
 hopr:
   db:
-    data: /var/lib/hoprd/data
+    data: /var/lib/hoprd
   strategy:
     on_fail_continue: true
     allow_recursive: true

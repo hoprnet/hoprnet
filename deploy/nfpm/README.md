@@ -12,14 +12,20 @@ Download the latest package from https://github.com/hoprnet/hoprnet/releases/lat
 
 ```bash
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.deb
-sudo -E dpkg -i hoprd-${arch}-linux.deb
+curl -s -L -o hoprd_${arch}.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd_${arch}.deb
+# You can get Safe address and the Module address from https://hub.hoprnet.org
+export HOPRD_SAFE_ADDRESS=
+export HOPRD_MODULE_ADDRESS=
+# Choose your own local RPC provider or any from https://docs.hoprnet.org/node/custom-rpc-provider
+export HOPRD_PROVIDER=
+sudo apt-get update
+sudo -E apt -y install ./hoprd_${arch}.deb
 ```
 
 Uninstall:
 
 ```bash
-sudo dpkg --purge --force-remove-reinstreq hoprd
+sudo apt purge hoprd
 ```
 
 ## Install via Centos package manager
@@ -28,13 +34,13 @@ Download the latest package from https://github.com/hoprnet/hoprnet/releases/lat
 
 ```bash
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.rpm https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.rpm
-# You can get Safe address and the Module addres from https://hub.hoprnet.org
+curl -s -L -o hoprd_${arch}.rpm https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd_${arch}.rpm
+# You can get Safe address and the Module address from https://hub.hoprnet.org
 export HOPRD_SAFE_ADDRESS=
 export HOPRD_MODULE_ADDRESS=
-# Choose your own local RPC provider or any from http://chainlist.org/chain/100
+# Choose your own local RPC provider or any from https://docs.hoprnet.org/node/custom-rpc-provider
 export HOPRD_PROVIDER=
-sudo -E dnf install -y ./hoprd-${arch}-linux.rpm
+sudo -E dnf install -y ./hoprd-${arch}.rpm
 ```
 
 Uninstall:
@@ -49,13 +55,13 @@ Download the latest package from https://github.com/hoprnet/hoprnet/releases/lat
 
 ```bash
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd-${arch}-linux.pkg.tar.zst https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.pkg.tar.zst
-# You can get Safe address and the Module addres from https://hub.hoprnet.org
+curl -s -L -o hoprd_${arch}.pkg.tar.zst https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd_${arch}.pkg.tar.zst
+# You can get Safe address and the Module address from https://hub.hoprnet.org
 export HOPRD_SAFE_ADDRESS=
 export HOPRD_MODULE_ADDRESS=
-# Choose your own local RPC provider or any from http://chainlist.org/chain/100
+# Choose your own local RPC provider or any from https://docs.hoprnet.org/node/custom-rpc-provider
 export HOPRD_PROVIDER=
-sudo pacman --noconfirm -U hoprd-${arch}-linux.pkg.tar.zst
+sudo pacman --noconfirm -U hoprd-${arch}.pkg.tar.zst
 ```
 
 Uninstall:

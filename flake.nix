@@ -788,6 +788,8 @@
               "Makefile"
               "db/entity/src/codegen/*"
               "deploy/compose/grafana/config.monitoring"
+              "deploy/nfpm/nfpm.yaml"
+              ".github/workflows/build-binaries.yaml"
               "docs/*"
               "ethereum/bindings/src/codegen/*"
               "ethereum/contracts/Makefile"
