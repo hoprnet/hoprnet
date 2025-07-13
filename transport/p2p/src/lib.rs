@@ -41,7 +41,10 @@ use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{StreamProtocol, autonat, swarm::NetworkBehaviour};
+use libp2p_stream::OpenStreamError;
 use rand::rngs::OsRng;
+
+pub const STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
 pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 pub const NAT_SERVER_PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
@@ -79,7 +82,12 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
     }
 
     async fn open(mut self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error> {
-        self.control.open_stream(peer, self.protocol).await
+        use futures_time::future::FutureExt as TimeExt;
+        self.control.open_stream(peer, self.protocol)
+            .timeout(futures_time::time::Duration::from(STREAM_OPEN_TIMEOUT))
+            .await
+            .map_err(|_| OpenStreamError::Io(std::io::Error::other(format!("timeout with {peer}"))))
+            .and_then(|s| s)
     }
 }
 

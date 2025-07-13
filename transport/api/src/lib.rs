@@ -31,7 +31,7 @@ use std::{
 
 use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{SinkExt, StreamExt, channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded}, FutureExt};
+use futures::{SinkExt, StreamExt, channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded}};
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::HoprPacket;

@@ -4,7 +4,6 @@
 use std::sync::Arc;
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, SinkExt as _, Stream, StreamExt, channel::mpsc::{Receiver, Sender, channel}, FutureExt};
-use futures::channel::mpsc::SendError;
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -20,8 +19,14 @@ pub trait BidirectionalStreamControl: std::fmt::Debug {
     async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
 }
 
-/*fn build_peer_stream_io<S, C>(peer: PeerId, stream: S, cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>, codec: C)
-where S: AsyncRead + AsyncWrite,
+fn build_peer_stream_io<S, C>(
+    peer: PeerId,
+    stream: S,
+    cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>,
+    codec: C,
+    ingress_from_peers: Sender<(PeerId,  <C as Decoder>::Item)>) -> Sender<<C as Decoder>::Item>
+where
+    S: AsyncRead + AsyncWrite + Send + 'static,
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
     <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
@@ -35,6 +40,7 @@ where S: AsyncRead + AsyncWrite,
     fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
 
     hopr_async_runtime::prelude::spawn(recv
+        .inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
         .map(Ok)
         .forward(fw)
         .then(move |res| {
@@ -46,7 +52,10 @@ where S: AsyncRead + AsyncWrite,
     hopr_async_runtime::prelude::spawn(FramedRead::new(stream_rx.compat(), codec)
         .filter_map(move |v| async move {
             match v {
-                Ok(v) => Some((peer, v)),
+                Ok(v) => {
+                    tracing::trace!(%peer, "read message from peer stream");
+                    Some((peer, v))
+                },
                 Err(error) => {
                     tracing::error!(%error, "Error decoding object from the underlying stream");
                     None
@@ -54,7 +63,7 @@ where S: AsyncRead + AsyncWrite,
             }
         })
         .map(Ok)
-        .forward(tx_in)
+        .forward(ingress_from_peers)
         .then(move |res| match res {
             Ok(_) => {
                 tracing::debug!(%peer, "received incoming stream done reading");
@@ -72,7 +81,10 @@ where S: AsyncRead + AsyncWrite,
             }
         })
     );
-}*/
+
+    tracing::trace!(%peer, "created new io for peer");
+    send
+}
 
 pub async fn process_stream_protocol<C, V>(
     codec: C,
@@ -115,60 +127,17 @@ where
 
         tracing::debug!(%peer, "Received incoming peer-to-peer stream");
 
+        let send = build_peer_stream_io(peer, stream, cache.clone(), codec.clone(), tx_in.clone());
+
         async move {
-            let (stream_rx, stream_tx) = stream.split();
-            let (send, recv) = channel::<<C as Decoder>::Item>(1000);
-            let cache_internal = cache.clone();
-
-            let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
-            fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
-
-            hopr_async_runtime::prelude::spawn(recv
-                .map(Ok)
-                .inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
-                .forward(fw)
-                .then(move |res| {
-                    tracing::debug!(%peer, ?res, "writing stream with peer done");
-                    futures::future::ready(())
-                })
-            );
-
-            hopr_async_runtime::prelude::spawn(FramedRead::new(stream_rx.compat(), codec)
-                    .filter_map(move |v| async move {
-                        match v {
-                            Ok(v) => Some((peer, v)),
-                            Err(error) => {
-                                tracing::error!(%error, "Error decoding object from the underlying stream");
-                                None
-                            }
-                        }
-                    })
-                    .map(Ok)
-                    .inspect(move |_| tracing::trace!(%peer, "read message from peer stream"))
-                    .forward(tx_in)
-                    .then(move |res| match res {
-                        Ok(_) => {
-                            tracing::debug!(%peer, "received incoming stream done reading");
-                            futures::future::ready(())
-                        }
-                        Err(error) => {
-                            tracing::error!(%peer, %error, "received incoming stream failed on reading");
-                            futures::future::ready(())
-                        }
-                    })
-                    .then(move |_| {
-                        let peer = peer.clone();
-                        async move {
-                            cache_internal.invalidate(&peer).await;
-                        }
-                    })
-            );
             cache.insert(peer, send).await;
         }
     }));
 
     // terminated when the rx_in is dropped
-    let _egress_process = hopr_async_runtime::prelude::spawn(rx_out.for_each_concurrent(Some(100), move |(peer, msg)| {
+    let _egress_process = hopr_async_runtime::prelude::spawn(rx_out
+        .inspect(|(peer, _)| tracing::trace!(%peer, "proceeding to deliver message to peer"))
+        .for_each_concurrent(None, move |(peer, msg)| {
         let cache = cache_out.clone();
         let control = control.clone();
         let codec = codec.clone();
@@ -201,54 +170,7 @@ where
                         .map_err(|e| anyhow::anyhow!("Could not open outgoing peer-to-peer stream: {e}"))?;
                     tracing::debug!(%peer, "Opening outgoing peer-to-peer stream");
 
-                    let (stream_rx, stream_tx) = stream.split();
-                    let (send, recv) = channel::<<C as Decoder>::Item>(1000);
-
-                    let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
-                    fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
-
-                    hopr_async_runtime::prelude::spawn(recv
-                        .map(Ok)
-                        .inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
-                        .forward(fw)
-                        .then(move |res| {
-                            tracing::debug!(%peer, ?res, "writing stream with peer done");
-                            futures::future::ready(())
-                        }));
-
-                    hopr_async_runtime::prelude::spawn(
-                        FramedRead::new(stream_rx.compat(), codec)
-                            .filter_map(move |v| async move {
-                                match v {
-                                    Ok(v) => Some((peer, v)),
-                                    Err(error) => {
-                                        tracing::error!(%error, "Error decoding object from the underlying stream");
-                                        None
-                                    }
-                                }
-                            })
-                            .map(Ok)
-                            .inspect(move |_| tracing::trace!(%peer, "read message from peer stream"))
-                            .forward(tx_in)
-                            .then(move |res| match res {
-                                Ok(_) => {
-                                    tracing::debug!(%peer, "created incoming stream done reading");
-                                    futures::future::ready(())
-                                }
-                                Err(error) => {
-                                    tracing::error!(%peer, %error, "created incoming stream failed on reading");
-                                    futures::future::ready(())
-                                }
-                            })
-                            .then(move |_| {
-                                let peer = peer.clone();
-                                async move {
-                                    cache_clone.invalidate(&peer).await;
-                                }
-                            })
-                    );
-
-                    Ok(send)
+                    Ok(build_peer_stream_io(peer, stream, cache_clone.clone(), codec.clone(), tx_in.clone()))
                 })
                 .await;
 

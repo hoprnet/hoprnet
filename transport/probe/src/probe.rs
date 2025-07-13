@@ -139,11 +139,11 @@ impl Probe {
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
-                            replier.notify(Err(ProbeError::Timeout(timeout.as_millis() as u64)));
+                            replier.notify(Err(ProbeError::Timeout(timeout.as_secs())));
                         };
                         async move {
                             store
-                                .on_finished(&peer, &Err(ProbeError::Timeout(timeout.as_millis() as u64)))
+                                .on_finished(&peer, &Err(ProbeError::Timeout(timeout.as_secs())))
                                 .await;
                         }
                         .boxed()

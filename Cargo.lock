@@ -5204,6 +5204,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
+ "futures-time",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
