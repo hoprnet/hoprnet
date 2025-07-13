@@ -72,7 +72,7 @@ mod capture;
 
 use std::collections::HashMap;
 
-use futures::{SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
@@ -278,6 +278,7 @@ where
                     }
                 })
                 .filter_map(futures::future::ready)
+                .inspect(|(peer, _)| trace!(%peer, "protocol message out"))
                 .map(Ok)
                 .forward(msg_to_send_tx)
                 .instrument(tracing::trace_span!("msg protocol processing - outgoing"))
@@ -301,6 +302,8 @@ where
                     let db = db_for_recv.clone();
                     let mut msg_to_send_tx = msg_to_send_tx.clone();
                     let me = me.clone();
+
+                    trace!(%peer, "protocol message in");
 
                     #[cfg(feature = "capture")]
                     let mut capture_clone = capture.clone();

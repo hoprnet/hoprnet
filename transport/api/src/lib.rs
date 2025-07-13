@@ -31,10 +31,7 @@ use std::{
 
 use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{
-    SinkExt, StreamExt,
-    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
-};
+use futures::{SinkExt, StreamExt, channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded}, FutureExt};
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::HoprPacket;
@@ -463,7 +460,11 @@ where
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
         let _mixing_process_before_sending_out =
-            hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
+            hopr_async_runtime::prelude::spawn(mixing_channel_rx
+                .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
+                .map(Ok)
+                .forward(wire_msg_tx)
+            );
 
         let (transport_events_tx, transport_events_rx) =
             futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
