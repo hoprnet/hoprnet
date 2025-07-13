@@ -3,10 +3,8 @@
 
 use std::sync::Arc;
 
-use futures::{
-    AsyncRead, AsyncReadExt, AsyncWrite, SinkExt as _, Stream, StreamExt,
-    channel::mpsc::{Receiver, Sender, channel},
-};
+use futures::{AsyncRead, AsyncReadExt, AsyncWrite, SinkExt as _, Stream, StreamExt, channel::mpsc::{Receiver, Sender, channel}, FutureExt};
+use futures::channel::mpsc::SendError;
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -21,6 +19,60 @@ pub trait BidirectionalStreamControl: std::fmt::Debug {
 
     async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
 }
+
+/*fn build_peer_stream_io<S, C>(peer: PeerId, stream: S, cache: moka::future::Cache<PeerId, Sender<<C as Decoder>::Item>>, codec: C)
+where S: AsyncRead + AsyncWrite,
+    C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
+    <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
+    <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
+    <C as Decoder>::Item: Clone + Send + 'static,
+{
+    let (stream_rx, stream_tx) = stream.split();
+    let (send, recv) = channel::<<C as Decoder>::Item>(1000);
+    let cache_internal = cache.clone();
+
+    let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
+    fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
+
+    hopr_async_runtime::prelude::spawn(recv
+        .map(Ok)
+        .forward(fw)
+        .then(move |res| {
+            tracing::debug!(%peer, ?res, "writing stream with peer done");
+            futures::future::ready(())
+        })
+    );
+
+    hopr_async_runtime::prelude::spawn(FramedRead::new(stream_rx.compat(), codec)
+        .filter_map(move |v| async move {
+            match v {
+                Ok(v) => Some((peer, v)),
+                Err(error) => {
+                    tracing::error!(%error, "Error decoding object from the underlying stream");
+                    None
+                }
+            }
+        })
+        .map(Ok)
+        .forward(tx_in)
+        .then(move |res| match res {
+            Ok(_) => {
+                tracing::debug!(%peer, "received incoming stream done reading");
+                futures::future::ready(())
+            }
+            Err(error) => {
+                tracing::error!(%peer, %error, "received incoming stream failed on reading");
+                futures::future::ready(())
+            }
+        })
+        .then(move |_| {
+            let peer = peer.clone();
+            async move {
+                cache_internal.invalidate(&peer).await;
+            }
+        })
+    );
+}*/
 
 pub async fn process_stream_protocol<C, V>(
     codec: C,
@@ -68,13 +120,19 @@ where
             let (send, recv) = channel::<<C as Decoder>::Item>(1000);
             let cache_internal = cache.clone();
 
-            hopr_async_runtime::prelude::spawn(recv.map(Ok).forward({
-                let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
-                fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
-                fw
-            }));
-            hopr_async_runtime::prelude::spawn(async move {
-                if let Err(error) = FramedRead::new(stream_rx.compat(), codec)
+            let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
+            fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
+
+            hopr_async_runtime::prelude::spawn(recv
+                .map(Ok)
+                .forward(fw)
+                .then(move |res| {
+                    tracing::debug!(%peer, ?res, "writing stream with peer done");
+                    futures::future::ready(())
+                })
+            );
+
+            hopr_async_runtime::prelude::spawn(FramedRead::new(stream_rx.compat(), codec)
                     .filter_map(move |v| async move {
                         match v {
                             Ok(v) => Some((peer, v)),
@@ -86,18 +144,29 @@ where
                     })
                     .map(Ok)
                     .forward(tx_in)
-                    .await
-                {
-                    tracing::error!(%peer, %error, "Incoming stream failed on reading");
-                }
-                cache_internal.invalidate(&peer).await;
-            });
+                    .then(move |res| match res {
+                        Ok(_) => {
+                            tracing::debug!(%peer, "received incoming stream done reading");
+                            futures::future::ready(())
+                        }
+                        Err(error) => {
+                            tracing::error!(%peer, %error, "received incoming stream failed on reading");
+                            futures::future::ready(())
+                        }
+                    })
+                    .then(move |_| {
+                        let peer = peer.clone();
+                        async move {
+                            cache_internal.invalidate(&peer).await;
+                        }
+                    })
+            );
             cache.insert(peer, send).await;
         }
     }));
 
     // terminated when the rx_in is dropped
-    let _egress_process = hopr_async_runtime::prelude::spawn(rx_out.for_each(move |(peer, msg)| {
+    let _egress_process = hopr_async_runtime::prelude::spawn(rx_out.for_each_concurrent(10, move |(peer, msg)| {
         let cache = cache_out.clone();
         let control = control.clone();
         let codec = codec.clone();
@@ -115,6 +184,7 @@ where
                 }
             }
 
+            let cache_clone = cache.clone();
             let cached: std::result::Result<Sender<<C as Decoder>::Item>, Arc<anyhow::Error>> = cache
                 .try_get_with(peer, async move {
                     let stream = control
@@ -126,11 +196,17 @@ where
                     let (stream_rx, stream_tx) = stream.split();
                     let (send, recv) = channel::<<C as Decoder>::Item>(1000);
 
-                    hopr_async_runtime::prelude::spawn(recv.map(Ok).forward({
-                        let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
-                        fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
-                        fw
-                    }));
+                    let mut fw = FramedWrite::new(stream_tx.compat_write(), codec.clone());
+                    fw.set_backpressure_boundary(1); // Low backpressure boundary to make sure each message is flushed after writing to buffer
+
+                    hopr_async_runtime::prelude::spawn(recv
+                        .map(Ok)
+                        .forward(fw)
+                        .then(move |res| {
+                            tracing::debug!(%peer, ?res, "writing stream with peer done");
+                            futures::future::ready(())
+                        }));
+
                     hopr_async_runtime::prelude::spawn(
                         FramedRead::new(stream_rx.compat(), codec)
                             .filter_map(move |v| async move {
@@ -143,7 +219,23 @@ where
                                 }
                             })
                             .map(Ok)
-                            .forward(tx_in),
+                            .forward(tx_in)
+                            .then(move |res| match res {
+                                Ok(_) => {
+                                    tracing::debug!(%peer, "created incoming stream done reading");
+                                    futures::future::ready(())
+                                }
+                                Err(error) => {
+                                    tracing::error!(%peer, %error, "created incoming stream failed on reading");
+                                    futures::future::ready(())
+                                }
+                            })
+                            .then(move |_| {
+                                let peer = peer.clone();
+                                async move {
+                                    cache_clone.invalidate(&peer).await;
+                                }
+                            })
                     );
 
                     Ok(send)
