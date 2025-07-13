@@ -2,8 +2,6 @@ use alloy::transports::{http::Http, utils::guess_local_url};
 use async_trait::async_trait;
 #[cfg(feature = "runtime-tokio")]
 pub use reqwest::Client as ReqwestClient;
-#[cfg(feature = "runtime-tokio")]
-use tracing::{debug, trace};
 use url::Url;
 
 use crate::errors::HttpRequestError;
@@ -86,15 +84,15 @@ impl HttpRequestor for ReqwestClient {
 
         let status = res.status();
 
-        debug!(%status, "received response from server");
+        tracing::debug!(%status, "received response from server");
 
         let body = res
             .bytes()
             .await
             .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?;
 
-        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-        trace!(body = %String::from_utf8_lossy(&body), "response body");
+        tracing::debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+        tracing::trace!(body = %String::from_utf8_lossy(&body), "response body");
 
         if !status.is_success() {
             return Err(HttpRequestError::HttpError(

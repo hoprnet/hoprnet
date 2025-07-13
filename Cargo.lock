@@ -4717,7 +4717,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aes",
  "anyhow",
@@ -5287,6 +5287,7 @@ dependencies = [
  "bytesize",
  "criterion",
  "futures",
+ "futures-time",
  "hex-literal",
  "hopr-async-runtime",
  "hopr-crypto-packet",

@@ -31,7 +31,10 @@ use std::{
 
 use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-use futures::{SinkExt, StreamExt, channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded}};
+use futures::{
+    SinkExt, StreamExt,
+    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
+};
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::HoprPacket;
@@ -399,10 +402,8 @@ where
         // -- transport medium
         let mixer_cfg = build_mixer_cfg_from_env();
 
-        //#[cfg(feature = "mixer-channel")]
-        //let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
-
-        let (mixing_channel_tx, mixing_channel_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
+        #[cfg(feature = "mixer-channel")]
+        let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
 
         #[cfg(feature = "mixer-stream")]
         let (mixing_channel_tx, mixing_channel_rx) = {
@@ -459,12 +460,12 @@ where
         let (wire_msg_tx, wire_msg_rx) =
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
-        let _mixing_process_before_sending_out =
-            hopr_async_runtime::prelude::spawn(mixing_channel_rx
+        let _mixing_process_before_sending_out = hopr_async_runtime::prelude::spawn(
+            mixing_channel_rx
                 .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
                 .map(Ok)
-                .forward(wire_msg_tx)
-            );
+                .forward(wire_msg_tx),
+        );
 
         let (transport_events_tx, transport_events_rx) =
             futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
@@ -519,11 +520,10 @@ where
             Some(tbf_path),
             (
                 mixing_channel_tx.with(|(peer, msg): (PeerId, Box<[u8]>)| {
-                    trace!(%peer, len = msg.len(), "sending message to peer");
-                    //futures::future::ok::<_, hopr_transport_mixer::channel::SenderError>((peer, msg))
-                    futures::future::ok::<_, mpsc::SendError>((peer, msg))
+                    trace!(%peer, "sending message to peer");
+                    futures::future::ok::<_, hopr_transport_mixer::channel::SenderError>((peer, msg))
                 }),
-                wire_msg_rx.inspect(|(peer, msg)| trace!(%peer, len = msg.len(), "received message from peer")),
+                wire_msg_rx.inspect(|(peer, _)| trace!(%peer, "received message from peer")),
             ),
             (tx_from_protocol, external_msg_rx),
         )
