@@ -166,7 +166,7 @@ where
     }));
 
     // terminated when the rx_in is dropped
-    let _egress_process = hopr_async_runtime::prelude::spawn(rx_out.for_each_concurrent(10, move |(peer, msg)| {
+    let _egress_process = hopr_async_runtime::prelude::spawn(rx_out.for_each_concurrent(Some(100), move |(peer, msg)| {
         let cache = cache_out.clone();
         let control = control.clone();
         let codec = codec.clone();
