@@ -125,6 +125,7 @@ where
 
             hopr_async_runtime::prelude::spawn(recv
                 .map(Ok)
+                .inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
                 .forward(fw)
                 .then(move |res| {
                     tracing::debug!(%peer, ?res, "writing stream with peer done");
@@ -143,6 +144,7 @@ where
                         }
                     })
                     .map(Ok)
+                    .inspect(move |_| tracing::trace!(%peer, "read message from peer stream"))
                     .forward(tx_in)
                     .then(move |res| match res {
                         Ok(_) => {
@@ -175,18 +177,24 @@ where
         async move {
             let cache = cache.clone();
 
+            tracing::trace!(%peer, "trying to deliver message to peer");
             if let Some(mut cached) = cache.get(&peer).await {
                 if let Err(error) = cached.send(msg.clone()).await {
                     tracing::error!(%peer, %error, "Error sending message to peer from the cached connection");
                     cache.invalidate(&peer).await;
                 } else {
+                    tracing::trace!(%peer, "message sent to peer from the cached connection");
                     return;
                 }
             }
 
+            tracing::trace!(%peer, "peer stream not found on the first try");
+
             let cache_clone = cache.clone();
             let cached: std::result::Result<Sender<<C as Decoder>::Item>, Arc<anyhow::Error>> = cache
                 .try_get_with(peer, async move {
+                    tracing::trace!(%peer, "peer is not in cache, opening new stream...");
+
                     let stream = control
                         .open(peer)
                         .await
@@ -201,6 +209,7 @@ where
 
                     hopr_async_runtime::prelude::spawn(recv
                         .map(Ok)
+                        .inspect(move |_| tracing::trace!(%peer, "writing message to peer stream"))
                         .forward(fw)
                         .then(move |res| {
                             tracing::debug!(%peer, ?res, "writing stream with peer done");
@@ -219,6 +228,7 @@ where
                                 }
                             })
                             .map(Ok)
+                            .inspect(move |_| tracing::trace!(%peer, "read message from peer stream"))
                             .forward(tx_in)
                             .then(move |res| match res {
                                 Ok(_) => {
@@ -247,6 +257,8 @@ where
                     if let Err(error) = cached.send(msg).await {
                         tracing::error!(%peer, %error, "Error sending message to peer");
                         cache.invalidate(&peer).await;
+                    } else {
+                        tracing::trace!(%peer, "message sent to peer");
                     }
                 }
                 Err(error) => {
