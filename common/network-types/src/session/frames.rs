@@ -32,6 +32,7 @@ impl Display for SegmentId {
 }
 
 /// Data frame of arbitrary length.
+///
 /// The frame can be segmented into [segments](Segment) and reassembled back
 /// via [`FrameBuilder`].
 #[derive(Clone, PartialEq, Eq)]
@@ -41,6 +42,8 @@ pub struct Frame {
     /// Frame data.
     pub data: Box<[u8]>,
     /// Indicates whether the frame is the last one of the frame sequence.
+    ///
+    /// This indicates that the Session is over.
     pub is_terminating: bool,
 }
 
@@ -135,14 +138,17 @@ impl SeqIndicator {
         Self(flags)
     }
 
+    #[inline]
     pub const fn new(seq_len: SeqNum) -> Self {
         Self::new_with_flags(seq_len, false)
     }
 
+    #[inline]
     const fn new_unchecked(seq_ind: SeqNum) -> Self {
         Self(seq_ind)
     }
 
+    #[inline]
     pub fn with_terminating_bit(self, is_terminating: bool) -> Self {
         Self::new_with_flags(self.0, is_terminating)
     }
@@ -182,9 +188,10 @@ impl TryFrom<SeqNum> for SeqIndicator {
 }
 
 /// Represents a frame segment.
+///
 /// Besides the data, a segment carries information about the total number of
-/// segments in the original frame, its index within the frame and
-/// ID of that frame.
+/// segments in the original frame ([`SeqIndicator`]), its index within the frame ([`SeqNum`]), and
+/// ID of that frame ([`FrameId`]).
 #[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
 pub struct Segment {
@@ -220,6 +227,12 @@ impl Segment {
         self.seq_idx == self.seq_flags.seq_num() - 1
     }
 
+    /// Short-cut to check if this segment is a terminating segment.
+    #[inline]
+    pub fn is_terminating(&self) -> bool {
+        self.seq_flags.is_terminating()
+    }
+
     /// Creates an empty `Segment` with the terminating flag set.
     pub fn terminating(frame_id: FrameId) -> Self {
         Self {
@@ -236,7 +249,7 @@ impl Debug for Segment {
         f.debug_struct("Segment")
             .field("frame_id", &self.frame_id)
             .field("seq_id", &self.seq_idx)
-            .field("seq_len", &self.seq_flags)
+            .field("seq_flags", &self.seq_flags)
             .field("data", &hex::encode(&self.data))
             .finish()
     }
@@ -315,6 +328,8 @@ impl TryFrom<FrameBuilder> for Frame {
     type Error = SessionError;
 
     fn try_from(value: FrameBuilder) -> Result<Self, Self::Error> {
+        // The Frame has the terminating flag set,
+        // if any of its segments had the terminating indicator set
         let mut is_terminating = false;
         value
             .segments

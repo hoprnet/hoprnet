@@ -392,7 +392,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     }
 
     #[tracing::instrument(name = "AcknowledgementState::incoming_segment", skip(self), fields(session_id = self.id, frame_id = seg_id.0))]
-    fn incoming_segment(&mut self, seg_id: &SegmentId, _segment_count: SeqIndicator) -> Result<(), SessionError> {
+    fn incoming_segment(&mut self, seg_id: &SegmentId, _ind: SeqIndicator) -> Result<(), SessionError> {
         tracing::trace!("segment received");
 
         let ctx = self

@@ -35,7 +35,7 @@ pub trait SocketState<const C: usize>: Send {
 
     /// Called when the Socket receives a new segment from Downstream.
     /// When the error is returned, the incoming segment is not passed Upstream.
-    fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqIndicator) -> Result<(), SessionError>;
+    fn incoming_segment(&mut self, id: &SegmentId, ind: SeqIndicator) -> Result<(), SessionError>;
 
     /// Called when [segment retransmission request](SegmentRequest) is received from Downstream.
     fn incoming_retransmission_request(&mut self, request: SegmentRequest<C>) -> Result<(), SessionError>;
@@ -136,7 +136,7 @@ mod tests {
             fn session_id(&self) -> &str;
             fn run(&mut self, components: SocketComponents<MTU>) -> Result<(), SessionError>;
             fn stop(&mut self) -> Result<(), SessionError>;
-            fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqIndicator) -> Result<(), SessionError>;
+            fn incoming_segment(&mut self, id: &SegmentId, ind: SeqIndicator) -> Result<(), SessionError>;
             fn incoming_retransmission_request(&mut self, request: SegmentRequest<MTU>) -> Result<(), SessionError>;
             fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<MTU>) -> Result<(), SessionError>;
             fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError>;
@@ -171,9 +171,9 @@ mod tests {
             self.0.lock().unwrap().stop()
         }
 
-        fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqIndicator) -> Result<(), SessionError> {
+        fn incoming_segment(&mut self, id: &SegmentId, ind: SeqIndicator) -> Result<(), SessionError> {
             tracing::debug!(id = self.1, "incoming_segment called");
-            self.0.lock().unwrap().incoming_segment(id, segment_count)
+            self.0.lock().unwrap().incoming_segment(id, ind)
         }
 
         fn incoming_retransmission_request(&mut self, request: SegmentRequest<MTU>) -> Result<(), SessionError> {
@@ -232,6 +232,11 @@ mod tests {
             .once()
             .in_sequence(&mut alice_seq)
             .return_once(|| Ok::<_, SessionError>(()));
+        alice_state
+            .expect_segment_sent() // terminating segment
+            .once()
+            .in_sequence(&mut alice_seq)
+            .return_once(|_| Ok::<_, SessionError>(()));
 
         let mut bob_seq = mockall::Sequence::new();
         let mut bob_state = MockSockState::new();
@@ -270,6 +275,11 @@ mod tests {
             .once()
             .in_sequence(&mut bob_seq)
             .return_once(|| Ok::<_, SessionError>(()));
+        bob_state
+            .expect_segment_sent() // terminating segment
+            .once()
+            .in_sequence(&mut bob_seq)
+            .return_once(|_| Ok::<_, SessionError>(()));
 
         let (alice, bob) = setup_alice_bob::<MTU>(
             FaultyNetworkConfig {

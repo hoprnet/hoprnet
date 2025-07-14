@@ -2,11 +2,12 @@ mod messages;
 
 use asynchronous_codec::{Decoder, Encoder};
 use bytes::{Buf, BufMut, BytesMut};
+pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest};
 
-pub use messages::{FrameAcknowledgements, SegmentRequest, MissingSegmentsBitmap};
-
-use crate::session::{errors::SessionError, frames::Segment};
-use crate::session::frames::SeqIndicator;
+use crate::session::{
+    errors::SessionError,
+    frames::{Segment, SeqIndicator},
+};
 
 /// Contains all messages of the Session sub-protocol.
 ///
@@ -94,8 +95,8 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
 pub struct SessionCodec<const C: usize>;
 
 impl<const C: usize> Encoder for SessionCodec<C> {
-    type Item<'a> = SessionMessage<C>;
     type Error = SessionError;
+    type Item<'a> = SessionMessage<C>;
 
     fn encode(&mut self, item: Self::Item<'_>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let disc = SessionMessageDiscriminants::from(&item) as u8;
@@ -118,8 +119,8 @@ impl<const C: usize> Encoder for SessionCodec<C> {
 }
 
 impl<const C: usize> Decoder for SessionCodec<C> {
-    type Item = SessionMessage<C>;
     type Error = SessionError;
+    type Item = SessionMessage<C>;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         tracing::trace!(msg_len = src.len(), "decoding message");
@@ -171,8 +172,8 @@ mod tests {
     use super::*;
     use crate::session::{
         frames::{FrameId, SegmentId},
+        utils::test::segment,
     };
-    use crate::session::utils::test::segment;
 
     #[test]
     fn ensure_session_protocol_version_1_values() {
@@ -207,12 +208,10 @@ mod tests {
     #[test]
     fn session_message_segment_request_should_serialize_and_deserialize() -> anyhow::Result<()> {
         // The first 8 segments are missing in Frame 10
-        let msg_1 =
-            SessionMessage::<466>::Request(SegmentRequest::from_iter([
-                (2 as FrameId,  [0b11000001].into()),
-                (10 as FrameId, [0b01000100].into())
-                ]
-            ));
+        let msg_1 = SessionMessage::<466>::Request(SegmentRequest::from_iter([
+            (2 as FrameId, [0b11000001].into()),
+            (10 as FrameId, [0b01000100].into()),
+        ]));
         let data = Vec::from(msg_1.clone());
         let msg_2 = SessionMessage::try_from(&data[..])?;
 
@@ -222,8 +221,11 @@ mod tests {
             SessionMessage::Request(r) => {
                 let missing_segments = r.into_iter().collect::<Vec<_>>();
                 let expected = vec![
-                    SegmentId(2, 0), SegmentId(2, 1), SegmentId(2, 7),
-                    SegmentId(10, 1), SegmentId(10, 5),
+                    SegmentId(2, 0),
+                    SegmentId(2, 1),
+                    SegmentId(2, 7),
+                    SegmentId(10, 1),
+                    SegmentId(10, 5),
                 ];
                 assert_eq!(expected, missing_segments);
             }
@@ -236,7 +238,9 @@ mod tests {
     #[test]
     fn session_message_ack_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let mut rng = thread_rng();
-        let frame_ids: Vec<u32> = (0..FrameAcknowledgements::<466>::MAX_ACK_FRAMES).map(|_| rng.gen()).collect();
+        let frame_ids: Vec<u32> = (0..FrameAcknowledgements::<466>::MAX_ACK_FRAMES)
+            .map(|_| rng.r#gen())
+            .collect();
 
         let msg_1 = SessionMessage::<466>::Acknowledge(frame_ids.try_into()?);
         let data = Vec::from(msg_1.clone());
