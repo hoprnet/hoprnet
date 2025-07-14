@@ -1,6 +1,6 @@
 #!/bin/bash
 set -Eeo pipefail
-
+set -x
 env_data=""
 HOPRD_CONFIG_FILE="/etc/hoprd/hoprd.cfg.yaml"
 

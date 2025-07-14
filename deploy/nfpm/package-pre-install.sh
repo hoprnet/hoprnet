@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-
+set -x
 errors=""
 
 check_safe() {
@@ -30,7 +30,7 @@ check_safe() {
 
 test_rpc_provider() {
   url=$1
-  rpc_response=$(curl -s --connect-timeout 3 --max-time 5 -X POST -H "Content-Type: application/json" \
+  rpc_response=$(curl -s --connect-timeout 3 --max-time 5 --retry 5 --retry-delay 2 --retry-connrefused -X POST -H "Content-Type: application/json" \
     --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' "${url}")
   if ! echo "$rpc_response" | jq -e '.result' >/dev/null; then
     errors+="- The 'HOPRD_PROVIDER' environment variable is not a valid RPC provider URL. Please check the URL and try again.\n"
