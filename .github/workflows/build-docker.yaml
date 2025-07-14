@@ -87,7 +87,7 @@ jobs:
             nix_debug_option=""
           fi
           declare docker_tag docker_tag_pr docker_release_latest_tag
-          if ${{ contains(steps.pr-labels.outputs.labels, ' release ') }}; then
+          if [ "${GITHUB_PR_LABEL_RELEASE:-0}" == '1' ]; then
             docker_tag=$(./scripts/get-current-version.sh docker)
             docker_tag_pr=${docker_tag}-pr.${{ github.event.pull_request.number }}
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
