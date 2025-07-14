@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeo pipefail
+set -o errtrace
 
 trap 'echo "Error occurred during package installation. Pausing for manual inspection..."; sleep 3600' ERR
 
