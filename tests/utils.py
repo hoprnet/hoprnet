@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sdk.python.api import Protocol
+from sdk.python.api.balance import Balance
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
 from sdk.python.localcluster.constants import TICKET_PRICE_PER_HOP
@@ -33,7 +34,7 @@ def make_routes(routes_with_hops: list[int], nodes: list[Node]):
 
 
 @asynccontextmanager
-async def create_channel(src: Node, dest: Node, funding: Decimal, close_from_dest: bool = True):
+async def create_channel(src: Node, dest: Node, funding: Balance, close_from_dest: bool = True):
     channel = await src.api.open_channel(dest.address, funding)
     assert channel is not None
     await asyncio.wait_for(check_channel_status(src, dest, status=ChannelStatus.Open), 10.0)
@@ -95,73 +96,62 @@ async def check_outgoing_channel_closed(src: Node, channel_id: str):
             await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_rejected_tickets_value(src: Node, value: Decimal):
-    current = (await src.api.get_tickets_statistics()).rejected_value
-    while current < value:
-        logging.debug(f"Rejected tickets value: {current}, wanted min: {value}")
+async def check_rejected_tickets_value(src: Node, value: Balance):
+    while (current := (await src.api.get_tickets_statistics()).rejected_value) < value:
+        logging.info(f"Rejected tickets value: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
-        current = (await src.api.get_tickets_statistics()).rejected_value
 
 
-async def check_unredeemed_tickets_value_max(src: Node, value: Decimal):
-    current = (await src.api.get_tickets_statistics()).unredeemed_value
-    while current > value:
+async def check_unredeemed_tickets_value_max(src: Node, value: Balance):
+    while (current := (await src.api.get_tickets_statistics()).unredeemed_value) > value:
         logging.debug(f"Unredeemed tickets value: {current}, wanted max: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
-        current = (await src.api.get_tickets_statistics()).unredeemed_value
 
 
-async def check_unredeemed_tickets_value(src: Node, value: Decimal, quantize: Decimal = Decimal("1e-10")):
-    current = Decimal((await src.api.get_tickets_statistics()).unredeemed_value).quantize(quantize)
-    value = value.quantize(quantize)
-    while current < value:
+async def check_unredeemed_tickets_value(src: Node, value: Balance):
+    while (current := (await src.api.get_tickets_statistics()).unredeemed_value) < value:
         logging.debug(f"Unredeemed tickets value: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
-        current = Decimal((await src.api.get_tickets_statistics()).unredeemed_value).quantize(quantize)
 
 
 async def check_winning_tickets_count(src: Node, value: int):
-    current = (await src.api.get_tickets_statistics()).winning_count
-    while current < value:
+    while (current := (await src.api.get_tickets_statistics()).winning_count) < value:
         logging.debug(f"Winning tickets count: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
-        current = (await src.api.get_tickets_statistics()).winning_count
 
 
-async def check_safe_balance(src: Node, value: Decimal):
-    safe_balance = (await src.api.balances()).safe_hopr
-    while f"{safe_balance:.0f}" > f"{value:.0f}":
-        logging.debug(f"Safe balance: {safe_balance:.0f}, wanted max: {value:.0f}")
+async def check_safe_balance(src: Node, value: Balance):
+    while (balance := (await src.api.balances()).safe_hopr) > value:
+        logging.debug(f"Safe balance: {balance}, wanted max: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_native_balance_below(src: Node, value: Decimal):
-    while (await src.api.balances()).native >= value:
+async def check_native_balance_below(src: Node, value: Balance):
+    while (current := (await src.api.balances()).native) >= value:
+        logging.debug(f"Native balance: {current}, wanted max: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_min_incoming_win_prob_eq(src: Node, value: float):
-    while round((await src.api.ticket_min_win_prob()).value, 5) != value:
+async def check_min_incoming_win_prob_eq(src: Node, value: Decimal):
+    while (current := (await src.api.ticket_min_win_prob()).value) != value:
+        logging.debug(f"Min incoming win prob: {current}, wanted: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
 async def check_all_tickets_redeemed(src: Node):
-    current = (await src.api.get_tickets_statistics()).unredeemed_value
-    while current > 0:
-        logging.debug(f"Unredeemed tickets value: {current}, wanted max: 0")
+    while (current := (await src.api.get_tickets_statistics()).unredeemed_value) > Balance.zero("wxHOPR"):
+        logging.debug(f"Unredeemed tickets value: {current}, wanted min: 0")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
-        current = (await src.api.get_tickets_statistics()).unredeemed_value
 
 
 async def get_ticket_price(src: Node):
     ticket_price = await src.api.ticket_price()
-    assert ticket_price is not None
-    logging.debug(f"Ticket price: {ticket_price}")
+    assert ticket_price.value is not None
     return ticket_price.value
 
 
 class RouteBidirectionalChannels:
-    def __init__(self, route: list[Node], funding_fwd: Decimal, funding_return: Decimal):
+    def __init__(self, route: list[Node], funding_fwd: Balance, funding_return: Balance):
         assert len(route) >= 2
         self._fwd_channels = []
         self._ret_channels = []
@@ -175,7 +165,7 @@ class RouteBidirectionalChannels:
 
             logging.debug(
                 f"open forward channel {self._route[i].address} ->"
-                + f"{self._route[i+1].address} with {self._funding_fwd * remaining} HOPR"
+                + f"{self._route[i+1].address} with {self._funding_fwd * remaining}"
             )
             fwd_channel = await self._route[i].api.open_channel(
                 self._route[i + 1].address, self._funding_fwd * remaining
@@ -185,7 +175,7 @@ class RouteBidirectionalChannels:
             ri = len(self._route) - i - 1
             logging.debug(
                 f"open return channel {self._route[ri].address} ->"
-                + f"{self._route[ri-1].address} with {self._funding_return * remaining} HOPR"
+                + f"{self._route[ri-1].address} with {self._funding_return * remaining}"
             )
             ret_channel = await self._route[ri].api.open_channel(
                 self._route[ri - 1].address, self._funding_return * remaining
@@ -269,7 +259,7 @@ class RouteBidirectionalChannels:
         return self._ret_channels
 
 
-def create_bidirectional_channels_for_route(route: list[Node], funding_fwd: Decimal, funding_return: Decimal):
+def create_bidirectional_channels_for_route(route: list[Node], funding_fwd: Balance, funding_return: Balance):
     return RouteBidirectionalChannels(route, funding_fwd, funding_return)
 
 

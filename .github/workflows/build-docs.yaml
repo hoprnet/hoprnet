@@ -11,23 +11,27 @@ env:
 on:
   workflow_call:
     inputs:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
+        required: true
+        type: string
       publish:
         required: true
         type: boolean
         description: 'Publish the docs'
 
 concurrency:
-  group: ${{ github.ref }}-docs
+  group: ${{ inputs.source_branch || github.ref_name }}-docs
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write # for peaceiris/actions-gh-pages to push pages branch
 
 jobs:
   rust:
-    permissions:
-      contents: write # for peaceiris/actions-gh-pages to push pages branch
-    name: Rust docs
+    name: Rust
     # big runner is needed because building docs involves building Rust code
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
@@ -42,6 +46,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_branch }}
 
       - name: Install Nix
         if: env.needs_nix_setup == true

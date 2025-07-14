@@ -66,9 +66,6 @@ class Snapshot:
             self.sdir.joinpath("default.cfg.yaml"),
         ]
 
-        for i in range(self.cluster.size):
-            node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-
         for f in expected_files:
             if not f.exists():
                 logging.warning(f"Cannot find {f} in snapshot")

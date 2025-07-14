@@ -367,12 +367,12 @@ where
                 addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Allow(peer))
+                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
+                    .send(PeerDiscovery::Allow(peer))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
             }

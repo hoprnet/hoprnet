@@ -1,17 +1,24 @@
 ---
-name: Audit PR
+name: Audit
 
 on:
   merge_group:
     types: [checks_requested]
-  pull_request:
-    types:
-      - synchronize
-      - ready_for_review
+  workflow_call:
+    inputs:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
+        required: true
+        type: string
+concurrency:
+  group: ${{ inputs.source_branch || github.ref_name }}-audit
+  cancel-in-progress: true
 
 jobs:
   cargo-audit:
-    name: Cargo Audit
+    name: Audit
     runs-on: self-hosted-hoprnet-big
     steps:
       - name: Harden Runner
@@ -24,6 +31,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_branch }}
 
       - name: Install Nix
         uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31

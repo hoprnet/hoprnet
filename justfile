@@ -22,3 +22,43 @@ run-smoke-test-all:
 # run a single smoke test
 run-smoke-test TEST:
     nix develop .#citest -c uv run --frozen -m pytest tests/test_{{TEST}}.py
+
+package-packager packager arch:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    RELEASE_VERSION=$(./scripts/get-current-version.sh)
+    case "{{arch}}" in
+        x86_64-linux)
+            ARCHITECTURE="amd64"
+            ;;
+        aarch64-linux)
+            ARCHITECTURE="arm64"
+            ;;
+        *)
+            echo "Unsupported architecture: {{arch}}"
+            exit 1
+            ;;
+    esac
+    export RELEASE_VERSION ARCHITECTURE
+    envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
+    mkdir -p dist/packages
+    nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
+
+package arch:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    just package-packager deb {{arch}}
+    just package-packager rpm {{arch}}
+    just package-packager archlinux {{arch}}
+
+test-package packager arch:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    trap 'deploy/nfpm/test-package-tool.sh delete {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log' EXIT
+    deploy/nfpm/test-package-tool.sh create {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log
+    deploy/nfpm/test-package-tool.sh copy {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
+    deploy/nfpm/test-package-tool.sh install {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
+
+# list all available docker image targets which can be built
+list-docker-images:
+    nix flake show --json | jq '.packages | to_entries | .[0].value | to_entries[] | select(.key | endswith("docker")) | .key'
