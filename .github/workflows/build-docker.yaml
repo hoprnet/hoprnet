@@ -188,4 +188,7 @@ jobs:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           repository: ${{ github.repository }}
           event-type: deploy_nodes
-          client-payload: '{"hoprd_cluster_name": "${{ steps.options.outputs.HOPRD_CLUSTER_NAME }}"}'
+          client-payload: |-
+              {
+                "hoprd_cluster_name": "${{ steps.options.outputs.HOPRD_CLUSTER_NAME }}"
+              }
