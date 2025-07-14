@@ -9,7 +9,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["capture"]
+default = []
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 capture = ["dep:pcap-file"]
