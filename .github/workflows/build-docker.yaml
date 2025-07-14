@@ -145,7 +145,7 @@ jobs:
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}
 
       - name: Trigger deploy workflow if needed
-        if: vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && inputs.package == 'hoprd' && contains(steps.pr-labels.outputs.labels, ' deploy_nodes ')
+        if: vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && inputs.package == 'hoprd' && env.GITHUB_PR_LABEL_DEPLOY_NODES == '1'
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
