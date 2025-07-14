@@ -83,16 +83,22 @@ jobs:
         id: options
         run: |
           nix_debug_option="-dev"
+          nix_profile_build="false"
           if [[ "${{ inputs.production }}" = "true" || -n "${GITHUB_PR_LABEL_DOCKER_PRODUCTION_BUILD}" ]]; then
             nix_debug_option=""
+            nix_profile_build="true"
+          fi
+          if [[ -n "${GITHUB_PR_LABEL_DOCKER_PROFILE_BUILD}" ]]; then
+            nix_profile_build="true"
           fi
           declare docker_tag docker_tag_pr docker_release_latest_tag
-          if ${{ contains(steps.pr-labels.outputs.labels, ' release ') }}; then
+          if [ "${GITHUB_PR_LABEL_RELEASE:-0}" == '1' ]; then
             docker_tag=$(./scripts/get-current-version.sh docker)
             docker_tag_pr=${docker_tag}-pr.${{ github.event.pull_request.number }}
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
             echo "DOCKER_TAG_PR=${docker_tag_pr}" >> $GITHUB_OUTPUT
             echo "NIX_BUILD_TARGET=${{ inputs.package }}${nix_debug_option}-docker-build-and-upload" >> $GITHUB_OUTPUT
+            echo "NIX_BUILD_TARGET_PROFILE=${{ inputs.package }}-profile-docker-build-and-upload" >> $GITHUB_OUTPUT
           else
             next_version=$(./scripts/get-next-version.sh Build)
             ./scripts/bump-version.sh ${next_version}
@@ -101,6 +107,9 @@ jobs:
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
             echo "DOCKER_TAG_PR=${docker_tag_pr}" >> $GITHUB_OUTPUT
             echo "NIX_BUILD_TARGET=${{ inputs.package }}${nix_debug_option}-docker-build-and-upload" >> $GITHUB_OUTPUT
+            if [[ "${nix_profile_build}" = "true" ]]; then
+              echo "NIX_BUILD_TARGET_PROFILE=${{ inputs.package }}-profile-docker-build-and-upload" >> $GITHUB_OUTPUT
+            fi
           fi
           base_branch=${{ github.event.pull_request.base.ref }}
           if [ "${base_branch}" == "master" ]; then
@@ -144,11 +153,42 @@ jobs:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}
 
+      - name: Build and push ${{ inputs.package }}-profile docker image - Commit
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
+        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != ''
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
+          IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG }}-profile
+
+      - name: Build and push ${{ inputs.package }}-profile docker image - PR
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
+        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != ''
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
+          IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG_PR }}-profile
+
+      - name: Build and push ${{ inputs.package }}-profile docker image - latest
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
+        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.production && github.event.pull_request.base.ref == 'master'
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
+          IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:latest-profile
+
+      - name: Build and push ${{ inputs.package }}-profile docker image - release-latest
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
+        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.production && steps.options.outputs.DOCKER_RELEASE_LATEST_TAG != ''
+        env:
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
+          IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}-profile
+
       - name: Trigger deploy workflow if needed
-        if: (env.GITHUB_PR_LABEL_DEPLOY_NODES || inputs.production ) && contains(inputs.package,'hoprd') && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true'
+        if: vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && inputs.package == 'hoprd' && env.GITHUB_PR_LABEL_DEPLOY_NODES == '1'
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           repository: ${{ github.repository }}
           event-type: deploy_nodes
-          client-payload: '{"hoprd_cluster_name": "${{ steps.options.outputs.HOPRD_CLUSTER_NAME }}"}'
+          client-payload: |-
+            {
+              "hoprd_cluster_name": "${{ steps.options.outputs.HOPRD_CLUSTER_NAME }}"
+            }

@@ -36,7 +36,7 @@ use futures::{
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
 };
 use helpers::PathPlanner;
-use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
+use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -460,10 +460,46 @@ where
         let (wire_msg_tx, wire_msg_rx) =
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
-        let _mixing_process_before_sending_out =
-            hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
+        let _mixing_process_before_sending_out = hopr_async_runtime::prelude::spawn(
+            mixing_channel_rx
+                .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
+                .map(Ok)
+                .forward(wire_msg_tx),
+        );
 
-        processes.insert(HoprTransportProcess::Medium, spawn_as_abortable(transport_layer.run()));
+        let (transport_events_tx, transport_events_rx) =
+            futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
+
+        let network_clone = self.network.clone();
+        spawn(transport_events_rx.for_each(move |event| {
+            let network = network_clone.clone();
+
+            async move {
+                match event {
+                    hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
+                        if let Err(error) = network
+                            .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
+                            .await
+                        {
+                            tracing::error!(%peer, %error, "Failed to add incoming connection peer");
+                        }
+                    }
+                    hopr_transport_p2p::DiscoveryEvent::FailedDial(peer) => {
+                        if let Err(error) = network
+                            .update(&peer, Err(hopr_transport_network::network::UpdateFailure::DialFailure))
+                            .await
+                        {
+                            tracing::error!(%peer, %error, "Failed to update peer status after failed dial");
+                        }
+                    }
+                }
+            }
+        }));
+
+        processes.insert(
+            HoprTransportProcess::Medium,
+            spawn_as_abortable!(transport_layer.run(transport_events_tx)),
+        );
 
         // -- msg-ack protocol over the wire transport
         let packet_cfg = PacketInteractionConfig {
@@ -482,7 +518,13 @@ where
             packet_cfg,
             self.db.clone(),
             Some(tbf_path),
-            (mixing_channel_tx, wire_msg_rx),
+            (
+                mixing_channel_tx.with(|(peer, msg): (PeerId, Box<[u8]>)| {
+                    trace!(%peer, "sending message to peer");
+                    futures::future::ok::<_, hopr_transport_mixer::channel::SenderError>((peer, msg))
+                }),
+                wire_msg_rx.inspect(|(peer, _)| trace!(%peer, "received message from peer")),
+            ),
             (tx_from_protocol, external_msg_rx),
         )
         .await
@@ -541,7 +583,7 @@ where
         let smgr = self.smgr.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
-            spawn_as_abortable(async move {
+            spawn_as_abortable!(async move {
                 let _the_process_should_not_end = StreamExt::filter_map(rx_from_probing, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {

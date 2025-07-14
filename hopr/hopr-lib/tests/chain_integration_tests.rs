@@ -140,13 +140,13 @@ async fn start_node_chain_logic(
 
     let mut node_tasks = Vec::new();
 
-    node_tasks.push(spawn_as_abortable(async move {
+    node_tasks.push(spawn_as_abortable!(async move {
         action_queue.start().await;
     }));
 
     // Action state tracking
     let (sce_tx, sce_rx) = async_channel::unbounded();
-    node_tasks.push(spawn_as_abortable(async move {
+    node_tasks.push(spawn_as_abortable!(async move {
         let rx = sce_rx.clone();
         pin_mut!(rx);
 
