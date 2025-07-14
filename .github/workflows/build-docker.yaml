@@ -189,6 +189,6 @@ jobs:
           repository: ${{ github.repository }}
           event-type: deploy_nodes
           client-payload: |-
-              {
-                "hoprd_cluster_name": "${{ steps.options.outputs.HOPRD_CLUSTER_NAME }}"
-              }
+            {
+              "hoprd_cluster_name": "${{ steps.options.outputs.HOPRD_CLUSTER_NAME }}"
+            }
