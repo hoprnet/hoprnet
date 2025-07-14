@@ -612,7 +612,7 @@ impl SessionPool {
             let pool_clone_3 = pool.clone();
             Ok(Self {
                 pool: Some(pool),
-                ah: Some(hopr_async_runtime::spawn_as_abortable(
+                ah: Some(hopr_async_runtime::spawn_as_abortable!(
                     futures_time::stream::interval(futures_time::time::Duration::from(
                         std::time::Duration::from_secs(1).max(hopr.config().session.idle_timeout / 2)
                     ))
@@ -704,7 +704,7 @@ async fn create_tcp_client_binding(
             target: target_spec.clone(),
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
-            abort_handle: hopr_async_runtime::spawn_as_abortable(
+            abort_handle: hopr_async_runtime::spawn_as_abortable!(
                 tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
                     .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
                     .for_each_concurrent(None, move |accepted_client| {
@@ -752,7 +752,7 @@ async fn create_tcp_client_binding(
                                 Err(e) => error!(error = %e, "failed to accept connection"),
                             }
                         }
-                    }),
+                    })
             ),
         },
     );
@@ -805,7 +805,7 @@ async fn create_udp_client_binding(
             target: target_spec.clone(),
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
-            abort_handle: hopr_async_runtime::spawn_as_abortable(async move {
+            abort_handle: hopr_async_runtime::spawn_as_abortable!(async move {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
