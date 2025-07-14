@@ -92,7 +92,7 @@ jobs:
             nix_profile_build="true"
           fi
           declare docker_tag docker_tag_pr docker_release_latest_tag
-          if ${{ contains(steps.pr-labels.outputs.labels, ' release ') }}; then
+          if [ "${GITHUB_PR_LABEL_RELEASE:-0}" == '1' ]; then
             docker_tag=$(./scripts/get-current-version.sh docker)
             docker_tag_pr=${docker_tag}-pr.${{ github.event.pull_request.number }}
             echo "DOCKER_TAG=${docker_tag}" >> $GITHUB_OUTPUT
@@ -182,7 +182,7 @@ jobs:
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}-profile
 
       - name: Trigger deploy workflow if needed
-        if: inputs.package == 'hoprd' && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && contains(steps.pr-labels.outputs.labels, 'deploy_nodes')
+        if: vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && inputs.package == 'hoprd' && env.GITHUB_PR_LABEL_DEPLOY_NODES == '1'
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
