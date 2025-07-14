@@ -2,7 +2,7 @@
 set -Eeo pipefail
 set -o errtrace
 
-trap 'echo "Error occurred during package installation. Pausing for manual inspection..."; sleep 3600' ERR
+trap 'echo "Error occurred during package installation. Pausing for manual inspection..."; sleep 60' ERR
 
 #set -x
 DISTRIBUTION="${1:?Error: DISTRIBUTION parameter is required}"

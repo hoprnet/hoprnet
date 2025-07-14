@@ -110,7 +110,7 @@ github_format_changelog() {
 # Build the changelog in JSON format
 json_format_changelog() {
   local change_log_content="$(printf '%s\n' "${changelog_entries[@]}" | jq -s -c '.')"
-  echo -e ${change_log_content}
+  echo -e "${change_log_content}"
 }
 
 # Function to determine the release type
@@ -129,7 +129,7 @@ get_release_type() {
     release_type="unstable"
   fi
 
-  echo ${release_type}
+  echo "${release_type}"
 }
 
 # Function to determine the urgency level

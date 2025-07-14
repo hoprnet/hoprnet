@@ -1,6 +1,6 @@
 #!/bin/bash
 set -Eeo pipefail
-set -x
+
 env_data=""
 HOPRD_CONFIG_FILE="/etc/hoprd/hoprd.cfg.yaml"
 
@@ -195,7 +195,7 @@ generate_identity_file() {
         exit 1
       fi
     else
-      echo "Error: Failed to create the identity file. Please check the HOPR_PASSWORD environment variable."
+      echo "Error: Failed to create the identity file. Please check the HOPRD_PASSWORD environment variable."
       exit 1
     fi
   else
