@@ -183,12 +183,12 @@ jobs:
 
       - name: Trigger deploy workflow if needed
         if: inputs.package == 'hoprd' && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && contains(steps.pr-labels.outputs.labels, 'deploy_nodes')
-        run: |
-          echo "Triggering deploy workflow for hoprd nodes"
-          curl -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/hoprnet/hoprnet/dispatches \
-            -d '{"event_type":"deploy_nodes", "client_payload": {"hoprd_cluster_name":"${{ steps.options.outputs.HOPRD_CLUSTER_NAME }}"}}'
-        env:
-          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        with:
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: deploy_nodes
+          client-payload: |-
+              {
+                "hoprd_cluster_name": "${{ steps.options.outputs.HOPRD_CLUSTER_NAME }}"
+              }
