@@ -243,12 +243,13 @@ where
 
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = HoprBalance::from_be_bytes(balance_decreased.newBalance.to_be_bytes::<12>());
-                    let diff = channel_edits.entry().balance - new_balance;
+                    let diff = channel_edits.entry().unwrap().balance - new_balance;
 
                     let updated_channel = self
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
-                        .await?;
+                        .await?
+                        .unwrap();
 
                     if is_synced
                         && (updated_channel.source == self.chain_key.public().to_address()
@@ -285,12 +286,13 @@ where
 
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = HoprBalance::from_be_bytes(balance_increased.newBalance.to_be_bytes::<12>());
-                    let diff = new_balance - channel_edits.entry().balance;
+                    let diff = new_balance - channel_edits.entry().unwrap().balance;
 
                     let updated_channel = self
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
-                        .await?;
+                        .await?
+                        .unwrap();
 
                     if updated_channel.source == self.chain_key.public().to_address() && is_synced {
                         info!("updating safe balance from chain after channel balance increased event");
@@ -336,8 +338,11 @@ where
                 );
 
                 if let Some(channel_edits) = maybe_channel {
-                    let channel_id = channel_edits.entry().get_id();
-                    let orientation = channel_edits.entry().orientation(&self.chain_key.public().to_address());
+                    let channel_id = channel_edits.entry().unwrap().get_id();
+                    let orientation = channel_edits
+                        .entry()
+                        .unwrap()
+                        .orientation(&self.chain_key.public().to_address());
 
                     // If the channel is our own (incoming or outgoing) reset its fields
                     // and change its state to Closed.
@@ -348,7 +353,7 @@ where
                             .change_balance(HoprBalance::zero())
                             .change_ticket_index(0);
 
-                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?;
+                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?.unwrap();
 
                         // Perform additional tasks based on the channel's direction
                         match direction {
@@ -367,7 +372,11 @@ where
                     } else {
                         // Closed channels that are not our own, we be safely removed
                         // from the database
-                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits.delete()).await?;
+                        let updated_channel = self
+                            .db
+                            .finish_channel_update(tx.into(), channel_edits.delete())
+                            .await?
+                            .unwrap();
                         debug!(channel_id = %channel_id, "foreign closed closed channel was deleted");
                         updated_channel
                     };
@@ -388,20 +397,19 @@ where
                 let channel = if let Some(channel_edits) = maybe_channel {
                     // Check that we're not receiving the Open event without the channel being Close prior
 
-                    if channel_edits.entry().status != ChannelStatus::Closed {
+                    if channel_edits.entry().unwrap().status != ChannelStatus::Closed {
                         warn!(%source, %destination, %channel_id, "received Open event for a channel that is not Closed, marking it as corrupted");
 
-                        let res = self
-                            .db
+                        self.db
                             .finish_channel_update(tx.into(), channel_edits.set_corrupted())
                             .await?;
 
-                        return Ok(Some(ChainEventType::ChannelOpened(res)));
+                        return Ok(None);
                     }
 
                     trace!(%source, %destination, %channel_id, "on_channel_reopened_event");
 
-                    let current_epoch = channel_edits.entry().channel_epoch;
+                    let current_epoch = channel_edits.entry().as_ref().unwrap().channel_epoch;
 
                     // cleanup tickets from previous epochs on channel re-opening
                     if source == self.chain_key.public().to_address()
@@ -437,10 +445,10 @@ where
                     );
 
                     self.db.upsert_channel(tx.into(), new_channel).await?;
-                    new_channel
+                    Some(new_channel)
                 };
 
-                Ok(Some(ChainEventType::ChannelOpened(channel)))
+                Ok(Some(ChainEventType::ChannelOpened(channel.unwrap())))
             }
             HoprChannelsEvents::TicketRedeemed(ticket_redeemed) => {
                 let maybe_channel = self
@@ -449,7 +457,12 @@ where
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
-                    let ack_ticket = match channel_edits.entry().direction(&self.chain_key.public().to_address()) {
+                    let ack_ticket = match channel_edits
+                        .entry()
+                        .as_ref()
+                        .unwrap()
+                        .direction(&self.chain_key.public().to_address())
+                    {
                         // For channels where destination is us, it means that our ticket
                         // has been redeemed, so mark it in the DB as redeemed
                         Some(ChannelDirection::Incoming) => {
@@ -457,7 +470,7 @@ where
                             let mut matching_tickets = self
                                 .db
                                 .get_tickets(
-                                    TicketSelector::from(channel_edits.entry())
+                                    TicketSelector::from(channel_edits.entry().as_ref().unwrap())
                                         .with_state(AcknowledgedTicketStatus::BeingRedeemed),
                                 )
                                 .await?
@@ -487,7 +500,7 @@ where
                                 Ordering::Less => {
                                     error!(
                                         idx = %ticket_redeemed.newTicketIndex.to::<u64>() - 1,
-                                        entry = %channel_edits.entry(),
+                                        entry = %channel_edits.entry().as_ref().unwrap(),
                                         "could not find acknowledged 'BeingRedeemed' ticket",
                                     );
                                     // This is not an error, because the ticket might've become neglected before
@@ -498,11 +511,11 @@ where
                                     error!(
                                         count = matching_tickets.len(),
                                         index = %ticket_redeemed.newTicketIndex.to::<u64>() - 1,
-                                        entry = %channel_edits.entry(),
+                                        entry = %channel_edits.entry().as_ref().unwrap(),
                                         "found tickets matching 'BeingRedeemed'",
                                     );
 
-                                    let entry_str = channel_edits.entry().to_string();
+                                    let entry_str = channel_edits.entry().as_ref().unwrap().to_string();
 
                                     self.db
                                         .finish_channel_update(tx.into(), channel_edits.set_corrupted())
@@ -522,10 +535,10 @@ where
                         // index value in the cache is at least the index of the redeemed ticket
                         Some(ChannelDirection::Outgoing) => {
                             // We need to ensure the outgoing ticket index is at least this new value
-                            debug!(channel = %channel_edits.entry(), "observed redeem event on an outgoing channel");
+                            debug!(channel = %channel_edits.entry().as_ref().unwrap(), "observed redeem event on an outgoing channel");
                             self.db
                                 .compare_and_set_outgoing_ticket_index(
-                                    channel_edits.entry().get_id(),
+                                    channel_edits.entry().as_ref().unwrap().get_id(),
                                     ticket_redeemed.newTicketIndex.to::<u64>(),
                                 )
                                 .await?;
@@ -534,7 +547,7 @@ where
                         // For a channel where neither source nor destination is us, we don't care
                         None => {
                             // Not our redeem event
-                            debug!(channel = %channel_edits.entry(), "observed redeem event on a foreign channel");
+                            debug!(channel = %channel_edits.entry().as_ref().unwrap(), "observed redeem event on a foreign channel");
                             None
                         }
                     };
@@ -548,7 +561,9 @@ where
                                 ticket_redeemed.newTicketIndex.to_be_bytes::<6>(),
                             )),
                         )
-                        .await?;
+                        .await?
+                        .unwrap();
+
                     // Neglect all the tickets in this channel
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
                     self.db
@@ -580,7 +595,8 @@ where
                     let channel = self
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_status(new_status))
-                        .await?;
+                        .await?
+                        .unwrap();
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     error!(channel_id = %Hash::from(closure_initiated.channelId.0), "observed channel closure initiation on a channel that we don't have in the DB");

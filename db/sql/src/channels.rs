@@ -15,14 +15,14 @@ use crate::{
 
 /// API for editing [ChannelEntry] in the DB.
 pub struct ChannelEditor {
-    orig: ChannelEntry,
+    orig: Option<ChannelEntry>,
     model: channel::ActiveModel,
     delete: bool,
 }
 
 impl ChannelEditor {
     /// Original channel entry **before** the edits.
-    pub fn entry(&self) -> &ChannelEntry {
+    pub fn entry(&self) -> &Option<ChannelEntry> {
         &self.orig
     }
 
@@ -87,7 +87,9 @@ pub trait HoprDbChannelOperations {
 
     /// Commits changes of the channel to the database.
     /// Returns the updated channel, or on deletion, the deleted channel entry.
-    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
+    ///
+    /// It can also return `None` if the channel entry is being set as corrupted and a proper `ChannelEntry` cannot be created.
+    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>>;
 
     /// Retrieves the channel by source and destination.
     /// This operation should be able to use cache since it can be also called from
@@ -188,28 +190,26 @@ impl HoprDbChannelOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     Ok::<_, DbSqlError>(
-                        if let Some(model) = Channel::find()
+                        Channel::find()
                             .filter(channel::Column::ChannelId.eq(id_hex))
                             .one(tx.as_ref())
                             .await?
-                        {
-                            Some(ChannelEditor {
-                                orig: model.clone().try_into()?,
+                            .map(|model| ChannelEditor {
+                                orig: model.clone().try_into().ok(),
                                 model: model.into_active_model(),
                                 delete: false,
-                            })
-                        } else {
-                            None
-                        },
+                            }),
                     )
                 })
             })
             .await
     }
 
-    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
+    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>> {
         let epoch = editor.model.epoch.clone();
-        let parties = ChannelParties(editor.orig.source, editor.orig.destination);
+        let origin = editor.orig.ok_or(DbSqlError::DecodingError)?;
+
+        let parties = ChannelParties(origin.source, origin.destination);
         let ret = self
             .nest_transaction(tx)
             .await?
@@ -217,10 +217,15 @@ impl HoprDbChannelOperations for HoprDb {
                 Box::pin(async move {
                     if !editor.delete {
                         let model = editor.model.update(tx.as_ref()).await?;
-                        Ok::<_, DbSqlError>(model.try_into()?)
+                        match ChannelEntry::try_from(model) {
+                            Ok(channel) => Ok::<_, DbSqlError>(Some(channel)),
+                            Err(_) => {
+                                Ok::<_, DbSqlError>(None) // If the channel entry cannot be created, return None
+                            }
+                        }
                     } else {
                         editor.model.delete(tx.as_ref()).await?;
-                        Ok::<_, DbSqlError>(editor.orig)
+                        Ok::<_, DbSqlError>(Some(origin))
                     }
                 })
             })
@@ -230,7 +235,7 @@ impl HoprDbChannelOperations for HoprDb {
         // Finally invalidate any unrealized values from the cache.
         // This might be a no-op if the channel was not in the cache
         // like for channels that are not ours.
-        let channel_id = editor.orig.get_id();
+        let channel_id = origin.get_id();
         if let Some(channel_epoch) = epoch.try_as_ref() {
             self.caches
                 .unrealized_value
