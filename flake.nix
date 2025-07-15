@@ -758,6 +758,34 @@
               '';
             };
           };
+
+          sign-file = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellApplication {
+              name = "sign-file";
+              text = ''
+                set -euo pipefail
+                source_file="$1"
+                echo "Signing file: $source_file"
+
+                # Create isolated GPG keyring
+                gnupghome="$(mktemp -d)"
+                export GNUPGHOME="$gnupghome"
+                echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
+
+                # Generate hash and signature
+                shasum -a 256 "$source_file" > "$source_file".sha256
+                echo "Hash written to $source_file.sha256"
+                gpg --armor --output "$source_file".sig --detach-sign "$source_file"
+                echo "Signature written to $source_file.sig"
+                gpg --armor --output "$source_file".sha256.asc --sign "$source_file".sha256
+                echo "Signature for hash written to $source_file.sha256.asc"
+
+                # Clean up
+                rm -rf "$gnupghome"
+              '';
+            };
+          };
+
           find-port-ci = flake-utils.lib.mkApp {
             drv = pkgs.writeShellApplication {
               name = "find-port";
@@ -909,6 +937,7 @@
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
+            sign = sign-file;
           };
 
           packages = {

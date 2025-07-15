@@ -211,3 +211,4 @@ result
 .pre-commit-config.yaml
 deploy/nfpm/nfpm.generated.yaml
 deploy/nfpm/changelog*
+privatekey.asc
