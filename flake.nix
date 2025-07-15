@@ -763,10 +763,10 @@
             drv = pkgs.writeShellApplication {
               name = "sign-file";
               runtimeInputs = [
-                pkgs.gnupg       # for gpg
-                pkgs.coreutils   # for basic utils like `basename`, `cp`
-                pkgs.openssl     # (optional alternative to shasum)
-                pkgs.perl        # for shasum (shasum is a Perl script)
+                pkgs.gnupg
+                pkgs.coreutils
+                pkgs.openssl
+                pkgs.perl
               ];
               text = ''
                 set -euo pipefail
