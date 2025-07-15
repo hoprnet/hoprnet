@@ -199,8 +199,16 @@
           # also used for Docker image
           hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           # also used for Docker image
+          hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
+          # also used for Docker image
           hoprd-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { CARGO_PROFILE = "dev"; }
+            hoprdBuildArgs
+            // {
+              CARGO_PROFILE = "dev";
+              cargoExtraArgs = "-F capture";
+            }
           );
           hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           hoprd-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
@@ -225,7 +233,11 @@
             hoprdBuildArgs // { runClippy = true; }
           );
           hoprd-dev = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { CARGO_PROFILE = "dev"; }
+            hoprdBuildArgs
+            // {
+              CARGO_PROFILE = "dev";
+              cargoExtraArgs = "-F capture";
+            }
           );
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hoprd-candidate =
@@ -337,7 +349,7 @@
           hoprd-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-x86_64-linux [ ]);
           hoprd-dev-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-x86_64-linux-dev [ ]);
           hoprd-profile-docker = import ./nix/docker-builder.nix (
-            hoprdDockerArgs hoprd-x86_64-linux profileDeps
+            hoprdDockerArgs hoprd-x86_64-linux-profile profileDeps
           );
 
           hopliDockerArgs = package: deps: {

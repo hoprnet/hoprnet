@@ -124,8 +124,10 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
 
-    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run());
-    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run());
+    let (tx, _rx) = futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
+
+    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run(tx.clone()));
+    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run(tx));
 
     // Announce nodes to each other
     api1.update_from_announcements
