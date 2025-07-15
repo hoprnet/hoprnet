@@ -94,6 +94,7 @@ pub(crate) struct InternalState {
         checks::healthyz,
         checks::readyz,
         checks::startedz,
+        checks::version,
         network::price,
         network::probability,
         node::configuration,
@@ -238,6 +239,7 @@ async fn build_api(
                 .route("/readyz", get(checks::readyz))
                 .route("/healthyz", get(checks::healthyz))
                 .route("/eligiblez", get(checks::eligiblez))
+                .route("/version", get(checks::version))
                 .layer(
                     ServiceBuilder::new().layer(
                         CorsLayer::new()
