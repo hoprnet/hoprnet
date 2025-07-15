@@ -35,6 +35,7 @@ prometheus = [
 ]
 mixer-stream = ["dep:rust-stream-ext-concurrent"]
 mixer-channel = []
+capture = ["hopr-transport-protocol/capture"]
 
 [dependencies]
 async-trait = { workspace = true }

@@ -20,7 +20,6 @@ runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
-bitcode = { version = "0.6.6", features = ["serde"] }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 hex = { workspace = true }

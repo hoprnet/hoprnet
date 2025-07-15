@@ -169,6 +169,7 @@ impl HoprDb {
         Ok(fwd)
     }
 
+    #[instrument(level = "trace", skip(self, ack), err(Debug))]
     async fn validate_acknowledgement(
         &self,
         ack: &Acknowledgement,
@@ -239,7 +240,7 @@ impl HoprDb {
 
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
-    #[instrument(level = "trace", skip(self, ack))]
+    #[instrument(level = "trace", skip(self, ack), err(Debug), ret)]
     async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()> {
         let result = self.validate_acknowledgement(&ack).await?;
         match &result {
@@ -301,6 +302,7 @@ impl HoprDbProtocolOperations for HoprDb {
         })?)
     }
 
+    #[tracing::instrument(level = "trace", skip(self, matcher), err)]
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)> {
         let pseudonym = matcher.pseudonym();
         let surbs_for_pseudonym = self
@@ -493,7 +495,7 @@ impl HoprDbProtocolOperations for HoprDb {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, data, pkt_keypair, sender), fields(sender = %sender))]
+    #[tracing::instrument(level = "trace", skip(self, data, pkt_keypair, sender), fields(sender = %sender), err)]
     async fn from_recv(
         &self,
         data: Box<[u8]>,
@@ -501,7 +503,7 @@ impl HoprDbProtocolOperations for HoprDb {
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-    ) -> Result<Option<IncomingPacket>> {
+    ) -> Result<IncomingPacket> {
         let offchain_keypair = pkt_keypair.clone();
         let myself = self.clone();
 
@@ -528,35 +530,40 @@ impl HoprDbProtocolOperations for HoprDb {
                         .value()
                         .push(incoming.surbs)?;
 
-                    tracing::trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
+                    trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
                 }
 
-                if let Some(ack_key) = incoming.ack_key {
-                    Ok(Some(IncomingPacket::Final {
+                Ok(match incoming.ack_key {
+                    None => {
+                        // The contained payload represents an Acknowledgement
+                        IncomingPacket::Acknowledgement {
+                            packet_tag: incoming.packet_tag,
+                            previous_hop: incoming.previous_hop,
+                            ack: incoming
+                                .plain_text
+                                .as_ref()
+                                .try_into()
+                                .map_err(|_| DbSqlError::DecodingError)
+                                .and_then(|ack: Acknowledgement| {
+                                    ack.validate(&incoming.previous_hop)
+                                        .map_err(|e| DbSqlError::AcknowledgementValidationError(e.to_string()))
+                                })
+                                .inspect_err(|error| {
+                                    tracing::error!(%error, "failed to decode the acknowledgement");
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_RECEIVED_ACKS.increment(&["false"]);
+                                })?,
+                        }
+                    }
+                    Some(ack_key) => IncomingPacket::Final {
                         packet_tag: incoming.packet_tag,
                         previous_hop: incoming.previous_hop,
                         sender: incoming.sender,
                         plain_text: incoming.plain_text,
                         ack_key,
-                    }))
-                } else {
-                    // The contained payload represents an Acknowledgement
-                    let ack: Acknowledgement = incoming.plain_text.as_ref().try_into().map_err(|error| {
-                        tracing::error!(%error, "failed to decode the acknowledgement");
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_RECEIVED_ACKS.increment(&["false"]);
-
-                        DbSqlError::DecodingError
-                    })?;
-
-                    let ack = ack
-                        .validate(&incoming.previous_hop)
-                        .map_err(|e| crate::errors::DbSqlError::AcknowledgementValidationError(e.to_string()))?;
-                    self.handle_acknowledgement(ack).await?;
-
-                    Ok(None)
-                }
+                    },
+                })
             }
             HoprPacket::Forwarded(fwd) => {
                 match self
@@ -568,13 +575,13 @@ impl HoprDbProtocolOperations for HoprDb {
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        Ok(Some(IncomingPacket::Forwarded {
+                        Ok(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
                             ack: Acknowledgement::new(fwd.ack_key, pkt_keypair),
-                        }))
+                        })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
@@ -599,6 +606,7 @@ impl HoprDbProtocolOperations for HoprDb {
 }
 
 impl HoprDb {
+    #[tracing::instrument(level = "trace", skip(self, channel))]
     async fn create_multihop_ticket(
         &self,
         channel: ChannelEntry,

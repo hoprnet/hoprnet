@@ -14,7 +14,7 @@ When the developer changes the PR status to **Ready for review**, then the follo
 
 - [Build](./build.yaml)
 - [Tests](./tests.yaml)
-- [Lint](./lint.yaml)
+- [Checks](./checks.yaml)
 - [Docs](./build-docs.yaml)
 
 ### Additional actions
