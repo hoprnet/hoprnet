@@ -5,22 +5,6 @@ use hopr_lib::HoprState;
 
 use crate::AppState;
 
-/// Returns the API version.
-#[utoipa::path(
-    get,
-    path = "/version",
-    description="Returns the API version",
-    responses(
-        (status = 200, description = "API version is returned"),
-        (status = 412, description = "The node is not started and running"),
-    ),
-    tag = "Checks"
-)]
-pub(super) async fn version(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
-    let version = env!("CARGO_PKG_VERSION_MAJOR").to_owned();
-    (StatusCode::OK, version).into_response()
-}
-
 /// Check whether the node is started.
 #[utoipa::path(
         get,
