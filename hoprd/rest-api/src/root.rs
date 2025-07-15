@@ -1,10 +1,13 @@
-use axum::extract::Json;
-use axum::extract::State;
+use std::sync::Arc;
+
+use axum::{
+    extract::{Json, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
+use serde::Serialize;
 
 use crate::{ApiError, ApiErrorStatus, InternalState};
-use axum::{http::StatusCode, response::IntoResponse};
-use serde::Serialize;
-use std::sync::Arc;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
