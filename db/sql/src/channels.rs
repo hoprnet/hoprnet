@@ -88,7 +88,8 @@ pub trait HoprDbChannelOperations {
     /// Commits changes of the channel to the database.
     /// Returns the updated channel, or on deletion, the deleted channel entry.
     ///
-    /// It can also return `None` if the channel entry is being set as corrupted and a proper `ChannelEntry` cannot be created.
+    /// It can also return `None` if the channel entry is being set as corrupted and a proper `ChannelEntry` cannot be
+    /// created.
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>>;
 
     /// Retrieves the channel by source and destination.
