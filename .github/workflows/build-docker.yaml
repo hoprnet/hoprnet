@@ -33,6 +33,7 @@ concurrency:
 jobs:
   docker:
     runs-on: self-hosted-hoprnet-bigger
+    if: inputs.package != 'hopr-pluto' || vars.BUILD_HOPR_PLUTO_DOCKER == 'true'
     timeout-minutes: 60
     steps:
       - name: Harden Runner
