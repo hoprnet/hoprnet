@@ -41,7 +41,7 @@ package packager arch:
     esac
     export RELEASE_VERSION ARCHITECTURE
     envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
-    ./scripts/generate-changelog.sh "${RELEASE_VERSION}" "{{packager}}" true > ./deploy/nfpm/changelog
+    ./scripts/generate-changelog.sh "${RELEASE_VERSION}" "{{packager}}" false > ./deploy/nfpm/changelog
     [[ "{{packager}}" == "deb" ]] && cat ./deploy/nfpm/changelog | gzip -9 > ./deploy/nfpm/changelog.gz
     [[ "{{packager}}" == "deb" ]] && sed -i.backup '/^license:.*/d' deploy/nfpm/nfpm.generated.yaml && rm deploy/nfpm/nfpm.generated.yaml.backup
     mkdir -p dist/packages

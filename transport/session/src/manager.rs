@@ -367,7 +367,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
         let myself = self.clone();
-        let ah_closure_notifications = hopr_async_runtime::spawn_as_abortable(session_close_rx.for_each_concurrent(
+        let ah_closure_notifications = hopr_async_runtime::spawn_as_abortable!(session_close_rx.for_each_concurrent(
             None,
             move |closed_session_id| {
                 let myself = myself.clone();
@@ -397,7 +397,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         // This ensures the dangling expired sessions are properly closed
         // and their closure is timely notified to the other party.
         let myself = self.clone();
-        let ah_session_expiration = hopr_async_runtime::spawn_as_abortable(async move {
+        let ah_session_expiration = hopr_async_runtime::spawn_as_abortable!(async move {
             let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
             let timeout = 2 * initiation_timeout_max_one_way(
                 myself.cfg.initiation_timeout_base,

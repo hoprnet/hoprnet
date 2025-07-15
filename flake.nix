@@ -199,8 +199,16 @@
           # also used for Docker image
           hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           # also used for Docker image
+          hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
+          # also used for Docker image
           hoprd-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { CARGO_PROFILE = "dev"; }
+            hoprdBuildArgs
+            // {
+              CARGO_PROFILE = "dev";
+              cargoExtraArgs = "-F capture";
+            }
           );
           hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           hoprd-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
@@ -225,7 +233,11 @@
             hoprdBuildArgs // { runClippy = true; }
           );
           hoprd-dev = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { CARGO_PROFILE = "dev"; }
+            hoprdBuildArgs
+            // {
+              CARGO_PROFILE = "dev";
+              cargoExtraArgs = "-F capture";
+            }
           );
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hoprd-candidate =
@@ -337,7 +349,7 @@
           hoprd-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-x86_64-linux [ ]);
           hoprd-dev-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-x86_64-linux-dev [ ]);
           hoprd-profile-docker = import ./nix/docker-builder.nix (
-            hoprdDockerArgs hoprd-x86_64-linux profileDeps
+            hoprdDockerArgs hoprd-x86_64-linux-profile profileDeps
           );
 
           hopliDockerArgs = package: deps: {
@@ -746,6 +758,34 @@
               '';
             };
           };
+
+          sign-file = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellApplication {
+              name = "sign-file";
+              text = ''
+                set -euo pipefail
+                source_file="$1"
+                echo "Signing file: $source_file"
+
+                # Create isolated GPG keyring
+                gnupghome="$(mktemp -d)"
+                export GNUPGHOME="$gnupghome"
+                echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
+
+                # Generate hash and signature
+                shasum -a 256 "$source_file" > "$source_file".sha256
+                echo "Hash written to $source_file.sha256"
+                gpg --armor --output "$source_file".sig --detach-sign "$source_file"
+                echo "Signature written to $source_file.sig"
+                gpg --armor --output "$source_file".sha256.asc --sign "$source_file".sha256
+                echo "Signature for hash written to $source_file.sha256.asc"
+
+                # Clean up
+                rm -rf "$gnupghome"
+              '';
+            };
+          };
+
           find-port-ci = flake-utils.lib.mkApp {
             drv = pkgs.writeShellApplication {
               name = "find-port";
@@ -897,6 +937,7 @@
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
+            sign = sign-file;
           };
 
           packages = {

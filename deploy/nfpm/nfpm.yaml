@@ -13,7 +13,7 @@ description: |
   users' data. This package contains the HOPR node daemon (hoprd) and the 
   command line interface (hopli) to interact with it.
 
-license: GNU Lesser General Public License v3.0
+license: GNU General Public License v3.0
 homepage: https://hoprnet.org
 depends:
   - systemd

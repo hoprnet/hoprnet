@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "3.0.0"
+version = "3.0.0-rc.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
@@ -35,6 +35,7 @@ prometheus = [
   "hopr-network-types/prometheus",
   "hopr-strategy/prometheus",
 ]
+capture = ["hopr-transport/capture"]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
