@@ -67,15 +67,31 @@ let
 
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchainFun;
 
-  # mold is only supported on Linux, so falling back to lld on Darwin
+  # mold is only supported on Linux builds, so falling back to lld for Darwin
   linker = if buildPlatform.isDarwin then "lld" else "mold";
 
-  buildEnvBase = {
-    CARGO_BUILD_TARGET = cargoTarget;
-    "CARGO_TARGET_${envCase cargoTarget}_LINKER" = "${pkgs.stdenv.cc.targetPrefix}cc";
-    HOST_CC = "${pkgs.stdenv.cc.nativePrefix}cc";
-    CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
-  };
+  buildEnvBase =
+    {
+      CARGO_BUILD_TARGET = cargoTarget;
+      "CARGO_TARGET_${envCase cargoTarget}_LINKER" = "${pkgs.stdenv.cc.targetPrefix}cc";
+      HOST_CC = "${pkgs.stdenv.cc.nativePrefix}cc";
+    }
+    // (
+      if isCross then
+        {
+          # For cross-compilation, don't use mold/lld as it can cause issues
+          CARGO_BUILD_RUSTFLAGS = "";
+          # Provide host OpenSSL for proc macros (like sqlx-macros) during cross-compilation
+          OPENSSL_LIB_DIR = "${pkgsLocal.openssl.out}/lib";
+          OPENSSL_INCLUDE_DIR = "${pkgsLocal.openssl.dev}/include";
+          # For musl static linking, pthread is provided by libc
+          RUSTFLAGS = "-C target-feature=-crt-static";
+        }
+      else
+        {
+          CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
+        }
+    );
   buildEnvStatic =
     if isStatic then
       {
