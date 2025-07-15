@@ -772,6 +772,9 @@
                 set -euo pipefail
                 source_file="$1"
                 echo "Signing file: $source_file"
+                outdir="$(pwd)"
+                basename="$(basename "$source_file")"
+
 
                 # Create isolated GPG keyring
                 gnupghome="$(mktemp -d)"
@@ -779,12 +782,12 @@
                 echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
 
                 # Generate hash and signature
-                shasum -a 256 "$source_file" > "$source_file".sha256
-                echo "Hash written to $source_file.sha256"
-                gpg --armor --output "$source_file".sig --detach-sign "$source_file"
-                echo "Signature written to $source_file.sig"
-                gpg --armor --output "$source_file".sha256.asc --sign "$source_file".sha256
-                echo "Signature for hash written to $source_file.sha256.asc"
+                shasum -a 256 "$source_file" > "$outdir/$basename.sha256"
+                echo "Hash written to $outdir/$basename.sha256"
+                gpg --armor --output "$outdir/$basename.sig" --detach-sign "$source_file"
+                echo "Signature written to $outdir/$basename.sig"
+                gpg --armor --output "$outdir/$basename.sha256.asc" --sign "$outdir/$basename.sha256"
+                echo "Signature for hash written to $outdir/$basename.sha256.asc"
 
                 # Clean up
                 rm -rf "$gnupghome"
