@@ -122,7 +122,7 @@ pub trait HoprDbChannelOperations {
     /// Retrieves all corrupted channels information from the DB.
     async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<CorruptedChannelEntry>>;
 
-    /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s
+    /// Returns a stream of all non-corrupted channels that are `Open` or `PendingToClose` with an active grace period.s
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>>;
 
     /// Inserts or updates the given channel entry.
@@ -367,6 +367,7 @@ impl HoprDbChannelOperations for HoprDb {
                         )))
                         .and(channel::Column::ClosureTime.gt(Utc::now()))),
             )
+            .filter(channel::Column::Corrupted.eq(false))
             .stream(&self.index_db)
             .await?
             .map_err(DbSqlError::from)

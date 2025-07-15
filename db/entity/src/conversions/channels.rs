@@ -99,6 +99,11 @@ impl TryFrom<channel::Model> for CorruptedChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
+        if !value.corrupted {
+            return Err(DbEntityError::ConversionError(
+                "channel is not marked as corrupted".into(),
+            ));
+        }
         (&value).try_into()
     }
 }
