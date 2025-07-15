@@ -54,11 +54,7 @@ let
 
   solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
 
-  cargoTarget =
-    if hostPlatform.config == "armv7l-unknown-linux-gnueabihf" then
-      "armv7-unknown-linux-gnueabihf"
-    else
-      hostPlatform.config;
+  cargoTarget = hostPlatform.config;
 
   rustToolchainFun =
     if useRustNightly then
