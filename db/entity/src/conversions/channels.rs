@@ -48,16 +48,15 @@ impl TryFrom<&channel::Model> for ChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
-        let status = value.try_into()?;
-
-        Ok(ChannelEntry::new(
-            value.source.parse()?,
-            value.destination.parse()?,
-            HoprBalance::from(U256::from_be_bytes(&value.balance)),
-            U256::from_be_bytes(&value.ticket_index),
-            status,
-            U256::from_be_bytes(&value.epoch),
-        ))
+        if value.corrupted {
+            return Err(DbEntityError::ConversionError(
+                "cannot convert corrupted channel model to ChannelEntry".into(),
+            ));
+        }
+        match model_to_channel_entry_unchecked(&value) {
+            Ok(channel_entry) => Ok(channel_entry),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -65,7 +64,16 @@ impl TryFrom<channel::Model> for ChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
-        (&value).try_into()
+        if value.corrupted {
+            return Err(DbEntityError::ConversionError(
+                "cannot convert corrupted channel model to ChannelEntry".into(),
+            ));
+        }
+
+        match model_to_channel_entry_unchecked(&value) {
+            Ok(channel_entry) => Ok(channel_entry),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -90,8 +98,15 @@ impl TryFrom<&channel::Model> for CorruptedChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
-        let channel = ChannelEntry::try_from(value)?;
-        Ok(CorruptedChannelEntry::from(channel))
+        if !value.corrupted {
+            return Err(DbEntityError::ConversionError(
+                "cannot convert non-corrupted channel model to CorruptedChannelEntry".into(),
+            ));
+        }
+        match model_to_channel_entry_unchecked(&value) {
+            Ok(channel_entry) => Ok(CorruptedChannelEntry::new(channel_entry)),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -101,10 +116,13 @@ impl TryFrom<channel::Model> for CorruptedChannelEntry {
     fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
         if !value.corrupted {
             return Err(DbEntityError::ConversionError(
-                "channel is not marked as corrupted".into(),
+                "cannot convert non-corrupted channel model to CorruptedChannelEntry".into(),
             ));
         }
-        (&value).try_into()
+        match model_to_channel_entry_unchecked(&value) {
+            Ok(channel_entry) => Ok(CorruptedChannelEntry::new(channel_entry)),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -114,4 +132,15 @@ impl From<CorruptedChannelEntry> for channel::ActiveModel {
         ret.corrupted = Set(true);
         ret
     }
+}
+
+fn model_to_channel_entry_unchecked(model: &channel::Model) -> Result<ChannelEntry, DbEntityError> {
+    Ok(ChannelEntry::new(
+        model.source.parse()?,
+        model.destination.parse()?,
+        HoprBalance::from(U256::from_be_bytes(&model.balance)),
+        U256::from_be_bytes(&model.ticket_index),
+        model.try_into()?,
+        U256::from_be_bytes(&model.epoch),
+    ))
 }
