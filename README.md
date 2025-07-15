@@ -74,6 +74,7 @@ Unless stated otherwise, the following sections only apply to `hoprd`.
 
 ## Install
 
+
 For production purposes always run the latest stable release.
 
 Multiple options for installation exist, the preferred choice for any production system should be to use the container image (e.g. using `docker`).
