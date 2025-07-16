@@ -2,20 +2,32 @@
 set -Eeuo pipefail
 #set -x
 
-PROJECT_ID="hopr-staging"
-ZONE="europe-west3-a"
+PROJECT_ID="${GCP_PROJECT:-hoprassociation}"
+ZONE="europe-west4-a"
 MACHINE_TYPE_x86="e2-medium"      # GCP's x86_64 instances
 MACHINE_TYPE_ARM="t2a-standard-2" # GCP's ARM instances
-NETWORK="vpc-network"
-SUBNET="private-subnet"
+NETWORK="default"
+SUBNET="default"
 
 get_vm_image() {
   case "${DISTRIBUTION}" in
   deb)
-    echo "projects/debian-cloud/global/images/family/debian-12"
+    if [ "${ARCHITECTURE}" == "aarch64-linux" ]; then
+      echo "projects/debian-cloud/global/images/family/debian-12-arm64"
+      return
+    else
+      echo "projects/debian-cloud/global/images/family/debian-12"
+      return
+    fi
     ;;
   rpm)
-    echo "projects/centos-cloud/global/images/family/centos-stream-9"
+    if [ "${ARCHITECTURE}" == "aarch64-linux" ]; then
+      echo "projects/centos-cloud/global/images/family/centos-stream-9-arm64"
+      return
+    else
+      echo "projects/centos-cloud/global/images/family/centos-stream-9"
+      return
+    fi
     ;;
   archlinux)
     # https://github.com/GoogleCloudPlatform/compute-archlinux-image-builder
@@ -33,7 +45,7 @@ create_action() {
   image=$(get_vm_image "${DISTRIBUTION}")
 
   echo "Creating VM for distribution: $DISTRIBUTION, architecture: $ARCHITECTURE"
-  if [ "${ARCHITECTURE}" == "aarch64" ]; then
+  if [ "${ARCHITECTURE}" == "aarch64-linux" ]; then
     machine_type="$MACHINE_TYPE_ARM"
   else
     machine_type="$MACHINE_TYPE_x86"
@@ -72,6 +84,7 @@ copy_action() {
   script_dir=$(cd "$(dirname "$0")" && pwd)
   if [ -f "${script_dir}/hopr.id" ]; then
     gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/hopr.id" "${INSTANCE_NAME}":/etc/hoprd/hopr.id
+    gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="sudo chown root:root /etc/hoprd/hopr.id && sudo chmod 644 /etc/hoprd/hopr.id" --quiet 2>/dev/null
   fi
   gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/install-hoprd-package.sh" "${INSTANCE_NAME}":/tmp/install-hoprd-package.sh
   gcloud compute scp --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${script_dir}/../../dist/packages/hoprd-${ARCHITECTURE}.${DISTRIBUTION}" "${INSTANCE_NAME}":/tmp/hoprd."${DISTRIBUTION}"

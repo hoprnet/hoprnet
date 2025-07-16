@@ -741,6 +741,43 @@
               '';
             };
           };
+
+          sign-file = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellApplication {
+              name = "sign-file";
+              runtimeInputs = [
+                pkgs.gnupg
+                pkgs.coreutils
+                pkgs.openssl
+                pkgs.perl
+              ];
+              text = ''
+                set -euo pipefail
+                source_file="$1"
+                echo "Signing file: $source_file"
+                outdir="$(pwd)"
+                basename="$(basename "$source_file")"
+
+
+                # Create isolated GPG keyring
+                gnupghome="$(mktemp -d)"
+                export GNUPGHOME="$gnupghome"
+                echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
+
+                # Generate hash and signature
+                shasum -a 256 "$source_file" > "$outdir/$basename.sha256"
+                echo "Hash written to $outdir/$basename.sha256"
+                gpg --armor --output "$outdir/$basename.sig" --detach-sign "$source_file"
+                echo "Signature written to $outdir/$basename.sig"
+                gpg --armor --output "$outdir/$basename.sha256.asc" --sign "$outdir/$basename.sha256"
+                echo "Signature for hash written to $outdir/$basename.sha256.asc"
+
+                # Clean up
+                rm -rf "$gnupghome"
+              '';
+            };
+          };
+
           find-port-ci = flake-utils.lib.mkApp {
             drv = pkgs.writeShellApplication {
               name = "find-port";
@@ -783,6 +820,8 @@
               "Makefile"
               "db/entity/src/codegen/*"
               "deploy/compose/grafana/config.monitoring"
+              "deploy/nfpm/nfpm.yaml"
+              ".github/workflows/build-binaries.yaml"
               "docs/*"
               "ethereum/bindings/src/codegen/*"
               "ethereum/contracts/Makefile"
@@ -890,6 +929,7 @@
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
+            sign = sign-file;
           };
 
           packages = {
