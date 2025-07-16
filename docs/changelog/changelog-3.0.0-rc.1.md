@@ -118,5 +118,3 @@ What's changed
 * Add support for libp2p_stream into the swarm object by @Teebor-Choka in #6928
 * Remove database connection opening per-packet by @NumberFour8 in #6922
 * Introduce WinningProbability type by @NumberFour8 in #6921
-
-
