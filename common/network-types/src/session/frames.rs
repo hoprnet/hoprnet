@@ -7,7 +7,10 @@ use std::{
 
 use hopr_primitive_types::prelude::GeneralError;
 
-use crate::{prelude::errors::SessionError, session::protocol::MissingSegmentsBitmap};
+use crate::{
+    prelude::{errors::SessionError, utils::to_hex_shortened},
+    session::protocol::MissingSegmentsBitmap,
+};
 
 /// ID of a [Frame].
 pub type FrameId = u32;
@@ -49,21 +52,10 @@ pub struct Frame {
 
 impl Debug for Frame {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        const DBG_LEN: usize = 16;
-        let excerpt = if self.data.len() > DBG_LEN {
-            format!(
-                "{}..{}",
-                hex::encode(&self.data[0..DBG_LEN / 2]),
-                hex::encode(&self.data[self.data.len() - DBG_LEN / 2..])
-            )
-        } else {
-            hex::encode(&self.data)
-        };
-
         f.debug_struct("Frame")
             .field("frame_id", &self.frame_id)
             .field("len", &self.data.len())
-            .field("data", &excerpt)
+            .field("data", &to_hex_shortened(&self.data, 16))
             .field("is_terminating", &self.is_terminating)
             .finish()
     }
@@ -124,7 +116,7 @@ impl From<OrderedFrame> for Frame {
 }
 
 /// Carries segment flags and the length of the segment sequence.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Default, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
 pub struct SeqIndicator(SeqNum);
 
@@ -166,6 +158,15 @@ impl SeqIndicator {
     #[inline]
     pub const fn value(&self) -> SeqNum {
         self.0
+    }
+}
+
+impl Debug for SeqIndicator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SeqIndicator")
+            .field("seq_num", &self.seq_num())
+            .field("is_terminating", &self.is_terminating())
+            .finish()
     }
 }
 
@@ -250,7 +251,7 @@ impl Debug for Segment {
             .field("frame_id", &self.frame_id)
             .field("seq_id", &self.seq_idx)
             .field("seq_flags", &self.seq_flags)
-            .field("data", &hex::encode(&self.data))
+            .field("data", &to_hex_shortened(&self.data, 16))
             .finish()
     }
 }
@@ -390,6 +391,7 @@ impl FrameBuilder {
     }
 }
 
+/// Allows inspecting incomplete frame buffer inside the Reassembler.
 // Must use only FrameDashMap, others cannot be reference-cloned
 #[derive(Clone, Debug)]
 pub struct FrameInspector(pub(crate) FrameDashMap);
@@ -427,6 +429,7 @@ pub(crate) enum FrameMapEntry<O: FrameMapOccupiedEntry, V: FrameMapVacantEntry> 
     Vacant(V),
 }
 
+/// An abstraction of a Hash Map, suitable for reassembling frames.
 pub(crate) trait FrameMap {
     type ExistingEntry<'a>: FrameMapOccupiedEntry
     where
@@ -594,6 +597,15 @@ impl FrameMap for FrameHashMap {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn terminating_sequence_indicator_should_be_greater_than_non_terminating() -> anyhow::Result<()> {
+        let ind_1 = SeqIndicator::new_with_flags(1, true);
+        let ind_2 = SeqIndicator::new_with_flags(1, false);
+
+        assert!(ind_1 > ind_2);
+        Ok(())
+    }
 
     #[test]
     fn segment_should_serialize_and_deserialize() -> anyhow::Result<()> {

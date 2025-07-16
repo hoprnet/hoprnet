@@ -11,9 +11,10 @@
 //! capabilities of individual segments.
 //!
 //! # Overview of the module
-//! - Protocol messages are defined in the [`protocol`] submodule.
-//! - Protocol state machine is defined in the [`state`] submodule.
-//! - Frames, segmentation and reassembly are defined in the `frame` submodule.
+//! - Protocol messages are defined in the `protocol` submodule.
+//! - Socket-like Session interface is defined in `socket` submodule.
+//! - Frames and segments are defined in the `frames` module.
+//! - Segmentation, reassembly and sequencing are defined in the `processing` submodule.
 
 /// Contains errors thrown from this module.
 pub mod errors;

@@ -1,5 +1,5 @@
+//! This module defines the [`Sequencer`] stream adaptor.
 use std::{
-    cmp::Reverse,
     collections::BinaryHeap,
     future::Future,
     pin::Pin,
@@ -12,6 +12,27 @@ use tracing::instrument;
 
 use crate::{prelude::errors::SessionError, session::frames::FrameId};
 
+/// Sequencer is an adaptor for streams, that yield elements that have a natural ordering and
+/// can be compared with [`FrameId`] and puts them in the correct sequence starting with
+/// `FrameId` equal to 1.
+///
+/// Sequencer internally maintains a `FrameId` to be yielded next, polls the underlying stream
+/// and yields elements only when they match the next `FrameId` to be yielded, incrementing the
+/// value on each yield.
+///
+/// The Sequencer takes to arguments: `max_wait` and `capacity`:
+///
+/// The `max_wait` indicates the maximum amount of time to wait for a certain `FrameId` to
+/// be yielded from the underlying stream.
+/// If this does not happen, the Segmenter yields an error,
+/// indicating that the given frame was discarded.
+///
+/// The `capacity` parameter sets the maximum number of buffered elements inside the Sequencer.
+/// If this value is reached, the Sequencer will stop polling the underlying stream, waiting for the
+/// next element to expire.
+///
+/// By definition, Sequencer is a fallible stream, yielding either `Ok(Item)`, `Err(`[`SessionError::FrameDiscarded`]`)`
+/// or `Ok(None)` when the underlying stream is closed and no more elements can be yielded.
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Sequencer<S: futures::Stream> {
@@ -92,7 +113,7 @@ where
                                 return Poll::Pending;
                             }
                             (_, Poll::Ready(_)) => {
-                                // Simulate buffer update when timer elapses
+                                // Simulate buffer update when the timer elapses
                                 tracing::trace!("timer elapsed");
                                 *this.state = State::BufferUpdated;
                             }
@@ -104,7 +125,7 @@ where
                                 } else {
                                     // Push new item to the buffer
                                     tracing::trace!("new item");
-                                    this.buffer.push(Reverse(item));
+                                    this.buffer.push(std::cmp::Reverse(item));
                                     *this.state = State::BufferUpdated;
                                 }
                             }
@@ -120,6 +141,7 @@ where
                     }
                 }
                 State::BufferUpdated => {
+                    // The buffer has been updated, check if we can yield something
                     if let Some(next) = this.buffer.peek().map(|item| &item.0) {
                         if next.eq(this.next_id) {
                             *this.next_id = this.next_id.wrapping_add(1);
@@ -145,9 +167,11 @@ where
                         tracing::trace!("buffer is empty");
                     }
 
+                    // Nothing to yield, keep on polling
                     *this.state = State::Polling;
                 }
                 State::Done => {
+                    // The underlying stream is done, drain what we have in the internal buffer
                     return if let Some(next) = this.buffer.peek().map(|item| &item.0) {
                         if next.lt(this.next_id) {
                             tracing::trace!("old item");
@@ -174,6 +198,8 @@ where
 }
 
 pub trait SequencerExt: futures::Stream {
+    /// Attaches a [`Sequencer`] to the underlying stream, given the item `timeout` and `capacity`
+    /// of items.
     fn sequencer(self, timeout: Duration, capacity: usize) -> Sequencer<Self>
     where
         Self::Item: Ord + PartialOrd<FrameId>,

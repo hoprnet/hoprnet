@@ -1,3 +1,5 @@
+//! This module defines the socket-like interface for Session protocol.
+
 pub mod ack_state;
 pub mod state;
 
@@ -55,7 +57,7 @@ pub struct SessionSocketConfig {
 /// implements [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`].
 ///
 /// The [`SocketState`] `S` given during instantiation can facilitate reliable or unreliable
-/// behavior.
+/// behavior (see [`AcknowledgementState`](ack_state::AcknowledgementState))
 #[pin_project::pin_project]
 pub struct SessionSocket<const C: usize, S> {
     // This is where upstream writes the to-be-segmented frame data to

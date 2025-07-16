@@ -1,3 +1,55 @@
+//! # `Session` protocol messages
+//!
+//! The protocol components are built via low-level types of the `frame` module, such as
+//! [`Segment`] and [`Frame`](crate::session::Frame).
+//! Most importantly, the `Session` protocol fixes the maximum number of segments per frame
+//! to 8 (see [`MAX_SEGMENTS_PER_FRAME`](SessionMessage::MAX_SEGMENTS_PER_FRAME)).
+//! Since each segment must fit within a maximum transmission unit (MTU),
+//! a frame can be at most *eight* times the size of the MTU.
+//!
+//! The [current version](SessionMessage::VERSION) of the protocol consists of three
+//! messages that are sent and received via the underlying transport:
+//! - [`Segment message`](Segment)
+//! - [`Retransmission request`](SegmentRequest)
+//! - [`Frame acknowledgement`](FrameAcknowledgements)
+//!
+//! All of these messages are bundled within the [`SessionMessage`] enum,
+//! which is then encoded as a byte array of a maximum
+//! MTU size `C` (which is a generic const argument of the `SessionMessage` type).
+//! The header of the `SessionMessage` encoding consists of the [`version`](SessionMessage::VERSION)
+//! byte, followed by the discriminator byte of one of the above messages and then followed by
+//! the message length and message's encoding itself.
+//!
+//! ## Segment message ([`Segment`](SessionMessage::Segment))
+//!
+//! The Segment message contains the payload [`Segment`] of some [`Frame`](crate::session::Frame).
+//! The size of this message can range from [`the minimum message size`](SessionMessage::minimum_message_size)
+//! up to `C`.
+//!
+//! ## Retransmission request message ([`Request`](SessionMessage::Request))
+//!
+//! Contains a request for retransmission of missing segments in a frame. This is sent from
+//! the segment recipient to the sender, once it realizes some of the received frames are incomplete
+//! (after a certain period of time).
+//!
+//! The encoding of this message consists of pairs of [frame ID](FrameId) and
+//! a single byte bitmap of requested segments in this frame.
+//! Each pair is therefore [`ENTRY_SIZE`](SegmentRequest::ENTRY_SIZE) bytes-long.
+//! There can be at most [`MAX_ENTRIES`](SegmentRequest::MAX_ENTRIES)
+//! in a single Retransmission request message, given `C` as the MTU size. If the message contains
+//! fewer entries, it is padded with zeros (0 is not a valid frame ID).
+//! If more frames have missing segments, multiple retransmission request messages need to be sent.
+//!
+//! ## Frame acknowledgement message ([`Acknowledge`](SessionMessage::Acknowledge))
+//!
+//! This message is sent from the segment recipient to the segment sender to acknowledge that
+//! all segments of certain frames have been completely and correctly received by the recipient.
+//!
+//! The message consists simply of a [frame ID](FrameId) list of the completely received
+//! frames. There can be at most [`MAX_ACK_FRAMES`](FrameAcknowledgements::MAX_ACK_FRAMES)
+//! per message. If more frames need to be acknowledged, more messages need to be sent.
+//! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
+
 mod messages;
 
 use asynchronous_codec::{Decoder, Encoder};
@@ -6,7 +58,7 @@ pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest}
 
 use crate::session::{
     errors::SessionError,
-    frames::{Segment, SeqIndicator},
+    frames::{FrameId, Segment, SeqIndicator},
 };
 
 /// Contains all messages of the Session sub-protocol.

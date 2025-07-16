@@ -327,8 +327,8 @@ mod tokio_utils {
     }
 }
 
-/// Converts a [`AsyncRead`] into [`Stream`] by reading at most `S` bytes
-/// in each call to [`Stream::poll_next`].
+/// Converts a [`AsyncRead`] into `futures::Stream` by reading at most `S` bytes
+/// in each call to `Stream::poll_next`.
 #[pin_project::pin_project]
 pub struct AsyncReadStreamer<const S: usize, R>(#[pin] pub R);
 

@@ -21,7 +21,7 @@ pub struct SocketComponents<const C: usize> {
     pub ctl_tx: UnboundedSender<SessionMessage<C>>,
 }
 
-/// Abstraction of the [`SessionSocket`] state.
+/// Abstraction of the [`SessionSocket`](super::SessionSocket) state.
 pub trait SocketState<const C: usize>: Send {
     /// Gets ID of this Session.
     fn session_id(&self) -> &str;

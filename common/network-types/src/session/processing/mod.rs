@@ -1,3 +1,14 @@
+//! This module contains the three main parts for frame processing.
+//! Each of them is represented using an adaptor
+//! extension to [`futures::Stream`] or [`futures::Sink`]
+//!
+//!
+//! 1. Segmenter
+//! 2. Reassembler
+//! 3. Sequencer
+//!
+//! Reassembler followed by a Sequencer is commonly called frame Reconstructor.
+
 mod reassembly;
 mod segmenter;
 mod sequencer;

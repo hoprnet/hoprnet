@@ -1,3 +1,4 @@
+//! This module defines a [`Segmenter`] adaptor for [`futures::Sink`].
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -12,7 +13,21 @@ use crate::session::{
     protocol::SessionMessage,
 };
 
-/// `C` is MTU size.
+/// Segmenter is an adaptor to [`futures::Sink`] of [`Segment`] items
+/// that turns it into [`futures::io::AsyncWrite`].
+///
+/// Bytes written to the Segmenter are buffered up and/or chopped into [`Segment`]
+/// of at most `C` in payload size (the `data` member).
+///
+/// The data are grouped into [`Frames`](frames::Frame) of the size given by the `frame_size`
+/// parameter, segments in each such group share the same [`FrameId`].
+/// This acts as a natural buffering feature of a Segmenter.
+///
+/// Segmenter can optionally send a [terminating](Segment::terminating) when `poll_close`
+/// is called.
+///
+/// Segmenter is essentially inverse of [`Reassembler`](super::reassembly::Reassembler).
+#[must_use = "sinks do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Segmenter<const C: usize, S> {
     #[pin]
@@ -251,6 +266,7 @@ where
 }
 
 pub trait SegmenterExt: futures::Sink<Segment, Error = SessionError> {
+    /// Attaches a [`Segmenter`] to the underlying sink.
     fn segmenter<const C: usize>(self, frame_size: usize) -> Segmenter<C, Self>
     where
         Self: Sized,

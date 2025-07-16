@@ -1,3 +1,6 @@
+//! Contains the frame [`Reassembler`]:
+//! an inverse component to the [`Segmenter`](super::segmenter::Segmenter).
+
 use std::{
     future::Future,
     pin::Pin,
@@ -16,6 +19,29 @@ use crate::session::{
     },
 };
 
+/// Reassembler is a stream adaptor that reads [`Segments`](Segment) from the underlying
+/// stream and tries to put them into correct order so they form a [`Frame`].
+///
+/// This is essentially the inverse of [`Segmenter`](super::segmenter::Segmenter).
+///
+/// Reassembler takes two parameters: `max_age` and `capacity`:
+///
+/// The `max_age` specifies how long an incomplete Frame (with a missing segment(s)) is to be kept
+/// in the internal buffer until it is considered definitely lost.
+/// In other words, it specifies how long the reassembler is allowed to wait for all segments
+/// of a Frame to arrive from the underlying stream.
+///
+/// The `capacity` specifies the maximum number of incomplete frames to keep in
+/// the internal buffer. If the reassembler is at maximum capacity, the underlying stream is not
+/// polled for new segments, leaving the oldest incomplete frames in the reassembler to expire and
+/// be definitely lost.
+///
+/// By definition, Reassembler is a fallible stream, yielding either `Ok(Some(`[`Frame`]`))`,
+/// `Err(`[`SessionError::FrameDiscarded`]`)` when a frame is lost due to expiry, or `Ok(None)` when
+/// there are no more elements in the underlying stream.
+///
+/// The reassemblers internal buffer is stored in a [`FrameMap`] and can be constructed using
+/// different implementations of it, suitable for different use-cases.
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Reassembler<S, M> {
@@ -162,10 +188,13 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
 }
 
 pub trait ReassemblerExt: futures::Stream<Item = Segment> {
+    /// Attaches a [`Reassembler`] with the given `timeout` for frame completion and `capacity`
+    /// to this stream.
     fn reassembler(self, timeout: Duration, capacity: usize) -> Reassembler<Self, FrameHashMap>
     where
         Self: Sized,
     {
+        // FrameHashMap is much faster than a FrameDashMap used in a FrameInspector
         Reassembler::new(
             self,
             FrameHashMap::with_capacity(FrameInspector::INCOMPLETE_FRAME_RATIO * capacity + 1),
@@ -174,6 +203,11 @@ pub trait ReassemblerExt: futures::Stream<Item = Segment> {
         )
     }
 
+    /// Attaches a [`Reassembler`] with the given `timeout` for frame completion, `capacity`
+    /// to this stream and [`FrameInspector`].
+    ///
+    /// Use only in situations where the [`FrameInspector`] is really needed, as such Reassembler
+    /// is slower than a Reassembler without a `FrameInspector`.
     fn reassembler_with_inspector(
         self,
         timeout: Duration,

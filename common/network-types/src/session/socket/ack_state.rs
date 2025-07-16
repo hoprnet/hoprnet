@@ -1,3 +1,6 @@
+//! This module defines the [`SocketState`] that turns [`SessionSocket`](super::SessionSocket) into
+//! a reliable socket, with segment/frame retransmission and frame acknowledgements.
+
 use std::{
     sync::atomic::AtomicBool,
     time::{Duration, Instant},
@@ -44,11 +47,13 @@ pub enum AcknowledgementMode {
 }
 
 impl AcknowledgementMode {
+    /// Indicates if `self` is [`AcknowledgementMode::Partial`] or [`AcknowledgementMode::Both`].
     #[inline]
     fn is_partial_ack_enabled(&self) -> bool {
         matches!(self, Self::Partial | Self::Both)
     }
 
+    /// Indicates if `self` is [`AcknowledgementMode::Full`] or [`AcknowledgementMode::Both`].
     #[inline]
     fn is_full_ack_enabled(&self) -> bool {
         matches!(self, Self::Full | Self::Both)
