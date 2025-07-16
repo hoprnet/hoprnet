@@ -55,7 +55,8 @@ jobs:
             echo "source_repo=${{ github.repository }}" | tee -a $GITHUB_OUTPUT
             echo "source_branch=${{ github.ref_name }}" | tee -a $GITHUB_OUTPUT
           fi
-          if [[ "${{ github.event.inputs.network }}" == "dufour" ]]; then
+          network="${{ inputs.network || github.event.inputs.network }}"
+          if [[ "${network}" == "dufour" ]]; then
               echo "dappnode_repository=dappnode/DAppNodePackage-Hopr" | tee -a $GITHUB_OUTPUT
             else
               echo "dappnode_repository=dappnode/DAppNodePackage-Hopr-testnet" | tee -a $GITHUB_OUTPUT

@@ -17,11 +17,6 @@ on:
         type: string
   workflow_dispatch:
     inputs:
-      base_branch:
-        description: 'The base branch used for the release'
-        required: true
-        type: string
-        default: master
       head_branch:
         description: 'The head branch from which download artifacts'
         required: true
@@ -42,12 +37,26 @@ jobs:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
+      - name: Set environment variables
+        id: vars
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            echo "The workflow is triggered by other pipeline"
+            echo "base_branch=${{ inputs.base_branch }}"  | tee -a $GITHUB_OUTPUT
+            echo "head_branch=${{ inputs.head_branch }}"  | tee -a $GITHUB_OUTPUT
+          else
+            echo "The workflow is triggered manually"
+            echo "base_branch=${{ github.ref_name }}" | tee -a $GITHUB_OUTPUT
+            echo "head_branch=${{ github.event.inputs.head_branch }}" | tee -a $GITHUB_OUTPUT
+          fi
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0  # Required for tagging
-          token: ${{ secrets.GH_RUNNER_TOKEN }} Required as using via pull_request_target
-          ref: ${{ github.event.inputs.base_branch }}
+          fetch-depth: 0 # Required for tagging
+          # Using a PAT because this job can be invoked from `pull_request_target`
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          ref: ${{ steps.vars.outputs.base_branch }}
 
       - name: Setup GCP
         id: gcp
@@ -73,7 +82,7 @@ jobs:
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
-          ./scripts/download-workflow-binaries.sh ${{ github.event.inputs.head_branch }}
+          ./scripts/download-workflow-binaries.sh ${{ steps.vars.outputs.head_branch }}
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
@@ -90,7 +99,7 @@ jobs:
           git tag v${{ steps.setup.outputs.current_version }}
           git push origin v${{ steps.setup.outputs.current_version }}
 
-          declare base_branch=${{ github.event.inputs.base_branch }}
+          declare base_branch=${{ steps.vars.outputs.base_branch }}
           # Tag release name
           if [[ "${base_branch}" == "master" ]]; then
             release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}

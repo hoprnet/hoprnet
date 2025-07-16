@@ -54,9 +54,11 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
             echo "The workflow is triggered by other pipeline"
             echo "source_branch=${{ inputs.source_branch }}"  | tee -a $GITHUB_OUTPUT
+            echo "release_type=${{ inputs.release_type }}"  | tee -a $GITHUB_OUTPUT
           else
             echo "The workflow is triggered manually"
             echo "source_branch=${{ github.ref_name }}" | tee -a $GITHUB_OUTPUT
+            echo "release_type=${{ github.event.inputs.release_type }}" | tee -a $GITHUB_OUTPUT
           fi
 
       - name: Checkout hoprnet repository
@@ -68,7 +70,7 @@ jobs:
       - name: Bump Version
         id: bump
         run: |
-          next_version=$(./scripts/get-next-version.sh ${{ github.event.inputs.release_type }})
+          next_version=$(./scripts/get-next-version.sh ${{ steps.vars.outputs.release_type }})
           ./scripts/bump-version.sh ${next_version}
           echo "next_version=${next_version}" >> $GITHUB_OUTPUT
 
@@ -77,10 +79,10 @@ jobs:
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Bump to version ${{ steps.bump.outputs.next_version }}"
-          base: ${{ inputs.source_branch }}
+          base: ${{ steps.vars.outputs.source_branch }}
           title: "ci: Open release ${{ steps.bump.outputs.next_version }}"
           body: "The scope of this PR is to create the contents of the new release ${{ steps.bump.outputs.next_version }}"
-          branch: bot/open-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+          branch: bot/open-${{ steps.vars.outputs.release_type }}-${{ steps.bump.outputs.next_version }}
           delete-branch: true
           draft: true
           assignees: ${{ github.actor }}
@@ -89,7 +91,7 @@ jobs:
       - name: Enable Auto Merge
         run: |
           git fetch
-          git checkout bot/open-${{ github.event.inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+          git checkout bot/open-${{ steps.vars.outputs.release_type }}-${{ steps.bump.outputs.next_version }}
           gh pr edit --add-reviewer "hoprnet/hopr-development"
           gh pr ready
         env:
