@@ -15,14 +15,14 @@ use crate::{
 
 /// API for editing [ChannelEntry] in the DB.
 pub struct ChannelEditor {
-    orig: Option<ChannelEntry>,
+    orig: ChannelEntry,
     model: channel::ActiveModel,
     delete: bool,
 }
 
 impl ChannelEditor {
     /// Original channel entry **before** the edits.
-    pub fn entry(&self) -> &Option<ChannelEntry> {
+    pub fn entry(&self) -> &ChannelEntry {
         &self.orig
     }
 
@@ -190,17 +190,24 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbSqlError>(
-                        Channel::find()
-                            .filter(channel::Column::ChannelId.eq(id_hex))
-                            .one(tx.as_ref())
-                            .await?
-                            .map(|model| ChannelEditor {
-                                orig: model.clone().try_into().ok(),
-                                model: model.into_active_model(),
-                                delete: false,
-                            }),
-                    )
+                    match Channel::find()
+                        .filter(channel::Column::ChannelId.eq(id_hex))
+                        .one(tx.as_ref())
+                        .await?
+                    {
+                        Some(model) => {
+                            if model.corrupted {
+                                return Ok(None); // If the channel is corrupted, we cannot edit it.
+                            } else {
+                                return Ok(Some(ChannelEditor {
+                                    orig: ChannelEntry::try_from(model.clone())?,
+                                    model: model.into_active_model(),
+                                    delete: false,
+                                }));
+                            }
+                        }
+                        None => Ok(None),
+                    }
                 })
             })
             .await
@@ -208,9 +215,8 @@ impl HoprDbChannelOperations for HoprDb {
 
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>> {
         let epoch = editor.model.epoch.clone();
-        let origin = editor.orig.ok_or(DbSqlError::DecodingError)?;
 
-        let parties = ChannelParties(origin.source, origin.destination);
+        let parties = ChannelParties(editor.orig.source, editor.orig.destination);
         let ret = self
             .nest_transaction(tx)
             .await?
@@ -226,7 +232,7 @@ impl HoprDbChannelOperations for HoprDb {
                         }
                     } else {
                         editor.model.delete(tx.as_ref()).await?;
-                        Ok::<_, DbSqlError>(Some(origin))
+                        Ok::<_, DbSqlError>(Some(editor.orig))
                     }
                 })
             })
@@ -236,7 +242,7 @@ impl HoprDbChannelOperations for HoprDb {
         // Finally invalidate any unrealized values from the cache.
         // This might be a no-op if the channel was not in the cache
         // like for channels that are not ours.
-        let channel_id = origin.get_id();
+        let channel_id = editor.orig.get_id();
         if let Some(channel_epoch) = epoch.try_as_ref() {
             self.caches
                 .unrealized_value
