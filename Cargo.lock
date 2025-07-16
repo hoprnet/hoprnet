@@ -5278,7 +5278,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
