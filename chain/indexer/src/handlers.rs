@@ -451,7 +451,7 @@ where
                     None => {
                         // Should not happen as such event should already have trigered a return Ok(None) before
                         warn!(%source, %destination, %channel_id, "observed channel open event for a channel that does not exist");
-                        return Ok(None);
+                        Ok(None)
                     }
                 }
             }

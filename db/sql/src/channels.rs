@@ -197,13 +197,13 @@ impl HoprDbChannelOperations for HoprDb {
                     {
                         Some(model) => {
                             if model.corrupted {
-                                return Ok(None); // If the channel is corrupted, we cannot edit it.
+                                Ok(None) // If the channel is corrupted, we cannot edit it.
                             } else {
-                                return Ok(Some(ChannelEditor {
+                                Ok(Some(ChannelEditor {
                                     orig: ChannelEntry::try_from(model.clone())?,
                                     model: model.into_active_model(),
                                     delete: false,
-                                }));
+                                }))
                             }
                         }
                         None => Ok(None),
