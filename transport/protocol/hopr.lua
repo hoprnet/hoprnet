@@ -225,7 +225,6 @@ local function dissect_hopr_session(buffer, pinfo, tree)
         end
     elseif msg_type == 0x01 then
         -- SegmentRequest[]
-        pinfo.cols.info:append(", SegmentRequest")
         local end_offset = offset + msg_len
         local idx = 0
         while offset < end_offset do
@@ -248,9 +247,9 @@ local function dissect_hopr_session(buffer, pinfo, tree)
             offset = offset + 5
             idx = idx + 1
         end
+        pinfo.cols.info:append(", SegmentRequest ("..idx..")")
     elseif msg_type == 0x02 then
         -- FrameAcknowledgement[]
-        pinfo.cols.info:append(", FrameAcknowledgements")
         local end_offset = offset + msg_len
         local idx = 0
         while offset < end_offset do
@@ -264,6 +263,7 @@ local function dissect_hopr_session(buffer, pinfo, tree)
             offset = offset + 4
             idx = idx + 1
         end
+        pinfo.cols.info:append(", FrameAcknowledgements ("..idx..")")
     end
 
     return 2 + msg_len

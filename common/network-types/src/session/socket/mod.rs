@@ -482,7 +482,7 @@ mod tests {
 
         let ack_cfg = AcknowledgementStateConfig {
             expected_packet_latency: Duration::from_millis(2),
-            acknowledgement_delay: Duration::from_millis(5),
+            acknowledgement_delay: Duration::from_millis(10),
             ..Default::default()
         };
 

@@ -62,6 +62,9 @@ impl<T> PcapIO<T> {
                     pin_mut!(receiver);
                     while let Some(next) = receiver.next().await {
                         let writer = writer.clone();
+                        let timestamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap();
                         if let Err(error) = hopr_async_runtime::prelude::spawn_blocking(move || {
                             let data = next.as_ref();
                             writer
@@ -71,9 +74,7 @@ impl<T> PcapIO<T> {
                                     writer
                                         .write_pcapng_block(EnhancedPacketBlock {
                                             interface_id: 0,
-                                            timestamp: std::time::SystemTime::now()
-                                                .duration_since(std::time::UNIX_EPOCH)
-                                                .unwrap(),
+                                            timestamp,
                                             original_len: data.len() as u32,
                                             data: data.into(),
                                             options: vec![EnhancedPacketOption::Comment(next.to_string().into())],
