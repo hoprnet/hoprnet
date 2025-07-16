@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -Eeo pipefail
+set -o errtrace
 
-trap 'echo "Error occurred during package installation. Pausing for manual inspection..."; sleep 600' ERR
+trap 'echo "Error occurred during package installation. Pausing for manual inspection..."; sleep 60' ERR
 
 #set -x
 DISTRIBUTION="${1:?Error: DISTRIBUTION parameter is required}"
@@ -13,8 +14,8 @@ export HOPRD_PROVIDER="$5"
 # Install the package based on the distribution
 case "$DISTRIBUTION" in
 deb)
-  apt-get update
-  apt install -y "/tmp/hoprd.${DISTRIBUTION}"
+  sudo apt-get update
+  sudo -E apt install -y "/tmp/hoprd.${DISTRIBUTION}"
   ;;
 rpm)
   sudo -E dnf install -y "/tmp/hoprd.${DISTRIBUTION}"
