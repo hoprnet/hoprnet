@@ -116,5 +116,4 @@ What's changed
 * Remove database connection opening per-packet by @NumberFour8 in #6922
 * Introduce WinningProbability type by @NumberFour8 in #6921
 * ci: Cache used cargo packages in a crates.io proxy by @Teebor-Choka in #6902
-
-
+* ci: Add pluto build flag by @ausias-armesto in #7315
