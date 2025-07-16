@@ -392,7 +392,8 @@ where
                 let maybe_channel = self.db.begin_channel_update(tx.into(), &channel_id).await?;
 
                 let channel = if let Some(channel_edits) = maybe_channel {
-                    // Check that we're not receiving the Open event without the channel being Close prior, or that the channel is not yet corrupted
+                    // Check that we're not receiving the Open event without the channel being Close prior, or that the
+                    // channel is not yet corrupted
 
                     if channel_edits.entry().status != ChannelStatus::Closed {
                         warn!(%source, %destination, %channel_id, "received Open event for a channel that is not Closed, marking it as corrupted");
