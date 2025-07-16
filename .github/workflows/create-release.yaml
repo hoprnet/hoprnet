@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       base_branch:
-        description: 'The base branch for the release'
+        description: 'The base branch used for the release'
         required: true
         type: string
         default: master
