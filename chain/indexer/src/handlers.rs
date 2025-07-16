@@ -450,8 +450,8 @@ where
                     Some(c) => Ok(Some(ChainEventType::ChannelOpened(c))),
                     None => {
                         // Should not happen as such event should already have trigered a return Ok(None) before
-                        warn!(%source, %destination, %channel_id, "observed channel open event for a channel that does not exist");
-                        Ok(None)
+                        error!(%source, %destination, %channel_id, "observed channel open event for a channel that does not exist");
+                        Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                     }
                 }
             }
