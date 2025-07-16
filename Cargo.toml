@@ -142,13 +142,18 @@ ringbuffer = "0.15.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.12", features = [
+sea-orm = { version = "1.1.12", default-features = false, features = [
   "sqlx-sqlite",
   "with-chrono",
+  "with-json",
   "debug-print",
 ] }
-sea-orm-cli = { version = "1.1.12", features = ["codegen"] }
-sea-orm-migration = { version = "1.1.12", features = [
+sea-orm-cli = { version = "1.1.12", default-features = false, features = [
+  "codegen",
+  "runtime-tokio-rustls",
+] }
+sea-orm-migration = { version = "1.1.12", default-features = false, features = [
+  "cli",
   "sqlx-sqlite",
   "with-chrono",
 ] }
@@ -174,6 +179,8 @@ sqlx = { version = "0.8.6", default-features = false, features = [
   "sqlite",
   "macros",
   "migrate",
+  "tls-rustls",
+  "runtime-tokio-rustls",
 ] }
 strum = { version = "0.27.1", features = ["derive"] }
 subtle = "2.6.1"

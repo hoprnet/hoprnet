@@ -964,8 +964,8 @@
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
             inherit pre-commit-check;
-            inherit hoprd-aarch64-linux hoprd-x86_64-linux;
-            inherit hopli-aarch64-linux hopli-x86_64-linux;
+            inherit hoprd-aarch64-linux hoprd-x86_64-linux hoprd-x86_64-linux-dev;
+            inherit hopli-aarch64-linux hopli-x86_64-linux hopli-x86_64-linux-dev;
             # FIXME: Darwin cross-builds are currently broken.
             # Follow https://github.com/nixos/nixpkgs/pull/256590
             inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
