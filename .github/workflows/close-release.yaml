@@ -22,7 +22,6 @@ on:
         required: true
         description: "Name of the release"
         options:
-          - singapore
           - kaunas
 concurrency:
   group: close-release
@@ -69,8 +68,7 @@ jobs:
           else
             echo "pr_template=pr-close-patch.md" >> $GITHUB_OUTPUT
           fi
-          milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${current_version}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-          ./scripts/generate-changelog.sh ${milestone_number} > docs/changelog/changelog-${current_version}.md
+          ./scripts/generate-changelog.sh ${current_version} github > docs/changelog/changelog-${current_version}.md
           cat docs/changelog/changelog-${current_version}.md
         env:
           GH_TOKEN: ${{ github.token }}
@@ -80,11 +78,11 @@ jobs:
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Close release ${{ steps.template.outputs.current_version }}"
-          title: "Close release ${{ steps.template.outputs.current_version }}"
+          title: "ci: Close release ${{ steps.template.outputs.current_version }}"
           body-path: .github/files/${{ steps.template.outputs.pr_template }}
           branch: bot/close-${{ steps.template.outputs.current_version }}
           delete-branch: true
-          labels: release,load_tests,component:hopli,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin
+          labels: release,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin
           draft: true
           assignees: ${{ github.actor }}
           team-reviewers: "@hoprnet/hopr-development"

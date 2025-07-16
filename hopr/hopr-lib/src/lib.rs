@@ -916,7 +916,7 @@ impl Hopr {
 
         processes.insert(
             HoprLibProcesses::OnReceivedAcknowledgement,
-            hopr_async_runtime::spawn_as_abortable(async move {
+            hopr_async_runtime::spawn_as_abortable!(async move {
                 while let Some(ack) = on_ack_tkt_rx.next().await {
                     if let Err(error) = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
                         &*multi_strategy_ack_ticket,
@@ -936,7 +936,7 @@ impl Hopr {
         {
             processes.insert(
                 HoprLibProcesses::SessionServer,
-                hopr_async_runtime::spawn_as_abortable(_session_rx.for_each_concurrent(None, move |session| {
+                hopr_async_runtime::spawn_as_abortable!(_session_rx.for_each_concurrent(None, move |session| {
                     let serve_handler = serve_handler.clone();
                     async move {
                         let session_id = *session.session.id();
@@ -975,7 +975,7 @@ impl Hopr {
         let db_clone = self.db.clone();
         processes.insert(
             HoprLibProcesses::TicketIndexFlush,
-            hopr_async_runtime::spawn_as_abortable(Box::pin(execute_on_tick(
+            hopr_async_runtime::spawn_as_abortable!(Box::pin(execute_on_tick(
                 Duration::from_secs(5),
                 move || {
                     let db_clone = db_clone.clone();
@@ -1005,7 +1005,7 @@ impl Hopr {
         let strategy_interval = self.cfg.strategy.execution_interval;
         processes.insert(
             HoprLibProcesses::StrategyTick,
-            hopr_async_runtime::spawn_as_abortable(async move {
+            hopr_async_runtime::spawn_as_abortable!(async move {
                 execute_on_tick(
                     Duration::from_secs(strategy_interval),
                     move || {

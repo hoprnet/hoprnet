@@ -70,7 +70,7 @@ impl<T> Clone for TrackedChannel<T> {
 }
 
 /// Error returned by the [`Sender`].
-#[derive(Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum SenderError {
     /// The channel is closed due to receiver being dropped.
     #[error("Channel is closed")]

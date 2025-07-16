@@ -246,7 +246,7 @@ where
 
         info!(next_block_to_process, "Indexer start point");
 
-        let indexing_abort_handle = hopr_async_runtime::spawn_as_abortable(async move {
+        let indexing_abort_handle = hopr_async_runtime::spawn_as_abortable!(async move {
             // Update the chain head once again
             debug!("Updating chain head at indexer startup");
             Self::update_chain_head(&rpc, chain_head.clone()).await;
