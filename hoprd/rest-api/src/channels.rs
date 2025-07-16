@@ -539,7 +539,7 @@ pub(super) async fn fund_channel(
     path = const_format::formatcp!("{BASE_PATH}/channels/corrupted"),
     description = "List corrupted channels due to incorrect indexing.",
     responses(
-        (status = 200, description = "Corrupted channels retrieved", body = Vec<NodeChannel>),
+        (status = 200, description = "Corrupted channels retrieved", body = Vec<ChannelInfoResponse>),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
         (status = 422, description = "Unknown failure", body = ApiError)
     ),
@@ -552,12 +552,20 @@ pub(super) async fn fund_channel(
 pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr.corrupted_channels().await {
-        Ok(corrupted_channels) => (
-            StatusCode::OK,
-            Json(corrupted_channels.into_iter().map(|c| *c.channel()).collect::<Vec<_>>()),
-        )
-            .into_response(),
+    let channels = hopr
+        .corrupted_channels()
+        .and_then(|corrupted_channels| async move {
+            futures::future::try_join_all(
+                corrupted_channels
+                    .into_iter()
+                    .map(|c| query_topology_info(&c.channel())),
+            )
+            .await
+        })
+        .await;
+
+    match channels {
+        Ok(list) => (StatusCode::OK, Json(list)).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
