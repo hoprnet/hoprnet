@@ -23,7 +23,7 @@ run-smoke-test-all:
 run-smoke-test TEST:
     nix develop .#citest -c uv run --frozen -m pytest tests/test_{{TEST}}.py
 
-package-packager packager arch:
+package packager arch:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
     RELEASE_VERSION=$(./scripts/get-current-version.sh)
@@ -41,19 +41,19 @@ package-packager packager arch:
     esac
     export RELEASE_VERSION ARCHITECTURE
     envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
+    ./scripts/generate-changelog.sh "${RELEASE_VERSION}" "{{packager}}" false > ./deploy/nfpm/changelog
+    [[ "{{packager}}" == "deb" ]] && cat ./deploy/nfpm/changelog | gzip -9 > ./deploy/nfpm/changelog.gz
+    [[ "{{packager}}" == "deb" ]] && sed -i.backup '/^license:.*/d' deploy/nfpm/nfpm.generated.yaml && rm deploy/nfpm/nfpm.generated.yaml.backup
     mkdir -p dist/packages
     nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
-
-package arch:
-    #!/usr/bin/env bash
-    set -o errexit -o nounset -o pipefail
-    just package-packager deb {{arch}}
-    just package-packager rpm {{arch}}
-    just package-packager archlinux {{arch}}
 
 test-package packager arch:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
+    if [ "{{packager}}" == "archlinux" ] && [ "{{arch}}" == "aarch64-linux" ]; then
+        echo "Skipping test for archlinux aarch64-linux as it is not supported yet in GCP images."
+        exit 0
+    fi
     trap 'deploy/nfpm/test-package-tool.sh delete {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log' EXIT
     deploy/nfpm/test-package-tool.sh create {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log
     deploy/nfpm/test-package-tool.sh copy {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
