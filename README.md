@@ -123,7 +123,7 @@ sudo cp result/bin/* /usr/local/bin/
 ### Install via linux package manager
 
 Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
-To install on specific distribution, see [detailed information](./deploy/nfpm/README.md)
+To install on specific distribution, see more [detailed information](./deploy/nfpm/README.md)
 
 ## Usage
 
