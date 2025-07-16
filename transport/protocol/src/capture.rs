@@ -263,7 +263,7 @@ mod tests {
         types::HalfKey,
     };
     use hopr_internal_types::prelude::Acknowledgement;
-    use hopr_network_types::session::frames::{Segment, SeqIndicator};
+    use hopr_network_types::session::types::*;
     use hopr_transport_packet::prelude::ApplicationData;
     use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
 
@@ -307,7 +307,26 @@ mod tests {
             .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
             .await;
 
-        let msg = SessionMessage::<1000>::Acknowledge(FrameAcknowledgements::from(vec![1, 2, 100]));
+        let msg = SessionMessage::<1000>::Segment(Segment {
+            frame_id: 2,
+            seq_idx: 0,
+            seq_flags: SeqIndicator::new_with_flags(10, false),
+            data: Box::new(hex!("474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a")),
+        });
+
+        let packet = IncomingPacket::Final {
+            packet_tag: hopr_crypto_random::random_bytes(),
+            previous_hop: *OffchainKeypair::random().public(),
+            sender: SimplePseudonym::random(),
+            plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
+            ack_key: HalfKey::random(),
+        };
+
+        let _ = pcap
+            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .await;
+
+        let msg = SessionMessage::<1000>::Acknowledge(FrameAcknowledgements::try_from(vec![1, 2, 100])?);
 
         let packet = IncomingPacket::Final {
             packet_tag: hopr_crypto_random::random_bytes(),
@@ -322,18 +341,8 @@ mod tests {
             .await;
 
         let msg = SessionMessage::<1000>::Request(SegmentRequest::from_iter([
-            FrameInfo {
-                frame_id: 15,
-                missing_segments: [0b10100001].into(),
-                total_segments: 8,
-                last_update: std::time::SystemTime::now(),
-            },
-            FrameInfo {
-                frame_id: 11,
-                missing_segments: [0b00100001].into(),
-                total_segments: 8,
-                last_update: std::time::SystemTime::now(),
-            },
+            (15 as FrameId, [0b10100001].into()),
+            (11 as FrameId, [0b00100001].into()),
         ]));
 
         let packet = IncomingPacket::Final {

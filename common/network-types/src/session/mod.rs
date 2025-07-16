@@ -18,7 +18,7 @@
 
 /// Contains errors thrown from this module.
 pub mod errors;
-pub mod frames;
+mod frames;
 mod processing;
 mod protocol;
 mod socket;
@@ -29,6 +29,12 @@ pub use socket::{
     ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
     state::{SocketState, Stateless},
 };
+
+// Enable exports of additional Session protocol types
+#[cfg(feature = "session-types")]
+pub mod types {
+    pub use super::{frames::*, protocol::*};
+}
 
 use crate::session::protocol::SessionMessage;
 

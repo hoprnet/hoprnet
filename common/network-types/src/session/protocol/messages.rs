@@ -30,7 +30,7 @@ impl<const C: usize> SegmentRequest<C> {
     pub const MAX_ENTRIES: usize = Self::SIZE / Self::ENTRY_SIZE;
     /// Maximum number of missing segments per frame.
     pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = SeqNum::BITS as usize;
-    /// Size of the message - `C` minus the header.
+    /// Size of the message.
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
 
     /// Returns the total number of segments to retransmit for all frames in this request.
@@ -130,6 +130,7 @@ pub struct FrameAcknowledgements<const C: usize>(pub(super) BTreeSet<FrameId>);
 impl<const C: usize> FrameAcknowledgements<C> {
     /// Maximum number of [`FrameIds`](FrameId) that can be accommodated.
     pub const MAX_ACK_FRAMES: usize = Self::SIZE / size_of::<FrameId>();
+    /// Size of the message.
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
 
     /// Pushes the frame ID.
@@ -158,7 +159,7 @@ impl<const C: usize> FrameAcknowledgements<C> {
         self.0.len() == Self::MAX_ACK_FRAMES
     }
 
-    /// Creates a vector of [`FrameAcknowledgements`] from the given iterator
+    /// Creates a vector of [`FrameAcknowledgements`](FrameAcknowledgements) from the given iterator
     /// of acknowledged [`FrameIds`](FrameId).
     pub fn new_multiple<T: IntoIterator<Item = FrameId>>(items: T) -> Vec<Self> {
         let mut out = Vec::with_capacity(2);

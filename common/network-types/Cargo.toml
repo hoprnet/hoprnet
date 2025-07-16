@@ -25,6 +25,7 @@ runtime-tokio = [
   "hickory-resolver/tokio-runtime",
 ]
 hashbrown = ["dep:hashbrown"]
+session-types = []
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 
 [dependencies]

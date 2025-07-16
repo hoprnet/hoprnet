@@ -155,18 +155,25 @@ local session_fields = {
     len = ProtoField.uint16("hopr_session.len", "Message Length", base.DEC),
 
     -- Segment fields
-    seg_frame_id = ProtoField.uint32("hopr_session.segment.frame_id", "Frame ID", base.DEC),
+    seg_frame_id = ProtoField.framenum("hopr_session.segment.frame_id", "Frame ID", base.NONE, frametype.NONE),
     seg_idx = ProtoField.uint8("hopr_session.segment.seg_idx", "Segment Index", base.DEC),
     seg_terminating = ProtoField.bool("hopr_session.segment.terminating", "Terminating", 8, nil, 0x80),
     seg_seq_len = ProtoField.uint8("hopr_session.segment.seq_len", "Sequence Length", base.DEC, nil, 0x3f),
     seg_data = ProtoField.bytes("hopr_session.segment.data", "Data"),
 
     -- SegmentRequest fields
-    req_frame_id = ProtoField.uint32("hopr_session.segment_request.frame_id", "Frame ID", base.DEC),
-    req_missing = ProtoField.uint8("hopr_session.segment_request.missing_segments", "Missing Segments", base.DEC),
+    req_frame_id = ProtoField.framenum("hopr_session.segment_request.frame_id", "Frame ID", base.NONE, frametype.REQUEST),
+    req_missing_1 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_1", "Segment 1 missing", 8, nil, 0x01),
+    req_missing_2 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_2", "Segment 2 missing", 8, nil, 0x02),
+    req_missing_3 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_3", "Segment 3 missing", 8, nil, 0x04),
+    req_missing_4 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_4", "Segment 4 missing", 8, nil, 0x08),
+    req_missing_5 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_5", "Segment 5 missing", 8, nil, 0x10),
+    req_missing_6 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_6", "Segment 6 missing", 8, nil, 0x20),
+    req_missing_7 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_7", "Segment 7 missing", 8, nil, 0x40),
+    req_missing_8 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_8", "Segment 8 missing", 8, nil, 0x80),
 
     -- FrameAcknowledgement fields
-    ack_frame_id = ProtoField.uint32("hopr_session.frame_ack.frame_id", "Frame ID", base.DEC)
+    ack_frame_id = ProtoField.framenum("hopr_session.frame_ack.frame_id", "Frame ID", base.NONE, frametype.ACK)
 }
 
 hopr_session.fields = session_fields
@@ -194,10 +201,11 @@ local function dissect_hopr_session(buffer, pinfo, tree)
         -- Segment
         pinfo.cols.info:append(", Segment")
         local seg_tree = subtree:add("Segment")
-        seg_tree:add(session_fields.seg_frame_id, buffer(offset,4))
+        seg_tree:add(session_fields.seg_frame_id, buffer(offset,4):uint())
         seg_tree:add(session_fields.seg_idx, buffer(offset+4,1))
-        seg_tree:add(session_fields.seg_terminating, buffer(offset+5,1))
-        seg_tree:add(session_fields.seg_seq_len, buffer(offset+5,1))
+        local seg_flags = seg_tree:add("Sequence flags")
+        seg_flags:add(session_fields.seg_terminating, buffer(offset+5,1))
+        seg_flags:add(session_fields.seg_seq_len, buffer(offset+5,1))
         local data_len = msg_len - 6
         local data_buf = buffer(offset+6, data_len)
 
@@ -227,7 +235,15 @@ local function dissect_hopr_session(buffer, pinfo, tree)
 
             local req_tree = subtree:add("SegmentRequest["..idx.."]")
             req_tree:add(session_fields.req_frame_id, frame_id)
-            req_tree:add(session_fields.req_missing, buffer(offset+4,1))
+            local missing = req_tree:add("Missing segments")
+            missing:add(session_fields.req_missing_1, buffer(offset+4,1))
+            missing:add(session_fields.req_missing_2, buffer(offset+4,1))
+            missing:add(session_fields.req_missing_3, buffer(offset+4,1))
+            missing:add(session_fields.req_missing_4, buffer(offset+4,1))
+            missing:add(session_fields.req_missing_5, buffer(offset+4,1))
+            missing:add(session_fields.req_missing_6, buffer(offset+4,1))
+            missing:add(session_fields.req_missing_7, buffer(offset+4,1))
+            missing:add(session_fields.req_missing_8, buffer(offset+4,1))
             offset = offset + 5
             idx = idx + 1
         end
