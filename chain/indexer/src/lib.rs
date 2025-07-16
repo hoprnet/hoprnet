@@ -15,6 +15,7 @@ pub mod config;
 pub mod constants;
 pub mod errors;
 pub mod handlers;
+pub mod snapshot;
 pub mod traits;
 
 pub use config::IndexerConfig;

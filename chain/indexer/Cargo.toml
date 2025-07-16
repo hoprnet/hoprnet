@@ -32,11 +32,18 @@ alloy = { workspace = true, default-features = false, features = [
 ] }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
+flate2 = "1.0"
 futures = { workspace = true }
+futures-util = "0.3"
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+scopeguard = "1.2"
 smart-default = { workspace = true }
+tar = "0.4"
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["fs", "time"] }
 tracing = { workspace = true }
 
 hopr-bindings = { workspace = true }
@@ -56,6 +63,7 @@ anyhow = { workspace = true }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
 primitive-types = { workspace = true }
+tempfile = "3.8"
 test-log = { workspace = true }
 tokio = { workspace = true }
 

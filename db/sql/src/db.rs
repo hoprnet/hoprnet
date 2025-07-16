@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{path::{Path, PathBuf}, sync::Arc, time::Duration};
 
 use futures::channel::mpsc::UnboundedSender;
 use hopr_crypto_types::{keypairs::Keypair, prelude::ChainKeypair};
@@ -239,6 +239,49 @@ impl HoprDb {
         } else {
             self.ticket_manager.start_ticket_processing(futures::sink::drain())
         }
+    }
+    
+    /// Check if the logs database exists and has data
+    pub async fn logs_db_exists_and_has_data(&self, directory: &Path) -> Result<bool> {
+        let logs_db_path = directory.join(SQL_DB_LOGS_FILE_NAME);
+        
+        // Check if file exists
+        if !tokio::fs::try_exists(&logs_db_path).await.unwrap_or(false) {
+            return Ok(false);
+        }
+        
+        // Check if database has data
+        match self.logs_db.query_one(
+            sea_orm::Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "SELECT COUNT(*) FROM logs".to_string()
+            )
+        ).await {
+            Ok(query_result) => {
+                if let Some(result) = query_result {
+                    let count: i64 = result.try_get("", "COUNT(*)")?;
+                    Ok(count > 0)
+                } else {
+                    Ok(false)
+                }
+            }
+            Err(_) => {
+                // Table doesn't exist or other error, assume no data
+                Ok(false)
+            }
+        }
+    }
+    
+    /// Get the path to the logs database file
+    pub fn logs_db_path(&self, directory: &Path) -> PathBuf {
+        directory.join(SQL_DB_LOGS_FILE_NAME)
+    }
+    
+    /// Get the directory where database files are stored
+    pub fn data_dir(&self) -> Option<PathBuf> {
+        // This would need to be stored in the HoprDb struct
+        // For now, return None - this can be enhanced later
+        None
     }
 }
 

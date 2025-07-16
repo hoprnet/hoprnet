@@ -487,6 +487,8 @@ impl Hopr {
             hopr_chain_indexer::IndexerConfig {
                 start_block_number: resolved_environment.channel_contract_deploy_block as u64,
                 fast_sync: cfg.chain.fast_sync,
+                log_snapshot_enabled: cfg.chain.log_snapshot_enabled,
+                log_snapshot_url: cfg.chain.log_snapshot_url,
             },
             tx_indexer_events,
         )?;
