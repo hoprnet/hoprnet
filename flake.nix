@@ -768,7 +768,7 @@
                 echo "Signing file: $source_file"
                 outdir="$(pwd)"
                 basename="$(basename "$source_file")"
-
+                dirname="$(dirname "$source_file")"
 
                 # Create isolated GPG keyring
                 gnupghome="$(mktemp -d)"
@@ -776,9 +776,10 @@
                 echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
 
                 # Generate hash and signature
-                shasum -a 256 "$source_file" > "$outdir/$basename.sha256"
+                cd "$dirname"
+                shasum -a 256 "$basename" > "$outdir/$basename.sha256"
                 echo "Hash written to $outdir/$basename.sha256"
-                gpg --armor --output "$outdir/$basename.sig" --detach-sign "$source_file"
+                gpg --armor --output "$outdir/$basename.sig" --detach-sign "$basename"
                 echo "Signature written to $outdir/$basename.sig"
                 gpg --armor --output "$outdir/$basename.sha256.asc" --sign "$outdir/$basename.sha256"
                 echo "Signature for hash written to $outdir/$basename.sha256.asc"
