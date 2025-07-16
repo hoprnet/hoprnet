@@ -102,7 +102,7 @@ impl FaucetArgs {
                 Address::from_str(addr).unwrap_or_else(|e| {
                     panic!(
                         "{}",
-                        format!("Cannot parse address {:?} for eth_addresses_all, due to {:?}", addr, e)
+                        format!("Cannot parse address {addr:?} for eth_addresses_all, due to {e:?}")
                     )
                 })
             }));

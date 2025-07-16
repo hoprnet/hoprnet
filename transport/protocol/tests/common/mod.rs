@@ -434,8 +434,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
                 .await
                 .context("peer should be able to extract expected tickets")?,
             expected_tickets,
-            "peer {} did not receive the expected amount of tickets",
-            i,
+            "peer {i} did not receive the expected amount of tickets",
         );
     }
 
