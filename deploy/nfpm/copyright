@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: hoprd
+Source: https://github.com/hoprnet/hoprnet
+
+Files: *
+Copyright: 2025 HOPR Association
+License: GPL-3
+Comment: Statically linked to libyaml to ensure compatibility across distributions.

@@ -85,7 +85,7 @@ All releases and associated changelogs are located in the [official releases](ht
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
 
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=singapore` to track the latest changes on the repository's `release/singapore` branch (2.2.X)
+- `export RELEASE=kaunas` to track the latest changes on the repository's `release/kaunas` branch (3.0.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
 Container image has the format
@@ -97,7 +97,7 @@ where:
 Pull the container image with `docker`:
 
 ```bash
-docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
+docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:kaunas
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -118,6 +118,21 @@ Build and install the `hoprd` binary, e.g. on a UNIX platform:
 ```bash
 nix build
 sudo cp result/bin/* /usr/local/bin/
+```
+
+To build and access man pages for `hoprd` and `hopli`:
+
+```bash
+# Build man page for hoprd
+nix build .#hoprd-man
+man ./result/share/man/man1/hoprd.1.gz
+
+# Build man page for hopli
+nix build .#hopli-man
+man ./result/share/man/man1/hopli.1.gz
+
+# Or install them system-wide
+sudo cp -r result/share/man/man1/* /usr/local/share/man/man1/
 ```
 
 ### Install via linux package manager
@@ -213,6 +228,8 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in SURB balancer (default: `0.2`)
 - `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
 - `HOPR_CAPTURE_PACKETS` - allow capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Note that `hoprd` must be built with the `capture` feature.
+- `HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS` - maximum number of concurrently processed incoming packets from all peers (default: 10)
+- `HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS` - maximum time (in milliseconds) to wait until a stream connection is established to a peer (default: 2000 ms)
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
 - `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
 
