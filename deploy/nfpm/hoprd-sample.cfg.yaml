@@ -1,0 +1,27 @@
+---
+hopr:
+  db:
+    data: /var/lib/hoprd
+  strategy:
+    on_fail_continue: true
+    allow_recursive: true
+    strategies:
+      - !Aggregating
+        aggregation_threshold: 330
+        unrealized_balance_ratio: 0.95
+        aggregate_on_channel_close: true
+      - !AutoRedeeming
+        redeem_only_aggregated: true
+        minimum_redeem_ticket_value: "2 wxHOPR"
+      - !ClosureFinalizer
+        max_closure_overdue: 300
+  chain:
+    announce: true
+    keep_logs: true
+    fast_sync: true
+  safe_module:
+    safe_transaction_service_provider: https://safe-transaction.prod.hoprnet.link/
+identity:
+  file: "/etc/hoprd/hopr.id"
+api:
+  enable: true

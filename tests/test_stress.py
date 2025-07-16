@@ -6,6 +6,7 @@ import time
 from contextlib import AsyncExitStack
 
 import pytest
+from api_lib.headers.authorization import Bearer
 from websockets.asyncio.client import connect
 
 from sdk.python.api.hopr import HoprdAPI
@@ -57,8 +58,10 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
     STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = stress_fixture["request_count"]
     ROUGH_PAYLOAD_SIZE = 460
 
-    api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"]) for d in stress_fixture["sources"]]
-    api_target = HoprdAPI(f'http://{stress_fixture["target"]["url"]}', stress_fixture["target"]["token"])
+    api_sources = [HoprdAPI(f"http://{d['url']}", Bearer(d["token"], "/api/v4")) for d in stress_fixture["sources"]]
+    api_target = HoprdAPI(
+        f"http://{stress_fixture['target']['url']}", Bearer(stress_fixture["target"]["token"], "/api/v4")
+    )
     target_address = (await api_target.addresses()).native
 
     async with AsyncExitStack() as channels:
@@ -107,7 +110,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
 
                 logging.info(
                     "The websocket stress test ran at "
-                    + f"{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT/(end_time - start_time)} packets/s/node"
+                    + f"{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT / (end_time - start_time)} packets/s/node"
                 )
 
                 assert read == data, f"Received data does not match the sent data: {read} != {data}"
@@ -142,7 +145,9 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                         source["url"].split(":")[0],
                         source["url"].split(":")[1],
                         source["token"],
-                        (await HoprdAPI(f'http://{source["url"]}', source["token"]).addresses()).native,
+                        (
+                            await HoprdAPI(f"http://{source['url']}", Bearer(source["token"], "/api/v4")).addresses()
+                        ).native,
                     ),
                     timeout=60.0,
                 )

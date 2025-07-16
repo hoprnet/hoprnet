@@ -22,7 +22,6 @@ on:
         required: true
         description: "Name of the release"
         options:
-          - singapore
           - kaunas
 concurrency:
   group: close-release
@@ -34,7 +33,7 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -69,8 +68,7 @@ jobs:
           else
             echo "pr_template=pr-close-patch.md" >> $GITHUB_OUTPUT
           fi
-          milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${current_version}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-          ./scripts/generate-changelog.sh ${milestone_number} > docs/changelog/changelog-${current_version}.md
+          ./scripts/generate-changelog.sh ${current_version} github > docs/changelog/changelog-${current_version}.md
           cat docs/changelog/changelog-${current_version}.md
         env:
           GH_TOKEN: ${{ github.token }}
@@ -80,11 +78,11 @@ jobs:
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Close release ${{ steps.template.outputs.current_version }}"
-          title: "Close release ${{ steps.template.outputs.current_version }}"
+          title: "ci: Close release ${{ steps.template.outputs.current_version }}"
           body-path: .github/files/${{ steps.template.outputs.pr_template }}
           branch: bot/close-${{ steps.template.outputs.current_version }}
           delete-branch: true
-          labels: release,load_tests,component:hopli,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin,binary:armv7l-linux
+          labels: release,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin
           draft: true
           assignees: ${{ github.actor }}
           team-reviewers: "@hoprnet/hopr-development"

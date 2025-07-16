@@ -21,6 +21,7 @@
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
+  - [Install via Linux package manager](#install-via-linux-package-manager)
 - [Usage](#usage)
   - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
@@ -33,6 +34,7 @@
     - [Code Formatting](#code-formatting)
     - [Code Linting](#code-linting)
     - [Generate the Python SDK](#generate-the-python-sdk)
+  - [Building a Docker image](#building-a-docker-image)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)
@@ -83,7 +85,7 @@ All releases and associated changelogs are located in the [official releases](ht
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
 
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=singapore` to track the latest changes on the repository's `release/singapore` branch (2.2.X)
+- `export RELEASE=kaunas` to track the latest changes on the repository's `release/kaunas` branch (3.0.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
 Container image has the format
@@ -95,7 +97,7 @@ where:
 Pull the container image with `docker`:
 
 ```bash
-docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
+docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:kaunas
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -117,6 +119,26 @@ Build and install the `hoprd` binary, e.g. on a UNIX platform:
 nix build
 sudo cp result/bin/* /usr/local/bin/
 ```
+
+To build and access man pages for `hoprd` and `hopli`:
+
+```bash
+# Build man page for hoprd
+nix build .#hoprd-man
+man ./result/share/man/man1/hoprd.1.gz
+
+# Build man page for hopli
+nix build .#hopli-man
+man ./result/share/man/man1/hopli.1.gz
+
+# Or install them system-wide
+sudo cp -r result/share/man/man1/* /usr/local/share/man/man1/
+```
+
+### Install via linux package manager
+
+Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+To install on specific distribution, see [detailed information](./deploy/nfpm/README.md)
 
 ## Usage
 
@@ -205,6 +227,9 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in SURB balancer (default: `0.7`)
 - `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in SURB balancer (default: `0.2`)
 - `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
+- `HOPR_CAPTURE_PACKETS` - allow capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Note that `hoprd` must be built with the `capture` feature.
+- `HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS` - maximum number of concurrently processed incoming packets from all peers (default: 10)
+- `HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS` - maximum time (in milliseconds) to wait until a stream connection is established to a peer (default: 2000 ms)
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
 - `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
 
@@ -339,6 +364,34 @@ Prerequisites:
 The generated SDK will be available in the `/tmp/hoprd-sdk-python/` directory. Modify the script to generate SDKs for different programming languages supported by swagger-codegen3.
 
 For usage examples of the generated SDK, refer to the generated README.md file in the SDK directory.
+
+### Building a Docker image
+
+Docker images can be built using the respective nix flake outputs.
+The available images can be listed with:
+
+```bash
+just list-docker-images
+```
+
+The following command builds the `hoprd` image for the host platform:
+
+```bash
+nix build .#hoprd-docker
+```
+
+If needed images for other platforms can be built by specifying the target
+platform. For example, to build the `hoprd` image for the `x86_64-linux`
+platform, while being on a Darwin host system, use the following command:
+
+```bash
+nix build .#packages.x86_64-linux.hoprd-docker
+```
+
+NOTE: Building for different platforms requires nix distributed builds to be
+set up properly.
+See [Nix documentation](https://nix.dev/manual/nix/2.28/advanced-topics/distributed-builds.html)
+for more information.
 
 ### Local node with safe staking service (local network)
 

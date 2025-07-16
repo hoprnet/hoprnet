@@ -79,12 +79,8 @@ let
 
   darwinBuildInputs =
     if isDarwinForDarwin || isDarwinForNonDarwin then
-      with pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks;
       [
-        CoreFoundation
-        CoreServices
-        Security
-        SystemConfiguration
+        pkgs.pkgsBuildHost.apple-sdk_15
       ]
     else
       [ ];

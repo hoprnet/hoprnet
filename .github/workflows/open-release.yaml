@@ -10,7 +10,7 @@ name: Open Release
 on:
   workflow_call:
     inputs:
-      base_branch:
+      source_branch:
         required: true
         type: string
       release_type:
@@ -33,7 +33,7 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          ref: "${{ inputs.base_branch }}"
+          ref: "${{ inputs.source_branch }}"
 
       - name: Bump Version
         id: bump
@@ -56,8 +56,8 @@ jobs:
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Bump to version ${{ steps.bump.outputs.next_version }}"
-          base: ${{ inputs.base_branch }}
-          title: "Open release ${{ steps.bump.outputs.next_version }}"
+          base: ${{ inputs.source_branch }}
+          title: "ci: Open release ${{ steps.bump.outputs.next_version }}"
           body: "The scope of this PR is to create the contents of the new release ${{ steps.bump.outputs.next_version }}"
           branch: bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
           delete-branch: true

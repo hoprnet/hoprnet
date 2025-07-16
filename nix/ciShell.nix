@@ -15,6 +15,10 @@ let
     swagger-codegen3
     vacuum-go
     zizmor
+    nfpm
+    envsubst
+    gnupg
+    perl
 
     # testing utilities
     cargo-audit
