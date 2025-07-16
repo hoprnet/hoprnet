@@ -138,8 +138,6 @@ pub(crate) struct PeerInfo {
     backoff: f64,
     #[schema(example = true)]
     is_new: bool,
-    #[schema(example = "2.1.0")]
-    reported_version: String,
 }
 
 #[serde_as]
@@ -279,7 +277,6 @@ pub(super) async fn peers(
             quality: info.get_average_quality(),
             backoff: info.backoff,
             is_new: info.heartbeats_sent == 0u64,
-            reported_version: info.peer_version.unwrap_or("UNKNOWN".to_string()),
         })
         .collect::<Vec<_>>()
         .await;

@@ -247,7 +247,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         processes.insert(
             HoprChainProcess::OutgoingOnchainActionQueue,
-            spawn_as_abortable(self.action_queue.clone().start()),
+            spawn_as_abortable!(self.action_queue.clone().start()),
         );
         processes.insert(
             HoprChainProcess::Indexer,

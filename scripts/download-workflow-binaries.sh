@@ -19,13 +19,13 @@ usage() {
 
 # set mydir
 declare mydir
-mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+mydir=$(pwd -P)
 : ${GH_TOKEN?"environment variable must be set"}
 head_branch=${1}
 workflow_run_id=$(gh api repos/hoprnet/hoprnet/actions/workflows/build.yaml/runs | jq --arg head_branch "$head_branch" '[.workflow_runs[] | select(.head_branch == $head_branch and .conclusion == "success" and .status == "completed")] | first | .id')
 artifacts=$(gh api repos/hoprnet/hoprnet/actions/runs/${workflow_run_id}/artifacts | jq -r '.artifacts[] | "\(.name) \(.archive_download_url)"')
 rm -rf "${mydir}/dist"
-mkdir -p "${mydir}/dist/zip" "${mydir}/dist/bin" "${mydir}/dist/packages"
+mkdir -p "${mydir}/dist/zip" "${mydir}/dist/unzip" "${mydir}/dist/bin" "${mydir}/dist/packages"
 while IFS= read -r line; do
   artifact_name=$(echo $line | awk '{print $1}')
   artifact_url=$(echo $line | awk '{print $2}')
@@ -35,21 +35,12 @@ while IFS= read -r line; do
   else
     echo "Downloaded binary file ${artifact_name}..."
   fi
-  # Extract the zip file
-  # Check if artifact_name contains an extension (a dot)
-  if [[ $artifact_name == *.* ]]; then
-    # Extract to ./dist/packages/${artifact_name}
-    unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/packages"
-  else
-    # Extract the platform (suffix after the first hyphen) and extract to ./dist/bin/${platform}
-    platform=$(echo "$artifact_name" | awk -F '-' '{print $2"-"$3}')
-    unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/bin/${platform}"
-  fi
+  # Extract the zip file to its corresponding directory
+  unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/unzip"
+  for artifact in dist/unzip/*; do
+    case "$artifact" in
+    *.deb | *.rpm | *.pkg.tar.zst) mv "$artifact" dist/packages/ ;;
+    *) mv "$artifact" dist/bin/ ;;
+    esac
+  done
 done <<<"$artifacts"
-
-# Group files by platform and create a single zip file for each platform
-platforms=$(ls -1 dist/bin/)
-for platform in $platforms; do
-  echo "Creating zip for platform: $platform"
-  zip -j "dist/binaries/hoprnet-binaries-${platform}.zip" ./dist/bin/${platform}/*
-done

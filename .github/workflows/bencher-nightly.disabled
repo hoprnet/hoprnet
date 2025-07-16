@@ -23,11 +23,11 @@ jobs:
     with:
       branch: master
       type: scheduled
-  bencher-nightly-release-singapore:
+  bencher-nightly-release-kaunas:
     name: Benchmarks
     uses: ./.github/workflows/bencher.yaml
     needs: bencher-nightly-master # Ensure that the master branch job is completed before running this one to avoid overloading the server
     secrets: inherit
     with:
-      branch: release/singapore
+      branch: release/kaunas
       type: scheduled
