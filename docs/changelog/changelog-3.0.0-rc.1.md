@@ -117,3 +117,5 @@ What's changed
 * Introduce WinningProbability type by @NumberFour8 in #6921
 * ci: Cache used cargo packages in a crates.io proxy by @Teebor-Choka in #6902
 * ci: Add pluto build flag by @ausias-armesto in #7315
+* fix: Using wrong branch when creating release by @ausias-armesto in #7317
+
