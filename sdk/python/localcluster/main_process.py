@@ -40,6 +40,9 @@ async def bringup(
     with open(config, "r") as f:
         config = yaml.safe_load(f)
 
+    cluster = Cluster(
+        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port
+    )
     anvil = Anvil(
         ANVIL_FOLDER.joinpath("anvil.log"),
         ANVIL_CONFIG_FILE,
@@ -47,12 +50,11 @@ async def bringup(
         base_port,
         not test_mode,
     )
-    anvil.kill()
 
-    cluster = Cluster(
-        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port
-    )
     snapshot = Snapshot(base_port, MAIN_DIR, cluster)
+
+    # STOP OLD LOCAL ANVIL SERVER
+    anvil.kill()
 
     # Remove old logs
     for f in MAIN_DIR.glob("*/*.log"):
