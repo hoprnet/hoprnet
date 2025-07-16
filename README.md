@@ -120,6 +120,21 @@ nix build
 sudo cp result/bin/* /usr/local/bin/
 ```
 
+To build and access man pages for `hoprd` and `hopli`:
+
+```bash
+# Build man page for hoprd
+nix build .#hoprd-man
+man ./result/share/man/man1/hoprd.1.gz
+
+# Build man page for hopli
+nix build .#hopli-man
+man ./result/share/man/man1/hopli.1.gz
+
+# Or install them system-wide
+sudo cp -r result/share/man/man1/* /usr/local/share/man/man1/
+```
+
 ### Install via linux package manager
 
 Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
