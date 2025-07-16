@@ -537,7 +537,7 @@ pub(super) async fn fund_channel(
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/channels/corrupted"),
-    description = "List corrupted channels due to poor indexing.",
+    description = "List corrupted channels due to incorrect indexing.",
     responses(
         (status = 200, description = "Corrupted channels retrieved", body = Vec<NodeChannel>),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
