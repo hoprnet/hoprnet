@@ -19,7 +19,7 @@ usage() {
 
 # set mydir
 declare mydir
-mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+mydir=$(pwd -P)
 : ${GH_TOKEN?"environment variable must be set"}
 head_branch=${1}
 workflow_run_id=$(gh api repos/hoprnet/hoprnet/actions/workflows/build.yaml/runs | jq --arg head_branch "$head_branch" '[.workflow_runs[] | select(.head_branch == $head_branch and .conclusion == "success" and .status == "completed")] | first | .id')
