@@ -85,7 +85,7 @@ All releases and associated changelogs are located in the [official releases](ht
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
 
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=singapore` to track the latest changes on the repository's `release/singapore` branch (2.2.X)
+- `export RELEASE=kaunas` to track the latest changes on the repository's `release/kaunas` branch (3.0.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
 Container image has the format
@@ -97,7 +97,7 @@ where:
 Pull the container image with `docker`:
 
 ```bash
-docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
+docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:kaunas
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
