@@ -13,6 +13,9 @@ pub mod types;
 /// Various network IO-related utilities
 pub mod utils;
 
+#[cfg(feature = "capture")]
+pub mod capture;
+
 #[doc(hidden)]
 pub mod prelude {
     pub use libp2p_identity::PeerId;

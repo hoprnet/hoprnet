@@ -341,6 +341,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        capture::PcapIoExt,
         prelude::AcknowledgementState,
         session::{AcknowledgementStateConfig, utils::test::*},
     };
@@ -470,6 +471,9 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn stateful_socket_bidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+
+        #[cfg(feature = "capture")]
+        let (alice, bob) = (alice.capture("alice.pcap"), bob.capture("bob.pcap"));
 
         let sock_cfg = SessionSocketConfig {
             frame_size: FRAME_SIZE,
@@ -900,6 +904,9 @@ mod tests {
             None,
             None,
         );
+
+        #[cfg(feature = "capture")]
+        let (alice, bob) = (alice.capture("alice.pcap"), bob.capture("bob.pcap"));
 
         let alice_cfg = SessionSocketConfig {
             frame_size: FRAME_SIZE,

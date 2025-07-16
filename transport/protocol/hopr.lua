@@ -178,7 +178,6 @@ local session_fields = {
 
 hopr_session.fields = session_fields
 
-
 -- Dissector function
 local function dissect_hopr_session(buffer, pinfo, tree)
     local subtree = tree:add(hopr_session, buffer())
@@ -199,10 +198,12 @@ local function dissect_hopr_session(buffer, pinfo, tree)
     -- Parse message based on type
     if msg_type == 0x00 then
         -- Segment
-        pinfo.cols.info:append(", Segment")
+        local frame_id = buffer(offset,4):uint()
+        local seg_idx = buffer(offset+4,1):uint()
+        pinfo.cols.info:append(", Segment (" .. frame_id .. "," ..seg_idx.. ")")
         local seg_tree = subtree:add("Segment")
-        seg_tree:add(session_fields.seg_frame_id, buffer(offset,4):uint())
-        seg_tree:add(session_fields.seg_idx, buffer(offset+4,1))
+        seg_tree:add(session_fields.seg_frame_id, frame_id)
+        seg_tree:add(session_fields.seg_idx, seg_idx)
         local seg_flags = seg_tree:add("Sequence flags")
         seg_flags:add(session_fields.seg_terminating, buffer(offset+5,1))
         seg_flags:add(session_fields.seg_seq_len, buffer(offset+5,1))
@@ -266,6 +267,15 @@ local function dissect_hopr_session(buffer, pinfo, tree)
     end
 
     return 2 + msg_len
+end
+
+function hopr_session.dissector(buffer, pinfo, tree)
+    local length = buffer:len()
+    if length < 1 then return end
+
+    pinfo.cols.protocol = "HOPR Session"
+    pinfo.cols.info:append("Session")
+    return dissect_hopr_session(buffer, pinfo, tree)
 end
 
 ---------------------------------------------------------------------------------------
@@ -558,3 +568,4 @@ end
 -- Register dissector
 local ethertype_table = DissectorTable.get("ethertype")
 ethertype_table:add(0x1234, hopr_proto)
+ethertype_table:add(0x1235, hopr_session)

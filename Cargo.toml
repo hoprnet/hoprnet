@@ -126,6 +126,7 @@ tracing-opentelemetry = { version = "0.31.0" }
 temp-env = "0.3.6"
 parameterized = "2.0.0"
 parking_lot = "0.12.4"
+pcap-file = "2.0.0"
 petgraph = { version = "0.8.2", features = ["serde-1"] }
 pid = "4.0.0"
 pin-project = "1.1.10"
