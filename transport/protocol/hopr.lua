@@ -157,7 +157,8 @@ local session_fields = {
     -- Segment fields
     seg_frame_id = ProtoField.uint32("hopr_session.segment.frame_id", "Frame ID", base.DEC),
     seg_idx = ProtoField.uint8("hopr_session.segment.seg_idx", "Segment Index", base.DEC),
-    seg_seq_len = ProtoField.uint8("hopr_session.segment.seq_len", "Sequence Length", base.DEC),
+    seg_terminating = ProtoField.bool("hopr_session.segment.terminating", "Terminating", 8, nil, 0x80),
+    seg_seq_len = ProtoField.uint8("hopr_session.segment.seq_len", "Sequence Length", base.DEC, nil, 0x3f),
     seg_data = ProtoField.bytes("hopr_session.segment.data", "Data"),
 
     -- SegmentRequest fields
@@ -195,6 +196,7 @@ local function dissect_hopr_session(buffer, pinfo, tree)
         local seg_tree = subtree:add("Segment")
         seg_tree:add(session_fields.seg_frame_id, buffer(offset,4))
         seg_tree:add(session_fields.seg_idx, buffer(offset+4,1))
+        seg_tree:add(session_fields.seg_terminating, buffer(offset+5,1))
         seg_tree:add(session_fields.seg_seq_len, buffer(offset+5,1))
         local data_len = msg_len - 6
         local data_buf = buffer(offset+6, data_len)

@@ -20,8 +20,8 @@ use tracing::{Instrument, instrument};
 
 use crate::session::{
     errors::SessionError,
-    frames::{FrameInspector, OrderedFrame},
-    processing::{ReassemblerExt, SegmenterExt, SequencerExt},
+    frames::OrderedFrame,
+    processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
     protocol::{SessionCodec, SessionMessage},
     socket::state::{SocketComponents, Stateless},
 };

@@ -30,6 +30,7 @@ impl<const C: usize> SegmentRequest<C> {
     pub const MAX_ENTRIES: usize = Self::SIZE / Self::ENTRY_SIZE;
     /// Maximum number of missing segments per frame.
     pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = SeqNum::BITS as usize;
+    /// Size of the message - `C` minus the header.
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
 
     /// Returns the total number of segments to retransmit for all frames in this request.

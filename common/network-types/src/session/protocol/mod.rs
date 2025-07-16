@@ -45,7 +45,7 @@
 //! This message is sent from the segment recipient to the segment sender to acknowledge that
 //! all segments of certain frames have been completely and correctly received by the recipient.
 //!
-//! The message consists simply of a [frame ID](FrameId) list of the completely received
+//! The message consists simply of a [frame ID](super::frames::FrameId) list of the completely received
 //! frames. There can be at most [`MAX_ACK_FRAMES`](FrameAcknowledgements::MAX_ACK_FRAMES)
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
@@ -58,7 +58,7 @@ pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest}
 
 use crate::session::{
     errors::SessionError,
-    frames::{FrameId, Segment, SeqIndicator},
+    frames::{Segment, SeqIndicator},
 };
 
 /// Contains all messages of the Session sub-protocol.
@@ -90,11 +90,8 @@ impl<const C: usize> SessionMessage<C> {
     /// This is currently the version byte, the size of [SessionMessageDiscriminants] representation
     /// and two bytes for the message length.
     pub const HEADER_SIZE: usize = 1 + size_of::<SessionMessageDiscriminants>() + size_of::<u16>();
-    /// Maximum size of the Session protocol message.
-    ///
-    /// This is equal to the typical Ethernet MTU size minus [`Self::SEGMENT_OVERHEAD`].
-    // TODO: parameterize this
-    pub const MAX_MESSAGE_SIZE: usize = 1492 - Self::SEGMENT_OVERHEAD;
+    /// Maximum size of the message in v1.
+    pub const MAX_MESSAGE_LENGTH: usize = 2047;
     /// Size of the overhead that's added to the raw payload of each [`Segment`].
     ///
     /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
@@ -191,17 +188,9 @@ impl<const C: usize> Decoder for SessionCodec<C> {
         // Message length
         let len = src.get_u16() as usize;
 
-        if len > SessionMessage::<C>::MAX_MESSAGE_SIZE {
-            return Err(SessionError::IncorrectMessageLength);
-        }
-
-        // The upper 6 bits of the size are reserved for future use,
-        // since MAX_MESSAGE_SIZE always fits within 10 bits (<= MAX_MESSAGE_SIZE = 1500)
-        let reserved = len & 0b111111_0000000000;
-
         // In version 1 check that the reserved bits are all 0
-        if reserved != 0 {
-            return Err(SessionError::ParseError);
+        if len > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
+            return Err(SessionError::IncorrectMessageLength);
         }
 
         // Read the message
@@ -234,10 +223,7 @@ mod tests {
         assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
         assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
         assert_eq!(8, SessionMessage::<0>::max_segments_per_frame());
-
-        const _: () = {
-            assert!(SessionMessage::<0>::MAX_MESSAGE_SIZE < 2048);
-        };
+        assert_eq!(2047, SessionMessage::<0>::MAX_MESSAGE_LENGTH);
     }
 
     #[test]

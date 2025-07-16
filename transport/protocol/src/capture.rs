@@ -263,10 +263,7 @@ mod tests {
         types::HalfKey,
     };
     use hopr_internal_types::prelude::Acknowledgement;
-    use hopr_network_types::prelude::{
-        FrameInfo, Segment,
-        protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
-    };
+    use hopr_network_types::session::frames::{Segment, SeqIndicator};
     use hopr_transport_packet::prelude::ApplicationData;
     use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
 
@@ -294,7 +291,7 @@ mod tests {
         let msg = SessionMessage::<1000>::Segment(Segment {
             frame_id: 1,
             seq_idx: 0,
-            seq_len: 1,
+            seq_flags: SeqIndicator::new_with_flags(1, true),
             data: Box::new(hex!("474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a")),
         });
 

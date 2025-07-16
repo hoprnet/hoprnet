@@ -2,7 +2,8 @@ use futures::channel::mpsc::UnboundedSender;
 
 use crate::session::{
     errors::SessionError,
-    frames::{FrameId, FrameInspector, Segment, SegmentId, SeqIndicator},
+    frames::{FrameId, Segment, SegmentId, SeqIndicator},
+    processing::types::FrameInspector,
     protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
 };
 

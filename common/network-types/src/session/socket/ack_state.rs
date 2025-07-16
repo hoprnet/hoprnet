@@ -20,7 +20,8 @@ use crate::{
         },
     },
     session::{
-        frames::{FrameId, FrameInspector, Segment, SegmentId, SeqIndicator},
+        frames::{FrameId, Segment, SegmentId, SeqIndicator},
+        processing::types::FrameInspector,
         protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
         socket::state::SocketComponents,
     },
@@ -613,7 +614,8 @@ mod tests {
 
     use super::*;
     use crate::session::{
-        frames::{FrameBuilder, FrameDashMap, FrameMap, SeqNum},
+        frames::SeqNum,
+        processing::types::{FrameBuilder, FrameDashMap, FrameMap},
         utils::test::segment,
     };
 

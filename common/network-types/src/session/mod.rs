@@ -18,11 +18,11 @@
 
 /// Contains errors thrown from this module.
 pub mod errors;
-mod frames;
+pub mod frames;
 mod processing;
 mod protocol;
 mod socket;
-pub mod utils;
+pub(crate) mod utils;
 
 pub use socket::{
     SessionSocket, SessionSocketConfig,

@@ -13,9 +13,10 @@ use tracing::instrument;
 
 use crate::session::{
     errors::SessionError,
-    frames::{
-        Frame, FrameBuilder, FrameDashMap, FrameHashMap, FrameId, FrameInspector, FrameMap, FrameMapEntry,
-        FrameMapOccupiedEntry, FrameMapVacantEntry, Segment,
+    frames::{Frame, FrameId, Segment},
+    processing::types::{
+        FrameBuilder, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry,
+        FrameMapVacantEntry,
     },
 };
 

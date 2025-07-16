@@ -13,6 +13,9 @@ mod reassembly;
 mod segmenter;
 mod sequencer;
 
+/// Types necessary for frame reconstruction and segmentation.
+pub(crate) mod types;
+
 pub(crate) use reassembly::ReassemblerExt;
 pub(crate) use segmenter::SegmenterExt;
 pub(crate) use sequencer::SequencerExt;
