@@ -622,6 +622,7 @@ mod tests {
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_crypto_types::types::SimplePseudonym;
     use hopr_network_types::prelude::{RoutingOptions, SurbMatcher};
     use hopr_primitive_types::prelude::Address;
 
@@ -634,6 +635,12 @@ mod tests {
         assert_eq!(5, max_decimal_digits_for_n_bytes(size_of::<u16>()));
         assert_eq!(10, max_decimal_digits_for_n_bytes(size_of::<u32>()));
         assert_eq!(20, max_decimal_digits_for_n_bytes(size_of::<u64>()));
+    }
+
+    #[test]
+    fn standard_session_id_must_fit_within_limit() {
+        let id = format!("{}:{}", SimplePseudonym::random(), Tag::Application(65535));
+        assert!(id.len() <= MAX_SESSION_ID_STR_LEN);
     }
 
     #[cfg(feature = "serde")]
