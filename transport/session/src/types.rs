@@ -639,7 +639,7 @@ mod tests {
 
     #[test]
     fn standard_session_id_must_fit_within_limit() {
-        let id = format!("{}:{}", SimplePseudonym::random(), Tag::Application(65535));
+        let id = format!("{}:{}", SimplePseudonym::random(), Tag::Application(Tag::MAX));
         assert!(id.len() <= MAX_SESSION_ID_STR_LEN);
     }
 
