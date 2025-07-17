@@ -147,11 +147,22 @@ where
             .inspect(|_| tracing::trace!("incoming peer stream processing terminated")),
     );
 
+    let max_concurrent_packets = std::env::var("HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(MAX_CONCURRENT_PACKETS);
+
+    let global_stream_open_timeout = std::env::var("HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .map(std::time::Duration::from_millis)
+        .unwrap_or(GLOBAL_STREAM_OPEN_TIMEOUT);
+
     // terminated when the rx_in is dropped
     let _egress_process = hopr_async_runtime::prelude::spawn(
         rx_out
             .inspect(|(peer, _)| tracing::trace!(%peer, "proceeding to deliver message to peer"))
-            .for_each_concurrent(MAX_CONCURRENT_PACKETS, move |(peer, msg)| {
+            .for_each_concurrent(max_concurrent_packets, move |(peer, msg)| {
                 let cache = cache_out.clone();
                 let control = control.clone();
                 let codec = codec.clone();
@@ -172,7 +183,7 @@ where
                             use futures_time::future::FutureExt as TimeExt;
                             let stream = control
                                 .open(peer)
-                                .timeout(futures_time::time::Duration::from(GLOBAL_STREAM_OPEN_TIMEOUT))
+                                .timeout(futures_time::time::Duration::from(global_stream_open_timeout))
                                 .await
                                 .map_err(|_| anyhow::anyhow!("timeout trying to open stream to {peer}"))?
                                 .map_err(|e| anyhow::anyhow!("could not open outgoing peer-to-peer stream: {e}"))?;
