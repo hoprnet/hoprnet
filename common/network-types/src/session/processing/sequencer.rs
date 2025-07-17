@@ -1,4 +1,5 @@
 //! This module defines the [`Sequencer`] stream adaptor.
+
 use std::{
     collections::BinaryHeap,
     future::Future,
@@ -33,6 +34,8 @@ use crate::{prelude::errors::SessionError, session::frames::FrameId};
 ///
 /// By definition, Sequencer is a fallible stream, yielding either `Ok(Item)`, `Err(`[`SessionError::FrameDiscarded`]`)`
 /// or `Ok(None)` when the underlying stream is closed and no more elements can be yielded.
+///
+/// Use [`SequencerExt`] methods to turn a stream into a sequenced stream.
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Sequencer<S: futures::Stream> {
@@ -197,6 +200,7 @@ where
     }
 }
 
+/// Stream extensions methods for item sequencing.
 pub trait SequencerExt: futures::Stream {
     /// Attaches a [`Sequencer`] to the underlying stream, given the item `timeout` and `capacity`
     /// of items.

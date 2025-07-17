@@ -24,9 +24,12 @@ use crate::session::{
 /// This acts as a natural buffering feature of a Segmenter.
 ///
 /// Segmenter can optionally send a [terminating](Segment::terminating) when `poll_close`
-/// is called.
+/// is called. If an unflushed segment is in the buffer, it will be marked as terminating, otherwise
+/// an empty terminating segment is emitted.
 ///
 /// Segmenter is essentially inverse of [`Reassembler`](super::reassembly::Reassembler).
+///
+/// Use [`SegmenterExt`] to turn a `Segment` sink into an `AsyncWrite` object using the `Segmenter`.
 #[must_use = "sinks do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Segmenter<const C: usize, S> {
@@ -265,6 +268,7 @@ where
     }
 }
 
+/// Sink extension methods for segmenting binary data into a sink.
 pub trait SegmenterExt: futures::Sink<Segment, Error = SessionError> {
     /// Attaches a [`Segmenter`] to the underlying sink.
     fn segmenter<const C: usize>(self, frame_size: usize) -> Segmenter<C, Self>
@@ -274,6 +278,8 @@ pub trait SegmenterExt: futures::Sink<Segment, Error = SessionError> {
         Segmenter::new(self, frame_size, false, false)
     }
 
+    /// Attaches a [`Segmenter`] to the underlying sink.
+    /// The `Segmenter` also sends a [terminating](Segment::terminating) when closed.
     fn segmenter_with_terminating_segment<const C: usize>(self, frame_size: usize) -> Segmenter<C, Self>
     where
         Self: Sized,

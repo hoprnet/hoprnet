@@ -43,6 +43,8 @@ use crate::session::{
 ///
 /// The reassemblers internal buffer is stored in a [`FrameMap`] and can be constructed using
 /// different implementations of it, suitable for different use-cases.
+///
+/// Use [`ReassemblerExt`] methods to turn a ` Segment ` stream into a fallible `Frame` stream using the `Reassembler`.
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
 pub struct Reassembler<S, M> {
@@ -188,6 +190,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
     }
 }
 
+/// Stream extension methods for frame reassembly.
 pub trait ReassemblerExt: futures::Stream<Item = Segment> {
     /// Attaches a [`Reassembler`] with the given `timeout` for frame completion and `capacity`
     /// to this stream.

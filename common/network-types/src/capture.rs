@@ -19,15 +19,24 @@ use pcap_file::{
 
 #[derive(Clone, Debug, strum::Display)]
 enum CapturedPacket {
-    Incoming(Box<[u8]>),
-    Outgoing(Box<[u8]>),
+    Incoming(std::time::Duration, Box<[u8]>),
+    Outgoing(std::time::Duration, Box<[u8]>),
 }
 
 impl AsRef<[u8]> for CapturedPacket {
     fn as_ref(&self) -> &[u8] {
         match self {
-            CapturedPacket::Incoming(data) => data.as_ref(),
-            CapturedPacket::Outgoing(data) => data.as_ref(),
+            CapturedPacket::Incoming(_, data) => data.as_ref(),
+            CapturedPacket::Outgoing(_, data) => data.as_ref(),
+        }
+    }
+}
+
+impl CapturedPacket {
+    fn timestamp(&self) -> std::time::Duration {
+        match self {
+            CapturedPacket::Incoming(timestamp, _) => *timestamp,
+            CapturedPacket::Outgoing(timestamp, _) => *timestamp,
         }
     }
 }
@@ -43,7 +52,7 @@ pub struct PcapIO<T> {
 }
 
 impl<T> PcapIO<T> {
-    pub fn new(inner: T, file: &str) -> Self {
+    fn new(inner: T, file: &str) -> Self {
         let (sender, receiver) = futures::channel::mpsc::channel::<CapturedPacket>(10_000);
         let file = file.to_owned();
 
@@ -62,9 +71,7 @@ impl<T> PcapIO<T> {
                     pin_mut!(receiver);
                     while let Some(next) = receiver.next().await {
                         let writer = writer.clone();
-                        let timestamp = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap();
+
                         if let Err(error) = hopr_async_runtime::prelude::spawn_blocking(move || {
                             let data = next.as_ref();
                             writer
@@ -74,7 +81,7 @@ impl<T> PcapIO<T> {
                                     writer
                                         .write_pcapng_block(EnhancedPacketBlock {
                                             interface_id: 0,
-                                            timestamp,
+                                            timestamp: next.timestamp(),
                                             original_len: data.len() as u32,
                                             data: data.into(),
                                             options: vec![EnhancedPacketOption::Comment(next.to_string().into())],
@@ -105,7 +112,10 @@ impl<T> PcapIO<T> {
 impl<T: futures::io::AsyncWrite> futures::io::AsyncWrite for PcapIO<T> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
-        let _ = this.sender.try_send(CapturedPacket::Outgoing(buf.into()));
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap();
+        let _ = this.sender.try_send(CapturedPacket::Outgoing(timestamp, buf.into()));
         this.inner.poll_write(cx, buf)
     }
 
@@ -128,7 +138,12 @@ impl<T: futures::io::AsyncRead> futures::io::AsyncRead for PcapIO<T> {
         let this = self.project();
         match futures::ready!(this.inner.poll_read(cx, buf)) {
             Ok(read) if read > 0 => {
-                let _ = this.sender.try_send(CapturedPacket::Incoming(Box::from(&buf[0..read])));
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap();
+                let _ = this
+                    .sender
+                    .try_send(CapturedPacket::Incoming(timestamp, Box::from(&buf[0..read])));
                 Poll::Ready(Ok(read))
             }
             Ok(_) => {
