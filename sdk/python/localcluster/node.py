@@ -224,6 +224,7 @@ class Node:
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
             "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
+            "HOPR_CAPTURE_PACKETS": self.dir.joinpath("captured.pcap"),
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 
@@ -264,7 +265,7 @@ class Node:
         ready = False
 
         while not ready:
-            # we choose a long timeout here to accomodate the node just starting
+            # we choose a long timeout here to accommodate the node just starting
             peers_info = await asyncio.wait_for(self.api.peers(), timeout=10)
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 

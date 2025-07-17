@@ -276,7 +276,11 @@ impl Session {
         // Based on the requested capabilities, see if we should use the Session protocol
         let inner: Pin<Box<dyn AsyncReadWrite>> = if capabilities.contains(Capability::Segmentation) {
             // TODO: update config values
-            let socket_cfg = SessionSocketConfig::default();
+            let socket_cfg = SessionSocketConfig {
+                frame_size: 1500,
+                frame_timeout: Duration::from_millis(800),
+                ..Default::default()
+            };
 
             if capabilities.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
                 // TODO: update config values

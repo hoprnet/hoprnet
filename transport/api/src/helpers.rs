@@ -61,6 +61,8 @@ pub(crate) struct PathPlanner<T, S> {
     me: Address,
 }
 
+const DEFAULT_PACKET_PLANNER_CONCURRENCY: usize = 10;
+
 impl<T, S> PathPlanner<T, S>
 where
     T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
@@ -192,12 +194,19 @@ where
     let (tx, rx) =
         futures::channel::mpsc::channel::<(DestinationRouting, ApplicationData)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
-    hopr_async_runtime::prelude::spawn(rx.for_each_concurrent(10, move |(routing, data)| {
+    let planner_concurrency = std::env::var("HOPR_PACKET_PLANNER_CONCURRENCY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_PACKET_PLANNER_CONCURRENCY);
+
+    hopr_async_runtime::prelude::spawn(rx.for_each_concurrent(planner_concurrency, move |(routing, data)| {
         let planner = planner.clone();
         let packet_sender = packet_sender.clone();
         async move {
             match planner.resolve_routing(data.len(), routing).await {
                 Ok(resolved) => {
+                    // The awaiter here is intentionally dropped,
+                    // since we do not intend to be notified about packet delivery to the first hop
                     if let Err(error) = packet_sender.send_packet(data, resolved).await {
                         tracing::error!(%error, "failed to enqueue packet for sending");
                     }

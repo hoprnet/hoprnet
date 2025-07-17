@@ -158,7 +158,7 @@ pub struct PacketSendFinalizer {
 impl PacketSendFinalizer {
     pub fn finalize(self, result: std::result::Result<(), PacketError>) {
         if self.tx.send(result).is_err() {
-            error!("Failed to notify the awaiter about the successful packet transmission")
+            tracing::trace!("Failed to notify the awaiter about the successful packet transmission")
         }
     }
 }
