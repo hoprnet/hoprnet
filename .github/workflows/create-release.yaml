@@ -163,6 +163,7 @@ jobs:
           event-type: create_release
           client-payload: |-
             {
+              "base_branch": "${{ steps.vars.outputs.base_branch }}",
               "version": "${{ steps.setup.outputs.current_version }}"
             }
 
