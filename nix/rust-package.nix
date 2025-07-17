@@ -74,6 +74,7 @@ let
   linuxNativeBuildInputs =
     if buildPlatform.isLinux then
       [
+        # mold is only supported on Linux
         mold
       ]
     else
