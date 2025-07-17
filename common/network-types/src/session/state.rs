@@ -1500,7 +1500,7 @@ mod tests {
         pin_mut!(f2);
 
         match futures::future::select(f1, f2).await {
-            Either::Left(_) => panic!("should timeout: {:?}", out),
+            Either::Left(_) => panic!("should timeout: {out:?}"),
             Either::Right(_) => {}
         }
 

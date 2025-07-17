@@ -881,7 +881,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
     // build the default permissions of capabilities
     let default_target =
     // let default_target: [u8; 32] =
-        U256::from_str(format!("{:?}{}", hopr_channels_address, DEFAULT_CAPABILITY_PERMISSIONS).as_str())
+        U256::from_str(format!("{hopr_channels_address:?}{DEFAULT_CAPABILITY_PERMISSIONS}").as_str())
             .unwrap();
     debug!("default target {:?}", default_target);
     // salt nonce
@@ -935,8 +935,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
 
     // add announcement as a permitted target in the deployed module proxy
     let announcement_target =
-        U256::from_str(format!("{:?}{}", hopr_announcement_address, DEFAULT_ANNOUNCEMENT_PERMISSIONS).as_str())
-            .unwrap();
+        U256::from_str(format!("{hopr_announcement_address:?}{DEFAULT_ANNOUNCEMENT_PERMISSIONS}").as_str()).unwrap();
     let scope_announcement_tx_payload = scopeTargetTokenCall {
         defaultTarget: announcement_target,
     }
@@ -1160,7 +1159,7 @@ pub async fn include_nodes_to_module<P: WalletProvider + Provider>(
     // prepare a multisend transaction to include each node to the  module
     let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
     for node_address in node_addresses {
-        let node_target = U256::from_str(format!("{:?}{}", node_address, DEFAULT_NODE_PERMISSIONS).as_str()).unwrap();
+        let node_target = U256::from_str(format!("{node_address:?}{DEFAULT_NODE_PERMISSIONS}").as_str()).unwrap();
         multisend_txns.push(MultisendTransaction {
             encoded_data: includeNodeCall {
                 nodeDefaultTarget: node_target,
@@ -1206,7 +1205,7 @@ pub async fn migrate_nodes<P: WalletProvider + Provider>(
 
     // scope channels and tokens contract of the network
     let default_target =
-        U256::from_str(format!("{:?}{}", channels_address, DEFAULT_CAPABILITY_PERMISSIONS).as_str()).unwrap();
+        U256::from_str(format!("{channels_address:?}{DEFAULT_CAPABILITY_PERMISSIONS}").as_str()).unwrap();
     debug!("default target {:?}", default_target);
 
     multisend_txns.push(MultisendTransaction {
@@ -1223,7 +1222,7 @@ pub async fn migrate_nodes<P: WalletProvider + Provider>(
 
     // scope announcement contract of the new network
     let announcement_target =
-        U256::from_str(format!("{:?}{}", announcement_address, DEFAULT_ANNOUNCEMENT_PERMISSIONS).as_str()).unwrap();
+        U256::from_str(format!("{announcement_address:?}{DEFAULT_ANNOUNCEMENT_PERMISSIONS}").as_str()).unwrap();
 
     multisend_txns.push(MultisendTransaction {
         // build multisend tx payload
@@ -1383,9 +1382,9 @@ pub async fn debug_node_safe_module_setup_main<P: Provider>(
     info!("node is included in the module: {:?}", is_node_included);
     info!("module has targets:");
     for target in module_targets {
-        let target_address = format!("{:#x}", target);
-        let has_channels = target_address.contains(&format!("{:#x}", channel_address));
-        let has_announcement = target_address.contains(&format!("{:#x}", announce_address));
+        let target_address = format!("{target:#x}");
+        let has_channels = target_address.contains(&format!("{channel_address:#x}"));
+        let has_announcement = target_address.contains(&format!("{announce_address:#x}"));
         // check if it contains channel and announcement
         info!(
             "Target {:?} has channels {:?} has announcement {:?}",

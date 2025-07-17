@@ -200,7 +200,7 @@ impl NetworkRegistrySubcommands {
                     .split(',')
                     .map(|addr| {
                         Address::from_str(addr)
-                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             );
@@ -209,7 +209,7 @@ impl NetworkRegistrySubcommands {
         node_eth_addresses.extend(
             local_identity
                 .to_addresses()
-                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
                 .map(Address::from),
         );
@@ -271,7 +271,7 @@ impl NetworkRegistrySubcommands {
                     .split(',')
                     .map(|addr| {
                         Address::from_str(addr)
-                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             );
@@ -280,7 +280,7 @@ impl NetworkRegistrySubcommands {
         node_eth_addresses.extend(
             local_identity
                 .to_addresses()
-                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
                 .map(Address::from),
         );
