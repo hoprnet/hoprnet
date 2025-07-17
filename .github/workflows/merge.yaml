@@ -146,6 +146,7 @@ jobs:
     with:
       source_repo: ${{ github.event.pull_request.base.repo.full_name }}
       source_branch: ${{ github.event.pull_request.base.ref }}
+      network: dufour
     secrets: inherit
   docs:
     name: Docs

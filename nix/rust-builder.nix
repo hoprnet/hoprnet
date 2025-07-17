@@ -54,7 +54,8 @@ let
 
   solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
 
-  cargoTarget = hostPlatform.config;
+  cargoTarget =
+    if hostPlatform.config == "arm64-apple-darwin" then "aarch64-apple-darwin" else hostPlatform.config;
 
   rustToolchainFun =
     if useRustNightly then
