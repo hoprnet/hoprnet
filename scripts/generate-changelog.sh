@@ -77,13 +77,13 @@ github_format_changelog() {
     title=$(echo "$entry" | jq -r '.title')
     author=$(echo "$entry" | jq -r '.author')
     case ${title} in
-    "feat("* | "feat:"* | "chore("*)
+    "feat("* | "feat:"* | "chore("* | "chore:"*)
       section_feature+="* ${title} by @${author} in #${id}\n"
       ;;
     "fix("* | "fix:"*)
       section_fix+="* ${title} by @${author} in #${id}\n"
       ;;
-    "refactor("* | "refactor:"* | "style("* | "style:"* | "bump("* | "bump:"*)
+    "refactor("* | "refactor:"* | "style("* | "style:"* )
       section_refactor+="* ${title} by @${author} in #${id}\n"
       ;;
     "docs("* | "docs:"*)
@@ -92,7 +92,7 @@ github_format_changelog() {
     "perf("* | "perf:"*)
       section_performance+="* ${title} by @${author} in #${id}\n"
       ;;
-    "ci("* | "ci:"* | "nix("* | "nix:"* | "test("* | "test:"* | "build("* | "build:"*)
+    "test("* | "test:"* | "build("* | "build:"*)
       section_ci+="* ${title} by @${author} in #${id}\n"
       ;;
     *)
