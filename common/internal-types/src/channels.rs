@@ -62,7 +62,7 @@ pub enum ChannelDirection {
     Outgoing = 1,
 }
 
-/// Alias for the [`Hash`] representing a channel ID.
+/// Alias for the [`Hash`](struct@Hash) representing a channel ID.
 pub type ChannelId = Hash;
 
 /// Overall description of a channel

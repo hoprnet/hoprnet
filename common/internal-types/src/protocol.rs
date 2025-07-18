@@ -91,7 +91,7 @@ impl Acknowledgement {
 
     /// Gets the acknowledged key out of this acknowledgement.
     ///
-    /// Returns [`InvalidAcknowledgement`]
+    /// Returns [`InvalidAcknowledgement`](CoreTypesError::InvalidAcknowledgement)
     /// if the acknowledgement has not been [validated](Acknowledgement::validate).
     pub fn ack_key_share(&self) -> Result<HalfKey> {
         if self.validated {
@@ -103,7 +103,7 @@ impl Acknowledgement {
 
     /// Gets the acknowledgement challenge out of this acknowledgement.
     ///
-    /// Returns [`InvalidAcknowledgement`]
+    /// Returns [`InvalidAcknowledgement`](CoreTypesError::InvalidAcknowledgement)
     /// if the acknowledgement has not been [validated](Acknowledgement::validate).
     pub fn ack_challenge(&self) -> Result<HalfKeyChallenge> {
         Ok(self.ack_key_share()?.to_challenge())
