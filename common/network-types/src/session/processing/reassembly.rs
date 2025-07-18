@@ -71,6 +71,17 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
             capacity,
         }
     }
+
+    fn expire_frames(incomplete_frames: &mut M, expired_frames: &mut Vec<FrameId>, max_age: Duration) {
+        incomplete_frames.retain(|id, builder| {
+            if builder.last_recv.elapsed() >= max_age {
+                expired_frames.push(*id);
+                false
+            } else {
+                true
+            }
+        });
+    }
 }
 
 impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, M> {
@@ -147,16 +158,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                     // Since the retaining operation is potentially expensive,
                     // we do it actually only if there's a real chance that a frame is expired
                     if this.last_expiration.is_none_or(|e| e.elapsed() >= *this.max_age) {
-                        this.incomplete_frames.retain(|id, builder| {
-                            if builder.last_recv.elapsed() >= *this.max_age
-                            // && *id != item.frame_id
-                            {
-                                this.expired_frames.push(*id);
-                                false
-                            } else {
-                                true
-                            }
-                        });
+                        Self::expire_frames(this.incomplete_frames, this.expired_frames, *this.max_age);
                         *this.last_expiration = Some(Instant::now());
                     }
                 }
@@ -175,14 +177,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                 }
                 (Poll::Pending, Poll::Ready(_)) => {
                     // Check if some frames are expired
-                    this.incomplete_frames.retain(|id, builder| {
-                        if builder.last_recv.elapsed() >= *this.max_age {
-                            this.expired_frames.push(*id);
-                            false
-                        } else {
-                            true
-                        }
-                    });
+                    Self::expire_frames(this.incomplete_frames, this.expired_frames, *this.max_age);
                     *this.last_expiration = Some(Instant::now());
                     this.timer.as_mut().reset_timer();
                 }
