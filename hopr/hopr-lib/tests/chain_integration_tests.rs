@@ -262,6 +262,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         fast_sync: false,
         log_snapshot_enabled: false,
         log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+        data_directory: "/tmp/test_hopr_data".to_string(),
     };
 
     // Setup ALICE

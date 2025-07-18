@@ -489,6 +489,7 @@ impl Hopr {
                 fast_sync: cfg.chain.fast_sync,
                 log_snapshot_enabled: cfg.chain.log_snapshot_enabled,
                 log_snapshot_url: cfg.chain.log_snapshot_url.clone(),
+                data_directory: cfg.db.data.clone(),
             },
             tx_indexer_events,
         )?;

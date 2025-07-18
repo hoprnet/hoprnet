@@ -3,7 +3,7 @@ use std::{path::Path, time::Duration};
 use futures_util::StreamExt;
 use reqwest::Client;
 use tokio::{fs::File, io::AsyncWriteExt};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::snapshot::error::{SnapshotError, SnapshotResult};
 
@@ -89,7 +89,7 @@ impl SnapshotDownloader {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| SnapshotError::Archive("All retry attempts failed".to_string())))
+        Err(last_error.unwrap_or_else(|| SnapshotError::Timeout("All retry attempts failed".to_string())))
     }
 
     /// Performs a single download attempt
@@ -127,6 +127,7 @@ impl SnapshotDownloader {
         // Stream download to file
         let mut file = File::create(target_path).await?;
         let mut downloaded = 0u64;
+        let total_size = response.content_length().unwrap_or(0);
         let mut stream = response.bytes_stream();
 
         while let Some(chunk) = stream.next().await {
@@ -141,6 +142,21 @@ impl SnapshotDownloader {
             }
 
             file.write_all(&chunk).await?;
+
+            // Progress reporting
+            if total_size > 0 {
+                let progress = (downloaded as f64 / total_size as f64) * 100.0;
+                if downloaded % (1024 * 1024) == 0 || downloaded == total_size {
+                    debug!(
+                        "Download progress: {:.1}% ({}/{} bytes)",
+                        progress, downloaded, total_size
+                    );
+                }
+            } else {
+                if downloaded % (10 * 1024 * 1024) == 0 {
+                    debug!("Downloaded: {} bytes", downloaded);
+                }
+            }
         }
 
         file.flush().await?;
@@ -150,19 +166,33 @@ impl SnapshotDownloader {
     }
 
     /// Checks if there's sufficient disk space available
-    async fn check_disk_space(&self, dir: &Path) -> SnapshotResult<()> {
+    pub async fn check_disk_space(&self, dir: &Path) -> SnapshotResult<()> {
         // Create directory if it doesn't exist
         tokio::fs::create_dir_all(dir).await?;
 
-        // For now, we'll implement a basic check
-        // In a production system, you might want to use statvfs or similar
-        // to get actual disk space information
+        // Check if directory exists and is accessible
         let metadata = tokio::fs::metadata(dir).await?;
         if !metadata.is_dir() {
             return Err(SnapshotError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "Target directory does not exist",
             )));
+        }
+
+        // Get available disk space
+        let available_bytes = get_available_disk_space(dir)?;
+
+        // We need at least 3x the max size to account for:
+        // 1. Downloaded archive
+        // 2. Extracted files
+        // 3. Safety margin for system operations
+        let required_bytes = self.config.max_size * 3;
+
+        if available_bytes < required_bytes {
+            return Err(SnapshotError::InsufficientSpace {
+                required: required_bytes / (1024 * 1024),
+                available: available_bytes / (1024 * 1024),
+            });
         }
 
         Ok(())
@@ -172,5 +202,46 @@ impl SnapshotDownloader {
 impl Default for SnapshotDownloader {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Gets available disk space in bytes for the given directory
+fn get_available_disk_space(dir: &Path) -> SnapshotResult<u64> {
+    use sysinfo::{Disk, Disks};
+
+    let disks = Disks::new_with_refreshed_list();
+
+    // Find the disk that contains the given directory
+    let target_path = dir.canonicalize().map_err(|e| SnapshotError::Io(e))?;
+
+    // Find the disk with the longest matching mount point
+    let mut best_match: Option<&Disk> = None;
+    let mut best_match_len = 0;
+
+    for disk in &disks {
+        let mount_point = disk.mount_point();
+        if target_path.starts_with(mount_point) {
+            let mount_len = mount_point.as_os_str().len();
+            if mount_len > best_match_len {
+                best_match = Some(disk);
+                best_match_len = mount_len;
+            }
+        }
+    }
+
+    match best_match {
+        Some(disk) => Ok(disk.available_space()),
+        None => {
+            // Fallback: use the first disk or return an error
+            if let Some(disk) = disks.first() {
+                tracing::warn!(
+                    "Could not find matching disk for path {:?}, using first available disk",
+                    dir
+                );
+                Ok(disk.available_space())
+            } else {
+                Err(SnapshotError::InvalidData("No disks found on system".to_string()))
+            }
+        }
     }
 }

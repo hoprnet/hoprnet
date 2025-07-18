@@ -154,8 +154,7 @@ where
         let index_empty = self.db.index_is_empty().await?;
 
         // Check if we need to download snapshot before fast sync
-        // TODO: This assumes we have a way to get the data directory - this needs to be improved
-        let logs_db_has_data = true; // Placeholder - we need to check if logs DB has data
+        let logs_db_has_data = self.has_logs_data().await?;
 
         if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.log_snapshot_enabled {
             info!("Logs database is empty, attempting to download snapshot...");
@@ -726,13 +725,33 @@ where
         }
     }
 
+    /// Checks if the logs database has any data
+    async fn has_logs_data(&self) -> Result<bool> {
+        // Get the total count of logs in the database
+        match self.db.get_logs_count(None, None).await {
+            Ok(count) => Ok(count > 0),
+            Err(e) => {
+                // If we can't query the database, assume it has no data
+                // This handles cases where the logs database doesn't exist yet
+                trace!("Failed to query logs count, assuming no data: {}", e);
+                Ok(false)
+            }
+        }
+    }
+
     /// Downloads a snapshot for faster initial sync
     pub async fn download_snapshot(&self) -> Result<SnapshotInfo> {
         let snapshot_manager = SnapshotManager::new();
 
-        // TODO: We need to get the actual data directory from somewhere
-        // For now, we'll use a placeholder path
-        let data_dir = std::path::Path::new("/tmp/hopr_data");
+        // Use the data directory from configuration
+        let data_dir = std::path::Path::new(&self.cfg.data_directory);
+
+        // Validate that the data directory is configured
+        if self.cfg.data_directory.is_empty() {
+            return Err(CoreEthereumIndexerError::SnapshotError(
+                "Data directory is not configured. Please set data_directory in IndexerConfig.".to_string(),
+            ));
+        }
 
         snapshot_manager
             .download_and_setup_snapshot(&self.cfg.log_snapshot_url, data_dir)
@@ -1097,6 +1116,7 @@ mod tests {
                 fast_sync: true,
                 log_snapshot_enabled: false,
                 log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+                data_directory: "/tmp/test_data".to_string(),
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
@@ -1190,6 +1210,7 @@ mod tests {
                 fast_sync: true,
                 log_snapshot_enabled: false,
                 log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+                data_directory: "/tmp/test_data".to_string(),
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
@@ -1368,6 +1389,7 @@ mod tests {
             fast_sync: false,
             log_snapshot_enabled: false,
             log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+            data_directory: "/tmp/test_data".to_string(),
         };
 
         let (tx_events, _) = async_channel::unbounded();
