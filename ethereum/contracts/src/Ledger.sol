@@ -28,7 +28,7 @@ abstract contract HoprLedgerEvents {
 abstract contract HoprLedger is HoprLedgerEvents {
     string public constant LEDGER_VERSION = "1.0.0";
 
-    uint256 immutable snapshotInterval;
+    uint256 public immutable snapshotInterval;
 
     /**
      * Stores the last indexer state
@@ -41,14 +41,14 @@ abstract contract HoprLedger is HoprLedgerEvents {
         uint32 timestamp;
     }
 
-    RootStruct latestRoot;
+    RootStruct public latestRoot;
 
-    RootStruct latestSnapshotRoot;
+    RootStruct public latestSnapshotRoot;
 
     bytes32 public ledgerDomainSeparator;
 
     /**
-     * @param _snapshotInterval time in miliseconds to create a new snapshot
+     * @param _snapshotInterval time in seconds to create a new snapshot
      */
     constructor(uint256 _snapshotInterval) {
         snapshotInterval = _snapshotInterval;
