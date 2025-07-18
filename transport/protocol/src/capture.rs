@@ -18,20 +18,28 @@ use pcap_file::{
 
 use crate::HOPR_PACKET_SIZE;
 
-#[derive(Copy, Clone, Debug, strum::Display)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
 pub enum PacketDirection {
     Incoming,
     Outgoing,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CapturedPacket {
+    pub direction: PacketDirection,
+    pub timestamp: std::time::Duration,
+    pub orig_len: u32,
+    pub data: Box<[u8]>,
+}
+
 pub trait PacketWriter {
-    fn write_packet(&mut self, packet: &[u8], direction: PacketDirection) -> std::io::Result<()>;
+    fn write_packet(&mut self, packet: CapturedPacket) -> std::io::Result<()>;
 }
 
 pub struct NullWriter;
 
 impl PacketWriter for NullWriter {
-    fn write_packet(&mut self, _: &[u8], _: PacketDirection) -> std::io::Result<()> {
+    fn write_packet(&mut self, _: CapturedPacket) -> std::io::Result<()> {
         Ok(())
     }
 }
@@ -55,17 +63,14 @@ impl PcapPacketWriter {
 }
 
 impl PacketWriter for PcapPacketWriter {
-    fn write_packet(&mut self, packet: &[u8], direction: PacketDirection) -> std::io::Result<()> {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap();
+    fn write_packet(&mut self, packet: CapturedPacket) -> std::io::Result<()> {
         self.0
             .write_pcapng_block(EnhancedPacketBlock {
                 interface_id: 0,
-                timestamp,
-                original_len: HOPR_PACKET_SIZE as u32,
-                data: packet.into(),
-                options: vec![EnhancedPacketOption::Comment(direction.to_string().into())],
+                timestamp: packet.timestamp,
+                original_len: packet.orig_len,
+                data: packet.data.into_vec().into(),
+                options: vec![EnhancedPacketOption::Comment(packet.direction.to_string().into())],
             })
             .map(|_| ())
             .map_err(std::io::Error::other)
@@ -83,10 +88,11 @@ impl UdpPacketDump {
 }
 
 impl PacketWriter for UdpPacketDump {
-    fn write_packet(&mut self, packet: &[u8], _direction: PacketDirection) -> std::io::Result<()> {
+    fn write_packet(&mut self, packet: CapturedPacket) -> std::io::Result<()> {
         let mut sent = 0;
-        while sent < packet.len() {
-            sent += self.0.send(&packet[sent..])?;
+        let data = packet.data;
+        while sent < data.len() {
+            sent += self.0.send(&data[sent..])?;
         }
         Ok(())
     }
@@ -103,7 +109,7 @@ pub fn packet_capture_channel(
             writer
                 .lock()
                 .map_err(|_| std::io::Error::other("lock poisoned"))
-                .and_then(|mut w| w.write_packet(&packet.1, packet.0))
+                .and_then(|mut w| w.write_packet(packet))
         })
         .map(|_| ())
     }));
@@ -120,12 +126,14 @@ enum PacketType {
     OutAck = 4,
 }
 
+/// Represents a customized dissection of a HOPR packet before it goes into the transport.
 pub enum PacketBeforeTransit<'a> {
     OutgoingPacket {
         me: OffchainPublicKey,
         next_hop: OffchainPublicKey,
         data: Cow<'a, [u8]>,
         ack_challenge: Cow<'a, [u8]>,
+        ticket: Cow<'a, [u8]>,
     },
     OutgoingAck {
         me: OffchainPublicKey,
@@ -136,10 +144,9 @@ pub enum PacketBeforeTransit<'a> {
     IncomingPacket {
         me: OffchainPublicKey,
         packet: &'a IncomingPacket,
+        ticket: Cow<'a, [u8]>,
     },
 }
-
-pub struct CapturedPacket(PacketDirection, Box<[u8]>);
 
 impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
     fn from(value: PacketBeforeTransit<'a>) -> Self {
@@ -151,6 +158,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 next_hop,
                 data,
                 ack_challenge,
+                ticket,
             } => {
                 out.push(PacketType::Outgoing as u8);
                 out.extend_from_slice(me.as_ref());
@@ -160,6 +168,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(ack_challenge.as_ref());
+                out.push(ticket.len() as u8);
+                out.extend_from_slice(ticket.as_ref());
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
                 direction = PacketDirection::Outgoing;
@@ -191,6 +201,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                         plain_text,
                         ack_key,
                     },
+                ticket,
             } => {
                 out.push(PacketType::Final as u8);
                 out.extend_from_slice(packet_tag);
@@ -202,6 +213,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(sender.as_ref());
                 out.extend_from_slice(ack_key.as_ref());
+                out.push(ticket.len() as u8);
+                out.extend_from_slice(ticket.as_ref());
                 out.extend_from_slice((plain_text.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(plain_text.as_ref());
             }
@@ -214,6 +227,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                         data,
                         ack,
                     },
+                ticket,
                 ..
             } => {
                 out.push(PacketType::Forwarded as u8);
@@ -225,6 +239,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.extend_from_slice(ack.as_ref());
+                out.push(ticket.len() as u8);
+                out.extend_from_slice(ticket.as_ref());
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
             }
@@ -236,6 +252,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                         previous_hop,
                         ack,
                     },
+                ..
             } => {
                 out.push(PacketType::InAck as u8);
                 out.extend_from_slice(packet_tag);
@@ -249,7 +266,14 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
             }
         }
 
-        Self(direction, out.into_boxed_slice())
+        Self {
+            direction,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default(),
+            orig_len: HOPR_PACKET_SIZE as u32,
+            data: out.into_boxed_slice(),
+        }
     }
 }
 
@@ -259,14 +283,15 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
-        prelude::{Keypair, OffchainKeypair, SimplePseudonym},
-        types::HalfKey,
+        prelude::{ChainKeypair, Keypair, OffchainKeypair, SimplePseudonym},
+        types::{HalfKey, Hash},
     };
-    use hopr_internal_types::prelude::Acknowledgement;
+    use hopr_internal_types::prelude::{Acknowledgement, TicketBuilder, WinningProbability};
     use hopr_network_types::prelude::{
         FrameInfo, Segment,
         protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
     };
+    use hopr_primitive_types::{primitives::EthereumChallenge, traits::BytesEncodable};
     use hopr_transport_packet::prelude::ApplicationData;
     use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
 
@@ -287,8 +312,27 @@ mod tests {
             ack_key: HalfKey::random(),
         };
 
+        let ticket = TicketBuilder::default()
+            .amount(10)
+            .channel_id(Hash::create(&[b"test"]))
+            .challenge(EthereumChallenge::default())
+            .win_prob(WinningProbability::try_from_f64(0.5)?)
+            .channel_epoch(1)
+            .index(10)
+            .index_offset(1)
+            .build_signed(&ChainKeypair::random(), &Hash::default())?
+            .leak()
+            .into_encoded();
+
         let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .send(
+                PacketBeforeTransit::IncomingPacket {
+                    me,
+                    packet: &packet,
+                    ticket: ticket.to_vec().into(),
+                }
+                .into(),
+            )
             .await;
 
         let msg = SessionMessage::<1000>::Segment(Segment {
@@ -307,7 +351,14 @@ mod tests {
         };
 
         let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .send(
+                PacketBeforeTransit::IncomingPacket {
+                    me,
+                    packet: &packet,
+                    ticket: ticket.to_vec().into(),
+                }
+                .into(),
+            )
             .await;
 
         let msg = SessionMessage::<1000>::Acknowledge(FrameAcknowledgements::from(vec![1, 2, 100]));
@@ -321,7 +372,14 @@ mod tests {
         };
 
         let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .send(
+                PacketBeforeTransit::IncomingPacket {
+                    me,
+                    packet: &packet,
+                    ticket: ticket.to_vec().into(),
+                }
+                .into(),
+            )
             .await;
 
         let msg = SessionMessage::<1000>::Request(SegmentRequest::from_iter([
@@ -348,7 +406,14 @@ mod tests {
         };
 
         let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .send(
+                PacketBeforeTransit::IncomingPacket {
+                    me,
+                    packet: &packet,
+                    ticket: ticket.to_vec().into(),
+                }
+                .into(),
+            )
             .await;
 
         let kp = OffchainKeypair::random();
@@ -359,7 +424,14 @@ mod tests {
         };
 
         let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .send(
+                PacketBeforeTransit::IncomingPacket {
+                    me,
+                    packet: &packet,
+                    ticket: ticket.to_vec().into(),
+                }
+                .into(),
+            )
             .await;
 
         let packet = IncomingPacket::Forwarded {
@@ -371,7 +443,14 @@ mod tests {
         };
 
         let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .send(
+                PacketBeforeTransit::IncomingPacket {
+                    me,
+                    packet: &packet,
+                    ticket: ticket.to_vec().into(),
+                }
+                .into(),
+            )
             .await;
 
         let hk = HalfKey::random().to_challenge();
@@ -387,6 +466,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
+            ticket: ticket.to_vec().into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -402,6 +482,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
+            ticket: ticket.to_vec().into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -417,6 +498,7 @@ mod tests {
             .to_bytes()
             .to_vec()
             .into(),
+            ticket: ticket.to_vec().into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -426,10 +508,11 @@ mod tests {
             me,
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
-            data: ApplicationData::new(1u64, &hex!("0004babe02"))
+            data: ApplicationData::new(1u64, &hex!("0104babe02"))
                 .to_bytes()
                 .into_vec()
                 .into(),
+            ticket: ticket.to_vec().into(),
         };
 
         let _ = pcap.send(packet.into()).await;

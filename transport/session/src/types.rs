@@ -621,8 +621,10 @@ where
 mod tests {
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_crypto_types::types::SimplePseudonym;
+    use hopr_crypto_types::{
+        keypairs::{ChainKeypair, Keypair},
+        types::SimplePseudonym,
+    };
     use hopr_network_types::prelude::{RoutingOptions, SurbMatcher};
     use hopr_primitive_types::prelude::Address;
 
