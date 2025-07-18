@@ -23,7 +23,7 @@ mydir=$(pwd -P)
 : ${GH_TOKEN?"environment variable must be set"}
 head_branch=${1}
 workflow_run_id=$(gh api repos/hoprnet/hoprnet/actions/workflows/build.yaml/runs | jq --arg head_branch "$head_branch" '[.workflow_runs[] | select(.head_branch == $head_branch and .conclusion == "success" and .status == "completed")] | first | .id')
-artifacts=$(gh api repos/hoprnet/hoprnet/actions/runs/${workflow_run_id}/artifacts | jq -r '.artifacts[] | "\(.name) \(.archive_download_url)"')
+artifacts=$(gh api --paginate repos/hoprnet/hoprnet/actions/runs/${workflow_run_id}/artifacts | jq -r '.artifacts[] | "\(.name) \(.archive_download_url)"')
 rm -rf "${mydir}/dist"
 mkdir -p "${mydir}/dist/zip" "${mydir}/dist/unzip" "${mydir}/dist/bin" "${mydir}/dist/packages"
 while IFS= read -r line; do
@@ -38,9 +38,9 @@ while IFS= read -r line; do
   # Extract the zip file to its corresponding directory
   unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/unzip"
   for artifact in dist/unzip/*; do
-    case "$artifact" in
-    *.deb | *.rpm | *.pkg.tar.zst) mv "$artifact" dist/packages/ ;;
-    *) mv "$artifact" dist/bin/ ;;
+    case "$artifact_name" in
+    *.deb | *.rpm | *.zst) mv "$artifact" dist/packages/${artifact_name} ;;
+    *) mv "$artifact" dist/bin/${artifact_name} ;;
     esac
   done
 done <<<"$artifacts"
