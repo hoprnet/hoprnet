@@ -5,6 +5,9 @@ pub enum DbEntityError {
     #[error("conversion error: {0}")]
     ConversionError(String),
 
+    #[error("invalid corruption flag: {0}")]
+    InvalidCorruptionFlag(String),
+
     #[error(transparent)]
     TypesError(#[from] hopr_internal_types::errors::CoreTypesError),
 

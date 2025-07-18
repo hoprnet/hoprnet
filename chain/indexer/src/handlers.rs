@@ -249,7 +249,10 @@ where
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?
-                        .unwrap();
+                        .ok_or(CoreEthereumIndexerError::ProcessError(format!(
+                            "channel balance decreased event for channel {} did not return an updated channel",
+                            Hash::from(balance_decreased.channelId.0)
+                        )))?;
 
                     if is_synced
                         && (updated_channel.source == self.chain_key.public().to_address()

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
-use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelude::Channel};
+use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, errors::DbEntityError, prelude::Channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
@@ -191,13 +191,15 @@ impl HoprDbChannelOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     match Channel::find()
-                        .filter(channel::Column::ChannelId.eq(id_hex))
+                        .filter(channel::Column::ChannelId.eq(id_hex.clone()))
                         .one(tx.as_ref())
                         .await?
                     {
                         Some(model) => {
                             if model.corrupted {
-                                Ok(None) // If the channel is corrupted, we cannot edit it.
+                                Err(DbSqlError::CorruptedChannelEntry(
+                                    Hash::from_hex(&model.channel_id).map_err(DbSqlError::from)?,
+                                ))
                             } else {
                                 Ok(Some(ChannelEditor {
                                     orig: ChannelEntry::try_from(model.clone())?,
@@ -226,9 +228,10 @@ impl HoprDbChannelOperations for HoprDb {
                         let model = editor.model.update(tx.as_ref()).await?;
                         match ChannelEntry::try_from(model) {
                             Ok(channel) => Ok::<_, DbSqlError>(Some(channel)),
-                            Err(_) => {
+                            Err(DbEntityError::InvalidCorruptionFlag(_)) => {
                                 Ok::<_, DbSqlError>(None) // If the channel entry cannot be created, return None
                             }
+                            Err(e) => Err(DbSqlError::from(e)),
                         }
                     } else {
                         editor.model.delete(tx.as_ref()).await?;

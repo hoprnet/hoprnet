@@ -552,19 +552,13 @@ pub(super) async fn fund_channel(
 pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let channels = hopr
-        .corrupted_channels()
-        .and_then(|corrupted_channels| async move {
-            futures::future::try_join_all(
-                corrupted_channels
-                    .into_iter()
-                    .map(|c| query_topology_info(&c.channel())),
-            )
-            .await
-        })
-        .await;
+    let corrupted = match hopr.corrupted_channels().await {
+        Ok(corrupted) => corrupted,
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    };
+    let channels_result = futures::future::try_join_all(corrupted.into_iter().map(|c| query_topology_info(c))).await;
 
-    match channels {
+    match channels_result {
         Ok(list) => (StatusCode::OK, Json(list)).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
