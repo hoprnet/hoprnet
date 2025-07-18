@@ -77,6 +77,18 @@ hopr:
     # was given.
     strategies:
       - !AutoRedeeming
+        #
+        # Channel strategy that performs automatic redemption of
+        # a winning acknowledged ticket
+        #
+        # If set, the strategy will redeem only aggregated tickets.
+        redeem_only_aggregated: true
+        # If set, all tickets will be redeemed on channel closure.
+        redeem_all_on_close: true
+        # Sets the minimum value of a ticket to be able to redeem it.
+        minimum_redeem_ticket_value: "0.09 wxHOPR"
+        #
+        ############################################
         # - !Aggregating
         # Strategy performing automatic ticket aggregation
         # once the number of unredeemed tickets in a channel goes
@@ -99,18 +111,6 @@ hopr:
         # If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
         #
         # aggregate_on_channel_close: true
-        #
-        ############################################
-        #
-        # Channel strategy that performs automatic redemption of
-        # a winning acknowledged ticket
-        #
-        # If set, the strategy will redeem only aggregated tickets.
-        redeem_only_aggregated: true
-        # If set, all tickets will be redeemed on channel closure.
-        redeem_all_on_close: true
-        # Sets the minimum value of a ticket to be able to redeem it.
-        minimum_redeem_ticket_value: "0.09 wxHOPR"
         #
         ############################################
         #

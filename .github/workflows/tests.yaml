@@ -292,9 +292,11 @@ jobs:
 
           # Copy files, delete all but the log files
           cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
-          find ${test_name}/ -type f ! -name "hoprd.log" -delete
+          find ${test_name}/ -type f ! -name "hoprd.log" ! -name "*.pcap" -delete
           cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
 
           # Create tarball and upload to GCP
           tar -czvf ${test_name}.tgz ${test_name}/
           gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
+
+          echo "Download logs from: https://console.cloud.google.com/storage/browser/hoprnet-test-logs/pr-${{ github.event.pull_request.number }}"
