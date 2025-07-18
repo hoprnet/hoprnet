@@ -46,13 +46,9 @@ use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
 use crate::{
-    Strategy::{Aggregating, AutoRedeeming},
-    aggregating::AggregatingStrategyConfig,
-    auto_funding::AutoFundingStrategyConfig,
-    auto_redeeming::AutoRedeemingStrategyConfig,
-    channel_finalizer::ClosureFinalizerStrategyConfig,
-    promiscuous::PromiscuousStrategyConfig,
-    strategy::MultiStrategyConfig,
+    Strategy::AutoRedeeming, aggregating::AggregatingStrategyConfig, auto_funding::AutoFundingStrategyConfig,
+    auto_redeeming::AutoRedeemingStrategyConfig, channel_finalizer::ClosureFinalizerStrategyConfig,
+    promiscuous::PromiscuousStrategyConfig, strategy::MultiStrategyConfig,
 };
 
 pub mod aggregating;
@@ -78,17 +74,9 @@ pub enum Strategy {
 
 /// Default HOPR node strategies (in order).
 ///
-/// ## Aggregation strategy
-///  - aggregate every 100 tickets on all channels
-///  - or when unredeemed value in the channel is more than 90% of channel's current balance
-///  - aggregate unredeemed tickets when a channel transitions to `PendingToClose`
 /// ## Auto-redeem Strategy
 /// - redeem only aggregated tickets
 /// - redeem single tickets on channel close if worth at least 2 HOPR
-/// ## Auto-funding Strategy
-/// - funding amount: 10 HOPR
-/// - lower limit: 1 HOPR
-/// - the strategy will fund channels which fall below the lower limit with the funding amount
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
         on_fail_continue: true,
@@ -99,11 +87,11 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             // min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
             // funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             // }),
-            Aggregating(AggregatingStrategyConfig {
-                aggregation_threshold: Some(100),
-                unrealized_balance_ratio: Some(0.9),
-                aggregate_on_channel_close: true,
-            }),
+            // Aggregating(AggregatingStrategyConfig {
+            //    aggregation_threshold: Some(100),
+            //    unrealized_balance_ratio: Some(0.9),
+            //    aggregate_on_channel_close: true,
+            //}),
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
                 redeem_all_on_close: true,

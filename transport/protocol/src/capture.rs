@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fs::File};
 
-use futures::{FutureExt, StreamExt};
+use futures::{StreamExt, pin_mut};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::prelude::IncomingPacket;
@@ -18,12 +18,14 @@ use pcap_file::{
 
 use crate::HOPR_PACKET_SIZE;
 
+/// Direction of the packet.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
 pub enum PacketDirection {
     Incoming,
     Outgoing,
 }
 
+/// A captured packet that can be written to a [`PacketWriter`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapturedPacket {
     pub direction: PacketDirection,
@@ -32,18 +34,23 @@ pub struct CapturedPacket {
     pub data: Box<[u8]>,
 }
 
+/// A trait that allows implementing different packet capture backends.
 pub trait PacketWriter {
+    /// Writes the [`CapturedPacket`] into the backend.
     fn write_packet(&mut self, packet: CapturedPacket) -> std::io::Result<()>;
 }
 
+/// A [`PacketWriter`] that does nothing.
 pub struct NullWriter;
 
 impl PacketWriter for NullWriter {
     fn write_packet(&mut self, _: CapturedPacket) -> std::io::Result<()> {
-        Ok(())
+        // An error causes the packet capture channel to terminate
+        Err(std::io::Error::other("null writer cannot write captured packets"))
     }
 }
 
+/// A [`PacketWriter`] that writes captured packets into a Pcap file.
 pub struct PcapPacketWriter(PcapNgWriter<File>);
 
 impl PcapPacketWriter {
@@ -77,6 +84,7 @@ impl PacketWriter for PcapPacketWriter {
     }
 }
 
+/// A [`PacketWriter`] that sends captured packets over UDP socket.
 pub struct UdpPacketDump(std::net::UdpSocket);
 
 impl UdpPacketDump {
@@ -98,21 +106,33 @@ impl PacketWriter for UdpPacketDump {
     }
 }
 
+/// Creates a queue that processes captured packets into a [`PacketWriter`].
 pub fn packet_capture_channel(
     writer: Box<dyn PacketWriter + Send>,
 ) -> (futures::channel::mpsc::Sender<CapturedPacket>, AbortHandle) {
     let (sender, receiver) = futures::channel::mpsc::channel(20_000);
     let writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
-    let ah = spawn_as_abortable!(receiver.for_each(move |packet: CapturedPacket| {
-        let writer = writer.clone();
-        hopr_async_runtime::prelude::spawn_blocking(move || {
-            writer
-                .lock()
-                .map_err(|_| std::io::Error::other("lock poisoned"))
-                .and_then(|mut w| w.write_packet(packet))
-        })
-        .map(|_| ())
-    }));
+    let ah = spawn_as_abortable!(async move {
+        pin_mut!(receiver);
+        while let Some(packet) = receiver.next().await {
+            let writer = writer.clone();
+            match hopr_async_runtime::prelude::spawn_blocking(move || {
+                writer
+                    .lock()
+                    .map_err(|_| std::io::Error::other("lock poisoned"))
+                    .and_then(|mut w| w.write_packet(packet))
+            })
+            .await
+            .map_err(std::io::Error::other)
+            {
+                Err(error) | Ok(Err(error)) => {
+                    tracing::warn!(%error, "cannot capture more packets due to error");
+                    break;
+                }
+                _ => {}
+            }
+        }
+    });
 
     (sender, ah)
 }

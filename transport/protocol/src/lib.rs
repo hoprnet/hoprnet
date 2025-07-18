@@ -67,6 +67,9 @@ pub mod stream;
 
 pub mod timer;
 
+/// Allows capturing dissected HOPR packets before they are processed by the transport.
+///
+/// Requires the `capture` feature to be enabled.
 #[cfg(feature = "capture")]
 mod capture;
 
