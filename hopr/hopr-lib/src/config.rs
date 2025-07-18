@@ -58,6 +58,7 @@ pub struct Chain {
     #[default = true]
     pub log_snapshot_enabled: bool,
     #[serde(default = "default_log_snapshot_url")]
+    #[default(_code = "default_log_snapshot_url()")]
     pub log_snapshot_url: String,
 }
 
