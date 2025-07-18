@@ -725,6 +725,20 @@ where
             }
         }
     }
+    
+    /// Downloads a snapshot for faster initial sync
+    pub async fn download_snapshot(&self) -> Result<SnapshotInfo> {
+        let snapshot_manager = SnapshotManager::new();
+        
+        // TODO: We need to get the actual data directory from somewhere
+        // For now, we'll use a placeholder path
+        let data_dir = std::path::Path::new("/tmp/hopr_data");
+        
+        snapshot_manager
+            .download_and_setup_snapshot(&self.cfg.log_snapshot_url, data_dir)
+            .await
+            .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))
+    }
 }
 
 #[cfg(test)]
@@ -801,20 +815,6 @@ mod tests {
         }
 
         Ok(logs)
-    }
-    
-    /// Downloads a snapshot for faster initial sync
-    async fn download_snapshot(&self) -> Result<SnapshotInfo> {
-        let snapshot_manager = SnapshotManager::new();
-        
-        // TODO: We need to get the actual data directory from somewhere
-        // For now, we'll use a placeholder path
-        let data_dir = std::path::Path::new("/tmp/hopr_data");
-        
-        snapshot_manager
-            .download_and_setup_snapshot(&self.cfg.log_snapshot_url, data_dir)
-            .await
-            .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))
     }
 
     mock! {

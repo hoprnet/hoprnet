@@ -3,18 +3,20 @@ pub mod error;
 pub mod extract;
 pub mod validate;
 
+// Re-export commonly used types
+pub use validate::SnapshotInfo;
+pub use error::{SnapshotError, SnapshotResult};
+
 #[cfg(test)]
 mod tests;
 
 use crate::snapshot::{
     download::SnapshotDownloader,
     extract::SnapshotExtractor,
-    validate::{SnapshotValidator, SnapshotInfo},
-    error::{SnapshotError, SnapshotResult},
+    validate::SnapshotValidator,
 };
 use std::path::Path;
-use tracing::{info, warn};
-use scopeguard;
+use tracing::info;
 
 /// Main snapshot management interface
 pub struct SnapshotManager {
@@ -47,19 +49,15 @@ impl SnapshotManager {
         &self,
         url: &str,
         data_dir: &Path,
-    ) -> SnapshotResult<SnapshotInfo> {
+    ) -> crate::snapshot::error::SnapshotResult<crate::snapshot::SnapshotInfo> {
         info!("Starting snapshot download and setup from: {}", url);
         
         // Create temporary directory for download
         let temp_dir = data_dir.join("snapshot_temp");
         tokio::fs::create_dir_all(&temp_dir).await?;
         
-        // Ensure cleanup on exit
-        let _cleanup = scopeguard::defer! {
-            if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
-                warn!("Failed to cleanup temp directory: {}", e);
-            }
-        };
+        // We'll clean up the temp directory at the end
+        let temp_dir_for_cleanup = temp_dir.clone();
         
         // Download snapshot
         let archive_path = temp_dir.join("snapshot.tar.gz");
@@ -76,6 +74,11 @@ impl SnapshotManager {
         // Move validated files to final location
         self.install_snapshot_files(&temp_dir, data_dir, &extracted_files).await?;
         
+        // Clean up temporary directory
+        if let Err(e) = tokio::fs::remove_dir_all(&temp_dir_for_cleanup).await {
+            tracing::warn!("Failed to cleanup temp directory: {}", e);
+        }
+        
         info!("Snapshot setup completed successfully");
         Ok(snapshot_info)
     }
@@ -86,7 +89,7 @@ impl SnapshotManager {
         temp_dir: &Path,
         data_dir: &Path,
         files: &[String],
-    ) -> SnapshotResult<()> {
+    ) -> crate::snapshot::error::SnapshotResult<()> {
         for file in files {
             let src = temp_dir.join(file);
             let dst = data_dir.join(file);

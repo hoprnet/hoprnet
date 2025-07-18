@@ -58,8 +58,12 @@ pub struct Chain {
     #[default = true]
     pub log_snapshot_enabled: bool,
     #[serde(default = "default_log_snapshot_url")]
-    #[default = "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string()]
     pub log_snapshot_url: String,
+}
+
+#[inline]
+fn default_log_snapshot_url() -> String {
+    "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string()
 }
 
 #[inline]
@@ -70,11 +74,6 @@ fn default_invalid_address() -> Address {
 #[inline]
 fn default_safe_transaction_service_provider() -> String {
     DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER.to_owned()
-}
-
-#[inline]
-fn default_log_snapshot_url() -> String {
-    "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string()
 }
 
 #[serde_as]

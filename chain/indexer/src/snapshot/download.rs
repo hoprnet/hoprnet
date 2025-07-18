@@ -92,11 +92,8 @@ impl SnapshotDownloader {
             }
         }
         
-        Err(last_error.unwrap_or_else(|| SnapshotError::Network(
-            reqwest::Error::from(std::io::Error::new(
-                std::io::ErrorKind::TimedOut,
-                "All retry attempts failed"
-            ))
+        Err(last_error.unwrap_or_else(|| SnapshotError::Archive(
+            "All retry attempts failed".to_string()
         )))
     }
     

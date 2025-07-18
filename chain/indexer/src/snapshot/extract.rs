@@ -1,7 +1,7 @@
 use crate::snapshot::error::{SnapshotError, SnapshotResult};
 use flate2::read::GzDecoder;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tar::Archive;
 use tracing::{info, warn};
 
@@ -70,17 +70,17 @@ impl SnapshotExtractor {
         
         for entry in archive.entries()? {
             let mut entry = entry?;
-            let path = entry.path()?;
+            let path_buf = entry.path()?.to_path_buf();
             
             // Security check: prevent directory traversal
-            if path.components().any(|c| c == std::path::Component::ParentDir) {
+            if path_buf.components().any(|c| c == std::path::Component::ParentDir) {
                 return Err(SnapshotError::InvalidFormat(
                     "Archive contains parent directory references".to_string()
                 ));
             }
             
             // Get the filename
-            let filename = path.file_name()
+            let filename = path_buf.file_name()
                 .and_then(|s| s.to_str())
                 .ok_or_else(|| SnapshotError::InvalidFormat("Invalid filename".to_string()))?;
             
