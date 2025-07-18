@@ -52,6 +52,7 @@ let
       time
       which
       yq-go
+      help2man
 
       ## formatting
       config.treefmt.build.wrapper

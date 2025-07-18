@@ -59,15 +59,14 @@ contents:
     packager: deb
     file_info:
       mode: 0644
-
-# - src: ./deploy/nfpm/hoprd.1
-#   dst: /usr/share/man/man1/hoprd.1
-#   file_info:
-#     mode: 0644
-# - src: ./deploy/nfpm/hopli.1
-#   dst: /usr/share/man/man1/hopli.1
-#   file_info:
-#     mode: 0644
+  - src: ./deploy/nfpm/hoprd.1.gz
+    dst: /usr/share/man/man1/hoprd.1.gz
+    file_info:
+      mode: 0644
+  - src: ./deploy/nfpm/hopli.1.gz
+    dst: /usr/share/man/man1/hopli.1.gz
+    file_info:
+      mode: 0644
 
 
 scripts:
