@@ -80,7 +80,7 @@ pub(crate) async fn authenticate(
                             return false;
                         }
                         match decode(q) {
-                            Ok(decoded) => decoded.into_owned().contains(&format!("apiToken={}", expected_token)),
+                            Ok(decoded) => decoded.into_owned().contains(&format!("apiToken={expected_token}")),
                             Err(_) => false,
                         }
                     })
@@ -90,7 +90,7 @@ pub(crate) async fn authenticate(
             };
             // Use "Authorization Bearer <token>" and "X-Auth-Token <token>" headers and "Sec-Websocket-Protocol"
             (!auth_headers.is_empty()
-                    && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {}", expected_token)))
+                    && (auth_headers.contains(&(&AUTHORIZATION, &format!("Bearer {expected_token}")))
                         || auth_headers.contains(&(&x_auth_header, expected_token)))
                 )
                 // The following line would never be needed, if the JavaScript browser was able to properly

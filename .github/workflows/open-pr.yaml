@@ -64,7 +64,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@6c439dc8bdf85cadbbce9ed30d1c7b959517bc49 # v2.12.2
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -74,7 +74,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/labeler@6463cdb00ee92c05bec55dffc4e1fce250301945 # main on 20.02.2025
+      - uses: actions/labeler@110d44140c9195b853f2f24044bbfed8f4968efb # main on 20.02.2025
         with:
           sync-labels: true
 
