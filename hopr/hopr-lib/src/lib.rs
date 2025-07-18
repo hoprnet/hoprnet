@@ -1325,6 +1325,11 @@ impl Hopr {
         Ok(self.hopr_chain_api.all_channels().await?)
     }
 
+    /// List all corrupted channels
+    pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
+        Ok(self.hopr_chain_api.corrupted_channels().await?)
+    }
+
     /// Current safe allowance balance
     pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
         Ok(self.hopr_chain_api.safe_allowance().await?)

@@ -533,3 +533,33 @@ pub(super) async fn fund_channel(
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
 }
+
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/channels/corrupted"),
+    description = "List corrupted channels due to incorrect indexing.",
+    responses(
+        (status = 200, description = "Corrupted channels retrieved", body = Vec<ChannelInfoResponse>),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Channels",
+)]
+pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    let corrupted = match hopr.corrupted_channels().await {
+        Ok(corrupted) => corrupted,
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    };
+    let channels_result = futures::future::try_join_all(corrupted.into_iter().map(|c| query_topology_info(c))).await;
+
+    match channels_result {
+        Ok(list) => (StatusCode::OK, Json(list)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}

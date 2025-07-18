@@ -248,7 +248,11 @@ where
                     let updated_channel = self
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
-                        .await?;
+                        .await?
+                        .ok_or(CoreEthereumIndexerError::ProcessError(format!(
+                            "channel balance decreased event for channel {} did not return an updated channel",
+                            Hash::from(balance_decreased.channelId.0)
+                        )))?;
 
                     if is_synced
                         && (updated_channel.source == self.chain_key.public().to_address()
@@ -290,7 +294,8 @@ where
                     let updated_channel = self
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
-                        .await?;
+                        .await?
+                        .unwrap();
 
                     if updated_channel.source == self.chain_key.public().to_address() && is_synced {
                         info!("updating safe balance from chain after channel balance increased event");
@@ -348,7 +353,7 @@ where
                             .change_balance(HoprBalance::zero())
                             .change_ticket_index(0);
 
-                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?;
+                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?.unwrap();
 
                         // Perform additional tasks based on the channel's direction
                         match direction {
@@ -367,7 +372,11 @@ where
                     } else {
                         // Closed channels that are not our own, we be safely removed
                         // from the database
-                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits.delete()).await?;
+                        let updated_channel = self
+                            .db
+                            .finish_channel_update(tx.into(), channel_edits.delete())
+                            .await?
+                            .unwrap();
                         debug!(channel_id = %channel_id, "foreign closed closed channel was deleted");
                         updated_channel
                     };
@@ -386,13 +395,17 @@ where
                 let maybe_channel = self.db.begin_channel_update(tx.into(), &channel_id).await?;
 
                 let channel = if let Some(channel_edits) = maybe_channel {
-                    // Check that we're not receiving the Open event without the channel being Close prior
+                    // Check that we're not receiving the Open event without the channel being Close prior, or that the
+                    // channel is not yet corrupted
+
                     if channel_edits.entry().status != ChannelStatus::Closed {
-                        return Err(CoreEthereumIndexerError::ProcessError(format!(
-                            "trying to re-open channel {} which is not closed, but {}",
-                            channel_edits.entry().get_id(),
-                            channel_edits.entry().status,
-                        )));
+                        warn!(%source, %destination, %channel_id, "received Open event for a channel that is not Closed, marking it as corrupted");
+
+                        self.db
+                            .finish_channel_update(tx.into(), channel_edits.set_corrupted())
+                            .await?;
+
+                        return Ok(None);
                     }
 
                     trace!(%source, %destination, %channel_id, "on_channel_reopened_event");
@@ -433,10 +446,17 @@ where
                     );
 
                     self.db.upsert_channel(tx.into(), new_channel).await?;
-                    new_channel
+                    Some(new_channel)
                 };
 
-                Ok(Some(ChainEventType::ChannelOpened(channel)))
+                match channel {
+                    Some(c) => Ok(Some(ChainEventType::ChannelOpened(c))),
+                    None => {
+                        // Should not happen as such event should already have trigered a return Ok(None) before
+                        error!(%source, %destination, %channel_id, "observed channel open event for a channel that does not exist");
+                        Err(CoreEthereumIndexerError::ChannelDoesNotExist)
+                    }
+                }
             }
             HoprChannelsEvents::TicketRedeemed(ticket_redeemed) => {
                 let maybe_channel = self
@@ -497,10 +517,17 @@ where
                                         entry = %channel_edits.entry(),
                                         "found tickets matching 'BeingRedeemed'",
                                     );
+
+                                    let entry_str = channel_edits.entry().to_string();
+
+                                    self.db
+                                        .finish_channel_update(tx.into(), channel_edits.set_corrupted())
+                                        .await?;
+
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
                                         ticket_redeemed.newTicketIndex.to::<u64>() - 1,
-                                        channel_edits.entry()
+                                        entry_str
                                     )));
                                 }
                             }
@@ -537,7 +564,9 @@ where
                                 ticket_redeemed.newTicketIndex.to_be_bytes::<6>(),
                             )),
                         )
-                        .await?;
+                        .await?
+                        .unwrap();
+
                     // Neglect all the tickets in this channel
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
                     self.db
@@ -569,7 +598,8 @@ where
                     let channel = self
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_status(new_status))
-                        .await?;
+                        .await?
+                        .unwrap();
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     error!(channel_id = %Hash::from(closure_initiated.channelId.0), "observed channel closure initiation on a channel that we don't have in the DB");
@@ -2539,7 +2569,17 @@ mod tests {
             .await?
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log, true).await }))
             .await
-            .expect_err("should not re-open channel that is not Closed");
+            .context("Channel should stay open, with corrupted flag set")?;
+
+        assert!(
+            db.get_channel_by_id(None, &channel.get_id()).await?.is_none(),
+            "channel should be deleted",
+        );
+
+        db.get_corrupted_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("a value should be present")?;
+
         Ok(())
     }
 
