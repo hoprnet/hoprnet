@@ -65,7 +65,7 @@ pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
 
     let rb_clone = rb.clone();
     hopr_async_runtime::prelude::spawn(rb_rx.for_each(move |s| {
-        rb_clone.lock().push(s);
+        rb_clone.lock().enqueue(s);
         futures::future::ready(())
     }));
 

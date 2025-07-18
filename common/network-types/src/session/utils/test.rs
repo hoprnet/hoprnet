@@ -162,6 +162,8 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
                     .fetch_add(buf.len(), std::sync::atomic::Ordering::Relaxed);
                 stats.packets_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
+        } else {
+            tracing::trace!(packet_id, "packet intentionally dropped");
         }
 
         tracing::trace!(len = buf.len(), "wrote bytes");

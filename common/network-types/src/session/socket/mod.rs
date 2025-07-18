@@ -340,8 +340,9 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
+    #[cfg(feature = "capture")]
+    use crate::capture::PcapIoExt;
     use crate::{
-        capture::PcapIoExt,
         prelude::AcknowledgementState,
         session::{AcknowledgementStateConfig, utils::test::*},
     };

@@ -45,7 +45,7 @@ pub struct Sequencer<S: futures::Stream> {
     timer: futures_time::task::Sleep,
     buffer: BinaryHeap<std::cmp::Reverse<S::Item>>,
     next_id: FrameId,
-    last_emitted: Instant,
+    last_emitted: Option<Instant>,
     max_wait: Duration,
     state: State,
 }
@@ -62,7 +62,7 @@ where
             buffer: BinaryHeap::with_capacity(capacity),
             timer: futures_time::task::sleep(max_wait.into()),
             next_id: 1,
-            last_emitted: Instant::now(),
+            last_emitted: None,
             max_wait,
             state: State::Polling,
         }
@@ -131,6 +131,11 @@ where
                                     this.buffer.push(std::cmp::Reverse(item));
                                     *this.state = State::BufferUpdated;
                                 }
+                                // If we've never emitted anything, set the last emission on
+                                // any first item returned by the inner stream
+                                if this.last_emitted.is_none() {
+                                    *this.last_emitted = Some(Instant::now());
+                                }
                             }
                             (Poll::Ready(None), _) => {
                                 tracing::trace!(len = this.buffer.len(), "stream is done");
@@ -148,18 +153,18 @@ where
                     if let Some(next) = this.buffer.peek().map(|item| &item.0) {
                         if next.eq(this.next_id) {
                             *this.next_id = this.next_id.wrapping_add(1);
-                            *this.last_emitted = Instant::now();
+                            *this.last_emitted = Some(Instant::now());
                             *this.state = State::BufferUpdated;
 
                             tracing::trace!("emit next frame");
 
                             return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
-                        } else if this.last_emitted.elapsed() >= *this.max_wait
+                        } else if this.last_emitted.is_some_and(|e| e.elapsed() >= *this.max_wait)
                             || this.buffer.len() == this.buffer.capacity()
                         {
                             let discarded = *this.next_id;
                             *this.next_id = this.next_id.wrapping_add(1);
-                            *this.last_emitted = Instant::now();
+                            *this.last_emitted = Some(Instant::now());
                             *this.state = State::BufferUpdated;
 
                             tracing::trace!(discarded, "discard frame");
@@ -183,11 +188,13 @@ where
                         } else if next.eq(this.next_id) {
                             *this.next_id = this.next_id.wrapping_add(1);
                             tracing::trace!("emit next frame when done");
-                            return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
+
+                            Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)))
                         } else {
                             let discarded = *this.next_id;
                             *this.next_id = this.next_id.wrapping_add(1);
                             tracing::trace!(discarded, "discard frame when done");
+
                             Poll::Ready(Some(Err(SessionError::FrameDiscarded(discarded))))
                         }
                     } else {

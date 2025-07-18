@@ -56,7 +56,7 @@ pub struct Reassembler<S, M> {
     expired_frames: Vec<FrameId>,
     max_age: Duration,
     capacity: usize,
-    last_expiration: Instant,
+    last_expiration: Option<Instant>,
 }
 
 impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
@@ -66,7 +66,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
             timer: futures_time::task::sleep(max_age.into()),
             incomplete_frames,
             expired_frames: Vec::with_capacity(capacity),
-            last_expiration: Instant::now(),
+            last_expiration: None,
             max_age,
             capacity,
         }
@@ -108,20 +108,6 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                         this.timer.as_mut().reset_timer();
                     }
 
-                    // Since the retaining operation is potentially expensive,
-                    // we do it actually only if there's a real chance that a frame is expired
-                    if this.last_expiration.elapsed() >= *this.max_age {
-                        this.incomplete_frames.retain(|id, builder| {
-                            if builder.last_recv.elapsed() >= *this.max_age && *id != item.frame_id {
-                                this.expired_frames.push(*id);
-                                false
-                            } else {
-                                true
-                            }
-                        });
-                        *this.last_expiration = Instant::now();
-                    }
-
                     tracing::trace!(
                         frame_id = item.frame_id,
                         seq_idx = item.seq_idx,
@@ -157,6 +143,22 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                             }
                         }
                     };
+
+                    // Since the retaining operation is potentially expensive,
+                    // we do it actually only if there's a real chance that a frame is expired
+                    if this.last_expiration.is_none_or(|e| e.elapsed() >= *this.max_age) {
+                        this.incomplete_frames.retain(|id, builder| {
+                            if builder.last_recv.elapsed() >= *this.max_age
+                            // && *id != item.frame_id
+                            {
+                                this.expired_frames.push(*id);
+                                false
+                            } else {
+                                true
+                            }
+                        });
+                        *this.last_expiration = Some(Instant::now());
+                    }
                 }
                 (Poll::Ready(None), _) => {
                     // Inner stream closed, dump all incomplete frames
@@ -181,7 +183,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                             true
                         }
                     });
-                    *this.last_expiration = Instant::now();
+                    *this.last_expiration = Some(Instant::now());
                     this.timer.as_mut().reset_timer();
                 }
                 (Poll::Pending, Poll::Pending) => return Poll::Pending,

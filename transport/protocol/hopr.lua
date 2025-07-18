@@ -163,14 +163,14 @@ local session_fields = {
 
     -- SegmentRequest fields
     req_frame_id = ProtoField.framenum("hopr_session.segment_request.frame_id", "Frame ID", base.NONE, frametype.REQUEST),
-    req_missing_1 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_1", "Segment 1 missing", 8, nil, 0x01),
-    req_missing_2 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_2", "Segment 2 missing", 8, nil, 0x02),
-    req_missing_3 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_3", "Segment 3 missing", 8, nil, 0x04),
-    req_missing_4 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_4", "Segment 4 missing", 8, nil, 0x08),
-    req_missing_5 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_5", "Segment 5 missing", 8, nil, 0x10),
-    req_missing_6 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_6", "Segment 6 missing", 8, nil, 0x20),
-    req_missing_7 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_7", "Segment 7 missing", 8, nil, 0x40),
-    req_missing_8 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_8", "Segment 8 missing", 8, nil, 0x80),
+    req_missing_1 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_1", "Segment 1 missing", 8, nil, 0x80),
+    req_missing_2 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_2", "Segment 2 missing", 8, nil, 0x40),
+    req_missing_3 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_3", "Segment 3 missing", 8, nil, 0x20),
+    req_missing_4 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_4", "Segment 4 missing", 8, nil, 0x10),
+    req_missing_5 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_5", "Segment 5 missing", 8, nil, 0x08),
+    req_missing_6 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_6", "Segment 6 missing", 8, nil, 0x04),
+    req_missing_7 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_7", "Segment 7 missing", 8, nil, 0x02),
+    req_missing_8 = ProtoField.bool("hopr_session.segment_request.missing_segments.seg_8", "Segment 8 missing", 8, nil, 0x01),
 
     -- FrameAcknowledgement fields
     ack_frame_id = ProtoField.framenum("hopr_session.frame_ack.frame_id", "Frame ID", base.NONE, frametype.ACK)

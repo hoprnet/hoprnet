@@ -116,7 +116,9 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
 mod tests {
     use std::{collections::HashSet, time::Duration};
 
+    use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
+    use futures_time::future::FutureExt;
 
     use super::*;
     use crate::{
@@ -302,12 +304,20 @@ mod tests {
         let mut bob_socket = SessionSocket::new(bob, CloneableMockState::new(bob_state, "bob"), cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
-        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket
+            .write_all(&alice_sent_data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await
+            .context("write_all timeout")??;
         alice_socket.flush().await?;
 
         // One entire frame is discarded
         let mut bob_recv_data = [0u8; (NUM_FRAMES - 1) * FRAME_SIZE];
-        bob_socket.read_exact(&mut bob_recv_data).await?;
+        bob_socket
+            .read_exact(&mut bob_recv_data)
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await
+            .context("read_exact timeout")??;
 
         tracing::debug!("stopping");
         alice_socket.close().await?;
