@@ -143,7 +143,7 @@ pub enum HoprState {
 
 impl Display for HoprState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -793,8 +793,7 @@ impl Hopr {
                 "Something is wrong with the safe module configuration",
             );
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
-                "Safe and module are not configured correctly {:?}",
-                safe_module_configuration,
+                "Safe and module are not configured correctly {safe_module_configuration:?}",
             ))));
         }
 

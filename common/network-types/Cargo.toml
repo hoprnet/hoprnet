@@ -22,7 +22,7 @@ runtime-tokio = [
   "dep:tokio",
   "dep:tokio-util",
   "hopr-async-runtime/runtime-tokio",
-  "hickory-resolver/tokio-runtime",
+  "hickory-resolver/tokio",
 ]
 hashbrown = ["dep:hashbrown"]
 session-types = []
@@ -55,7 +55,7 @@ ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
-socket2 = { workspace = true }
+socket2 = { workspace = true, features = ["all"] }
 strum = { workspace = true }
 thiserror = { workspace = true }
 test-log = { workspace = true }

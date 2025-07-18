@@ -76,7 +76,8 @@ hopr:
     # If left empty, the node will behave as if only `!Passive` strategy
     # was given.
     strategies:
-      - !Aggregating
+      - !AutoRedeeming
+        # - !Aggregating
         # Strategy performing automatic ticket aggregation
         # once the number of unredeemed tickets in a channel goes
         # over the given threshold.
@@ -84,24 +85,26 @@ hopr:
         # Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
         # in that channel when exceeded.
         # This condition is independent of `unrealized_balance_ratio`.
-        aggregation_threshold: 100
+        #
+        # aggregation_threshold: 100
+        #
         # Percentage of unrealized balance in unaggregated tickets in a channel
         # that triggers the ticket aggregation when exceeded.
         # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
         # This condition is independent of `aggregation_threshold`.
-        unrealized_balance_ratio: 0.9
+        # unrealized_balance_ratio: 0.9
         # If set, the strategy will automatically aggregate tickets in channel that has transitioned
         # to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
         # or `unrealized_balance_ratio` thresholds are met on that channel.
         # If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
-        aggregate_on_channel_close: true
+        #
+        # aggregate_on_channel_close: true
         #
         ############################################
         #
         # Channel strategy that performs automatic redemption of
         # a winning acknowledged ticket
         #
-      - !AutoRedeeming
         # If set, the strategy will redeem only aggregated tickets.
         redeem_only_aggregated: true
         # If set, all tickets will be redeemed on channel closure.

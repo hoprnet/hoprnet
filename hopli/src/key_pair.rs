@@ -209,9 +209,9 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
         let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
 
         let decoded_key = hex::decode(priv_key_without_prefix)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {e:?}")))?;
         ChainKeypair::from_secret(&decoded_key)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {e:?}")))
     }
 
     /// Read the default private key and return an address string
@@ -266,9 +266,9 @@ impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
         // trim the 0x prefix if needed
         let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
         let decoded_key = hex::decode(priv_key_without_prefix)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {e:?}")))?;
         ChainKeypair::from_secret(&decoded_key)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {e:?}")))
     }
 
     /// Read the default private key and return an address string
@@ -505,7 +505,7 @@ mod tests {
         let key = private_key_args.read_default()?;
 
         let ref_decoded_value = hex::decode(DUMMY_PRIVATE_KEY)?;
-        println!("ref_decoded_value {:?}", ref_decoded_value);
+        println!("ref_decoded_value {ref_decoded_value:?}");
 
         assert_eq!(
             key.public().to_address().to_checksum(),
@@ -725,7 +725,7 @@ mod tests {
     fn get_files(identity_directory: &str, identity_prefix: &Option<String>) -> Vec<PathBuf> {
         // early return if failed in reading identity directory
         let directory = fs::read_dir(Path::new(identity_directory))
-            .unwrap_or_else(|_| panic!("cannot read directory {}", identity_directory));
+            .unwrap_or_else(|_| panic!("cannot read directory {identity_directory}"));
 
         // read all the files from the directory that contains
         // 1) "id" in its name

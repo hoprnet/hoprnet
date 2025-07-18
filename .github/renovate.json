@@ -18,7 +18,7 @@
       "matchPackageNames": [
         "serde_yaml",
         "libp2p-stream",
-        "hickory-resolver",
+        "generic-array",
         "rand",
         "rand_distr"
       ],

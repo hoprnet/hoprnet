@@ -441,6 +441,12 @@ mod tests {
         assert_eq!(20, max_decimal_digits_for_n_bytes(size_of::<u64>()));
     }
 
+    #[test]
+    fn standard_session_id_must_fit_within_limit() {
+        let id = format!("{}:{}", SimplePseudonym::random(), Tag::Application(Tag::MAX));
+        assert!(id.len() <= MAX_SESSION_ID_STR_LEN);
+    }
+
     #[cfg(feature = "serde")]
     #[test]
     fn session_id_should_serialize_and_deserialize_correctly() -> anyhow::Result<()> {
