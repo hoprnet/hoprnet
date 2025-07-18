@@ -23,6 +23,8 @@ on:
         description: "Name of the release"
         options:
           - kaunas
+          - altea
+          - edinburgh
 concurrency:
   group: close-release
   cancel-in-progress: true

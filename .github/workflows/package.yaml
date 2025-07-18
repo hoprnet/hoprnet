@@ -106,6 +106,7 @@ jobs:
 
       - name: Test Package
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        timeout-minutes: 30
         continue-on-error: true
         run: |
           echo "${{ secrets.TEST_OS_PACKAGE_HOPR_IDENTITY_FILE }}" | base64 -d > ${{ github.workspace }}/deploy/nfpm/hopr.id

@@ -69,9 +69,17 @@ create_action() {
       sudo chmod 777 /etc/hoprd
     '
   sleep 15
+  waiting_iterations=0
   # Automatically delete the VM after 1 hour
   while ! gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} "${INSTANCE_NAME}" --command="sudo mkdir -p /etc/hoprd && sudo chmod 777 /etc/hoprd && echo SSH is accessible" --quiet 2>/dev/null; do
     echo "Waiting for SSH to become accessible..."
+    waiting_iterations=$((waiting_iterations + 1))
+    if [ $waiting_iterations -ge 33 ]; then
+      echo "SSH is still not accessible after 3 minutes. Exiting."
+      echo "You can try to SSH into the VM using the following command:"
+      echo "gcloud compute ssh --tunnel-through-iap --project=${PROJECT_ID} --zone=${ZONE} ${INSTANCE_NAME}"
+      exit 1
+    fi
     sleep 5
   done
   echo "SSH is now accessible on ${INSTANCE_NAME}."
