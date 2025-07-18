@@ -7,15 +7,17 @@ This document describes the implementation of the log snapshot feature for the H
 ## Implementation Summary
 
 ### ✅ **Phase 1: Foundation and Configuration**
+
 - **Added CLI arguments** to `hoprd/hoprd/src/cli.rs`:
   - `--noLogSnapshot` flag to disable snapshot downloading
   - `--logSnapshotUrl` option to specify custom snapshot URL
 - **Updated IndexerConfig** with new fields:
-  - `log_snapshot_enabled: bool` 
+  - `log_snapshot_enabled: bool`
   - `log_snapshot_url: String`
 - **Created snapshot module structure** with organized submodules
 
 ### ✅ **Phase 2: Core Download Logic**
+
 - **Implemented error types** (`snapshot/error.rs`) with comprehensive error handling
 - **Implemented download logic** (`snapshot/download.rs`) with:
   - HTTP downloading with retry logic
@@ -31,6 +33,7 @@ This document describes the implementation of the log snapshot feature for the H
   - Data consistency verification
 
 ### ✅ **Phase 3: Integration with Fast Sync**
+
 - **Added database existence checks** to `db/sql/src/db.rs`
 - **Integrated with fast sync logic** in `chain/indexer/src/block.rs`:
   - Checks for empty logs database before fast sync
@@ -38,11 +41,13 @@ This document describes the implementation of the log snapshot feature for the H
   - Graceful fallback to normal sync on failures
 
 ### ✅ **Phase 4: Configuration Integration**
+
 - **Connected CLI arguments** to configuration system
 - **Updated configuration structs** in `hopr-lib/src/config.rs`
 - **Wired up IndexerConfig construction** with new fields
 
 ### ✅ **Phase 5: Testing**
+
 - **Added comprehensive tests** covering:
   - Archive extraction functionality
   - SQLite validation
@@ -141,6 +146,7 @@ The implementation includes comprehensive tests:
 - **Security tests**: Directory traversal, malicious archives
 
 Run tests with:
+
 ```bash
 cargo test -p hopr-chain-indexer snapshot
 ```
@@ -149,14 +155,15 @@ cargo test -p hopr-chain-indexer snapshot
 
 ### CLI Arguments
 
-| Argument | Environment Variable | Default | Description |
-|----------|---------------------|---------|-------------|
-| `--noLogSnapshot` | `HOPRD_INDEXER_DISABLE_LOG_SNAPSHOT` | `false` | Disable snapshot downloading |
-| `--logSnapshotUrl` | `HOPRD_LOG_SNAPSHOT_URL` | `https://snapshots.hoprnet.org/logs/latest.tar.gz` | Snapshot download URL |
+| Argument           | Environment Variable                 | Default                                            | Description                  |
+| ------------------ | ------------------------------------ | -------------------------------------------------- | ---------------------------- |
+| `--noLogSnapshot`  | `HOPRD_INDEXER_DISABLE_LOG_SNAPSHOT` | `false`                                            | Disable snapshot downloading |
+| `--logSnapshotUrl` | `HOPRD_LOG_SNAPSHOT_URL`             | `https://snapshots.hoprnet.org/logs/latest.tar.gz` | Snapshot download URL        |
 
 ### Snapshot Format
 
 The snapshot should be a tar.gz archive containing:
+
 - `hopr_logs.db` - Main SQLite database file
 - `hopr_logs.db-wal` - Write-ahead log file (optional)
 - `hopr_logs.db-shm` - Shared memory file (optional)
@@ -164,6 +171,7 @@ The snapshot should be a tar.gz archive containing:
 ### Database Schema
 
 The logs database should contain at minimum:
+
 - `logs` table with log entries
 - `blocks` table with block information
 
@@ -195,6 +203,7 @@ The logs database should contain at minimum:
 ### Debug Logging
 
 Enable detailed logging with:
+
 ```bash
 RUST_LOG=hopr_chain_indexer::snapshot=debug hoprd --identity ./identity --init
 ```
@@ -204,6 +213,7 @@ RUST_LOG=hopr_chain_indexer::snapshot=debug hoprd --identity ./identity --init
 This implementation addresses GitHub issue #7300: "Automatically pull synced logs from a reliable source on startup"
 
 Requirements fulfilled:
+
 - ✅ Store log snapshot publicly accessible via HTTPS
 - ✅ Configurable default URL
 - ✅ Compress snapshot as tar.gz containing SQLite database

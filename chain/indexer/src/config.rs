@@ -49,12 +49,7 @@ impl IndexerConfig {
     /// # Returns
     ///
     /// A new instance of `IndexerConfig`
-    pub fn new(
-        start_block_number: u64,
-        fast_sync: bool,
-        log_snapshot_enabled: bool,
-        log_snapshot_url: String,
-    ) -> Self {
+    pub fn new(start_block_number: u64, fast_sync: bool, log_snapshot_enabled: bool, log_snapshot_url: String) -> Self {
         Self {
             start_block_number,
             fast_sync,

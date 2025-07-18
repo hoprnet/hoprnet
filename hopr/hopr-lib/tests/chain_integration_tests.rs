@@ -260,6 +260,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let indexer_cfg = IndexerConfig {
         start_block_number: 1,
         fast_sync: false,
+        log_snapshot_enabled: false,
+        log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
     };
 
     // Setup ALICE
@@ -274,7 +276,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         safe_cfgs[0],
         rpc_cfg.clone(),
         actions_cfg,
-        indexer_cfg,
+        indexer_cfg.clone(),
     )
     .await?;
 

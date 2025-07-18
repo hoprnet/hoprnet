@@ -21,7 +21,7 @@ use tracing::{debug, error, info, trace};
 use crate::{
     IndexerConfig,
     errors::{CoreEthereumIndexerError, Result},
-    snapshot::{SnapshotManager, SnapshotInfo},
+    snapshot::{SnapshotInfo, SnapshotManager},
     traits::ChainLogHandler,
 };
 
@@ -152,14 +152,14 @@ where
         //   4. Finally, starting the rpc indexer.
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
-        
+
         // Check if we need to download snapshot before fast sync
         // TODO: This assumes we have a way to get the data directory - this needs to be improved
         let logs_db_has_data = true; // Placeholder - we need to check if logs DB has data
-        
+
         if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.log_snapshot_enabled {
             info!("Logs database is empty, attempting to download snapshot...");
-            
+
             match self.download_snapshot().await {
                 Ok(snapshot_info) => {
                     info!("Snapshot downloaded successfully: {:?}", snapshot_info);
@@ -725,15 +725,15 @@ where
             }
         }
     }
-    
+
     /// Downloads a snapshot for faster initial sync
     pub async fn download_snapshot(&self) -> Result<SnapshotInfo> {
         let snapshot_manager = SnapshotManager::new();
-        
+
         // TODO: We need to get the actual data directory from somewhere
         // For now, we'll use a placeholder path
         let data_dir = std::path::Path::new("/tmp/hopr_data");
-        
+
         snapshot_manager
             .download_and_setup_snapshot(&self.cfg.log_snapshot_url, data_dir)
             .await
@@ -1095,6 +1095,8 @@ mod tests {
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
                 fast_sync: true,
+                log_snapshot_enabled: false,
+                log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
@@ -1186,6 +1188,8 @@ mod tests {
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
                 fast_sync: true,
+                log_snapshot_enabled: false,
+                log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
@@ -1362,6 +1366,8 @@ mod tests {
         let indexer_cfg = IndexerConfig {
             start_block_number: 0,
             fast_sync: false,
+            log_snapshot_enabled: false,
+            log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
         };
 
         let (tx_events, _) = async_channel::unbounded();

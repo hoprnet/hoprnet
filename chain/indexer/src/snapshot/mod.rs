@@ -4,19 +4,17 @@ pub mod extract;
 pub mod validate;
 
 // Re-export commonly used types
-pub use validate::SnapshotInfo;
 pub use error::{SnapshotError, SnapshotResult};
+pub use validate::SnapshotInfo;
 
 #[cfg(test)]
 mod tests;
 
-use crate::snapshot::{
-    download::SnapshotDownloader,
-    extract::SnapshotExtractor,
-    validate::SnapshotValidator,
-};
 use std::path::Path;
+
 use tracing::info;
+
+use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator};
 
 /// Main snapshot management interface
 pub struct SnapshotManager {
@@ -34,7 +32,7 @@ impl SnapshotManager {
             validator: SnapshotValidator::new(),
         }
     }
-    
+
     /// Downloads and sets up a snapshot from the given URL
     ///
     /// # Arguments
@@ -51,38 +49,39 @@ impl SnapshotManager {
         data_dir: &Path,
     ) -> crate::snapshot::error::SnapshotResult<crate::snapshot::SnapshotInfo> {
         info!("Starting snapshot download and setup from: {}", url);
-        
+
         // Create temporary directory for download
         let temp_dir = data_dir.join("snapshot_temp");
         tokio::fs::create_dir_all(&temp_dir).await?;
-        
+
         // We'll clean up the temp directory at the end
         let temp_dir_for_cleanup = temp_dir.clone();
-        
+
         // Download snapshot
         let archive_path = temp_dir.join("snapshot.tar.gz");
         self.downloader.download_snapshot(url, &archive_path).await?;
-        
+
         // Extract snapshot
         let extracted_files = self.extractor.extract_snapshot(&archive_path, &temp_dir).await?;
         info!("Extracted files: {:?}", extracted_files);
-        
+
         // Validate extracted database
         let db_path = temp_dir.join("hopr_logs.db");
         let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
-        
+
         // Move validated files to final location
-        self.install_snapshot_files(&temp_dir, data_dir, &extracted_files).await?;
-        
+        self.install_snapshot_files(&temp_dir, data_dir, &extracted_files)
+            .await?;
+
         // Clean up temporary directory
         if let Err(e) = tokio::fs::remove_dir_all(&temp_dir_for_cleanup).await {
             tracing::warn!("Failed to cleanup temp directory: {}", e);
         }
-        
+
         info!("Snapshot setup completed successfully");
         Ok(snapshot_info)
     }
-    
+
     /// Installs snapshot files from temporary directory to final location
     async fn install_snapshot_files(
         &self,
@@ -93,17 +92,17 @@ impl SnapshotManager {
         for file in files {
             let src = temp_dir.join(file);
             let dst = data_dir.join(file);
-            
+
             // Remove existing file if it exists
             if dst.exists() {
                 tokio::fs::remove_file(&dst).await?;
             }
-            
+
             // Move file from temp to final location
             tokio::fs::rename(&src, &dst).await?;
             info!("Installed: {} -> {}", file, dst.display());
         }
-        
+
         Ok(())
     }
 }

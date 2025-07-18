@@ -57,7 +57,7 @@ pub enum CoreEthereumIndexerError {
 
     #[error(transparent)]
     RpcError(#[from] hopr_chain_rpc::errors::RpcError),
-    
+
     #[error("Snapshot error: {0}")]
     SnapshotError(String),
 }

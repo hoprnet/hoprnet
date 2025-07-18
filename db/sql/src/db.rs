@@ -1,4 +1,8 @@
-use std::{path::{Path, PathBuf}, sync::Arc, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use futures::channel::mpsc::UnboundedSender;
 use hopr_crypto_types::{keypairs::Keypair, prelude::ChainKeypair};
@@ -240,16 +244,16 @@ impl HoprDb {
             self.ticket_manager.start_ticket_processing(futures::sink::drain())
         }
     }
-    
+
     /// Check if the logs database exists and has data
     pub async fn logs_db_exists_and_has_data(&self, directory: &Path) -> Result<bool> {
         let logs_db_path = directory.join(SQL_DB_LOGS_FILE_NAME);
-        
+
         // Check if file exists
         if !logs_db_path.exists() {
             return Ok(false);
         }
-        
+
         // Check if database has data
         match self.logs_db.execute_unprepared("SELECT COUNT(*) FROM logs").await {
             Ok(_) => {
@@ -263,12 +267,12 @@ impl HoprDb {
             }
         }
     }
-    
+
     /// Get the path to the logs database file
     pub fn logs_db_path(&self, directory: &Path) -> PathBuf {
         directory.join(SQL_DB_LOGS_FILE_NAME)
     }
-    
+
     /// Get the directory where database files are stored
     pub fn data_dir(&self) -> Option<PathBuf> {
         // This would need to be stored in the HoprDb struct
