@@ -279,6 +279,7 @@ impl Session {
             let socket_cfg = SessionSocketConfig {
                 frame_size: 1500,
                 frame_timeout: Duration::from_millis(800),
+                capacity: 16384,
                 ..Default::default()
             };
 

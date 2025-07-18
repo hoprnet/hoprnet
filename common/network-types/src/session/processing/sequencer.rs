@@ -45,7 +45,7 @@ pub struct Sequencer<S: futures::Stream> {
     timer: futures_time::task::Sleep,
     buffer: BinaryHeap<std::cmp::Reverse<S::Item>>,
     next_id: FrameId,
-    last_emitted: Option<Instant>,
+    last_emitted: Instant,
     max_wait: Duration,
     state: State,
 }
@@ -62,7 +62,7 @@ where
             buffer: BinaryHeap::with_capacity(capacity),
             timer: futures_time::task::sleep(max_wait.into()),
             next_id: 1,
-            last_emitted: None,
+            last_emitted: Instant::now(),
             max_wait,
             state: State::Polling,
         }
@@ -115,15 +115,16 @@ where
                                 *this.state = State::Polling;
                                 return Poll::Pending;
                             }
-                            (_, Poll::Ready(_)) => {
-                                // Simulate buffer update when the timer elapses
-                                tracing::trace!("timer elapsed");
-                                *this.state = State::BufferUpdated;
-                            }
                             (Poll::Ready(Some(item)), _) => {
+                                // We have to reset the last emitted timestamp if
+                                // the buffer was empty until now
+                                if this.buffer.is_empty() {
+                                    *this.last_emitted = Instant::now();
+                                }
+
                                 if item.lt(this.next_id) {
                                     // Do not accept older frame ids
-                                    tracing::trace!("old item");
+                                    tracing::error!("old item");
                                     *this.state = State::Polling;
                                 } else {
                                     // Push new item to the buffer
@@ -131,15 +132,15 @@ where
                                     this.buffer.push(std::cmp::Reverse(item));
                                     *this.state = State::BufferUpdated;
                                 }
-                                // If we've never emitted anything, set the last emission on
-                                // any first item returned by the inner stream
-                                if this.last_emitted.is_none() {
-                                    *this.last_emitted = Some(Instant::now());
-                                }
                             }
                             (Poll::Ready(None), _) => {
                                 tracing::trace!(len = this.buffer.len(), "stream is done");
                                 *this.state = State::Done
+                            }
+                            (_, Poll::Ready(_)) => {
+                                // Simulate buffer update when the timer elapses
+                                tracing::trace!("timer elapsed");
+                                *this.state = State::BufferUpdated;
                             }
                         }
                     } else {
@@ -153,18 +154,18 @@ where
                     if let Some(next) = this.buffer.peek().map(|item| &item.0) {
                         if next.eq(this.next_id) {
                             *this.next_id = this.next_id.wrapping_add(1);
-                            *this.last_emitted = Some(Instant::now());
+                            *this.last_emitted = Instant::now();
                             *this.state = State::BufferUpdated;
 
                             tracing::trace!("emit next frame");
 
                             return Poll::Ready(this.buffer.pop().map(|item| Ok(item.0)));
-                        } else if this.last_emitted.is_some_and(|e| e.elapsed() >= *this.max_wait)
+                        } else if this.last_emitted.elapsed() >= *this.max_wait
                             || this.buffer.len() == this.buffer.capacity()
                         {
                             let discarded = *this.next_id;
                             *this.next_id = this.next_id.wrapping_add(1);
-                            *this.last_emitted = Some(Instant::now());
+                            *this.last_emitted = Instant::now();
                             *this.state = State::BufferUpdated;
 
                             tracing::trace!(discarded, "discard frame");
@@ -182,7 +183,7 @@ where
                     // The underlying stream is done, drain what we have in the internal buffer
                     return if let Some(next) = this.buffer.peek().map(|item| &item.0) {
                         if next.lt(this.next_id) {
-                            tracing::trace!("old item");
+                            tracing::error!("old item");
                             this.buffer.pop();
                             continue;
                         } else if next.eq(this.next_id) {
@@ -424,6 +425,34 @@ mod tests {
         assert!(matches!(rx.next().await, Some(Ok(LAST_ID))));
         assert!(matches!(rx.next().await, Some(Ok(FrameId::MAX))));
         assert!(matches!(rx.next().await, None));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test(flavor = "multi_thread"))]
+    async fn sequencer_must_not_discard_frames_when_buffer_was_empty_after_timeout() -> anyhow::Result<()> {
+        let (tx, rx) = futures::channel::mpsc::unbounded();
+
+        let jh = tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(2)).await;
+            pin_mut!(tx);
+            tx.send_all(&mut futures::stream::iter([3, 1, 2, 4]).map(Ok)).await?;
+
+            tokio::time::sleep(Duration::from_millis(150)).await;
+
+            tx.send_all(&mut futures::stream::iter([6, 5, 7]).map(Ok)).await?;
+
+            anyhow::Ok(())
+        });
+
+        let chunks = rx
+            .sequencer(Duration::from_millis(50), 1024)
+            .try_ready_chunks(10)
+            .try_collect::<Vec<Vec<_>>>()
+            .await?;
+
+        assert_eq!(chunks, vec![vec![1, 2, 3, 4], vec![5, 6, 7]]);
+        jh.await??;
 
         Ok(())
     }
