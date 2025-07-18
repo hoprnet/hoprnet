@@ -169,19 +169,19 @@ pub struct CliArgs {
     #[arg(
         long = "noLogSnapshot",
         env = "HOPRD_INDEXER_DISABLE_LOG_SNAPSHOT",
-        help = "Disables downloading log snapshot on startup.",
+        help = "Disables downloading logs snapshot on startup.",
         action = ArgAction::Count
     )]
-    pub no_log_snapshot: u8,
+    pub no_logs_snapshot: u8,
 
     #[arg(
         long = "logSnapshotUrl",
         env = "HOPRD_LOG_SNAPSHOT_URL",
-        help = "URL to download log snapshot from",
+        help = "URL to download logs snapshot from",
         value_name = "URL",
         default_value = "https://snapshots.hoprnet.org/logs/latest.tar.gz"
     )]
-    pub log_snapshot_url: String,
+    pub logs_snapshot_url: String,
 
     #[arg(
         long = "maxBlockRange",

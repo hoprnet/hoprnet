@@ -212,8 +212,8 @@ mod tests {
         let config = IndexerConfig {
             start_block_number: 0,
             fast_sync: true,
-            log_snapshot_enabled: true,
-            log_snapshot_url: "https://example.com/snapshot.tar.gz".to_string(),
+            logs_snapshot_enabled: true,
+            logs_snapshot_url: "https://example.com/snapshot.tar.gz".to_string(),
             data_directory: "".to_string(),
         };
 
@@ -223,8 +223,8 @@ mod tests {
         let config = IndexerConfig {
             start_block_number: 0,
             fast_sync: true,
-            log_snapshot_enabled: true,
-            log_snapshot_url: "https://example.com/snapshot.tar.gz".to_string(),
+            logs_snapshot_enabled: true,
+            logs_snapshot_url: "https://example.com/snapshot.tar.gz".to_string(),
             data_directory: "/tmp/test_data".to_string(),
         };
 
@@ -266,8 +266,8 @@ mod tests {
 
         assert_eq!(config.start_block_number, 100);
         assert_eq!(config.fast_sync, true);
-        assert_eq!(config.log_snapshot_enabled, true);
-        assert_eq!(config.log_snapshot_url, "https://example.com/snapshot.tar.gz");
+        assert_eq!(config.logs_snapshot_enabled, true);
+        assert_eq!(config.logs_snapshot_url, "https://example.com/snapshot.tar.gz");
         assert_eq!(config.data_directory, "/tmp/hopr_data");
 
         // Test validation - valid config

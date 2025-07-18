@@ -1,6 +1,9 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, AtomicU64, Ordering},
+use std::{
+    path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
 };
 
 use alloy::sol_types::SolEvent;
@@ -148,24 +151,24 @@ where
         // If so:
         //   1. Delete the existing indexed data
         //   2. Reset fast sync progress
-        //   3. Run the fast sync process until completion
-        //   4. Finally, starting the rpc indexer.
+        //   3. Download the snapshot if the logs database is empty and the snapshot is enabled
+        //   4. Run the fast sync process until completion
+        //   5. Finally, starting the rpc indexer.
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
 
         // Check if we need to download snapshot before fast sync
         let logs_db_has_data = self.has_logs_data().await?;
 
-        if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.log_snapshot_enabled {
-            info!("Logs database is empty, attempting to download snapshot...");
+        if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.logs_snapshot_enabled {
+            info!("Logs database is empty, attempting to download logs snapshot...");
 
             match self.download_snapshot().await {
                 Ok(snapshot_info) => {
-                    info!("Snapshot downloaded successfully: {:?}", snapshot_info);
+                    info!("Logs snapshot downloaded successfully: {:?}", snapshot_info);
                 }
                 Err(e) => {
-                    error!("Failed to download snapshot: {}. Continuing with regular sync.", e);
-                    // Continue with normal sync - don't fail the entire process
+                    error!("Failed to download logs snapshot: {}. Continuing with regular sync.", e);
                 }
             }
         }
@@ -741,20 +744,16 @@ where
 
     /// Downloads a snapshot for faster initial sync
     pub async fn download_snapshot(&self) -> Result<SnapshotInfo> {
-        let snapshot_manager = SnapshotManager::new();
-
-        // Use the data directory from configuration
-        let data_dir = std::path::Path::new(&self.cfg.data_directory);
-
-        // Validate that the data directory is configured
-        if self.cfg.data_directory.is_empty() {
-            return Err(CoreEthereumIndexerError::SnapshotError(
-                "Data directory is not configured. Please set data_directory in IndexerConfig.".to_string(),
-            ));
+        // Validate config before proceeding
+        if let Err(e) = self.cfg.validate() {
+            return Err(CoreEthereumIndexerError::SnapshotError(e.to_string()));
         }
 
+        let snapshot_manager = SnapshotManager::new();
+        let data_dir = Path::new(&self.cfg.data_directory);
+
         snapshot_manager
-            .download_and_setup_snapshot(&self.cfg.log_snapshot_url, data_dir)
+            .download_and_setup_snapshot(&self.cfg.logs_snapshot_url, data_dir)
             .await
             .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))
     }
@@ -1114,8 +1113,8 @@ mod tests {
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
                 fast_sync: true,
-                log_snapshot_enabled: false,
-                log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+                logs_snapshot_enabled: false,
+                logs_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
                 data_directory: "/tmp/test_data".to_string(),
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
@@ -1208,8 +1207,8 @@ mod tests {
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
                 fast_sync: true,
-                log_snapshot_enabled: false,
-                log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+                logs_snapshot_enabled: false,
+                logs_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
                 data_directory: "/tmp/test_data".to_string(),
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
@@ -1387,8 +1386,8 @@ mod tests {
         let indexer_cfg = IndexerConfig {
             start_block_number: 0,
             fast_sync: false,
-            log_snapshot_enabled: false,
-            log_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+            logs_snapshot_enabled: false,
+            logs_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
             data_directory: "/tmp/test_data".to_string(),
         };
 

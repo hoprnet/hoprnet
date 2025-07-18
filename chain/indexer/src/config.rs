@@ -1,3 +1,5 @@
+use std::path::Path;
+
 /// Configuration for the chain indexer functionality
 #[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct IndexerConfig {
@@ -19,21 +21,21 @@ pub struct IndexerConfig {
     #[default(true)]
     pub fast_sync: bool,
 
-    /// Whether to enable log snapshot downloading on startup.
+    /// Whether to enable logs snapshot downloading on startup.
     /// When enabled and fast sync is enabled, the indexer will attempt to download
     /// a pre-built logs database snapshot for faster initial sync.
     ///
     /// Default is `true`.
     #[default(true)]
-    pub log_snapshot_enabled: bool,
+    pub logs_snapshot_enabled: bool,
 
-    /// URL to download log snapshot from.
+    /// URL to download logs snapshot from.
     /// This should point to a publicly accessible tar.gz file containing
     /// the SQLite logs database files.
     ///
     /// Default is "https://snapshots.hoprnet.org/logs/latest.tar.gz".
     #[default("https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string())]
-    pub log_snapshot_url: String,
+    pub logs_snapshot_url: String,
 
     /// Path to the data directory where databases are stored.
     /// This is used for snapshot installation and database state checking.
@@ -50,8 +52,8 @@ impl IndexerConfig {
     ///
     /// * `start_block_number` - The block number from which to start indexing
     /// * `fast_sync` - Whether to enable fast synchronization during startup
-    /// * `log_snapshot_enabled` - Whether to enable log snapshot downloading
-    /// * `log_snapshot_url` - URL to download log snapshot from
+    /// * `logs_snapshot_enabled` - Whether to enable logs snapshot downloading
+    /// * `logs_snapshot_url` - URL to download logs snapshot from
     /// * `data_directory` - Path to the data directory where databases are stored
     ///
     /// # Returns
@@ -60,15 +62,15 @@ impl IndexerConfig {
     pub fn new(
         start_block_number: u64,
         fast_sync: bool,
-        log_snapshot_enabled: bool,
-        log_snapshot_url: String,
+        logs_snapshot_enabled: bool,
+        logs_snapshot_url: String,
         data_directory: String,
     ) -> Self {
         Self {
             start_block_number,
             fast_sync,
-            log_snapshot_enabled,
-            log_snapshot_url,
+            logs_snapshot_enabled,
+            logs_snapshot_url,
             data_directory,
         }
     }
@@ -76,30 +78,30 @@ impl IndexerConfig {
     /// Validates the configuration and returns any validation errors
     pub fn validate(&self) -> Result<(), String> {
         // Validate URL format if snapshot is enabled
-        if self.log_snapshot_enabled {
-            if self.log_snapshot_url.is_empty() {
-                return Err("Log snapshot URL cannot be empty when snapshots are enabled".to_string());
+        if self.logs_snapshot_enabled {
+            if self.logs_snapshot_url.is_empty() {
+                return Err("Logs snapshot URL cannot be empty when snapshots are enabled".to_string());
             }
 
             // Basic URL validation
-            if !self.log_snapshot_url.starts_with("http://") && !self.log_snapshot_url.starts_with("https://") {
-                return Err("Log snapshot URL must be a valid HTTP or HTTPS URL".to_string());
+            if !self.logs_snapshot_url.starts_with("http://") && !self.logs_snapshot_url.starts_with("https://") {
+                return Err("Logs snapshot URL must be a valid HTTP or HTTPS URL".to_string());
             }
 
             // Check if URL ends with .tar.gz
-            if !self.log_snapshot_url.ends_with(".tar.gz") {
-                return Err("Log snapshot URL must point to a .tar.gz file".to_string());
+            if !self.logs_snapshot_url.ends_with(".tar.gz") {
+                return Err("Logs snapshot URL must point to a .tar.gz file".to_string());
             }
         }
 
         // Validate data directory if snapshot is enabled
-        if self.log_snapshot_enabled && self.data_directory.is_empty() {
-            return Err("Data directory must be specified when log snapshots are enabled".to_string());
+        if self.logs_snapshot_enabled && self.data_directory.is_empty() {
+            return Err("Data directory must be specified when logs snapshots are enabled".to_string());
         }
 
         // Validate data directory path
         if !self.data_directory.is_empty() {
-            let path = std::path::Path::new(&self.data_directory);
+            let path = Path::new(&self.data_directory);
             if path.is_file() {
                 return Err("Data directory path points to a file, not a directory".to_string());
             }
