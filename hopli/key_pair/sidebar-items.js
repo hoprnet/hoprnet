@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["create_identity","read_identities","read_identity","update_identity_password"],"struct":["IdentityFileArgs","IdentityFromDirectoryArgs","ManagerPrivateKeyArgs","NewPasswordArgs","PasswordArgs","PrivateKeyArgs"],"trait":["ArgEnvReader"]};

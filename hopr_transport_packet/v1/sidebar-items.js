@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ReservedTag","Tag"],"struct":["ApplicationData","ReservedTagIter"]};

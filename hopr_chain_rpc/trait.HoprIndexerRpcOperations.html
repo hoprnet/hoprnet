@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Trait with RPC provider functionality required by the Indexer."><title>HoprIndexerRpcOperations in hopr_chain_rpc - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-aa0817cf.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hopr_chain_rpc" data-themes="" data-resource-suffix="" data-rustdoc-version="1.90.0-nightly (855e0fe46 2025-07-11)" data-channel="nightly" data-search-js="search-179e01a3.js" data-settings-js="settings-5514c975.js" ><script src="../static.files/storage-4e99c027.js"></script><script defer src="sidebar-items.js"></script><script defer src="../static.files/main-673ee1e0.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hopr_chain_rpc/index.html">hopr_<wbr>chain_<wbr>rpc</a><span class="version">0.7.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Hopr<wbr>Indexer<wbr>RpcOperations</a></h2><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.block_number" title="block_number">block_number</a></li><li><a href="#tymethod.get_hopr_allowance" title="get_hopr_allowance">get_hopr_allowance</a></li><li><a href="#tymethod.get_hopr_balance" title="get_hopr_balance">get_hopr_balance</a></li><li><a href="#tymethod.get_xdai_balance" title="get_xdai_balance">get_xdai_balance</a></li><li><a href="#tymethod.try_stream_logs" title="try_stream_logs">try_stream_logs</a></li></ul><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="index.html">In crate hopr_<wbr>chain_<wbr>rpc</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="index.html">hopr_chain_rpc</a></div><h1>Trait <span class="trait">HoprIndexerRpcOperations</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hopr_chain_rpc/lib.rs.html#328-393">Source</a> </span></div><pre class="rust item-decl"><code>pub trait HoprIndexerRpcOperations {
+    // Required methods
+    fn <a href="#tymethod.block_number" class="fn">block_number</a>&lt;'life0, 'async_trait&gt;(
+        &amp;'life0 self,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait</span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.get_hopr_allowance" class="fn">get_hopr_allowance</a>&lt;'life0, 'async_trait&gt;(
+        &amp;'life0 self,
+        owner: Address,
+        spender: Address,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;HoprBalance&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait</span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.get_xdai_balance" class="fn">get_xdai_balance</a>&lt;'life0, 'async_trait&gt;(
+        &amp;'life0 self,
+        address: Address,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;XDaiBalance&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait</span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.get_hopr_balance" class="fn">get_hopr_balance</a>&lt;'life0, 'async_trait&gt;(
+        &amp;'life0 self,
+        address: Address,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;HoprBalance&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait</span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.try_stream_logs" class="fn">try_stream_logs</a>&lt;'a&gt;(
+        &amp;'a self,
+        start_block_number: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>,
+        filters: <a class="struct" href="struct.FilterSet.html" title="struct hopr_chain_rpc::FilterSet">FilterSet</a>,
+        is_synced: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,
+    ) -&gt; <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn Stream&lt;Item = <a class="struct" href="struct.BlockWithLogs.html" title="struct hopr_chain_rpc::BlockWithLogs">BlockWithLogs</a>&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'a&gt;&gt;&gt;;
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Trait with RPC provider functionality required by the Indexer.</p>
+</div></details><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.block_number" class="method"><a class="src rightside" href="../src/hopr_chain_rpc/lib.rs.html#330">Source</a><h4 class="code-header">fn <a href="#tymethod.block_number" class="fn">block_number</a>&lt;'life0, 'async_trait&gt;(
+    &amp;'life0 self,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Retrieves the latest block number.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.get_hopr_allowance" class="method"><a class="src rightside" href="../src/hopr_chain_rpc/lib.rs.html#343">Source</a><h4 class="code-header">fn <a href="#tymethod.get_hopr_allowance" class="fn">get_hopr_allowance</a>&lt;'life0, 'async_trait&gt;(
+    &amp;'life0 self,
+    owner: Address,
+    spender: Address,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;HoprBalance&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Queries the HOPR token allowance between owner and spender addresses.</p>
+<p>This method queries the HOPR token contract to determine how many tokens
+the owner has approved the spender to transfer on their behalf.</p>
+<h5 id="arguments"><a class="doc-anchor" href="#arguments">§</a>Arguments</h5>
+<ul>
+<li><code>owner</code> - The address that owns the tokens and grants the allowance</li>
+<li><code>spender</code> - The address that is approved to spend the tokens</li>
+</ul>
+<h5 id="returns"><a class="doc-anchor" href="#returns">§</a>Returns</h5>
+<ul>
+<li><code>Result&lt;HoprBalance&gt;</code> - The current allowance amount</li>
+</ul>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.get_xdai_balance" class="method"><a class="src rightside" href="../src/hopr_chain_rpc/lib.rs.html#355">Source</a><h4 class="code-header">fn <a href="#tymethod.get_xdai_balance" class="fn">get_xdai_balance</a>&lt;'life0, 'async_trait&gt;(
+    &amp;'life0 self,
+    address: Address,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;XDaiBalance&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Queries the xDAI (native token) balance for a specific address.</p>
+<p>This method queries the current xDAI balance of the specified address
+from the blockchain.</p>
+<h5 id="arguments-1"><a class="doc-anchor" href="#arguments-1">§</a>Arguments</h5>
+<ul>
+<li><code>address</code> - The Ethereum address to query the balance for</li>
+</ul>
+<h5 id="returns-1"><a class="doc-anchor" href="#returns-1">§</a>Returns</h5>
+<ul>
+<li><code>Result&lt;XDaiBalance&gt;</code> - The current xDAI balance</li>
+</ul>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.get_hopr_balance" class="method"><a class="src rightside" href="../src/hopr_chain_rpc/lib.rs.html#367">Source</a><h4 class="code-header">fn <a href="#tymethod.get_hopr_balance" class="fn">get_hopr_balance</a>&lt;'life0, 'async_trait&gt;(
+    &amp;'life0 self,
+    address: Address,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;HoprBalance&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Queries the HOPR token balance for a specific address.</p>
+<p>This method directly queries the HOPR token contract to get the current
+token balance of the specified address.</p>
+<h5 id="arguments-2"><a class="doc-anchor" href="#arguments-2">§</a>Arguments</h5>
+<ul>
+<li><code>address</code> - The Ethereum address to query the balance for</li>
+</ul>
+<h5 id="returns-2"><a class="doc-anchor" href="#returns-2">§</a>Returns</h5>
+<ul>
+<li><code>Result&lt;HoprBalance&gt;</code> - The current HOPR token balance</li>
+</ul>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.try_stream_logs" class="method"><a class="src rightside" href="../src/hopr_chain_rpc/lib.rs.html#387-392">Source</a><h4 class="code-header">fn <a href="#tymethod.try_stream_logs" class="fn">try_stream_logs</a>&lt;'a&gt;(
+    &amp;'a self,
+    start_block_number: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.u64.html">u64</a>,
+    filters: <a class="struct" href="struct.FilterSet.html" title="struct hopr_chain_rpc::FilterSet">FilterSet</a>,
+    is_synced: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.bool.html">bool</a>,
+) -&gt; <a class="type" href="errors/type.Result.html" title="type hopr_chain_rpc::errors::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/nightly/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn Stream&lt;Item = <a class="struct" href="struct.BlockWithLogs.html" title="struct hopr_chain_rpc::BlockWithLogs">BlockWithLogs</a>&gt; + <a class="trait" href="https://doc.rust-lang.org/nightly/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'a&gt;&gt;&gt;</h4></section></summary><div class="docblock"><p>Streams blockchain logs using selective filtering based on synchronization state.</p>
+<p>This method intelligently selects which log filters to use based on whether
+the indexer is currently syncing historical data or processing live events.
+During initial sync, it uses <code>no_token</code> filters to exclude irrelevant token
+events. When synced, it uses all filters to capture complete event data.</p>
+<h5 id="arguments-3"><a class="doc-anchor" href="#arguments-3">§</a>Arguments</h5>
+<ul>
+<li><code>start_block_number</code> - Starting block number for log retrieval</li>
+<li><code>filters</code> - Set of categorized filters (all, token, no_token)</li>
+<li><code>is_synced</code> - Whether the indexer has completed initial synchronization</li>
+</ul>
+<h5 id="returns-3"><a class="doc-anchor" href="#returns-3">§</a>Returns</h5>
+<ul>
+<li><code>impl Stream&lt;Item = Result&lt;Log&gt;&gt;</code> - Stream of blockchain logs</li>
+</ul>
+<h5 id="behavior"><a class="doc-anchor" href="#behavior">§</a>Behavior</h5>
+<ul>
+<li>When <code>is_synced</code> is <code>false</code>: Uses <code>filter_set.no_token</code> to reduce log volume</li>
+<li>When <code>is_synced</code> is <code>true</code>: Uses <code>filter_set.all</code> for complete coverage</li>
+</ul>
+</div></details></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"><section id="impl-HoprIndexerRpcOperations-for-RpcOperations%3CR%3E" class="impl"><a class="src rightside" href="../src/hopr_chain_rpc/indexer.rs.html#138-278">Source</a><a href="#impl-HoprIndexerRpcOperations-for-RpcOperations%3CR%3E" class="anchor">§</a><h3 class="code-header">impl&lt;R: <a class="trait" href="transport/trait.HttpRequestor.html" title="trait hopr_chain_rpc::transport::HttpRequestor">HttpRequestor</a> + 'static + <a class="trait" href="https://doc.rust-lang.org/nightly/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a>&gt; <a class="trait" href="trait.HoprIndexerRpcOperations.html" title="trait hopr_chain_rpc::HoprIndexerRpcOperations">HoprIndexerRpcOperations</a> for <a class="struct" href="rpc/struct.RpcOperations.html" title="struct hopr_chain_rpc::rpc::RpcOperations">RpcOperations</a>&lt;R&gt;</h3></section></div><script src="../trait.impl/hopr_chain_rpc/trait.HoprIndexerRpcOperations.js" async></script></section></div></main></body></html>

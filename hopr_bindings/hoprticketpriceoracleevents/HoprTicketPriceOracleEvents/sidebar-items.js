@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprTicketPriceOracleEventsEvents"],"fn":["deploy","deploy_builder","new"],"static":["BYTECODE","DEPLOYED_BYTECODE"],"struct":["HoprTicketPriceOracleEventsInstance","TicketPriceUpdated"]};
