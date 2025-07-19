@@ -38,8 +38,6 @@ let
       "/lib64/ld-linux-x86-64.so.2"
     else if hostPlatform.isLinux && hostPlatform.isAarch64 then
       "/lib64/ld-linux-aarch64.so.1"
-    else if hostPlatform.isLinux && hostPlatform.isArmv7 then
-      "/lib64/ld-linux-armhf.so.3"
     else
       "";
 
@@ -73,14 +71,18 @@ let
   isDarwinForDarwin = buildPlatform.isDarwin && hostPlatform.isDarwin;
   isDarwinForNonDarwin = buildPlatform.isDarwin && !hostPlatform.isDarwin;
 
+  linuxNativeBuildInputs =
+    if buildPlatform.isLinux then
+      [
+        # mold is only supported on Linux
+        mold
+      ]
+    else
+      [ ];
   darwinBuildInputs =
     if isDarwinForDarwin || isDarwinForNonDarwin then
-      with pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks;
       [
-        CoreFoundation
-        CoreServices
-        Security
-        SystemConfiguration
+        pkgs.pkgsBuildHost.apple-sdk_15
       ]
     else
       [ ];
@@ -108,14 +110,14 @@ let
     nativeBuildInputs =
       [
         llvmPackages.bintools
-        mold
         solcDefault
         foundryBin
         pkg-config
         libiconv
       ]
       ++ stdenv.extraNativeBuildInputs
-      ++ darwinNativeBuildInputs;
+      ++ darwinNativeBuildInputs
+      ++ linuxNativeBuildInputs;
     buildInputs = buildInputs ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";

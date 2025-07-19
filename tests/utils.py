@@ -165,7 +165,7 @@ class RouteBidirectionalChannels:
 
             logging.debug(
                 f"open forward channel {self._route[i].address} ->"
-                + f"{self._route[i+1].address} with {self._funding_fwd * remaining}"
+                + f"{self._route[i + 1].address} with {self._funding_fwd * remaining}"
             )
             fwd_channel = await self._route[i].api.open_channel(
                 self._route[i + 1].address, self._funding_fwd * remaining
@@ -175,7 +175,7 @@ class RouteBidirectionalChannels:
             ri = len(self._route) - i - 1
             logging.debug(
                 f"open return channel {self._route[ri].address} ->"
-                + f"{self._route[ri-1].address} with {self._funding_return * remaining}"
+                + f"{self._route[ri - 1].address} with {self._funding_return * remaining}"
             )
             ret_channel = await self._route[ri].api.open_channel(
                 self._route[ri - 1].address, self._funding_return * remaining
@@ -186,7 +186,7 @@ class RouteBidirectionalChannels:
                 check_channel_status(self._route[i], self._route[i + 1], status=ChannelStatus.Open), 10.0
             )
             logging.debug(
-                f"opened forward channel {fwd_channel.id}: {self._route[i].address} -> {self._route[i+1].address}"
+                f"opened forward channel {fwd_channel.id}: {self._route[i].address} -> {self._route[i + 1].address}"
             )
             self._fwd_channels.append(fwd_channel)
 
@@ -194,7 +194,7 @@ class RouteBidirectionalChannels:
                 check_channel_status(self._route[ri], self._route[ri - 1], status=ChannelStatus.Open), 10.0
             )
             logging.debug(
-                f"opened return channel {ret_channel.id}: {self._route[ri].address} -> {self._route[ri-1].address}"
+                f"opened return channel {ret_channel.id}: {self._route[ri].address} -> {self._route[ri - 1].address}"
             )
             self._ret_channels.append(ret_channel)
 
@@ -205,13 +205,13 @@ class RouteBidirectionalChannels:
         for i in range(len(self._route) - 2):
             logging.debug(
                 f"close channel {self._fwd_channels[i].id}: {self._route[i].address} -> "
-                + f"{self._route[i+1].address}"
+                + f"{self._route[i + 1].address}"
             )
             assert await self._route[i].api.close_channel(self._fwd_channels[i].id)
 
             ri = len(self._route) - i - 1
             logging.debug(
-                f"close channel {self._ret_channels[i].id}: {self._route[ri].address} -> {self._route[ri-1].address}"
+                f"close channel {self._ret_channels[i].id}: {self._route[ri].address} -> {self._route[ri - 1].address}"
             )
             assert await self._route[ri].api.close_channel(self._ret_channels[i].id)
 
@@ -220,7 +220,7 @@ class RouteBidirectionalChannels:
             )
             logging.debug(
                 f"pending to close channel {self._fwd_channels[i].id}: {self._route[i].address} ->"
-                + f"{self._route[i+1].address}"
+                + f"{self._route[i + 1].address}"
             )
 
             await asyncio.wait_for(
@@ -228,7 +228,7 @@ class RouteBidirectionalChannels:
             )
             logging.debug(
                 f"pending to close channel {self._ret_channels[i].id}: {self._route[ri].address} ->"
-                + f"{self._route[ri-1].address}"
+                + f"{self._route[ri - 1].address}"
             )
 
             await asyncio.sleep(15)
@@ -240,14 +240,14 @@ class RouteBidirectionalChannels:
                 check_channel_status(self._route[i], self._route[i + 1], status=ChannelStatus.Closed), 10.0
             )
             logging.debug(
-                f"closed channel {self._fwd_channels[i].id}: {self._route[i].address} -> {self._route[i+1].address}"
+                f"closed channel {self._fwd_channels[i].id}: {self._route[i].address} -> {self._route[i + 1].address}"
             )
 
             await asyncio.wait_for(
                 check_channel_status(self._route[ri], self._route[ri - 1], status=ChannelStatus.Closed), 10.0
             )
             logging.debug(
-                f"closed channel {self._ret_channels[i].id}: {self._route[ri].address} -> {self._route[ri-1].address}"
+                f"closed channel {self._ret_channels[i].id}: {self._route[ri].address} -> {self._route[ri - 1].address}"
             )
 
     @property

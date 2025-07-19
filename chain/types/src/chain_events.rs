@@ -76,7 +76,7 @@ impl Display for ChainEventType {
                 peer,
                 address,
                 multiaddresses,
-            } => write!(f, "announcement event of {peer} ({address}): {:?}", multiaddresses),
+            } => write!(f, "announcement event of {peer} ({address}): {multiaddresses:?}"),
             ChainEventType::ChannelOpened(c) => write!(f, "open channel event {}", c.get_id()),
             ChainEventType::ChannelClosureInitiated(c) => write!(f, "close channel initiation event {}", c.get_id()),
             ChainEventType::ChannelClosed(c) => write!(f, "close channel event {}", c.get_id()),
@@ -84,7 +84,7 @@ impl Display for ChainEventType {
             ChainEventType::ChannelBalanceDecreased(c, _) => write!(f, "channel decrease balance event {}", c.get_id()),
             ChainEventType::TicketRedeemed(c, _) => write!(f, "ticket redeem event in channel {}", c.get_id()),
             ChainEventType::NodeSafeRegistered(s) => write!(f, "safe registered event {s}"),
-            ChainEventType::NetworkRegistryUpdate(a, s) => write!(f, "network registry update event {a}: {:?}", s),
+            ChainEventType::NetworkRegistryUpdate(a, s) => write!(f, "network registry update event {a}: {s:?}"),
         }
     }
 }

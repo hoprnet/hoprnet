@@ -18,6 +18,9 @@ What's changed
 
 ### 🐞 Fixes
 
+* fix(ci): Do not use mold on macos by @tolbrino in #7321
+* fix: Using wrong branch when creating release  by @ausias-armesto in #7317
+* fix(nix): hopli aarch64 build working and add man-page generation by @tolbrino in #7310
 * fix(ci): Port deploy_nodes changes by @tolbrino in #7305
 * fix(ci): comply with pre-commit by @Teebor-Choka in #7281
 * fix(ci): Fixing merge pipeline by @ausias-armesto in #7276
@@ -39,6 +42,8 @@ What's changed
 * Update documentation on Nodemanagement module by @QYuQianchen in #7028
 * Post-Providence smart contract features (tracker for v3.0) by @QYuQianchen in #7027
 * Protocol Feature: Return Path by @tolbrino in #4496
+* feat: add configurable limits for transport packet handling and stream open timeout by @NumberFour8 in #7320
+* ci: Add pluto build flag by @ausias-armesto in #7315
 * feat: Add binary signatures and multiple os package improvements by @ausias-armesto in #7297
 * Remove balance update on API query by @NumberFour8 in #7252
 * tests: Fix randomly failing win_prob smoke test by @Teebor-Choka in #7230
@@ -113,9 +118,5 @@ What's changed
 * Introduce Return Path to the protocol by @NumberFour8 in #6932
 * Split API endpoints by content type by @jeandemeusy in #6931
 * Add support for libp2p_stream into the swarm object by @Teebor-Choka in #6928
-* Remove database connection opening per-packet by @NumberFour8 in #6922
-* Introduce WinningProbability type by @NumberFour8 in #6921
-* ci: Cache used cargo packages in a crates.io proxy by @Teebor-Choka in #6902
-* ci: Add pluto build flag by @ausias-armesto in #7315
-* fix: Using wrong branch when creating release by @ausias-armesto in #7317
+
 

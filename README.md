@@ -120,6 +120,21 @@ nix build
 sudo cp result/bin/* /usr/local/bin/
 ```
 
+To build and access man pages for `hoprd` and `hopli`:
+
+```bash
+# Build man page for hoprd
+nix build .#hoprd-man
+man ./result/share/man/man1/hoprd.1.gz
+
+# Build man page for hopli
+nix build .#hopli-man
+man ./result/share/man/man1/hopli.1.gz
+
+# Or install them system-wide
+sudo cp -r result/share/man/man1/* /usr/local/share/man/man1/
+```
+
 ### Install via linux package manager
 
 Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
@@ -213,6 +228,8 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in SURB balancer (default: `0.2`)
 - `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
 - `HOPR_CAPTURE_PACKETS` - allow capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Note that `hoprd` must be built with the `capture` feature.
+- `HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS` - maximum number of concurrently processed incoming packets from all peers (default: 10)
+- `HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS` - maximum time (in milliseconds) to wait until a stream connection is established to a peer (default: 2000 ms)
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
 - `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
 

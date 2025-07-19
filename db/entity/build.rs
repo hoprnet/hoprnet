@@ -96,7 +96,7 @@ fn main() -> anyhow::Result<()> {
             .as_str(),
     );
 
-    futures::executor::block_on(execute_sea_orm_cli_command([
+    tokio::runtime::Runtime::new()?.block_on(execute_sea_orm_cli_command([
         "sea-orm-cli",
         "migrate",
         "refresh",
@@ -119,7 +119,7 @@ fn main() -> anyhow::Result<()> {
             .as_str(),
     ]))?;
 
-    futures::executor::block_on(execute_sea_orm_cli_command([
+    tokio::runtime::Runtime::new()?.block_on(execute_sea_orm_cli_command([
         "sea-orm-cli",
         "generate",
         "entity",

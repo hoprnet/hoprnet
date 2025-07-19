@@ -107,7 +107,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
 }
 
 fn build_transport_client(url: &str) -> Result<Http<ReqwestClient>> {
-    let parsed_url = url::Url::parse(url).unwrap_or_else(|_| panic!("failed to parse URL: {}", url));
+    let parsed_url = url::Url::parse(url).unwrap_or_else(|_| panic!("failed to parse URL: {url}"));
     Ok(ReqwestTransport::new(parsed_url))
 }
 
@@ -289,8 +289,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             .map_err(HoprChainError::from)
             .and_then(|v| {
                 v.ok_or(errors::HoprChainError::Api(format!(
-                    "Channel entry not available {}-{}",
-                    src, dest
+                    "Channel entry not available {src}-{dest}"
                 )))
             })
     }

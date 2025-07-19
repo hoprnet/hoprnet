@@ -106,7 +106,7 @@ impl<'a> serde::Deserialize<'a> for Tag {
 
 impl std::fmt::Display for Tag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Tag({})", self.as_u64())
+        write!(f, "{}", self.as_u64())
     }
 }
 

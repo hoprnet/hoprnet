@@ -9,7 +9,12 @@
   useRustNightly ? false,
 }:
 let
-  cargoTarget = pkgs.stdenv.buildPlatform.config;
+  buildPlatform = pkgs.stdenv.buildPlatform;
+  cargoTarget =
+    if buildPlatform.config == "arm64-apple-darwin" then
+      "aarch64-apple-darwin"
+    else
+      buildPlatform.config;
   rustToolchain =
     if useRustNightly then
       pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
@@ -18,6 +23,16 @@ let
         targets = [ cargoTarget ];
       };
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+  linuxMinimumPackages =
+    if buildPlatform.isLinux then
+      with pkgs;
+      [
+        # mold is only supported on Linux
+        mold
+      ]
+    else
+      [ ];
+
   minimumPackages =
     with pkgs;
     [
@@ -31,7 +46,6 @@ let
       just
       llvmPackages.bintools
       lsof
-      mold
       openssl
       patchelf
       pkg-config

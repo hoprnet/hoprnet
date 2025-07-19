@@ -58,9 +58,9 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
     STRESS_1_HOP_TO_SELF_MESSAGE_COUNT = stress_fixture["request_count"]
     ROUGH_PAYLOAD_SIZE = 460
 
-    api_sources = [HoprdAPI(f'http://{d["url"]}', Bearer(d["token"], "/api/v4")) for d in stress_fixture["sources"]]
+    api_sources = [HoprdAPI(f"http://{d['url']}", Bearer(d["token"], "/api/v4")) for d in stress_fixture["sources"]]
     api_target = HoprdAPI(
-        f'http://{stress_fixture["target"]["url"]}', Bearer(stress_fixture["target"]["token"], "/api/v4")
+        f"http://{stress_fixture['target']['url']}", Bearer(stress_fixture["target"]["token"], "/api/v4")
     )
     target_address = (await api_target.addresses()).native
 
@@ -110,7 +110,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
 
                 logging.info(
                     "The websocket stress test ran at "
-                    + f"{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT/(end_time - start_time)} packets/s/node"
+                    + f"{STRESS_1_HOP_TO_SELF_MESSAGE_COUNT / (end_time - start_time)} packets/s/node"
                 )
 
                 assert read == data, f"Received data does not match the sent data: {read} != {data}"
@@ -146,7 +146,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                         source["url"].split(":")[1],
                         source["token"],
                         (
-                            await HoprdAPI(f'http://{source["url"]}', Bearer(source["token"], "/api/v4")).addresses()
+                            await HoprdAPI(f"http://{source['url']}", Bearer(source["token"], "/api/v4")).addresses()
                         ).native,
                     ),
                     timeout=60.0,

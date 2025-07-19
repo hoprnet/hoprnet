@@ -4,7 +4,7 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.20.1";
     # pin it to a version which we are compatible with
@@ -176,19 +176,6 @@
             isCross = true;
           };
 
-          rust-builder-armv7l-linux = import ./nix/rust-builder.nix {
-            inherit
-              nixpkgs
-              rust-overlay
-              crane
-              foundry
-              solc
-              localSystem
-              ;
-            crossSystem = pkgs.lib.systems.examples.armv7l-hf-multiplatform;
-            isCross = true;
-          };
-
           hoprdBuildArgs = {
             inherit src depsSrc rev;
             cargoExtraArgs = "-p hoprd-api";
@@ -211,7 +198,6 @@
             }
           );
           hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
-          hoprd-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           # CAVEAT: must be built from a darwin system
           hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           # CAVEAT: must be built from a darwin system
@@ -270,7 +256,6 @@
             hopliBuildArgs // { CARGO_PROFILE = "dev"; }
           );
           hopli-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
-          hopli-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
           # CAVEAT: must be built from a darwin system
           hopli-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
           # CAVEAT: must be built from a darwin system
@@ -279,20 +264,10 @@
           hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (
             hopliBuildArgs // { runClippy = true; }
           );
+
           hopli-dev = rust-builder-local.callPackage ./nix/rust-package.nix (
             hopliBuildArgs // { CARGO_PROFILE = "dev"; }
           );
-          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
-          hopli-candidate =
-            if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
-              )
-            else
-              rust-builder-local.callPackage ./nix/rust-package.nix (
-                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
-              );
-
           profileDeps = with pkgs; [
             gdb
             # FIXME: heaptrack would be useful, but it adds 700MB to the image size (unpacked)
@@ -332,6 +307,25 @@
               exec /bin/hoprd "$@"
             fi
           '';
+
+          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
+          hopli-candidate =
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
+                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
+              )
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix (
+                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
+              );
+
+          # Man pages
+          man-pages = pkgs.callPackage ./nix/man-pages.nix {
+            hoprd = hoprd-dev;
+            hopli = hopli-dev;
+          };
+          hoprd-man = man-pages.hoprd-man;
+          hopli-man = man-pages.hopli-man;
 
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
@@ -774,7 +768,7 @@
                 echo "Signing file: $source_file"
                 outdir="$(pwd)"
                 basename="$(basename "$source_file")"
-
+                dirname="$(dirname "$source_file")"
 
                 # Create isolated GPG keyring
                 gnupghome="$(mktemp -d)"
@@ -782,9 +776,10 @@
                 echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
 
                 # Generate hash and signature
-                shasum -a 256 "$source_file" > "$outdir/$basename.sha256"
+                cd "$dirname"
+                shasum -a 256 "$basename" > "$outdir/$basename.sha256"
                 echo "Hash written to $outdir/$basename.sha256"
-                gpg --armor --output "$outdir/$basename.sig" --detach-sign "$source_file"
+                gpg --armor --output "$outdir/$basename.sig" --detach-sign "$basename"
                 echo "Signature written to $outdir/$basename.sig"
                 gpg --armor --output "$outdir/$basename.sha256.asc" --sign "$outdir/$basename.sha256"
                 echo "Signature for hash written to $outdir/$basename.sha256.asc"
@@ -969,13 +964,14 @@
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
             inherit pre-commit-check;
-            inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-x86_64-linux;
-            inherit hopli-aarch64-linux hopli-armv7l-linux hopli-x86_64-linux;
+            inherit hoprd-aarch64-linux hoprd-x86_64-linux hoprd-x86_64-linux-dev;
+            inherit hopli-aarch64-linux hopli-x86_64-linux hopli-x86_64-linux-dev;
             # FIXME: Darwin cross-builds are currently broken.
             # Follow https://github.com/nixos/nixpkgs/pull/256590
             inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
             inherit hopli-aarch64-darwin hopli-x86_64-darwin;
             inherit hoprd-bench;
+            inherit hoprd-man hopli-man;
             default = hoprd;
           };
 
