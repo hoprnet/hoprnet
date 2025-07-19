@@ -30,11 +30,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        prelude::errors::SessionError,
-        session::{
-            frames::{Frame, OrderedFrame},
-            utils::test::segment,
-        },
+        errors::SessionError,
+        frames::{Frame, OrderedFrame},
+        utils::test::segment,
     };
 
     const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");

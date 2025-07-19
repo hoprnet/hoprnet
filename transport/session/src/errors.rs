@@ -1,4 +1,4 @@
-use hopr_network_types::prelude::errors::SessionError;
+use hopr_protocol_session::errors::SessionError;
 use thiserror::Error;
 
 use crate::initiation::StartErrorReason;

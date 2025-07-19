@@ -7,7 +7,7 @@ use std::{
 
 use hopr_primitive_types::prelude::GeneralError;
 
-use crate::prelude::{errors::SessionError, utils::to_hex_shortened};
+use crate::{errors::SessionError, utils::to_hex_shortened};
 
 /// ID of a [Frame].
 pub type FrameId = u32;

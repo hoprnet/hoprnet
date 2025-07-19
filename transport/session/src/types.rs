@@ -9,11 +9,14 @@ use std::{
 use futures::{SinkExt, StreamExt, TryStreamExt, pin_mut};
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
-    prelude::{DestinationRouting, ReliableSocket, SealedHost, SessionSocketConfig, StatelessSocket},
-    session::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
+    prelude::{DestinationRouting, SealedHost},
     utils::{AsyncWriteSink, DuplexIO},
 };
 use hopr_primitive_types::prelude::BytesRepresentable;
+use hopr_protocol_session::{
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
+    StatelessSocket,
+};
 use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::debug;
 

@@ -56,7 +56,7 @@ use asynchronous_codec::{Decoder, Encoder};
 use bytes::{Buf, BufMut, BytesMut};
 pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest};
 
-use crate::session::{
+use crate::{
     errors::SessionError,
     frames::{Segment, SeqIndicator},
 };
@@ -211,7 +211,7 @@ mod tests {
     use rand::{Rng, thread_rng};
 
     use super::*;
-    use crate::session::{
+    use crate::{
         frames::{FrameId, SegmentId},
         utils::test::segment,
     };

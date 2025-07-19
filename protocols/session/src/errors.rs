@@ -1,7 +1,7 @@
 use hopr_primitive_types::prelude::GeneralError;
 use thiserror::Error;
 
-use crate::session::frames::FrameId;
+use crate::frames::FrameId;
 
 #[derive(Error, Debug)]
 pub enum SessionError {

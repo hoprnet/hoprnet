@@ -18,7 +18,7 @@ use futures_concurrency::stream::Merge;
 use state::SocketState;
 use tracing::{Instrument, instrument};
 
-use crate::session::{
+use crate::{
     errors::SessionError,
     frames::OrderedFrame,
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
@@ -340,12 +340,7 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
-    #[cfg(feature = "capture")]
-    use crate::capture::PcapIoExt;
-    use crate::{
-        prelude::AcknowledgementState,
-        session::{AcknowledgementStateConfig, utils::test::*},
-    };
+    use crate::{AcknowledgementState, AcknowledgementStateConfig, utils::test::*};
 
     const MTU: usize = 1000;
 
@@ -473,8 +468,8 @@ mod tests {
     async fn stateful_socket_bidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
 
-        #[cfg(feature = "capture")]
-        let (alice, bob) = (alice.capture("alice.pcap"), bob.capture("bob.pcap"));
+        // use hopr_network_types::capture::PcapIoExt;
+        // let (alice, bob) = (alice.capture("alice.pcap"), bob.capture("bob.pcap"));
 
         let sock_cfg = SessionSocketConfig {
             frame_size: FRAME_SIZE,
@@ -906,8 +901,8 @@ mod tests {
             None,
         );
 
-        #[cfg(feature = "capture")]
-        let (alice, bob) = (alice.capture("alice.pcap"), bob.capture("bob.pcap"));
+        // use hopr_network_types::capture::PcapIoExt;
+        // let (alice, bob) = (alice.capture("alice.pcap"), bob.capture("bob.pcap"));
 
         let alice_cfg = SessionSocketConfig {
             frame_size: FRAME_SIZE,

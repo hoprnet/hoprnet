@@ -11,19 +11,14 @@ use futures_time::stream::StreamExt as TimeStreamExt;
 use tracing::Instrument;
 
 use crate::{
-    prelude::{
-        SocketState,
-        errors::SessionError,
-        utils::{
-            RetriedFrameId, RingBufferProducer, RingBufferView, next_deadline_with_backoff, searchable_ringbuffer,
-            skip_queue::{Skip, SkipDelaySender, skip_delay_channel},
-        },
-    },
-    session::{
-        frames::{FrameId, Segment, SegmentId, SeqIndicator},
-        processing::types::FrameInspector,
-        protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
-        socket::state::SocketComponents,
+    errors::SessionError,
+    frames::{FrameId, Segment, SegmentId, SeqIndicator},
+    processing::types::FrameInspector,
+    protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
+    socket::{SocketState, state::SocketComponents},
+    utils::{
+        RetriedFrameId, RingBufferProducer, RingBufferView, next_deadline_with_backoff, searchable_ringbuffer,
+        skip_queue::{Skip, SkipDelaySender, skip_delay_channel},
     },
 };
 
@@ -613,7 +608,7 @@ mod tests {
     use anyhow::Context;
 
     use super::*;
-    use crate::session::{
+    use crate::{
         frames::SeqNum,
         processing::types::{FrameBuilder, FrameDashMap, FrameMap},
         utils::test::segment,

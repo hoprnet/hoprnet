@@ -15,8 +15,8 @@ mod utils;
 
 pub use balancer::SurbBalancerConfig;
 use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_network_types::prelude::session_socket_mtu;
 pub use hopr_network_types::types::*;
+use hopr_protocol_session::session_socket_mtu;
 use hopr_transport_packet::prelude::ApplicationData;
 pub use manager::{DispatchResult, MIN_BALANCER_SAMPLING_INTERVAL, SessionManager, SessionManagerConfig};
 pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget};

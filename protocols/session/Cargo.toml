@@ -1,0 +1,62 @@
+[package]
+name = "hopr-protocol-session"
+version = "1.0.0"
+edition = "2024"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Contains implementation of Session protocol according to HOPR RFC-0006"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[features]
+default = ["hashbrown"]
+serde = ["dep:serde", "hopr-crypto-packet/serde"]
+runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
+hashbrown = ["dep:hashbrown"]
+session-types = []
+
+[dependencies]
+aquamarine = { workspace = true }
+asynchronous-codec = { workspace = true }
+bitvec = { workspace = true }
+bytes = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+futures-concurrency = { workspace = true }
+futures-time = { workspace = true }
+hex = { workspace = true }
+hashbrown = { workspace = true, optional = true }
+pin-project = { workspace = true }
+parking_lot = { workspace = true }
+ringbuffer = { workspace = true }
+serde = { workspace = true, optional = true }
+smart-default = { workspace = true }
+strum = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+tracing = { workspace = true }
+
+hopr-async-runtime = { workspace = true }
+hopr-crypto-packet = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-primitive-types = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+criterion = { workspace = true }
+hex-literal = { workspace = true }
+lazy_static = { workspace = true }
+mockall = { workspace = true }
+parameterized = { workspace = true }
+rand = { workspace = true }
+rand_distr = { workspace = true }
+rayon = { workspace = true }
+test-log = { workspace = true, features = ["trace"] }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+
+hopr-network-types = { workspace = true, features = ["capture"] }
+
+[[bench]]
+name = "reconstructor_bench"
+harness = false

@@ -36,7 +36,7 @@ pub mod types {
     pub use super::{frames::*, protocol::*};
 }
 
-use crate::session::protocol::SessionMessage;
+use protocol::SessionMessage;
 
 /// Represents a stateless (and therefore unreliable) socket.
 pub type StatelessSocket<const C: usize> = SessionSocket<C, Stateless<C>>;

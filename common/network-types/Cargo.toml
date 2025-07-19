@@ -9,7 +9,8 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = ["hashbrown"]
+default = []
+capture = ["dep:pcap-file"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
@@ -24,41 +25,23 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hickory-resolver/tokio",
 ]
-hashbrown = ["dep:hashbrown"]
-session-types = []
-capture = ["dep:pcap-file"]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 
 [dependencies]
-aquamarine = { workspace = true }
 arrayvec = { workspace = true }
-asynchronous-codec = { workspace = true }
-bitvec = { workspace = true }
-bytes = { workspace = true }
 cfg-if = { workspace = true }
-dashmap = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
-futures-time = { workspace = true }
-hex = { workspace = true }
 hickory-resolver = { workspace = true }
-hashbrown = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 pin-project = { workspace = true }
-parking_lot = { workspace = true }
 pcap-file = { workspace = true, optional = true }
-rand = { workspace = true }
-rand_distr = { workspace = true }
-ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
-smart-default = { workspace = true }
 socket2 = { workspace = true, features = ["all"] }
 strum = { workspace = true }
 thiserror = { workspace = true }
-test-log = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
 tracing = { workspace = true }
@@ -74,15 +57,8 @@ hopr-path = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-criterion = { workspace = true }
-hex-literal = { workspace = true }
 lazy_static = { workspace = true }
-mockall = { workspace = true }
 parameterized = { workspace = true }
-rand = { workspace = true }
-rand_distr = { workspace = true }
-rayon = { workspace = true }
-test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 
@@ -90,7 +66,3 @@ hopr-crypto-random = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
-
-[[bench]]
-name = "reconstructor_bench"
-harness = false

@@ -12,7 +12,7 @@ use std::{
 use futures::StreamExt;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
-use crate::session::frames::FrameId;
+use crate::frames::FrameId;
 
 pub(crate) fn to_hex_shortened(data: &impl AsRef<[u8]>, max_chars: usize) -> String {
     let data = data.as_ref();

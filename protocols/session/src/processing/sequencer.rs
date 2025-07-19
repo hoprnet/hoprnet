@@ -11,7 +11,7 @@ use std::{
 use futures_time::future::Timer;
 use tracing::instrument;
 
-use crate::{prelude::errors::SessionError, session::frames::FrameId};
+use crate::{errors::SessionError, frames::FrameId};
 
 /// Sequencer is an adaptor for streams, that yield elements that have a natural ordering and
 /// can be compared with [`FrameId`] and puts them in the correct sequence starting with

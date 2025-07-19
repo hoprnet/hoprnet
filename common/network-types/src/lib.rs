@@ -1,8 +1,6 @@
 /// Contains all errors thrown from this crate.
 pub mod errors;
 
-pub mod session;
-
 /// Contains UDP socket-related helpers.
 #[cfg(feature = "runtime-tokio")]
 pub mod udp;
@@ -20,7 +18,7 @@ pub mod capture;
 pub mod prelude {
     pub use libp2p_identity::PeerId;
 
+    pub use crate::types::*;
     #[cfg(feature = "runtime-tokio")]
     pub use crate::udp::*;
-    pub use crate::{session::*, types::*};
 }

@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bitvec::{BitArr, field::BitField, prelude::Msb0};
 
-use crate::session::{
+use crate::{
     errors::SessionError,
     frames::{FrameId, SegmentId, SeqNum},
     protocol::SessionMessage,

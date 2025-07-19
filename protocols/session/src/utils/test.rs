@@ -8,6 +8,7 @@ use std::{
 };
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, StreamExt, channel::mpsc::UnboundedSender, stream::BoxStream};
+use hopr_network_types::utils::DuplexIO;
 use rand::{
     Rng, SeedableRng,
     distributions::{Bernoulli, Distribution},
@@ -16,33 +17,32 @@ use rand::{
 use rand_distr::Normal;
 use tracing::instrument;
 
-use crate::{session::frames::SeqIndicator, utils::DuplexIO};
+use crate::{
+    errors::SessionError,
+    frames::{Segment, SeqIndicator},
+};
 
 // Using static RNG seed to make tests reproducible between different runs
 // const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
 /// Helper function to segment `data` into segments of a given ` max_segment_size ` length.
 /// All segments are tagged with the same `frame_id`.
-pub fn segment<T: AsRef<[u8]>>(
-    data: T,
-    max_segment_size: usize,
-    frame_id: u32,
-) -> crate::session::errors::Result<Vec<crate::session::frames::Segment>> {
-    use crate::session::frames::SeqNum;
+pub fn segment<T: AsRef<[u8]>>(data: T, max_segment_size: usize, frame_id: u32) -> crate::errors::Result<Vec<Segment>> {
+    use crate::frames::SeqNum;
 
     if frame_id == 0 {
-        return Err(crate::session::errors::SessionError::InvalidFrameId);
+        return Err(SessionError::InvalidFrameId);
     }
 
     if max_segment_size == 0 {
-        return Err(crate::session::errors::SessionError::InvalidSegmentSize);
+        return Err(SessionError::InvalidSegmentSize);
     }
 
     let data = data.as_ref();
 
     let num_chunks = data.len().div_ceil(max_segment_size);
     if num_chunks > SeqNum::MAX as usize {
-        return Err(crate::session::errors::SessionError::DataTooLong);
+        return Err(SessionError::DataTooLong);
     }
 
     let chunks = data.chunks(max_segment_size);
@@ -50,7 +50,7 @@ pub fn segment<T: AsRef<[u8]>>(
     let seq_len = SeqIndicator::try_from(chunks.len() as SeqNum)?;
     Ok(chunks
         .enumerate()
-        .map(|(idx, data)| crate::session::frames::Segment {
+        .map(|(idx, data)| Segment {
             frame_id,
             seq_flags: seq_len,
             seq_idx: idx as u8,
@@ -318,7 +318,6 @@ mod tests {
     use futures::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
-    use crate::session::utils::test::{FaultyNetwork, FaultyNetworkConfig};
 
     async fn spawn_single_byte_read_write<C>(channel: C, data: Vec<u8>) -> anyhow::Result<(Vec<u8>, Vec<u8>)>
     where

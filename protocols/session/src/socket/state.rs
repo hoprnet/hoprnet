@@ -1,6 +1,6 @@
 use futures::channel::mpsc::UnboundedSender;
 
-use crate::session::{
+use crate::{
     errors::SessionError,
     frames::{FrameId, Segment, SegmentId, SeqIndicator},
     processing::types::FrameInspector,
@@ -122,11 +122,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        prelude::{
-            SessionSocketConfig,
-            utils::test::{FaultyNetworkConfig, setup_alice_bob},
-        },
-        session::SessionSocket,
+        SessionSocket, SessionSocketConfig,
+        utils::test::{FaultyNetworkConfig, setup_alice_bob},
     };
 
     const FRAME_SIZE: usize = 1500;
