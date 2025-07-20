@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::HashSet,
     convert::identity,
     pin::Pin,
     sync::{Arc, atomic::AtomicUsize},
@@ -14,7 +14,6 @@ use rand::{
     distributions::{Bernoulli, Distribution},
     prelude::StdRng,
 };
-use rand_distr::Normal;
 use tracing::instrument;
 
 use crate::{
@@ -74,40 +73,6 @@ pub struct NetworkStats {
     pub packets_received: Arc<AtomicUsize>,
     pub bytes_sent: Arc<AtomicUsize>,
     pub bytes_received: Arc<AtomicUsize>,
-}
-
-impl NetworkStats {
-    pub fn assert_packets_sent(&self, expected: usize) {
-        let actual = self.packets_sent.load(std::sync::atomic::Ordering::Relaxed);
-        assert_eq!(
-            actual, expected,
-            "packets sent must be equal to {expected}, but was {actual}",
-        );
-    }
-
-    pub fn assert_packets_received(&self, expected: usize) {
-        let actual = self.packets_received.load(std::sync::atomic::Ordering::Relaxed);
-        assert_eq!(
-            actual, expected,
-            "packets received must be equal to {expected}, but was {actual}",
-        )
-    }
-
-    pub fn assert_bytes_sent(&self, expected: usize) {
-        let actual = self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed);
-        assert_eq!(
-            actual, expected,
-            "bytes sent must be equal to {expected}, but was {actual}",
-        );
-    }
-
-    pub fn assert_bytes_received(&self, expected: usize) {
-        let actual = self.bytes_received.load(std::sync::atomic::Ordering::Relaxed);
-        assert_eq!(
-            actual, expected,
-            "bytes received must be equal to {expected}, but was {actual}",
-        );
-    }
 }
 
 impl Default for FaultyNetworkConfig {
@@ -253,29 +218,6 @@ impl<const C: usize> FaultyNetwork<'_, C> {
             ids_to_drop: cfg.ids_to_drop,
         }
     }
-}
-
-/// Sample an index between `0` and `len - 1` using the given distribution and RNG.
-pub fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len: usize) -> usize {
-    let f: f64 = dist.sample(rng);
-    (f.max(0.0).round() as usize).min(len - 1)
-}
-
-/// Shuffles the given `vec` by taking the next element with index `|N(0,factor^2)`|, where
-/// `N` denotes normal distribution.
-/// When used on frame segments vector, it will shuffle the segments in a controlled manner;
-/// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length in segments.
-pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
-    if factor == 0.0 || vec.is_empty() {
-        return vec.into(); // no mixing
-    }
-
-    let mut dist = Normal::new(0.0, factor).unwrap();
-    let mut ret = Vec::new();
-    while !vec.is_empty() {
-        ret.push(vec.remove(sample_index(&mut dist, rng, vec.len())).unwrap());
-    }
-    ret
 }
 
 type Duplex<'a, const MTU: usize> =

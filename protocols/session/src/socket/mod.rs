@@ -87,7 +87,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
 
-        // Pipeline: Data incoming from Upstream
+        // Pipeline IN: Data incoming from Upstream
         let upstream_frames_in = packets_out
             .with(|segment| future::ok(SessionMessage::<C>::Segment(segment)))
             .segmenter::<C>(cfg.frame_size);
@@ -98,7 +98,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let downstream_terminated = Arc::new(AtomicBool::new(false));
         let downstream_terminated_clone = downstream_terminated.clone();
 
-        // Pipeline: Packets incoming from Downstream
+        // Pipeline OUT: Packets incoming from Downstream
         let downstream_frames_out = packets_in
             // Continue receiving packets from downstream, unless we received a terminating frame
             .take_while(move |_| {
@@ -181,7 +181,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             ctl_tx,
         })?;
 
-        // Pipeline: Data incoming from Upstream
+        // Pipeline IN: Data incoming from Upstream
         let (segments_tx, segments_rx) = futures::channel::mpsc::channel(cfg.capacity);
         let mut st_1 = state.clone();
         let upstream_frames_in = segments_tx
@@ -221,7 +221,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let downstream_terminated = Arc::new(AtomicBool::new(false));
         let downstream_terminated_clone = downstream_terminated.clone();
 
-        // Pipeline: Packets incoming from Downstream
+        // Pipeline OUT: Packets incoming from Downstream
         let mut st_1 = state.clone();
         let mut st_2 = state.clone();
         let mut st_3 = state.clone();

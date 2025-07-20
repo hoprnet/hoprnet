@@ -58,5 +58,5 @@ tokio-util = { workspace = true }
 hopr-network-types = { workspace = true, features = ["capture"] }
 
 [[bench]]
-name = "reconstructor_bench"
+name = "socket_bench"
 harness = false
