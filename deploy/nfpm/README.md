@@ -10,7 +10,7 @@ Hoprd has a ready to use package for the following variants:
 
 - Go to [release page](https://github.com/hoprnet/hoprnet/releases)
 - Identify the architecture you need execute this command `uname -a`. Keep in mind that architecture `arm64` is equivalent to `aarch64`.
-- Identify the package manager: *.deb, *.rpm, *.pkg.tar.zst
+- Identify the package manager: deb, rpm, pkg.tar.zst
 - Export the required environment variables:
 
 ```bash
