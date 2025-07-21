@@ -41,6 +41,7 @@ jobs:
 
   build-dappnode:
     strategy:
+      fail-fast: false
       matrix:
         dappnode_repository:
           - DAppNodePackage-Hopr
@@ -58,6 +59,7 @@ jobs:
 
   build-binaries:
     strategy:
+      fail-fast: false
       matrix:
         binary:
           - hopli
@@ -85,6 +87,7 @@ jobs:
     name: ${{ matrix.target }}-${{ matrix.packager.package }}
     needs: build-binaries
     strategy:
+      fail-fast: false
       matrix:
         target:
           - x86_64-linux

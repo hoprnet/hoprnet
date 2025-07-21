@@ -27,6 +27,10 @@ concurrency:
   group: ${{ inputs.branch }}-package-${{ inputs.target }}-${{ inputs.packager }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   package:
     name: Package
