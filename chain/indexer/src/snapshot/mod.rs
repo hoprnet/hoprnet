@@ -19,8 +19,10 @@
 //!
 //! use hopr_chain_indexer::snapshot::SnapshotManager;
 //!
-//! async fn setup_snapshot() -> Result<(), Box<dyn std::error::Error>> {
-//!     let manager = SnapshotManager::new();
+//! async fn setup_snapshot(
+//!     db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+//! ) -> Result<(), Box<dyn std::error::Error>> {
+//!     let manager = SnapshotManager::with_db(db);
 //!     let snapshot_info = manager
 //!         .download_and_setup_snapshot("https://example.com/snapshot.tar.gz", Path::new("/data/hopr"))
 //!         .await?;
@@ -49,7 +51,7 @@ use tracing::{debug, error, info};
 
 use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator};
 
-/// Main snapshot management interface for coordinating snapshot operations.
+/// Main snapshot management interface for coordinating snapshot operations with database support.
 ///
 /// `SnapshotManager` provides a high-level API for downloading, extracting, and validating
 /// database snapshots. It coordinates the individual components (downloader, extractor, validator)
@@ -64,7 +66,7 @@ pub struct SnapshotManager<Db>
 where
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
-    db: Option<Db>,
+    db: Db,
     downloader: SnapshotDownloader,
     extractor: SnapshotExtractor,
     validator: SnapshotValidator,
@@ -74,20 +76,10 @@ impl<Db> SnapshotManager<Db>
 where
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
-    /// Creates a new snapshot manager instance
-    pub fn new() -> Self {
-        Self {
-            db: None,
-            downloader: SnapshotDownloader::new(),
-            extractor: SnapshotExtractor::new(),
-            validator: SnapshotValidator::new(),
-        }
-    }
-
-    /// Creates a new snapshot manager instance (with a DB)
+    /// Creates a new snapshot manager instance with a database
     pub fn with_db(db: Db) -> Self {
         Self {
-            db: Some(db),
+            db,
             downloader: SnapshotDownloader::new(),
             extractor: SnapshotExtractor::new(),
             validator: SnapshotValidator::new(),
@@ -126,17 +118,12 @@ where
         let db_path = temp_dir.join("hopr_logs.db");
         let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
 
-        // Update database (if db is provided) or install files to data directory
-        if let Some(db) = &self.db {
-            db.clone()
-                .replace_logs_db(&temp_dir, &extracted_files)
-                .await
-                .map_err(|e| SnapshotError::Installation(e.to_string()))?;
-        } else {
-            // If no database, install files directly to data directory
-            self.install_snapshot_files(&temp_dir, data_dir, &extracted_files)
-                .await?;
-        }
+        // Update database using replace_logs_db
+        self.db
+            .clone()
+            .replace_logs_db(&temp_dir, &extracted_files)
+            .await
+            .map_err(|e| SnapshotError::Installation(e.to_string()))?;
 
         // Clean up temporary directory
         if let Err(e) = fs::remove_dir_all(&temp_dir_for_cleanup) {
@@ -144,6 +131,77 @@ where
         }
 
         info!("Snapshot setup completed successfully");
+        Ok(snapshot_info)
+    }
+}
+
+/// Test-only snapshot manager without database dependencies.
+///
+/// This variant is used in tests where we don't need database integration
+/// and want to test individual components in isolation.
+#[cfg(test)]
+pub struct TestSnapshotManager {
+    downloader: SnapshotDownloader,
+    extractor: SnapshotExtractor,
+    validator: SnapshotValidator,
+}
+
+#[cfg(test)]
+impl TestSnapshotManager {
+    /// Creates a new test snapshot manager instance
+    pub fn new() -> Self {
+        Self {
+            downloader: SnapshotDownloader::new(),
+            extractor: SnapshotExtractor::new(),
+            validator: SnapshotValidator::new(),
+        }
+    }
+
+    /// Downloads and sets up a snapshot from the given URL (test version)
+    ///
+    /// This version doesn't integrate with a database and just extracts files
+    /// to the data directory for testing purposes.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - The URL to download the snapshot from
+    /// * `data_dir` - The directory to install the snapshot to
+    ///
+    /// # Returns
+    ///
+    /// Information about the installed snapshot on success
+    pub async fn download_and_setup_snapshot(&self, url: &str, data_dir: &Path) -> SnapshotResult<SnapshotInfo> {
+        info!("Starting test snapshot download and setup from: {}", url);
+
+        // Create temporary directory for download
+        let temp_dir = data_dir.join("snapshot_temp");
+        fs::create_dir_all(&temp_dir)?;
+
+        // We'll clean up the temp directory at the end
+        let temp_dir_for_cleanup = temp_dir.clone();
+
+        // Download snapshot
+        let archive_path = temp_dir.join("snapshot.tar.gz");
+        self.downloader.download_snapshot(url, &archive_path).await?;
+
+        // Extract snapshot
+        let extracted_files = self.extractor.extract_snapshot(&archive_path, &temp_dir).await?;
+        debug!("Extracted snapshot files: {:?}", extracted_files);
+
+        // Validate extracted database
+        let db_path = temp_dir.join("hopr_logs.db");
+        let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
+
+        // Install files directly to data directory (test mode)
+        self.install_snapshot_files(&temp_dir, data_dir, &extracted_files)
+            .await?;
+
+        // Clean up temporary directory
+        if let Err(e) = fs::remove_dir_all(&temp_dir_for_cleanup) {
+            error!("Failed to cleanup temp directory: {}", e);
+        }
+
+        info!("Test snapshot setup completed successfully");
         Ok(snapshot_info)
     }
 
@@ -166,5 +224,20 @@ where
         }
 
         Ok(())
+    }
+
+    /// Get access to the downloader for direct testing
+    pub fn downloader(&self) -> &SnapshotDownloader {
+        &self.downloader
+    }
+
+    /// Get access to the extractor for direct testing
+    pub fn extractor(&self) -> &SnapshotExtractor {
+        &self.extractor
+    }
+
+    /// Get access to the validator for direct testing
+    pub fn validator(&self) -> &SnapshotValidator {
+        &self.validator
     }
 }

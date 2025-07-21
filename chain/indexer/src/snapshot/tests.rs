@@ -7,7 +7,7 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::snapshot::{
-        SnapshotManager, download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator,
+        TestSnapshotManager, download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator,
     };
 
     /// Creates a test SQLite database for testing
@@ -152,24 +152,21 @@ mod tests {
         // Create test archive
         let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
-        // For this test, we'll simulate a file:// URL since we can't rely on external URLs
-        // This is a simplified test - in a real scenario you'd use a mock HTTP server
+        // Use TestSnapshotManager for testing
+        let manager = TestSnapshotManager::new();
         let data_dir = temp_dir.path().join("data");
         fs::create_dir_all(&data_dir).unwrap();
 
-        // Manually test the components
-        let extractor = SnapshotExtractor::new();
-        let validator = SnapshotValidator::new();
+        // Test file:// URL using TestSnapshotManager
+        let file_url = format!("file://{}", archive_path.display());
+        let result = manager.download_and_setup_snapshot(&file_url, &data_dir).await;
 
-        // Test extraction
-        let extract_dir = temp_dir.path().join("extracted");
-        let extracted_files = extractor.extract_snapshot(&archive_path, &extract_dir).await.unwrap();
-        assert!(extracted_files.contains(&"hopr_logs.db".to_string()));
-
-        // Test validation
-        let db_path = extract_dir.join("hopr_logs.db");
-        let info = validator.validate_snapshot(&db_path).await.unwrap();
+        assert!(result.is_ok(), "TestSnapshotManager should handle file:// URLs");
+        let info = result.unwrap();
         assert_eq!(info.log_count, 2);
+
+        // Verify the database file was installed
+        assert!(data_dir.join("hopr_logs.db").exists());
     }
 
     #[tokio::test]
@@ -244,37 +241,28 @@ mod tests {
         // Create a test archive
         let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
-        // Test file:// URL support directly through components
-        let downloader = SnapshotDownloader::new();
-        let extractor = SnapshotExtractor::new();
-        let validator = SnapshotValidator::new();
+        // Test file:// URL support using TestSnapshotManager
+        let manager = TestSnapshotManager::new();
 
         // Test with file:// URL for local testing
         let file_url = format!("file://{}", archive_path.display());
-        let downloaded_archive = data_dir.join("downloaded_snapshot.tar.gz");
 
-        // Test file:// URL download
-        let download_result = downloader.download_snapshot(&file_url, &downloaded_archive).await;
-        assert!(download_result.is_ok(), "file:// URL download should succeed");
-        assert!(downloaded_archive.exists(), "Downloaded archive should exist");
+        // Test the full workflow through TestSnapshotManager
+        let result = manager.download_and_setup_snapshot(&file_url, &data_dir).await;
+        assert!(result.is_ok(), "TestSnapshotManager should handle complete workflow");
 
-        // Test extraction
-        let extract_dir = data_dir.join("extracted");
-        let extracted_files = extractor
-            .extract_snapshot(&downloaded_archive, &extract_dir)
-            .await
-            .unwrap();
-
-        // Test validation
-        let db_path = extract_dir.join("hopr_logs.db");
-        let validation_result = validator.validate_snapshot(&db_path).await;
-        assert!(validation_result.is_ok(), "Validation should succeed");
-
-        // Move extracted files to final location (simulating installation)
-        fs::copy(&db_path, &data_dir.join("hopr_logs.db")).unwrap();
+        let info = result.unwrap();
+        assert_eq!(info.log_count, 2);
 
         // Verify the database file exists in the data directory
         assert!(data_dir.join("hopr_logs.db").exists());
+
+        // Also test individual component access
+        let downloader = manager.downloader();
+        let downloaded_archive = data_dir.join("test_download.tar.gz");
+        let download_result = downloader.download_snapshot(&file_url, &downloaded_archive).await;
+        assert!(download_result.is_ok(), "file:// URL download should succeed");
+        assert!(downloaded_archive.exists(), "Downloaded archive should exist");
     }
 
     #[tokio::test]
