@@ -59,6 +59,7 @@ permissions:
 
 jobs:
   binary:
+    name: Binary
     if: >-
       github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
     runs-on: ${{ github.event.inputs.runner || inputs.runner }}
