@@ -4,7 +4,7 @@ Hoprd has a ready to use package for the following variants:
 
 - Architecture supported: `x86_64` and `aarch64`
 - Supported operativa systems: `linux` and `darwin`
-- Supported linux distributions: `debian`, `readhat` and `archlinux`
+- Supported linux distributions: `debian`, `redhat` and `archlinux`
 
 ## Install via package manager
 
