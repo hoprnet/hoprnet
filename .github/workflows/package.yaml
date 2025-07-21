@@ -92,6 +92,8 @@ jobs:
           architecture=${architecture%-linux}
           echo "package_file_name=hoprd_${current_version}_${architecture}" | tee -a $GITHUB_OUTPUT
           ls -alh ./dist/bin
+          ./dist/bin/hoprd --help || { echo "Failed to run hoprd --help"; exit 1; }
+          ./dist/bin/hopli --help || { echo "Failed to run hopli --help"; exit 1; }
 
       - name: Install Nix
         uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
