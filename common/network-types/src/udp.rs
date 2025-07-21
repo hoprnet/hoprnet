@@ -35,7 +35,7 @@ lazy_static::lazy_static! {
 
 /// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
 /// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
-/// The instance is always constructed using a [`UdpStreamBuilder`].
+/// The instance must always be constructed using a [`UdpStreamBuilder`].
 ///
 /// To set a counterparty, one of the following must happen:
 /// 1) setting it during build via [`UdpStreamBuilder::with_counterparty`]
@@ -95,7 +95,7 @@ pub enum ForeignDataMode {
 pub enum UdpStreamParallelism {
     /// Bind as many sender or receiver sockets as given by [`std::thread::available_parallelism`].
     Auto,
-    /// Bind specific number of sender or receiver sockets.
+    /// Bind a specific number of sender or receiver sockets.
     Specific(NonZeroUsize),
 }
 

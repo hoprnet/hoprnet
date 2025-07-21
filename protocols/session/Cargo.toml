@@ -43,19 +43,26 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+clap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
-lazy_static = { workspace = true }
 mockall = { workspace = true }
 parameterized = { workspace = true }
 rand = { workspace = true }
-rand_distr = { workspace = true }
-rayon = { workspace = true }
 test-log = { workspace = true, features = ["trace"] }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "io-std", "net", "signal"] }
 tokio-util = { workspace = true }
 
-hopr-network-types = { workspace = true, features = ["capture"] }
+hopr-protocol-session = { workspace = true }
+hopr-network-types = { workspace = true, features = [
+  "capture",
+  "runtime-tokio",
+] }
+
+[[example]]
+name = "session-socket"
+path = "examples/session_socket.rs"
+required-features = ["runtime-tokio"]
 
 [[bench]]
 name = "socket_bench"

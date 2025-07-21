@@ -274,7 +274,7 @@ function hopr_session.dissector(buffer, pinfo, tree)
     if length < 1 then return end
 
     pinfo.cols.protocol = "HOPR Session"
-    pinfo.cols.info:append("Session")
+    pinfo.cols.info = "Session"
     return dissect_hopr_session(buffer, pinfo, tree)
 end
 
@@ -712,3 +712,6 @@ end
 local ethertype_table = DissectorTable.get("ethertype")
 ethertype_table:add(0x1234, hopr_proto)
 ethertype_table:add(0x1235, hopr_session)
+
+local udp_table = DissectorTable.get("udp.port")
+udp_table:add(10000, hopr_session)

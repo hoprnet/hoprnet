@@ -332,6 +332,41 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncWrit
     }
 }
 
+#[cfg(feature = "runtime-tokio")]
+impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncRead for SessionSocket<C, S> {
+    #[instrument(name = "SessionSocket::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id()))]
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let slice = buf.initialize_unfilled();
+        let n = futures::ready!(self.project().downstream_frames_out.as_mut().poll_read(cx, slice))?;
+        buf.advance(n);
+        Poll::Ready(Ok(()))
+    }
+}
+
+#[cfg(feature = "runtime-tokio")]
+impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncWrite for SessionSocket<C, S> {
+    #[instrument(name = "SessionSocket::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
+        self.project().upstream_frames_in.as_mut().poll_write(cx, buf)
+    }
+
+    #[instrument(name = "SessionSocket::poll_flush", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        self.project().upstream_frames_in.as_mut().poll_flush(cx)
+    }
+
+    #[instrument(name = "SessionSocket::poll_shutdown", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        let this = self.project();
+        let _ = this.state.stop();
+        this.upstream_frames_in.as_mut().poll_close(cx)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
