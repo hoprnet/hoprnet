@@ -25,10 +25,7 @@
 //!         .download_and_setup_snapshot("https://example.com/snapshot.tar.gz", Path::new("/data/hopr"))
 //!         .await?;
 //!
-//!     println!(
-//!         "Snapshot installed: {} logs, {} blocks",
-//!         snapshot_info.log_count, snapshot_info.block_count
-//!     );
+//!     println!("Snapshot installed: {} logs", snapshot_info.log_count);
 //!     Ok(())
 //! }
 //! ```
@@ -129,12 +126,16 @@ where
         let db_path = temp_dir.join("hopr_logs.db");
         let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
 
-        // Update database (if db is provided)
+        // Update database (if db is provided) or install files to data directory
         if let Some(db) = &self.db {
             db.clone()
                 .replace_logs_db(&temp_dir, &extracted_files)
                 .await
                 .map_err(|e| SnapshotError::Installation(e.to_string()))?;
+        } else {
+            // If no database, install files directly to data directory
+            self.install_snapshot_files(&temp_dir, data_dir, &extracted_files)
+                .await?;
         }
 
         // Clean up temporary directory
@@ -144,5 +145,26 @@ where
 
         info!("Snapshot setup completed successfully");
         Ok(snapshot_info)
+    }
+
+    /// Installs snapshot files from temporary directory to final location
+    async fn install_snapshot_files(&self, temp_dir: &Path, data_dir: &Path, files: &[String]) -> SnapshotResult<()> {
+        fs::create_dir_all(data_dir)?;
+
+        for file in files {
+            let src = temp_dir.join(file);
+            let dst = data_dir.join(file);
+
+            // Remove existing file if it exists
+            if dst.exists() {
+                fs::remove_file(&dst)?;
+            }
+
+            // Copy file to final location
+            fs::copy(&src, &dst)?;
+            debug!("Installed snapshot file: {} -> {}", file, dst.display());
+        }
+
+        Ok(())
     }
 }

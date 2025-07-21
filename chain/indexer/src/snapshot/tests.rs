@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::fs;
-    use std::fs::File;
+    use std::{fs, fs::File};
 
     use flate2::{Compression, write::GzEncoder};
     use tar::Builder;
@@ -245,14 +244,36 @@ mod tests {
         // Create a test archive
         let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
-        let manager = SnapshotManager::new();
+        // Test file:// URL support directly through components
+        let downloader = SnapshotDownloader::new();
+        let extractor = SnapshotExtractor::new();
+        let validator = SnapshotValidator::new();
 
         // Test with file:// URL for local testing
         let file_url = format!("file://{}", archive_path.display());
-        let _ = manager.download_and_setup_snapshot(&file_url, &data_dir).await;
+        let downloaded_archive = data_dir.join("downloaded_snapshot.tar.gz");
 
-        // The result may fail due to HTTP client not supporting file:// URLs
-        // but we can verify the data directory structure is correct
+        // Test file:// URL download
+        let download_result = downloader.download_snapshot(&file_url, &downloaded_archive).await;
+        assert!(download_result.is_ok(), "file:// URL download should succeed");
+        assert!(downloaded_archive.exists(), "Downloaded archive should exist");
+
+        // Test extraction
+        let extract_dir = data_dir.join("extracted");
+        let extracted_files = extractor
+            .extract_snapshot(&downloaded_archive, &extract_dir)
+            .await
+            .unwrap();
+
+        // Test validation
+        let db_path = extract_dir.join("hopr_logs.db");
+        let validation_result = validator.validate_snapshot(&db_path).await;
+        assert!(validation_result.is_ok(), "Validation should succeed");
+
+        // Move extracted files to final location (simulating installation)
+        fs::copy(&db_path, &data_dir.join("hopr_logs.db")).unwrap();
+
+        // Verify the database file exists in the data directory
         assert!(data_dir.join("hopr_logs.db").exists());
     }
 

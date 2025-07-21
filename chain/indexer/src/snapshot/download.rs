@@ -41,10 +41,11 @@ impl Default for DownloadConfig {
     }
 }
 
-/// Handles downloading snapshots from HTTP/HTTPS URLs with retry logic.
+/// Handles downloading snapshots from HTTP/HTTPS URLs and local file:// URLs with retry logic.
 ///
 /// `SnapshotDownloader` provides a robust download mechanism with:
-/// - Automatic retry with exponential backoff
+/// - Support for HTTP/HTTPS and local file:// URLs
+/// - Automatic retry with exponential backoff (HTTP/HTTPS only)
 /// - Progress tracking for large downloads
 /// - Disk space validation before download
 /// - Configurable size limits and timeouts
@@ -94,14 +95,15 @@ impl SnapshotDownloader {
 
     /// Downloads a snapshot with configurable retry logic.
     ///
-    /// Implements exponential backoff between retry attempts. Certain errors
+    /// Implements exponential backoff between retry attempts for HTTP/HTTPS URLs.
+    /// Local file:// URLs are handled without retry logic. Certain errors
     /// (like 4xx HTTP status codes or insufficient disk space) will not be retried.
     ///
     /// # Arguments
     ///
-    /// * `url` - The HTTP/HTTPS URL to download from
+    /// * `url` - The HTTP/HTTPS or file:// URL to download/copy from
     /// * `target_path` - Local path where the downloaded file will be saved
-    /// * `max_retries` - Maximum number of retry attempts
+    /// * `max_retries` - Maximum number of retry attempts (ignored for file:// URLs)
     ///
     /// # Errors
     ///
@@ -153,6 +155,11 @@ impl SnapshotDownloader {
 
         // Check available disk space
         self.check_disk_space(target_path.parent().unwrap()).await?;
+
+        // Handle file:// URLs for local file access
+        if url.starts_with("file://") {
+            return self.copy_local_file(url, target_path).await;
+        }
 
         // Send GET request
         let response = self.client.get(url).send().await?;
@@ -214,6 +221,47 @@ impl SnapshotDownloader {
 
         file.flush().await?;
         info!("Snapshot downloaded {} bytes to {:?}", downloaded, target_path);
+
+        Ok(())
+    }
+
+    /// Copies a local file from a file:// URL to the target path
+    async fn copy_local_file(&self, url: &str, target_path: &Path) -> SnapshotResult<()> {
+        // Parse the file path from the URL
+        let file_path = url
+            .strip_prefix("file://")
+            .ok_or_else(|| SnapshotError::InvalidData("Invalid file:// URL format".to_string()))?;
+
+        let source_path = Path::new(file_path);
+
+        // Check if source file exists
+        if !source_path.exists() {
+            return Err(SnapshotError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("Local file not found: {}", file_path),
+            )));
+        }
+
+        // Check file size
+        let metadata = fs::metadata(source_path)?;
+        if metadata.len() > self.config.max_size {
+            return Err(SnapshotError::TooLarge {
+                size: metadata.len(),
+                max_size: self.config.max_size,
+            });
+        }
+
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        // Copy the file
+        let copied_bytes = tokio::fs::copy(source_path, target_path).await?;
+        info!(
+            "Copied local snapshot file {} bytes from {:?} to {:?}",
+            copied_bytes, source_path, target_path
+        );
 
         Ok(())
     }
