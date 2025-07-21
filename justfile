@@ -26,6 +26,7 @@ run-smoke-test TEST:
 package packager arch:
     #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
+    set -x
     RELEASE_VERSION=$(./scripts/get-current-version.sh)
     case "{{arch}}" in
         x86_64-linux)
