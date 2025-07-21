@@ -1,7 +1,7 @@
 use std::{
+    fs,
     path::{Path, PathBuf},
     sync::Arc,
-    fs,
     time::Duration,
 };
 
@@ -24,8 +24,7 @@ use sqlx::{
 use tracing::{debug, log::LevelFilter};
 
 use crate::{
-    errors::DbSqlError,
-    HoprDbAllOperations, accounts::model_to_account_entry, cache::HoprDbCaches, errors::Result,
+    HoprDbAllOperations, accounts::model_to_account_entry, cache::HoprDbCaches, errors::DbSqlError, errors::Result,
     ticket_manager::TicketManager,
 };
 
@@ -51,7 +50,8 @@ pub struct HoprDb {
     pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
     pub(crate) caches: Arc<HoprDbCaches>,
-    pub(crate) directory: &Path,
+    pub(crate) directory: PathBuf,
+    pub(crate) cfg: HoprDbConfig,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -68,43 +68,29 @@ impl HoprDb {
             lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
         }
 
-        fs::create_dir_all(directory).map_err(|_e| {
-            DbSqlError::Construction(format!("cannot create main database directory {directory:?}"))
-        })?;
+        fs::create_dir_all(directory)
+            .map_err(|_e| DbSqlError::Construction(format!("cannot create main database directory {directory:?}")))?;
 
-        // Default SQLite config values for all 3 DBs.
-        // Each DB can customize with its own specific values
-        let cfg_template = SqliteConnectOptions::default()
-            .create_if_missing(cfg.create_if_missing)
-            .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
-            .log_statements(LevelFilter::Debug)
-            .journal_mode(SqliteJournalMode::Wal)
-            .synchronous(SqliteSynchronous::Normal)
-            .auto_vacuum(SqliteAutoVacuum::Full)
-            //.optimize_on_close(true, None) // Removed, because it causes optimization on each connection, due to min_connections being set to 0
-            .page_size(4096)
-            .pragma("cache_size", "-30000") // 32M
-            .pragma("busy_timeout", "1000"); // 1000ms
+        let index = Self::create_pool(cfg, PoolOptions::new(), Some(0), Some(30), SQL_DB_INDEX_FILE_NAME);
 
-        let index = create_pool(cfg_template, Some(0), Some(30), SQL_DB_INDEX_FILE_NAME)
-
-        let peers_options = cfg_template.clone()
+        let peers_options = PoolOptions::new()
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
             .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
             .max_lifetime(Some(Duration::from_secs(30 * 60))); // This is the default
-        let peers= create_pool(peers_options, Some(0), Some(300), SQL_DB_PEERS_FILE_NAME)
+        let peers = Self::create_pool(cfg, peers_options, Some(0), Some(300), SQL_DB_PEERS_FILE_NAME);
 
-        let tickets = create_pool(cfg_template, Some(0), Some(50), SQL_DB_TICKETS_FILE_NAME)
+        let tickets = Self::create_pool(cfg, PoolOptions::new(), Some(0), Some(50), SQL_DB_TICKETS_FILE_NAME);
 
-        let logs = create_pool(cfg_template, Some(0), None, SQL_DB_LOGS_FILE_NAME)
+        let logs = Self::create_pool(cfg, PoolOptions::new(), Some(0), None, SQL_DB_LOGS_FILE_NAME);
 
-        Self::new_sqlx_sqlite(chain_key, directory, index, peers, tickets, logs).await
+        Self::new_sqlx_sqlite(cfg, chain_key, directory.to_path_buf(), index, peers, tickets, logs).await
     }
 
     pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self> {
         Self::new_sqlx_sqlite(
+            HoprDbConfig::default(),
             chain_key,
-            "",
+            Path::new("/tmp").to_path_buf(),
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| DbSqlError::Construction(e.to_string()))?,
@@ -122,8 +108,9 @@ impl HoprDb {
     }
 
     async fn new_sqlx_sqlite(
+        cfg: HoprDbConfig,
         chain_key: ChainKeypair,
-        directory: &Path,
+        directory: PathBuf,
         index_db: SqlitePool,
         peers_db: SqlitePool,
         tickets_db: SqlitePool,
@@ -213,7 +200,8 @@ impl HoprDb {
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
             tickets_db,
             caches,
-            directory
+            directory,
+            cfg,
         })
     }
 
@@ -245,17 +233,16 @@ impl HoprDb {
 
             // Remove existing file if it exists
             if dst.exists() {
-                fs::remove_file(&dst)?;
+                fs::remove_file(&dst).map_err(|e| DbSqlError::Construction(e.to_string()))?;
             }
 
             // Move file from temp to final location
-            fs::rename(&src, &dst)?;
+            fs::rename(&src, &dst).map_err(|e| DbSqlError::Construction(e.to_string()))?;
             debug!("Installed snapshot file: {} -> {}", file, dst.display());
         }
 
-
         // Open new logs database connection and apply migrations (snapshot could be outdated)
-        let logs_db_pool = create_pool(cfg_template, Some(0), None, SQL_DB_LOGS_FILE_NAME);
+        let logs_db_pool = Self::create_pool(self.cfg, PoolOptions::new(), Some(0), None, SQL_DB_LOGS_FILE_NAME);
         self.logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db_pool);
 
         MigratorChainLogs::up(self.logs_db, None)
@@ -263,12 +250,28 @@ impl HoprDb {
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
     }
 
+    /// Default SQLite config values for all DBs.
+    fn common_connection_cfg(cfg: HoprDbConfig) -> SqliteConnectOptions {
+        SqliteConnectOptions::default()
+            .create_if_missing(cfg.create_if_missing)
+            .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
+            .log_statements(LevelFilter::Debug)
+            .journal_mode(SqliteJournalMode::Wal)
+            .synchronous(SqliteSynchronous::Normal)
+            .auto_vacuum(SqliteAutoVacuum::Full)
+            //.optimize_on_close(true, None) // Removed, because it causes optimization on each connection, due to min_connections being set to 0
+            .page_size(4096)
+            .pragma("cache_size", "-30000") // 32M
+            .pragma("busy_timeout", "1000") // 1000ms
+    }
+
     async fn create_pool(
-        cfg: SqliteConnectOptions,
+        cfg: HoprDbConfig,
+        options: PoolOptions<SqlitePool>,
         min_conn: Option<u64>,
         max_conn: Option<u64>,
         path: &str,
-    ) -> Result<Pool<Sqlite>> {
+    ) -> Result<SqlitePool> {
         let options = if let Some(min_conn) = min_conn {
             options.min_connections(min_conn)
         } else {
@@ -280,10 +283,11 @@ impl HoprDb {
             options
         };
 
+        let cfg = Self::common_connection_cfg(cfg);
         options
             .connect_with(cfg.filename(self.directory.join(path)))
             .await
-            .unwrap_or_else(|e| panic!("failed to create {path} database: {e}"));
+            .unwrap_or_else(|e| panic!("failed to create {path} database: {e}"))
     }
 }
 
