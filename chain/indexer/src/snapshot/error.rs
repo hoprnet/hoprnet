@@ -87,6 +87,9 @@ pub enum SnapshotError {
          values."
     )]
     Timeout(String),
+
+    #[error("Installation error: {0}.")]
+    Installation(String),
 }
 
 /// Specialized `Result` type for snapshot operations.

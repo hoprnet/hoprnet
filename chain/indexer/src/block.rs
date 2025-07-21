@@ -774,7 +774,7 @@ where
             return Err(CoreEthereumIndexerError::SnapshotError(e.to_string()));
         }
 
-        let snapshot_manager = SnapshotManager::new(self.db.clone());
+        let snapshot_manager = SnapshotManager::with_db(self.db.clone());
         let data_dir = Path::new(&self.cfg.data_directory);
 
         snapshot_manager

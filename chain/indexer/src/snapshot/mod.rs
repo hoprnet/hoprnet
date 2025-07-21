@@ -47,6 +47,7 @@ mod tests;
 
 use std::{fs, path::Path};
 
+use hopr_db_sql::HoprDbGeneralModelOperations;
 use tracing::{debug, error, info};
 
 use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator};
@@ -62,18 +63,34 @@ use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, 
 /// - **Downloader**: Handles HTTP/HTTPS downloads with retry logic and progress tracking
 /// - **Extractor**: Safely extracts tar.gz archives with security validations
 /// - **Validator**: Verifies SQLite database integrity and content consistency
-pub struct SnapshotManager {
-    db: HoprDb,
+pub struct SnapshotManager<Db>
+where
+    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+{
+    db: Option<Db>,
     downloader: SnapshotDownloader,
     extractor: SnapshotExtractor,
     validator: SnapshotValidator,
 }
 
-impl SnapshotManager {
+impl<Db> SnapshotManager<Db>
+where
+    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+{
     /// Creates a new snapshot manager instance
-    pub fn new(db: HoprDb) -> Self {
+    pub fn new() -> Self {
         Self {
-            db: HoprDb,
+            db: None,
+            downloader: SnapshotDownloader::new(),
+            extractor: SnapshotExtractor::new(),
+            validator: SnapshotValidator::new(),
+        }
+    }
+
+    /// Creates a new snapshot manager instance (with a DB)
+    pub fn with_db(db: Db) -> Self {
+        Self {
+            db: Some(db),
             downloader: SnapshotDownloader::new(),
             extractor: SnapshotExtractor::new(),
             validator: SnapshotValidator::new(),
@@ -112,8 +129,13 @@ impl SnapshotManager {
         let db_path = temp_dir.join("hopr_logs.db");
         let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
 
-        // Update database
-        self.db.replace_logs_db(&temp_dir, &extracted_files).await?;
+        // Update database (if db is provided)
+        if let Some(db) = &self.db {
+            db.clone()
+                .replace_logs_db(&temp_dir, &extracted_files)
+                .await
+                .map_err(|e| SnapshotError::Installation(e.to_string()))?;
+        }
 
         // Clean up temporary directory
         if let Err(e) = fs::remove_dir_all(&temp_dir_for_cleanup) {
@@ -122,30 +144,5 @@ impl SnapshotManager {
 
         info!("Snapshot setup completed successfully");
         Ok(snapshot_info)
-    }
-
-    /// Installs snapshot files from temporary directory to final location
-    async fn install_snapshot_files(&self, temp_dir: &Path, data_dir: &Path, files: &[String]) -> SnapshotResult<()> {
-        for file in files {
-            let src = temp_dir.join(file);
-            let dst = data_dir.join(file);
-
-            // Remove existing file if it exists
-            if dst.exists() {
-                fs::remove_file(&dst)?;
-            }
-
-            // Move file from temp to final location
-            fs::rename(&src, &dst)?;
-            debug!("Installed snapshot file: {} -> {}", file, dst.display());
-        }
-
-        Ok(())
-    }
-}
-
-impl Default for SnapshotManager {
-    fn default() -> Self {
-        Self::new(HoprDb::default())
     }
 }

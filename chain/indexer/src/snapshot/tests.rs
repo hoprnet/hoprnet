@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::fs::File;
 
     use flate2::{Compression, write::GzEncoder};
@@ -76,7 +77,7 @@ mod tests {
         tar.into_inner()?.finish()?;
 
         // Clean up the temporary database file to avoid test interference
-        std::fs::remove_file(&db_path)?;
+        fs::remove_file(&db_path)?;
 
         Ok(archive_path)
     }
@@ -137,7 +138,7 @@ mod tests {
 
         // Create invalid archive (just a text file)
         let archive_path = temp_dir.path().join("invalid.tar.gz");
-        std::fs::write(&archive_path, "not a valid archive").unwrap();
+        fs::write(&archive_path, "not a valid archive").unwrap();
 
         let extract_dir = temp_dir.path().join("extracted");
         let result = extractor.extract_snapshot(&archive_path, &extract_dir).await;
@@ -148,7 +149,6 @@ mod tests {
     #[tokio::test]
     async fn test_snapshot_manager_integration() {
         let temp_dir = TempDir::new().unwrap();
-        let _manager = SnapshotManager::new();
 
         // Create test archive
         let archive_path = create_test_archive(&temp_dir).await.unwrap();
@@ -156,7 +156,7 @@ mod tests {
         // For this test, we'll simulate a file:// URL since we can't rely on external URLs
         // This is a simplified test - in a real scenario you'd use a mock HTTP server
         let data_dir = temp_dir.path().join("data");
-        std::fs::create_dir_all(&data_dir).unwrap();
+        fs::create_dir_all(&data_dir).unwrap();
 
         // Manually test the components
         let extractor = SnapshotExtractor::new();
@@ -240,7 +240,7 @@ mod tests {
     async fn test_snapshot_manager_with_data_directory() {
         let temp_dir = TempDir::new().unwrap();
         let data_dir = temp_dir.path().join("hopr_data");
-        std::fs::create_dir_all(&data_dir).unwrap();
+        fs::create_dir_all(&data_dir).unwrap();
 
         // Create a test archive
         let archive_path = create_test_archive(&temp_dir).await.unwrap();
@@ -253,7 +253,7 @@ mod tests {
 
         // The result may fail due to HTTP client not supporting file:// URLs
         // but we can verify the data directory structure is correct
-        assert!(data_dir.exists());
+        assert!(data_dir.join("hopr_logs.db").exists());
     }
 
     #[tokio::test]

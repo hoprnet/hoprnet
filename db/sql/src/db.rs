@@ -14,7 +14,7 @@ use hopr_db_entity::{
 use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
 use sqlx::{
     ConnectOptions, SqlitePool,
@@ -24,7 +24,10 @@ use sqlx::{
 use tracing::{debug, log::LevelFilter};
 
 use crate::{
-    HoprDbAllOperations, accounts::model_to_account_entry, cache::HoprDbCaches, errors::DbSqlError, errors::Result,
+    HoprDbAllOperations,
+    accounts::model_to_account_entry,
+    cache::HoprDbCaches,
+    errors::{DbSqlError, Result},
     ticket_manager::TicketManager,
 };
 
@@ -250,47 +253,6 @@ impl HoprDb {
         }
     }
 
-    pub async fn replace_logs_db(mut self, src_dir: &Path, files: &[String]) -> Result<()> {
-        // First close the existing database connection
-        let _ = self
-            .logs_db
-            .clone()
-            .close()
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("failed to close logs database: {e}")))?;
-
-        // Copy over the new database files
-        for file in files {
-            let src = src_dir.join(file);
-            let dst = self.directory.join(file);
-
-            // Remove existing file if it exists
-            if dst.exists() {
-                fs::remove_file(&dst).map_err(|e| DbSqlError::Construction(e.to_string()))?;
-            }
-
-            // Move file from temp to final location
-            fs::rename(&src, &dst).map_err(|e| DbSqlError::Construction(e.to_string()))?;
-            debug!("Installed snapshot file: {} -> {}", file, dst.display());
-        }
-
-        // Open new logs database connection and apply migrations (snapshot could be outdated)
-        let logs_db_pool = Self::create_pool(
-            self.cfg.clone(),
-            self.directory.clone(),
-            PoolOptions::new(),
-            Some(0),
-            None,
-            SQL_DB_LOGS_FILE_NAME,
-        )
-        .await;
-        self.logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db_pool);
-
-        MigratorChainLogs::up(&self.logs_db, None)
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))
-    }
-
     /// Default SQLite config values for all DBs.
     fn common_connection_cfg(cfg: HoprDbConfig) -> SqliteConnectOptions {
         SqliteConnectOptions::default()
@@ -306,7 +268,7 @@ impl HoprDb {
             .pragma("busy_timeout", "1000") // 1000ms
     }
 
-    async fn create_pool(
+    pub async fn create_pool(
         cfg: HoprDbConfig,
         directory: PathBuf,
         mut options: PoolOptions<sqlx::Sqlite>,
