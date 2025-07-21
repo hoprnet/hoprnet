@@ -18,6 +18,12 @@ class Addresses(JsonResponse):
 
 
 @APIobject
+class ApiVersion(JsonResponse):
+    version: str = APIfield()
+    path: str = APIfield()
+
+
+@APIobject
 class Balances(JsonResponse):
     hopr: Balance = APIfield()
     native: Balance = APIfield()

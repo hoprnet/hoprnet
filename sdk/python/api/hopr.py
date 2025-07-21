@@ -24,6 +24,7 @@ from .request_objects import (
 )
 from .response_objects import (
     Addresses,
+    ApiVersion,
     Balances,
     Channel,
     Channels,
@@ -94,6 +95,13 @@ class HoprdAPI(ApiLib):
     """
     HOPRd API helper to handle exceptions and logging.
     """
+
+    async def api_version(self) -> Optional[ApiVersion]:
+        """
+        Returns the API version of the HOPRd node.
+        :return: version: str | undefined
+        """
+        return await self.try_req(Method.GET, "/api_version", ApiVersion, use_api_prefix=False)
 
     async def balances(self) -> Optional[Balances]:
         """
