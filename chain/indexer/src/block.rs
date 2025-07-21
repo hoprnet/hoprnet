@@ -728,21 +728,46 @@ where
         }
     }
 
-    /// Checks if the logs database has any data
+    /// Checks if the logs database has any existing data.
+    ///
+    /// This method determines whether the database already contains logs, which helps
+    /// decide whether to download a snapshot for faster synchronization. It queries
+    /// the database for the total log count and returns an error if the query fails
+    /// (e.g., when the database doesn't exist yet).
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(true)` if the database contains one or more logs
+    /// - `Ok(false)` if the database is empty
+    /// - `Err(e)` if the database cannot be queried
     async fn has_logs_data(&self) -> Result<bool> {
-        // Get the total count of logs in the database
-        match self.db.get_logs_count(None, None).await {
-            Ok(count) => Ok(count > 0),
-            Err(e) => {
-                // If we can't query the database, assume it has no data
-                // This handles cases where the logs database doesn't exist yet
-                trace!("Failed to query logs count, assuming no data: {}", e);
-                Ok(false)
-            }
-        }
+        self.db
+            .get_logs_count(None, None)
+            .await
+            .map(|count| count > 0)
+            .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))
     }
 
-    /// Downloads a snapshot for faster initial sync
+    /// Downloads and installs a database snapshot for faster initial synchronization.
+    ///
+    /// This method coordinates the snapshot download process by:
+    /// 1. Validating the indexer configuration
+    /// 2. Creating a snapshot manager instance
+    /// 3. Downloading and extracting the snapshot to the data directory
+    ///
+    /// Snapshots allow new nodes to quickly synchronize with the network by downloading
+    /// pre-built database files instead of fetching all historical logs from scratch.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(SnapshotInfo)` containing details about the downloaded snapshot
+    /// - `Err(CoreEthereumIndexerError::SnapshotError)` if validation or download fails
+    ///
+    /// # Prerequisites
+    ///
+    /// - Configuration must be valid (proper URL format, data directory set)
+    /// - Sufficient disk space must be available
+    /// - Network connectivity to the snapshot URL
     pub async fn download_snapshot(&self) -> Result<SnapshotInfo> {
         // Validate config before proceeding
         if let Err(e) = self.cfg.validate() {

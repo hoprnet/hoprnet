@@ -75,7 +75,34 @@ impl IndexerConfig {
         }
     }
 
-    /// Validates the configuration and returns any validation errors
+    /// Validates the configuration and returns any validation errors.
+    ///
+    /// Performs comprehensive validation of configuration parameters including:
+    /// - URL format and protocol validation (HTTP/HTTPS only)
+    /// - File extension validation (.tar.gz required)
+    /// - Data directory path validation
+    /// - Dependency validation (data directory required when snapshots enabled)
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` if all validation passes
+    /// - `Err(String)` with a descriptive error message if validation fails
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use hopr_chain_indexer::IndexerConfig;
+    ///
+    /// let config = IndexerConfig::new(
+    ///     100,
+    ///     true,
+    ///     true,
+    ///     "https://example.com/snapshot.tar.gz".to_string(),
+    ///     "/tmp/hopr_data".to_string(),
+    /// );
+    ///
+    /// assert!(config.validate().is_ok());
+    /// ```
     pub fn validate(&self) -> Result<(), String> {
         // Validate URL format if snapshot is enabled
         if self.logs_snapshot_enabled {
@@ -110,7 +137,25 @@ impl IndexerConfig {
         Ok(())
     }
 
-    /// Returns true if the configuration is valid
+    /// Convenience method to check if the configuration is valid.
+    ///
+    /// This is a simple wrapper around `validate()` that returns a boolean
+    /// instead of a `Result`, making it easier to use in conditional expressions.
+    ///
+    /// # Returns
+    ///
+    /// `true` if all validation passes, `false` otherwise
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use hopr_chain_indexer::IndexerConfig;
+    ///
+    /// let config = IndexerConfig::default();
+    /// if !config.is_valid() {
+    ///     // Handle invalid configuration
+    /// }
+    /// ```
     pub fn is_valid(&self) -> bool {
         self.validate().is_ok()
     }

@@ -1,8 +1,12 @@
-use std::{fs::File, path::Path};
+use std::{
+    fs,
+    fs::File,
+    path::{Component::ParentDir, Path},
+};
 
 use flate2::read::GzDecoder;
 use tar::Archive;
-use tracing::{info, warn};
+use tracing::{debug, error, info};
 
 use crate::snapshot::error::{SnapshotError, SnapshotResult};
 
@@ -38,22 +42,20 @@ impl SnapshotExtractor {
         info!("Extracting snapshot from {:?} to {:?}", archive_path, target_dir);
 
         // Create target directory if it doesn't exist
-        tokio::fs::create_dir_all(target_dir).await?;
+        fs::create_dir_all(target_dir)?;
 
         // Extract in blocking task to avoid blocking async runtime
         let archive_path = archive_path.to_path_buf();
         let target_dir = target_dir.to_path_buf();
         let expected_files = self.expected_files.clone();
 
-        let extracted_files =
-            tokio::task::spawn_blocking(move || Self::extract_tar_gz(&archive_path, &target_dir, &expected_files))
-                .await??;
+        let extracted_files = Self::extract_tar_gz(&archive_path, &target_dir, &expected_files)?;
 
-        info!("Extracted {} files", extracted_files.len());
+        info!("Extracted {} snapshot files", extracted_files.len());
         Ok(extracted_files)
     }
 
-    /// Extracts a tar.gz archive (blocking operation)
+    /// Extracts a tar.gz archive
     fn extract_tar_gz(
         archive_path: &Path,
         target_dir: &Path,
@@ -70,7 +72,7 @@ impl SnapshotExtractor {
             let path_buf = entry.path()?.to_path_buf();
 
             // Security check: prevent directory traversal
-            if path_buf.components().any(|c| c == std::path::Component::ParentDir) {
+            if path_buf.components().any(|c| c == ParentDir) {
                 return Err(SnapshotError::InvalidFormat(
                     "Archive contains parent directory references".to_string(),
                 ));
@@ -90,9 +92,9 @@ impl SnapshotExtractor {
                 entry.unpack(&target_path)?;
                 extracted_files.push(filename.to_string());
 
-                info!("Extracted: {}", filename);
+                debug!("Extracted: {}", filename);
             } else {
-                warn!("Skipping unexpected file in archive: {}", filename);
+                error!("Skipping unexpected file in archive: {}", filename);
             }
         }
 
@@ -110,7 +112,7 @@ impl SnapshotExtractor {
     pub async fn validate_archive(&self, archive_path: &Path) -> SnapshotResult<Vec<String>> {
         let archive_path = archive_path.to_path_buf();
 
-        tokio::task::spawn_blocking(move || Self::list_archive_contents(&archive_path)).await?
+        Self::list_archive_contents(&archive_path)
     }
 
     /// Lists the contents of a tar.gz archive

@@ -1,31 +1,69 @@
-use std::{path::Path, time::Duration};
+//! Snapshot download functionality with retry logic and disk space management.
+//!
+//! This module provides secure download capabilities for snapshot archives with:
+//! - Configurable retry logic with exponential backoff
+//! - Progress tracking and reporting
+//! - Disk space validation before download
+//! - File size limits and timeout protection
+//! - Cross-platform disk space checking using sysinfo
+
+use std::{fs, path::Path, time::Duration};
 
 use futures_util::StreamExt;
+use hopr_async_runtime::prelude::sleep;
 use reqwest::Client;
 use tokio::{fs::File, io::AsyncWriteExt};
 use tracing::{debug, info, warn};
 
 use crate::snapshot::error::{SnapshotError, SnapshotResult};
 
-/// Configuration for snapshot downloads
+/// Configuration for snapshot downloads with safety limits.
+///
+/// Controls download behavior including size limits, timeouts, and retry attempts
+/// to ensure safe and reliable snapshot downloads.
 #[derive(Debug, Clone)]
 pub struct DownloadConfig {
+    /// Maximum allowed file size in bytes (default: 2GB)
     pub max_size: u64,
+    /// HTTP request timeout duration (default: 30 minutes)
     pub timeout: Duration,
+    /// Maximum number of retry attempts for failed downloads (default: 3)
     pub max_retries: u32,
 }
 
 impl Default for DownloadConfig {
     fn default() -> Self {
         Self {
-            max_size: 10 * 1024 * 1024 * 1024,  // 10GB max
+            max_size: 2 * 1024 * 1024 * 1024,   // 2GB max
             timeout: Duration::from_secs(1800), // 30 minutes
             max_retries: 3,
         }
     }
 }
 
-/// Handles downloading snapshots from HTTP URLs
+/// Handles downloading snapshots from HTTP/HTTPS URLs with retry logic.
+///
+/// `SnapshotDownloader` provides a robust download mechanism with:
+/// - Automatic retry with exponential backoff
+/// - Progress tracking for large downloads
+/// - Disk space validation before download
+/// - Configurable size limits and timeouts
+///
+/// # Example
+///
+/// ```no_run
+/// use std::path::Path;
+///
+/// use hopr_chain_indexer::snapshot::download::{DownloadConfig, SnapshotDownloader};
+///
+/// async fn download_snapshot() -> Result<(), Box<dyn std::error::Error>> {
+///     let downloader = SnapshotDownloader::new();
+///     downloader
+///         .download_snapshot("https://example.com/snapshot.tar.gz", Path::new("/tmp/snapshot.tar.gz"))
+///         .await?;
+///     Ok(())
+/// }
+/// ```
 pub struct SnapshotDownloader {
     client: Client,
     config: DownloadConfig,
@@ -54,7 +92,24 @@ impl SnapshotDownloader {
             .await
     }
 
-    /// Downloads a snapshot with retry logic
+    /// Downloads a snapshot with configurable retry logic.
+    ///
+    /// Implements exponential backoff between retry attempts. Certain errors
+    /// (like 4xx HTTP status codes or insufficient disk space) will not be retried.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - The HTTP/HTTPS URL to download from
+    /// * `target_path` - Local path where the downloaded file will be saved
+    /// * `max_retries` - Maximum number of retry attempts
+    ///
+    /// # Errors
+    ///
+    /// Returns `SnapshotError` for various failure conditions including:
+    /// - Network errors (with retry)
+    /// - HTTP errors (4xx without retry, 5xx with retry)
+    /// - Insufficient disk space (without retry)
+    /// - File size exceeding limits (without retry)
     pub async fn download_snapshot_with_retry(
         &self,
         url: &str,
@@ -67,7 +122,7 @@ impl SnapshotDownloader {
             if attempt > 0 {
                 let delay = Duration::from_secs(2u64.pow(attempt.min(5))); // Exponential backoff
                 info!("Retry attempt {} after {:?}", attempt, delay);
-                tokio::time::sleep(delay).await;
+                sleep(delay).await;
             }
 
             match self.download_snapshot_once(url, target_path).await {
@@ -121,7 +176,7 @@ impl SnapshotDownloader {
 
         // Create parent directory if it doesn't exist
         if let Some(parent) = target_path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
+            fs::create_dir_all(parent)?;
         }
 
         // Stream download to file
@@ -148,30 +203,44 @@ impl SnapshotDownloader {
                 let progress = (downloaded as f64 / total_size as f64) * 100.0;
                 if downloaded % (1024 * 1024) == 0 || downloaded == total_size {
                     debug!(
-                        "Download progress: {:.1}% ({}/{} bytes)",
+                        "Snapshot download progress: {:.1}% ({}/{} bytes)",
                         progress, downloaded, total_size
                     );
                 }
             } else {
                 if downloaded % (10 * 1024 * 1024) == 0 {
-                    debug!("Downloaded: {} bytes", downloaded);
+                    debug!("snapshot downloaded: {} bytes", downloaded);
                 }
             }
         }
 
         file.flush().await?;
-        info!("Downloaded {} bytes to {:?}", downloaded, target_path);
+        info!("Snapshot downloaded {} bytes to {:?}", downloaded, target_path);
 
         Ok(())
     }
 
-    /// Checks if there's sufficient disk space available
+    /// Checks if there's sufficient disk space available for download and extraction.
+    ///
+    /// Validates that the target directory has at least 3x the maximum download size
+    /// available to account for:
+    /// 1. The downloaded archive
+    /// 2. Extracted files
+    /// 3. Safety margin for system operations
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - Directory to check for available space
+    ///
+    /// # Errors
+    ///
+    /// Returns `SnapshotError::InsufficientSpace` if available space is below requirements
     pub async fn check_disk_space(&self, dir: &Path) -> SnapshotResult<()> {
         // Create directory if it doesn't exist
-        tokio::fs::create_dir_all(dir).await?;
+        fs::create_dir_all(dir)?;
 
         // Check if directory exists and is accessible
-        let metadata = tokio::fs::metadata(dir).await?;
+        let metadata = fs::metadata(dir)?;
         if !metadata.is_dir() {
             return Err(SnapshotError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -205,7 +274,24 @@ impl Default for SnapshotDownloader {
     }
 }
 
-/// Gets available disk space in bytes for the given directory
+/// Gets available disk space in bytes for the given directory using cross-platform sysinfo.
+///
+/// This function uses the sysinfo crate to provide platform-independent disk space checking.
+/// It finds the disk/mount point that contains the specified directory and returns the
+/// available space on that disk.
+///
+/// # Arguments
+///
+/// * `dir` - Directory path to check (will be canonicalized)
+///
+/// # Returns
+///
+/// Available space in bytes on the disk containing the directory
+///
+/// # Errors
+///
+/// - `SnapshotError::Io` if the path cannot be canonicalized
+/// - `SnapshotError::InvalidData` if no disks are found on the system
 fn get_available_disk_space(dir: &Path) -> SnapshotResult<u64> {
     use sysinfo::{Disk, Disks};
 
@@ -234,7 +320,7 @@ fn get_available_disk_space(dir: &Path) -> SnapshotResult<u64> {
         None => {
             // Fallback: use the first disk or return an error
             if let Some(disk) = disks.first() {
-                tracing::warn!(
+                warn!(
                     "Could not find matching disk for path {:?}, using first available disk",
                     dir
                 );
