@@ -137,7 +137,7 @@ sudo cp -r result/share/man/man1/* /usr/local/share/man/man1/
 
 ### Install via linux package manager
 
-Linux packages are available at every github release, download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+Linux packages are available at every github release. Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
 To install on specific distribution, see [detailed information](./deploy/nfpm/README.md)
 
 ## Usage
