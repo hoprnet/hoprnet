@@ -556,7 +556,8 @@ pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) 
         Ok(corrupted) => corrupted,
         Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     };
-    let channels_result = futures::future::try_join_all(corrupted.into_iter().map(|c| query_topology_info(c))).await;
+    let channels_result =
+        futures::future::try_join_all(corrupted.into_iter().map(|c| query_topology_info(c.channel()))).await;
 
     match channels_result {
         Ok(list) => (StatusCode::OK, Json(list)).into_response(),

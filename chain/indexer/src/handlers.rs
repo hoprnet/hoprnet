@@ -295,7 +295,10 @@ where
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?
-                        .unwrap();
+                        .ok_or(CoreEthereumIndexerError::ProcessError(format!(
+                            "channel balance increased event for channel {} did not return an updated channel",
+                            Hash::from(balance_increased.channelId.0)
+                        )))?;
 
                     if updated_channel.source == self.chain_key.public().to_address() && is_synced {
                         info!("updating safe balance from chain after channel balance increased event");
@@ -353,7 +356,12 @@ where
                             .change_balance(HoprBalance::zero())
                             .change_ticket_index(0);
 
-                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?.unwrap();
+                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?.ok_or(
+                            CoreEthereumIndexerError::ProcessError(format!(
+                                "channel closed event for channel {} did not return an updated channel",
+                                Hash::from(channel_closed.channelId.0)
+                            )),
+                        )?;
 
                         // Perform additional tasks based on the channel's direction
                         match direction {
@@ -376,7 +384,11 @@ where
                             .db
                             .finish_channel_update(tx.into(), channel_edits.delete())
                             .await?
-                            .unwrap();
+                            .ok_or(CoreEthereumIndexerError::ProcessError(format!(
+                                "channel closed event for channel {} did not return an updated channel",
+                                Hash::from(channel_closed.channelId.0)
+                            )))?;
+
                         debug!(channel_id = %channel_id, "foreign closed closed channel was deleted");
                         updated_channel
                     };
@@ -433,6 +445,9 @@ where
                                 .change_status(ChannelStatus::Open),
                         )
                         .await?
+                        .ok_or(CoreEthereumIndexerError::ProcessError(format!(
+                            "channel opened event for channel {channel_id} did not return an updated channel",
+                        )))?
                 } else {
                     trace!(%source, %destination, %channel_id, "on_channel_opened_event");
 
@@ -446,17 +461,10 @@ where
                     );
 
                     self.db.upsert_channel(tx.into(), new_channel).await?;
-                    Some(new_channel)
+                    new_channel
                 };
 
-                match channel {
-                    Some(c) => Ok(Some(ChainEventType::ChannelOpened(c))),
-                    None => {
-                        // Should not happen as such event should already have trigered a return Ok(None) before
-                        error!(%source, %destination, %channel_id, "observed channel open event for a channel that does not exist");
-                        Err(CoreEthereumIndexerError::ChannelDoesNotExist)
-                    }
-                }
+                Ok(Some(ChainEventType::ChannelOpened(channel)))
             }
             HoprChannelsEvents::TicketRedeemed(ticket_redeemed) => {
                 let maybe_channel = self
@@ -565,7 +573,10 @@ where
                             )),
                         )
                         .await?
-                        .unwrap();
+                        .ok_or(CoreEthereumIndexerError::ProcessError(format!(
+                            "ticket redeemed event for channel {} did not return an updated channel",
+                            Hash::from(ticket_redeemed.channelId.0)
+                        )))?;
 
                     // Neglect all the tickets in this channel
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
@@ -599,7 +610,11 @@ where
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_status(new_status))
                         .await?
-                        .unwrap();
+                        .ok_or(CoreEthereumIndexerError::ProcessError(format!(
+                            "channel closure initiation event for channel {} did not return an updated channel",
+                            Hash::from(closure_initiated.channelId.0)
+                        )))?;
+
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     error!(channel_id = %Hash::from(closure_initiated.channelId.0), "observed channel closure initiation on a channel that we don't have in the DB");

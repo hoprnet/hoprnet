@@ -64,16 +64,7 @@ impl TryFrom<channel::Model> for ChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
-        if value.corrupted {
-            return Err(DbEntityError::InvalidCorruptionFlag(
-                "cannot convert corrupted channel model to ChannelEntry".into(),
-            ));
-        }
-
-        match model_to_channel_entry_unchecked(&value) {
-            Ok(channel_entry) => Ok(channel_entry),
-            Err(e) => Err(e),
-        }
+        (&value).try_into()
     }
 }
 
@@ -114,15 +105,7 @@ impl TryFrom<channel::Model> for CorruptedChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
-        if !value.corrupted {
-            return Err(DbEntityError::ConversionError(
-                "cannot convert non-corrupted channel model to CorruptedChannelEntry".into(),
-            ));
-        }
-        match model_to_channel_entry_unchecked(&value) {
-            Ok(channel_entry) => Ok(CorruptedChannelEntry::new(channel_entry)),
-            Err(e) => Err(e),
-        }
+        (&value).try_into()
     }
 }
 
