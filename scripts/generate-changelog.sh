@@ -83,7 +83,7 @@ github_format_changelog() {
     "fix("* | "fix:"*)
       section_fix+="* ${title} by @${author} in #${id}\n"
       ;;
-    "refactor("* | "refactor:"* | "style("* | "style:"* )
+    "refactor("* | "refactor:"* | "style("* | "style:"*)
       section_refactor+="* ${title} by @${author} in #${id}\n"
       ;;
     "docs("* | "docs:"*)
