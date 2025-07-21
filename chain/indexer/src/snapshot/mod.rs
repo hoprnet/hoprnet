@@ -63,6 +63,7 @@ use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, 
 /// - **Extractor**: Safely extracts tar.gz archives with security validations
 /// - **Validator**: Verifies SQLite database integrity and content consistency
 pub struct SnapshotManager {
+    db: HoprDb,
     downloader: SnapshotDownloader,
     extractor: SnapshotExtractor,
     validator: SnapshotValidator,
@@ -145,6 +146,6 @@ impl SnapshotManager {
 
 impl Default for SnapshotManager {
     fn default() -> Self {
-        Self::new()
+        Self::new(HoprDb::default())
     }
 }

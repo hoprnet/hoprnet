@@ -71,17 +71,49 @@ impl HoprDb {
         fs::create_dir_all(directory)
             .map_err(|_e| DbSqlError::Construction(format!("cannot create main database directory {directory:?}")))?;
 
-        let index = Self::create_pool(cfg, PoolOptions::new(), Some(0), Some(30), SQL_DB_INDEX_FILE_NAME);
+        let index = Self::create_pool(
+            cfg.clone(),
+            directory.to_path_buf(),
+            PoolOptions::new(),
+            Some(0),
+            Some(30),
+            SQL_DB_INDEX_FILE_NAME,
+        )
+        .await;
 
         let peers_options = PoolOptions::new()
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
             .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
             .max_lifetime(Some(Duration::from_secs(30 * 60))); // This is the default
-        let peers = Self::create_pool(cfg, peers_options, Some(0), Some(300), SQL_DB_PEERS_FILE_NAME);
+        let peers = Self::create_pool(
+            cfg.clone(),
+            directory.to_path_buf(),
+            peers_options,
+            Some(0),
+            Some(300),
+            SQL_DB_PEERS_FILE_NAME,
+        )
+        .await;
 
-        let tickets = Self::create_pool(cfg, PoolOptions::new(), Some(0), Some(50), SQL_DB_TICKETS_FILE_NAME);
+        let tickets = Self::create_pool(
+            cfg.clone(),
+            directory.to_path_buf(),
+            PoolOptions::new(),
+            Some(0),
+            Some(50),
+            SQL_DB_TICKETS_FILE_NAME,
+        )
+        .await;
 
-        let logs = Self::create_pool(cfg, PoolOptions::new(), Some(0), None, SQL_DB_LOGS_FILE_NAME);
+        let logs = Self::create_pool(
+            cfg.clone(),
+            directory.to_path_buf(),
+            PoolOptions::new(),
+            Some(0),
+            None,
+            SQL_DB_LOGS_FILE_NAME,
+        )
+        .await;
 
         Self::new_sqlx_sqlite(cfg, chain_key, directory.to_path_buf(), index, peers, tickets, logs).await
     }
@@ -218,10 +250,11 @@ impl HoprDb {
         }
     }
 
-    pub async fn replace_logs_db(&self, src_dir: &Path, files: &[String]) -> Result<bool> {
+    pub async fn replace_logs_db(mut self, src_dir: &Path, files: &[String]) -> Result<()> {
         // First close the existing database connection
         let _ = self
             .logs_db
+            .clone()
             .close()
             .await
             .map_err(|e| DbSqlError::Construction(format!("failed to close logs database: {e}")))?;
@@ -242,12 +275,20 @@ impl HoprDb {
         }
 
         // Open new logs database connection and apply migrations (snapshot could be outdated)
-        let logs_db_pool = Self::create_pool(self.cfg, PoolOptions::new(), Some(0), None, SQL_DB_LOGS_FILE_NAME);
+        let logs_db_pool = Self::create_pool(
+            self.cfg.clone(),
+            self.directory.clone(),
+            PoolOptions::new(),
+            Some(0),
+            None,
+            SQL_DB_LOGS_FILE_NAME,
+        )
+        .await;
         self.logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db_pool);
 
-        MigratorChainLogs::up(self.logs_db, None)
+        MigratorChainLogs::up(&self.logs_db, None)
             .await
-            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
+            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))
     }
 
     /// Default SQLite config values for all DBs.
@@ -267,25 +308,22 @@ impl HoprDb {
 
     async fn create_pool(
         cfg: HoprDbConfig,
-        options: PoolOptions<SqlitePool>,
-        min_conn: Option<u64>,
-        max_conn: Option<u64>,
+        directory: PathBuf,
+        mut options: PoolOptions<sqlx::Sqlite>,
+        min_conn: Option<u32>,
+        max_conn: Option<u32>,
         path: &str,
-    ) -> Result<SqlitePool> {
-        let options = if let Some(min_conn) = min_conn {
-            options.min_connections(min_conn)
-        } else {
-            PoolOptions::new()
-        };
-        options = if let Some(max_conn) = max_conn {
-            options.max_connections(max_conn)
-        } else {
-            options
-        };
+    ) -> SqlitePool {
+        if let Some(min_conn) = min_conn {
+            options = options.min_connections(min_conn);
+        }
+        if let Some(max_conn) = max_conn {
+            options = options.max_connections(max_conn);
+        }
 
         let cfg = Self::common_connection_cfg(cfg);
         options
-            .connect_with(cfg.filename(self.directory.join(path)))
+            .connect_with(cfg.filename(directory.join(path)))
             .await
             .unwrap_or_else(|e| panic!("failed to create {path} database: {e}"))
     }
