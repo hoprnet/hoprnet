@@ -275,6 +275,17 @@ local hopr_fields = {
     next_hop_peer_id = ProtoField.stringz("hopr.next_hop_peer_id", "Next Hop (Peer ID)"),
     data_len = ProtoField.uint16("hopr.data_len", "Data Length"),
 
+    -- Ticket fields
+    ticket_channel_id = ProtoField.bytes("hopr.ticket.channel_id", "Channel ID"),
+    ticket_amount = ProtoField.bytes("hopr.ticket.amount", "Amount"),
+    ticket_index = ProtoField.uint64("hopr.ticket.index", "Index"),
+    ticket_offset = ProtoField.uint32("hopr.ticket.index_offset", "Index offset"),
+    ticket_epoch = ProtoField.uint24("hopr.ticket.channel_epoch", "Channel epoch"),
+    ticket_challenge = ProtoField.bytes("hopr.ticket.challenge", "Ethereum challenge"),
+    ticket_luck = ProtoField.uint64("hopr.ticket.luck", "Luck"),
+    ticket_win_prob = ProtoField.double("hopr.ticket.win_prob", "Winning probability"),
+    ticket_signature = ProtoField.bytes("hopr.ticket.signature", "Signature"),
+
     -- FinalPacket specific
     sender_pseudonym = ProtoField.bytes("hopr.sender_pseudonym", "Sender Pseudonym"),
 
@@ -295,6 +306,132 @@ local hopr_fields = {
 
 hopr_proto.fields = hopr_fields
 
+-- Helper function to convert IEEE 754 bits to double
+local function convert_ieee_to_double(high32, low32)
+    -- Create byte array in big-endian order
+    local bytes = {}
+    bytes[1] = bit.rshift(high32, 24)
+    bytes[2] = bit.band(bit.rshift(high32, 16), 0xFF)
+    bytes[3] = bit.band(bit.rshift(high32, 8), 0xFF)
+    bytes[4] = bit.band(high32, 0xFF)
+    bytes[5] = bit.rshift(low32, 24)
+    bytes[6] = bit.band(bit.rshift(low32, 16), 0xFF)
+    bytes[7] = bit.band(bit.rshift(low32, 8), 0xFF)
+    bytes[8] = bit.band(low32, 0xFF)
+
+    -- Create ByteArray and convert to Tvb
+    local ba = ByteArray.new()
+    ba:set_size(8)
+    for i = 1, 8 do
+        ba:set_index(i - 1, bytes[i])
+    end
+
+    -- Convert to Tvb and extract as double
+    local tvb = ba:tvb("IEEE754")
+    return tvb(0, 8):float()
+end
+
+local function luck_to_double(buffer)
+    -- Input validation
+    if buffer:len() ~= 7 then
+        error("Input must be exactly 7 bytes")
+    end
+
+    -- Check for special case: all zeros
+    local all_zeros = true
+    for i = 0, 6 do
+        if buffer(i, 1):uint() ~= 0 then
+            all_zeros = false
+            break
+        end
+    end
+    if all_zeros then
+        return 0.0
+    end
+
+    -- Check for special case: all 0xff
+    local all_ff = true
+    for i = 0, 6 do
+        if buffer(i, 1):uint() ~= 0xff then
+            all_ff = false
+            break
+        end
+    end
+    if all_ff then
+        return 1.0
+    end
+
+    -- Build 64-bit value from 7 bytes (big-endian)
+    local high32 = 0
+    local low32 = 0
+
+    -- Process first 3 bytes for high 32 bits
+    for i = 0, 2 do
+        high32 = high32 + bit.lshift(buffer(i, 1):uint(), 8 * (2 - i))
+    end
+
+    -- Process last 4 bytes for low 32 bits
+    for i = 3, 6 do
+        low32 = low32 + bit.lshift(buffer(i, 1):uint(), 8 * (6 - i))
+    end
+
+    -- Add 1 to the 56-bit value (significand = tmp + 1)
+    low32 = low32 + 1
+    if low32 >= 2^32 then
+        high32 = high32 + 1
+        low32 = low32 - 2^32
+    end
+
+    -- Right shift by 4 bits (significand >> 4)
+    local shifted_low = bit.rshift(low32, 4)
+    local shifted_high = bit.rshift(high32, 4)
+    shifted_low = shifted_low + bit.lshift(bit.band(high32, 0xF), 28)
+
+    -- Add IEEE 754 exponent bias (1023 << 52)
+    shifted_high = shifted_high + bit.lshift(1023, 20)  -- 52 - 32 = 20
+
+    -- Convert to double using byte manipulation
+    return convert_ieee_to_double(shifted_high, shifted_low) - 1.0
+end
+
+
+local function dissect_ticket(buffer, tree, offset)
+    local ticket_tree = tree:add("Ticket")
+
+    local data_len = buffer(offset, 1):uint()
+    offset = offset + 1
+    if data_len ~= 148 then
+        ticket_tree:add_expert_info(PI_MALFORMED, PI_ERROR, "Invalid ticket length: ".. data_len)
+        return offset
+    end
+
+    ticket_tree:add(hopr_fields.ticket_channel_id, buffer(offset, 32))
+    offset = offset + 32
+
+    ticket_tree:add(hopr_fields.ticket_amount, buffer(offset, 12))
+    offset = offset + 12
+
+    ticket_tree:add(hopr_fields.ticket_index, buffer(offset, 6):uint64())
+    offset = offset + 6
+
+    ticket_tree:add(hopr_fields.ticket_offset, buffer(offset, 4):uint())
+    offset = offset + 4
+
+    ticket_tree:add(hopr_fields.ticket_epoch, buffer(offset, 3):uint())
+    offset = offset + 3
+
+    ticket_tree:add(hopr_fields.ticket_luck, buffer(offset, 7))
+    ticket_tree:add(hopr_fields.ticket_win_prob, luck_to_double(buffer(offset, 7)))
+    offset = offset + 7
+
+    ticket_tree:add(hopr_fields.ticket_challenge, buffer(offset, 20))
+    offset = offset + 20
+
+    ticket_tree:add(hopr_fields.ticket_signature, buffer(offset, 64))
+    offset = offset + 64
+
+    return offset
+end
 
 -- ApplicationData dissector
 local function dissect_appdata(buffer, tree, offset, data_len, pinfo)
@@ -382,6 +519,8 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         final_tree:add(hopr_fields.ack_key, buffer(offset, 32))
         offset = offset + 32
 
+        offset = dissect_ticket(buffer, final_tree, offset)
+
         local data_len_field = buffer(offset, 2)
         local data_len = data_len_field:uint()
         final_tree:add(hopr_fields.data_len, data_len_field)
@@ -423,6 +562,8 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         offset = offset + 32
         ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
         offset = offset + 64
+
+        offset = dissect_ticket(buffer, fwd_tree, offset)
     elseif pkt_type == 2 then -- OutgoingPacket
         if length < 1 + 32 + 32 + 33 + 2 + 8 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for OutgoingPacket")
@@ -452,6 +593,8 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         out_tree:add(hopr_fields.challenge, buffer(offset, 33))
         offset = offset + 33
+
+        offset = dissect_ticket(buffer, out_tree, offset)
 
         local data_len_field = buffer(offset, 2)
         local data_len = data_len_field:uint()
