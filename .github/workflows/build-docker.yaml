@@ -32,6 +32,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   docker:
+    name: Docker
     runs-on: self-hosted-hoprnet-bigger
     # Skip hopr-pluto builds unless explicitly enabled via BUILD_HOPR_PLUTO_DOCKER variable
     if: inputs.package != 'hopr-pluto' || vars.BUILD_HOPR_PLUTO_DOCKER == 'true'

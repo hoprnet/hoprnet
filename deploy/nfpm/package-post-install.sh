@@ -188,7 +188,7 @@ generate_identity_file() {
     if IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/; then
       if [ -f /etc/hoprd/hopr0.id ]; then
         mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
-        chmod 640 /etc/hoprd/hopr.id
+        chmod 644 /etc/hoprd/hopr.id
         show_node_address
       else
         echo "Error: Identity file was not created at expected location /etc/hoprd/hopr0.id"

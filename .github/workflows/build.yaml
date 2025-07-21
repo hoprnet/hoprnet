@@ -28,14 +28,14 @@ jobs:
     strategy:
       matrix:
         package:
-          - hopli
-          - hoprd
+          - Hopli
+          - Hoprd
     name: ${{ matrix.package }}
     uses: ./.github/workflows/build-docker.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-      package: ${{ matrix.package }}
+      package: ${{ toLower(matrix.package) }}
       production: false
     secrets: inherit
 

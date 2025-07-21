@@ -25,7 +25,7 @@ head_branch=${1}
 workflow_run_id=$(gh api repos/hoprnet/hoprnet/actions/workflows/build.yaml/runs | jq --arg head_branch "$head_branch" '[.workflow_runs[] | select(.head_branch == $head_branch and .conclusion == "success" and .status == "completed")] | first | .id')
 artifacts=$(gh api --paginate repos/hoprnet/hoprnet/actions/runs/${workflow_run_id}/artifacts | jq -r '.artifacts[] | "\(.name) \(.archive_download_url)"')
 rm -rf "${mydir}/dist"
-mkdir -p "${mydir}/dist/zip" "${mydir}/dist/unzip" "${mydir}/dist/bin" "${mydir}/dist/packages"
+mkdir -p "${mydir}/dist/zip" "${mydir}/dist/unzip" "${mydir}/dist/upload"
 while IFS= read -r line; do
   artifact_name=$(echo $line | awk '{print $1}')
   artifact_url=$(echo $line | awk '{print $2}')
@@ -39,8 +39,8 @@ while IFS= read -r line; do
   unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/unzip"
   for artifact in dist/unzip/*; do
     case "$artifact_name" in
-    *.deb | *.rpm | *.zst) mv "$artifact" dist/packages/${artifact_name} ;;
-    *) mv "$artifact" dist/bin/${artifact_name} ;;
+    *.sha256) cat "$artifact" >> dist/upload/SHA256SUMS ;;
+    *) mv "$artifact" dist/upload/${artifact_name} ;;
     esac
   done
 done <<<"$artifacts"

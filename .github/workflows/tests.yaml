@@ -107,6 +107,7 @@ jobs:
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger
+    name: Smart Contracts
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
     env:
@@ -196,6 +197,7 @@ jobs:
 
   tests-smoke:
     runs-on: self-hosted-hoprnet-bigger
+    name: Smoke Tests
     needs:
       - build-candidate-binaries
     timeout-minutes: 30

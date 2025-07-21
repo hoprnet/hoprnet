@@ -27,13 +27,13 @@ Install commands:
 
 ```bash
 sudo apt-get update
-sudo -E apt -y install ./hoprd_3.0.0_aarch64.deb
+sudo -E apt -y install ./hoprd.deb
 ```
 
 Uninstall commands:
 
 ```bash
-sudo apt purge hoprd
+sudo apt remove -y hoprd
 ```
 
 ### Centos
@@ -41,7 +41,7 @@ sudo apt purge hoprd
 Install commands:
 
 ```bash
-sudo -E dnf install -y ./hoprd_3.0.0_aarch64.rpm
+sudo -E dnf install -y ./hoprd.rpm
 ```
 
 Uninstall commands:
@@ -55,7 +55,7 @@ sudo dnf remove -y hoprd
 Install commands:
 
 ```bash
-sudo pacman --noconfirm -U ./hoprd_3.0.0_aarch64.pkg.tar.zst
+sudo pacman --noconfirm -U ./hoprd.pkg.tar.zst
 ```
 
 Uninstall commands:
