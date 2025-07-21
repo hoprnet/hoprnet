@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fs, path::Path};
 
 use rusqlite::{Connection, OpenFlags};
 use tracing::{info, warn};
@@ -49,7 +49,7 @@ impl SnapshotValidator {
         let db_path = db_path.to_path_buf();
         let expected_tables = self.expected_tables.clone();
 
-        let info = tokio::task::spawn_blocking(move || Self::validate_sqlite_db(&db_path, &expected_tables)).await??;
+        let info = Self::validate_sqlite_db(&db_path, &expected_tables)?;
 
         info!("Snapshot validation successful: {:?}", info);
         Ok(info)
@@ -62,7 +62,6 @@ impl SnapshotValidator {
 
         // Additional safety checks
         self.check_database_version(db_path).await?;
-        self.check_file_permissions(db_path).await?;
 
         Ok(info)
     }
@@ -75,57 +74,55 @@ impl SnapshotValidator {
         }
 
         // Get file size
-        let metadata = std::fs::metadata(db_path)?;
+        let metadata = fs::metadata(db_path)?;
         let db_size = metadata.len();
 
         // Open database in read-only mode
         let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-            .map_err(|e| SnapshotError::Validation(format!("Cannot open database: {}", e)))?;
+            .map_err(|e| SnapshotError::Validation(format!("Cannot open database: {e}")))?;
 
         // Check database integrity
         let integrity_check: String = conn
             .query_row("PRAGMA integrity_check", [], |row| row.get(0))
-            .map_err(|e| SnapshotError::Validation(format!("Integrity check failed: {}", e)))?;
+            .map_err(|e| SnapshotError::Validation(format!("Integrity check failed: {e}")))?;
 
         if integrity_check != "ok" {
             return Err(SnapshotError::Validation(format!(
-                "Database integrity check failed: {}",
-                integrity_check
+                "Database integrity check failed: {integrity_check}",
             )));
         }
 
         // Get SQLite version
         let sqlite_version: String = conn
             .query_row("SELECT sqlite_version()", [], |row| row.get(0))
-            .map_err(|e| SnapshotError::Validation(format!("Cannot get SQLite version: {}", e)))?;
+            .map_err(|e| SnapshotError::Validation(format!("Cannot get SQLite version: {e}")))?;
 
         // Check for expected tables
         let tables: Vec<String> = conn
             .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-            .map_err(|e| SnapshotError::Validation(format!("Cannot query tables: {}", e)))?
+            .map_err(|e| SnapshotError::Validation(format!("Cannot query tables: {e}")))?
             .query_map([], |row| row.get(0))
-            .map_err(|e| SnapshotError::Validation(format!("Cannot read tables: {}", e)))?
+            .map_err(|e| SnapshotError::Validation(format!("Cannot read tables: {e}")))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| SnapshotError::Validation(format!("Cannot collect tables: {}", e)))?;
+            .map_err(|e| SnapshotError::Validation(format!("Cannot collect tables: {e}")))?;
 
         // Verify expected tables exist
         for expected in expected_tables {
             if !tables.contains(expected) {
-                return Err(SnapshotError::Validation(format!(
-                    "Missing expected table: {}",
-                    expected
-                )));
+                return Err(SnapshotError::Validation(
+                    format!("Missing expected table: {expected}",),
+                ));
             }
         }
 
         // Get snapshot metadata
         let log_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM logs", [], |row| row.get(0))
-            .map_err(|e| SnapshotError::Validation(format!("Cannot count logs: {}", e)))?;
+            .map_err(|e| SnapshotError::Validation(format!("Cannot count logs: {e}")))?;
 
         let latest_block: Option<i64> = conn
             .query_row("SELECT MAX(block_number) FROM logs", [], |row| row.get(0))
-            .map_err(|e| SnapshotError::Validation(format!("Cannot get latest block: {}", e)))?;
+            .map_err(|e| SnapshotError::Validation(format!("Cannot get latest block: {e}")))?;
 
         // Validate that we have some data
         if log_count == 0 {
@@ -146,12 +143,12 @@ impl SnapshotValidator {
         let db_path = db_path.to_path_buf();
         tokio::task::spawn_blocking(move || {
             let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-                .map_err(|e| SnapshotError::Validation(format!("Cannot open database: {}", e)))?;
+                .map_err(|e| SnapshotError::Validation(format!("Cannot open database: {e}")))?;
 
             // Check SQLite version compatibility
             let version: String = conn
                 .query_row("SELECT sqlite_version()", [], |row| row.get(0))
-                .map_err(|e| SnapshotError::Validation(format!("Cannot get SQLite version: {}", e)))?;
+                .map_err(|e| SnapshotError::Validation(format!("Cannot get SQLite version: {e}")))?;
 
             // Add version compatibility checks as needed
             info!("Snapshot database SQLite version: {}", version);
@@ -161,47 +158,27 @@ impl SnapshotValidator {
         .await?
     }
 
-    /// Checks file permissions
-    async fn check_file_permissions(&self, db_path: &Path) -> SnapshotResult<()> {
-        let metadata = tokio::fs::metadata(db_path).await?;
-
-        // Ensure file is readable
-        if metadata.permissions().readonly() {
-            warn!("Database file is read-only, this may cause issues during indexing");
-        }
-
-        Ok(())
-    }
-
     /// Checks data consistency
     pub async fn check_data_consistency(&self, db_path: &Path) -> SnapshotResult<()> {
         let db_path = db_path.to_path_buf();
-        tokio::task::spawn_blocking(move || {
-            let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-                .map_err(|e| SnapshotError::Validation(format!("Cannot open database: {}", e)))?;
+        let conn = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|e| SnapshotError::Validation(format!("Cannot open database: {e}")))?;
 
-            // Check for orphaned records or other consistency issues
-            // This is a placeholder - add specific consistency checks based on your schema
+        let invalid_logs: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM logs WHERE block_number IS NULL OR block_number < 0",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| SnapshotError::Validation(format!("Cannot check log consistency: {e}")))?;
 
-            // Example: Check that all logs have valid block numbers
-            let invalid_logs: i64 = conn
-                .query_row(
-                    "SELECT COUNT(*) FROM logs WHERE block_number IS NULL OR block_number < 0",
-                    [],
-                    |row| row.get(0),
-                )
-                .map_err(|e| SnapshotError::Validation(format!("Cannot check log consistency: {}", e)))?;
+        if invalid_logs > 0 {
+            return Err(SnapshotError::Validation(format!(
+                "Found {invalid_logs} logs with invalid block numbers",
+            )));
+        }
 
-            if invalid_logs > 0 {
-                return Err(SnapshotError::Validation(format!(
-                    "Found {} logs with invalid block numbers",
-                    invalid_logs
-                )));
-            }
-
-            Ok(())
-        })
-        .await?
+        Ok(())
     }
 }
 

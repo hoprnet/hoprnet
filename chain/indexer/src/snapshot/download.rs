@@ -207,10 +207,8 @@ impl SnapshotDownloader {
                         progress, downloaded, total_size
                     );
                 }
-            } else {
-                if downloaded % (10 * 1024 * 1024) == 0 {
-                    debug!("snapshot downloaded: {} bytes", downloaded);
-                }
+            } else if downloaded % (10 * 1024 * 1024) == 0 {
+                debug!("snapshot downloaded: {} bytes", downloaded);
             }
         }
 
@@ -298,7 +296,7 @@ fn get_available_disk_space(dir: &Path) -> SnapshotResult<u64> {
     let disks = Disks::new_with_refreshed_list();
 
     // Find the disk that contains the given directory
-    let target_path = dir.canonicalize().map_err(|e| SnapshotError::Io(e))?;
+    let target_path = dir.canonicalize().map_err(SnapshotError::Io)?;
 
     // Find the disk with the longest matching mount point
     let mut best_match: Option<&Disk> = None;
