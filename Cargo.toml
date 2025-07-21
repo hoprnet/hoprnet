@@ -52,7 +52,7 @@ alloy = { version = "=1.0.16", default-features = false, features = [
   "contract",
   "k256",
   "std",
-] } # pinned to 1.0.4 due to many breaking changes in patch releases
+] } # pinned to 1.0.16 due to many breaking changes in patch releases
 anyhow = "1.0.98"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
@@ -90,12 +90,14 @@ divan = "0.1.21"
 env_logger = "0.11.8"
 either = "1.15.0"
 flagset = "0.4.7"
+flate2 = "1.0"
 flume = "0.11.1"
 float-cmp = "0.10.0"
 futures = "0.3.31"
 futures-concurrency = "7.6.3"
 futures-timer = "3.0.3"
 futures-time = "3.0.0"
+futures-util = "0.3"
 generic-array = "1.2.0"
 glob = "0.3.2"
 governor = { version = "0.10" }
@@ -142,6 +144,7 @@ ringbuffer = "0.16.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
+scopeguard = "1.2"
 sea-orm = { version = "1.1.13", default-features = false, features = [
   "sqlx-sqlite",
   "with-chrono",
@@ -180,6 +183,8 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 ] }
 strum = { version = "0.27.1", features = ["derive"] }
 subtle = "2.6.1"
+sysinfo = "0.30"
+tar = "0.4"
 tempfile = "3.20.0"
 test-log = { version = "0.2.18", features = ["trace"] }
 thiserror = "2.0.12"

@@ -70,8 +70,9 @@ pub struct SnapshotManager {
 
 impl SnapshotManager {
     /// Creates a new snapshot manager instance
-    pub fn new() -> Self {
+    pub fn new(db: HoprDb) -> Self {
         Self {
+            db: HoprDb,
             downloader: SnapshotDownloader::new(),
             extractor: SnapshotExtractor::new(),
             validator: SnapshotValidator::new(),
@@ -110,9 +111,8 @@ impl SnapshotManager {
         let db_path = temp_dir.join("hopr_logs.db");
         let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
 
-        // Move validated files to final location
-        self.install_snapshot_files(&temp_dir, data_dir, &extracted_files)
-            .await?;
+        // Update database
+        self.db.replace_logs_db(&temp_dir, &extracted_files).await?;
 
         // Clean up temporary directory
         if let Err(e) = fs::remove_dir_all(&temp_dir_for_cleanup) {

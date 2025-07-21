@@ -1,6 +1,7 @@
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
+    fs,
     time::Duration,
 };
 
@@ -23,6 +24,7 @@ use sqlx::{
 use tracing::{debug, log::LevelFilter};
 
 use crate::{
+    errors::DbSqlError,
     HoprDbAllOperations, accounts::model_to_account_entry, cache::HoprDbCaches, errors::Result,
     ticket_manager::TicketManager,
 };
@@ -49,6 +51,7 @@ pub struct HoprDb {
     pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
     pub(crate) caches: Arc<HoprDbCaches>,
+    pub(crate) directory: &Path,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -65,8 +68,8 @@ impl HoprDb {
             lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
         }
 
-        std::fs::create_dir_all(directory).map_err(|_e| {
-            crate::errors::DbSqlError::Construction(format!("cannot create main database directory {directory:?}"))
+        fs::create_dir_all(directory).map_err(|_e| {
+            DbSqlError::Construction(format!("cannot create main database directory {directory:?}"))
         })?;
 
         // Default SQLite config values for all 3 DBs.
@@ -83,63 +86,44 @@ impl HoprDb {
             .pragma("cache_size", "-30000") // 32M
             .pragma("busy_timeout", "1000"); // 1000ms
 
-        // Indexer database
-        let index = PoolOptions::new()
-            .min_connections(0)
-            .max_connections(30)
-            .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_INDEX_FILE_NAME)))
-            .await
-            .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?;
+        let index = create_pool(cfg_template, Some(0), Some(30), SQL_DB_INDEX_FILE_NAME)
 
-        // Peers database
-        let peers = PoolOptions::new()
-            .min_connections(0) // Default is 0
+        let peers_options = cfg_template.clone()
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
             .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
-            .max_lifetime(Some(Duration::from_secs(30 * 60))) // This is the default
-            .max_connections(300) // Default is 10
-            .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_PEERS_FILE_NAME)))
-            .await
-            .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?;
+            .max_lifetime(Some(Duration::from_secs(30 * 60))); // This is the default
+        let peers= create_pool(peers_options, Some(0), Some(300), SQL_DB_PEERS_FILE_NAME)
 
-        // Tickets database
-        let tickets = PoolOptions::new()
-            .min_connections(0)
-            .max_connections(50)
-            .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_TICKETS_FILE_NAME)))
-            .await
-            .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?;
+        let tickets = create_pool(cfg_template, Some(0), Some(50), SQL_DB_TICKETS_FILE_NAME)
 
-        let logs = PoolOptions::new()
-            .min_connections(0)
-            .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_LOGS_FILE_NAME)))
-            .await
-            .unwrap_or_else(|e| panic!("failed to create logs database: {e}"));
+        let logs = create_pool(cfg_template, Some(0), None, SQL_DB_LOGS_FILE_NAME)
 
-        Self::new_sqlx_sqlite(chain_key, index, peers, tickets, logs).await
+        Self::new_sqlx_sqlite(chain_key, directory, index, peers, tickets, logs).await
     }
 
     pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self> {
         Self::new_sqlx_sqlite(
             chain_key,
+            "",
             SqlitePool::connect(":memory:")
                 .await
-                .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?,
+                .map_err(|e| DbSqlError::Construction(e.to_string()))?,
             SqlitePool::connect(":memory:")
                 .await
-                .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?,
+                .map_err(|e| DbSqlError::Construction(e.to_string()))?,
             SqlitePool::connect(":memory:")
                 .await
-                .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?,
+                .map_err(|e| DbSqlError::Construction(e.to_string()))?,
             SqlitePool::connect(":memory:")
                 .await
-                .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?,
+                .map_err(|e| DbSqlError::Construction(e.to_string()))?,
         )
         .await
     }
 
     async fn new_sqlx_sqlite(
         chain_key: ChainKeypair,
+        directory: &Path,
         index_db: SqlitePool,
         peers_db: SqlitePool,
         tickets_db: SqlitePool,
@@ -149,25 +133,25 @@ impl HoprDb {
 
         MigratorIndex::up(&index_db, None)
             .await
-            .map_err(|e| crate::errors::DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
+            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
         let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db);
 
         MigratorTickets::up(&tickets_db, None)
             .await
-            .map_err(|e| crate::errors::DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
+            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
         let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db);
 
         MigratorPeers::up(&peers_db, None)
             .await
-            .map_err(|e| crate::errors::DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
+            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
         let logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db);
 
         MigratorChainLogs::up(&logs_db, None)
             .await
-            .map_err(|e| crate::errors::DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
+            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
         // Reset the peer network information
         let res = hopr_db_entity::network_peer::Entity::delete_many()
@@ -189,7 +173,7 @@ impl HoprDb {
             )
             .exec(&peers_db)
             .await
-            .map_err(|e| crate::errors::DbSqlError::Construction(format!("must reset peers on init: {e}")))?;
+            .map_err(|e| DbSqlError::Construction(format!("must reset peers on init: {e}")))?;
         debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
 
         // Reset all BeingAggregated ticket states to Untouched
@@ -229,6 +213,7 @@ impl HoprDb {
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
             tickets_db,
             caches,
+            directory
         })
     }
 
@@ -245,39 +230,60 @@ impl HoprDb {
         }
     }
 
-    /// Check if the logs database exists and has data
-    pub async fn logs_db_exists_and_has_data(&self, directory: &Path) -> Result<bool> {
-        let logs_db_path = directory.join(SQL_DB_LOGS_FILE_NAME);
+    pub async fn replace_logs_db(&self, src_dir: &Path, files: &[String]) -> Result<bool> {
+        // First close the existing database connection
+        let _ = self
+            .logs_db
+            .close()
+            .await
+            .map_err(|e| DbSqlError::Construction(format!("failed to close logs database: {e}")))?;
 
-        // Check if file exists
-        if !logs_db_path.exists() {
-            return Ok(false);
+        // Copy over the new database files
+        for file in files {
+            let src = src_dir.join(file);
+            let dst = self.directory.join(file);
+
+            // Remove existing file if it exists
+            if dst.exists() {
+                fs::remove_file(&dst)?;
+            }
+
+            // Move file from temp to final location
+            fs::rename(&src, &dst)?;
+            debug!("Installed snapshot file: {} -> {}", file, dst.display());
         }
 
-        // Check if database has data
-        match self.logs_db.execute_unprepared("SELECT COUNT(*) FROM logs").await {
-            Ok(_) => {
-                // Table exists, assume it has data
-                // For a proper check, we would need to parse the result
-                Ok(true)
-            }
-            Err(_) => {
-                // Table doesn't exist or other error, assume no data
-                Ok(false)
-            }
-        }
+
+        // Open new logs database connection and apply migrations (snapshot could be outdated)
+        let logs_db_pool = create_pool(cfg_template, Some(0), None, SQL_DB_LOGS_FILE_NAME);
+        self.logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db_pool);
+
+        MigratorChainLogs::up(self.logs_db, None)
+            .await
+            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
     }
 
-    /// Get the path to the logs database file
-    pub fn logs_db_path(&self, directory: &Path) -> PathBuf {
-        directory.join(SQL_DB_LOGS_FILE_NAME)
-    }
+    async fn create_pool(
+        cfg: SqliteConnectOptions,
+        min_conn: Option<u64>,
+        max_conn: Option<u64>,
+        path: &str,
+    ) -> Result<Pool<Sqlite>> {
+        let options = if let Some(min_conn) = min_conn {
+            options.min_connections(min_conn)
+        } else {
+            PoolOptions::new()
+        };
+        options = if let Some(max_conn) = max_conn {
+            options.max_connections(max_conn)
+        } else {
+            options
+        };
 
-    /// Get the directory where database files are stored
-    pub fn data_dir(&self) -> Option<PathBuf> {
-        // This would need to be stored in the HoprDb struct
-        // For now, return None - this can be enhanced later
-        None
+        options
+            .connect_with(cfg.filename(self.directory.join(path)))
+            .await
+            .unwrap_or_else(|e| panic!("failed to create {path} database: {e}"));
     }
 }
 

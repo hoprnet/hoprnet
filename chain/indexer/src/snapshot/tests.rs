@@ -11,8 +11,15 @@ mod tests {
     };
 
     /// Creates a test SQLite database for testing
-    fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-        let conn = rusqlite::Connection::open(path)?;
+    async fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+        use sqlx::{
+            Connection, Executor,
+            sqlite::{SqliteConnectOptions, SqliteConnection},
+        };
+
+        let options = SqliteConnectOptions::new().filename(path).create_if_missing(true);
+
+        let mut conn = SqliteConnection::connect_with(&options).await?;
 
         // Create test tables
         conn.execute(
@@ -22,8 +29,8 @@ mod tests {
                 log_index INTEGER NOT NULL,
                 data TEXT NOT NULL
             )",
-            [],
-        )?;
+        )
+        .await?;
 
         conn.execute(
             "CREATE TABLE blocks (
@@ -31,32 +38,30 @@ mod tests {
                 block_number INTEGER NOT NULL UNIQUE,
                 block_hash TEXT NOT NULL
             )",
-            [],
-        )?;
+        )
+        .await?;
 
         // Insert test data
-        conn.execute(
-            "INSERT INTO logs (block_number, log_index, data) VALUES (1, 0, 'test_log_1')",
-            [],
-        )?;
+        conn.execute("INSERT INTO logs (block_number, log_index, data) VALUES (1, 0, 'test_log_1')")
+            .await?;
 
-        conn.execute(
-            "INSERT INTO logs (block_number, log_index, data) VALUES (2, 0, 'test_log_2')",
-            [],
-        )?;
+        conn.execute("INSERT INTO logs (block_number, log_index, data) VALUES (2, 0, 'test_log_2')")
+            .await?;
 
-        conn.execute("INSERT INTO blocks (block_number, block_hash) VALUES (1, 'hash_1')", [])?;
+        conn.execute("INSERT INTO blocks (block_number, block_hash) VALUES (1, 'hash_1')")
+            .await?;
 
-        conn.execute("INSERT INTO blocks (block_number, block_hash) VALUES (2, 'hash_2')", [])?;
+        conn.execute("INSERT INTO blocks (block_number, block_hash) VALUES (2, 'hash_2')")
+            .await?;
 
         Ok(())
     }
 
     /// Creates a test tar.gz archive containing a SQLite database
-    fn create_test_archive(temp_dir: &TempDir) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    async fn create_test_archive(temp_dir: &TempDir) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
         // Create the database
         let db_path = temp_dir.path().join("hopr_logs.db");
-        create_test_sqlite_db(&db_path)?;
+        create_test_sqlite_db(&db_path).await?;
 
         // Create archive
         let archive_path = temp_dir.path().join("test_snapshot.tar.gz");
@@ -82,7 +87,7 @@ mod tests {
         let extractor = SnapshotExtractor::new();
 
         // Create test archive
-        let archive_path = create_test_archive(&temp_dir).unwrap();
+        let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
         // Extract the archive
         let extract_dir = temp_dir.path().join("extracted");
@@ -101,7 +106,7 @@ mod tests {
 
         // Create test database
         let db_path = temp_dir.path().join("hopr_logs.db");
-        create_test_sqlite_db(&db_path).unwrap();
+        create_test_sqlite_db(&db_path).await.unwrap();
 
         // Validate the database
         let result = validator.validate_snapshot(&db_path).await;
@@ -146,7 +151,7 @@ mod tests {
         let _manager = SnapshotManager::new();
 
         // Create test archive
-        let archive_path = create_test_archive(&temp_dir).unwrap();
+        let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
         // For this test, we'll simulate a file:// URL since we can't rely on external URLs
         // This is a simplified test - in a real scenario you'd use a mock HTTP server
@@ -238,7 +243,7 @@ mod tests {
         std::fs::create_dir_all(&data_dir).unwrap();
 
         // Create a test archive
-        let archive_path = create_test_archive(&temp_dir).unwrap();
+        let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
         let manager = SnapshotManager::new();
 
@@ -310,7 +315,7 @@ mod tests {
         let db_path = temp_dir.path().join("hopr_logs.db");
 
         // Create a test database
-        create_test_sqlite_db(&db_path).unwrap();
+        create_test_sqlite_db(&db_path).await.unwrap();
 
         let validator = SnapshotValidator::new();
         let result = validator.validate_snapshot(&db_path).await;
@@ -326,7 +331,7 @@ mod tests {
         let extractor = SnapshotExtractor::new();
 
         // Test with valid archive
-        let archive_path = create_test_archive(&temp_dir).unwrap();
+        let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
         let extract_dir = temp_dir.path().join("extract");
 
