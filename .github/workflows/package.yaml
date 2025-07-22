@@ -107,7 +107,7 @@ jobs:
 
       - name: Generate Changelog
         run: |
-          ./scripts/generate-changelog.sh "${{ steps.download.outputs.current_version }}" "${{ inputs.packager }}" > ./deploy/nfpm/changelog
+          ./scripts/generate-changelog.sh "${{ steps.download.outputs.current_version }}" "${{ inputs.packager }}" true > ./deploy/nfpm/changelog
           if [[ "${{ inputs.packager }}" == "deb" ]]; then
             gzip -9 -c ./deploy/nfpm/changelog > ./deploy/nfpm/changelog.gz
           fi
