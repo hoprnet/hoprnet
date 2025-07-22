@@ -134,9 +134,7 @@ jobs:
           USER: runner
 
       - name: Build ${{ steps.vars.outputs.binary }} binaries
-        run: |
-          nix build -L .#${{ steps.vars.outputs.binary }}${{ steps.vars.outputs.package_suffix }}
-          cp "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}" "${{ github.workspace }}/${{ steps.vars.outputs.binary }}"
+        run: nix build -L .#${{ steps.vars.outputs.binary }}${{ steps.vars.outputs.package_suffix }}
 
       - name: Publish ${{ steps.vars.outputs.binary }} binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
