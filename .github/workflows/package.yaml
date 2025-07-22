@@ -94,13 +94,6 @@ jobs:
           architecture=${architecture%-linux}
           echo "package_file_name=hoprd_${current_version}_${architecture}" | tee -a $GITHUB_OUTPUT
           echo "current_version=${current_version}" | tee -a $GITHUB_OUTPUT
-          ls -alh ./dist/bin
-          ./dist/bin/hoprd --version || echo "hoprd binary not found or version command failed"
-          ./dist/bin/hopli --version || echo "hopli binary not found or version command failed"
-          ./dist/bin/hoprd --help || echo "hoprd binary not found or help command failed"
-          ./dist/bin/hopli --help || echo "hopli binary not found or help command failed"
-
-
 
       - name: Install packages
         run: |
@@ -114,14 +107,14 @@ jobs:
           curl -L -o nfpm.deb "$nfpm_url"
           sudo apt install -y ./nfpm.deb
 
-      - name: Generate man pages
+      - name: Create man pages
         run: |
           help2man --name="HOPR node executable" --no-info --output ./deploy/nfpm/hoprd.1 ./dist/bin/hoprd
           gzip -9n ./deploy/nfpm/hoprd.1
           help2man --name="HOPR CLI helper tool" --no-info --output ./deploy/nfpm/hopli.1 ./dist/bin/hopli
           gzip -9n ./deploy/nfpm/hopli.1
 
-      - name: Generate Changelog
+      - name: Create Changelog
         run: |
           ./scripts/generate-changelog.sh "${{ steps.download.outputs.current_version }}" "${{ inputs.packager }}" true > ./deploy/nfpm/changelog
           if [[ "${{ inputs.packager }}" == "deb" ]]; then
@@ -130,7 +123,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Package
+      - name: Create package
         run: just package ${{ inputs.packager }} ${{ inputs.target }}
 
       - name: Create signatures
@@ -141,7 +134,7 @@ jobs:
         env:
           GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
 
-      - name: Test Package
+      - name: Test package
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
         timeout-minutes: 30
         continue-on-error: true
@@ -156,42 +149,42 @@ jobs:
           HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
           GCP_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       - name: Publish hoprd binary signature
-        if: inputs.target == 'x86_64-linux' || inputs.packager == 'deb'
+        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.sig
           path: ${{ github.workspace }}/dist/bin/hoprd.sig
 
       - name: Publish hoprd binary hash
-        if: inputs.target == 'x86_64-linux' || inputs.packager == 'deb'
+        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.sha256
           path: ${{ github.workspace }}/dist/bin/hoprd.sha256
 
       - name: Publish hoprd binary hash signature
-        if: inputs.target == 'x86_64-linux' || inputs.packager == 'deb'
+        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hoprd-${{ inputs.target }}.sha256.asc
           path: ${{ github.workspace }}/dist/bin/hoprd.sha256.asc
 
       - name: Publish hopli binary signature
-        if: inputs.target == 'x86_64-linux' || inputs.packager == 'deb'
+        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hopli-${{ inputs.target }}.sig
           path: ${{ github.workspace }}/dist/bin/hopli.sig
 
       - name: Publish hopli binary hash
-        if: inputs.target == 'x86_64-linux' || inputs.packager == 'deb'
+        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hopli-${{ inputs.target }}.sha256
           path: ${{ github.workspace }}/dist/bin/hopli.sha256
 
       - name: Publish hopli binary hash signature
-        if: inputs.target == 'x86_64-linux' || inputs.packager == 'deb'
+        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hopli-${{ inputs.target }}.sha256.asc

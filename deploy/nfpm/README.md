@@ -16,10 +16,10 @@ Hoprd has a ready to use package for the following variants:
 
 ```bash
 # You can get Safe address and the Module address from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=<your_safe_address>
-export HOPRD_MODULE_ADDRESS=<your_module_address>
+export HOPRD_SAFE_ADDRESS=<SAFE_WALLET_ADDRESS>
+export HOPRD_MODULE_ADDRESS=<MODULE_ADDRESS>
 # Choose your own local RPC provider or any from https://docs.hoprnet.org/node/custom-rpc-provider
-export HOPRD_PROVIDER=<your_rpc_provider>
+export HOPRD_PROVIDER=<CUSTOM_RPC_PROVIDER>
 ```
 
 ### `.deb` (Debian, Ubuntu and derivatives)
