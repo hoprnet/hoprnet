@@ -1,11 +1,10 @@
-//! Snapshot download functionality with retry logic and disk space management.
+//! Secure snapshot downloading with HTTP/HTTPS and local file support.
 //!
-//! This module provides secure download capabilities for snapshot archives with:
-//! - Configurable retry logic with exponential backoff
-//! - Progress tracking and reporting
-//! - Disk space validation before download
-//! - File size limits and timeout protection
-//! - Cross-platform disk space checking using sysinfo
+//! Provides robust download capabilities for snapshot archives with:
+//! - **URL Support**: HTTP/HTTPS with retry logic, local file:// URLs
+//! - **Safety**: Size limits, timeout protection, disk space validation
+//! - **Reliability**: Exponential backoff, progress tracking, error recovery
+//! - **Cross-platform**: Uses sysinfo for disk space checking
 
 use std::{fs, path::Path, time::Duration};
 
@@ -41,29 +40,42 @@ impl Default for DownloadConfig {
     }
 }
 
-/// Handles downloading snapshots from HTTP/HTTPS URLs and local file:// URLs with retry logic.
+/// Downloads snapshot archives from HTTP/HTTPS and file:// URLs.
 ///
-/// `SnapshotDownloader` provides a robust download mechanism with:
-/// - Support for HTTP/HTTPS and local file:// URLs
-/// - Automatic retry with exponential backoff (HTTP/HTTPS only)
-/// - Progress tracking for large downloads
-/// - Disk space validation before download
-/// - Configurable size limits and timeouts
+/// Provides secure, reliable downloading with automatic retry logic for network sources
+/// and direct file copying for local sources.
 ///
-/// # Example
+/// # Features
+///
+/// - **HTTP/HTTPS**: Automatic retry with exponential backoff, progress tracking
+/// - **Local Files**: Direct copying from file:// URLs with validation
+/// - **Safety**: Size limits, disk space checks, timeout protection
+/// - **Monitoring**: Progress reporting and detailed error messages
+///
+/// # Examples
 ///
 /// ```no_run
 /// use std::path::Path;
 ///
-/// use hopr_chain_indexer::snapshot::download::{DownloadConfig, SnapshotDownloader};
+/// use hopr_chain_indexer::snapshot::download::SnapshotDownloader;
 ///
-/// async fn download_snapshot() -> Result<(), Box<dyn std::error::Error>> {
-///     let downloader = SnapshotDownloader::new();
-///     downloader
-///         .download_snapshot("https://example.com/snapshot.tar.gz", Path::new("/tmp/snapshot.tar.gz"))
-///         .await?;
-///     Ok(())
-/// }
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let downloader = SnapshotDownloader::new();
+///
+/// // Download from HTTPS
+/// downloader
+///     .download_snapshot(
+///         "https://snapshots.hoprnet.org/logs.tar.gz",
+///         Path::new("/tmp/snapshot.tar.gz"),
+///     )
+///     .await?;
+///
+/// // Copy from local file
+/// downloader
+///     .download_snapshot("file:///backups/snapshot.tar.gz", Path::new("/tmp/snapshot.tar.gz"))
+///     .await?;
+/// # Ok(())
+/// # }
 /// ```
 pub struct SnapshotDownloader {
     client: Client,
@@ -87,7 +99,18 @@ impl SnapshotDownloader {
         }
     }
 
-    /// Downloads a snapshot from the given URL to the target path
+    /// Downloads a snapshot from the given URL to the target path.
+    ///
+    /// Supports HTTP/HTTPS URLs with retry logic and file:// URLs for local files.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - Source URL (http://, https://, or file:// scheme)
+    /// * `target_path` - Destination file path
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SnapshotError`] for network failures, file system errors, or validation failures.
     pub async fn download_snapshot(&self, url: &str, target_path: &Path) -> SnapshotResult<()> {
         self.download_snapshot_with_retry(url, target_path, self.config.max_retries)
             .await
@@ -225,7 +248,20 @@ impl SnapshotDownloader {
         Ok(())
     }
 
-    /// Copies a local file from a file:// URL to the target path
+    /// Copies a local file from a file:// URL to the target path.
+    ///
+    /// Validates file existence, checks size limits, and copies the file to the target location.
+    ///
+    /// # Arguments
+    ///
+    /// * `url` - File URL in format `file:///absolute/path/to/file`
+    /// * `target_path` - Destination file path
+    ///
+    /// # Errors
+    ///
+    /// * [`SnapshotError::InvalidData`] - Invalid file:// URL format
+    /// * [`SnapshotError::Io`] - File not found or permission errors
+    /// * [`SnapshotError::TooLarge`] - File exceeds size limit
     async fn copy_local_file(&self, url: &str, target_path: &Path) -> SnapshotResult<()> {
         // Parse the file path from the URL
         let file_path = url

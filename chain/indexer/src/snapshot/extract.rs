@@ -1,3 +1,8 @@
+//! Secure tar.gz archive extraction with path traversal protection.
+//!
+//! Provides safe extraction of snapshot archives with security validations
+//! to prevent malicious archives from escaping the target directory.
+
 use std::{
     fs,
     fs::File,
@@ -10,14 +15,22 @@ use tracing::{debug, error, info};
 
 use crate::snapshot::error::{SnapshotError, SnapshotResult};
 
-/// Handles extraction of snapshot archives
+/// Extracts tar.gz snapshot archives with security validations.
+///
+/// Provides safe extraction by validating file paths to prevent directory
+/// traversal attacks and ensuring only expected database files are extracted.
 pub struct SnapshotExtractor {
-    /// List of files we expect to find in the archive
+    /// Expected database files in snapshot archives
     expected_files: Vec<String>,
 }
 
 impl SnapshotExtractor {
-    /// Creates a new snapshot extractor
+    /// Creates a new extractor with predefined expected files.
+    ///
+    /// Expected files include SQLite database and WAL files:
+    /// - `hopr_logs.db` - Main database file
+    /// - `hopr_logs.db-wal` - Write-Ahead Log file
+    /// - `hopr_logs.db-shm` - Shared memory file
     pub fn new() -> Self {
         Self {
             expected_files: vec![
@@ -28,16 +41,30 @@ impl SnapshotExtractor {
         }
     }
 
-    /// Extracts a snapshot archive to the target directory
+    /// Extracts a tar.gz snapshot archive safely to the target directory.
+    ///
+    /// Validates each file path to prevent directory traversal attacks and
+    /// only extracts expected database files.
     ///
     /// # Arguments
     ///
-    /// * `archive_path` - Path to the tar.gz archive
-    /// * `target_dir` - Directory to extract files to
+    /// * `archive_path` - Path to the tar.gz archive file
+    /// * `target_dir` - Directory where files will be extracted
     ///
     /// # Returns
     ///
-    /// List of files that were successfully extracted
+    /// Vector of successfully extracted file names (relative paths)
+    ///
+    /// # Errors
+    ///
+    /// * [`SnapshotError::Archive`] - Invalid archive format or extraction failure
+    /// * [`SnapshotError::Io`] - File system errors during extraction
+    /// * [`SnapshotError::InvalidFormat`] - Path traversal attempt detected
+    ///
+    /// # Security
+    ///
+    /// This method validates all file paths to prevent extraction outside
+    /// the target directory (path traversal attacks).
     pub async fn extract_snapshot(&self, archive_path: &Path, target_dir: &Path) -> SnapshotResult<Vec<String>> {
         info!("Extracting snapshot from {:?} to {:?}", archive_path, target_dir);
 

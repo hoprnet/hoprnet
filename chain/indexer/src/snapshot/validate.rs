@@ -1,3 +1,8 @@
+//! SQLite database validation for snapshot integrity verification.
+//!
+//! Validates extracted snapshot databases to ensure they contain expected
+//! tables, data, and are not corrupted before installation.
+
 use std::{fs, path::Path};
 
 use sqlx::{
@@ -8,44 +13,66 @@ use tracing::{info, warn};
 
 use crate::snapshot::error::{SnapshotError, SnapshotResult};
 
-/// Information about a validated snapshot
+/// Metadata about a validated snapshot database.
+///
+/// Contains information gathered during validation that describes
+/// the contents and state of the snapshot database.
 #[derive(Debug, Clone)]
 pub struct SnapshotInfo {
-    /// Number of log entries in the snapshot
+    /// Total number of log entries in the snapshot
     pub log_count: u64,
-    /// Latest block number in the snapshot
+    /// Highest block number found in the snapshot (if any)
     pub latest_block: Option<u64>,
-    /// Number of tables in the database
+    /// Number of database tables found
     pub tables: usize,
-    /// SQLite database version
+    /// SQLite version used to create the database  
     pub sqlite_version: String,
-    /// Size of the database file in bytes
+    /// Database file size in bytes
     pub db_size: u64,
 }
 
-/// Handles validation of snapshot SQLite databases
+/// Validates SQLite snapshot databases for integrity and expected content.
+///
+/// Performs comprehensive validation including database connectivity,
+/// schema verification, and data integrity checks.
 pub struct SnapshotValidator {
-    /// Expected tables that should exist in the logs database
+    /// Required tables that must exist in valid snapshot databases
     expected_tables: Vec<String>,
 }
 
 impl SnapshotValidator {
-    /// Creates a new snapshot validator
+    /// Creates a new validator with predefined expected tables.
+    ///
+    /// Expected tables include:
+    /// - `logs` - Blockchain log entries
+    /// - `blocks` - Block metadata
     pub fn new() -> Self {
         Self {
             expected_tables: vec!["logs".to_string(), "blocks".to_string()],
         }
     }
 
-    /// Validates a snapshot database
+    /// Validates a snapshot database for integrity and expected content.
+    ///
+    /// Performs comprehensive validation:
+    /// 1. File existence and accessibility
+    /// 2. Database connectivity
+    /// 3. Schema validation (expected tables)
+    /// 4. Data integrity checks
+    /// 5. Content statistics gathering
     ///
     /// # Arguments
     ///
-    /// * `db_path` - Path to the SQLite database file
+    /// * `db_path` - Path to the SQLite database file to validate
     ///
     /// # Returns
     ///
-    /// Information about the validated snapshot
+    /// [`SnapshotInfo`] containing validation results and database metadata
+    ///
+    /// # Errors
+    ///
+    /// * [`SnapshotError::Validation`] - Database corruption or schema issues
+    /// * [`SnapshotError::Io`] - File access errors
     pub async fn validate_snapshot(&self, db_path: &Path) -> SnapshotResult<SnapshotInfo> {
         info!("Validating snapshot database at {:?}", db_path);
 

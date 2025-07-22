@@ -1,35 +1,40 @@
-//! Snapshot module for HOPR indexer
+//! Fast synchronization using database snapshots.
 //!
-//! This module provides functionality for downloading, extracting, validating, and managing
-//! log database snapshots. Snapshots allow new nodes to quickly synchronize with the network
-//! by downloading pre-built database files instead of fetching all historical logs.
+//! This module enables HOPR nodes to synchronize quickly with the network by downloading
+//! and installing pre-built database snapshots instead of processing all historical blockchain logs.
 //!
 //! # Features
 //!
-//! - **Download**: Secure download of snapshot archives from HTTP/HTTPS URLs with retry logic
-//! - **Extraction**: Safe extraction of tar.gz archives with path traversal protection
-//! - **Validation**: SQLite database integrity checks and content validation
-//! - **Disk Space Management**: Cross-platform disk space verification before operations
-//! - **Error Handling**: Comprehensive error types with actionable user guidance
+//! - **HTTP/HTTPS Downloads**: Secure download with retry logic and progress tracking
+//! - **Local File Support**: Direct installation from local `file://` URLs
+//! - **Archive Extraction**: Safe tar.gz extraction with path traversal protection
+//! - **Database Validation**: SQLite integrity checks and content verification
+//! - **Disk Space Management**: Cross-platform space validation before operations
+//! - **Comprehensive Errors**: Actionable error messages with recovery suggestions
+//!
+//! # URL Support
+//!
+//! - `https://example.com/snapshot.tar.gz` - Remote HTTP/HTTPS downloads
+//! - `file:///path/to/snapshot.tar.gz` - Local file system access
 //!
 //! # Example
 //!
 //! ```no_run
 //! use std::path::Path;
-//!
 //! use hopr_chain_indexer::snapshot::SnapshotManager;
 //!
-//! async fn setup_snapshot(
-//!     db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
-//! ) -> Result<(), Box<dyn std::error::Error>> {
-//!     let manager = SnapshotManager::with_db(db);
-//!     let snapshot_info = manager
-//!         .download_and_setup_snapshot("https://example.com/snapshot.tar.gz", Path::new("/data/hopr"))
-//!         .await?;
+//! # async fn example(db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static) -> Result<(), Box<dyn std::error::Error>> {
+//! let manager = SnapshotManager::with_db(db);
+//! let info = manager
+//!     .download_and_setup_snapshot(
+//!         "https://snapshots.hoprnet.org/logs.tar.gz",
+//!         Path::new("/data/hopr")
+//!     )
+//!     .await?;
 //!
-//!     println!("Snapshot installed: {} logs", snapshot_info.log_count);
-//!     Ok(())
-//! }
+//! println!("Installed snapshot: {} logs, {} blocks", info.log_count, info.block_count);
+//! # Ok(())
+//! # }
 //! ```
 
 pub mod download;
@@ -51,17 +56,17 @@ use tracing::{debug, error, info};
 
 use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator};
 
-/// Main snapshot management interface for coordinating snapshot operations with database support.
+/// Coordinates snapshot download, extraction, validation, and database integration.
 ///
-/// `SnapshotManager` provides a high-level API for downloading, extracting, and validating
-/// database snapshots. It coordinates the individual components (downloader, extractor, validator)
-/// to provide a seamless snapshot setup experience.
+/// The main interface for snapshot operations in production environments.
+/// Manages the complete workflow from download to database installation.
 ///
-/// # Components
+/// # Architecture
 ///
-/// - **Downloader**: Handles HTTP/HTTPS downloads with retry logic and progress tracking
-/// - **Extractor**: Safely extracts tar.gz archives with security validations
-/// - **Validator**: Verifies SQLite database integrity and content consistency
+/// - [`SnapshotDownloader`] - HTTP/HTTPS and file:// URL handling with retry logic
+/// - [`SnapshotExtractor`] - Secure tar.gz extraction with path validation
+/// - [`SnapshotValidator`] - SQLite integrity and content verification
+/// - Database integration via [`HoprDbGeneralModelOperations::replace_logs_db`]
 pub struct SnapshotManager<Db>
 where
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
@@ -76,7 +81,20 @@ impl<Db> SnapshotManager<Db>
 where
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
-    /// Creates a new snapshot manager instance with a database
+    /// Creates a snapshot manager with database integration.
+    ///
+    /// # Arguments
+    ///
+    /// * `db` - Database instance implementing [`HoprDbGeneralModelOperations`]
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use hopr_chain_indexer::snapshot::SnapshotManager;
+    /// # fn example(db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static) {
+    /// let manager = SnapshotManager::with_db(db);
+    /// # }
+    /// ```
     pub fn with_db(db: Db) -> Self {
         Self {
             db,
@@ -86,16 +104,46 @@ where
         }
     }
 
-    /// Downloads and sets up a snapshot from the given URL
+    /// Downloads, extracts, validates, and installs a snapshot.
+    ///
+    /// Performs the complete snapshot setup workflow:
+    /// 1. Downloads archive from URL (HTTP/HTTPS/file://)
+    /// 2. Extracts tar.gz archive safely
+    /// 3. Validates database integrity
+    /// 4. Installs via [`HoprDbGeneralModelOperations::replace_logs_db`]
+    /// 5. Cleans up temporary files
     ///
     /// # Arguments
     ///
-    /// * `url` - The URL to download the snapshot from
-    /// * `data_dir` - The directory to install the snapshot to
+    /// * `url` - Snapshot URL (`https://`, `http://`, or `file://` scheme)
+    /// * `data_dir` - Target directory for temporary files during installation
     ///
     /// # Returns
     ///
-    /// Information about the installed snapshot on success
+    /// [`SnapshotInfo`] containing log count, block count, and metadata on success
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SnapshotError`] for network failures, validation errors, or installation issues
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use std::path::Path;
+    /// # use hopr_chain_indexer::snapshot::SnapshotManager;
+    /// # async fn example(manager: SnapshotManager<impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static>) -> Result<(), Box<dyn std::error::Error>> {
+    /// // Download from HTTPS
+    /// let info = manager
+    ///     .download_and_setup_snapshot("https://snapshots.hoprnet.org/logs.tar.gz", Path::new("/data"))
+    ///     .await?;
+    ///
+    /// // Use local file
+    /// let info = manager
+    ///     .download_and_setup_snapshot("file:///backups/snapshot.tar.gz", Path::new("/data"))
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn download_and_setup_snapshot(&self, url: &str, data_dir: &Path) -> SnapshotResult<SnapshotInfo> {
         info!("Starting snapshot download and setup from: {}", url);
 
@@ -137,8 +185,9 @@ where
 
 /// Test-only snapshot manager without database dependencies.
 ///
-/// This variant is used in tests where we don't need database integration
-/// and want to test individual components in isolation.
+/// Provides the same snapshot workflow as [`SnapshotManager`] but installs
+/// files directly to the filesystem instead of integrating with a database.
+/// Used in unit tests where database setup would add unnecessary complexity.
 #[cfg(test)]
 pub struct TestSnapshotManager {
     downloader: SnapshotDownloader,
@@ -148,7 +197,7 @@ pub struct TestSnapshotManager {
 
 #[cfg(test)]
 impl TestSnapshotManager {
-    /// Creates a new test snapshot manager instance
+    /// Creates a test snapshot manager without database dependencies.
     pub fn new() -> Self {
         Self {
             downloader: SnapshotDownloader::new(),
@@ -157,19 +206,19 @@ impl TestSnapshotManager {
         }
     }
 
-    /// Downloads and sets up a snapshot from the given URL (test version)
+    /// Downloads, extracts, validates, and installs a snapshot (test mode).
     ///
-    /// This version doesn't integrate with a database and just extracts files
-    /// to the data directory for testing purposes.
+    /// Performs the same workflow as [`SnapshotManager::download_and_setup_snapshot`]
+    /// but installs files directly to the filesystem instead of database integration.
     ///
     /// # Arguments
     ///
-    /// * `url` - The URL to download the snapshot from
-    /// * `data_dir` - The directory to install the snapshot to
+    /// * `url` - Snapshot URL (`https://`, `http://`, or `file://` scheme)
+    /// * `data_dir` - Target directory for extracted files
     ///
     /// # Returns
     ///
-    /// Information about the installed snapshot on success
+    /// [`SnapshotInfo`] containing validation results
     pub async fn download_and_setup_snapshot(&self, url: &str, data_dir: &Path) -> SnapshotResult<SnapshotInfo> {
         info!("Starting test snapshot download and setup from: {}", url);
 
@@ -205,7 +254,9 @@ impl TestSnapshotManager {
         Ok(snapshot_info)
     }
 
-    /// Installs snapshot files from temporary directory to final location
+    /// Installs snapshot files from temporary directory to final location.
+    ///
+    /// Copies extracted files to the target directory, replacing existing files.
     async fn install_snapshot_files(&self, temp_dir: &Path, data_dir: &Path, files: &[String]) -> SnapshotResult<()> {
         fs::create_dir_all(data_dir)?;
 
@@ -226,17 +277,17 @@ impl TestSnapshotManager {
         Ok(())
     }
 
-    /// Get access to the downloader for direct testing
+    /// Returns a reference to the downloader for component testing.
     pub fn downloader(&self) -> &SnapshotDownloader {
         &self.downloader
     }
 
-    /// Get access to the extractor for direct testing
+    /// Returns a reference to the extractor for component testing.
     pub fn extractor(&self) -> &SnapshotExtractor {
         &self.extractor
     }
 
-    /// Get access to the validator for direct testing
+    /// Returns a reference to the validator for component testing.
     pub fn validator(&self) -> &SnapshotValidator {
         &self.validator
     }
