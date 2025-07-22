@@ -66,6 +66,7 @@ github_format_changelog() {
   section_feature="\n### 🚀 New Features\n\n"
   section_fix="\n### 🐞 Fixes\n\n"
   section_refactor="\n### 🧹 Refactor\n\n"
+  section_ci="\n### ⚙️ Automation\n\n"
   section_documentation="\n### 📚 Documentation\n\n"
   section_performance="\n### ⚡ Performance Improvements\n\n"
   section_other="\n### 🌟 Other\n\n"
@@ -76,20 +77,23 @@ github_format_changelog() {
     title=$(echo "$entry" | jq -r '.title')
     author=$(echo "$entry" | jq -r '.author')
     case ${title} in
-    "feat("* | "chore("*)
+    "feat("* | "feat:"* | "chore("* | "chore:"*)
       section_feature+="* ${title} by @${author} in #${id}\n"
       ;;
-    "fix"*)
+    "fix("* | "fix:"*)
       section_fix+="* ${title} by @${author} in #${id}\n"
       ;;
-    "refactor("* | "style("*)
+    "refactor("* | "refactor:"* | "style("* | "style:"*)
       section_refactor+="* ${title} by @${author} in #${id}\n"
       ;;
-    "docs("*)
+    "docs("* | "docs:"*)
       section_documentation+="* ${title} by @${author} in #${id}\n"
       ;;
-    "perf("*)
+    "perf("* | "perf:"*)
       section_performance+="* ${title} by @${author} in #${id}\n"
+      ;;
+    "test("* | "test:"* | "build("* | "build:"*)
+      section_ci+="* ${title} by @${author} in #${id}\n"
       ;;
     *)
       section_other+="* ${title} by @${author} in #${id}\n"
@@ -98,7 +102,7 @@ github_format_changelog() {
   done
 
   # The exclamation mark (!) in ${!section} is used for indirect variable expansion in Bash. It allows you to reference the value of a variable whose name is stored in another variable.
-  for section in section_feature section_fix section_refactor section_documentation section_performance section_other; do
+  for section in section_feature section_fix section_refactor section_ci section_documentation section_performance section_other; do
     if [[ ${!section} == *" by "* ]]; then
       change_log_content+="${!section}\n"
     fi
