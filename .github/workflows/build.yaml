@@ -84,7 +84,7 @@ jobs:
     secrets: inherit
 
   package:
-    name: ${{ matrix.target }}-${{ matrix.packager.package }}
+    name: ${{ matrix.target.arch }}-${{ matrix.packager.package }}
     needs: build-binaries
     strategy:
       fail-fast: false
@@ -93,7 +93,7 @@ jobs:
           - arch: x86_64-linux
             runner: self-hosted-hoprnet-small
           - arch: aarch64-linux
-            runner: ubuntu-latest-arm64
+            runner: ubuntu-24.04-arm
         packager:
           - package: deb
             extension: deb
