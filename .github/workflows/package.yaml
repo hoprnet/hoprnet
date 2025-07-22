@@ -94,6 +94,12 @@ jobs:
           architecture=${architecture%-linux}
           echo "package_file_name=hoprd_${current_version}_${architecture}" | tee -a $GITHUB_OUTPUT
           echo "current_version=${current_version}" | tee -a $GITHUB_OUTPUT
+          ls -alh ./dist/bin
+          ./dist/bin/hoprd --version || echo "hoprd binary not found or version command failed"
+          ./dist/bin/hopli --version || echo "hopli binary not found or version command failed"
+          ./dist/bin/hoprd --help || echo "hoprd binary not found or help command failed"
+          ./dist/bin/hopli --help || echo "hopli binary not found or help command failed"
+
 
 
       - name: Install packages
