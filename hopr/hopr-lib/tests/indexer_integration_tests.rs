@@ -1,3 +1,4 @@
+use std::env;
 use std::path::Path;
 
 use hopr_chain_indexer::{IndexerConfig, snapshot::SnapshotManager};
@@ -18,7 +19,7 @@ use tracing::info;
 #[tokio::test]
 async fn test_full_snapshot_indexer_workflow() -> anyhow::Result<()> {
     // Setup test environment
-    let temp_dir = std::env::temp_dir().join("hopr_snapshot_test");
+    let temp_dir = env::temp_dir().join("hopr_snapshot_test");
     let data_dir = temp_dir.join("hopr_data");
     fs::create_dir_all(&data_dir).await?;
 
@@ -38,7 +39,7 @@ async fn test_full_snapshot_indexer_workflow() -> anyhow::Result<()> {
     let snapshot_url = format!("file://{}", snapshot_file_path.display());
     info!("Using snapshot from: {}", snapshot_url);
 
-    // Create SnapshotManager with standard validation
+    // Create SnapshotManager
     let snapshot_manager = SnapshotManager::with_db(db.clone());
 
     info!("Testing snapshot download and installation workflow...");
@@ -104,7 +105,7 @@ async fn test_snapshot_validation_workflow() -> anyhow::Result<()> {
 
     info!("Testing isolated snapshot validation workflow");
 
-    let temp_dir = std::env::temp_dir().join("hopr_validation_test");
+    let temp_dir = env::temp_dir().join("hopr_validation_test");
     let data_dir = temp_dir.join("validation_test");
     fs::create_dir_all(&data_dir).await?;
 
@@ -148,7 +149,7 @@ async fn test_snapshot_validation_workflow() -> anyhow::Result<()> {
     info!("Testing validation step...");
     // Validate the snapshot with strict validation
     let snapshot_info = validator.validate_snapshot(&db_path).await?;
-    
+
     info!("Snapshot validation successful:");
     info!("   - Validated {} logs", snapshot_info.log_count);
     info!("   - Latest block: {:?}", snapshot_info.latest_block);

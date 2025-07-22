@@ -21,37 +21,92 @@ mod tests {
 
         let mut conn = SqliteConnection::connect_with(&options).await?;
 
-        // Create test tables
+        // Create test tables matching the actual snapshot schema
         conn.execute(
-            "CREATE TABLE logs (
-                id INTEGER PRIMARY KEY,
-                block_number INTEGER NOT NULL,
-                log_index INTEGER NOT NULL,
-                data TEXT NOT NULL
+            "CREATE TABLE log (
+                transaction_index blob(8) NOT NULL,
+                log_index blob(8) NOT NULL,
+                block_number blob(8) NOT NULL,
+                block_hash blob(32) NOT NULL,
+                transaction_hash blob(32) NOT NULL,
+                address blob(20) NOT NULL,
+                topics blob(1) NOT NULL,
+                data blob(1) NOT NULL,
+                removed boolean NOT NULL
             )",
         )
         .await?;
 
         conn.execute(
-            "CREATE TABLE blocks (
+            "CREATE TABLE log_status (
                 id INTEGER PRIMARY KEY,
-                block_number INTEGER NOT NULL UNIQUE,
-                block_hash TEXT NOT NULL
+                status TEXT NOT NULL
             )",
         )
         .await?;
 
-        // Insert test data
-        conn.execute("INSERT INTO logs (block_number, log_index, data) VALUES (1, 0, 'test_log_1')")
+        conn.execute(
+            "CREATE TABLE log_topic_info (
+                id INTEGER PRIMARY KEY,
+                topic_hash TEXT NOT NULL
+            )",
+        )
+        .await?;
+
+        conn.execute(
+            "CREATE TABLE seaql_migrations (
+                version TEXT PRIMARY KEY,
+                applied_at INTEGER NOT NULL
+            )",
+        )
+        .await?;
+
+        // Insert test data with proper blob format (8-byte big-endian for block numbers)
+        let block_1_bytes = 1i64.to_be_bytes().to_vec();
+        let block_2_bytes = 2i64.to_be_bytes().to_vec();
+        let dummy_blob = vec![0u8];
+        let dummy_hash32 = vec![0u8; 32];
+        let dummy_hash20 = vec![0u8; 20];
+
+        sqlx::query(
+            "INSERT INTO log (transaction_index, log_index, block_number, block_hash, transaction_hash, address, \
+             topics, data, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&block_1_bytes) // transaction_index
+        .bind(&block_1_bytes) // log_index
+        .bind(&block_1_bytes) // block_number
+        .bind(&dummy_hash32) // block_hash
+        .bind(&dummy_hash32) // transaction_hash
+        .bind(&dummy_hash20) // address
+        .bind(&dummy_blob) // topics
+        .bind(&dummy_blob) // data
+        .bind(false) // removed
+        .execute(&mut conn)
+        .await?;
+
+        sqlx::query(
+            "INSERT INTO log (transaction_index, log_index, block_number, block_hash, transaction_hash, address, \
+             topics, data, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&block_2_bytes) // transaction_index
+        .bind(&block_2_bytes) // log_index
+        .bind(&block_2_bytes) // block_number
+        .bind(&dummy_hash32) // block_hash
+        .bind(&dummy_hash32) // transaction_hash
+        .bind(&dummy_hash20) // address
+        .bind(&dummy_blob) // topics
+        .bind(&dummy_blob) // data
+        .bind(false) // removed
+        .execute(&mut conn)
+        .await?;
+
+        conn.execute("INSERT INTO log_status (status) VALUES ('active')")
             .await?;
 
-        conn.execute("INSERT INTO logs (block_number, log_index, data) VALUES (2, 0, 'test_log_2')")
+        conn.execute("INSERT INTO log_topic_info (topic_hash) VALUES ('0x123')")
             .await?;
 
-        conn.execute("INSERT INTO blocks (block_number, block_hash) VALUES (1, 'hash_1')")
-            .await?;
-
-        conn.execute("INSERT INTO blocks (block_number, block_hash) VALUES (2, 'hash_2')")
+        conn.execute("INSERT INTO seaql_migrations (version, applied_at) VALUES ('v1', 1234567890)")
             .await?;
 
         Ok(())
@@ -102,7 +157,7 @@ mod tests {
     #[tokio::test]
     async fn test_snapshot_validator() {
         let temp_dir = TempDir::new().unwrap();
-        let validator = SnapshotValidator::new_legacy();
+        let validator = SnapshotValidator::new();
 
         // Create test database
         let db_path = temp_dir.path().join("hopr_logs.db");
@@ -115,13 +170,13 @@ mod tests {
         let info = result.unwrap();
         assert_eq!(info.log_count, 2);
         assert_eq!(info.latest_block, Some(2));
-        assert_eq!(info.tables, 2);
+        assert_eq!(info.tables, 4);
     }
 
     #[tokio::test]
     async fn test_snapshot_validator_missing_file() {
         let temp_dir = TempDir::new().unwrap();
-        let validator = SnapshotValidator::new_legacy();
+        let validator = SnapshotValidator::new();
 
         // Try to validate non-existent file
         let db_path = temp_dir.path().join("nonexistent.db");
@@ -326,7 +381,7 @@ mod tests {
         // Create a test database
         create_test_sqlite_db(&db_path).await.unwrap();
 
-        let validator = SnapshotValidator::new_legacy();
+        let validator = SnapshotValidator::new();
         let result = validator.validate_snapshot(&db_path).await;
 
         assert!(result.is_ok());
