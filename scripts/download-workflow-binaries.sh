@@ -39,7 +39,7 @@ while IFS= read -r line; do
   unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/unzip"
   for artifact in dist/unzip/*; do
     case "$artifact_name" in
-    *.sha256) cat "$artifact" >> dist/upload/SHA256SUMS ;;
+    *.sha256) cat "$artifact" >>dist/upload/SHA256SUMS ;;
     *) mv "$artifact" dist/upload/${artifact_name} ;;
     esac
   done
