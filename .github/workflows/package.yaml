@@ -111,6 +111,8 @@ jobs:
           if [[ "${{ inputs.packager }}" == "deb" ]]; then
             gzip -9 -c ./deploy/nfpm/changelog > ./deploy/nfpm/changelog.gz
           fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Nix
         uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
@@ -127,8 +129,6 @@ jobs:
 
       - name: Package
         run: nix develop -c just package ${{ inputs.packager }} ${{ inputs.target }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create package Signature
         run: |
