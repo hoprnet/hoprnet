@@ -58,6 +58,32 @@ test-package packager arch:
     deploy/nfpm/test-package-tool.sh copy {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
     deploy/nfpm/test-package-tool.sh install {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
 
+sign-file source_file:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    echo "Signing file: {{source_file}}"
+    basename="$(basename {{source_file}})"
+    dirname="$(dirname {{source_file}})"
+
+     # Create isolated GPG keyring
+    gnupghome="$(mktemp -d)"
+    export GNUPGHOME="$gnupghome"
+    echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
+
+     # Generate hash and signature
+    cd "$dirname"
+    shasum -a 256 "$basename" > "$basename.sha256"
+    echo "Hash written to $basename.sha256"
+    gpg --armor --output "$basename.sig" --detach-sign "$basename"
+    echo "Signature written to $basename.sig"
+    gpg --armor --output "$basename.sha256.asc" --sign "$basename.sha256"
+    echo "Signature for hash written to $basename.sha256.asc"
+
+     # Clean up
+    rm -rf "$gnupghome"
+
+
+
 # list all available docker image targets which can be built
 list-docker-images:
     nix flake show --json | jq '.packages | to_entries | .[0].value | to_entries[] | select(.key | endswith("docker")) | .key'

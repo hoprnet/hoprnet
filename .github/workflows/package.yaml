@@ -96,10 +96,16 @@ jobs:
           echo "current_version=${current_version}" | tee -a $GITHUB_OUTPUT
 
 
-      - name: Generate man pages
+      - name: Install packages
         run: |
           sudo apt-get update
-          sudo apt install -y help2man gzip
+          sudo apt install -y help2man just
+          nfpm_url=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | jq -r '.assets[] | select(.name | endswith("amd64.deb")) | .browser_download_url')
+          curl -L -o nfpm.deb "$nfpm_url"
+          sudo apt install -y ./nfpm.deb
+
+      - name: Generate man pages
+        run: |
           help2man --name="HOPR node executable" --no-info --output ./deploy/nfpm/hoprd.1 ./dist/bin/hoprd
           gzip -9n ./deploy/nfpm/hoprd.1
           help2man --name="HOPR CLI helper tool" --no-info --output ./deploy/nfpm/hopli.1 ./dist/bin/hopli
@@ -114,25 +120,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          nix_path: nixpkgs=channel:nixos-24.05
-
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
-
       - name: Package
-        run: nix develop -c just package ${{ inputs.packager }} ${{ inputs.target }}
+        run: just package ${{ inputs.packager }} ${{ inputs.target }}
 
       - name: Create package Signature
-        run: |
-          nix run .#sign -- "${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}"
+        run: just sign-file "${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}"
         env:
           GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
 
@@ -162,17 +154,17 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.sha256
-          path: ${{ github.workspace }}/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sha256
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sha256
 
 
       - name: Publish Github Workflow signed package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.sig
-          path: ${{ github.workspace }}/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sig
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sig
 
       - name: Publish Github Workflow hash signature package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.sha256.asc
-          path: ${{ github.workspace }}/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sha256.asc
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sha256.asc
