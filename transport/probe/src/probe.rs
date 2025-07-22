@@ -363,7 +363,7 @@ mod tests {
 
     /// !!! This generates a completely random data blob that pretends to be a SURB.
     ///
-    /// !!! It must never by accessed or invoked, only passed around.
+    /// !!! It must never be accessed or invoked, only passed around.
     fn random_memory_violating_surb() -> hopr_db_api::protocol::HoprSurb {
         const SURB_SIZE: usize = std::mem::size_of::<hopr_db_api::protocol::HoprSurb>();
 

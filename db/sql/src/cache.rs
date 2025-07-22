@@ -2,7 +2,6 @@ use std::{
     sync::{Arc, Mutex, atomic::AtomicU64},
     time::Duration,
 };
-
 use dashmap::{DashMap, Entry};
 use hopr_crypto_packet::{
     HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener,
@@ -70,22 +69,22 @@ pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 /// Ring buffer containing SURBs along with their IDs.
 /// All these SURBs usually belong to the same pseudonym.
 #[derive(Clone, Debug)]
-pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<(HoprSurbId, HoprSurb)>>>);
+pub(crate) struct SurbRingBuffer<S>(Arc<Mutex<AllocRingBuffer<(HoprSurbId, S)>>>);
 
-impl Default for SurbRingBuffer {
+impl<S> Default for SurbRingBuffer<S> {
     fn default() -> Self {
-        // With the current packet size, this is roughly for 7 MB of data budget in SURBs
+        // With the current packet size, this is almost 10 MB of data budget in SURBs
         Self::new(10_000)
     }
 }
 
-impl SurbRingBuffer {
+impl<S> SurbRingBuffer<S> {
     pub fn new(capacity: usize) -> Self {
         Self(Arc::new(Mutex::new(AllocRingBuffer::new(capacity))))
     }
 
     /// Push all SURBs with their IDs into the RB.
-    pub fn push<I: IntoIterator<Item = (HoprSurbId, HoprSurb)>>(&self, surbs: I) -> Result<(), DbError> {
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> Result<(), DbError> {
         self.0
             .lock()
             .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
@@ -94,7 +93,7 @@ impl SurbRingBuffer {
     }
 
     /// Pop the latest SURB and its IDs from the RB.
-    pub fn pop_one(&self) -> Result<(HoprSurbId, HoprSurb), DbError> {
+    pub fn pop_one(&self) -> Result<(HoprSurbId, S), DbError> {
         self.0
             .lock()
             .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
@@ -103,7 +102,7 @@ impl SurbRingBuffer {
     }
 
     /// Check if the next SURB has the given ID and pop it from the RB.
-    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, HoprSurb), DbError> {
+    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, S), DbError> {
         let mut rb = self
             .0
             .lock()
@@ -131,7 +130,7 @@ pub struct HoprDbCaches {
     // KeyIdMapper must be synchronous because it is used from a sync context.
     pub(crate) key_id_mapper: CacheKeyMapper,
     pub(crate) pseudonym_openers: moka::sync::Cache<HoprSenderId, ReplyOpener>,
-    pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer>,
+    pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
 }
 
 impl Default for HoprDbCaches {
@@ -264,5 +263,56 @@ impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for 
 
     fn map_id_to_public(&self, id: &KeyIdent) -> Option<OffchainPublicKey> {
         self.0.get(id).map(|k| *k.value())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn surb_ring_buffer_must_drop_items_when_capacity_is_reached() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(3);
+        rb.push([([1u8; 8], 0)])?;
+        rb.push([([2u8; 8], 0)])?;
+        rb.push([([3u8; 8], 0)])?;
+        rb.push([([4u8; 8], 0)])?;
+
+        assert_eq!([2u8; 8],  rb.pop_one()?.0);
+        assert_eq!([3u8; 8],  rb.pop_one()?.0);
+        assert_eq!([4u8; 8],  rb.pop_one()?.0);
+        assert!(rb.pop_one().is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn surb_ring_buffer_must_be_fifo() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5);
+
+        rb.push([([1u8; 8], 0)])?;
+        rb.push([([2u8; 8], 0)])?;
+
+        assert_eq!([1u8; 8],  rb.pop_one()?.0);
+        assert_eq!([2u8; 8],  rb.pop_one()?.0);
+
+        rb.push([([1u8; 8], 0), ([2u8; 8], 0)])?;
+
+        assert_eq!([1u8; 8],  rb.pop_one()?.0);
+        assert_eq!([2u8; 8],  rb.pop_one()?.0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn surb_ring_buffer_must_not_pop_if_id_does_not_match() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5);
+
+        rb.push([([1u8; 8], 0)])?;
+
+        assert!(rb.pop_one_if_has_id(&[2u8; 8]).is_err());
+        assert_eq!([1u8; 8],  rb.pop_one_if_has_id(&[1u8; 8])?.0);
+
+        Ok(())
     }
 }
