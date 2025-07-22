@@ -484,6 +484,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         target: SessionTarget,
         cfg: SessionClientConfig,
     ) -> crate::errors::Result<Session> {
+        self.session_initiations.run_pending_tasks().await;
+        self.sessions.run_pending_tasks().await;
+
         if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
         }
@@ -791,6 +794,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                 // Construct the session
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+                self.sessions.run_pending_tasks().await;
                 let allocated_slot = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
                     insert_into_next_slot(
                         &self.sessions,
