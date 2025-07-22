@@ -9,7 +9,7 @@ Hoprd has a ready to use package for the following variants:
 ## Install via package manager
 
 - Visit the [release page](https://github.com/hoprnet/hoprnet/releases)
-- Determine your processor architecture by running `uname -a`.  
+- Determine your processor architecture by running `uname -m`.  
   Note: `arm64` is equivalent to `aarch64`.
 - Choose the appropriate package format for your system: `deb`, `rpm`, or `pkg.tar.zst`.
 - Set the required environment variables before installing the package:
