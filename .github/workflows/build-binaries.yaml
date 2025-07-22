@@ -138,37 +138,8 @@ jobs:
           nix build -L .#${{ steps.vars.outputs.binary }}${{ steps.vars.outputs.package_suffix }}
           cp "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}" "${{ github.workspace }}/${{ steps.vars.outputs.binary }}"
 
-      - name: Install packages
-        run: |
-          apt-get update
-          apt install -y just
-
-      - name: Create ${{ steps.vars.outputs.binary }} Signature
-        run: just sign-file "${{ github.workspace }}/${{ steps.vars.outputs.binary }}"
-        env:
-          GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
-
-
-      - name: Publish Github Workflow binary
+      - name: Publish ${{ steps.vars.outputs.binary }} binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
           path: ${{ github.workspace }}/${{ steps.vars.outputs.binary }}
-
-      - name: Publish Github Workflow binary signature
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sig
-          path: ${{ github.workspace }}/${{ steps.vars.outputs.binary }}.sig
-
-      - name: Publish Github Workflow binary hash
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sha256
-          path: ${{ github.workspace }}/${{ steps.vars.outputs.binary }}.sha256
-
-      - name: Publish Github Workflow binary hash signature
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sha256.asc
-          path: ${{ github.workspace }}/${{ steps.vars.outputs.binary }}.sha256.asc
