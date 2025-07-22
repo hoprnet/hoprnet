@@ -15,7 +15,7 @@ use hopr_network_types::{
 use hopr_primitive_types::prelude::BytesRepresentable;
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
-    StatelessSocket,
+    UnreliableSocket,
 };
 use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::debug;
@@ -317,7 +317,7 @@ impl Session {
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
 
-                Box::pin(StatelessSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
+                Box::pin(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
                     id, transport, socket_cfg,
                 )?)
             }

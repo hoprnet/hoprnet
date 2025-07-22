@@ -25,11 +25,18 @@ use crate::{
     protocol::{SessionCodec, SessionMessage},
     socket::state::{SocketComponents, Stateless},
 };
+use crate::frames::SeqIndicator;
+use crate::protocol::SegmentRequest;
 
 /// Configuration object for [`SessionSocket`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
 pub struct SessionSocketConfig {
     /// The maximum size of a frame on the read/write interface of the [`SessionSocket`].
+    ///
+    /// The size is always greater or equal to the MTU `C` of the underlying transport, and
+    /// less or equal to:
+    /// - (`C` -  [`SessionMessage::SEGMENT_OVERHEAD`]) * ([`SeqIndicator::MAX`] + 1) for stateless sockets, or
+    /// - (`C` - `SessionMessage::SEGMENT_OVERHEAD`) * min(`SeqIndicator::MAX` + 1, [`SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`]) for stateful sockets
     ///
     /// Default is 1500 bytes.
     #[default(1500)]
@@ -58,6 +65,8 @@ pub struct SessionSocketConfig {
 ///
 /// The [`SocketState`] `S` given during instantiation can facilitate reliable or unreliable
 /// behavior (see [`AcknowledgementState`](ack_state::AcknowledgementState))
+///
+/// The constant argument `C` specifies the MTU in bytes of the underlying transport.
 #[pin_project::pin_project]
 pub struct SessionSocket<const C: usize, S> {
     // This is where upstream writes the to-be-segmented frame data to
@@ -77,6 +86,9 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         I: std::fmt::Display + Clone,
     {
+        // The maximum frame size in a stateless socket is only bounded by the size of the SeqIndicator
+        let frame_size = cfg.frame_size.clamp(C, (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize);
+
         // Segment data incoming/outgoing using underlying transport
         let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
 
@@ -90,7 +102,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Pipeline IN: Data incoming from Upstream
         let upstream_frames_in = packets_out
             .with(|segment| future::ok(SessionMessage::<C>::Segment(segment)))
-            .segmenter::<C>(cfg.frame_size);
+            .segmenter::<C>(frame_size);
 
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
@@ -163,6 +175,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
+        // The maximum frame size is reduced due to the size of the missing segment bitmap in SegmentRequests
+        let frame_size = cfg.frame_size.clamp(C, (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize));
+
         // Segment data incoming/outgoing using underlying transport
         let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
 
@@ -194,7 +209,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 }
                 future::ok(SessionMessage::<C>::Segment(segment))
             })
-            .segmenter_with_terminating_segment::<C>(cfg.frame_size);
+            .segmenter_with_terminating_segment::<C>(frame_size);
 
         // We have to merge the streams here and spawn a special task for it
         // Since the control messages from the State can come independent of Upstream writes.
@@ -373,11 +388,11 @@ mod tests {
 
     use futures::{AsyncReadExt, AsyncWriteExt};
     use futures_time::future::FutureExt;
-
+    use hopr_crypto_packet::prelude::HoprPacket;
     use super::*;
     use crate::{AcknowledgementState, AcknowledgementStateConfig, utils::test::*};
 
-    const MTU: usize = 1000;
+    const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 
     const FRAME_SIZE: usize = 1500;
 

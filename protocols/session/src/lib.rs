@@ -10,7 +10,7 @@
 //! The session has some reliability guarantees given by the retransmission and acknowledgement
 //! capabilities of individual segments.
 //!
-//! The [`StatelessSocket`] acts as an unreliable Session protocol socket, taking care only of
+//! The [`UnreliableSocket`] acts as an unreliable Session protocol socket, taking care only of
 //! segmentation, reassembly and sequencing.
 //!
 //! The [`ReliableSocket`] has (in addition to segmentation, reassembly and sequencing) an
@@ -49,7 +49,7 @@ pub mod types {
 }
 
 /// Represents a stateless (and therefore unreliable) socket.
-pub type StatelessSocket<const C: usize> = SessionSocket<C, Stateless<C>>;
+pub type UnreliableSocket<const C: usize> = SessionSocket<C, Stateless<C>>;
 
 /// Represents a socket with reliable delivery.
 pub type ReliableSocket<const C: usize> = SessionSocket<C, AcknowledgementState<C>>;
@@ -75,12 +75,12 @@ pub trait SessionSocketExt: futures::io::AsyncRead + futures::io::AsyncWrite + S
         SessionSocket::new(self, ack, cfg)
     }
 
-    /// Runs [unreliable](StatelessSocket) Session protocol on self.
+    /// Runs [unreliable](UnreliableSocket) Session protocol on self.
     fn unreliable_session<const MTU: usize>(
         self,
         id: &str,
         cfg: SessionSocketConfig,
-    ) -> errors::Result<StatelessSocket<MTU>>
+    ) -> errors::Result<UnreliableSocket<MTU>>
     where
         Self: Sized + 'static,
     {

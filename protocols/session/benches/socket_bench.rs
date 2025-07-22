@@ -2,7 +2,7 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use futures::{AsyncRead, AsyncWrite, io::Cursor};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::utils::DuplexIO;
-use hopr_protocol_session::{SessionSocketConfig, StatelessSocket};
+use hopr_protocol_session::{SessionSocketConfig, UnreliableSocket};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
 const MTU: usize = HoprPacket::PAYLOAD_SIZE;
@@ -11,7 +11,7 @@ pub async fn alice_send_data<S: AsyncRead + AsyncWrite + Send + Unpin + 'static>
     use futures::AsyncWriteExt;
 
     let mut alice_socket =
-        StatelessSocket::<MTU>::new_stateless("alice", alice, SessionSocketConfig::default()).unwrap();
+        UnreliableSocket::<MTU>::new_stateless("alice", alice, SessionSocketConfig::default()).unwrap();
 
     alice_socket.write_all(data).await.unwrap();
     alice_socket.flush().await.unwrap();
@@ -21,7 +21,7 @@ pub async fn alice_send_data<S: AsyncRead + AsyncWrite + Send + Unpin + 'static>
 pub async fn bob_receive_data(data: Vec<u8>, mut recv_data: Vec<u8>) -> Vec<u8> {
     use futures::AsyncReadExt;
 
-    let mut bob_socket = StatelessSocket::<MTU>::new_stateless(
+    let mut bob_socket = UnreliableSocket::<MTU>::new_stateless(
         "bob",
         DuplexIO::from((futures::io::sink(), Cursor::new(data))),
         SessionSocketConfig::default(),

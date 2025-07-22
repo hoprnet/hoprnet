@@ -34,7 +34,7 @@ pub fn segment<T: AsRef<[u8]>>(data: T, max_segment_size: usize, frame_id: u32) 
     }
 
     if max_segment_size == 0 {
-        return Err(SessionError::InvalidSegmentSize);
+        return Err(SessionError::IncorrectMessageLength);
     }
 
     let data = data.as_ref();

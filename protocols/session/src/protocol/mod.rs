@@ -58,7 +58,7 @@ pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest}
 
 use crate::{
     errors::SessionError,
-    frames::{Segment, SeqIndicator},
+    frames::Segment,
 };
 
 /// Contains all messages of the Session sub-protocol.
@@ -106,11 +106,6 @@ impl<const C: usize> SessionMessage<C> {
             + Segment::HEADER_SIZE
                 .min(SegmentRequest::<C>::SIZE)
                 .min(FrameAcknowledgements::<C>::SIZE)
-    }
-
-    /// Maximum number of segments per frame.
-    pub fn max_segments_per_frame() -> usize {
-        SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min(SeqIndicator::MAX as usize + 1)
     }
 
     /// Convenience method to encode the session message.
@@ -222,7 +217,6 @@ mod tests {
         assert_eq!(1, SessionMessage::<0>::VERSION);
         assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
         assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
-        assert_eq!(8, SessionMessage::<0>::max_segments_per_frame());
         assert_eq!(2047, SessionMessage::<0>::MAX_MESSAGE_LENGTH);
     }
 
