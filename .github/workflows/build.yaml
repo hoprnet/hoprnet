@@ -91,7 +91,7 @@ jobs:
       matrix:
         target:
           - arch: x86_64-linux
-            runner: self-hosted-hoprnet-small
+            runner: ubuntu-latest
           - arch: aarch64-linux
             runner: ubuntu-24.04-arm
         packager:
