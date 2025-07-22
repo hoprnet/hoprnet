@@ -104,6 +104,7 @@ where
         }
     }
 
+
     /// Downloads, extracts, validates, and installs a snapshot.
     ///
     /// Performs the complete snapshot setup workflow:
@@ -188,6 +189,7 @@ where
 /// Provides the same snapshot workflow as [`SnapshotManager`] but installs
 /// files directly to the filesystem instead of integrating with a database.
 /// Used in unit tests where database setup would add unnecessary complexity.
+/// Uses legacy table names for backward compatibility with existing tests.
 #[cfg(test)]
 pub struct TestSnapshotManager {
     downloader: SnapshotDownloader,
@@ -202,7 +204,7 @@ impl TestSnapshotManager {
         Self {
             downloader: SnapshotDownloader::new(),
             extractor: SnapshotExtractor::new(),
-            validator: SnapshotValidator::new(),
+            validator: SnapshotValidator::new_legacy(),
         }
     }
 

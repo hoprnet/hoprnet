@@ -9,7 +9,7 @@ let
   shellHook = ''
     ${pre-commit-check.shellHook}
   '';
-  packages = [ ];
+  packages = [ sqlite ];
   shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [
     "pre-commit-check"

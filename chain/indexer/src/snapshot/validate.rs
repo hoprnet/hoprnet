@@ -44,9 +44,28 @@ impl SnapshotValidator {
     /// Creates a new validator with predefined expected tables.
     ///
     /// Expected tables include:
-    /// - `logs` - Blockchain log entries
-    /// - `blocks` - Block metadata
+    /// - `log` - Blockchain log entries
+    /// - `log_status` - Log processing status
+    /// - `log_topic_info` - Log topic information
+    /// - `seaql_migrations` - Database migration tracking
     pub fn new() -> Self {
+        Self {
+            expected_tables: vec![
+                "log".to_string(),
+                "log_status".to_string(),
+                "log_topic_info".to_string(),
+                "seaql_migrations".to_string(),
+            ],
+        }
+    }
+
+    /// Creates a validator for legacy test databases.
+    ///
+    /// Expected tables include:
+    /// - `logs` - Blockchain log entries (legacy format)
+    /// - `blocks` - Block metadata (legacy format)
+    #[cfg(test)]
+    pub fn new_legacy() -> Self {
         Self {
             expected_tables: vec!["logs".to_string(), "blocks".to_string()],
         }
@@ -137,25 +156,67 @@ impl SnapshotValidator {
             .await
             .map_err(|e| SnapshotError::Validation(format!("Cannot query tables: {e}")))?;
 
-        // Verify expected tables exist
+        // Verify expected tables exist with strict validation
+        let mut missing_tables = Vec::new();
         for expected in expected_tables {
             if !tables.contains(expected) {
-                return Err(SnapshotError::Validation(
-                    format!("Missing expected table: {expected}",),
-                ));
+                missing_tables.push(expected.clone());
             }
         }
 
-        // Get snapshot metadata
-        let log_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM logs")
-            .fetch_one(&mut conn)
-            .await
-            .map_err(|e| SnapshotError::Validation(format!("Cannot count logs: {e}")))?;
+        if !missing_tables.is_empty() {
+            return Err(SnapshotError::Validation(format!(
+                "Missing required table(s): {}. Available tables: [{}]",
+                missing_tables.join(", "),
+                tables.join(", ")
+            )));
+        }
 
-        let latest_block: Option<i64> = sqlx::query_scalar("SELECT MAX(block_number) FROM logs")
+        // Determine which table to use for logs (new schema uses 'log', legacy uses 'logs')
+        let log_table = if tables.contains(&"log".to_string()) {
+            "log"
+        } else if tables.contains(&"logs".to_string()) {
+            "logs"
+        } else {
+            return Err(SnapshotError::Validation(format!(
+                "No log table found. Available tables: [{}]",
+                tables.join(", ")
+            )));
+        };
+
+        // Get snapshot metadata using the detected log table
+        let log_count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {}", log_table))
             .fetch_one(&mut conn)
             .await
-            .map_err(|e| SnapshotError::Validation(format!("Cannot get latest block: {e}")))?;
+            .map_err(|e| SnapshotError::Validation(format!("Cannot count logs from {}: {e}", log_table)))?;
+
+        // Get latest block number, handling both integer and blob formats
+        let latest_block: Option<i64> = if log_table == "log" {
+            // New schema: block_number is stored as 8-byte big-endian blob
+            match sqlx::query_scalar::<_, Vec<u8>>(&format!("SELECT MAX(block_number) FROM {}", log_table))
+                .fetch_optional(&mut conn)
+                .await
+                .map_err(|e| SnapshotError::Validation(format!("Cannot get latest block: {e}")))?
+            {
+                Some(blob) if blob.len() == 8 => {
+                    // Convert 8-byte big-endian blob to i64
+                    let bytes: [u8; 8] = blob.try_into().map_err(|_| {
+                        SnapshotError::Validation("Invalid block_number blob length".to_string())
+                    })?;
+                    Some(i64::from_be_bytes(bytes))
+                }
+                Some(_) => {
+                    return Err(SnapshotError::Validation("Invalid block_number blob format".to_string()));
+                }
+                None => None,
+            }
+        } else {
+            // Legacy schema: block_number is stored as integer
+            sqlx::query_scalar::<_, Option<i64>>(&format!("SELECT MAX(block_number) FROM {}", log_table))
+                .fetch_one(&mut conn)
+                .await
+                .map_err(|e| SnapshotError::Validation(format!("Cannot get latest block: {e}")))?
+        };
 
         // Validate that we have some data
         if log_count == 0 {
@@ -199,11 +260,26 @@ impl SnapshotValidator {
             .await
             .map_err(|e| SnapshotError::Validation(format!("Cannot open database: {e}")))?;
 
-        let invalid_logs: i64 =
+        // Get available tables to determine schema format
+        let tables: Vec<String> = sqlx::query_scalar::<_, String>("SELECT name FROM sqlite_master WHERE type='table'")
+            .fetch_all(&mut conn)
+            .await
+            .map_err(|e| SnapshotError::Validation(format!("Cannot query tables: {e}")))?;
+
+        // Check for invalid block_numbers - adapt to schema format
+        let invalid_logs: i64 = if tables.contains(&"log".to_string()) {
+            // New schema: check for NULL block_numbers (blob columns can't be negative)
+            sqlx::query_scalar("SELECT COUNT(*) FROM log WHERE block_number IS NULL")
+                .fetch_one(&mut conn)
+                .await
+                .map_err(|e| SnapshotError::Validation(format!("Cannot check log consistency: {e}")))?
+        } else {
+            // Legacy schema: check for NULL or negative block_numbers
             sqlx::query_scalar("SELECT COUNT(*) FROM logs WHERE block_number IS NULL OR block_number < 0")
                 .fetch_one(&mut conn)
                 .await
-                .map_err(|e| SnapshotError::Validation(format!("Cannot check log consistency: {e}")))?;
+                .map_err(|e| SnapshotError::Validation(format!("Cannot check log consistency: {e}")))?
+        };
 
         if invalid_logs > 0 {
             return Err(SnapshotError::Validation(format!(

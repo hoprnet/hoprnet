@@ -102,7 +102,7 @@ mod tests {
     #[tokio::test]
     async fn test_snapshot_validator() {
         let temp_dir = TempDir::new().unwrap();
-        let validator = SnapshotValidator::new();
+        let validator = SnapshotValidator::new_legacy();
 
         // Create test database
         let db_path = temp_dir.path().join("hopr_logs.db");
@@ -121,7 +121,7 @@ mod tests {
     #[tokio::test]
     async fn test_snapshot_validator_missing_file() {
         let temp_dir = TempDir::new().unwrap();
-        let validator = SnapshotValidator::new();
+        let validator = SnapshotValidator::new_legacy();
 
         // Try to validate non-existent file
         let db_path = temp_dir.path().join("nonexistent.db");
@@ -326,7 +326,7 @@ mod tests {
         // Create a test database
         create_test_sqlite_db(&db_path).await.unwrap();
 
-        let validator = SnapshotValidator::new();
+        let validator = SnapshotValidator::new_legacy();
         let result = validator.validate_snapshot(&db_path).await;
 
         assert!(result.is_ok());

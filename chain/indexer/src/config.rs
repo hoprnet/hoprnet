@@ -78,7 +78,7 @@ impl IndexerConfig {
     /// Validates the configuration and returns any validation errors.
     ///
     /// Performs comprehensive validation of configuration parameters including:
-    /// - URL format and protocol validation (HTTP/HTTPS only)
+    /// - URL format and protocol validation (HTTP/HTTPS/file:// supported)
     /// - File extension validation (.tar.gz required)
     /// - Data directory path validation
     /// - Dependency validation (data directory required when snapshots enabled)
@@ -110,9 +110,12 @@ impl IndexerConfig {
                 return Err("Logs snapshot URL cannot be empty when snapshots are enabled".to_string());
             }
 
-            // Basic URL validation
-            if !self.logs_snapshot_url.starts_with("http://") && !self.logs_snapshot_url.starts_with("https://") {
-                return Err("Logs snapshot URL must be a valid HTTP or HTTPS URL".to_string());
+            // Basic URL validation (allow file:// for testing)
+            if !self.logs_snapshot_url.starts_with("http://")
+                && !self.logs_snapshot_url.starts_with("https://")
+                && !self.logs_snapshot_url.starts_with("file://")
+            {
+                return Err("Logs snapshot URL must be a valid HTTP, HTTPS, or file:// URL".to_string());
             }
 
             // Check if URL ends with .tar.gz
