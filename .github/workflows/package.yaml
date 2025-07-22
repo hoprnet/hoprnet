@@ -100,7 +100,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install -y help2man just
-          nfpm_url=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | jq -r '.assets[] | select(.name | endswith("amd64.deb")) | .browser_download_url')
+          if [[ "${{ inputs.target }}" == "x86_64-linux" ]]; then
+            nfpm_url=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | jq -r '.assets[] | select(.name | endswith("amd64.deb")) | .browser_download_url')
+          else
+            nfpm_url=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | jq -r '.assets[] | select(.name | endswith("arm64.deb")) | .browser_download_url')
+          fi
           curl -L -o nfpm.deb "$nfpm_url"
           sudo apt install -y ./nfpm.deb
 
