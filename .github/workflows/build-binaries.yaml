@@ -140,8 +140,8 @@ jobs:
 
       - name: Install packages
         run: |
-          sudo apt-get update
-          sudo apt install -y just
+          apt-get update
+          apt install -y just
 
       - name: Create ${{ steps.vars.outputs.binary }} Signature
         run: just sign-file "${{ github.workspace }}/${{ steps.vars.outputs.binary }}"
