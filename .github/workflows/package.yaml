@@ -98,10 +98,12 @@ jobs:
 
       - name: Generate man pages
         run: |
-            help2man --name="HOPR node executable" --no-info --output ./deploy/nfpm/hoprd.1 ./dist/bin/hoprd
-            gzip -9n ./deploy/nfpm/hoprd.1
-            help2man --name="HOPR CLI helper tool" --no-info --output ./deploy/nfpm/hopli.1 ./dist/bin/hopli
-            gzip -9n ./deploy/nfpm/hopli.1
+          sudo apt-get update
+          sudo apt install -y help2man gzip
+          help2man --name="HOPR node executable" --no-info --output ./deploy/nfpm/hoprd.1 ./dist/bin/hoprd
+          gzip -9n ./deploy/nfpm/hoprd.1
+          help2man --name="HOPR CLI helper tool" --no-info --output ./deploy/nfpm/hopli.1 ./dist/bin/hopli
+          gzip -9n ./deploy/nfpm/hopli.1
 
       - name: Generate Changelog
         run: |
