@@ -66,6 +66,17 @@ pub struct SessionManagerConfig {
     #[default(_code = "16u64..1024u64")]
     pub session_tag_range: Range<u64>,
 
+    /// The maximum number of sessions (incoming and outgoing) that is allowed
+    /// to be managed by the manager.
+    ///
+    /// When reached, creating [new sessions](SessionManager::new_session) will return
+    /// an [`SessionManagerError::TooManySessions`], and incoming sessions will be rejected
+    /// with [`StartErrorReason::NoSlotsAvailable`] Start protocol error.
+    ///
+    /// Default is 16, minimum is 1, maximum 256.
+    #[default(16)]
+    pub maximum_sessions: usize,
+
     /// The base timeout for initiation of Session initiation.
     ///
     /// The actual timeout is adjusted according to the number of hops for that Session:
@@ -312,6 +323,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             let diff = min_session_tag_range_reservation - cfg.session_tag_range.start;
             cfg.session_tag_range = min_session_tag_range_reservation..cfg.session_tag_range.end + diff;
         }
+        cfg.maximum_sessions = cfg
+            .maximum_sessions
+            .clamp(1, (cfg.session_tag_range.end - cfg.session_tag_range.start) as usize);
 
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
@@ -320,13 +334,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::future::Cache::builder()
-                .max_capacity(
-                    std::ops::Range {
-                        start: cfg.session_tag_range.start,
-                        end: cfg.session_tag_range.end,
-                    }
-                    .count() as u64,
-                )
+                .max_capacity(cfg.maximum_sessions as u64)
                 .time_to_live(
                     2 * initiation_timeout_max_one_way(
                         cfg.initiation_timeout_base,
@@ -335,7 +343,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 )
                 .build(),
             sessions: moka::future::Cache::builder()
-                .max_capacity(u16::MAX as u64)
+                .max_capacity(cfg.maximum_sessions as u64)
                 .time_to_idle(cfg.idle_timeout)
                 .async_eviction_listener(move |k, v, c| {
                     let msg_sender = msg_sender.clone();
@@ -476,6 +484,13 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         target: SessionTarget,
         cfg: SessionClientConfig,
     ) -> crate::errors::Result<Session> {
+        self.session_initiations.run_pending_tasks().await;
+        self.sessions.run_pending_tasks().await;
+
+        if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
+            return Err(SessionManagerError::TooManySessions.into());
+        }
+
         let msg_sender = self.msg_sender.get().ok_or(SessionManagerError::NotStarted)?;
 
         let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
@@ -779,31 +794,38 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                 // Construct the session
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-                if let Some(session_id) = insert_into_next_slot(
-                    &self.sessions,
-                    |sid| {
-                        // NOTE: It is allowed to insert sessions using the same tag
-                        // but different pseudonyms because the SessionId is different.
-                        let next_tag: Tag = match sid {
-                            Some(session_id) => ((session_id.tag().as_u64() + 1) % self.cfg.session_tag_range.end)
-                                .max(self.cfg.session_tag_range.start)
+                self.sessions.run_pending_tasks().await;
+                let allocated_slot = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
+                    insert_into_next_slot(
+                        &self.sessions,
+                        |sid| {
+                            // NOTE: It is allowed to insert sessions using the same tag
+                            // but different pseudonyms because the SessionId is different.
+                            let next_tag: Tag = match sid {
+                                Some(session_id) => ((session_id.tag().as_u64() + 1) % self.cfg.session_tag_range.end)
+                                    .max(self.cfg.session_tag_range.start)
+                                    .into(),
+                                None => hopr_crypto_random::random_integer(
+                                    self.cfg.session_tag_range.start,
+                                    Some(self.cfg.session_tag_range.end),
+                                )
                                 .into(),
-                            None => hopr_crypto_random::random_integer(
-                                self.cfg.session_tag_range.start,
-                                Some(self.cfg.session_tag_range.end),
-                            )
-                            .into(),
-                        };
-                        SessionId::new(next_tag, pseudonym)
-                    },
-                    CachedSession {
-                        session_tx: Arc::new(tx_session_data),
-                        routing_opts: reply_routing.clone(),
-                        abort_handles: vec![],
-                    },
-                )
-                .await
-                {
+                            };
+                            SessionId::new(next_tag, pseudonym)
+                        },
+                        CachedSession {
+                            session_tx: Arc::new(tx_session_data),
+                            routing_opts: reply_routing.clone(),
+                            abort_handles: vec![],
+                        },
+                    )
+                    .await
+                } else {
+                    error!(%pseudonym, "cannot accept incoming session, the maximum number of sessions has been reached");
+                    None
+                };
+
+                if let Some(session_id) = allocated_slot {
                     debug!(?session_id, "assigning a new session");
 
                     let session = Session::new(
@@ -1369,6 +1391,104 @@ mod tests {
 
         let cfg = SessionManagerConfig {
             session_tag_range: 16u64..17u64, // Slot for exactly one session
+            ..Default::default()
+        };
+
+        let alice_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(cfg);
+
+        // Occupy the only free slot with tag 16
+        let (dummy_tx, _) = futures::channel::mpsc::unbounded();
+        bob_mgr
+            .sessions
+            .insert(
+                SessionId::new(16u64, alice_pseudonym),
+                CachedSession {
+                    session_tx: Arc::new(dummy_tx),
+                    routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+                    abort_handles: Vec::new(),
+                },
+            )
+            .await;
+
+        let mut sequence = mockall::Sequence::new();
+        let mut alice_transport = MockMsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |data, peer| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+            })
+            .returning(move |data, _| {
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
+            });
+
+        // Bob sends the SessionError message
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |data, peer| {
+                msg_type(data, StartProtocolDiscriminants::SessionError)
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+            })
+            .returning(move |data, _| {
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
+            });
+
+        let mut jhs = Vec::new();
+
+        // Start Alice
+        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        jhs.extend(alice_mgr.start(alice_transport, new_session_tx_alice)?);
+
+        // Start Bob
+        let (new_session_tx_bob, _) = futures::channel::mpsc::unbounded();
+        jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
+
+        let result = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: Capabilities::empty(),
+                    pseudonym: alice_pseudonym.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        assert!(
+            matches!(result, Err(TransportSessionError::Rejected(reason)) if reason == StartErrorReason::NoSlotsAvailable)
+        );
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_not_allow_establish_session_when_maximum_number_of_session_is_reached()
+    -> anyhow::Result<()> {
+        let alice_pseudonym = HoprPseudonym::random();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let cfg = SessionManagerConfig {
+            maximum_sessions: 1,
             ..Default::default()
         };
 

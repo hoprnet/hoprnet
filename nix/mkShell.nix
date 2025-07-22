@@ -23,16 +23,14 @@ let
         targets = [ cargoTarget ];
       };
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
-  linuxMinimumPackages =
-    if buildPlatform.isLinux then
-      with pkgs;
-      [
-        # mold is only supported on Linux
-        mold
-      ]
-    else
-      [ ];
-
+  linuxMinimumPackages = pkgs.lib.optionals pkgs.stdenv.isLinux (
+    with pkgs;
+    [
+      # mold is only supported on Linux
+      mold
+      autoPatchelfHook
+    ]
+  );
   minimumPackages =
     with pkgs;
     [
@@ -52,16 +50,17 @@ let
       time
       which
       yq-go
+      help2man
 
       ## formatting
       config.treefmt.build.wrapper
     ]
-    ++ (lib.attrValues config.treefmt.build.programs)
-    ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+    ++ (pkgs.lib.attrValues config.treefmt.build.programs)
+    ++ linuxMinimumPackages;
   packages = minimumPackages ++ shellPackages;
 
   # mold is only supported on Linux, so falling back to lld on Darwin
-  linker = if pkgs.stdenv.buildPlatform.isDarwin then "lld" else "mold";
+  linker = if buildPlatform.isDarwin then "lld" else "mold";
 in
 craneLib.devShell {
   inherit shellHook packages;

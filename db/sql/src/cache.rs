@@ -157,11 +157,11 @@ impl Default for HoprDbCaches {
                 .max_capacity(10_000)
                 .build(),
             // SURB openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
-            // and therefore, there's more but with a shorter lifetime
+            // and therefore, there's more
             pseudonym_openers: moka::sync::Cache::builder()
-                .time_to_live(Duration::from_secs(60))
+                .time_to_live(Duration::from_secs(3600))
                 .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::trace!(?sender_id, ?cause, "Evicting SURB reply opener for sender");
+                    tracing::trace!(?sender_id, ?cause, "evicting reply opener for sender id");
                 })
                 .max_capacity(100_000)
                 .build(),
@@ -169,6 +169,9 @@ impl Default for HoprDbCaches {
             // For each Pseudonym, there's an RB of SURBs and their IDs.
             surbs_per_pseudonym: Cache::builder()
                 .time_to_idle(Duration::from_secs(600))
+                .eviction_listener(|pseudonym, _reply_opener, cause| {
+                    tracing::trace!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                })
                 .max_capacity(10_000)
                 .build(),
             key_id_mapper: CacheKeyMapper::with_capacity(10_000),

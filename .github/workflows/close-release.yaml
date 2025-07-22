@@ -23,6 +23,8 @@ on:
         description: "Name of the release"
         options:
           - kaunas
+          - altea
+          - edinburgh
 concurrency:
   group: close-release
   cancel-in-progress: true
@@ -78,7 +80,7 @@ jobs:
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           commit-message: "Close release ${{ steps.template.outputs.current_version }}"
-          title: "ci: Close release ${{ steps.template.outputs.current_version }}"
+          title: "build: Close release ${{ steps.template.outputs.current_version }}"
           body-path: .github/files/${{ steps.template.outputs.pr_template }}
           branch: bot/close-${{ steps.template.outputs.current_version }}
           delete-branch: true
