@@ -49,12 +49,13 @@ pub struct HoprDb {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) logs_db: sea_orm::DatabaseConnection,
-    pub(crate) ticket_manager: Arc<TicketManager>,
-    pub(crate) chain_key: ChainKeypair,
-    pub(crate) me_onchain: Address,
+
     pub(crate) caches: Arc<HoprDbCaches>,
-    pub(crate) directory: PathBuf,
     pub(crate) cfg: HoprDbConfig,
+    pub(crate) chain_key: ChainKeypair,
+    pub(crate) directory: PathBuf,
+    pub(crate) me_onchain: Address,
+    pub(crate) ticket_manager: Arc<TicketManager>,
 }
 
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
@@ -146,30 +147,30 @@ impl HoprDb {
         cfg: HoprDbConfig,
         chain_key: ChainKeypair,
         directory: PathBuf,
-        index_db: SqlitePool,
-        peers_db: SqlitePool,
-        tickets_db: SqlitePool,
-        logs_db: SqlitePool,
+        index_db_pool: SqlitePool,
+        peers_db_pool: SqlitePool,
+        tickets_db_pool: SqlitePool,
+        logs_db_pool: SqlitePool,
     ) -> Result<Self> {
-        let index_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db);
+        let index_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db_pool.clone());
 
         MigratorIndex::up(&index_db, None)
             .await
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
-        let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db);
+        let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db_pool.clone());
 
         MigratorTickets::up(&tickets_db, None)
             .await
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
-        let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db);
+        let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db_pool.clone());
 
         MigratorPeers::up(&peers_db, None)
             .await
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
-        let logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db);
+        let logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db_pool.clone());
 
         MigratorChainLogs::up(&logs_db, None)
             .await
@@ -227,16 +228,17 @@ impl HoprDb {
             })?;
 
         Ok(Self {
+            cfg,
+            directory,
             me_onchain: chain_key.public().to_address(),
             chain_key,
+            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
+            caches,
+
             index_db,
+            tickets_db,
             peers_db,
             logs_db,
-            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
-            tickets_db,
-            caches,
-            directory,
-            cfg,
         })
     }
 

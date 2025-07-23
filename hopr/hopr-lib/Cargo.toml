@@ -88,6 +88,7 @@ tracing-test = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 url = { workspace = true }
+test-log = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }

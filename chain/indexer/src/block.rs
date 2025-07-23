@@ -149,29 +149,16 @@ where
 
         // First, check whether fast sync is enabled and can be performed.
         // If so:
-        //   1. Delete the existing indexed data
-        //   2. Reset fast sync progress
-        //   3. Download the snapshot if the logs database is empty and the snapshot is enabled
+        //   1. Download the snapshot if the logs database is empty and the snapshot is enabled
+        //   2. Delete the existing indexed data
+        //   3. Reset fast sync progress
         //   4. Run the fast sync process until completion
         //   5. Finally, starting the rpc indexer.
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
 
-        // Check if we need to download snapshot before fast sync
-        let logs_db_has_data = self.has_logs_data().await?;
-
-        if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.logs_snapshot_enabled {
-            info!("Logs database is empty, attempting to download logs snapshot...");
-
-            match self.download_snapshot().await {
-                Ok(snapshot_info) => {
-                    info!("Logs snapshot downloaded successfully: {:?}", snapshot_info);
-                }
-                Err(e) => {
-                    error!("Failed to download logs snapshot: {}. Continuing with regular sync.", e);
-                }
-            }
-        }
+        // Pre-start operations to ensure the indexer is ready, including snapshot fetching
+        self.pre_start().await?;
 
         #[derive(PartialEq, Eq)]
         enum FastSyncMode {
@@ -378,6 +365,28 @@ where
                 "Error during indexing start".into(),
             ))
         }
+    }
+
+    pub async fn pre_start(&self) -> Result<()> {
+        let fast_sync_configured = self.cfg.fast_sync;
+        let index_empty = self.db.index_is_empty().await?;
+
+        // Check if we need to download snapshot before fast sync
+        let logs_db_has_data = self.has_logs_data().await?;
+
+        if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.logs_snapshot_enabled {
+            info!("Logs database is empty, attempting to download logs snapshot...");
+
+            match self.download_snapshot().await {
+                Ok(snapshot_info) => {
+                    info!("Logs snapshot downloaded successfully: {:?}", snapshot_info);
+                }
+                Err(e) => {
+                    error!("Failed to download logs snapshot: {}. Continuing with regular sync.", e);
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Generates specialized log filters for efficient blockchain event processing.

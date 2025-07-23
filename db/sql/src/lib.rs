@@ -126,7 +126,7 @@ pub trait HoprDbGeneralModelOperations {
     /// Creates a new transaction.
     async fn begin_transaction_in_db(&self, target: TargetDb) -> Result<OpenTransaction>;
 
-    async fn replace_logs_db(mut self, src_dir: &Path, files: &[String]) -> Result<()>;
+    async fn import_logs_db(mut self, src_dir: &Path, files: &[String]) -> Result<()>;
 
     /// Same as [`HoprDbGeneralModelOperations::begin_transaction_in_db`] with default [TargetDb].
     async fn begin_transaction(&self) -> Result<OpenTransaction> {
@@ -192,45 +192,10 @@ impl HoprDbGeneralModelOperations for HoprDb {
         }
     }
 
-    async fn replace_logs_db(mut self, src_dir: &Path, files: &[String]) -> Result<()> {
-        // First close the existing database connection
-        let _ = self
-            .logs_db
-            .clone()
-            .close()
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("failed to close logs database: {e}")))?;
-
-        // Copy over the new database files
-        for file in files {
-            let src = src_dir.join(file);
-            let dst = self.directory.join(file);
-
-            // Remove existing file if it exists
-            if dst.exists() {
-                fs::remove_file(&dst).map_err(|e| DbSqlError::Construction(e.to_string()))?;
-            }
-
-            // Move file from temp to final location
-            fs::rename(&src, &dst).map_err(|e| DbSqlError::Construction(e.to_string()))?;
-            debug!("Installed snapshot file: {} -> {}", file, dst.display());
-        }
-
-        // Open new logs database connection and apply migrations (snapshot could be outdated)
-        let logs_db_pool = Self::create_pool(
-            self.cfg.clone(),
-            self.directory.clone(),
-            PoolOptions::new(),
-            Some(0),
-            None,
-            SQL_DB_LOGS_FILE_NAME,
-        )
-        .await;
-        self.logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db_pool);
-
-        MigratorChainLogs::up(&self.logs_db, None)
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))
+    async fn import_logs_db(mut self, src_dir: &Path, files: &[String]) -> Result<()> {
+        // TODO: Attach logs database in src dir to main logs db connection
+        // TODO: Copy over all data from the logs database in src dir to the main logs db
+        // TODO: Detach src logs database
     }
 }
 

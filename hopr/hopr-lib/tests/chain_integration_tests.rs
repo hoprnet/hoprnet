@@ -1,7 +1,8 @@
 mod common;
 
-use std::time::Duration;
+use std::{env, path::Path, time::Duration};
 
+use alloy::node_bindings::AnvilInstance;
 use alloy::primitives::{B256, U256};
 use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
@@ -25,12 +26,13 @@ use hopr_chain_rpc::{
     client::SnapshotRequestor,
     rpc::{RpcOperations, RpcOperationsConfig},
 };
-use hopr_chain_types::{chain_events::ChainEventType, utils::create_anvil};
+use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType, utils::create_anvil};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
+use tokio::fs;
 use tracing::info;
 
 use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node};
@@ -822,6 +824,80 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|ah| async move { ah.abort() })).await;
     futures::future::join_all(bob_node.node_tasks.into_iter().map(|ah| async move { ah.abort() })).await;
+
+    Ok(())
+}
+
+#[test_log::test(tokio::test)]
+async fn integration_test_indexer_logs_snapshot() -> anyhow::Result<()> {
+    // Setup test environment
+    let temp_dir = env::temp_dir().join(format!("hopr_indexer_snapshot_test_{}", std::process::id()));
+    let data_directory = temp_dir.join("hopr_data");
+    fs::create_dir_all(&data_directory).await?;
+
+    let chain_key = ChainKeypair::random();
+    let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
+
+    // Verify snapshot file exists
+    let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.gz");
+    if !snapshot_file_path.exists() {
+        anyhow::bail!("Snapshot test file not found at: {}", snapshot_file_path.display());
+    }
+
+    let logs_snapshot_url = format!("file://{}", snapshot_file_path.display());
+
+    let indexer_cfg = IndexerConfig {
+        start_block_number: 0,
+        fast_sync: true,
+        logs_snapshot_enabled: true,
+        logs_snapshot_url,
+        data_directory: data_directory.to_string_lossy().to_string(),
+    };
+
+    let requestor_in = SnapshotRequestor::new(SNAPSHOT_ALICE_RX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+
+    let http_requestor_in = DefaultHttpRequestor::new();
+    let anvil = alloy::node_bindings::Anvil::new().spawn();
+    let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_in.clone(), &anvil);
+    let rpc = RpcOperations::new(
+        json_rpc_client,
+        http_requestor_in.clone(),
+        &chain_key,
+        RpcOperationsConfig::default(),
+        None,
+    )?;
+
+    let handlers = ContractEventHandlers::new(
+        ContractAddresses::default(),
+        chain_key.public().to_address(),
+        chain_key.clone(),
+        db.clone(),
+        rpc.clone(),
+    );
+
+    let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, async_channel::unbounded().0);
+
+    // Verify database is initially empty (as expected for snapshot test)
+    let initial_logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
+    let initial_index_empty = db.index_is_empty().await?;
+
+    // These conditions should be true for a fresh database that would benefit from snapshot
+    assert_eq!(initial_logs_count, 0, "Fresh database should have no logs");
+    assert!(initial_index_empty, "Fresh database index should be empty");
+
+    // run snapshot fetch
+    indexer.pre_start().await?;
+
+    // now we can check if the logs were imported
+    let logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
+    let index_empty = db.index_is_empty().await?;
+
+    assert_eq!(logs_count, 50, "Imported database should have logs");
+    assert!(index_empty, "Imported database index should be empty");
 
     Ok(())
 }

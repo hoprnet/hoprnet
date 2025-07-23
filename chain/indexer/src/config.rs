@@ -163,3 +163,97 @@ impl IndexerConfig {
         self.validate().is_ok()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_full_valid_config() {
+        let data_directory = "/tmp/hopr_test_data";
+        let logs_snapshot_url = format!("file:///tmp/snapshot.tar.gz");
+
+        let cfg = IndexerConfig {
+            start_block_number: 0,
+            fast_sync: true,
+            logs_snapshot_enabled: true,
+            logs_snapshot_url,
+            data_directory: data_directory.into(),
+        };
+
+        cfg.validate().expect("Failed to validate snapshot configuration");
+        assert!(cfg.is_valid(), "Valid configuration should return true for is_valid()");
+    }
+
+    #[test]
+    fn test_invalid_url_config() {
+        let data_directory = "/tmp/hopr_test_data";
+        let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.gz");
+
+        let cfg = IndexerConfig {
+            start_block_number: 0,
+            fast_sync: true,
+            logs_snapshot_enabled: true,
+            logs_snapshot_url,
+            data_directory: data_directory.into(),
+        };
+
+        assert!(cfg.validate().is_err(), "Invalid URL should fail validation");
+        assert!(
+            !cfg.is_valid(),
+            "Invalid configuration should return false for is_valid()"
+        );
+    }
+
+    #[test]
+    fn test_empty_url_config() {
+        let data_directory = "/tmp/hopr_test_data";
+
+        let cfg = IndexerConfig {
+            start_block_number: 0,
+            fast_sync: true,
+            logs_snapshot_enabled: true,
+            logs_snapshot_url: "".to_string(),
+            data_directory: data_directory.into(),
+        };
+
+        assert!(
+            cfg.validate().is_err(),
+            "Empty URL should fail validation when snapshots enabled"
+        );
+    }
+
+    #[test]
+    fn test_empty_dir_config() {
+        let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.gz");
+
+        let cfg = IndexerConfig {
+            start_block_number: 0,
+            fast_sync: true,
+            logs_snapshot_enabled: true,
+            logs_snapshot_url,
+            data_directory: "".to_string(),
+        };
+
+        assert!(
+            cfg.validate().is_err(),
+            "Empty data directory should fail validation when snapshots enabled"
+        );
+    }
+
+    #[test]
+    fn test_disabled_snapshot_config() {
+        let cfg = IndexerConfig {
+            start_block_number: 0,
+            fast_sync: true,
+            logs_snapshot_enabled: false,
+            logs_snapshot_url: "".to_string(),
+            data_directory: "".to_string(),
+        };
+
+        assert!(
+            cfg.validate().is_ok(),
+            "Configuration should be valid when snapshots disabled"
+        );
+    }
+}
