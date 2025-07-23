@@ -140,7 +140,7 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}/dist/bin
           cp ${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }} ${{ github.workspace }}/dist/bin/
-          nix develop -c just sign-file "${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}"
+          nix develop -L .#ci -c bash -c 'just sign-file "${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}"'
         env:
           GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
 
