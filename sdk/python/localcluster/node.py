@@ -224,6 +224,7 @@ class Node:
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
             "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
+            "HOPR_CAPTURE_PACKETS": self.dir.joinpath(f"capture_{self.id}.pcap"),
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 

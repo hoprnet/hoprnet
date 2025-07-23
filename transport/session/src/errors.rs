@@ -57,6 +57,8 @@ pub enum SessionManagerError {
     NoChallengeSlots,
     #[error("session with the given id does not exist")]
     NonExistingSession,
+    #[error("number of sessions exceeds the maximum allowed")]
+    TooManySessions,
     #[error("loopback sessions are not allowed")]
     Loopback,
     #[error("non-specific session manager error: {0}")]
