@@ -150,20 +150,16 @@ jobs:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
           path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}
 
-      - name: Publish Github Workflow artifact signature
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sig
-          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.sig
-
       - name: Publish Github Workflow artifact hash
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sha256
           path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.sha256
 
-      - name: Publish Github Workflow artifact hash signature
+      - name: Publish Github Workflow artifact signature
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sha256.asc
-          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.sha256.asc
+          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.asc
+          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.asc
+
+
