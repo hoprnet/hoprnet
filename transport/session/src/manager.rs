@@ -1384,11 +1384,11 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |data, peer| {
-                msg_type(data, StartProtocolDiscriminants::StartSession)
+            .withf(move |peer, data| {
+                msg_type(data) == StartProtocolDiscriminants::StartSession
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
-            .returning(move |data, _| {
+            .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
                     bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
@@ -1402,11 +1402,11 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |data, peer| {
-                msg_type(data, StartProtocolDiscriminants::SessionError)
+            .withf(move |peer, data| {
+                msg_type(data) == StartProtocolDiscriminants::SessionError
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
-            .returning(move |data, _| {
+            .returning(move |_, data| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
                 Box::pin(async move {
                     alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
@@ -1418,11 +1418,11 @@ mod tests {
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
-        jhs.extend(alice_mgr.start(alice_transport, new_session_tx_alice)?);
+        jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::unbounded();
-        jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
+        jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let result = alice_mgr
             .new_session(
