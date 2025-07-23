@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   tests-unit:
+    name: Unit Tests
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     env:
@@ -59,6 +60,7 @@ jobs:
         run: nix build -L .#hopr-test
 
   tests-unit-nightly:
+    name: Unit Tests Nightly
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
@@ -107,6 +109,7 @@ jobs:
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger
+    name: Smart Contracts
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
     env:
@@ -196,6 +199,7 @@ jobs:
 
   tests-smoke:
     runs-on: self-hosted-hoprnet-bigger
+    name: Smoke Tests
     needs:
       - build-candidate-binaries
     timeout-minutes: 30

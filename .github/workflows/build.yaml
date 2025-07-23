@@ -16,7 +16,7 @@ on:
 
 permissions:
   contents: write
-  actions: read
+  actions: write
   security-events: write
 
 concurrency:
@@ -41,6 +41,7 @@ jobs:
 
   build-dappnode:
     strategy:
+      fail-fast: false
       matrix:
         dappnode_repository:
           - DAppNodePackage-Hopr
@@ -58,6 +59,7 @@ jobs:
 
   build-binaries:
     strategy:
+      fail-fast: false
       matrix:
         binary:
           - hopli
@@ -82,13 +84,16 @@ jobs:
     secrets: inherit
 
   package:
-    name: ${{ matrix.target }}-${{ matrix.packager.package }}
+    name: ${{ matrix.target.arch }}-${{ matrix.packager.package }}
     needs: build-binaries
     strategy:
+      fail-fast: false
       matrix:
         target:
-          - x86_64-linux
-          - aarch64-linux
+          - arch: x86_64-linux
+            runner: ubuntu-latest
+          - arch: aarch64-linux
+            runner: ubuntu-24.04-arm
         packager:
           - package: deb
             extension: deb
@@ -100,8 +105,9 @@ jobs:
 
     uses: ./.github/workflows/package.yaml
     with:
+      runner: ${{ matrix.target.runner }}
       branch: ${{ github.event.pull_request.head.ref }}
-      target: ${{ matrix.target }}
+      target: ${{ matrix.target.arch }}
       packager: ${{ matrix.packager.package }}
       extension: ${{ matrix.packager.extension }}
       workflow_run_id: ${{ github.run_id }}
