@@ -29,18 +29,19 @@ mkdir -p "${mydir}/dist/zip" "${mydir}/dist/unzip" "${mydir}/dist/upload"
 while IFS= read -r line; do
   artifact_name=$(echo $line | awk '{print $1}')
   artifact_url=$(echo $line | awk '{print $2}')
-  if ! curl -L -s -f -o "dist/zip/${artifact_name}.zip" -H "Authorization: Bearer ${GH_TOKEN}" "${artifact_url}"; then
+  if ! curl -L -s -f -o "${mydir}/dist/zip/${artifact_name}.zip" -H "Authorization: Bearer ${GH_TOKEN}" "${artifact_url}"; then
     echo "Error: Failed to download binary file ${artifact_name}"
     exit 1
   else
-    echo "Downloaded binary file ${artifact_name}..."
+    echo "Downloaded binary file ${artifact_name}"
   fi
   # Extract the zip file to its corresponding directory
-  unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/unzip"
-  for artifact in dist/unzip/*; do
-    case "$artifact_name" in
-    *.sha256) cat "$artifact" >>dist/upload/SHA256SUMS ;;
-    *) mv "$artifact" dist/upload/${artifact_name} ;;
-    esac
-  done
+  unzip -o "${mydir}/dist/zip/${artifact_name}.zip" -d "${mydir}/dist/unzip/"
+  extracted_file=$(ls -1 "${mydir}/dist/unzip/" | head -n1)
+  mv "${mydir}/dist/unzip/${extracted_file}" "${mydir}/dist/upload/${artifact_name}"
+  if [[ ${artifact_name} =~ \.sha256$ ]]; then
+    hash=$(cat "${mydir}/dist/upload/${artifact_name}" | awk '{print $1}')
+    echo "${hash} ${artifact_name/\.sha256/}" >>"${mydir}/dist/upload/SHA256SUMS"
+    rm "${mydir}/dist/upload/${artifact_name}"
+  fi
 done <<<"$artifacts"
