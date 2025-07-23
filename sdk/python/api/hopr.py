@@ -101,7 +101,7 @@ class HoprdAPI(ApiLib):
         :return: version: str | undefined
         """
 
-        openapi_spec = await self.try_req(Method.GET, "/api-docs/openapi.json", str, use_api_prefix=False)
+        openapi_spec = await self.try_req(Method.GET, "/api-docs/openapi.json", dict, use_api_prefix=False)
         version = openapi_spec.get("info", {}).get("version", None) if isinstance(openapi_spec, dict) else None
 
         return version
