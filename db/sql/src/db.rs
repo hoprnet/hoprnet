@@ -43,6 +43,18 @@ pub struct HoprDbConfig {
     pub log_slow_queries: Duration,
 }
 
+/// Main database handle for HOPR node operations.
+///
+/// Manages multiple SQLite databases for different data domains to avoid
+/// locking conflicts and improve performance:
+///
+/// - **Index DB**: Blockchain indexing and contract data
+/// - **Tickets DB**: Payment tickets and acknowledgments
+/// - **Peers DB**: Network peer information and metadata
+/// - **Logs DB**: Blockchain logs and processing status
+///
+/// Supports database snapshot imports for fast synchronization via
+/// [`HoprDbGeneralModelOperations::import_logs_db`].
 #[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) index_db: sea_orm::DatabaseConnection,
@@ -56,9 +68,13 @@ pub struct HoprDb {
     pub(crate) ticket_manager: Arc<TicketManager>,
 }
 
+/// Filename for the blockchain indexing database.
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
+/// Filename for the network peers database.
 pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
+/// Filename for the payment tickets database.
 pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
+/// Filename for the blockchain logs database (used in snapshots).
 pub const SQL_DB_LOGS_FILE_NAME: &str = "hopr_logs.db";
 
 impl HoprDb {

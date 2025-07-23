@@ -88,7 +88,10 @@ pub enum SnapshotError {
     )]
     Timeout(String),
 
-    #[error("Installation error: {0}.")]
+    #[error(
+        "Database installation error: {0}.\nSuggestion: Failed to install snapshot data. Ensure the database is not \
+         locked by another process and try again."
+    )]
     Installation(String),
 }
 
