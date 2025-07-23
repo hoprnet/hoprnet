@@ -104,7 +104,6 @@ pub(crate) struct InternalState {
         node::version,
         peers::ping_peer,
         peers::show_peer_info,
-        root::api_version,
         root::metrics,
         session::create_client,
         session::list_clients,
@@ -127,7 +126,7 @@ pub(crate) struct InternalState {
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery, node::NodeGraphResponse,
-            peers::NodePeerInfoResponse, peers::PingResponse, root::ApiVersionResponse,
+            peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
@@ -139,7 +138,6 @@ pub(crate) struct InternalState {
         (name = "Configuration", description = "HOPR node configuration endpoints"),
         (name = "Checks", description = "HOPR node functionality checks"),
         (name = "Network", description = "HOPR node network endpoints"),
-        (name = "Meta", description = "HOPR API meta information endpoints"),
         (name = "Node", description = "HOPR node information endpoints"),
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
         (name = "Session", description = "HOPR node session management endpoints"),
@@ -231,7 +229,7 @@ async fn build_api(
     Router::new()
         .merge(
             Router::new()
-                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
+                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
                 .merge(Scalar::with_url("/scalar", ApiDoc::openapi())),
         )
         .merge(
@@ -250,34 +248,6 @@ async fn build_api(
                     ),
                 )
                 .with_state(state.into()),
-        )
-        .merge(
-            Router::new()
-                .route("/api_version", get(root::api_version))
-                .with_state(inner_state.clone().into())
-                .layer(axum::middleware::from_fn_with_state(
-                    inner_state.clone(),
-                    middleware::preconditions::authenticate,
-                ))
-                .layer(axum::middleware::from_fn_with_state(
-                    inner_state.clone(),
-                    middleware::preconditions::cap_websockets,
-                ))
-                .layer(
-                    ServiceBuilder::new()
-                        .layer(TraceLayer::new_for_http())
-                        .layer(
-                            CorsLayer::new()
-                                .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
-                                .allow_origin(Any)
-                                .allow_headers(Any)
-                                .max_age(std::time::Duration::from_secs(86400)),
-                        )
-                        .layer(axum::middleware::from_fn(middleware::prometheus::record))
-                        .layer(CompressionLayer::new())
-                        .layer(ValidateRequestHeaderLayer::accept("application/json"))
-                        .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
-                ),
         )
         .merge(
             Router::new()

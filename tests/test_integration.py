@@ -355,8 +355,6 @@ class TestIntegrationWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_api_version(self, peer, swarm7: dict[str, Node]):
-        result = await swarm7[peer].api.api_version()
+        version = await swarm7[peer].api.api_version()
 
-        assert isinstance(result.path, str)
-        assert isinstance(result.version, str)
-        assert re.match(r"^\d+\.\d+\.\d+$", result.version) is not None, "Version should be in the format X.Y.Z"
+        assert re.match(r"^\d+\.\d+\.\d+$", version) is not None, "Version should be in the format X.Y.Z"

@@ -1,13 +1,6 @@
-use std::sync::Arc;
+use axum::{http::StatusCode, response::IntoResponse};
 
-use axum::{
-    extract::{Json, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
-use serde::Serialize;
-
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
+use crate::{ApiError, ApiErrorStatus};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
@@ -41,40 +34,4 @@ pub(super) async fn metrics() -> impl IntoResponse {
         Ok(metrics) => (StatusCode::OK, metrics).into_response(),
         Err(error) => (StatusCode::UNPROCESSABLE_ENTITY, error).into_response(),
     }
-}
-
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-#[schema(example = json!({
-        "version": "4.0.1",
-        "path": "/api/v4"
-    }))]
-#[serde(rename_all = "camelCase")]
-/// Running API version.
-pub(crate) struct ApiVersionResponse {
-    #[schema(example = "4.0.1")]
-    version: String,
-    #[schema(example = "/api/v4")]
-    path: String,
-}
-
-/// Returns the API version.
-#[utoipa::path(
-    get,
-    path = "/api_version",
-    description="Returns the API version",
-    responses(
-        (status = 200, description = "API version is returned", body = ApiVersionResponse),
-        (status = 401, description = "Invalid authorization token.", body = ApiError),
-        (status = 412, description = "The node is not started and running"),
-    ),
-    security(
-        ("api_token" = []),
-        ("bearer_token" = [])
-    ),
-    tag = "Meta"
-)]
-pub(super) async fn api_version(State(_state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let version = env!("CARGO_PKG_VERSION").to_owned();
-    let path = BASE_PATH.to_string();
-    (StatusCode::OK, Json(ApiVersionResponse { version, path })).into_response()
 }
