@@ -127,10 +127,7 @@ jobs:
         run: just package ${{ inputs.packager }} ${{ inputs.target }}
 
       - name: Create signatures
-        run: |
-          just sign-file "${{ github.workspace }}/dist/bin/hoprd"
-          just sign-file "${{ github.workspace }}/dist/bin/hopli"
-          just sign-file "${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}"
+        run: just sign-file "${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}"
         env:
           GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
 
@@ -148,47 +145,6 @@ jobs:
           HOPRD_MODULE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_MODULE_ADDRESS }}
           HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
           GCP_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      - name: Publish hoprd binary signature
-        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: hoprd-${{ inputs.target }}.sig
-          path: ${{ github.workspace }}/dist/bin/hoprd.sig
-
-      - name: Publish hoprd binary hash
-        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: hoprd-${{ inputs.target }}.sha256
-          path: ${{ github.workspace }}/dist/bin/hoprd.sha256
-
-      - name: Publish hoprd binary hash signature
-        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: hoprd-${{ inputs.target }}.sha256.asc
-          path: ${{ github.workspace }}/dist/bin/hoprd.sha256.asc
-
-      - name: Publish hopli binary signature
-        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: hopli-${{ inputs.target }}.sig
-          path: ${{ github.workspace }}/dist/bin/hopli.sig
-
-      - name: Publish hopli binary hash
-        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: hopli-${{ inputs.target }}.sha256
-          path: ${{ github.workspace }}/dist/bin/hopli.sha256
-
-      - name: Publish hopli binary hash signature
-        if: inputs.target == 'x86_64-linux' && inputs.packager == 'deb'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: hopli-${{ inputs.target }}.sha256.asc
-          path: ${{ github.workspace }}/dist/bin/hopli.sha256.asc
 
       - name: Publish package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
