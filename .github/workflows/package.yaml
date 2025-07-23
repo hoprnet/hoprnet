@@ -161,11 +161,6 @@ jobs:
       - name: Publish package signature
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.sig
-          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sig
+          name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.asc
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.asc
 
-      - name: Publish package hash signature
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.sha256.asc
-          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sha256.asc

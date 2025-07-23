@@ -73,10 +73,8 @@ sign-file source_file:
     cd "$dirname"
     shasum -a 256 "$basename" > "$basename.sha256"
     echo "Hash written to $basename.sha256"
-    gpg --armor --output "$basename.sig" --detach-sign "$basename"
-    echo "Signature written to $basename.sig"
-    gpg --armor --output "$basename.sha256.asc" --sign "$basename.sha256"
-    echo "Signature for hash written to $basename.sha256.asc"
+    gpg --armor --output "$basename.asc" --detach-sign "$basename"
+    echo "Signature written to $basename.asc"
 
      # Clean up
     rm -rf "$gnupghome"
