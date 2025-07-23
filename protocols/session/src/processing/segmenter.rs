@@ -173,20 +173,20 @@ where
             .min(Self::PAYLOAD_CAPACITY - self.seg_buffer.len())
             .min(self.frame_size - self.current_frame_len);
 
-        if new_len_in_buffer > 0 {
-            self.as_mut()
-                .project()
-                .seg_buffer
-                .extend_from_slice(&buf[..new_len_in_buffer]);
+        debug_assert!(new_len_in_buffer > 0);
 
-            tracing::trace!(
-                buf_len = self.seg_buffer.len(),
-                len = new_len_in_buffer,
-                remaining = Self::PAYLOAD_CAPACITY - self.seg_buffer.len(),
-                "add segment data @ cap {}",
-                Self::PAYLOAD_CAPACITY
-            );
-        }
+        self.as_mut()
+            .project()
+            .seg_buffer
+            .extend_from_slice(&buf[..new_len_in_buffer]);
+
+        tracing::trace!(
+            buf_len = self.seg_buffer.len(),
+            len = new_len_in_buffer,
+            remaining = Self::PAYLOAD_CAPACITY - self.seg_buffer.len(),
+            "add segment data @ cap {}",
+            Self::PAYLOAD_CAPACITY
+        );
 
         // If the chunk finishes the frame, flush it
         if self.current_frame_len + new_len_in_buffer == self.frame_size {

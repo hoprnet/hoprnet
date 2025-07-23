@@ -173,29 +173,34 @@ impl<const C: usize> Decoder for SessionCodec<C> {
         }
 
         // Protocol version
-        if src.get_u8() != SessionMessage::<C>::VERSION {
+        if src[0] != SessionMessage::<C>::VERSION {
             return Err(SessionError::WrongVersion);
         }
 
         // Message discriminant
-        let disc = src.get_u8();
+        let disc = src[1];
 
         // Message length
-        let len = src.get_u16() as usize;
+        let payload_len = u16::from_be_bytes([src[2], src[3]]) as usize;
 
-        // In version 1 check that the reserved bits are all 0
-        if len > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
+        // Check the maximum message length for version 1
+        if payload_len > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
             return Err(SessionError::IncorrectMessageLength);
+        }
+
+        // Check if there's enough data so that we can read the rest of the message
+        if src.len() < SessionMessage::<C>::HEADER_SIZE + payload_len {
+            return Ok(None);
         }
 
         // Read the message
         let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
-            SessionMessageDiscriminants::Segment => SessionMessage::Segment(src[..len].try_into()?),
-            SessionMessageDiscriminants::Request => SessionMessage::Request(src[..len].try_into()?),
-            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(src[..len].try_into()?),
+            SessionMessageDiscriminants::Segment => SessionMessage::Segment(src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE+payload_len].try_into()?),
+            SessionMessageDiscriminants::Request => SessionMessage::Request(src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE+payload_len].try_into()?),
+            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE+payload_len].try_into()?),
         };
 
-        src.advance(len);
+        src.advance(SessionMessage::<C>::HEADER_SIZE + payload_len);
         Ok(Some(res))
     }
 }

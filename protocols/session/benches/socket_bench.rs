@@ -60,7 +60,7 @@ pub fn stateless_socket_benchmark(c: &mut Criterion) {
         // Make a sanity check
         assert_eq!(
             alice_data,
-            runtime.block_on(bob_receive_data(wire_data.clone(), vec![0u8; *size]))
+            runtime.block_on(bob_receive_data(wire_data.clone(), Vec::with_capacity(*size)))
         );
 
         group.throughput(Throughput::Bytes(*size as u64));
