@@ -265,7 +265,7 @@ where
                             Ok(v) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
-                                    METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &v.next_hop.to_string()]);
+                                    METRIC_PACKET_COUNT_PER_PEER.increment(&[&v.next_hop.to_string(), "out"]);
                                     METRIC_PACKET_COUNT.increment(&["sent"]);
                                 }
                                 finalizer.finalize(Ok(()));
@@ -347,7 +347,7 @@ where
                             let peer: OffchainPublicKey = match peer.try_into() {
                                 Ok(p) => p,
                                 Err(error) => {
-                                    warn!(%peer, %error, "Dropping packet – cannot convert peer id");
+                                    warn!(%peer, %error, "Dropping packet - cannot convert peer id");
                                     return None;
                                 }
                             };
@@ -473,6 +473,12 @@ where
                                 is_random: false,
                             }.into();
 
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_PACKET_COUNT_PER_PEER.increment(&[&previous_hop.to_string(), "in"]);
+                                METRIC_PACKET_COUNT.increment(&["received"]);
+                            }
+
                             if let Ok(ack_packet) = db
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
                                 .await
@@ -512,6 +518,11 @@ where
                                 .unwrap_or_else(|_| {
                                     error!("failed to forward a packet to the transport layer");
                                 });
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                            }
 
                             #[cfg(feature = "capture")]
                             let _ = capture_clone.try_send(captured_packet);
