@@ -15,7 +15,7 @@ pub mod resolver;
 mod ticket_manager;
 pub mod tickets;
 
-use std::{fs, path::Path};
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use futures::future::BoxFuture;
@@ -24,11 +24,8 @@ use hopr_db_api::{
     logs::HoprDbLogOperations, peers::HoprDbPeersOperations, protocol::HoprDbProtocolOperations,
     resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations,
 };
-use migration::{MigratorChainLogs, MigratorTrait};
+use sea_orm::{ConnectionTrait, TransactionTrait};
 pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
-use sea_orm::{SqlxSqliteConnector, TransactionTrait};
-use sqlx::pool::PoolOptions;
-use tracing::debug;
 
 use crate::{
     accounts::HoprDbAccountOperations,
@@ -36,7 +33,6 @@ use crate::{
     db::HoprDb,
     errors::{DbSqlError, Result},
     info::HoprDbInfoOperations,
-    prelude::SQL_DB_LOGS_FILE_NAME,
     registry::HoprDbRegistryOperations,
 };
 
@@ -126,7 +122,9 @@ pub trait HoprDbGeneralModelOperations {
     /// Creates a new transaction.
     async fn begin_transaction_in_db(&self, target: TargetDb) -> Result<OpenTransaction>;
 
-    async fn import_logs_db(mut self, src_dir: &Path, files: &[String]) -> Result<()>;
+    /// Import the logs data from a snapshot directory.
+    /// This is a higher-level method that handles database replacement for snapshots.
+    async fn import_logs_db(self, src_dir: PathBuf) -> Result<()>;
 
     /// Same as [`HoprDbGeneralModelOperations::begin_transaction_in_db`] with default [TargetDb].
     async fn begin_transaction(&self) -> Result<OpenTransaction> {
@@ -192,10 +190,31 @@ impl HoprDbGeneralModelOperations for HoprDb {
         }
     }
 
-    async fn import_logs_db(mut self, src_dir: &Path, files: &[String]) -> Result<()> {
-        // TODO: Attach logs database in src dir to main logs db connection
-        // TODO: Copy over all data from the logs database in src dir to the main logs db
-        // TODO: Detach src logs database
+    async fn import_logs_db(self, src_dir: PathBuf) -> Result<()> {
+        let src_db_path = src_dir.join("hopr_logs.db");
+        if !src_db_path.exists() {
+            return Err(DbSqlError::Construction(format!(
+                "Source logs database file does not exist: {}",
+                src_db_path.display()
+            )));
+        }
+
+        let sql = format!(
+            "ATTACH DATABASE '{}' AS source_logs; BEGIN TRANSACTION; DELETE FROM log; DELETE FROM log_status; DELETE \
+             FROM log_topic_info; INSERT INTO log_topic_info SELECT * FROM source_logs.log_topic_info; INSERT INTO \
+             log_status SELECT * FROM source_logs.log_status; INSERT INTO log SELECT * FROM source_logs.log; COMMIT; \
+             DETACH DATABASE source_logs;",
+            src_db_path.to_string_lossy().replace("'", "''")
+        );
+
+        let logs_conn = self.conn(TargetDb::Logs);
+
+        logs_conn
+            .execute_unprepared(sql.as_str())
+            .await
+            .map_err(|e| DbSqlError::Construction(format!("Failed to import logs data: {}", e)))?;
+
+        Ok(())
     }
 }
 

@@ -51,9 +51,7 @@ pub struct HoprDb {
     pub(crate) logs_db: sea_orm::DatabaseConnection,
 
     pub(crate) caches: Arc<HoprDbCaches>,
-    pub(crate) cfg: HoprDbConfig,
     pub(crate) chain_key: ChainKeypair,
-    pub(crate) directory: PathBuf,
     pub(crate) me_onchain: Address,
     pub(crate) ticket_manager: Arc<TicketManager>,
 }
@@ -119,14 +117,12 @@ impl HoprDb {
         )
         .await;
 
-        Self::new_sqlx_sqlite(cfg, chain_key, directory.to_path_buf(), index, peers, tickets, logs).await
+        Self::new_sqlx_sqlite(chain_key, index, peers, tickets, logs).await
     }
 
     pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self> {
         Self::new_sqlx_sqlite(
-            HoprDbConfig::default(),
             chain_key,
-            Path::new("/tmp").to_path_buf(),
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| DbSqlError::Construction(e.to_string()))?,
@@ -144,9 +140,7 @@ impl HoprDb {
     }
 
     async fn new_sqlx_sqlite(
-        cfg: HoprDbConfig,
         chain_key: ChainKeypair,
-        directory: PathBuf,
         index_db_pool: SqlitePool,
         peers_db_pool: SqlitePool,
         tickets_db_pool: SqlitePool,
@@ -228,8 +222,6 @@ impl HoprDb {
             })?;
 
         Ok(Self {
-            cfg,
-            directory,
             me_onchain: chain_key.public().to_address(),
             chain_key,
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),

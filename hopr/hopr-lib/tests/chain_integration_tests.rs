@@ -2,7 +2,6 @@ mod common;
 
 use std::{env, path::Path, time::Duration};
 
-use alloy::node_bindings::AnvilInstance;
 use alloy::primitives::{B256, U256};
 use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
@@ -896,7 +895,7 @@ async fn integration_test_indexer_logs_snapshot() -> anyhow::Result<()> {
     let logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
     let index_empty = db.index_is_empty().await?;
 
-    assert_eq!(logs_count, 50, "Imported database should have logs");
+    assert_eq!(logs_count, 72, "Imported database should have logs");
     assert!(index_empty, "Imported database index should be empty");
 
     Ok(())

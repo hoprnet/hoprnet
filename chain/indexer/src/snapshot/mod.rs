@@ -110,7 +110,7 @@ where
     /// 1. Downloads archive from URL (HTTP/HTTPS/file://)
     /// 2. Extracts tar.gz archive safely
     /// 3. Validates database integrity
-    /// 4. Installs via [`HoprDbGeneralModelOperations::replace_logs_db`]
+    /// 4. Installs via [`HoprDbGeneralModelOperations::import_logs_db`]
     /// 5. Cleans up temporary files
     ///
     /// # Arguments
@@ -166,10 +166,10 @@ where
         let db_path = temp_dir.join("hopr_logs.db");
         let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
 
-        // Update database using replace_logs_db
+        // Update database
         self.db
             .clone()
-            .replace_logs_db(&temp_dir, &extracted_files)
+            .import_logs_db(temp_dir.clone())
             .await
             .map_err(|e| SnapshotError::Installation(e.to_string()))?;
 
