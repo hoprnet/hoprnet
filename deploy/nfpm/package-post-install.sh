@@ -293,6 +293,3 @@ create_user_group
 start_service
 echo "HOPR package installation completed successfully."
 show_summary
-
-
-
