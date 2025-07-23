@@ -2,63 +2,68 @@
 
 Hoprd has a ready to use package for the following variants:
 
-- Architecture supported: `x86_64` and `aarch64`
-- Supported operativa systems: `linux` and `darwin`
-- Supported linux distributions: `debian`, `redhat` and `archlinux`
+- Supported processor architectures: `x86_64` and `aarch64`
+- Supported operating systems: `Linux` and `macOS`
+- Supported package formats: `deb`, `rpm`, and `pkg.tar.zst`
 
 ## Install via package manager
 
-- Go to [release page](https://github.com/hoprnet/hoprnet/releases)
-- Identify the architecture you need execute this command `uname -a`. Keep in mind that architecture `arm64` is equivalent to `aarch64`.
-- Identify the package manager: deb, rpm, pkg.tar.zst
-- Export the required environment variables:
+- Visit the [release page](https://github.com/hoprnet/hoprnet/releases)
+- Determine your processor architecture by running `uname -m`.  
+  Note: `arm64` is equivalent to `aarch64`.
+- Choose the appropriate package format for your system: `deb`, `rpm`, or `pkg.tar.zst`.
+- Set the required environment variables before installing the package:
 
 ```bash
 # You can get Safe address and the Module address from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=
-export HOPRD_MODULE_ADDRESS=
+export HOPRD_SAFE_ADDRESS=<SAFE_WALLET_ADDRESS>
+export HOPRD_MODULE_ADDRESS=<MODULE_ADDRESS>
 # Choose your own local RPC provider or any from https://docs.hoprnet.org/node/custom-rpc-provider
-export HOPRD_PROVIDER=
+export HOPRD_PROVIDER=<CUSTOM_RPC_PROVIDER>
 ```
 
-### Debian:
+### `.deb` (Debian, Ubuntu and derivatives)
 
-Install commands:
+**Install:**
 
 ```bash
 sudo apt-get update
-sudo -E apt -y install ./hoprd_3.0.0_aarch64.deb
+sudo -E apt -y install ./hoprd.deb
 ```
 
-Uninstall commands:
+**Uninstall:**
 
 ```bash
-sudo apt purge hoprd
+sudo apt remove -y hoprd
 ```
 
-### Centos
+---
 
-Install commands:
+### `.rpm` (Fedora, CentOS, RHEL, openSUSE)
+
+**Install:**
 
 ```bash
-sudo -E dnf install -y ./hoprd_3.0.0_aarch64.rpm
+sudo -E dnf install -y ./hoprd.rpm
 ```
 
-Uninstall commands:
+**Uninstall:**
 
 ```bash
 sudo dnf remove -y hoprd
 ```
 
-## Archlinux
+---
 
-Install commands:
+### `.pkg.tar.zst` (Arch Linux, Manjaro)
+
+**Install:**
 
 ```bash
-sudo pacman --noconfirm -U ./hoprd_3.0.0_aarch64.pkg.tar.zst
+sudo pacman --noconfirm -U ./hoprd.pkg.tar.zst
 ```
 
-Uninstall commands:
+**Uninstall:**
 
 ```bash
 sudo pacman -Rs hoprd
@@ -107,6 +112,4 @@ export HOPRD_PROVIDER=
 echo "Optionally create an identifiy file at ./deploy/nfpm/hopr.id"
 just test-package deb aarch64-linux
 just test-package rpm aarch64-linux
-just test-package archlinux aarch64-linux
-
 ```
