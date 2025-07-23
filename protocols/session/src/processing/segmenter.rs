@@ -53,13 +53,17 @@ where
 
     /// Creates a new instance, wrapping the given `inner` Segment sink.
     ///
-    /// The `frame_size` value will be clamped into the `[C, (C - SessionMessage::SEGMENT_OVERHEAD) * SeqIndicator::MAX + 1]` interval.
+    /// The `frame_size` value will be clamped into the `[C, (C - SessionMessage::SEGMENT_OVERHEAD) * SeqIndicator::MAX
+    /// + 1]` interval.
     pub fn new(inner: S, frame_size: usize, send_terminating_segment: bool, flush_each_segment: bool) -> Self {
         // We must clamp to at most SeqIndicator::MAX + 1 segments per frame.
         // This is true for Session protocol without partial acknowledgements.
         // When partial acknowledgements are enabled, the maximum frame size is less,
         // and the caller must take care of it.
-        let frame_size = frame_size.clamp(C, (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize);
+        let frame_size = frame_size.clamp(
+            C,
+            (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
+        );
 
         Self {
             seg_buffer: Vec::with_capacity(Self::PAYLOAD_CAPACITY),

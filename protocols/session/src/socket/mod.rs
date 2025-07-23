@@ -20,13 +20,11 @@ use tracing::{Instrument, instrument};
 
 use crate::{
     errors::SessionError,
-    frames::OrderedFrame,
+    frames::{OrderedFrame, SeqIndicator},
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
-    protocol::{SessionCodec, SessionMessage},
+    protocol::{SegmentRequest, SessionCodec, SessionMessage},
     socket::state::{SocketComponents, Stateless},
 };
-use crate::frames::SeqIndicator;
-use crate::protocol::SegmentRequest;
 
 /// Configuration object for [`SessionSocket`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
@@ -36,7 +34,8 @@ pub struct SessionSocketConfig {
     /// The size is always greater or equal to the MTU `C` of the underlying transport, and
     /// less or equal to:
     /// - (`C` -  [`SessionMessage::SEGMENT_OVERHEAD`]) * ([`SeqIndicator::MAX`] + 1) for stateless sockets, or
-    /// - (`C` - `SessionMessage::SEGMENT_OVERHEAD`) * min(`SeqIndicator::MAX` + 1, [`SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`]) for stateful sockets
+    /// - (`C` - `SessionMessage::SEGMENT_OVERHEAD`) * min(`SeqIndicator::MAX` + 1,
+    ///   [`SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`]) for stateful sockets
     ///
     /// Default is 1500 bytes.
     #[default(1500)]
@@ -87,7 +86,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         I: std::fmt::Display + Clone,
     {
         // The maximum frame size in a stateless socket is only bounded by the size of the SeqIndicator
-        let frame_size = cfg.frame_size.clamp(C, (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize);
+        let frame_size = cfg.frame_size.clamp(
+            C,
+            (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * (SeqIndicator::MAX + 1) as usize,
+        );
 
         // Segment data incoming/outgoing using underlying transport
         let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
@@ -176,7 +178,11 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
         // The maximum frame size is reduced due to the size of the missing segment bitmap in SegmentRequests
-        let frame_size = cfg.frame_size.clamp(C, (C - SessionMessage::<C>::SEGMENT_OVERHEAD) * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize));
+        let frame_size = cfg.frame_size.clamp(
+            C,
+            (C - SessionMessage::<C>::SEGMENT_OVERHEAD)
+                * SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME.min((SeqIndicator::MAX + 1) as usize),
+        );
 
         // Segment data incoming/outgoing using underlying transport
         let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
@@ -389,6 +395,7 @@ mod tests {
     use futures::{AsyncReadExt, AsyncWriteExt};
     use futures_time::future::FutureExt;
     use hopr_crypto_packet::prelude::HoprPacket;
+
     use super::*;
     use crate::{AcknowledgementState, AcknowledgementStateConfig, utils::test::*};
 

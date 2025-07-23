@@ -56,10 +56,7 @@ use asynchronous_codec::{Decoder, Encoder};
 use bytes::{Buf, BufMut, BytesMut};
 pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest};
 
-use crate::{
-    errors::SessionError,
-    frames::Segment,
-};
+use crate::{errors::SessionError, frames::Segment};
 
 /// Contains all messages of the Session sub-protocol.
 ///
@@ -195,9 +192,15 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
         // Read the message
         let res = match SessionMessageDiscriminants::from_repr(disc).ok_or(SessionError::UnknownMessageTag)? {
-            SessionMessageDiscriminants::Segment => SessionMessage::Segment(src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE+payload_len].try_into()?),
-            SessionMessageDiscriminants::Request => SessionMessage::Request(src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE+payload_len].try_into()?),
-            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE+payload_len].try_into()?),
+            SessionMessageDiscriminants::Segment => SessionMessage::Segment(
+                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
+            ),
+            SessionMessageDiscriminants::Request => SessionMessage::Request(
+                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
+            ),
+            SessionMessageDiscriminants::Acknowledge => SessionMessage::Acknowledge(
+                src[SessionMessage::<C>::HEADER_SIZE..SessionMessage::<C>::HEADER_SIZE + payload_len].try_into()?,
+            ),
         };
 
         src.advance(SessionMessage::<C>::HEADER_SIZE + payload_len);
