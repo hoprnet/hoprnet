@@ -41,12 +41,6 @@ package packager arch:
     esac
     export RELEASE_VERSION ARCHITECTURE
     envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
-    ./scripts/generate-changelog.sh "${RELEASE_VERSION}" "{{packager}}" true > ./deploy/nfpm/changelog
-    help2man --name="HOPR node executable" --no-info --output ./deploy/nfpm/hoprd.1 ./dist/bin/hoprd
-    gzip -9n ./deploy/nfpm/hoprd.1
-    help2man --name="HOPR CLI helper tool" --no-info --output ./deploy/nfpm/hopli.1 ./dist/bin/hopli
-    gzip -9n ./deploy/nfpm/hopli.1
-    [[ "{{packager}}" == "deb" ]] && cat ./deploy/nfpm/changelog | gzip -9 > ./deploy/nfpm/changelog.gz
     [[ "{{packager}}" == "deb" ]] && sed -i.backup '/^license:.*/d' deploy/nfpm/nfpm.generated.yaml && rm deploy/nfpm/nfpm.generated.yaml.backup
     mkdir -p dist/packages
     nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
@@ -62,6 +56,30 @@ test-package packager arch:
     deploy/nfpm/test-package-tool.sh create {{packager}} {{arch}} 2>&1 | tee deploy/nfpm/test-package-{{packager}}-{{arch}}.log
     deploy/nfpm/test-package-tool.sh copy {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
     deploy/nfpm/test-package-tool.sh install {{packager}} {{arch}} 2>&1 | tee -a deploy/nfpm/test-package-{{packager}}-{{arch}}.log
+
+sign-file source_file:
+    #!/usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    echo "Signing file: {{source_file}}"
+    basename="$(basename {{source_file}})"
+    dirname="$(dirname {{source_file}})"
+
+     # Create isolated GPG keyring
+    gnupghome="$(mktemp -d)"
+    export GNUPGHOME="$gnupghome"
+    echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
+
+     # Generate hash and signature
+    cd "$dirname"
+    shasum -a 256 "$basename" > "$basename.sha256"
+    echo "Hash written to $basename.sha256"
+    gpg --armor --output "$basename.asc" --detach-sign "$basename"
+    echo "Signature written to $basename.asc"
+
+     # Clean up
+    rm -rf "$gnupghome"
+
+
 
 # list all available docker image targets which can be built
 list-docker-images:
