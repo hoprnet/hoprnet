@@ -171,6 +171,12 @@ where
             return Poll::Ready(Err(std::io::ErrorKind::QuotaExceeded.into()));
         }
 
+        if self.current_frame_len == self.frame_size {
+            tracing::trace!("frame is complete before write");
+            self.as_mut().complete_segment();
+            ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
+        }
+
         // Write only as much as there is space in the segment or the frame
         let new_len_in_buffer = buf
             .len()
