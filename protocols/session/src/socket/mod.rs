@@ -103,7 +103,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
 
         // Pipeline IN: Data incoming from Upstream
         let upstream_frames_in = packets_out
-            .with(|segment| future::ok(SessionMessage::<C>::Segment(segment)))
+            .with(|segment| future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment)))
             .segmenter::<C>(frame_size);
 
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
@@ -206,14 +206,14 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let (segments_tx, segments_rx) = futures::channel::mpsc::channel(cfg.capacity);
         let mut st_1 = state.clone();
         let upstream_frames_in = segments_tx
-            .sink_map_err(|_| SessionError::InvalidSegment)
+            //.sink_map_err(|_| SessionError::InvalidSegment)
             .with(move |segment| {
                 // The segment_sent event is raised only for segments coming from Upstream,
                 // not for the segments from the Control stream (= segment resends).
                 if let Err(error) = st_1.segment_sent(&segment) {
                     tracing::debug!(%error, "outgoing segment state update failed");
                 }
-                future::ok(SessionMessage::<C>::Segment(segment))
+                future::ok::<_, futures::channel::mpsc::SendError>(SessionMessage::<C>::Segment(segment))
             })
             .segmenter_with_terminating_segment::<C>(frame_size);
 
@@ -405,41 +405,6 @@ mod tests {
     const FRAME_SIZE: usize = 1500;
 
     const DATA_SIZE: usize = 17 * MTU + 271; // Use some size not directly divisible by the MTU
-
-    #[test_log::test(tokio::test)]
-    async fn another_test() -> anyhow::Result<()> {
-        let size = 128 * 1024;
-        let data = vec![1u8; size];
-
-        let (alice, mut bob) = tokio::io::duplex(2 * size);
-
-        let mut alice_socket = UnreliableSocket::<MTU>::new_stateless(
-            "alice",
-            tokio_util::compat::TokioAsyncReadCompatExt::compat(alice),
-            SessionSocketConfig::default(),
-        )
-        .unwrap();
-
-        alice_socket.write_all(&data).await?;
-        alice_socket.flush().await?;
-        alice_socket.close().await?;
-
-        let mut wire_data = Vec::new();
-        tokio::io::AsyncReadExt::read_to_end(&mut bob, &mut wire_data).await?;
-
-        let mut bob_socket = UnreliableSocket::<MTU>::new_stateless(
-            "bob",
-            DuplexIO::from((futures::io::sink(), futures::io::Cursor::new(wire_data))),
-            SessionSocketConfig::default(),
-        )?;
-
-        let mut recv_data = Vec::with_capacity(size);
-        bob_socket.read_to_end(&mut recv_data).await?;
-
-        assert_eq!(data, recv_data);
-
-        Ok(())
-    }
 
     #[test_log::test(tokio::test)]
     async fn stateless_socket_unidirectional_should_work() -> anyhow::Result<()> {

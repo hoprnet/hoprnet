@@ -10,10 +10,9 @@
 //! Reassembler followed by a Sequencer is commonly called frame Reconstructor.
 
 mod reassembly;
+// mod segmenter_old;
 mod segmenter;
 mod sequencer;
-
-mod segmenter2;
 /// Types necessary for frame reconstruction and segmentation.
 pub(crate) mod types;
 
@@ -172,6 +171,7 @@ mod tests {
         .timeout(futures_time::time::Duration::from_secs(5));
 
         data_in.write_all(&data_written).await?;
+        data_in.flush().await?;
         data_in.close().await?;
 
         let (data_read, frame_count) = data_read.await???;

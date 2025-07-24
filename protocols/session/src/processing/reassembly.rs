@@ -1,5 +1,5 @@
 //! Contains the frame [`Reassembler`]:
-//! an inverse component to the [`Segmenter`](super::segmenter::Segmenter).
+//! an inverse component to the [`Segmenter`](super::segmenter_old::Segmenter).
 
 use std::{
     future::Future,
@@ -23,7 +23,7 @@ use crate::{
 /// Reassembler is a stream adaptor that reads [`Segments`](Segment) from the underlying
 /// stream and tries to put them into correct order so they form a [`Frame`].
 ///
-/// This is essentially the inverse of [`Segmenter`](super::segmenter::Segmenter).
+/// This is essentially the inverse of [`Segmenter`](super::segmenter_old::Segmenter).
 ///
 /// Reassembler takes two parameters: `max_age` and `capacity`:
 ///

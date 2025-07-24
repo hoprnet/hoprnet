@@ -55,6 +55,10 @@ where
     S: futures::Stream,
     S::Item: Ord + PartialOrd<FrameId>,
 {
+    /// Creates a new instance, wrapping the given `inner` Segment sink.
+    ///
+    /// The `frame_size` value will be clamped into the `[C, (C - SessionMessage::SEGMENT_OVERHEAD) * SeqIndicator::MAX
+    /// + 1]` interval.
     fn new(inner: S, max_wait: Duration, capacity: usize) -> Self {
         assert!(capacity > 0, "capacity should be positive");
         Self {
