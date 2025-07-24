@@ -289,13 +289,8 @@ mod tests {
 
         let mut all_data = Vec::new();
         for _ in 0..num_frames {
-            let mut offset = 0;
             let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
-
-            while offset < data.len() {
-                let written = writer.write(&data[offset..]).await?;
-                offset += written;
-            }
+            writer.write_all(&data).await?;
             all_data.extend(data);
         }
 
@@ -356,14 +351,11 @@ mod tests {
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
         let mut writer = segments_tx.segmenter::<MTU>(FRAME_SIZE);
 
-        let mut offset = 0;
+        // Make sure the FRAME_SIZE is not a multiple of MTU
+        assert_ne!(0, FRAME_SIZE % MTU);
+
         let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
-
-        while offset < data.len() {
-            let written = writer.write(&data[offset..]).await?;
-            offset += written;
-        }
-
+        writer.write_all(&data).await?;
         writer.flush().await?;
         writer.close().await?;
 
@@ -399,14 +391,17 @@ mod tests {
 
         pin_mut!(segments);
 
+        // The first frame should come out even without a flush
         assert_frame_segments(1, 1, &mut segments, &data).await?;
 
+        // And no more segment comes out for the remaining bytes
         segments
             .next()
             .timeout(futures_time::time::Duration::from_millis(10))
             .await
             .expect_err("should time out");
 
+        // ... until it is flushed
         writer.flush().await?;
 
         let seg = segments
@@ -420,6 +415,7 @@ mod tests {
         assert_eq!(4, seg.data.len());
         assert_eq!(&data[FRAME_SIZE..], seg.data.as_ref());
 
+        // The next full frame should come out normally after a flush
         let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
         writer.write_all(&data).await?;
         writer.flush().await?;
