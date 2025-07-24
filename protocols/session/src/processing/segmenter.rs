@@ -108,14 +108,13 @@ where
                     } else {
                         // No more space in the frame buffer, we need to segment it
                         // and write segments to the downstream
-                        if let Err(error) = segment_into(
+                        segment_into(
                             this.frame.as_slice(),
                             C - SessionMessage::<C>::SEGMENT_OVERHEAD,
                             *this.frame_id,
                             this.ready_segments,
-                        ) {
-                            return Poll::Ready(Err(std::io::Error::other(error)));
-                        }
+                        )
+                        .map_err(std::io::Error::other)?;
 
                         tracing::trace!(num_segments = this.ready_segments.len(), "frame ready");
 
@@ -156,21 +155,19 @@ where
             // If there's any data in the unfinished frame, segment it
             if !this.frame.is_empty() {
                 // Flush the downstream sink first
-                if let Err(error) = futures::ready!(this.inner.as_mut().poll_flush(cx).map_err(std::io::Error::other)) {
-                    return Poll::Ready(Err(error));
-                }
+                futures::ready!(this.inner.as_mut().poll_flush(cx).map_err(std::io::Error::other))?;
 
                 // Segment whatever data is in the frame
                 // At this point ready_segments must be empty,
                 // because poll_write always makes sure it is before returning Ready
-                if let Err(error) = segment_into(
+                segment_into(
                     this.frame.as_slice(),
                     C - SessionMessage::<C>::SEGMENT_OVERHEAD,
                     *this.frame_id,
                     this.ready_segments,
-                ) {
-                    return Poll::Ready(Err(std::io::Error::other(error)));
-                }
+                )
+                .map_err(std::io::Error::other)?;
+
                 tracing::trace!(num_segments = this.ready_segments.len(), "flushed frame ready");
 
                 this.frame.clear();
@@ -181,13 +178,13 @@ where
                 let segment = this.ready_segments.pop_front().unwrap();
                 tracing::trace!(seg_id = %segment.id(), "segment flushing out");
 
-                if let Err(error) = this.inner.as_mut().start_send(segment) {
-                    return Poll::Ready(Err(std::io::Error::other(error)));
-                }
+                this.inner.as_mut().start_send(segment).map_err(std::io::Error::other)?;
             } else {
                 // Both buffers are empty, so only flush the downstream
+                futures::ready!(this.inner.as_mut().poll_flush(cx).map_err(std::io::Error::other))?;
+
                 tracing::trace!("all segments flushed out");
-                return this.inner.as_mut().poll_flush(cx).map_err(std::io::Error::other);
+                return Poll::Ready(Ok(()));
             }
         }
     }

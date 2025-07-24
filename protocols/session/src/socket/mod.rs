@@ -395,10 +395,9 @@ mod tests {
     use futures::{AsyncReadExt, AsyncWriteExt};
     use futures_time::future::FutureExt;
     use hopr_crypto_packet::prelude::HoprPacket;
-    use hopr_network_types::utils::DuplexIO;
 
     use super::*;
-    use crate::{AcknowledgementState, AcknowledgementStateConfig, UnreliableSocket, utils::test::*};
+    use crate::{AcknowledgementState, AcknowledgementStateConfig, utils::test::*};
 
     const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 
