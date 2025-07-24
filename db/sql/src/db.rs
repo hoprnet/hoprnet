@@ -82,7 +82,7 @@ impl HoprDb {
         // Indexer database
         let index = PoolOptions::new()
             .min_connections(0)
-            .max_connections(30)
+            .max_connections(1)
             .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_INDEX_FILE_NAME)))
             .await
             .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?;
