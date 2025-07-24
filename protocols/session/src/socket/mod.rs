@@ -395,15 +395,51 @@ mod tests {
     use futures::{AsyncReadExt, AsyncWriteExt};
     use futures_time::future::FutureExt;
     use hopr_crypto_packet::prelude::HoprPacket;
+    use hopr_network_types::utils::DuplexIO;
 
     use super::*;
-    use crate::{AcknowledgementState, AcknowledgementStateConfig, utils::test::*};
+    use crate::{AcknowledgementState, AcknowledgementStateConfig, UnreliableSocket, utils::test::*};
 
     const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 
     const FRAME_SIZE: usize = 1500;
 
     const DATA_SIZE: usize = 17 * MTU + 271; // Use some size not directly divisible by the MTU
+
+    #[test_log::test(tokio::test)]
+    async fn another_test() -> anyhow::Result<()> {
+        let size = 128 * 1024;
+        let data = vec![1u8; size];
+
+        let (alice, mut bob) = tokio::io::duplex(2 * size);
+
+        let mut alice_socket = UnreliableSocket::<MTU>::new_stateless(
+            "alice",
+            tokio_util::compat::TokioAsyncReadCompatExt::compat(alice),
+            SessionSocketConfig::default(),
+        )
+        .unwrap();
+
+        alice_socket.write_all(&data).await?;
+        alice_socket.flush().await?;
+        alice_socket.close().await?;
+
+        let mut wire_data = Vec::new();
+        tokio::io::AsyncReadExt::read_to_end(&mut bob, &mut wire_data).await?;
+
+        let mut bob_socket = UnreliableSocket::<MTU>::new_stateless(
+            "bob",
+            DuplexIO::from((futures::io::sink(), futures::io::Cursor::new(wire_data))),
+            SessionSocketConfig::default(),
+        )?;
+
+        let mut recv_data = Vec::with_capacity(size);
+        bob_socket.read_to_end(&mut recv_data).await?;
+
+        assert_eq!(data, recv_data);
+
+        Ok(())
+    }
 
     #[test_log::test(tokio::test)]
     async fn stateless_socket_unidirectional_should_work() -> anyhow::Result<()> {

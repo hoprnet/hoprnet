@@ -593,7 +593,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 // once all its segments (seq_len) are sent,
                 // and the acknowledgement also comes back to us.
                 // Therefore, RTO_BASE_SENDER = latency * (seq_len + 1)
-                self.cfg.expected_packet_latency * (segment.seq_flags.seq_num() + 1) as u32,
+                self.cfg.expected_packet_latency * (segment.seq_flags.seq_len() + 1) as u32,
             )) {
                 tracing::error!(%error, "failed to insert outgoing retry of a frame");
             }
@@ -611,7 +611,7 @@ mod tests {
     use crate::{
         frames::SeqNum,
         processing::types::{FrameBuilder, FrameDashMap, FrameMap},
-        utils::test::segment,
+        utils::segment,
     };
 
     const FRAME_SIZE: usize = 1500;

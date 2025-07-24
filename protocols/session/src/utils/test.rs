@@ -16,47 +16,8 @@ use rand::{
 };
 use tracing::instrument;
 
-use crate::{
-    errors::SessionError,
-    frames::{Segment, SeqIndicator},
-};
-
 // Using static RNG seed to make tests reproducible between different runs
 // const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
-
-/// Helper function to segment `data` into segments of a given ` max_segment_size ` length.
-/// All segments are tagged with the same `frame_id`.
-pub fn segment<T: AsRef<[u8]>>(data: T, max_segment_size: usize, frame_id: u32) -> crate::errors::Result<Vec<Segment>> {
-    use crate::frames::SeqNum;
-
-    if frame_id == 0 {
-        return Err(SessionError::InvalidFrameId);
-    }
-
-    if max_segment_size == 0 {
-        return Err(SessionError::IncorrectMessageLength);
-    }
-
-    let data = data.as_ref();
-
-    let num_chunks = data.len().div_ceil(max_segment_size);
-    if num_chunks > SeqNum::MAX as usize {
-        return Err(SessionError::DataTooLong);
-    }
-
-    let chunks = data.chunks(max_segment_size);
-
-    let seq_len = SeqIndicator::try_from(chunks.len() as SeqNum)?;
-    Ok(chunks
-        .enumerate()
-        .map(|(idx, data)| Segment {
-            frame_id,
-            seq_flags: seq_len,
-            seq_idx: idx as u8,
-            data: data.into(),
-        })
-        .collect())
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FaultyNetworkConfig {

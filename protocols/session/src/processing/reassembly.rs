@@ -235,7 +235,7 @@ mod tests {
     use rand::{SeedableRng, prelude::SliceRandom, rngs::StdRng};
 
     use super::*;
-    use crate::utils::test::segment;
+    use crate::utils::segment;
 
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 

@@ -143,7 +143,7 @@ impl SeqIndicator {
     }
 
     #[inline]
-    pub const fn seq_num(&self) -> SeqNum {
+    pub const fn seq_len(&self) -> SeqNum {
         self.0 & Self::MAX
     }
 
@@ -156,7 +156,7 @@ impl SeqIndicator {
 impl Debug for SeqIndicator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SeqIndicator")
-            .field("seq_num", &self.seq_num())
+            .field("seq_len", &self.seq_len())
             .field("is_terminating", &self.is_terminating())
             .finish()
     }
@@ -164,7 +164,7 @@ impl Debug for SeqIndicator {
 
 impl Display for SeqIndicator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.seq_num(), if self.is_terminating() { "*" } else { "" })
+        write!(f, "{}{}", self.seq_len(), if self.is_terminating() { "*" } else { "" })
     }
 }
 
@@ -217,7 +217,7 @@ impl Segment {
     /// Indicates whether this segment is the last one from the frame.
     #[inline]
     pub fn is_last(&self) -> bool {
-        self.seq_idx == self.seq_flags.seq_num() - 1
+        self.seq_idx == self.seq_flags.seq_len() - 1
     }
 
     /// Short-cut to check if this segment is a terminating segment.
@@ -291,7 +291,7 @@ impl TryFrom<&[u8]> for Segment {
             seq_flags: SeqIndicator::new_unchecked(header[5]),
             data: data.into(),
         };
-        (segment.frame_id > 0 && segment.seq_idx < segment.seq_flags.seq_num())
+        (segment.frame_id > 0 && segment.seq_idx < segment.seq_flags.seq_len())
             .then_some(segment)
             .ok_or(SessionError::InvalidSegment)
     }

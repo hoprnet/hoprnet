@@ -12,7 +12,10 @@ use std::{
 use futures::StreamExt;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
-use crate::frames::FrameId;
+use crate::{
+    errors::SessionError,
+    frames::{FrameId, Segment, SeqIndicator, SeqNum},
+};
 
 pub(crate) fn to_hex_shortened(data: &impl AsRef<[u8]>, max_chars: usize) -> String {
     let data = data.as_ref();
@@ -128,5 +131,81 @@ impl PartialOrd<Self> for RetriedFrameId {
 impl Ord for RetriedFrameId {
     fn cmp(&self, other: &Self) -> Ordering {
         self.frame_id.cmp(&other.frame_id)
+    }
+}
+
+/// Helper function to segment `data` into segments of a given ` max_segment_size ` length.
+/// All segments are tagged with the same `frame_id` and output into the given ` segments ` buffer.
+pub fn segment_into<T: AsRef<[u8]>, E: Extend<Segment>>(
+    data: T,
+    max_segment_size: usize,
+    frame_id: FrameId,
+    segments: &mut E,
+) -> crate::errors::Result<()> {
+    if frame_id == 0 {
+        return Err(SessionError::InvalidFrameId);
+    }
+
+    if max_segment_size == 0 {
+        return Err(SessionError::IncorrectMessageLength);
+    }
+
+    let data = data.as_ref();
+
+    let num_chunks = data.len().div_ceil(max_segment_size);
+    if num_chunks > SeqNum::MAX as usize {
+        return Err(SessionError::DataTooLong);
+    }
+
+    let chunks = data.chunks(max_segment_size);
+
+    let seq_len = SeqIndicator::try_from(chunks.len() as SeqNum)?;
+    segments.extend(chunks.enumerate().map(|(idx, data)| Segment {
+        frame_id,
+        seq_flags: seq_len,
+        seq_idx: idx as u8,
+        data: data.into(),
+    }));
+
+    Ok(())
+}
+
+/// Convenience wrapper for [`segment_into`] that allocates its own output buffer and returns it.
+#[allow(unused)]
+pub fn segment<T: AsRef<[u8]>>(data: T, max_segment_size: usize, frame_id: u32) -> crate::errors::Result<Vec<Segment>> {
+    let mut out = Vec::with_capacity(data.as_ref().len().div_ceil(max_segment_size));
+    segment_into(data, max_segment_size, frame_id, &mut out)?;
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use hex_literal::hex;
+
+    use super::*;
+
+    #[test]
+    fn segment_should_split_data_correctly() -> anyhow::Result<()> {
+        let data = hex!("deadbeefcafebabe");
+
+        let segments = segment(data, 3, 1)?;
+        assert_eq!(3, segments.len());
+
+        assert_eq!(hex!("deadbe"), segments[0].data.as_ref());
+        assert_eq!(0, segments[0].seq_idx);
+        assert_eq!(3, segments[0].seq_flags.seq_len());
+        assert_eq!(1, segments[0].frame_id);
+
+        assert_eq!(hex!("efcafe"), segments[1].data.as_ref());
+        assert_eq!(1, segments[1].seq_idx);
+        assert_eq!(3, segments[1].seq_flags.seq_len());
+        assert_eq!(1, segments[1].frame_id);
+
+        assert_eq!(hex!("babe"), segments[2].data.as_ref());
+        assert_eq!(2, segments[2].seq_idx);
+        assert_eq!(3, segments[2].seq_flags.seq_len());
+        assert_eq!(1, segments[2].frame_id);
+
+        Ok(())
     }
 }

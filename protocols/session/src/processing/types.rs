@@ -20,9 +20,9 @@ impl From<Segment> for FrameBuilder {
     fn from(value: Segment) -> Self {
         let idx = value.seq_idx;
         let mut ret = Self {
-            segments: vec![None; value.seq_flags.seq_num() as usize],
+            segments: vec![None; value.seq_flags.seq_len() as usize],
             frame_id: value.frame_id,
-            seg_remaining: value.seq_flags.seq_num() - 1,
+            seg_remaining: value.seq_flags.seq_len() - 1,
             recv_bytes: value.data.len(),
             last_recv: Instant::now(),
         };
@@ -41,7 +41,7 @@ impl FrameBuilder {
         let idx = segment.seq_idx;
         if segment.frame_id != self.frame_id
             || idx as usize >= self.segments.len()
-            || segment.seq_flags.seq_num() as usize != self.segments.len()
+            || segment.seq_flags.seq_len() as usize != self.segments.len()
             || self.seg_remaining == 0
             || self.segments[idx as usize].is_some()
         {

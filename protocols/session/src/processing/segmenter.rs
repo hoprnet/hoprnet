@@ -78,7 +78,7 @@ where
         }
     }
 
-    #[instrument(name = "Segmenter::poll_flush_segments", level = "trace", skip(self, cx), fields(frame_id = self.next_frame_id, seq_len = self.ready_segments.len()))]
+    #[instrument(name = "Segmenter::poll_flush_segments", level = "trace", skip(self, cx), fields(frame_id = self.next_frame_id, seq_len = self.ready_segments.len()), ret)]
     fn poll_flush_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SessionError>> {
         let seq_len = self.ready_segments.len();
         debug_assert!(seq_len <= SeqIndicator::MAX as usize);
@@ -171,18 +171,17 @@ where
             return Poll::Ready(Err(std::io::ErrorKind::QuotaExceeded.into()));
         }
 
-        if self.current_frame_len == self.frame_size {
-            tracing::trace!("frame is complete before write");
-            self.as_mut().complete_segment();
-            ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
-        }
+        // if self.current_frame_len == self.frame_size {
+        // tracing::trace!("frame is complete before write");
+        // self.as_mut().complete_segment();
+        // ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
+        // }
 
         // Write only as much as there is space in the segment or the frame
         let new_len_in_buffer = buf
             .len()
             .min(Self::PAYLOAD_CAPACITY - self.seg_buffer.len())
             .min(self.frame_size - self.current_frame_len);
-
         debug_assert!(new_len_in_buffer > 0);
 
         self.as_mut()
@@ -200,7 +199,7 @@ where
 
         // If the chunk finishes the frame, flush it
         if self.current_frame_len + new_len_in_buffer == self.frame_size {
-            tracing::trace!("frame is complete");
+            tracing::trace!(last_write = new_len_in_buffer, "frame is complete");
             self.as_mut().complete_segment();
             ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
         } else if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
@@ -213,7 +212,6 @@ where
             }
         }
 
-        tracing::trace!(len = new_len_in_buffer, "ready");
         Poll::Ready(Ok(new_len_in_buffer))
     }
 
@@ -311,7 +309,7 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
-    use crate::utils::test::segment;
+    use crate::utils::segment;
 
     const MTU: usize = 1000;
     const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
@@ -331,7 +329,7 @@ mod tests {
             let frame_id = i / SEGMENTS_PER_FRAME + start_frame_id;
             assert_eq!(frame_id as FrameId, seg.frame_id);
             assert_eq!((i % SEGMENTS_PER_FRAME) as SeqNum, seg.seq_idx);
-            assert_eq!((FRAME_SIZE / MTU + 1) as SeqNum, seg.seq_flags.seq_num());
+            assert_eq!((FRAME_SIZE / MTU + 1) as SeqNum, seg.seq_flags.seq_len());
             if i % SEGMENTS_PER_FRAME == 0 {
                 assert_eq!(SMTU, seg.data.len());
                 assert_eq!(
@@ -372,7 +370,7 @@ mod tests {
 
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(1, seg.frame_id);
-        assert_eq!(1, seg.seq_flags.seq_num());
+        assert_eq!(1, seg.seq_flags.seq_len());
         assert_eq!(0, seg.seq_idx);
         assert_eq!(b"test", seg.data.as_ref());
 
@@ -503,7 +501,7 @@ mod tests {
             let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
             assert_eq!(1, seg.frame_id);
             assert_eq!(i as SeqNum, seg.seq_idx);
-            assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_flags.seq_num());
+            assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_flags.seq_len());
             assert_eq!(SMTU, seg.data.len());
             assert_eq!(&data[i * SMTU..i * SMTU + SMTU], seg.data.as_ref());
         }
@@ -511,7 +509,7 @@ mod tests {
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(1, seg.frame_id);
         assert_eq!((FRAME_SIZE / SMTU) as SeqNum, seg.seq_idx);
-        assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_flags.seq_num());
+        assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_flags.seq_len());
         assert_eq!(FRAME_SIZE % SMTU, seg.data.len());
         assert_eq!(&data[FRAME_SIZE - FRAME_SIZE % SMTU..], seg.data.as_ref());
 
@@ -545,7 +543,7 @@ mod tests {
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(2, seg.frame_id);
         assert_eq!(0, seg.seq_idx);
-        assert_eq!(1, seg.seq_flags.seq_num());
+        assert_eq!(1, seg.seq_flags.seq_len());
         assert_eq!(4, seg.data.len());
         assert_eq!(&data[FRAME_SIZE..], seg.data.as_ref());
 
@@ -580,7 +578,7 @@ mod tests {
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(2, seg.frame_id);
         assert_eq!(0, seg.seq_idx);
-        assert_eq!(1, seg.seq_flags.seq_num());
+        assert_eq!(1, seg.seq_flags.seq_len());
         assert_eq!(4, seg.data.len());
         assert_eq!(&data[FRAME_SIZE..], seg.data.as_ref());
 

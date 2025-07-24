@@ -216,7 +216,7 @@ mod tests {
     use super::*;
     use crate::{
         frames::{FrameId, SegmentId},
-        utils::test::segment,
+        utils::segment,
     };
 
     #[test]

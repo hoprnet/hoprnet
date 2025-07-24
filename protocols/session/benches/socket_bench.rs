@@ -38,7 +38,7 @@ pub fn stateless_socket_benchmark(c: &mut Criterion) {
 
     group.sample_size(100000);
 
-    for size in [/*16 * KB, 64 * KB,*/ 128 * KB, 1024 * KB].iter() {
+    for size in [/* 16 * KB, 64 * KB, */ 128 * KB, 1024 * KB].iter() {
         let mut alice_data = vec![0u8; *size];
 
         hopr_crypto_random::random_fill(&mut alice_data);
