@@ -177,7 +177,10 @@ impl SnapshotDownloader {
         info!("Downloading snapshot from: {}", url);
 
         // Check available disk space
-        self.check_disk_space(target_path.parent().unwrap()).await?;
+        let parent_dir = target_path
+            .parent()
+            .ok_or_else(|| SnapshotError::InvalidData("Target path has no parent directory".to_string()))?;
+        self.check_disk_space(parent_dir).await?;
 
         // Handle file:// URLs for local file access
         if url.starts_with("file://") {
@@ -270,8 +273,11 @@ impl SnapshotDownloader {
 
         let source_path = Path::new(file_path);
 
+        // Validate path to prevent directory traversal
+        let canonical_path = source_path.canonicalize().map_err(SnapshotError::Io)?;
+
         // Check if source file exists
-        if !source_path.exists() {
+        if !canonical_path.exists() {
             return Err(SnapshotError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("Local file not found: {file_path}"),
@@ -279,7 +285,7 @@ impl SnapshotDownloader {
         }
 
         // Check file size
-        let metadata = fs::metadata(source_path)?;
+        let metadata = fs::metadata(canonical_path.clone())?;
         if metadata.len() > self.config.max_size {
             return Err(SnapshotError::TooLarge {
                 size: metadata.len(),
@@ -293,10 +299,10 @@ impl SnapshotDownloader {
         }
 
         // Copy the file
-        let copied_bytes = tokio::fs::copy(source_path, target_path).await?;
+        let copied_bytes = tokio::fs::copy(canonical_path.clone(), target_path).await?;
         info!(
             "Copied local snapshot file {} bytes from {:?} to {:?}",
-            copied_bytes, source_path, target_path
+            copied_bytes, canonical_path, target_path
         );
 
         Ok(())
@@ -397,19 +403,12 @@ fn get_available_disk_space(dir: &Path) -> SnapshotResult<u64> {
         }
     }
 
-    match best_match {
-        Some(disk) => Ok(disk.available_space()),
-        None => {
-            // Fallback: use the first disk or return an error
-            if let Some(disk) = disks.first() {
-                warn!(
-                    "Could not find matching disk for path {:?}, using first available disk",
-                    dir
-                );
-                Ok(disk.available_space())
-            } else {
-                Err(SnapshotError::InvalidData("No disks found on system".to_string()))
-            }
-        }
-    }
+    best_match.map_or_else(
+        || {
+            Err(SnapshotError::InvalidData(format!(
+                "Could not determine disk space for path: {dir:?}"
+            )))
+        },
+        |disk| Ok(disk.available_space()),
+    )
 }

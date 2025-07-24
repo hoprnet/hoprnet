@@ -222,33 +222,24 @@ impl TestSnapshotManager {
     pub async fn download_and_setup_snapshot(&self, url: &str, data_dir: &Path) -> SnapshotResult<SnapshotInfo> {
         info!("Starting test snapshot download and setup from: {}", url);
 
-        // Create temporary directory for download
-        let temp_dir = data_dir.join("snapshot_temp");
-        fs::create_dir_all(&temp_dir)?;
-
-        // We'll clean up the temp directory at the end
-        let temp_dir_for_cleanup = temp_dir.clone();
+        let temp_dir = tempfile::tempdir_in(data_dir)?;
+        let temp_path = temp_dir.path();
 
         // Download snapshot
-        let archive_path = temp_dir.join("snapshot.tar.gz");
+        let archive_path = temp_path.join("snapshot.tar.gz");
         self.downloader.download_snapshot(url, &archive_path).await?;
 
         // Extract snapshot
-        let extracted_files = self.extractor.extract_snapshot(&archive_path, &temp_dir).await?;
+        let extracted_files = self.extractor.extract_snapshot(&archive_path, &temp_path).await?;
         debug!("Extracted snapshot files: {:?}", extracted_files);
 
         // Validate extracted database
-        let db_path = temp_dir.join("hopr_logs.db");
+        let db_path = temp_path.join("hopr_logs.db");
         let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
 
         // Install files directly to data directory (test mode)
-        self.install_snapshot_files(&temp_dir, data_dir, &extracted_files)
+        self.install_snapshot_files(&temp_path, data_dir, &extracted_files)
             .await?;
-
-        // Clean up temporary directory
-        if let Err(e) = fs::remove_dir_all(&temp_dir_for_cleanup) {
-            error!("Failed to cleanup temp directory: {}", e);
-        }
 
         info!("Test snapshot setup completed successfully");
         Ok(snapshot_info)

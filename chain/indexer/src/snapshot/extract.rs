@@ -10,6 +10,7 @@ use std::{
 };
 
 use flate2::read::GzDecoder;
+use hopr_async_runtime::prelude::spawn_blocking;
 use tar::Archive;
 use tracing::{debug, error, info};
 
@@ -71,12 +72,13 @@ impl SnapshotExtractor {
         // Create target directory if it doesn't exist
         fs::create_dir_all(target_dir)?;
 
-        // Extract in blocking task to avoid blocking async runtime
         let archive_path = archive_path.to_path_buf();
         let target_dir = target_dir.to_path_buf();
         let expected_files = self.expected_files.clone();
 
-        let extracted_files = Self::extract_tar_gz(&archive_path, &target_dir, &expected_files)?;
+        // Run in blocking task to avoid blocking async runtime
+        let extracted_files =
+            spawn_blocking(move || Self::extract_tar_gz(&archive_path, &target_dir, &expected_files)).await??;
 
         info!("Extracted {} snapshot files", extracted_files.len());
         Ok(extracted_files)
@@ -139,7 +141,8 @@ impl SnapshotExtractor {
     pub async fn validate_archive(&self, archive_path: &Path) -> SnapshotResult<Vec<String>> {
         let archive_path = archive_path.to_path_buf();
 
-        Self::list_archive_contents(&archive_path)
+        // Run in blocking task to avoid blocking async runtime
+        spawn_blocking(move || Self::list_archive_contents(&archive_path)).await?
     }
 
     /// Lists the contents of a tar.gz archive
