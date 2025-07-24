@@ -68,7 +68,6 @@ contents:
     file_info:
       mode: 0644
 
-
 scripts:
   preinstall: ./deploy/nfpm/package-pre-install.sh
   postinstall: ./deploy/nfpm/package-post-install.sh

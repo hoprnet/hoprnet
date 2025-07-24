@@ -185,11 +185,10 @@ generate_identity_file() {
   # If the identity file not exists, automatically create it
   if [ ! -f "/etc/hoprd/hopr.id" ]; then
     echo "Generating HOPR node identity file at /etc/hoprd/hopr.id..."
-    if IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/; then
+    if IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/ >/dev/null; then
       if [ -f /etc/hoprd/hopr0.id ]; then
         mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
-        chmod 640 /etc/hoprd/hopr.id
-        show_node_address
+        chmod 644 /etc/hoprd/hopr.id
       else
         echo "Error: Identity file was not created at expected location /etc/hoprd/hopr0.id"
         exit 1
@@ -257,10 +256,32 @@ start_service() {
 }
 
 # Function to show the HOPR node address
-show_node_address() {
+show_summary() {
   node_address=$(IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity read -d /etc/hoprd/ | grep "Identity addresses:" | awk -F '[\\[\\]]' '{print $2}')
-  echo "HOPR node address: ${node_address}"
-  echo "Finish the onboarding of this node at https://hub.hoprnet.org by registering it and adding it to your safe."
+  hoprd_host=$(echo "${HOPRD_HOST}" | cut -d':' -f1)
+  echo "*********************************************************************************************"
+  echo "***************************************        HOPR        **********************************"
+  echo "*********************************************************************************************"
+  echo ""
+  echo "API Endpoint:       http://${hoprd_host}:${HOPRD_API_PORT} or http://localhost:${HOPRD_API_PORT}"
+  echo "Safe Address:       ${HOPRD_SAFE_ADDRESS}"
+  echo "Module Address:     ${HOPRD_MODULE_ADDRESS}"
+  echo "Node address:       ${node_address}"
+  echo "Config Directory:   /etc/hoprd"
+  echo "Data Directory:     /var/lib/hoprd"
+  echo "Log Location:       /var/log/hoprd"
+  echo "HOPRd Binary:       /usr/bin/hoprd"
+  echo "HOPLi Binary:       /usr/bin/hopli"
+  echo ""
+  echo "Next Steps:"
+  echo "  - Edit the environment file at ${HOPRD_ENV_FILE} to set the appropriate environment variables."
+  echo "  - Edit the configuration file at ${HOPRD_CONFIG_FILE} to customize your node settings."
+  echo "  - Register and complete the onboarding at: https://hub.hoprnet.org"
+  echo ""
+  echo "Note: Your API token and password are stored in ${HOPRD_ENV_FILE} (Keep this file secure!)"
+  echo ""
+  echo "*********************************************************************************************"
+
 }
 
 # Main script execution starts here
@@ -271,3 +292,4 @@ generate_config_file
 create_user_group
 start_service
 echo "HOPR package installation completed successfully."
+show_summary
