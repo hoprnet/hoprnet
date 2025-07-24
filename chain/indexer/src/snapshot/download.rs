@@ -274,7 +274,7 @@ impl SnapshotDownloader {
         if !source_path.exists() {
             return Err(SnapshotError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!("Local file not found: {}", file_path),
+                format!("Local file not found: {file_path}"),
             )));
         }
 

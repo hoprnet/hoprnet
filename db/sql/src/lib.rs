@@ -241,10 +241,18 @@ impl HoprDbGeneralModelOperations for HoprDb {
         }
 
         let sql = format!(
-            "ATTACH DATABASE '{}' AS source_logs; BEGIN TRANSACTION; DELETE FROM log; DELETE FROM log_status; DELETE \
-             FROM log_topic_info; INSERT INTO log_topic_info SELECT * FROM source_logs.log_topic_info; INSERT INTO \
-             log_status SELECT * FROM source_logs.log_status; INSERT INTO log SELECT * FROM source_logs.log; COMMIT; \
-             DETACH DATABASE source_logs;",
+            r#"
+            ATTACH DATABASE '{}' AS source_logs;
+            BEGIN TRANSACTION;
+            DELETE FROM log;
+            DELETE FROM log_status;
+            DELETE FROM log_topic_info;
+            INSERT INTO log_topic_info SELECT * FROM source_logs.log_topic_info;
+            INSERT INTO log_status SELECT * FROM source_logs.log_status;
+            INSERT INTO log SELECT * FROM source_logs.log;
+            COMMIT;
+            DETACH DATABASE source_logs;
+        "#,
             src_db_path.to_string_lossy().replace("'", "''")
         );
 
@@ -253,7 +261,7 @@ impl HoprDbGeneralModelOperations for HoprDb {
         logs_conn
             .execute_unprepared(sql.as_str())
             .await
-            .map_err(|e| DbSqlError::Construction(format!("Failed to import logs data: {}", e)))?;
+            .map_err(|e| DbSqlError::Construction(format!("Failed to import logs data: {e}")))?;
 
         Ok(())
     }

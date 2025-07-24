@@ -25,7 +25,7 @@ pub struct SnapshotInfo {
     pub latest_block: Option<u64>,
     /// Number of database tables found
     pub tables: usize,
-    /// SQLite version used to create the database  
+    /// SQLite version used to create the database
     pub sqlite_version: String,
     /// Database file size in bytes
     pub db_size: u64,
@@ -90,17 +90,6 @@ impl SnapshotValidator {
         let info = Self::validate_sqlite_db(db_path, &expected_tables).await?;
 
         info!("Snapshot validation successful: {:?}", info);
-        Ok(info)
-    }
-
-    /// Performs comprehensive validation of the database
-    pub async fn comprehensive_validation(&self, db_path: &Path) -> SnapshotResult<SnapshotInfo> {
-        // Basic validation
-        let info = self.validate_snapshot(db_path).await?;
-
-        // Additional safety checks
-        self.check_database_version(db_path).await?;
-
         Ok(info)
     }
 
@@ -201,26 +190,6 @@ impl SnapshotValidator {
             sqlite_version,
             db_size,
         })
-    }
-
-    /// Checks database version compatibility
-    async fn check_database_version(&self, db_path: &Path) -> SnapshotResult<()> {
-        let options = SqliteConnectOptions::new().filename(db_path).read_only(true);
-
-        let mut conn = SqliteConnection::connect_with(&options)
-            .await
-            .map_err(|e| SnapshotError::Validation(format!("Cannot open database: {e}")))?;
-
-        // Check SQLite version compatibility
-        let version: String = sqlx::query_scalar("SELECT sqlite_version()")
-            .fetch_one(&mut conn)
-            .await
-            .map_err(|e| SnapshotError::Validation(format!("Cannot get SQLite version: {e}")))?;
-
-        // Add version compatibility checks as needed
-        info!("Snapshot database SQLite version: {}", version);
-
-        Ok(())
     }
 
     /// Checks data consistency
