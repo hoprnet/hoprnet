@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-sql"
-version = "0.14.3"
+version = "0.15.0"
 edition = "2021"
 description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"

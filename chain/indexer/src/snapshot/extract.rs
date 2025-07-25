@@ -96,6 +96,8 @@ impl SnapshotExtractor {
 
         let mut extracted_files = Vec::new();
 
+        // Using a for loop because entries uses references which would be hard to iterated over
+        // otherwise.
         for entry in archive.entries()? {
             let mut entry = entry?;
             let path_buf = entry.path()?.to_path_buf();
@@ -153,6 +155,8 @@ impl SnapshotExtractor {
 
         let mut files = Vec::new();
 
+        // Using a for loop because entries uses references which would be hard to iterated over
+        // otherwise.
         for entry in archive.entries()? {
             let entry = entry?;
             let path = entry.path()?;

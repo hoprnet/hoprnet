@@ -11,13 +11,17 @@ use std::{fs, path::Path, time::Duration};
 use futures_util::StreamExt;
 use hopr_async_runtime::prelude::sleep;
 use reqwest::Client;
-use tokio::{fs::File, io::AsyncWriteExt};
+use sysinfo::Disks;
+use tokio::fs::File;
+use tokio_util::codec::{BytesCodec, FramedWrite};
 use tracing::{debug, info, warn};
 
-use crate::constants::{
-    LOGS_SNAPSHOT_DOWNLOADER_MAX_RETRIES, LOGS_SNAPSHOT_DOWNLOADER_MAX_SIZE, LOGS_SNAPSHOT_DOWNLOADER_TIMEOUT,
+use crate::{
+    constants::{
+        LOGS_SNAPSHOT_DOWNLOADER_MAX_RETRIES, LOGS_SNAPSHOT_DOWNLOADER_MAX_SIZE, LOGS_SNAPSHOT_DOWNLOADER_TIMEOUT,
+    },
+    snapshot::error::{SnapshotError, SnapshotResult},
 };
-use crate::snapshot::error::{SnapshotError, SnapshotResult};
 
 /// Configuration for snapshot downloads with safety limits.
 ///
@@ -384,29 +388,28 @@ impl Default for SnapshotDownloader {
 /// - `SnapshotError::Io` if the path cannot be canonicalized
 /// - `SnapshotError::InvalidData` if no disks are found on the system
 fn get_available_disk_space(dir: &Path) -> SnapshotResult<u64> {
-    use sysinfo::{Disk, Disks};
-
-    let disks = Disks::new_with_refreshed_list();
-
     // Find the disk that contains the given directory
     let target_path = dir.canonicalize().map_err(SnapshotError::Io)?;
 
     // Find the disk with the longest matching mount point
-    let mut best_match: Option<&Disk> = None;
-    let mut best_match_len = 0;
+    let disks = Disks::new_with_refreshed_list();
 
-    for disk in &disks {
-        let mount_point = disk.mount_point();
-        if target_path.starts_with(mount_point) {
-            let mount_len = mount_point.as_os_str().len();
-            if mount_len > best_match_len {
-                best_match = Some(disk);
-                best_match_len = mount_len;
-            }
-        }
-    }
+    // Filter out disks with non matching mount points
+    let mut usable_disks = disks
+        .iter()
+        .filter(|d| target_path.starts_with(d.mount_point()))
+        .collect::<Vec<_>>();
 
-    best_match.map_or_else(
+    // Sort disks by mount point length (longest first)
+    usable_disks.sort_by(|a, b| {
+        b.mount_point()
+            .as_os_str()
+            .len()
+            .cmp(&(a.mount_point().as_os_str().len()))
+    });
+
+    // If no usable disks found, return an error
+    usable_disks.first().map_or_else(
         || {
             Err(SnapshotError::InvalidData(format!(
                 "Could not determine disk space for path: {dir:?}"

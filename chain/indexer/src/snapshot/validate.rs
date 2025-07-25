@@ -134,13 +134,11 @@ impl SnapshotValidator {
             .map_err(|e| SnapshotError::Validation(format!("Cannot query tables: {e}")))?;
 
         // Verify expected tables exist with strict validation
-        let mut missing_tables = Vec::new();
-        for expected in expected_tables {
-            if !tables.contains(expected) {
-                missing_tables.push(expected.clone());
-            }
-        }
-
+        let missing_tables = expected_tables
+            .iter()
+            .filter(|t| !tables.contains(t))
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>();
         if !missing_tables.is_empty() {
             return Err(SnapshotError::Validation(format!(
                 "Missing required table(s): {}. Available tables: [{}]",
