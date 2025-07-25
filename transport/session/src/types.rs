@@ -264,6 +264,11 @@ pub struct Session {
 }
 
 impl Session {
+    /// Creates a new HOPR Session.
+    ///
+    /// It builds an [`futures::io::AsyncRead`] + [`futures::io::AsyncWrite`] transport
+    /// from the given `hopr` interface and passing it to the appropriate [`UnreliableSocket`] or [`ReliableSocket`]
+    /// based on the given `capabilities`.
     #[tracing::instrument(skip(hopr, on_close), fields(session_id = %id))]
     pub fn new<Tx, Rx, C>(
         id: SessionId,

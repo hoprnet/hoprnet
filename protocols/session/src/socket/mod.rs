@@ -5,15 +5,12 @@ pub mod state;
 
 use std::{
     pin::Pin,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicU32},
-    },
+    sync::{Arc, atomic::AtomicU32},
     task::{Context, Poll},
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future};
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, future::AbortHandle};
 use futures_concurrency::stream::Merge;
 use state::SocketState;
 use tracing::{Instrument, instrument};
@@ -109,15 +106,15 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
-        let downstream_terminated = Arc::new(AtomicBool::new(false));
-        let downstream_terminated_clone = downstream_terminated.clone();
+        let session_id_1 = id.to_string();
+        let session_id_2 = id.to_string();
+        let session_id_3 = id.to_string();
+
+        let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
         // Pipeline OUT: Packets incoming from Downstream
-        let downstream_frames_out = packets_in
-            // Continue receiving packets from downstream, unless we received a terminating frame
-            .take_while(move |_| {
-                futures::future::ready(!downstream_terminated.load(std::sync::atomic::Ordering::Relaxed))
-            })
+        // Continue receiving packets from downstream, unless we received a terminating frame
+        let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
                 futures::future::ready(match packet {
@@ -129,11 +126,15 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         None
                     }
                 })
+                .instrument(tracing::debug_span!(
+                    "SessionSocket::packets_in::pre_reassembly",
+                    session_id = session_id_1
+                ))
             })
             // Reassemble the segments into frames
             .reassembler(cfg.frame_timeout, cfg.capacity)
             // Discard frames that we could not reassemble
-            .filter_map(|maybe_frame| {
+            .filter_map(move |maybe_frame| {
                 futures::future::ready(match maybe_frame {
                     Ok(frame) => Some(OrderedFrame(frame)),
                     Err(error) => {
@@ -141,6 +142,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                         None
                     }
                 })
+                .instrument(tracing::debug_span!(
+                    "SessionSocket::packets_in::pre_sequencing",
+                    session_id = session_id_2
+                ))
             })
             // Put the frames into the correct sequence by Frame Ids
             .sequencer(cfg.frame_timeout, cfg.capacity)
@@ -149,7 +154,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                 future::ready(match maybe_frame {
                     Ok(frame) => {
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
-                        downstream_terminated_clone.store(frame.0.is_terminating, std::sync::atomic::Ordering::Relaxed);
+                        if frame.0.is_terminating {
+                            tracing::warn!("terminating frame received");
+                            packets_in_abort_handle.abort();
+                        }
                         Some(Ok(frame.0))
                     }
                     // Downstream skips discarded frames
@@ -159,6 +167,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
                     }
                     Err(err) => Some(Err(std::io::Error::other(err))),
                 })
+                .instrument(tracing::debug_span!(
+                    "SessionSocket::packets_in::post_sequencing",
+                    session_id = session_id_3
+                ))
             })
             .into_async_read();
 
@@ -239,18 +251,15 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
 
-        let downstream_terminated = Arc::new(AtomicBool::new(false));
-        let downstream_terminated_clone = downstream_terminated.clone();
+        let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
         // Pipeline OUT: Packets incoming from Downstream
         let mut st_1 = state.clone();
         let mut st_2 = state.clone();
         let mut st_3 = state.clone();
-        let downstream_frames_out = packets_in
-            // Continue receiving packets from downstream, unless we received a terminating frame
-            .take_while(move |_| {
-                futures::future::ready(!downstream_terminated.load(std::sync::atomic::Ordering::Relaxed))
-            })
+
+        // Continue receiving packets from downstream, unless we received a terminating frame
+        let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter out Session control messages and update the State, pass only Segments onwards
             .filter_map(move |packet| {
                 futures::future::ready(match packet {
@@ -272,6 +281,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         None
                     }
                 })
+                .instrument(tracing::debug_span!(
+                    "SessionSocket::packets_in::pre_reassembly",
+                    session_id = st_1.session_id()
+                ))
             })
             // Reassemble segments into frames
             .reassembler_with_inspector(cfg.frame_timeout, cfg.capacity, inspector)
@@ -289,6 +302,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         None
                     }
                 })
+                .instrument(tracing::debug_span!(
+                    "SessionSocket::packets_in::pre_sequencing",
+                    session_id = st_2.session_id()
+                ))
             })
             // Put the frames into the correct sequence by Frame Ids
             .sequencer(cfg.frame_timeout, cfg.frame_size)
@@ -302,9 +319,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             tracing::error!(%error, "frame received state update failed");
                         }
                         last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
-                        downstream_terminated_clone.store(frame.0.is_terminating, std::sync::atomic::Ordering::Relaxed);
                         if frame.0.is_terminating {
                             tracing::warn!("terminating frame received");
+                            packets_in_abort_handle.abort();
                         }
                         Some(Ok(frame.0))
                     }
@@ -316,6 +333,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     }
                     Err(err) => Some(Err(std::io::Error::other(err))),
                 })
+                .instrument(tracing::debug_span!(
+                    "SessionSocket::packets_in::post_sequencing",
+                    session_id = st_3.session_id()
+                ))
             })
             .into_async_read();
 

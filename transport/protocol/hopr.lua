@@ -16,8 +16,7 @@ local start_msg_types = {
     [0x00] = "StartSession",
     [0x01] = "SessionEstablished",
     [0x02] = "SessionError",
-    [0x03] = "CloseSession",
-    [0x04] = "KeepAlive"
+    [0x03] = "KeepAlive"
 }
 
 -- Start protocol fields

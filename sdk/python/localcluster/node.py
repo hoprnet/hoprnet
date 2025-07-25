@@ -200,7 +200,7 @@ class Node:
 
     def setup(self, password: str, config_file: Path, dir: Path, log_tag: str):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
-        log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
+        log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "info"
 
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
@@ -209,6 +209,9 @@ class Node:
                     log_level,
                     "hyper_util=warn",
                     "hickory_resolver=warn",
+                    "hopr_transport_session=debug",
+                    "hopr_protocol_session=debug",
+                    "hopr_network_types=debug",
                     "isahc=error",
                     "libp2p_swarm=info",
                     "libp2p_tcp=info",

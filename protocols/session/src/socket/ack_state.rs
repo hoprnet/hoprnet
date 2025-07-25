@@ -321,7 +321,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 .forward(ctl_tx_clone)
                 .map(move |res| match res {
                     Ok(_) => tracing::debug!("acknowledgement forwarding done"),
-                    Err(error) => tracing::error!(%error, "acknowledgement forwarding failed"),
+                    Err(error) => tracing::debug!(%error, "acknowledgement forwarding failed"),
                 })
                 .instrument(tracing::debug_span!("acknowledgement_sender")),
         );
