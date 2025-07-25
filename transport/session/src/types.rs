@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{SinkExt, StreamExt, TryStreamExt, pin_mut};
+use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
     prelude::{DestinationRouting, SealedHost},
@@ -204,9 +204,20 @@ fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     }
 }
 
+/// Indicates the closure reason of a [`Session`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+pub enum ClosureReason {
+    /// Write-half of the Session has been closed.
+    WriteClosed,
+    /// Read-part of the Session has been closed (encountered empty read).
+    EmptyRead,
+    /// Session has been evicted from the cache due to inactivity or capacity reasons.
+    Eviction,
+}
+
 /// Helper trait to allow Box aliasing
-trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
-impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
+trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send + Unpin {}
+impl<T: futures::AsyncWrite + futures::AsyncRead + Send + Unpin> AsyncReadWrite for T {}
 
 /// Describes a node service target.
 /// These are specialized [`SessionTargets`](SessionTarget::ExitNode)
@@ -238,13 +249,18 @@ pub struct IncomingSession {
     pub target: SessionTarget,
 }
 
-// Represents the Session protocol socket over HOPR.
+/// Represents the Session protocol socket over HOPR.
+///
+/// This is essentially a HOPR-specific wrapper for [`ReliableSocket`] and [`UnreliableSocket`]
+/// Session protocol sockets.
+#[pin_project::pin_project]
 pub struct Session {
     id: SessionId,
-    inner: Pin<Box<dyn AsyncReadWrite>>,
+    #[pin]
+    inner: Box<dyn AsyncReadWrite>,
     routing: DestinationRouting,
     capabilities: Capabilities,
-    on_close: Option<Box<dyn FnOnce(SessionId) + Send + Sync>>,
+    on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
 }
 
 impl Session {
@@ -254,7 +270,7 @@ impl Session {
         routing: DestinationRouting,
         capabilities: C,
         hopr: (Tx, Rx),
-        on_close: Option<Box<dyn FnOnce(SessionId) + Send + Sync>>,
+        on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationData)> + Send + Sync + Unpin + 'static,
@@ -277,7 +293,7 @@ impl Session {
         );
 
         // Based on the requested capabilities, see if we should use the Session protocol
-        let inner: Pin<Box<dyn AsyncReadWrite>> = if capabilities.contains(Capability::Segmentation) {
+        let inner: Box<dyn AsyncReadWrite> = if capabilities.contains(Capability::Segmentation) {
             // TODO: update config values
             let socket_cfg = SessionSocketConfig {
                 frame_size: 1500,
@@ -288,7 +304,7 @@ impl Session {
 
             if capabilities.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
                 // TODO: update config values
-                let mut ack_cfg = AcknowledgementStateConfig {
+                let ack_cfg = AcknowledgementStateConfig {
                     // This is a very coarse assumption, that a single 3-hop packet
                     // takes on average 200 ms to deliver.
                     // We can no longer base this timeout on the number of hops because
@@ -301,15 +317,11 @@ impl Session {
                     ..Default::default()
                 };
 
-                // TODO: this is not what NoDelay means
-                if capabilities.contains(Capability::NoDelay) {
-                    // We must use a very small delay anyway
-                    ack_cfg.acknowledgement_delay = Duration::from_millis(1);
-                }
+                // TODO: The NoDelay capability is currently unused
 
                 debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
 
-                Box::pin(ReliableSocket::new(
+                Box::new(ReliableSocket::new(
                     transport,
                     AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
                     socket_cfg,
@@ -317,13 +329,13 @@ impl Session {
             } else {
                 debug!(?socket_cfg, "opening new stateless session socket");
 
-                Box::pin(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
+                Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
                     id, transport, socket_cfg,
                 )?)
             }
         } else {
             debug!("opening raw session socket");
-            Box::pin(transport)
+            Box::new(transport)
         };
 
         Ok(Self {
@@ -361,39 +373,39 @@ impl std::fmt::Debug for Session {
 }
 
 impl futures::AsyncRead for Session {
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        let inner = self.inner.as_mut();
-        pin_mut!(inner);
-        inner.poll_read(cx, buf)
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+        let this = self.project();
+        let read = futures::ready!(this.inner.poll_read(cx, buf))?;
+        if read == 0 {
+            // Empty read signals end of the socket, notify if needed
+            if let Some(notifier) = this.on_close.take() {
+                tracing::trace!(session_id = ?this.id, "notifying read half closure of session");
+                notifier(*this.id, ClosureReason::EmptyRead);
+            }
+        }
+        Poll::Ready(Ok(read))
     }
 }
 
 impl futures::AsyncWrite for Session {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        let inner = &mut self.inner;
-        pin_mut!(inner);
-        inner.poll_write(cx, buf)
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        self.project().inner.poll_write(cx, buf)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let inner = &mut self.inner;
-        pin_mut!(inner);
-        inner.poll_flush(cx)
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        self.project().inner.poll_flush(cx)
     }
 
-    fn poll_close(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        let inner = &mut self.inner;
-        pin_mut!(inner);
-        match inner.poll_close(cx) {
-            Poll::Ready(res) => {
-                // Notify about closure if desired
-                if let Some(notifier) = self.on_close.take() {
-                    notifier(self.id);
-                }
-                Poll::Ready(res)
-            }
-            Poll::Pending => Poll::Pending,
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        let this = self.project();
+        futures::ready!(this.inner.poll_close(cx))?;
+
+        if let Some(notifier) = this.on_close.take() {
+            tracing::trace!(session_id = ?this.id, "notifying write half closure of session");
+            notifier(*this.id, ClosureReason::WriteClosed);
         }
+
+        Poll::Ready(Ok(()))
     }
 }
 

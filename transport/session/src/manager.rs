@@ -23,6 +23,7 @@ use crate::{
     balancer::{RateController, RateLimitExt, SurbBalancer, SurbFlowController},
     errors::{SessionManagerError, TransportSessionError},
     initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
+    types::ClosureReason,
     utils::ScoringSink,
 };
 
@@ -100,63 +101,20 @@ pub struct SessionManagerConfig {
     pub balancer_sampling_interval: Duration,
 }
 
-fn close_session_after_eviction<S>(
-    msg_sender: Arc<OnceLock<S>>,
-    session_id: SessionId,
-    session_data: CachedSession,
-    cause: moka::notification::RemovalCause,
-) -> moka::notification::ListenerFuture
-where
-    S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
-    S::Error: std::error::Error + Send + Sync + 'static,
-{
-    // When a Session is removed from the cache, we notify the other party only
-    // if this removal was due to expiration or cache size limit.
-    match cause {
-        r @ moka::notification::RemovalCause::Expired | r @ moka::notification::RemovalCause::Size
-            if msg_sender.get().is_some() =>
-        {
-            trace!(
-                ?session_id,
-                reason = ?r,
-                "session termination due to eviction from the cache"
-            );
-            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id)) {
-                Ok(data) => data,
-                Err(error) => {
-                    error!(%session_id, %error, "failed to serialize CloseSession");
-                    return futures::future::ready(()).boxed();
-                }
-            };
+fn close_session(session_id: SessionId, session_data: CachedSession, reason: ClosureReason) {
+    debug!(?session_id, ?reason, "closing session");
 
-            // Unwrap cannot panic, since the value's existence is checked on L72
-            let mut msg_sender = msg_sender.get().cloned().unwrap();
-            async move {
-                if let Err(error) = msg_sender.send((session_data.routing_opts.clone(), data)).await {
-                    error!(
-                        %session_id,
-                        %error,
-                        "could not send notification of session closure after cache eviction"
-                    );
-                }
-
-                session_data.session_tx.close_channel();
-                debug!(
-                    ?session_id,
-                    reason = ?r,
-                    "session has been closed due to cache eviction"
-                );
-
-                // Terminate any additional tasks spawned by the Session
-                session_data.abort_handles.into_iter().for_each(|h| h.abort());
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACTIVE_SESSIONS.decrement(1.0);
-            }
-            .boxed()
-        }
-        _ => futures::future::ready(()).boxed(),
+    if reason != ClosureReason::EmptyRead {
+        // Closing the data sender will also cause it to close from the read side
+        session_data.session_tx.close_channel();
+        trace!(?session_id, "data tx channel closed on session");
     }
+
+    // Terminate any additional tasks spawned by the Session
+    session_data.abort_handles.into_iter().for_each(|h| h.abort());
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    METRIC_ACTIVE_SESSIONS.decrement(1.0);
 }
 
 /// This function will use the given generator to generate an initial seeding key.
@@ -305,7 +263,12 @@ where
 /// through keep-alive messages (sent to counterparty) is controlled to maintain that target level.
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
-    session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
+    session_notifiers: Arc<
+        OnceLock<(
+            UnboundedSender<IncomingSession>,
+            UnboundedSender<(SessionId, ClosureReason)>,
+        )>,
+    >,
     sessions: moka::future::Cache<SessionId, CachedSession>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
@@ -370,9 +333,12 @@ where
             sessions: moka::future::Cache::builder()
                 .max_capacity(cfg.maximum_sessions as u64)
                 .time_to_idle(cfg.idle_timeout)
-                .async_eviction_listener(move |k, v, c| {
-                    let msg_sender = msg_sender.clone();
-                    close_session_after_eviction(msg_sender, *k, v, c)
+                .eviction_listener(|session_id: Arc<SessionId>, entry, reason| match &reason {
+                    moka::notification::RemovalCause::Expired | moka::notification::RemovalCause::Size => {
+                        trace!(?session_id, ?reason, "session evicted from the cache");
+                        close_session(*session_id.as_ref(), entry, ClosureReason::Eviction);
+                    }
+                    _ => {}
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
@@ -389,7 +355,7 @@ where
         &self,
         msg_sender: S,
         new_session_notifier: UnboundedSender<IncomingSession>,
-    ) -> crate::errors::Result<Vec<hopr_async_runtime::AbortHandle>> {
+    ) -> crate::errors::Result<Vec<AbortHandle>> {
         self.msg_sender
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -402,24 +368,21 @@ where
         let myself = self.clone();
         let ah_closure_notifications = hopr_async_runtime::spawn_as_abortable!(session_close_rx.for_each_concurrent(
             None,
-            move |closed_session_id| {
+            move |(session_id, closure_reason)| {
                 let myself = myself.clone();
                 async move {
-                    trace!(
-                        session_id = ?closed_session_id,
-                        "sending notification of session closure done by us"
-                    );
-                    match myself.close_session(closed_session_id, true).await {
-                        Ok(closed) if closed => debug!(
-                            session_id = ?closed_session_id,
-                            "session has been closed by us"
-                        ),
-                        Err(e) => error!(
-                            session_id = ?closed_session_id,
-                            error = %e,
-                            "cannot initiate session closure notification"
-                        ),
-                        _ => {}
+                    // These notifications come from the Sessions themselves once
+                    // an empty read is encountered, which means the closure was done by the
+                    // other party.
+                    if let Some(session_data) = myself.sessions.remove(&session_id).await {
+                        close_session(session_id, session_data, closure_reason);
+                    } else {
+                        // Do not treat this as an error
+                        debug!(
+                            ?session_id,
+                            ?closure_reason,
+                            "could not find session id to close, maybe the session is already closed"
+                        );
                     }
                 }
             },
@@ -544,9 +507,9 @@ where
                     .get()
                     .map(|(_, notifier)| {
                         let notifier = notifier.clone();
-                        Box::new(move |session_id: SessionId| {
+                        Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             let _ = notifier
-                                .unbounded_send(session_id)
+                                .unbounded_send((session_id, reason))
                                 .inspect_err(|error| error!(%session_id, %error, "failed to notify session closure"));
                         })
                     })
@@ -706,6 +669,7 @@ where
     /// This currently "fires & forgets" and does not expect nor await any "pong" response.
     pub async fn ping_session(&self, id: &SessionId) -> crate::errors::Result<()> {
         if let Some(session_data) = self.sessions.get(id).await {
+            trace!(session_id = ?id, "pinging manually session");
             Ok(self
                 .msg_sender
                 .get()
@@ -824,9 +788,9 @@ where
                         reply_routing.clone(),
                         session_req.capabilities,
                         (msg_sender.clone(), rx_session_data),
-                        Some(Box::new(move |session_id: SessionId| {
-                            if let Err(error) = close_session_notifier.unbounded_send(session_id) {
-                                error!(%session_id, %error, "failed to notify session closure");
+                        Some(Box::new(move |session_id: SessionId, reason: ClosureReason| {
+                            if let Err(error) = close_session_notifier.unbounded_send((session_id, reason)) {
+                                error!(%session_id, %error, %reason, "failed to notify session closure");
                             }
                         })),
                     )?;
@@ -935,18 +899,6 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&[&error.reason.to_string()])
             }
-            StartProtocol::CloseSession(session_id) => {
-                trace!(?session_id, "received session close request");
-                match self.close_session(session_id, false).await {
-                    Ok(closed) if closed => debug!(?session_id, "session has been closed by the other party"),
-                    Err(error) => error!(
-                        %session_id,
-                        %error,
-                        "session could not be closed on other party's request"
-                    ),
-                    _ => {}
-                }
-            }
             StartProtocol::KeepAlive(msg) => {
                 let session_id = msg.id;
                 if self.sessions.get(&session_id).await.is_some() {
@@ -958,43 +910,6 @@ where
         }
 
         Ok(())
-    }
-
-    async fn close_session(&self, session_id: SessionId, notify_closure: bool) -> crate::errors::Result<bool> {
-        if let Some(session_data) = self.sessions.remove(&session_id).await {
-            // Notification is not sent only when closing in response to the other party's request
-            if notify_closure {
-                trace!(?session_id, "sending session termination");
-                self.msg_sender
-                    .get()
-                    .cloned()
-                    .ok_or(SessionManagerError::NotStarted)?
-                    .send((
-                        session_data.routing_opts,
-                        StartProtocol::CloseSession(session_id).try_into()?,
-                    ))
-                    .await
-                    .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?;
-            }
-
-            // Closing the data sender on the session will cause the Session to terminate
-            session_data.session_tx.close_channel();
-            trace!(?session_id, "data tx channel closed on session");
-
-            // Terminate any additional tasks spawned by the Session
-            session_data.abort_handles.into_iter().for_each(|h| h.abort());
-
-            #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_ACTIVE_SESSIONS.decrement(1.0);
-            Ok(true)
-        } else {
-            // Do not treat this as an error
-            debug!(
-                ?session_id,
-                "could not find session id to close, maybe the session is already closed"
-            );
-            Ok(false)
-        }
     }
 }
 
@@ -1119,42 +1034,6 @@ mod tests {
                 })
             });
 
-        // Alice sends the CloseSession message to initiate closure
-        let bob_mgr_clone = bob_mgr.clone();
-        alice_transport
-            .expect_send_message()
-            .once()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::CloseSession
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
-            })
-            .returning(move |_, data| {
-                let bob_mgr_clone = bob_mgr_clone.clone();
-                Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
-                    Ok(())
-                })
-            });
-
-        // Bob does NOT confirm the closure
-        let alice_mgr_clone = alice_mgr.clone();
-        bob_transport
-            .expect_send_message()
-            .never()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::CloseSession
-                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
-            })
-            .returning(move |_, data| {
-                let alice_mgr_clone = alice_mgr_clone.clone();
-                Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
-                    Ok(())
-                })
-            });
-
         let mut ahs = Vec::new();
 
         // Start Alice
@@ -1199,6 +1078,12 @@ mod tests {
         alice_session.close().await?;
 
         tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert!(matches!(
+            alice_mgr.ping_session(alice_session.id()).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+
         futures::stream::iter(ahs)
             .for_each(|ah| async move { ah.abort() })
             .await;
@@ -1260,43 +1145,6 @@ mod tests {
                 })
             });
 
-        // Alice sends the CloseSession message to initiate closure
-        let bob_mgr_clone = bob_mgr.clone();
-        alice_transport
-            .expect_send_message()
-            .once()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::CloseSession
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
-            })
-            .returning(move |_, data| {
-                let bob_mgr_clone = bob_mgr_clone.clone();
-                Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
-                    Ok(())
-                })
-            });
-
-        // Bob sends the CloseSession message to confirm
-        let alice_mgr_clone = alice_mgr.clone();
-        bob_transport
-            .expect_send_message()
-            .once()
-            .in_sequence(&mut sequence)
-            .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::CloseSession
-                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
-            })
-            .returning(move |_, data| {
-                let alice_mgr_clone = alice_mgr_clone.clone();
-
-                Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
-                    Ok(())
-                })
-            });
-
         let mut ahs = Vec::new();
 
         // Start Alice
@@ -1337,8 +1185,13 @@ mod tests {
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
-        // Let the session timeout
+        // Let the session timeout at Alice
         tokio::time::sleep(Duration::from_millis(300)).await;
+
+        assert!(matches!(
+            alice_mgr.ping_session(alice_session.id()).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
 
         futures::stream::iter(ahs)
             .for_each(|ah| async move { ah.abort() })
@@ -1735,24 +1588,6 @@ mod tests {
                 })
             });
 
-        // Alice sends the CloseSession message to initiate closure
-        let bob_mgr_clone = bob_mgr.clone();
-        alice_transport
-            .expect_send_message()
-            .once()
-            .withf(move |peer, data| {
-                tracing::debug!("Alice sends {:?} message to Bob", msg_type(data));
-                msg_type(data) == StartProtocolDiscriminants::CloseSession
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
-            })
-            .returning(move |_, data| {
-                let bob_mgr_clone = bob_mgr_clone.clone();
-                Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
-                    Ok(())
-                })
-            });
-
         let mut ahs = Vec::new();
 
         // Start Alice
@@ -1796,6 +1631,11 @@ mod tests {
         alice_session.close().await?;
 
         tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(matches!(
+            alice_mgr.ping_session(alice_session.id()).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+
         futures::stream::iter(ahs)
             .for_each(|ah| async move { ah.abort() })
             .await;

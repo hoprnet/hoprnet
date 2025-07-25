@@ -66,7 +66,10 @@ pub struct ConnectedUdpStream {
 }
 
 #[derive(Copy, Clone)]
-enum State { Writing, Flushing(usize) }
+enum State {
+    Writing,
+    Flushing(usize),
+}
 
 /// Defines what happens when data from another [`SocketAddr`](std::net::SocketAddr) arrives
 /// into the [`ConnectedUdpStream`] (other than the one that is considered a counterparty for that
@@ -401,7 +404,7 @@ impl UdpStreamBuilder {
             socket_handles,
             counterparty,
             bound_to: bound_addr.ok_or(ErrorKind::AddrNotAvailable)?,
-            state: State::Writing
+            state: State::Writing,
         })
     }
 }
@@ -631,9 +634,7 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
         if let Some(sender) = this.egress_tx.as_pin_mut() {
-            sender
-                .poll_flush(cx)
-                .map_err(std::io::Error::other)
+            sender.poll_flush(cx).map_err(std::io::Error::other)
         } else {
             Poll::Ready(Err(std::io::Error::new(
                 ErrorKind::NotConnected,
@@ -665,8 +666,7 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use futures::future::Either;
-    use futures::pin_mut;
+    use futures::{future::Either, pin_mut};
     use parameterized::parameterized;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
