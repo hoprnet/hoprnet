@@ -244,6 +244,11 @@ where
     (KeepAliveController(controller), abort_handle)
 }
 
+type SessionNotifiers = (
+    UnboundedSender<IncomingSession>,
+    UnboundedSender<(SessionId, ClosureReason)>,
+);
+
 /// Manages lifecycles of Sessions.
 ///
 /// Once the manager is [started](SessionManager::start), the [`SessionManager::dispatch_message`]
@@ -263,12 +268,7 @@ where
 /// through keep-alive messages (sent to counterparty) is controlled to maintain that target level.
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
-    session_notifiers: Arc<
-        OnceLock<(
-            UnboundedSender<IncomingSession>,
-            UnboundedSender<(SessionId, ClosureReason)>,
-        )>,
-    >,
+    session_notifiers: Arc<OnceLock<SessionNotifiers>>,
     sessions: moka::future::Cache<SessionId, CachedSession>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
