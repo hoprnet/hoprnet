@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprAnnouncementsEventsEvents"],"fn":["deploy","deploy_builder","new"],"static":["BYTECODE","DEPLOYED_BYTECODE"],"struct":["AddressAnnouncement","HoprAnnouncementsEventsInstance","KeyBinding","RevokeAnnouncement"]};
