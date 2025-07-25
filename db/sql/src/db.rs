@@ -97,7 +97,7 @@ impl HoprDb {
             Some(30),
             SQL_DB_INDEX_FILE_NAME,
         )
-        .await;
+        .await?;
 
         let peers_options = PoolOptions::new()
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
@@ -111,7 +111,7 @@ impl HoprDb {
             Some(300),
             SQL_DB_PEERS_FILE_NAME,
         )
-        .await;
+        .await?;
 
         let tickets = Self::create_pool(
             cfg.clone(),
@@ -121,7 +121,7 @@ impl HoprDb {
             Some(50),
             SQL_DB_TICKETS_FILE_NAME,
         )
-        .await;
+        .await?;
 
         let logs = Self::create_pool(
             cfg.clone(),
@@ -131,7 +131,7 @@ impl HoprDb {
             None,
             SQL_DB_LOGS_FILE_NAME,
         )
-        .await;
+        .await?;
 
         Self::new_sqlx_sqlite(chain_key, index, peers, tickets, logs).await
     }
@@ -285,7 +285,7 @@ impl HoprDb {
         min_conn: Option<u32>,
         max_conn: Option<u32>,
         path: &str,
-    ) -> SqlitePool {
+    ) -> Result<SqlitePool> {
         if let Some(min_conn) = min_conn {
             options = options.min_connections(min_conn);
         }
@@ -294,10 +294,12 @@ impl HoprDb {
         }
 
         let cfg = Self::common_connection_cfg(cfg);
-        options
+        let pool = options
             .connect_with(cfg.filename(directory.join(path)))
             .await
-            .unwrap_or_else(|e| panic!("failed to create {path} database: {e}"))
+            .map_err(|e| DbSqlError::Construction(format!("failed to create {path} database: {e}")))?;
+
+        Ok(pool)
     }
 }
 

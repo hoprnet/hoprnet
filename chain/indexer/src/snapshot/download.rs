@@ -14,6 +14,9 @@ use reqwest::Client;
 use tokio::{fs::File, io::AsyncWriteExt};
 use tracing::{debug, info, warn};
 
+use crate::constants::{
+    LOGS_SNAPSHOT_DOWNLOADER_MAX_RETRIES, LOGS_SNAPSHOT_DOWNLOADER_MAX_SIZE, LOGS_SNAPSHOT_DOWNLOADER_TIMEOUT,
+};
 use crate::snapshot::error::{SnapshotError, SnapshotResult};
 
 /// Configuration for snapshot downloads with safety limits.
@@ -22,20 +25,20 @@ use crate::snapshot::error::{SnapshotError, SnapshotResult};
 /// to ensure safe and reliable snapshot downloads.
 #[derive(Debug, Clone)]
 pub struct DownloadConfig {
-    /// Maximum allowed file size in bytes (default: 2GB)
+    /// Maximum allowed file size in bytes
     pub max_size: u64,
-    /// HTTP request timeout duration (default: 30 minutes)
+    /// HTTP request timeout duration
     pub timeout: Duration,
-    /// Maximum number of retry attempts for failed downloads (default: 3)
+    /// Maximum number of retry attempts for failed downloads
     pub max_retries: u32,
 }
 
 impl Default for DownloadConfig {
     fn default() -> Self {
         Self {
-            max_size: 2 * 1024 * 1024 * 1024,   // 2GB max
-            timeout: Duration::from_secs(1800), // 30 minutes
-            max_retries: 3,
+            max_size: LOGS_SNAPSHOT_DOWNLOADER_MAX_SIZE,
+            timeout: LOGS_SNAPSHOT_DOWNLOADER_TIMEOUT,
+            max_retries: LOGS_SNAPSHOT_DOWNLOADER_MAX_RETRIES,
         }
     }
 }
@@ -60,7 +63,7 @@ impl Default for DownloadConfig {
 /// use hopr_chain_indexer::snapshot::download::SnapshotDownloader;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let downloader = SnapshotDownloader::new();
+/// let downloader = SnapshotDownloader::new()?;
 ///
 /// // Download from HTTPS
 /// downloader
@@ -84,19 +87,19 @@ pub struct SnapshotDownloader {
 
 impl SnapshotDownloader {
     /// Creates a new snapshot downloader with default configuration
-    pub fn new() -> Self {
+    pub fn new() -> SnapshotResult<Self> {
         Self::with_config(DownloadConfig::default())
     }
 
     /// Creates a new snapshot downloader with custom configuration
-    pub fn with_config(config: DownloadConfig) -> Self {
-        Self {
+    pub fn with_config(config: DownloadConfig) -> SnapshotResult<Self> {
+        Ok(Self {
             client: Client::builder()
                 .timeout(config.timeout)
                 .build()
-                .expect("Failed to create HTTP client"),
+                .map_err(SnapshotError::Network)?,
             config,
-        }
+        })
     }
 
     /// Downloads a snapshot from the given URL to the target path.
@@ -358,7 +361,7 @@ impl SnapshotDownloader {
 
 impl Default for SnapshotDownloader {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default SnapshotDownloader")
     }
 }
 

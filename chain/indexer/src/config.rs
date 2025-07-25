@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use crate::constants::LOGS_SNAPSHOT_URL;
+
 /// Configuration for the chain indexer functionality
 #[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct IndexerConfig {
@@ -33,8 +35,8 @@ pub struct IndexerConfig {
     /// This should point to a publicly accessible tar.gz file containing
     /// the SQLite logs database files.
     ///
-    /// Default is "https://snapshots.hoprnet.org/logs/latest.tar.gz".
-    #[default("https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string())]
+    /// Default is "https://logs-snapshots.hoprnet.org/latest-stable.tar.gz".
+    #[default(LOGS_SNAPSHOT_URL.to_string())]
     pub logs_snapshot_url: String,
 
     /// Path to the data directory where databases are stored.

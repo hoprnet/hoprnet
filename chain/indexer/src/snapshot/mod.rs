@@ -66,7 +66,7 @@ use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, 
 /// - [`SnapshotDownloader`] - HTTP/HTTPS and file:// URL handling with retry logic
 /// - [`SnapshotExtractor`] - Secure tar.gz extraction with path validation
 /// - [`SnapshotValidator`] - SQLite integrity and content verification
-/// - Database integration via [`HoprDbGeneralModelOperations::replace_logs_db`]
+/// - Database integration via [`HoprDbGeneralModelOperations::import_logs_db`]
 pub struct SnapshotManager<Db>
 where
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
@@ -92,16 +92,16 @@ where
     /// ```no_run
     /// # use hopr_chain_indexer::snapshot::SnapshotManager;
     /// # fn example(db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static) {
-    /// let manager = SnapshotManager::with_db(db);
+    /// let manager = SnapshotManager::with_db(db)?;
     /// # }
     /// ```
-    pub fn with_db(db: Db) -> Self {
-        Self {
+    pub fn with_db(db: Db) -> Result<Self, SnapshotError> {
+        Ok(Self {
             db,
-            downloader: SnapshotDownloader::new(),
+            downloader: SnapshotDownloader::new()?,
             extractor: SnapshotExtractor::new(),
             validator: SnapshotValidator::new(),
-        }
+        })
     }
 
     /// Downloads, extracts, validates, and installs a snapshot.

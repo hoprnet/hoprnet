@@ -85,9 +85,7 @@ impl SnapshotValidator {
     pub async fn validate_snapshot(&self, db_path: &Path) -> SnapshotResult<SnapshotInfo> {
         info!("Validating snapshot database at {:?}", db_path);
 
-        let expected_tables = self.expected_tables.clone();
-
-        let info = Self::validate_sqlite_db(db_path, &expected_tables).await?;
+        let info = Self::validate_sqlite_db(db_path, &self.expected_tables).await?;
 
         info!("Snapshot validation successful: {:?}", info);
         Ok(info)
