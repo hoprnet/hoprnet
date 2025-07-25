@@ -167,6 +167,23 @@ pub struct CliArgs {
     pub no_fast_sync: u8,
 
     #[arg(
+        long = "noLogSnapshot",
+        env = "HOPRD_INDEXER_DISABLE_LOG_SNAPSHOT",
+        help = "Disables downloading logs snapshot on startup.",
+        action = ArgAction::Count
+    )]
+    pub no_logs_snapshot: u8,
+
+    #[arg(
+        long = "logSnapshotUrl",
+        env = "HOPRD_LOG_SNAPSHOT_URL",
+        help = "URL to download logs snapshot from",
+        value_name = "URL",
+        default_value = "https://snapshots.hoprnet.org/logs/latest.tar.gz"
+    )]
+    pub logs_snapshot_url: String,
+
+    #[arg(
         long = "maxBlockRange",
         help = "Maximum number of blocks that can be fetched in a batch request from the RPC provider.",
         env = "HOPRD_MAX_BLOCK_RANGE",
