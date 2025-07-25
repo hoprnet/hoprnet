@@ -6,7 +6,7 @@ use futures_concurrency::stream::StreamExt as _;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
-use hopr_network_types::types::{ResolvedTransportRouting, SurbMatcher, ValidatedPath};
+use hopr_network_types::types::{ResolvedTransportRouting, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag};
@@ -240,7 +240,7 @@ impl Probe {
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
-                                        match db.find_surb(SurbMatcher::Pseudonym(pseudonym)).await.map(|(sender_id, surb)| ResolvedTransportRouting::Return(sender_id, surb)) {
+                                        match db.find_surb(pseudonym.into()).await.map(|(sender_id, surb)| ResolvedTransportRouting::Return(sender_id, surb)) {
                                             Ok(path) => {
                                                 tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
                                             let message = Message::Probe(NeighborProbe::Pong(ping));
@@ -292,6 +292,7 @@ mod tests {
     use async_trait::async_trait;
     use futures::future::BoxFuture;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_network_types::prelude::SurbMatcher;
     use hopr_transport_packet::prelude::Tag;
 
     use super::*;

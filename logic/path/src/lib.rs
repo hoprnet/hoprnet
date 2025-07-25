@@ -3,7 +3,7 @@
 /// Defines the graph of HOPR payment channels.
 pub mod channel_graph;
 pub mod errors;
-/// Implements different path selectors in the [ChannelGraph](crate::channel_graph::ChannelGraph).
+/// Implements different path selectors in the [`ChannelGraph`].
 pub mod selectors;
 
 use std::{
@@ -96,7 +96,7 @@ impl<T: Into<PathAddress> + Copy + PartialEq + Eq> Path<T> for Vec<T> {
 
 pub type ChannelPath = Vec<Address>;
 
-/// A [`NonEmptyPath`] that can be used to route packets using [`OffchainPublicKeys`].
+/// A [`NonEmptyPath`] that can be used to route packets using [`OffchainPublicKey`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TransportPath(Vec<OffchainPublicKey>);
 
@@ -234,7 +234,7 @@ impl Path<Address> for ChainPath {
 
 impl NonEmptyPath<Address> for ChainPath {}
 
-/// Allows resolution of [`OffchainPublicKeys`] for a given [`Address`] or vice versa.
+/// Allows resolution of [`OffchainPublicKey`] for a given [`Address`] or vice versa.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait PathAddressResolver {

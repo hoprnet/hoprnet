@@ -7,9 +7,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{FutureExt, Sink, SinkExt, pin_mut, ready};
+use futures::{FutureExt, Sink, SinkExt, ready};
 use tokio::net::UdpSocket;
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, instrument, trace, warn};
 
 use crate::utils::SocketAddrStr;
 
@@ -35,7 +35,7 @@ lazy_static::lazy_static! {
 
 /// Mimics TCP-like stream functionality on a UDP socket by restricting it to a single
 /// counterparty and implements [`tokio::io::AsyncRead`] and [`tokio::io::AsyncWrite`].
-/// The instance is always constructed using a [`UdpStreamBuilder`].
+/// The instance must always be constructed using a [`UdpStreamBuilder`].
 ///
 /// To set a counterparty, one of the following must happen:
 /// 1) setting it during build via [`UdpStreamBuilder::with_counterparty`]
@@ -53,12 +53,22 @@ lazy_static::lazy_static! {
 /// multiple sockets with `SO_REUSEADDR` and spin parallel tasks that will coordinate data and
 /// transmission retrieval using these sockets. This is driven by RX/TX MPMC queues, which are
 /// per-default unbounded (see [queue size](UdpStreamBuilder::with_queue_size) for details).
+#[pin_project::pin_project]
 pub struct ConnectedUdpStream {
     socket_handles: Vec<tokio::task::JoinHandle<()>>,
+    #[pin]
     ingress_rx: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
+    #[pin]
     egress_tx: Option<BoxIoSink<Box<[u8]>>>,
     counterparty: Arc<OnceLock<SocketAddrStr>>,
     bound_to: std::net::SocketAddr,
+    state: State,
+}
+
+#[derive(Copy, Clone)]
+enum State {
+    Writing,
+    Flushing(usize),
 }
 
 /// Defines what happens when data from another [`SocketAddr`](std::net::SocketAddr) arrives
@@ -95,7 +105,7 @@ pub enum ForeignDataMode {
 pub enum UdpStreamParallelism {
     /// Bind as many sender or receiver sockets as given by [`std::thread::available_parallelism`].
     Auto,
-    /// Bind specific number of sender or receiver sockets.
+    /// Bind a specific number of sender or receiver sockets.
     Specific(NonZeroUsize),
 }
 
@@ -394,6 +404,7 @@ impl UdpStreamBuilder {
             socket_handles,
             counterparty,
             bound_to: bound_addr.ok_or(ErrorKind::AddrNotAvailable)?,
+            state: State::Writing,
         })
     }
 }
@@ -575,57 +586,42 @@ impl ConnectedUdpStream {
     }
 }
 
-impl Drop for ConnectedUdpStream {
-    fn drop(&mut self) {
-        self.socket_handles.iter().for_each(|handle| {
-            handle.abort();
-        })
-    }
-}
-
 impl tokio::io::AsyncRead for ConnectedUdpStream {
+    #[instrument(name = "ConnectedUdpStream::poll_read", level = "trace", skip(self, cx), fields(counterparty = ?self.counterparty.get(), rem = buf.remaining()) , ret)]
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        trace!(
-            remaining_bytes = buf.remaining(),
-            counterparty = ?self.counterparty.get(),
-            "polling read of from udp stream",
-        );
-        match Pin::new(&mut self.ingress_rx).poll_read(cx, buf) {
-            Poll::Ready(Ok(())) => {
-                let read = buf.filled().len();
-                trace!(bytes = read, "read bytes");
-                Poll::Ready(Ok(()))
-            }
-            Poll::Ready(Err(err)) => Poll::Ready(Err(err)),
-            Poll::Pending => Poll::Pending,
-        }
+        ready!(self.project().ingress_rx.poll_read(cx, buf))?;
+        trace!(bytes = buf.filled().len(), "read bytes");
+        Poll::Ready(Ok(()))
     }
 }
 
 impl tokio::io::AsyncWrite for ConnectedUdpStream {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        trace!(
-            bytes = buf.len(),
-            counterparty = ?self.counterparty.get(),
-            "polling write to udp stream",
-        );
-        if let Some(sender) = &mut self.egress_tx {
-            if let Err(e) = ready!(sender.poll_ready_unpin(cx)) {
-                return Poll::Ready(Err(e));
-            }
+    #[instrument(name = "ConnectedUdpStream::poll_write", level = "trace", skip(self, cx), fields(counterparty = ?self.counterparty.get(), len = buf.len()) , ret)]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        let this = self.project();
+        if let Some(sender) = this.egress_tx.get_mut() {
+            loop {
+                match *this.state {
+                    State::Writing => {
+                        ready!(sender.poll_ready_unpin(cx))?;
 
-            let len = buf.iter().len();
-            if let Err(e) = sender.start_send_unpin(Box::from(buf)) {
-                return Poll::Ready(Err(e));
-            }
+                        let len = buf.iter().len();
+                        sender.start_send_unpin(Box::from(buf))?;
+                        *this.state = State::Flushing(len);
+                    }
+                    State::Flushing(len) => {
+                        // Explicitly flush after each data sent
+                        ready!(sender.poll_flush_unpin(cx))?;
+                        *this.state = State::Writing;
 
-            // Explicitly flush after each data sent
-            pin_mut!(sender);
-            sender.poll_flush(cx).map_ok(|_| len)
+                        return Poll::Ready(Ok(len));
+                    }
+                }
+            }
         } else {
             Poll::Ready(Err(std::io::Error::new(
                 ErrorKind::NotConnected,
@@ -634,16 +630,11 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
         }
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        trace!(
-            counterparty = ?self.counterparty.get(),
-            "polling flush to udp stream"
-        );
-        if let Some(sender) = &mut self.egress_tx {
-            pin_mut!(sender);
-            sender
-                .poll_flush(cx)
-                .map_err(|err| std::io::Error::other(err.to_string()))
+    #[instrument(name = "ConnectedUdpStream::poll_flush", level = "trace", skip(self, cx), fields(counterparty = ?self.counterparty.get()) , ret)]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        let this = self.project();
+        if let Some(sender) = this.egress_tx.as_pin_mut() {
+            sender.poll_flush(cx).map_err(std::io::Error::other)
         } else {
             Poll::Ready(Err(std::io::Error::new(
                 ErrorKind::NotConnected,
@@ -652,18 +643,17 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
         }
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        trace!(
-            counterparty = ?self.counterparty.get(),
-            "polling close on udp stream"
-        );
-        // Take the sender to make sure it gets dropped
-        let mut taken_sender = self.egress_tx.take();
-        if let Some(sender) = &mut taken_sender {
-            pin_mut!(sender);
-            sender
-                .poll_close(cx)
-                .map_err(|err| std::io::Error::other(err.to_string()))
+    #[instrument(name = "ConnectedUdpStream::poll_shutdown", level = "trace", skip(self, cx), fields(counterparty = ?self.counterparty.get()) , ret)]
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        let this = self.project();
+        if let Some(sender) = this.egress_tx.as_pin_mut() {
+            let ret = ready!(sender.poll_close(cx));
+
+            this.socket_handles.iter().for_each(|handle| {
+                handle.abort();
+            });
+
+            Poll::Ready(ret)
         } else {
             Poll::Ready(Err(std::io::Error::new(
                 ErrorKind::NotConnected,
@@ -676,7 +666,7 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use futures::future::Either;
+    use futures::{future::Either, pin_mut};
     use parameterized::parameterized;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},

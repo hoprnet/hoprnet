@@ -78,9 +78,8 @@ use hopr_transport_protocol::{
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_PAYLOAD_SIZE,
-    ServiceId, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
-    errors::TransportSessionError, traits::SendMsg,
+    Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_MTU, ServiceId,
+    Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, errors::TransportSessionError,
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use hopr_transport_ticket_aggregation::{
@@ -96,7 +95,7 @@ pub use crate::{
     config::HoprTransportConfig,
     helpers::{PeerEligibility, TicketStatistics},
 };
-use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError};
+use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, helpers::run_packet_planner};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
@@ -195,7 +194,7 @@ where
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<helpers::MessageSender<T, CurrentPathSelector>>,
+    smgr: SessionManager<Sender<(DestinationRouting, ApplicationData)>>,
 }
 
 impl<T> HoprTransport<T>
@@ -570,9 +569,16 @@ where
             .expect("must set the ticket aggregation writer only once");
 
         // -- session management
-        let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
+        let packet_planner = run_packet_planner(
+            self.path_planner.clone(),
+            self.process_packet_send
+                .get()
+                .cloned()
+                .expect("packet sender must be set"),
+        );
+
         self.smgr
-            .start(msg_sender, on_incoming_session)
+            .start(packet_planner, on_incoming_session)
             .expect("failed to start session manager")
             .into_iter()
             .enumerate()
