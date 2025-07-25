@@ -19,7 +19,7 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@6c439dc8bdf85cadbbce9ed30d1c7b959517bc49 # v2.12.2
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: false
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
 
       - name: Update flake.lock
-        uses: DeterminateSystems/update-flake-lock@428c2b58a4b7414dabd372acb6a03dba1084d3ab # v25
+        uses: DeterminateSystems/update-flake-lock@c5930b397a673a70ca70be06020e943aeac310a1 # v27
         id: update
         with:
           pr-title: "chore(nix): update flake.lock"
