@@ -30,6 +30,9 @@ pub enum DbSqlError {
     #[error("channel not found: {0}")]
     ChannelNotFound(Hash),
 
+    #[error("can't edit a corrupted channel: {0}")]
+    CorruptedChannelEntry(Hash),
+
     #[error("missing fixed entry in table {0}")]
     MissingFixedTableEntry(String),
 

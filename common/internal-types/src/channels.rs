@@ -251,6 +251,32 @@ impl ChannelChange {
     }
 }
 
+/// A wrapper around [`ChannelEntry`] representing a Channel that is corrupted.
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CorruptedChannelEntry(ChannelEntry);
+
+impl CorruptedChannelEntry {
+    pub fn new(channel: ChannelEntry) -> Self {
+        CorruptedChannelEntry(channel)
+    }
+
+    /// Returns the inner `ChannelEntry`.
+    pub fn channel(&self) -> &ChannelEntry {
+        &self.0
+    }
+}
+
+/// A pair of source and destination addresses representing a channel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SrcDstPair(Address, Address);
+
+impl From<ChannelEntry> for SrcDstPair {
+    fn from(channel: ChannelEntry) -> Self {
+        SrcDstPair(channel.source, channel.destination)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{

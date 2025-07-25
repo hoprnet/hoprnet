@@ -423,6 +423,7 @@ pub(super) async fn channel_graph(
         "indexBlockPrevChecksum": 0,
         "indexerLastLogBlock": 123450,
         "indexerLastLogChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+        "isIndexerCorrupted": false,
     }))]
 #[serde(rename_all = "camelCase")]
 /// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses
@@ -473,6 +474,8 @@ pub(crate) struct NodeInfoResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae")]
     indexer_last_log_checksum: Hash,
+    #[schema(example = true)]
+    is_indexer_corrupted: bool,
 }
 
 /// Get information about this HOPR Node.
@@ -505,6 +508,12 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
 
     let is_eligible = hopr.is_allowed_to_access_network(either::Right(me_address)).await?;
 
+    // If one channel or more are corrupted, we consider the indexer as corrupted.
+    let is_indexer_corrupted = match hopr.corrupted_channels().await {
+        Ok(corrupted) => !corrupted.is_empty(),
+        Err(_) => false,
+    };
+
     match hopr.get_channel_closure_notice_period().await {
         Ok(channel_closure_notice_period) => {
             let body = NodeInfoResponse {
@@ -525,6 +534,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 indexer_block: indexer_state_info.latest_block_number,
                 indexer_last_log_block: indexer_state_info.latest_log_block_number,
                 indexer_last_log_checksum: indexer_state_info.latest_log_checksum,
+                is_indexer_corrupted,
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())
