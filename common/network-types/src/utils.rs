@@ -115,6 +115,10 @@ pub use tokio_utils::copy_duplex;
 
 #[cfg(feature = "runtime-tokio")]
 mod tokio_utils {
+    use futures::{
+        FutureExt,
+        future::{AbortHandle, Abortable},
+    };
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
     use super::*;
@@ -155,13 +159,37 @@ mod tokio_utils {
 
     /// This is a proper re-implementation of Tokio's
     /// [`copy_bidirectional_with_sizes`](tokio::io::copy_bidirectional_with_sizes), which does not leave the stream
-    /// in half-open-state when one side closes read or write side. Instead, if either side encounters and empty
+    /// in half-open-state when one side closes read or write side.
+    ///
+    /// Instead, if either side encounters and empty
     /// read (EOF indication), the write-side is closed as well and vice versa.
     pub async fn copy_duplex<A, B>(
         a: &mut A,
         b: &mut B,
-        a_to_b_buffer_size: usize,
-        b_to_a_buffer_size: usize,
+        (a_to_b_buffer_size, b_to_a_buffer_size): (usize, usize),
+    ) -> std::io::Result<(u64, u64)>
+    where
+        A: AsyncRead + AsyncWrite + Unpin + ?Sized,
+        B: AsyncRead + AsyncWrite + Unpin + ?Sized,
+    {
+        let (_, ar_a) = AbortHandle::new_pair();
+        let (_, ar_b) = AbortHandle::new_pair();
+
+        copy_duplex_abortable(a, b, (a_to_b_buffer_size, b_to_a_buffer_size), (ar_a, ar_b)).await
+    }
+
+    /// Variant of [`copy_duplex`] with an option to abort either side early using the given
+    /// [`AbortRegistrations`](futures::future::AbortRegistration).
+    ///
+    /// Once a side is aborted, its proper shutdown is initiated, and once done, the other side's
+    /// shutdown is also initiated.
+    /// The difference between the two abort handles is only in the order - which side gets shutdown
+    /// first after the abort.
+    pub async fn copy_duplex_abortable<A, B>(
+        a: &mut A,
+        b: &mut B,
+        (a_to_b_buffer_size, b_to_a_buffer_size): (usize, usize),
+        (a_abort, b_abort): (futures::future::AbortRegistration, futures::future::AbortRegistration),
     ) -> std::io::Result<(u64, u64)>
     where
         A: AsyncRead + AsyncWrite + Unpin + ?Sized,
@@ -170,10 +198,29 @@ mod tokio_utils {
         let mut a_to_b = TransferState::Running(CopyBuffer::new(a_to_b_buffer_size));
         let mut b_to_a = TransferState::Running(CopyBuffer::new(b_to_a_buffer_size));
 
+        // Abort futures are fused: once aborted, each poll returns Err(Aborted)
+        let (mut abort_a, mut abort_b) = (
+            Abortable::new(futures::future::pending::<()>(), a_abort),
+            Abortable::new(futures::future::pending::<()>(), b_abort),
+        );
+
         std::future::poll_fn(|cx| {
             let mut a_to_b_result = transfer_one_direction(cx, &mut a_to_b, a, b)?;
             let mut b_to_a_result = transfer_one_direction(cx, &mut b_to_a, b, a)?;
 
+            // Initiate A's shutdown if A is aborted while still running
+            if let (Poll::Ready(Err(_)), TransferState::Running(buf)) = (abort_a.poll_unpin(cx), &a_to_b) {
+                tracing::trace!("A-side has been aborted.");
+                a_to_b = TransferState::ShuttingDown(buf.amt);
+            }
+
+            // Initiate B's shutdown if B is aborted while still running
+            if let (Poll::Ready(Err(_)), TransferState::Running(buf)) = (abort_b.poll_unpin(cx), &b_to_a) {
+                tracing::trace!("B-side has been aborted.");
+                b_to_a = TransferState::ShuttingDown(buf.amt);
+            }
+
+            // Once B-side is done, initiate shutdown of A-side
             if let TransferState::Done(_) = b_to_a {
                 if let TransferState::Running(buf) = &a_to_b {
                     tracing::trace!("B-side has completed, terminating A-side.");
@@ -182,6 +229,7 @@ mod tokio_utils {
                 }
             }
 
+            // Once A-side is done, initiate shutdown of B-side
             if let TransferState::Done(_) = a_to_b {
                 if let TransferState::Running(buf) = &b_to_a {
                     tracing::trace!("A-side has completed, terminate B-side.");
@@ -404,8 +452,7 @@ mod tests {
         let (a_to_b, b_to_a) = copy_duplex(
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(alice),
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(bob),
-            128,
-            128,
+            (128, 128),
         )
         .await?;
 
@@ -415,6 +462,12 @@ mod tests {
         assert_eq!(alice_tx, bob_rx);
         assert_eq!(bob_tx, alice_rx);
 
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_copy_duplex_with_abort() -> anyhow::Result<()> {
+        // TODO
         Ok(())
     }
 
@@ -434,8 +487,7 @@ mod tests {
         let (a_to_b, b_to_a) = copy_duplex(
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(alice),
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(bob),
-            128,
-            128,
+            (128, 128),
         )
         .await?;
 
@@ -460,7 +512,7 @@ mod tests {
         server_tx.write_all(b"data").await?;
         server_tx.shutdown().await?;
 
-        let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, 2, 2).await?;
+        let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, (2, 2)).await?;
 
         let (client_to_server_count, server_to_client_count) = result;
         assert_eq!(client_to_server_count, 5); // 'hello' was transferred
@@ -480,7 +532,7 @@ mod tests {
 
         client_tx.write_all(b"some longer data to transfer").await?;
 
-        let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, 2, 2).await?;
+        let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, (2, 2)).await?;
 
         let (client_to_server_count, server_to_client_count) = result;
         assert_eq!(server_to_client_count, 5); // 'hello' was transferred

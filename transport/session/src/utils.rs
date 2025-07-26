@@ -25,7 +25,7 @@ where
         "session buffers"
     );
 
-    hopr_network_types::utils::copy_duplex(session, stream, max_buffer, max_buffer)
+    hopr_network_types::utils::copy_duplex(session, stream, (max_buffer, max_buffer))
         .await
         .map(|(a, b)| (a as usize, b as usize))
 }
