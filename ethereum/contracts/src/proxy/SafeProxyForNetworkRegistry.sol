@@ -38,9 +38,9 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
         address _token,
         address _nodeSafeRegistry
     ) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _owner);
-        _setupRole(MANAGER_ROLE, _owner);
-        _setupRole(MANAGER_ROLE, _manager);
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(MANAGER_ROLE, _owner);
+        _grantRole(MANAGER_ROLE, _manager);
         _updateStakeThreshold(_stakeThreshold);
         _updateSnapshotBlockNumber(_snapshotBlockNumber);
 
