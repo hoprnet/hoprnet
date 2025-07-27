@@ -20,7 +20,7 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget,
-    balancer::{RateController, RateLimitExt, SurbBalancer, SurbFlowController},
+    balancer::{RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer, SurbFlowController},
     errors::{SessionManagerError, TransportSessionError},
     initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
     types::ClosureReason,
@@ -212,16 +212,18 @@ where
     let elem = StartProtocol::KeepAlive(session_id.into());
 
     // The stream is suspended until the caller sets a rate via the Controller
-    let (ka_stream, controller) = futures::stream::repeat(elem).rate_limit_per_unit(0, Duration::from_secs(1));
+    let controller = RateController::new(0, Duration::from_secs(1));
 
-    let (abort_handle, reg) = AbortHandle::new_pair();
+    let (ka_stream, abort_handle) =
+        futures::stream::abortable(futures::stream::repeat(elem).rate_limit_with_controller(&controller));
+
     let sender_clone = sender.clone();
     let fwd_routing_clone = routing.clone();
 
     // This task will automatically terminate once the returned abort handle is used.
     debug!(%session_id, "spawning keep-alive stream");
     hopr_async_runtime::prelude::spawn(
-        futures::stream::Abortable::new(ka_stream, reg)
+        ka_stream
             .map(move |msg| ApplicationData::try_from(msg).map(|m| (fwd_routing_clone.clone(), m)))
             .try_for_each_concurrent(None, move |msg| {
                 let mut sender_clone = sender_clone.clone();
@@ -783,11 +785,17 @@ where
                 if let Some(session_id) = allocated_slot {
                     debug!(?session_id, "assigning a new session");
 
+                    // TODO: figure out how to make the rate-limit parameters dynamic
+                    let session_msg_sender = msg_sender
+                        .clone()
+                        .rate_limit_with_controller(&RateController::new(1000, Duration::from_secs(1)))
+                        .buffer(20_000);
+
                     let session = Session::new(
                         session_id,
                         reply_routing.clone(),
                         session_req.capabilities,
-                        (msg_sender.clone(), rx_session_data),
+                        (session_msg_sender, rx_session_data),
                         Some(Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             if let Err(error) = close_session_notifier.unbounded_send((session_id, reason)) {
                                 error!(%session_id, %error, %reason, "failed to notify session closure");

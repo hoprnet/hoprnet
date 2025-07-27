@@ -1,8 +1,9 @@
 mod controller;
+#[allow(dead_code)]
 mod rate_limiting;
 
 pub use controller::{SurbBalancer, SurbBalancerConfig};
-pub use rate_limiting::{RateController, RateLimitExt};
+pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
 
 /// Allows estimating the flow of SURBs in a Session (production or depletion).
 #[cfg_attr(test, mockall::automock)]
