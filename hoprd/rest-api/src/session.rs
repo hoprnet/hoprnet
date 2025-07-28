@@ -1,4 +1,11 @@
-use std::{collections::VecDeque, fmt::Formatter, future::Future, net::IpAddr, str::FromStr, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Formatter,
+    future::Future,
+    net::IpAddr,
+    str::FromStr,
+    sync::Arc,
+};
 
 use axum::{
     Error,
@@ -12,7 +19,7 @@ use axum::{
 use axum_extra::extract::Query;
 use base64::Engine;
 use futures::{
-    AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt,
+    AsyncReadExt, AsyncWriteExt, FutureExt, SinkExt, StreamExt, TryStreamExt,
     future::{AbortHandle, AbortRegistration},
 };
 use futures_concurrency::stream::Merge;
@@ -131,7 +138,7 @@ pub struct StoredSessionEntry {
     pub forward_path: RoutingOptions,
     /// Return path used for the Session.
     pub return_path: RoutingOptions,
-    /// The join handle for the Session processing.
+    /// The abort handle for the Session processing.
     pub abort_handle: AbortHandle,
 }
 
@@ -700,6 +707,88 @@ async fn create_tcp_client_binding(
     )
     .await?;
 
+    // Create an abort handler for the listener
+    let (abort_handle, abort_reg) = AbortHandle::new_pair();
+    hopr_async_runtime::prelude::spawn(async move {
+        let active_sessions = Arc::new(std::sync::Mutex::new(HashMap::new()));
+        let active_sessions_clone = active_sessions.clone();
+
+        futures::stream::Abortable::new(tokio_stream::wrappers::TcpListenerStream::new(tcp_listener), abort_reg)
+            .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
+            .for_each(move |accepted_client| {
+                let data = data.clone();
+                let target = target.clone();
+                let hopr = hopr.clone();
+                let active_sessions = active_sessions_clone.clone();
+
+                // Try to pop from the pool only if a client was accepted
+                let maybe_pooled_session = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
+                async move {
+                    match accepted_client {
+                        Ok((sock_addr, stream)) => {
+                            debug!(?sock_addr, "incoming TCP connection");
+                            let session = match maybe_pooled_session {
+                                Some(s) => {
+                                    debug!(session_id = %s.id(), "using pooled session");
+                                    s
+                                }
+                                None => {
+                                    debug!("no more active sessions in the pool, creating a new one");
+                                    match hopr.connect_to(dst, target, data).await {
+                                        Ok(s) => s,
+                                        Err(error) => {
+                                            error!(%error, "failed to establish session");
+                                            return;
+                                        }
+                                    }
+                                }
+                            };
+
+                            let session_id = *session.id();
+                            debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
+
+                            let (abort_handle, abort_reg) = AbortHandle::new_pair();
+                            if let Ok(mut active_sessions) = active_sessions.lock() {
+                                active_sessions.insert(session_id, abort_handle);
+                            }
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
+
+                            hopr_async_runtime::prelude::spawn(
+                                // The stream either terminates naturally (by the client closing the TCP connection)
+                                // or is terminated via the abort handle.
+                                bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).map(
+                                    move |_| async move {
+                                        // Regardless how the session ended, remove the abort handle
+                                        // from the map
+                                        if let Ok(mut active_sessions) = active_sessions.lock() {
+                                            active_sessions.remove(&session_id);
+                                        }
+
+                                        debug!(%session_id, "tcp session has ended");
+
+                                        #[cfg(all(feature = "prometheus", not(test)))]
+                                        METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
+                                    },
+                                ),
+                            );
+                        }
+                        Err(error) => error!(%error, "failed to accept connection"),
+                    }
+                }
+            })
+            .await;
+
+        // Once the listener is done, abort all active sessions created by the listener
+        if let Ok(active_sessions) = active_sessions.lock() {
+            active_sessions.iter().for_each(|(session_id, handle)| {
+                debug!(%session_id, "aborting opened TCP session after listener has been closed");
+                handle.abort()
+            });
+        };
+    });
+
     state.open_listeners.write_arc().await.insert(
         ListenerId(hopr_network_types::types::IpProtocol::TCP, bound_host),
         StoredSessionEntry {
@@ -707,58 +796,7 @@ async fn create_tcp_client_binding(
             target: target_spec.clone(),
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
-            abort_handle: hopr_async_runtime::spawn_as_abortable!(
-                tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
-                    .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
-                    .for_each_concurrent(None, move |accepted_client| {
-                        let data = data.clone();
-                        let target = target.clone();
-                        let hopr = hopr.clone();
-
-                        // Try to pop from the pool only if a client was accepted
-                        let maybe_pooled_session = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
-                        async move {
-                            match accepted_client {
-                                Ok((sock_addr, stream)) => {
-                                    debug!(socket = ?sock_addr, "incoming TCP connection");
-                                    let session = match maybe_pooled_session {
-                                        Some(s) => {
-                                            debug!(session_id = %s.id(), "using pooled session");
-                                            s
-                                        }
-                                        None => {
-                                            debug!("no more active sessions in pool, creating a new one");
-                                            match hopr.connect_to(dst, target, data).await {
-                                                Ok(s) => s,
-                                                Err(error) => {
-                                                    error!(%error, "failed to establish session");
-                                                    return;
-                                                }
-                                            }
-                                        }
-                                    };
-
-                                    debug!(
-                                        socket = ?sock_addr,
-                                        session_id = tracing::field::debug(*session.id()),
-                                        "new session for incoming TCP connection",
-                                    );
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
-
-                                    // We do not need to install the `AbortRegistration` here,
-                                    // since the `stream` terminates naturally once the TCP connection is closed.
-                                    bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, None).await;
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
-                                }
-                                Err(e) => error!(error = %e, "failed to accept connection"),
-                            }
-                        }
-                    })
-            ),
+            abort_handle,
         },
     );
     Ok(bound_host)

@@ -47,8 +47,7 @@ pub trait SocketState<const C: usize>: Send {
     /// Called when a complete Frame has been finalized from segments received from Downstream.
     fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError>;
 
-    /// Called when a complete Frame has been finalized from segments received from Downstream and
-    /// emitted to Upstream.
+    /// Called when a complete Frame emitted to Upstream in-sequence.
     fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError>;
 
     /// Called when a frame could not be completed from the segments received from Downstream.

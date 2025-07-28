@@ -207,19 +207,21 @@ local function dissect_hopr_session(buffer, pinfo, tree)
         seg_flags:add(session_fields.seg_terminating, buffer(offset+5,1))
         seg_flags:add(session_fields.seg_seq_len, buffer(offset+5,1))
         local data_len = msg_len - 6
-        local data_buf = buffer(offset+6, data_len)
+        if data_len > 0 then
+            local data_buf = buffer(offset+6, data_len)
 
-        -- Call heuristic dissectors on Segment.data
-        -- This allows Wireshark to attempt to decode the payload inside Segment.data
-        local data_tvb = data_buf:tvb()
+            -- Call heuristic dissectors on Segment.data
+            -- This allows Wireshark to attempt to decode the payload inside Segment.data
+            local data_tvb = data_buf:tvb()
 
-        -- Get the heuristic dissector table for "data"
-        succ = DissectorTable.try_heuristics("udp", data_tvb, pinfo, seg_tree)
-        if not succ then
-            succ = DissectorTable.try_heuristics("tcp", data_tvb, pinfo, seg_tree)
+            -- Get the heuristic dissector table for "data"
+            succ = DissectorTable.try_heuristics("udp", data_tvb, pinfo, seg_tree)
             if not succ then
-                -- Fallback: just add raw bytes if no heuristic table found
-                seg_tree:add(session_fields.seg_data, data_buf)
+                succ = DissectorTable.try_heuristics("tcp", data_tvb, pinfo, seg_tree)
+                if not succ then
+                    -- Fallback: just add raw bytes if no heuristic table found
+                    seg_tree:add(session_fields.seg_data, data_buf)
+                end
             end
         end
     elseif msg_type == 0x01 then
