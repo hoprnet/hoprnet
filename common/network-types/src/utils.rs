@@ -111,7 +111,7 @@ impl Hash for SocketAddrStr {
 }
 
 #[cfg(feature = "runtime-tokio")]
-pub use tokio_utils::copy_duplex;
+pub use tokio_utils::{copy_duplex, copy_duplex_abortable};
 
 #[cfg(feature = "runtime-tokio")]
 mod tokio_utils {
@@ -146,10 +146,12 @@ mod tokio_utils {
             match state {
                 TransferState::Running(buf) => {
                     let count = std::task::ready!(buf.poll_copy(cx, r.as_mut(), w.as_mut()))?;
+                    tracing::trace!(processed = count, "direction copy complete");
                     *state = TransferState::ShuttingDown(count);
                 }
                 TransferState::ShuttingDown(count) => {
                     std::task::ready!(w.as_mut().poll_shutdown(cx))?;
+                    tracing::trace!(processed = *count, "direction shutdown complete");
                     *state = TransferState::Done(*count);
                 }
                 TransferState::Done(count) => return Poll::Ready(Ok(*count)),
@@ -184,7 +186,7 @@ mod tokio_utils {
     /// Once a side is aborted, its proper shutdown is initiated, and once done, the other side's
     /// shutdown is also initiated.
     /// The difference between the two abort handles is only in the order - which side gets shutdown
-    /// first after the abort.
+    /// first after the abort is called.
     pub async fn copy_duplex_abortable<A, B>(
         a: &mut A,
         b: &mut B,
@@ -212,12 +214,14 @@ mod tokio_utils {
             if let (Poll::Ready(Err(_)), TransferState::Running(buf)) = (abort_a.poll_unpin(cx), &a_to_b) {
                 tracing::trace!("A-side has been aborted.");
                 a_to_b = TransferState::ShuttingDown(buf.amt);
+                cx.waker().wake_by_ref();
             }
 
             // Initiate B's shutdown if B is aborted while still running
             if let (Poll::Ready(Err(_)), TransferState::Running(buf)) = (abort_b.poll_unpin(cx), &b_to_a) {
                 tracing::trace!("B-side has been aborted.");
                 b_to_a = TransferState::ShuttingDown(buf.amt);
+                cx.waker().wake_by_ref();
             }
 
             // Once B-side is done, initiate shutdown of A-side
@@ -242,6 +246,11 @@ mod tokio_utils {
             let a_to_b_bytes_transferred = std::task::ready!(a_to_b_result);
             let b_to_a_bytes_transferred = std::task::ready!(b_to_a_result);
 
+            tracing::trace!(
+                a_to_b = a_to_b_bytes_transferred,
+                b_to_a = b_to_a_bytes_transferred,
+                "copy completed"
+            );
             Poll::Ready(Ok((a_to_b_bytes_transferred, b_to_a_bytes_transferred)))
         })
         .await

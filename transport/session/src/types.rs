@@ -18,7 +18,7 @@ use hopr_protocol_session::{
     UnreliableSocket,
 };
 use hopr_transport_packet::prelude::{ApplicationData, Tag};
-use tracing::debug;
+use tracing::{debug, instrument};
 
 use crate::{Capabilities, Capability, errors::TransportSessionError};
 
@@ -378,13 +378,15 @@ impl std::fmt::Debug for Session {
 }
 
 impl futures::AsyncRead for Session {
+    #[instrument(name = "Session::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
         let read = futures::ready!(this.inner.poll_read(cx, buf))?;
         if read == 0 {
+            tracing::trace!("hopr session empty read");
             // Empty read signals end of the socket, notify if needed
             if let Some(notifier) = this.on_close.take() {
-                tracing::trace!(session_id = ?this.id, "notifying read half closure of session");
+                tracing::trace!("notifying read half closure of session");
                 notifier(*this.id, ClosureReason::EmptyRead);
             }
         }
@@ -393,20 +395,24 @@ impl futures::AsyncRead for Session {
 }
 
 impl futures::AsyncWrite for Session {
+    #[instrument(name = "Session::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         self.project().inner.poll_write(cx, buf)
     }
 
+    #[instrument(name = "Session::poll_flush", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         self.project().inner.poll_flush(cx)
     }
 
+    #[instrument(name = "Session::poll_close", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
         futures::ready!(this.inner.poll_close(cx))?;
+        tracing::trace!("hopr session closed");
 
         if let Some(notifier) = this.on_close.take() {
-            tracing::trace!(session_id = ?this.id, "notifying write half closure of session");
+            tracing::trace!("notifying write half closure of session");
             notifier(*this.id, ClosureReason::WriteClosed);
         }
 

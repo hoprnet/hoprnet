@@ -31,6 +31,7 @@
 /// Contains errors thrown from this module.
 pub mod errors;
 mod frames;
+#[allow(dead_code)]
 mod processing;
 mod protocol;
 mod socket;

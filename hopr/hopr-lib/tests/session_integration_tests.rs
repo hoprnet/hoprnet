@@ -45,7 +45,7 @@ async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
     let addr = *listener.bound_address();
 
     tokio::task::spawn(async move {
-        transfer_session(&mut alice_session, &mut listener, BUF_LEN)
+        transfer_session(&mut alice_session, &mut listener, BUF_LEN, None)
             .await
             .expect("transfer must not fail")
     });

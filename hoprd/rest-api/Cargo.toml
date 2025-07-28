@@ -70,3 +70,4 @@ hopr-platform = { workspace = true }
 anyhow = { workspace = true }
 hopr-transport-session = { workspace = true }
 oas3 = "0.16.1"
+test-log = { workspace = true }

@@ -5253,6 +5253,7 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum 0.27.1",
+ "test-log",
  "tokio",
  "tokio-stream",
  "tower 0.5.2",

@@ -101,7 +101,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Pipeline IN: Data incoming from Upstream
         let upstream_frames_in = packets_out
             .with(|segment| future::ok::<_, SessionError>(SessionMessage::<C>::Segment(segment)))
-            .segmenter::<C>(frame_size);
+            .segmenter_with_terminating_segment::<C>(frame_size);
 
         let last_emitted_frame = Arc::new(AtomicU32::new(0));
         let last_emitted_frame_clone = last_emitted_frame.clone();
@@ -113,7 +113,8 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         let (packets_in_abort_handle, packets_in_abort_reg) = AbortHandle::new_pair();
 
         // Pipeline OUT: Packets incoming from Downstream
-        // Continue receiving packets from downstream, unless we received a terminating frame
+        // Continue receiving packets from downstream, unless we received a terminating frame.
+        // Once the terminating frame is received, the `packets_in_abort_handle` is triggered, terminating the pipeline.
         let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
@@ -258,7 +259,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let mut st_2 = state.clone();
         let mut st_3 = state.clone();
 
-        // Continue receiving packets from downstream, unless we received a terminating frame
+        // Continue receiving packets from downstream, unless we received a terminating frame.
+        // Once the terminating frame is received, the `packets_in_abort_handle` is triggered, terminating the pipeline.
         let downstream_frames_out = futures::stream::Abortable::new(packets_in, packets_in_abort_reg)
             // Filter out Session control messages and update the State, pass only Segments onwards
             .filter_map(move |packet| {
