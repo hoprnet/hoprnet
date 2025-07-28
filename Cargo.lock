@@ -4565,7 +4565,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.14.3"
+version = "0.14.4"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -5224,7 +5224,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.1.0"
+version = "4.1.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
