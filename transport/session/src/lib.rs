@@ -47,9 +47,7 @@ flagset::flags! {
         /// Implies [`Segmentation`].
         RetransmissionNack = 0b1010,
         /// Disable packet buffering
-        ///
-        /// Implies [`Segmentation`], [`RetransmissionAck`] and [`RetransmissionNack`].
-        NoDelay = 0b1111,
+        NoDelay = 0b0001,
     }
 }
 
