@@ -226,10 +226,14 @@ impl SnapshotDownloader {
 
         // Stream download to file
         let file = File::create(target_path).await?;
-        let total_size = response.content_length().unwrap_or(0);
-        let stream = response.bytes_stream();
+
+        // Fail if content length is not available
+        let total_size = response
+            .content_length()
+            .ok_or_else(SnapshotError::ContentLengthMissing)?;
 
         // Convert file to a sink for streaming using FramedWrite with BytesCodec
+        let stream = response.bytes_stream();
         let file_sink = FramedWrite::new(file, BytesCodec::new());
 
         // Use AtomicU64 for thread-safe progress tracking
@@ -252,17 +256,13 @@ impl SnapshotDownloader {
                         });
                     }
 
-                    // Progress reporting
-                    if total_size > 0 {
-                        let progress = (new_total as f64 / total_size as f64) * 100.0;
-                        if new_total % (1024 * 1024) == 0 || new_total == total_size {
-                            debug!(
-                                "Snapshot download progress: {:.1}% ({}/{} bytes)",
-                                progress, new_total, total_size
-                            );
-                        }
-                    } else if new_total % (10 * 1024 * 1024) == 0 {
-                        debug!("snapshot downloaded: {} bytes", new_total);
+                    // Progress reporting, only per 1MB or at the end
+                    let progress = (new_total as f64 / total_size as f64) * 100.0;
+                    if new_total % (1024 * 1024) == 0 || new_total == total_size {
+                        debug!(
+                            "Snapshot download progress: {:.1}% ({}/{} bytes)",
+                            progress, new_total, total_size
+                        );
                     }
 
                     // Send chunk to sink

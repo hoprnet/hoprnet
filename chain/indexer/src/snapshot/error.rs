@@ -24,75 +24,69 @@ pub enum SnapshotError {
     /// Network-related errors during download operations.
     /// Includes connection failures, DNS issues, and request timeouts.
     #[error(
-        "Network error: {0}.\nSuggestion: Check your internet connection and verify the snapshot URL is accessible."
+        "Network error: {0}. Suggestion: Check your internet connection and verify the snapshot URL is accessible."
     )]
     Network(#[from] reqwest::Error),
 
-    #[error("IO error: {0}.\nSuggestion: Ensure the target directory exists and has proper write permissions.")]
+    #[error("IO error: {0}. Suggestion: Ensure the target directory exists and has proper write permissions.")]
     Io(#[from] std::io::Error),
 
     #[error(
-        "Archive extraction error: {0}.\nSuggestion: The snapshot file may be corrupted. Try downloading it again or \
+        "Archive extraction error: {0}. Suggestion: The snapshot file may be corrupted. Try downloading it again or \
          use a different snapshot URL."
     )]
     Archive(String),
 
     #[error(
-        "SQLite validation error: {0}.\nSuggestion: The snapshot database may be corrupted or incompatible. Try using \
+        "SQLite validation error: {0}. Suggestion: The snapshot database may be corrupted or incompatible. Try using \
          a different snapshot or disable snapshots with --noLogSnapshot."
     )]
     Validation(String),
 
     #[error(
-        "Invalid snapshot format: {0}.\nSuggestion: The snapshot file format is not supported. Ensure you're using a \
+        "Invalid snapshot format: {0}. Suggestion: The snapshot file format is not supported. Ensure you're using a \
          valid tar.gz snapshot file."
     )]
     InvalidFormat(String),
 
-    #[error(
-        "Insufficient disk space: required {required} MB, available {available} MB.\nSuggestion: Free up disk space \
-         or use a different data directory with more available space."
-    )]
+    #[error("Insufficient disk space: required {required} MB, available {available} MB.")]
     InsufficientSpace { required: u64, available: u64 },
 
-    #[error(
-        "Snapshot too large: {size} bytes exceeds maximum {max_size} bytes.\nSuggestion: The snapshot file is \
-         unusually large. Verify the snapshot URL or increase size limits if this is expected."
-    )]
+    #[error("Snapshot too large: {size} bytes exceeds maximum {max_size} bytes.")]
     TooLarge { size: u64, max_size: u64 },
 
-    #[error("Task join error: {0}.\nSuggestion: Internal error occurred. Check system resources and try again.")]
+    #[error("Task join error: {0}. Suggestion: Internal error occurred. Check system resources and try again.")]
     TaskJoin(#[from] tokio::task::JoinError),
 
     #[error(
-        "HTTP response error: status {status}.\nSuggestion: Server returned error {status}. Check if the snapshot URL \
+        "HTTP response error: status {status}. Suggestion: Server returned error {status}. Check if the snapshot URL \
          is correct and the server is accessible."
     )]
     HttpStatus { status: u16 },
 
     #[error(
-        "Invalid data: {0}.\nSuggestion: The snapshot data is invalid or corrupted. Try downloading again or use a \
+        "Invalid data: {0}. Suggestion: The snapshot data is invalid or corrupted. Try downloading again or use a \
          different snapshot source."
     )]
     InvalidData(String),
 
     #[error(
-        "Configuration error: {0}.\nSuggestion: Check your configuration settings and ensure all required parameters \
+        "Configuration error: {0}. Suggestion: Check your configuration settings and ensure all required parameters \
          are set correctly."
     )]
     Configuration(String),
 
     #[error(
-        "Timeout error: {0}.\nSuggestion: The operation timed out. Check your network connection or increase timeout \
+        "Timeout error: {0}. Suggestion: The operation timed out. Check your network connection or increase timeout \
          values."
     )]
     Timeout(String),
 
-    #[error(
-        "Database installation error: {0}.\nSuggestion: Failed to install snapshot data. Ensure the database is not \
-         locked by another process and try again."
-    )]
+    #[error("Database installation error: {0}.")]
     Installation(String),
+
+    #[error("The snapshot file is missing the required Content-Length header.")]
+    ContentLengthMissing(),
 }
 
 /// Specialized `Result` type for snapshot operations.

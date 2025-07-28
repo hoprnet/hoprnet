@@ -919,19 +919,19 @@ async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> 
 
     let mut server = mockito::Server::new_async().await;
     let server_mock = server
-        .mock("GET", "/")
+        .mock("GET", "/logs-snapshot.tar.gz")
         .with_status(200)
         .with_body_from_file(snapshot_file_path.to_string_lossy().to_string())
         .expect(1)
         .create();
 
-    let logs_snapshot_url = url::Url::parse(&server.url())?;
+    let logs_snapshot_url = url::Url::parse(format!("{}/logs-snapshot.tar.gz", server.url()).as_str())?;
 
     let indexer_cfg = IndexerConfig {
         start_block_number: 0,
         fast_sync: true,
         logs_snapshot_enabled: true,
-        logs_snapshot_url.into(),
+        logs_snapshot_url: logs_snapshot_url.into(),
         data_directory: data_directory.to_string_lossy().to_string(),
     };
 

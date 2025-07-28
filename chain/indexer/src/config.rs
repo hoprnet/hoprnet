@@ -122,7 +122,10 @@ impl IndexerConfig {
 
             // Check if URL ends with .tar.gz
             if !self.logs_snapshot_url.ends_with(".tar.gz") {
-                return Err("Logs snapshot URL must point to a .tar.gz file".to_string());
+                return Err(format!(
+                    "Logs snapshot URL must point to a .tar.gz file. {} is incorrect",
+                    self.logs_snapshot_url
+                ));
             }
         }
 
