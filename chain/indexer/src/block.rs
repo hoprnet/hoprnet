@@ -526,7 +526,7 @@ where
                         }
                     },
                     Err(CoreEthereumIndexerError::ProcessError(error)) => {
-                        warn!(block_id, %error, "failed to process log into event, continuing indexing");
+                        error!(block_id, %error, "failed to process log into event, continuing indexing");
                         None
                     }
                     Err(error) => {
