@@ -214,6 +214,7 @@ mod tokio_utils {
             if let (Poll::Ready(Err(_)), TransferState::Running(buf)) = (abort_a.poll_unpin(cx), &a_to_b) {
                 tracing::trace!("A-side has been aborted.");
                 a_to_b = TransferState::ShuttingDown(buf.amt);
+                // We need an artificial wake-up here, as if an empty read was received
                 cx.waker().wake_by_ref();
             }
 
@@ -221,6 +222,7 @@ mod tokio_utils {
             if let (Poll::Ready(Err(_)), TransferState::Running(buf)) = (abort_b.poll_unpin(cx), &b_to_a) {
                 tracing::trace!("B-side has been aborted.");
                 b_to_a = TransferState::ShuttingDown(buf.amt);
+                // We need an artificial wake-up here, as if an empty read was received
                 cx.waker().wake_by_ref();
             }
 
@@ -474,9 +476,59 @@ mod tests {
         Ok(())
     }
 
+    #[test_log::test(tokio::test(flavor = "multi_thread"))]
+    async fn test_copy_duplex_with_abort_from_client() -> anyhow::Result<()> {
+        let (mut client_tx, mut client_rx) = tokio::io::duplex(10); // Create a mock duplex stream
+        let (mut server_rx, mut server_tx) = tokio::io::duplex(10); // Create a mock duplex stream
+
+        // Simulate 'a' finishing while there's still data for 'b'
+        client_tx.write_all(b"hello").await?;
+        server_tx.write_all(b"data").await?;
+
+        let (handle_a, reg_a) = futures::future::AbortHandle::new_pair();
+        let (_, reg_b) = futures::future::AbortHandle::new_pair();
+
+        let result = tokio::task::spawn(async move {
+            crate::utils::copy_duplex_abortable(&mut client_rx, &mut server_rx, (2, 2), (reg_a, reg_b)).await
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+        // The abort must make the task terminate, although none of the streams were shutdown
+        handle_a.abort();
+
+        let (a, b) = tokio::time::timeout(std::time::Duration::from_millis(100), result).await???;
+        assert_eq!(a, 5);
+        assert_eq!(b, 4);
+
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_copy_duplex_with_abort() -> anyhow::Result<()> {
-        // TODO
+    async fn test_copy_duplex_with_abort_from_server() -> anyhow::Result<()> {
+        let (mut client_tx, mut client_rx) = tokio::io::duplex(10); // Create a mock duplex stream
+        let (mut server_rx, mut server_tx) = tokio::io::duplex(10); // Create a mock duplex stream
+
+        // Simulate 'a' finishing while there's still data for 'b'
+        client_tx.write_all(b"hello").await?;
+        server_tx.write_all(b"data").await?;
+
+        let (_, reg_a) = futures::future::AbortHandle::new_pair();
+        let (handle_b, reg_b) = futures::future::AbortHandle::new_pair();
+
+        let result = tokio::task::spawn(async move {
+            crate::utils::copy_duplex_abortable(&mut client_rx, &mut server_rx, (2, 2), (reg_a, reg_b)).await
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+        // The abort must make the task terminate, although none of the streams were shutdown
+        handle_b.abort();
+
+        let (a, b) = tokio::time::timeout(std::time::Duration::from_millis(100), result).await???;
+        assert_eq!(a, 5);
+        assert_eq!(b, 4);
+
         Ok(())
     }
 

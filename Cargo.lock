@@ -4714,6 +4714,7 @@ dependencies = [
  "serde_bytes",
  "socket2 0.6.0",
  "strum 0.27.1",
+ "test-log",
  "thiserror 2.0.12",
  "tokio",
  "tokio-util",
