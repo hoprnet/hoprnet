@@ -208,7 +208,7 @@ mod tests {
         let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
         // Use TestSnapshotManager for testing
-        let manager = TestSnapshotManager::new();
+        let manager = TestSnapshotManager::new().expect("Failed to create TestSnapshotManager");
         let data_dir = temp_dir.path().join("data");
         fs::create_dir_all(&data_dir).unwrap();
 
@@ -227,7 +227,7 @@ mod tests {
     #[tokio::test]
     async fn test_disk_space_validation() {
         let temp_dir = TempDir::new().unwrap();
-        let downloader = SnapshotDownloader::new();
+        let downloader = SnapshotDownloader::new().expect("Failed to create SnapshotDownloader");
 
         // Test with available disk space (this should pass)
         let result = downloader.check_disk_space(temp_dir.path()).await;
@@ -243,7 +243,7 @@ mod tests {
     #[tokio::test]
     async fn test_enhanced_error_messages() {
         let temp_dir = TempDir::new().unwrap();
-        let downloader = SnapshotDownloader::new();
+        let downloader = SnapshotDownloader::new().expect("Failed to create SnapshotDownloader");
 
         // Test invalid URL error
         let result = downloader.download_snapshot("invalid://url", temp_dir.path()).await;
@@ -297,7 +297,7 @@ mod tests {
         let archive_path = create_test_archive(&temp_dir).await.unwrap();
 
         // Test file:// URL support using TestSnapshotManager
-        let manager = TestSnapshotManager::new();
+        let manager = TestSnapshotManager::new().expect("Failed to create TestSnapshotManager");
 
         // Test with file:// URL for local testing
         let file_url = format!("file://{}", archive_path.display());

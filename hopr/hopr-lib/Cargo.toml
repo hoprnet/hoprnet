@@ -83,6 +83,7 @@ hopr-transport = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
+mockito = { workspace = true }
 serde_yaml = { workspace = true }
 tracing-test = { workspace = true }
 tokio = { workspace = true }

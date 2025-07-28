@@ -6,9 +6,14 @@
 //! - **Reliability**: Exponential backoff, progress tracking, error recovery
 //! - **Cross-platform**: Uses sysinfo for disk space checking
 
-use std::{fs, path::Path, time::Duration};
+use std::{
+    fs,
+    path::Path,
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 
-use futures_util::StreamExt;
+use futures_util::{SinkExt, TryStreamExt};
 use hopr_async_runtime::prelude::sleep;
 use reqwest::Client;
 use sysinfo::Disks;
@@ -220,40 +225,58 @@ impl SnapshotDownloader {
         }
 
         // Stream download to file
-        let mut file = File::create(target_path).await?;
-        let mut downloaded = 0u64;
+        let file = File::create(target_path).await?;
         let total_size = response.content_length().unwrap_or(0);
-        let mut stream = response.bytes_stream();
+        let stream = response.bytes_stream();
 
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk?;
-            downloaded += chunk.len() as u64;
+        // Convert file to a sink for streaming using FramedWrite with BytesCodec
+        let file_sink = FramedWrite::new(file, BytesCodec::new());
 
-            if downloaded > self.config.max_size {
-                return Err(SnapshotError::TooLarge {
-                    size: downloaded,
-                    max_size: self.config.max_size,
-                });
-            }
+        // Use AtomicU64 for thread-safe progress tracking
+        let downloaded = std::sync::Arc::new(AtomicU64::new(0));
+        let downloaded_clone = downloaded.clone();
 
-            file.write_all(&chunk).await?;
+        stream
+            .map_err(SnapshotError::Network)
+            .try_fold(file_sink, move |mut sink, chunk| {
+                let downloaded = downloaded_clone.clone();
+                let max_size = self.config.max_size;
+                async move {
+                    let new_total = downloaded.fetch_add(chunk.len() as u64, Ordering::Relaxed) + chunk.len() as u64;
 
-            // Progress reporting
-            if total_size > 0 {
-                let progress = (downloaded as f64 / total_size as f64) * 100.0;
-                if downloaded % (1024 * 1024) == 0 || downloaded == total_size {
-                    debug!(
-                        "Snapshot download progress: {:.1}% ({}/{} bytes)",
-                        progress, downloaded, total_size
-                    );
+                    // Check size limit and abort if exceeded
+                    if new_total > max_size {
+                        return Err(SnapshotError::TooLarge {
+                            size: new_total,
+                            max_size,
+                        });
+                    }
+
+                    // Progress reporting
+                    if total_size > 0 {
+                        let progress = (new_total as f64 / total_size as f64) * 100.0;
+                        if new_total % (1024 * 1024) == 0 || new_total == total_size {
+                            debug!(
+                                "Snapshot download progress: {:.1}% ({}/{} bytes)",
+                                progress, new_total, total_size
+                            );
+                        }
+                    } else if new_total % (10 * 1024 * 1024) == 0 {
+                        debug!("snapshot downloaded: {} bytes", new_total);
+                    }
+
+                    // Send chunk to sink
+                    sink.send(chunk)
+                        .await
+                        .map_err(|e| SnapshotError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+                    Ok(sink)
                 }
-            } else if downloaded % (10 * 1024 * 1024) == 0 {
-                debug!("snapshot downloaded: {} bytes", downloaded);
-            }
-        }
+            })
+            .await?;
 
-        file.flush().await?;
-        info!("Snapshot downloaded {} bytes to {:?}", downloaded, target_path);
+        let total_downloaded = downloaded.load(Ordering::Relaxed);
+        info!("Snapshot downloaded {} bytes to {:?}", total_downloaded, target_path);
 
         Ok(())
     }

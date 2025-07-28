@@ -198,12 +198,12 @@ pub struct TestSnapshotManager {
 #[cfg(test)]
 impl TestSnapshotManager {
     /// Creates a test snapshot manager without database dependencies.
-    pub fn new() -> Self {
-        Self {
-            downloader: SnapshotDownloader::new(),
+    pub fn new() -> Result<Self, SnapshotError> {
+        Ok(Self {
+            downloader: SnapshotDownloader::new()?,
             extractor: SnapshotExtractor::new(),
             validator: SnapshotValidator::new(),
-        }
+        })
     }
 
     /// Downloads, extracts, validates, and installs a snapshot (test mode).
