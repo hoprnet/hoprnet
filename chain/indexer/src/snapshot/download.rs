@@ -13,8 +13,8 @@ use std::{
     time::Duration,
 };
 
+use backon::Retryable;
 use futures_util::{SinkExt, TryStreamExt};
-use hopr_async_runtime::prelude::sleep;
 use reqwest::Client;
 use sysinfo::Disks;
 use tokio::fs::File;
@@ -155,33 +155,30 @@ impl SnapshotDownloader {
     ) -> SnapshotResult<()> {
         let mut last_error = None;
 
-        for attempt in 0..=max_retries {
-            if attempt > 0 {
-                let delay = Duration::from_secs(2u64.pow(attempt.min(5))); // Exponential backoff
-                info!("Retry attempt {} after {:?}", attempt, delay);
-                sleep(delay).await;
-            }
+        let backoff = backon::ExponentialBuilder::default().with_max_times(max_retries as usize);
 
-            match self.download_snapshot_once(url, target_path).await {
-                Ok(()) => return Ok(()),
-                Err(e) => {
-                    warn!("Download attempt {} failed: {}", attempt + 1, e);
-                    last_error = Some(e);
+        struct Sleeper;
+        impl backon::Sleeper for Sleeper {
+            type Sleep = futures_timer::Delay;
 
-                    // Don't retry on certain errors
-                    if let Some(ref err) = last_error {
-                        match err {
-                            SnapshotError::TooLarge { .. }
-                            | SnapshotError::InsufficientSpace { .. }
-                            | SnapshotError::HttpStatus { status: 400..=499 } => break,
-                            _ => continue,
-                        }
-                    }
-                }
+            fn sleep(&self, dur: Duration) -> Self::Sleep {
+                futures_timer::Delay::new(dur)
             }
         }
 
-        Err(last_error.unwrap_or_else(|| SnapshotError::Timeout("All retry attempts failed".to_string())))
+        self.download_snapshot_once(url, target_path)
+            .retry(backoff)
+            .sleep(Sleeper)
+            .when(|err| match err {
+                SnapshotError::TooLarge { .. }
+                | SnapshotError::InsufficientSpace { .. }
+                | SnapshotError::HttpStatus { status: 400..=499 } => false,
+                _ => true,
+            })
+            .notify(|err, dur| {
+                warn!("Download attempt failed: {}", err);
+            })
+            .await?
     }
 
     /// Performs a single download attempt
