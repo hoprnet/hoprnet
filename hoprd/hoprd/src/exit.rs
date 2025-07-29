@@ -109,7 +109,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
 
-                    match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE).await {
+                    // The Session forwards the termination to the udp_bridge, terminating
+                    // the UDP socket.
+                    match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
                             session_to_stream_bytes,
@@ -183,7 +185,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
 
-                    match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE).await {
+                    match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
                             session_to_stream_bytes,
