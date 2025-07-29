@@ -508,8 +508,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let is_indexer_corrupted = hopr
         .corrupted_channels()
         .await
-        .map(|channels| !channels.is_empty())
-        .unwrap_or_default();
+        .any(|channels| !channels.is_empty());
 
     match hopr.get_channel_closure_notice_period().await {
         Ok(channel_closure_notice_period) => {

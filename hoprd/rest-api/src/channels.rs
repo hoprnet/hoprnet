@@ -173,7 +173,7 @@ pub(super) async fn list_channels(
         let topology = hopr
             .all_channels()
             .and_then(|channels| async move {
-                futures::future::try_join_all(channels.iter().map(|c| query_topology_info(*c))).await
+                futures::future::try_join_all(channels.into_iter().map(query_topology_info)).await
             })
             .await;
 
