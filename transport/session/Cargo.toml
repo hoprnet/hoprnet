@@ -60,6 +60,7 @@ hopr-transport-packet = { workspace = true }
 anyhow = { workspace = true }
 criterion = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
+hopr-protocol-session = { workspace = true, features = ["session-types"] }
 mockall = { workspace = true }
 rand = { workspace = true }
 test-log = { workspace = true }

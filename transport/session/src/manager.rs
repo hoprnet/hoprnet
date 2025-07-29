@@ -955,11 +955,10 @@ mod tests {
         tx
     }
 
-    fn msg_type(data: &ApplicationData) -> StartProtocolDiscriminants {
-        StartProtocolDiscriminants::from(
-            StartProtocol::<SessionId>::decode(data.application_tag, &data.plain_text)
-                .expect("failed to parse message"),
-        )
+    fn msg_type(data: &ApplicationData, expected: StartProtocolDiscriminants) -> bool {
+        StartProtocol::<SessionId>::decode(data.application_tag, &data.plain_text)
+            .map(|d| StartProtocolDiscriminants::from(d) == expected)
+            .unwrap_or(false)
     }
 
     #[tokio::test]
@@ -1004,7 +1003,8 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::StartSession
+                info!("alice sends {}", data.application_tag);
+                msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {
@@ -1022,7 +1022,8 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::SessionEstablished
+                info!("bob sends {}", data.application_tag);
+                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |_, data| {
@@ -1030,6 +1031,30 @@ mod tests {
 
                 Box::pin(async move {
                     alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
+            });
+
+        // Alice sends the terminating segment to close the Session
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
+                    data.plain_text.as_ref(),
+                )
+                .expect("must be a session message")
+                .try_as_segment()
+                .expect("must be a segment")
+                .is_terminating()
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+            })
+            .returning(move |_, data| {
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
                     Ok(())
                 })
             });
@@ -1115,7 +1140,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::StartSession
+                msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {
@@ -1133,7 +1158,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::SessionEstablished
+                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |_, data| {
@@ -1238,7 +1263,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::StartSession
+                msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {
@@ -1256,7 +1281,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::SessionError
+                msg_type(data, StartProtocolDiscriminants::SessionError)
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |_, data| {
@@ -1336,7 +1361,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::StartSession
+                msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {
@@ -1354,7 +1379,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::SessionError
+                msg_type(data, StartProtocolDiscriminants::SessionError)
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |_, data| {
@@ -1412,7 +1437,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::StartSession
+                msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {
@@ -1431,7 +1456,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::SessionEstablished
+                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |_, data| {
@@ -1491,7 +1516,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::StartSession
+                msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(|_, _| Box::pin(async { Ok(()) }));
@@ -1541,7 +1566,7 @@ mod tests {
             .once()
             .in_sequence(&mut open_sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::StartSession
+                msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {
@@ -1559,7 +1584,7 @@ mod tests {
             .once()
             .in_sequence(&mut open_sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::SessionEstablished
+                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |_, data| {
@@ -1577,7 +1602,31 @@ mod tests {
             .times(5..)
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                msg_type(data) == StartProtocolDiscriminants::KeepAlive
+                msg_type(data, StartProtocolDiscriminants::KeepAlive)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+            })
+            .returning(move |_, data| {
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
+            });
+
+        // Alice sends the terminating segment to close the Session
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            //.in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
+                    data.plain_text.as_ref(),
+                )
+                .expect("must be a session message")
+                .try_as_segment()
+                .expect("must be a segment")
+                .is_terminating()
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {

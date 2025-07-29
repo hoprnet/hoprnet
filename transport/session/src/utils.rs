@@ -5,8 +5,6 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::future::AbortRegistration;
-
 /// Convenience function to copy data in both directions between a [`Session`] and arbitrary
 /// async IO stream.
 /// This function is only available with Tokio and will panic with other runtimes.
@@ -20,7 +18,7 @@ pub async fn transfer_session<S>(
     session: &mut crate::Session,
     stream: &mut S,
     max_buffer: usize,
-    abort_stream: Option<AbortRegistration>,
+    abort_stream: Option<futures::future::AbortRegistration>,
 ) -> std::io::Result<(usize, usize)>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
