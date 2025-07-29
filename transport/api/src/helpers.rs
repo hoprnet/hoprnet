@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use async_lock::RwLock;
 use futures::{StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
@@ -114,9 +114,17 @@ where
             RoutingOptions::Hops(hops) => {
                 trace!(%hops, "resolving path using hop count");
 
+                let channels_blacklist = self
+                    .db
+                    .get_corrupted_channels(None)
+                    .await?
+                    .into_iter()
+                    .map(|c| SrcDstPair::from(*c.channel()))
+                    .collect::<HashSet<_>>();
+
                 let cp = self
                     .selector
-                    .select_path(source, destination, hops.into(), hops.into())
+                    .select_path(source, destination, hops.into(), hops.into(), channels_blacklist)
                     .await?;
 
                 ValidatedPath::new(source, ChainPath::from_channel_path(cp, destination), &cg, &self.db).await?
