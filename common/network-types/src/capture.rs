@@ -112,6 +112,7 @@ impl<T> PcapIO<T> {
 impl<T: futures::io::AsyncWrite> futures::io::AsyncWrite for PcapIO<T> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
+        // If the channel is full, drop the data
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap();

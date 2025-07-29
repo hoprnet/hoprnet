@@ -284,6 +284,10 @@ impl TryFrom<&[u8]> for Segment {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < Self::HEADER_SIZE {
+            return Err(SessionError::InvalidSegment);
+        }
+
         let (header, data) = value.split_at(Self::HEADER_SIZE);
         let segment = Segment {
             frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| SessionError::InvalidSegment)?),

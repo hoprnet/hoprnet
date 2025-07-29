@@ -19,7 +19,7 @@ use crate::{
 
 pub(crate) fn to_hex_shortened(data: &impl AsRef<[u8]>, max_chars: usize) -> String {
     let data = data.as_ref();
-    if data.len() > max_chars {
+    if data.len() * 2 > max_chars {
         format!(
             "{}..{}",
             hex::encode(&data[0..max_chars / 2]),
@@ -63,7 +63,8 @@ impl<T: Clone> RingBufferView<T> {
 pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
     capacity: usize,
 ) -> (RingBufferProducer<T>, RingBufferView<T>) {
-    let (rb_tx, rb_rx) = futures::channel::mpsc::channel(capacity * 2);
+    // The channel gets the same capacity as RB in case the task cannot keep up (due to locking)
+    let (rb_tx, rb_rx) = futures::channel::mpsc::channel(capacity);
     let rb = Arc::new(parking_lot::FairMutex::new(AllocRingBuffer::new(capacity)));
 
     let rb_clone = rb.clone();
@@ -75,8 +76,11 @@ pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
     (RingBufferProducer(rb_tx), RingBufferView(rb))
 }
 
+const MAX_BACKOFF: Duration = Duration::from_secs(300);
+
 pub(crate) fn next_deadline_with_backoff(n: usize, base: f64, duration: Duration) -> Instant {
-    Instant::now() + duration.mul_f64(base.powi(n as i32 + 1))
+    let backoff = duration.mul_f64(base.powi(n.min((i32::MAX / 2) as usize) as i32 + 1));
+    Instant::now() + backoff.min(MAX_BACKOFF)
 }
 
 #[derive(Debug, Copy, Clone, Eq)]
@@ -87,7 +91,7 @@ pub(crate) struct RetriedFrameId {
 }
 
 impl RetriedFrameId {
-    pub fn new(frame_id: FrameId) -> Self {
+    pub fn no_retries(frame_id: FrameId) -> Self {
         Self {
             frame_id,
             retry_count: 1,

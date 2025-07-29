@@ -18,6 +18,7 @@ struct DelayedEntry<T> {
     cancelled: AtomicBool,
 }
 
+// The entries are equal only if the items they carry are equal
 impl<T: PartialEq> PartialEq for DelayedEntry<T> {
     fn eq(&self, other: &Self) -> bool {
         self.item == other.item
@@ -29,11 +30,16 @@ impl<T: Eq> Eq for DelayedEntry<T> {}
 impl<T: Ord> Ord for DelayedEntry<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         if other.item != self.item {
+            // If items are not equal, the order is determined by the deadline
             match self.at.cmp(&other.at) {
+                // If the deadlines are equal, use the natural order of the items.
+                // This should be presumably consistent with their PartialEq and won't
+                // therefore return Ordering::Equal.
                 Ordering::Equal => self.item.cmp(&other.item),
                 x => x,
             }
         } else {
+            // Be consistent with PartialEq
             Ordering::Equal
         }
     }
@@ -123,7 +129,10 @@ impl<T: Ord> futures::Stream for SkipDelayReceiver<T> {
 
     #[instrument(name = "SkipDelayReceiver::poll_next", level = "trace", skip(self, cx))]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut queue = self.0.lock().unwrap();
+        let Ok(mut queue) = self.0.lock() else {
+            tracing::error!("poisoned mutex");
+            return Poll::Ready(None);
+        };
 
         // Wait until the timer is done, if any
         if let Some(next_wakeup) = queue.next_wakeup.as_mut() {

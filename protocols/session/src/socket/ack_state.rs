@@ -251,7 +251,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let (rb_tx, rb_rx) = searchable_ringbuffer(self.cfg.lookbehind_segments);
 
         // Full frame acknowledgements get a special channel with fixed capacity
-        let (ack_tx, ack_rx) = futures::channel::mpsc::channel(200_000);
+        let (ack_tx, ack_rx) = futures::channel::mpsc::channel(2 * self.cfg.lookbehind_segments);
 
         let context = self.context.insert(AcknowledgementStateContext {
             rb_tx,
@@ -459,7 +459,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             if let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
                 missing_frame_ids
                     .into_iter()
-                    .map(|frame_id| (RetriedFrameId::new(frame_id), Skip).into()),
+                    .map(|frame_id| (RetriedFrameId::no_retries(frame_id), Skip).into()),
             ) {
                 tracing::error!(%error, "failed to cancel frame resend of partially acknowledged frames");
             }
@@ -491,7 +491,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             if let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
                 ack.into_iter()
                     .inspect(|frame_id| tracing::trace!(frame_id, "frame acknowledged"))
-                    .map(|frame_id| (RetriedFrameId::new(frame_id), Skip).into()),
+                    .map(|frame_id| (RetriedFrameId::no_retries(frame_id), Skip).into()),
             ) {
                 tracing::error!(%error, "failed to cancel frame resend");
             }
@@ -520,7 +520,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             // No more requesting of segment retransmissions from frames that were completed
             if let Err(error) = ctx
                 .incoming_frame_retries_tx
-                .send_one((RetriedFrameId::new(frame_id), Skip))
+                .send_one((RetriedFrameId::no_retries(frame_id), Skip))
             {
                 tracing::error!(%error, "failed to cancel retry of acknowledged frame");
             }
@@ -556,7 +556,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             // No more requesting of segment retransmissions from frames that were discarded
             if let Err(error) = ctx
                 .incoming_frame_retries_tx
-                .send_one((RetriedFrameId::new(frame_id), Skip))
+                .send_one((RetriedFrameId::no_retries(frame_id), Skip))
             {
                 tracing::error!(%error, "failed to cancel retry of acknowledged frame");
             }

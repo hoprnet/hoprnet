@@ -44,7 +44,7 @@ impl<const C: usize> SegmentRequest<C> {
 
     /// Returns true if there are no segments to retransmit in this request.
     pub fn is_empty(&self) -> bool {
-        self.0.iter().all(|(_, e)| e.count_ones() == 0)
+        self.0.iter().take(Self::MAX_ENTRIES).all(|(_, e)| e.count_ones() == 0)
     }
 }
 
@@ -108,7 +108,7 @@ impl<const C: usize> From<SegmentRequest<C>> for Vec<u8> {
         let mut ret = vec![0u8; SegmentRequest::<C>::SIZE];
         let mut offset = 0;
         for (frame_id, seq_num) in value.0 {
-            if offset + size_of::<FrameId>() + size_of::<SeqNum>() < C {
+            if offset + size_of::<FrameId>() + size_of::<SeqNum>() <= SegmentRequest::<C>::SIZE {
                 ret[offset..offset + size_of::<FrameId>()].copy_from_slice(&frame_id.to_be_bytes());
                 offset += size_of::<FrameId>();
                 ret[offset..offset + size_of::<SeqNum>()].copy_from_slice(&seq_num.to_be_bytes());
