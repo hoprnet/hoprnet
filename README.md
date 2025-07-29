@@ -177,6 +177,10 @@ Options:
           Disables keeping RPC logs in the logs database after they were processed. [env: HOPRD_INDEXER_DISABLE_KEEP_LOGS=]
       --noFastSync...
           Disables using fast sync at node start. [env: HOPRD_INDEXER_DISABLE_FAST_SYNC=]
+      --enableLogsSnapshot...
+          Enables downloading logs snapshot at node start. If this is set to true, the node will attempt to download logs snapshot from the configured `logsSnapshotUrl`. [env: HOPRD_ENABLE_LOGS_SNAPSHOT=]
+      --logsSnapshotUrl <LOGS_SNAPSHOT_URL>
+          URL to download logs snapshot from. If none is provided or configured in the configuration file, the node will not attempt to download any logs snapshot. [env: HOPRD_LOGS_SNAPSHOT_URL=]
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>

@@ -258,12 +258,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         max_action_confirmation_wait: Duration::from_secs(60), // lower action confirmation limit
     };
 
-    let indexer_cfg = IndexerConfig {
-        start_block_number: 1,
-        fast_sync: false,
-        logs_snapshot_url: "".to_string(),
-        data_directory: "/tmp/test_hopr_data".to_string(),
-    };
+    let indexer_cfg = IndexerConfig::new(1, false, false, None, "/tmp/test_hopr_data".to_string());
 
     // Setup ALICE
     info!("Starting up ALICE");
@@ -845,12 +840,13 @@ async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> 
 
     let logs_snapshot_url = format!("file://{}", snapshot_file_path.display());
 
-    let indexer_cfg = IndexerConfig {
-        start_block_number: 0,
-        fast_sync: true,
-        logs_snapshot_url,
-        data_directory: data_directory.to_string_lossy().to_string(),
-    };
+    let indexer_cfg = IndexerConfig::new(
+        0,
+        true,
+        true,
+        Some(logs_snapshot_url),
+        data_directory.to_string_lossy().to_string(),
+    );
 
     let requestor_in = SnapshotRequestor::new(SNAPSHOT_ALICE_RX)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
@@ -927,12 +923,13 @@ async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> 
 
     let logs_snapshot_url = url::Url::parse(format!("{}/logs-snapshot.tar.gz", server.url()).as_str())?;
 
-    let indexer_cfg = IndexerConfig {
-        start_block_number: 0,
-        fast_sync: true,
-        logs_snapshot_url: logs_snapshot_url.into(),
-        data_directory: data_directory.to_string_lossy().to_string(),
-    };
+    let indexer_cfg = IndexerConfig::new(
+        0,
+        true,
+        true,
+        Some(logs_snapshot_url.into()),
+        data_directory.to_string_lossy().to_string(),
+    );
 
     let requestor_in = SnapshotRequestor::new(SNAPSHOT_ALICE_RX)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())

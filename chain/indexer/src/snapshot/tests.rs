@@ -3,20 +3,22 @@ mod tests {
     use std::{fs, fs::File};
 
     use flate2::{Compression, write::GzEncoder};
+    use sqlx::{
+        Connection, Executor,
+        sqlite::{SqliteConnectOptions, SqliteConnection},
+    };
     use tar::Builder;
     use tempfile::TempDir;
 
-    use crate::snapshot::{
-        TestSnapshotManager, download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator,
+    use crate::{
+        IndexerConfig,
+        snapshot::{
+            TestSnapshotManager, download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator,
+        },
     };
 
     /// Creates a test SQLite database for testing
     async fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-        use sqlx::{
-            Connection, Executor,
-            sqlite::{SqliteConnectOptions, SqliteConnection},
-        };
-
         let options = SqliteConnectOptions::new().filename(path).create_if_missing(true);
 
         let mut conn = SqliteConnection::connect_with(&options).await?;
@@ -262,25 +264,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_data_directory_validation() {
-        use crate::IndexerConfig;
-
         // Test with empty data directory
-        let config = IndexerConfig {
-            start_block_number: 0,
-            fast_sync: true,
-            logs_snapshot_url: "https://example.com/snapshot.tar.gz".to_string(),
-            data_directory: "".to_string(),
-        };
+        let config = IndexerConfig::new(
+            0,
+            true,
+            true,
+            Some("https://example.com/snapshot.tar.gz".to_string()),
+            "".to_string(),
+        );
 
         assert!(config.data_directory.is_empty());
 
         // Test with valid data directory
-        let config = IndexerConfig {
-            start_block_number: 0,
-            fast_sync: true,
-            logs_snapshot_url: "https://example.com/snapshot.tar.gz".to_string(),
-            data_directory: "/tmp/test_data".to_string(),
-        };
+        let config = IndexerConfig::new(
+            0,
+            true,
+            true,
+            Some("https://example.com/snapshot.tar.gz".to_string()),
+            "/tmp/test_data".to_string(),
+        );
 
         assert!(!config.data_directory.is_empty());
     }
@@ -320,19 +322,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_configuration_validation() {
-        use crate::IndexerConfig;
-
         // Test IndexerConfig::new with all parameters
         let config = IndexerConfig::new(
             100,
             true,
-            "https://example.com/snapshot.tar.gz".to_string(),
+            true,
+            Some("https://example.com/snapshot.tar.gz".to_string()),
             "/tmp/hopr_data".to_string(),
         );
 
         assert_eq!(config.start_block_number, 100);
         assert_eq!(config.fast_sync, true);
-        assert_eq!(config.logs_snapshot_url, "https://example.com/snapshot.tar.gz");
+        assert_eq!(config.enable_logs_snapshot, true);
+        assert_eq!(
+            config.logs_snapshot_url,
+            Some("https://example.com/snapshot.tar.gz".to_string())
+        );
         assert_eq!(config.data_directory, "/tmp/hopr_data");
 
         // Test validation - valid config
@@ -343,7 +348,8 @@ mod tests {
         let invalid_url_config = IndexerConfig::new(
             100,
             true,
-            "ftp://example.com/snapshot.tar.gz".to_string(),
+            true,
+            Some("ftp://example.com/snapshot.tar.gz".to_string()),
             "/tmp/hopr_data".to_string(),
         );
         assert!(invalid_url_config.validate().is_err());
@@ -353,13 +359,14 @@ mod tests {
         let empty_dir_config = IndexerConfig::new(
             100,
             true,
-            "https://example.com/snapshot.tar.gz".to_string(),
+            true,
+            Some("https://example.com/snapshot.tar.gz".to_string()),
             "".to_string(),
         );
         assert!(empty_dir_config.validate().is_err());
 
         // Test validation - snapshots disabled (should be valid even with empty fields)
-        let disabled_config = IndexerConfig::new(100, true, "".to_string(), "".to_string());
+        let disabled_config = IndexerConfig::new(100, true, false, Some("".to_string()), "".to_string());
         assert!(disabled_config.validate().is_ok());
     }
 

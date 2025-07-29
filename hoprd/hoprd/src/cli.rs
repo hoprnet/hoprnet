@@ -167,6 +167,16 @@ pub struct CliArgs {
     pub no_fast_sync: u8,
 
     #[arg(
+        long = "enableLogsSnapshot",
+        env = "HOPRD_ENABLE_LOGS_SNAPSHOT",
+        help = "Enables downloading logs snapshot at node start. If this is set to true, the node will attempt to \
+                download logs snapshot from the configured `logsSnapshotUrl`.",
+        value_name = "ENABLE_LOGS_SNAPSHOT",
+        action = ArgAction::Count
+    )]
+    pub enable_logs_snapshot: u8,
+
+    #[arg(
         long = "logsSnapshotUrl",
         env = "HOPRD_LOGS_SNAPSHOT_URL",
         help = "URL to download logs snapshot from. If none is provided or configured in the configuration file, the \

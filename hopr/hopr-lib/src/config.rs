@@ -11,7 +11,6 @@ use validator::{Validate, ValidationError};
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
-pub const DEFAULT_LOGS_SNAPSHOT_URL: &str = "https://logs-snapshots.hoprnet.org/latest-stable.tar.gz";
 
 fn validate_announced(v: &bool) -> Result<(), ValidationError> {
     if *v {
@@ -31,6 +30,11 @@ fn default_network() -> String {
 #[inline]
 fn just_true() -> bool {
     true
+}
+
+#[inline]
+fn just_false() -> bool {
+    false
 }
 
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
@@ -55,14 +59,11 @@ pub struct Chain {
     #[serde(default = "just_true")]
     #[default = true]
     pub fast_sync: bool,
-    #[serde(default = "default_logs_snapshot_url")]
-    #[default(default_logs_snapshot_url())]
-    pub logs_snapshot_url: String,
-}
-
-#[inline]
-fn default_logs_snapshot_url() -> String {
-    DEFAULT_LOGS_SNAPSHOT_URL.to_owned()
+    #[serde(default = "just_false")]
+    #[default = false]
+    pub enable_logs_snapshot: bool,
+    #[serde(default)]
+    pub logs_snapshot_url: Option<String>,
 }
 
 #[inline]

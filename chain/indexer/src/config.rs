@@ -21,19 +21,25 @@ pub struct IndexerConfig {
     #[default(true)]
     pub fast_sync: bool,
 
+    /// Whether to perform logs snapshot download on startup.
+    /// When enabled, it allows for quicker indexing from scratch.
+    ///
+    /// Default is `false`.
+    #[default(false)]
+    pub enable_logs_snapshot: bool,
+
     /// URL to download logs snapshot from.
     /// This should point to a publicly accessible tar.gz file containing
     /// the SQLite logs database files.
     ///
-    /// Default is empty string (must be set by application).
-    #[default("".to_string())]
-    pub logs_snapshot_url: String,
+    /// Default is None
+    #[default(None)]
+    pub logs_snapshot_url: Option<String>,
 
     /// Path to the data directory where databases are stored.
     /// This is used for snapshot installation and database state checking.
     ///
     /// Default is empty string (must be set by application).
-    #[default("".to_string())]
     pub data_directory: String,
 }
 
@@ -44,16 +50,24 @@ impl IndexerConfig {
     ///
     /// * `start_block_number` - The block number from which to start indexing
     /// * `fast_sync` - Whether to enable fast synchronization during startup
+    /// * `enable_logs_snapshot` - Whether to enable logs snapshot download
     /// * `logs_snapshot_url` - URL to download logs snapshot from
     /// * `data_directory` - Path to the data directory where databases are stored
     ///
     /// # Returns
     ///
     /// A new instance of `IndexerConfig`
-    pub fn new(start_block_number: u64, fast_sync: bool, logs_snapshot_url: String, data_directory: String) -> Self {
+    pub fn new(
+        start_block_number: u64,
+        fast_sync: bool,
+        enable_logs_snapshot: bool,
+        logs_snapshot_url: Option<String>,
+        data_directory: String,
+    ) -> Self {
         Self {
             start_block_number,
             fast_sync,
+            enable_logs_snapshot,
             logs_snapshot_url,
             data_directory,
         }
@@ -80,36 +94,41 @@ impl IndexerConfig {
     /// let config = IndexerConfig::new(
     ///     100,
     ///     true,
-    ///     "https://example.com/snapshot.tar.gz".to_string(),
+    ///     true,
+    ///     Some("https://example.com/snapshot.tar.gz".to_string()),
     ///     "/tmp/hopr_data".to_string(),
     /// );
     ///
     /// assert!(config.validate().is_ok());
     /// ```
     pub fn validate(&self) -> Result<(), String> {
-        let logs_snapshot_enabled = !self.logs_snapshot_url.is_empty();
-
         // Validate URL format if snapshot URL is enabled
-        if logs_snapshot_enabled {
-            // Basic URL validation (allow file:// for testing)
-            if !self.logs_snapshot_url.starts_with("http://")
-                && !self.logs_snapshot_url.starts_with("https://")
-                && !self.logs_snapshot_url.starts_with("file://")
-            {
-                return Err("Logs snapshot URL must be a valid HTTP, HTTPS, or file:// URL".to_string());
+        if self.enable_logs_snapshot {
+            if self.logs_snapshot_url.is_none() || self.logs_snapshot_url.as_ref().unwrap().is_empty() {
+                return Err("Logs snapshot URL must be specified when logs snapshots are enabled".to_string());
             }
 
-            // Check if URL ends with .tar.gz
-            if !self.logs_snapshot_url.ends_with(".tar.gz") {
-                return Err(format!(
-                    "Logs snapshot URL must point to a .tar.gz file. {} is incorrect",
-                    self.logs_snapshot_url
-                ));
+            if let Some(url) = &self.logs_snapshot_url {
+                if url.is_empty() {
+                    return Err("Logs snapshot URL must not be empty".to_string());
+                }
+
+                // Basic URL validation (allow file:// for testing)
+                if !url.starts_with("http://") && !url.starts_with("https://") && !url.starts_with("file://") {
+                    return Err("Logs snapshot URL must be a valid HTTP, HTTPS, or file:// URL".to_string());
+                }
+
+                // Check if URL ends with .tar.gz
+                if !url.ends_with(".tar.gz") {
+                    return Err(format!(
+                        "Logs snapshot URL must point to a .tar.gz file. {url} is incorrect"
+                    ));
+                }
             }
         }
 
         // Validate data directory if snapshot is enabled
-        if logs_snapshot_enabled && self.data_directory.is_empty() {
+        if self.enable_logs_snapshot && self.data_directory.is_empty() {
             return Err("Data directory must be specified when logs snapshots are enabled".to_string());
         }
 
@@ -157,12 +176,7 @@ mod tests {
         let data_directory = "/tmp/hopr_test_data";
         let logs_snapshot_url = format!("file:///tmp/snapshot.tar.gz");
 
-        let cfg = IndexerConfig {
-            start_block_number: 0,
-            fast_sync: true,
-            logs_snapshot_url,
-            data_directory: data_directory.into(),
-        };
+        let cfg = IndexerConfig::new(0, true, true, Some(logs_snapshot_url), data_directory.into());
 
         cfg.validate().expect("Failed to validate snapshot configuration");
         assert!(cfg.is_valid(), "Valid configuration should return true for is_valid()");
@@ -173,12 +187,7 @@ mod tests {
         let data_directory = "/tmp/hopr_test_data";
         let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.gz");
 
-        let cfg = IndexerConfig {
-            start_block_number: 0,
-            fast_sync: true,
-            logs_snapshot_url,
-            data_directory: data_directory.into(),
-        };
+        let cfg = IndexerConfig::new(0, true, true, Some(logs_snapshot_url), data_directory.into());
 
         assert!(cfg.validate().is_err(), "Invalid URL should fail validation");
         assert!(
@@ -191,12 +200,7 @@ mod tests {
     fn test_empty_dir_config() {
         let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.gz");
 
-        let cfg = IndexerConfig {
-            start_block_number: 0,
-            fast_sync: true,
-            logs_snapshot_url,
-            data_directory: "".to_string(),
-        };
+        let cfg = IndexerConfig::new(0, true, true, Some(logs_snapshot_url), "".to_string());
 
         assert!(
             cfg.validate().is_err(),
@@ -206,16 +210,31 @@ mod tests {
 
     #[test]
     fn test_disabled_snapshot_config() {
-        let cfg = IndexerConfig {
-            start_block_number: 0,
-            fast_sync: true,
-            logs_snapshot_url: "".to_string(),
-            data_directory: "".to_string(),
-        };
+        let cfg = IndexerConfig::new(0, true, false, Some("".to_string()), "".to_string());
 
         assert!(
             cfg.validate().is_ok(),
             "Configuration should be valid when snapshots disabled"
+        );
+    }
+
+    #[test]
+    fn test_missing_snapshot_url() {
+        let cfg = IndexerConfig::new(0, true, true, None, "".to_string());
+
+        assert!(
+            cfg.validate().is_err(),
+            "Configuration should be invalid when snapshots is enabled but URL is missing"
+        );
+    }
+
+    #[test]
+    fn test_emoty_snapshot_url() {
+        let cfg = IndexerConfig::new(0, true, true, Some("".to_string()), "".to_string());
+
+        assert!(
+            cfg.validate().is_err(),
+            "Configuration should be invalid when snapshots is enabled but URL is empty"
         );
     }
 }

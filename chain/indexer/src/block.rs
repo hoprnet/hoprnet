@@ -374,7 +374,7 @@ where
         // Check if we need to download snapshot before fast sync
         let logs_db_has_data = self.has_logs_data().await?;
 
-        if fast_sync_configured && index_empty && !logs_db_has_data && !self.cfg.logs_snapshot_url.is_empty() {
+        if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.enable_logs_snapshot {
             info!("Logs database is empty, attempting to download logs snapshot...");
 
             match self.download_snapshot().await {
@@ -386,6 +386,7 @@ where
                 }
             }
         }
+
         Ok(())
     }
 
@@ -788,10 +789,17 @@ where
 
         let data_dir = Path::new(&self.cfg.data_directory);
 
-        snapshot_manager
-            .download_and_setup_snapshot(&self.cfg.logs_snapshot_url, data_dir)
-            .await
-            .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))
+        // The URL has been verified so we can just use it.
+        if let Some(url) = &self.cfg.logs_snapshot_url {
+            snapshot_manager
+                .download_and_setup_snapshot(url, data_dir)
+                .await
+                .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))
+        } else {
+            Err(CoreEthereumIndexerError::SnapshotError(
+                "Logs snapshot URL is not configured".to_string(),
+            ))
+        }
     }
 }
 
@@ -1146,12 +1154,7 @@ mod tests {
                 .expect_contract_addresses_map()
                 .return_const(ContractAddresses::default());
 
-            let indexer_cfg = IndexerConfig {
-                start_block_number: 0,
-                fast_sync: true,
-                logs_snapshot_url: "".to_string(),
-                data_directory: "/tmp/test_data".to_string(),
-            };
+            let indexer_cfg = IndexerConfig::new(0, true, false, None, "/tmp/test_data".to_string());
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -1239,12 +1242,7 @@ mod tests {
                 .expect_contract_addresses_map()
                 .return_const(ContractAddresses::default());
 
-            let indexer_cfg = IndexerConfig {
-                start_block_number: 0,
-                fast_sync: true,
-                logs_snapshot_url: "".to_string(),
-                data_directory: "/tmp/test_data".to_string(),
-            };
+            let indexer_cfg = IndexerConfig::new(0, true, false, None, "/tmp/test_data".to_string());
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -1417,12 +1415,7 @@ mod tests {
             .expect_contract_addresses_map()
             .return_const(ContractAddresses::default());
 
-        let indexer_cfg = IndexerConfig {
-            start_block_number: 0,
-            fast_sync: false,
-            logs_snapshot_url: "".to_string(),
-            data_directory: "/tmp/test_data".to_string(),
-        };
+        let indexer_cfg = IndexerConfig::new(0, false, false, None, "/tmp/test_data".to_string());
 
         let (tx_events, _) = async_channel::unbounded();
         let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
