@@ -268,7 +268,6 @@ mod tests {
         let config = IndexerConfig {
             start_block_number: 0,
             fast_sync: true,
-            logs_snapshot_enabled: true,
             logs_snapshot_url: "https://example.com/snapshot.tar.gz".to_string(),
             data_directory: "".to_string(),
         };
@@ -279,7 +278,6 @@ mod tests {
         let config = IndexerConfig {
             start_block_number: 0,
             fast_sync: true,
-            logs_snapshot_enabled: true,
             logs_snapshot_url: "https://example.com/snapshot.tar.gz".to_string(),
             data_directory: "/tmp/test_data".to_string(),
         };
@@ -328,14 +326,12 @@ mod tests {
         let config = IndexerConfig::new(
             100,
             true,
-            true,
             "https://example.com/snapshot.tar.gz".to_string(),
             "/tmp/hopr_data".to_string(),
         );
 
         assert_eq!(config.start_block_number, 100);
         assert_eq!(config.fast_sync, true);
-        assert_eq!(config.logs_snapshot_enabled, true);
         assert_eq!(config.logs_snapshot_url, "https://example.com/snapshot.tar.gz");
         assert_eq!(config.data_directory, "/tmp/hopr_data");
 
@@ -347,21 +343,15 @@ mod tests {
         let invalid_url_config = IndexerConfig::new(
             100,
             true,
-            true,
             "ftp://example.com/snapshot.tar.gz".to_string(),
             "/tmp/hopr_data".to_string(),
         );
         assert!(invalid_url_config.validate().is_err());
         assert!(!invalid_url_config.is_valid());
 
-        // Test validation - empty URL when snapshots enabled
-        let empty_url_config = IndexerConfig::new(100, true, true, "".to_string(), "/tmp/hopr_data".to_string());
-        assert!(empty_url_config.validate().is_err());
-
         // Test validation - empty data directory when snapshots enabled
         let empty_dir_config = IndexerConfig::new(
             100,
-            true,
             true,
             "https://example.com/snapshot.tar.gz".to_string(),
             "".to_string(),
@@ -369,7 +359,7 @@ mod tests {
         assert!(empty_dir_config.validate().is_err());
 
         // Test validation - snapshots disabled (should be valid even with empty fields)
-        let disabled_config = IndexerConfig::new(100, true, false, "".to_string(), "".to_string());
+        let disabled_config = IndexerConfig::new(100, true, "".to_string(), "".to_string());
         assert!(disabled_config.validate().is_ok());
     }
 

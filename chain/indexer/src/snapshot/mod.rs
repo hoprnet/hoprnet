@@ -21,10 +21,10 @@
 //!
 //! ```no_run
 //! use std::path::Path;
-//! use hopr_chain_indexer::snapshot::SnapshotManager;
+//! use hopr_chain_indexer::snapshot::{SnapshotResult, SnapshotManager};
 //!
-//! # async fn example(db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static) -> Result<(), Box<dyn std::error::Error>> {
-//! let manager = SnapshotManager::with_db(db);
+//! # async fn example(db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static) -> SnapshotResult<()> {
+//! let manager = SnapshotManager::with_db(db)?;
 //! let info = manager
 //!     .download_and_setup_snapshot(
 //!         "https://snapshots.hoprnet.org/logs.tar.gz",
@@ -90,9 +90,11 @@ where
     /// # Example
     ///
     /// ```no_run
-    /// # use hopr_chain_indexer::snapshot::SnapshotManager;
-    /// # fn example(db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static) {
+    /// # use hopr_chain_indexer::snapshot::{SnapshotResult, SnapshotManager};
+    ///
+    /// # fn example(db: impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static) -> SnapshotResult<()> {
     /// let manager = SnapshotManager::with_db(db)?;
+    /// # Ok(())
     /// # }
     /// ```
     pub fn with_db(db: Db) -> Result<Self, SnapshotError> {

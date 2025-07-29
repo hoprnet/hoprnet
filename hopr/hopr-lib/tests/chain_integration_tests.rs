@@ -261,8 +261,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let indexer_cfg = IndexerConfig {
         start_block_number: 1,
         fast_sync: false,
-        logs_snapshot_enabled: false,
-        logs_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+        logs_snapshot_url: "".to_string(),
         data_directory: "/tmp/test_hopr_data".to_string(),
     };
 
@@ -848,7 +847,6 @@ async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> 
     let indexer_cfg = IndexerConfig {
         start_block_number: 0,
         fast_sync: true,
-        logs_snapshot_enabled: true,
         logs_snapshot_url,
         data_directory: data_directory.to_string_lossy().to_string(),
     };
@@ -930,7 +928,6 @@ async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> 
     let indexer_cfg = IndexerConfig {
         start_block_number: 0,
         fast_sync: true,
-        logs_snapshot_enabled: true,
         logs_snapshot_url: logs_snapshot_url.into(),
         data_directory: data_directory.to_string_lossy().to_string(),
     };

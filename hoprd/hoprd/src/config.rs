@@ -244,8 +244,10 @@ impl HoprdConfig {
 
         cfg.hopr.chain.fast_sync = cli_args.no_fast_sync == 0;
         cfg.hopr.chain.keep_logs = cli_args.no_keep_logs == 0;
-        cfg.hopr.chain.logs_snapshot_enabled = cli_args.no_logs_snapshot == 0;
-        cfg.hopr.chain.logs_snapshot_url = cli_args.logs_snapshot_url;
+
+        if let Some(x) = cli_args.logs_snapshot_url {
+            cfg.hopr.chain.logs_snapshot_url = x;
+        }
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {

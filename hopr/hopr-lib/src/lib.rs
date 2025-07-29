@@ -487,7 +487,6 @@ impl Hopr {
             hopr_chain_indexer::IndexerConfig {
                 start_block_number: resolved_environment.channel_contract_deploy_block as u64,
                 fast_sync: cfg.chain.fast_sync,
-                logs_snapshot_enabled: cfg.chain.logs_snapshot_enabled,
                 logs_snapshot_url: cfg.chain.logs_snapshot_url.clone(),
                 data_directory: cfg.db.data.clone(),
             },

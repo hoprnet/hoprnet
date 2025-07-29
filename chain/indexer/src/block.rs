@@ -374,7 +374,7 @@ where
         // Check if we need to download snapshot before fast sync
         let logs_db_has_data = self.has_logs_data().await?;
 
-        if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.logs_snapshot_enabled {
+        if fast_sync_configured && index_empty && !logs_db_has_data && !self.cfg.logs_snapshot_url.is_empty() {
             info!("Logs database is empty, attempting to download logs snapshot...");
 
             match self.download_snapshot().await {
@@ -1149,8 +1149,7 @@ mod tests {
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
                 fast_sync: true,
-                logs_snapshot_enabled: false,
-                logs_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+                logs_snapshot_url: "".to_string(),
                 data_directory: "/tmp/test_data".to_string(),
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
@@ -1243,8 +1242,7 @@ mod tests {
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
                 fast_sync: true,
-                logs_snapshot_enabled: false,
-                logs_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+                logs_snapshot_url: "".to_string(),
                 data_directory: "/tmp/test_data".to_string(),
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
@@ -1422,8 +1420,7 @@ mod tests {
         let indexer_cfg = IndexerConfig {
             start_block_number: 0,
             fast_sync: false,
-            logs_snapshot_enabled: false,
-            logs_snapshot_url: "https://snapshots.hoprnet.org/logs/latest.tar.gz".to_string(),
+            logs_snapshot_url: "".to_string(),
             data_directory: "/tmp/test_data".to_string(),
         };
 
