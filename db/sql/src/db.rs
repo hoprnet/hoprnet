@@ -94,7 +94,7 @@ impl HoprDb {
             directory.to_path_buf(),
             PoolOptions::new(),
             Some(0),
-            Some(30),
+            Some(1),
             SQL_DB_INDEX_FILE_NAME,
         )
         .await?;
@@ -103,6 +103,7 @@ impl HoprDb {
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
             .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
             .max_lifetime(Some(Duration::from_secs(30 * 60))); // This is the default
+
         let peers = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
