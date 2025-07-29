@@ -83,11 +83,9 @@ hopr-transport = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
+parameterized = { workspace = true }
 serde_yaml = { workspace = true }
-tracing-test = { workspace = true }
 tokio = { workspace = true }
-tokio-util = { workspace = true }
-url = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }

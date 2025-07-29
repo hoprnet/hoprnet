@@ -38,7 +38,7 @@ class TestRedeemingWithSwarm:
         relay = swarm7[random.choice(route[1:-1])]
 
         async with create_bidirectional_channels_for_route(
-            [swarm7[hop] for hop in route], (message_count + 1) * ticket_price, ticket_price
+            [swarm7[hop] for hop in route], (message_count + 2) * ticket_price, 2 * ticket_price
         ) as channels:
             unredeemed_tickets_before = (await relay.api.get_tickets_statistics()).unredeemed_value
 
@@ -48,7 +48,7 @@ class TestRedeemingWithSwarm:
             )
 
             await asyncio.wait_for(
-                check_unredeemed_tickets_value(relay, unredeemed_tickets_before + (message_count + 2) * ticket_price),
+                check_unredeemed_tickets_value(relay, unredeemed_tickets_before + (message_count + 4) * ticket_price),
                 30.0,
             )
 
@@ -72,7 +72,7 @@ class TestRedeemingWithSwarm:
         message_count = 2
 
         async with create_bidirectional_channels_for_route(
-            [swarm7[hop] for hop in route], (message_count + 1) * ticket_price, ticket_price
+            [swarm7[hop] for hop in route], (message_count + 2) * ticket_price, 2 * ticket_price
         ) as channels:
             relay = swarm7[random.choice(route[1:-1])]
             unredeemed_value_before = (await relay.api.get_tickets_statistics()).unredeemed_value
@@ -83,7 +83,7 @@ class TestRedeemingWithSwarm:
             )
 
             await asyncio.wait_for(
-                check_unredeemed_tickets_value(relay, unredeemed_value_before + (message_count + 2) * ticket_price),
+                check_unredeemed_tickets_value(relay, unredeemed_value_before + (message_count + 4) * ticket_price),
                 30.0,
             )
 
@@ -109,10 +109,10 @@ class TestRedeemingWithSwarm:
         ticket_price = await get_ticket_price(swarm7[route[0]])
         message_count = 5
 
-        # Note that there are always +1 of messages in both directions due to the Session establishment
+        # Note that there are always +2 of messages in both directions due to the Session establishment and closure
 
         async with create_bidirectional_channels_for_route(
-            [swarm7[hop] for hop in route], (message_count + 1) * ticket_price, ticket_price
+            [swarm7[hop] for hop in route], (message_count + 2) * ticket_price, 2 * ticket_price
         ):
             # Get values of unredeemed tickets on relays
             unredeemed_values_before = []
@@ -135,8 +135,8 @@ class TestRedeemingWithSwarm:
                     check_unredeemed_tickets_value(
                         relay,
                         unredeemed_values_before[i]
-                        + (message_count + 1) * ticket_price * (route_len - i)
-                        + ticket_price * (i + 1),
+                        + (message_count + 2) * ticket_price * (route_len - i)
+                        + 2 * ticket_price * (i + 1),
                     ),
                     30.0,
                 )
@@ -161,14 +161,14 @@ class TestRedeemingWithSwarm:
         neglected_value_before = ticket_statistics.neglected_value
 
         async with create_bidirectional_channels_for_route(
-            [swarm7[hop] for hop in route], (ticket_count + 1) * ticket_price, ticket_price
+            [swarm7[hop] for hop in route], (ticket_count + 2) * ticket_price, 2 * ticket_price
         ):
             await basic_send_and_receive_packets_over_single_route(ticket_count, [swarm7[hop] for hop in route])
 
-            await asyncio.wait_for(check_unredeemed_tickets_value(relay, (ticket_count + 2) * ticket_price), 30.0)
+            await asyncio.wait_for(check_unredeemed_tickets_value(relay, (ticket_count + 4) * ticket_price), 30.0)
 
             # NOTE: will be closed on context manager exit
 
         # Once channels are closed, the tickets must become neglected
         ticket_statistics = await relay.api.get_tickets_statistics()
-        assert ticket_statistics.neglected_value >= neglected_value_before + (ticket_count + 2) * ticket_price
+        assert ticket_statistics.neglected_value >= neglected_value_before + (ticket_count + 4) * ticket_price
