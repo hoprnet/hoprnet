@@ -509,7 +509,11 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let is_eligible = hopr.is_allowed_to_access_network(either::Right(me_address)).await?;
 
     // If one channel or more are corrupted, we consider the indexer as corrupted.
-    let is_indexer_corrupted = hopr.corrupted_channels().await.map(|channels| ! channels.is_empty()).unwrap_or_default();
+    let is_indexer_corrupted = hopr
+        .corrupted_channels()
+        .await
+        .map(|channels| !channels.is_empty())
+        .unwrap_or_default();
 
     match hopr.get_channel_closure_notice_period().await {
         Ok(channel_closure_notice_period) => {

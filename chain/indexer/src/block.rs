@@ -16,7 +16,7 @@ use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations};
 use hopr_primitive_types::prelude::*;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace};
 
 use crate::{
     IndexerConfig,
