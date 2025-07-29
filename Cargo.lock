@@ -10860,7 +10860,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "windows-sys"
 version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10870,8 +10869,6 @@ dependencies = [
 ]
 
 [[package]]
-=======
->>>>>>> 3a3c5e7fac (chore(nix): update flake.lock (#7351))
 name = "windows-targets"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10903,7 +10900,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "windows-targets"
 version = "0.53.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10921,8 +10917,6 @@ dependencies = [
 ]
 
 [[package]]
-=======
->>>>>>> 3a3c5e7fac (chore(nix): update flake.lock (#7351))
 name = "windows-threading"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
