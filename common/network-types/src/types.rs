@@ -338,6 +338,18 @@ impl SurbMatcher {
     }
 }
 
+impl From<HoprPseudonym> for SurbMatcher {
+    fn from(value: HoprPseudonym) -> Self {
+        Self::Pseudonym(value)
+    }
+}
+
+impl From<&HoprPseudonym> for SurbMatcher {
+    fn from(pseudonym: &HoprPseudonym) -> Self {
+        (*pseudonym).into()
+    }
+}
+
 /// Routing information containing forward or return routing options.
 ///
 /// Information in this object represents the minimum required basis

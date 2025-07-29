@@ -556,6 +556,10 @@ where
                             panic!("failed to mark log as processed, panicking to prevent data loss")
                         }
                     },
+                    Err(CoreEthereumIndexerError::ProcessError(error)) => {
+                        error!(block_id, %error, "failed to process log into event, continuing indexing");
+                        None
+                    }
                     Err(error) => {
                         error!(block_id, %error, "failed to process log into event, panicking to prevent data loss");
                         panic!("failed to process log into event, panicking to prevent data loss")

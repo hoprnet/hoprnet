@@ -35,7 +35,9 @@ pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
 pub use hopr_internal_types::channels::ChannelEntry;
-use hopr_internal_types::{account::AccountEntry, prelude::ChannelDirection, tickets::WinningProbability};
+use hopr_internal_types::{
+    account::AccountEntry, channels::CorruptedChannelEntry, prelude::ChannelDirection, tickets::WinningProbability,
+};
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
 
@@ -304,6 +306,10 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self.db.get_all_channels(None).await?)
+    }
+
+    pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
+        Ok(self.db.get_corrupted_channels(None).await?)
     }
 
     pub async fn ticket_price(&self) -> errors::Result<Option<HoprBalance>> {

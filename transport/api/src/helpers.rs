@@ -1,11 +1,11 @@
-use std::sync::{Arc, OnceLock};
+use std::{collections::HashSet, sync::Arc};
 
 use async_lock::RwLock;
-use futures::{TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
+use futures::{StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_types::crypto_traits::Randomizable;
-use hopr_db_sql::{HoprDbAllOperations, api::prelude::DbError};
+use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::{
     prelude::{ResolvedTransportRouting, RoutingOptions},
@@ -13,15 +13,11 @@ use hopr_network_types::{
 };
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
 use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
-use hopr_transport_packet::prelude::ApplicationData;
+use hopr_transport_packet::v1::ApplicationData;
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
-use hopr_transport_session::{
-    errors::{SessionManagerError, TransportSessionError},
-    traits::SendMsg,
-};
 use tracing::trace;
 
-use crate::errors::HoprTransportError;
+use crate::constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -64,6 +60,8 @@ pub(crate) struct PathPlanner<T, S> {
     selector: S,
     me: Address,
 }
+
+const DEFAULT_PACKET_PLANNER_CONCURRENCY: usize = 10;
 
 impl<T, S> PathPlanner<T, S>
 where
@@ -116,9 +114,17 @@ where
             RoutingOptions::Hops(hops) => {
                 trace!(%hops, "resolving path using hop count");
 
+                let channels_blacklist = self
+                    .db
+                    .get_corrupted_channels(None)
+                    .await?
+                    .into_iter()
+                    .map(|c| SrcDstPair::from(*c.channel()))
+                    .collect::<HashSet<_>>();
+
                 let cp = self
                     .selector
-                    .select_path(source, destination, hops.into(), hops.into())
+                    .select_path(source, destination, hops.into(), hops.into(), channels_blacklist)
                     .await?;
 
                 ValidatedPath::new(source, ChainPath::from_channel_path(cp, destination), &cg, &self.db).await?
@@ -180,69 +186,43 @@ where
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct MessageSender<T, S> {
-    pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
-    pub resolver: PathPlanner<T, S>,
-}
-
-impl<T, S> MessageSender<T, S>
+// TODO: consider making this a `with` decorator for `MsgSender`
+// ^^ This requires
+//   a) `MsgSender` to be a `Sink`
+//   b) Dropping the `Clone` requirement on `Sink` that is given into `SessionManager`
+// However the DestinationRouting resolution concurrency (from for_each_concurrent) would be lost.
+pub(crate) fn run_packet_planner<T, S>(
+    planner: PathPlanner<T, S>,
+    packet_sender: MsgSender<Sender<SendMsgInput>>,
+) -> Sender<(DestinationRouting, ApplicationData)>
 where
-    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
-    S: PathSelector + Send + Sync,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
+    S: PathSelector + Clone + Send + Sync + 'static,
 {
-    pub fn new(
-        process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
-        resolver: PathPlanner<T, S>,
-    ) -> Self {
-        Self {
-            process_packet_send,
-            resolver,
-        }
-    }
-}
+    let (tx, rx) =
+        futures::channel::mpsc::channel::<(DestinationRouting, ApplicationData)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
-#[async_trait::async_trait]
-impl<T, S> SendMsg for MessageSender<T, S>
-where
-    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
-    S: PathSelector + Send + Sync,
-{
-    #[tracing::instrument(level = "debug", skip(self, data))]
-    async fn send_message(
-        &self,
-        data: ApplicationData,
-        routing: DestinationRouting,
-    ) -> std::result::Result<(), TransportSessionError> {
-        let routing = self
-            .resolver
-            .resolve_routing(data.len(), routing)
-            .await
-            .map_err(|error| {
-                tracing::error!(%error, "failed to resolve routing");
-                // Out of SURBs error gets a special distinction by the Session code
-                if let HoprTransportError::Db(DbError::NoSurbAvailable(_)) = error {
-                    TransportSessionError::OutOfSurbs
-                } else {
-                    TransportSessionError::Path
+    let planner_concurrency = std::env::var("HOPR_PACKET_PLANNER_CONCURRENCY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_PACKET_PLANNER_CONCURRENCY);
+
+    hopr_async_runtime::prelude::spawn(rx.for_each_concurrent(planner_concurrency, move |(routing, data)| {
+        let planner = planner.clone();
+        let packet_sender = packet_sender.clone();
+        async move {
+            match planner.resolve_routing(data.len(), routing).await {
+                Ok(resolved) => {
+                    // The awaiter here is intentionally dropped,
+                    // since we do not intend to be notified about packet delivery to the first hop
+                    if let Err(error) = packet_sender.send_packet(data, resolved).await {
+                        tracing::error!(%error, "failed to enqueue packet for sending");
+                    }
                 }
-            })?;
+                Err(error) => tracing::error!(%error, "failed to resolve path for routing"),
+            }
+        }
+    }));
 
-        self.process_packet_send
-            .get()
-            .ok_or_else(|| SessionManagerError::NotStarted)?
-            .send_packet(data, routing)
-            .await
-            .map_err(|_| TransportSessionError::Closed)?
-            .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
-            .await
-            .map_err(|error| {
-                tracing::error!(%error, "packet send error");
-                TransportSessionError::Timeout
-            })?;
-
-        trace!("packet sent to the outgoing queue");
-
-        Ok(())
-    }
+    tx
 }

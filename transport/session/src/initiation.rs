@@ -1,4 +1,5 @@
 //! This module defines the Start sub-protocol used for HOPR Session initiation and management.
+// TODO: Move this module as a standalone crate into hopr-protocol-start
 
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 
@@ -65,7 +66,6 @@ pub struct StartEstablished<T> {
 ///     Entry->>Exit: KeepAlive (SessionID)
 ///     Note over Entry,Exit: Data
 ///     Entry->>Exit: Close Session (SessionID)
-///     Exit->>Entry: Close Session (SessionID)
 ///     else If Exit cannot accept a new session
 ///     Exit->>Entry: SessionError (Challenge, Reason)
 ///     end
@@ -84,8 +84,6 @@ pub enum StartProtocol<T> {
     SessionEstablished(StartEstablished<T>),
     /// Counterparty could not establish a new session due to an error.
     SessionError(StartErrorType),
-    /// Counterparty has closed the session.
-    CloseSession(T),
     /// A ping message to keep the session alive.
     KeepAlive(KeepAliveMessage<T>),
 }
@@ -134,9 +132,6 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             StartProtocol::SessionError(err) => {
                 bincode::serde::encode_into_std_write(err, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
             }
-            StartProtocol::CloseSession(id) => {
-                bincode::serde::encode_into_std_write(&id, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
-            }
             StartProtocol::KeepAlive(msg) => {
                 bincode::serde::encode_into_std_write(&msg, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
             }
@@ -174,10 +169,6 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(
-                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
-                    .map(|(v, _bytes)| v)?,
-            )),
-            StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(
                 bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
@@ -329,21 +320,6 @@ mod tests {
 
     #[cfg(feature = "serde")]
     #[test]
-    fn start_protocol_close_session_message_should_encode_and_decode() -> anyhow::Result<()> {
-        let msg_1 = StartProtocol::<i32>::CloseSession(10);
-
-        let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
-        assert_eq!(tag, expected);
-
-        let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
-
-        assert_eq!(msg_1, msg_2);
-        Ok(())
-    }
-
-    #[cfg(feature = "serde")]
-    #[test]
     fn start_protocol_keep_alive_message_should_encode_and_decode() -> anyhow::Result<()> {
         let msg_1 = StartProtocol::<i32>::KeepAlive(10.into());
 
@@ -393,13 +369,6 @@ mod tests {
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "SessionError must fit within {}",
-            HoprPacket::PAYLOAD_SIZE
-        );
-
-        let msg = StartProtocol::CloseSession(SessionId::new(Tag::MAX, HoprPseudonym::random()));
-        assert!(
-            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
-            "CloseSession must fit within {}",
             HoprPacket::PAYLOAD_SIZE
         );
 

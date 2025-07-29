@@ -105,16 +105,16 @@ class TestWinProbWithSwarm:
         # A has win prob 0.1 on tickets, everyone else has 1.0
         #
         # So B (relay) should get:
-        #  - 12 tickets (1 session establish + 10 messages + 1 session closure) from A with win prob 0.1.
-        #  - 1 ticket (session establishment confirmation) from C with win prob 1
+        #  - 102 tickets (1 session establish + 100 messages + 1 session closure) from A with win prob 0.1.
+        #  - 2 tickets (session establishment confirmation + 1 session closure) from C with win prob 1
         #
-        # Average B should have 0.1 * 12 + 1 = 2.2 winning tickets
+        # Average B should have 0.1 * 102 + 2 = 12.2 winning tickets
 
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
                 2 * (ticket_count + 1) * ticket_price / win_prob,
-                ticket_price / win_prob,
+                2 * ticket_price / win_prob,
             ) as channels:
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -142,22 +142,22 @@ class TestWinProbWithSwarm:
                 winning_count = ticket_statistics.winning_count - statistics_before.winning_count
                 assert new_tickets_value > Balance.zero("wxHOPR")
 
-                # ticket_count + 2 tickets are sent with win_prob < 1 (A), and one is sent with win_prob = 1 (C)
-                assert abs((winning_count - 1) - (ticket_count + 2) * win_prob) <= win_ticket_tolerance * (
+                # ticket_count + 2 tickets are sent with win_prob < 1 (A), and 2 are sent with win_prob = 1 (C)
+                assert abs((winning_count - 2) - (ticket_count + 2) * win_prob) <= win_ticket_tolerance * (
                     ticket_count + 2
                 )
 
                 # Redeem only on the channel incoming from the Entry
                 assert await swarm7[relay].api.channel_redeem_tickets(channels.fwd_channels[0].id)
 
-                # The only unredeemed ticket is on the return channel
-                await asyncio.wait_for(check_unredeemed_tickets_value_max(swarm7[relay], ticket_price), 30.0)
+                # The only 2 unredeemed tickets are on the return channel (establishment and closure)
+                await asyncio.wait_for(check_unredeemed_tickets_value_max(swarm7[relay], 2 * ticket_price), 30.0)
 
-                # The redeemed ticket value must be the new value minus the ticket on the return channel
+                # The redeemed ticket value must be the new value minus the 2 tickets on the return channel
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
                 assert (
                     ticket_statistics.redeemed_value - statistics_before.redeemed_value
-                    == new_tickets_value - ticket_price
+                    == new_tickets_value - 2 * ticket_price
                 )
 
         finally:
@@ -192,7 +192,7 @@ class TestWinProbWithSwarm:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
                 2 * (ticket_count + 1) * ticket_price / win_prob,
-                ticket_price / win_prob,
+                2 * ticket_price / win_prob,
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -228,12 +228,12 @@ class TestWinProbWithSwarm:
                 unredeemed_value_2 = ticket_statistics.unredeemed_value
                 rejected_value = ticket_statistics.rejected_value
 
-                # We need to subtract one ticket which was not rejected, because it is sent
-                # for the RP from the exit to the relay during the session establishment.
-                # Therefore, it has win_prob = 1 and does not get rejected
+                # We need to subtract 2 tickets which were not rejected because they were sent
+                # for the RP from the exit to the relay during the session establishment and closure.
+                # Therefore, they have win_prob = 1 and do not get rejected
                 # by increasing the winning probability threshold.
-                assert unredeemed_value_2 - unredeemed_value_before == ticket_price
-                assert rejected_value - rejected_value_before == unredeemed_value_1 - ticket_price
+                assert unredeemed_value_2 - unredeemed_value_before == 2 * ticket_price
+                assert rejected_value - rejected_value_before == unredeemed_value_1 - 2 * ticket_price
 
         finally:
             # Always return winning probability to 1.0 even if the test failed
@@ -267,7 +267,7 @@ class TestWinProbWithSwarm:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
                 2 * (ticket_count + 1) * ticket_price / win_prob,
-                ticket_price / win_prob,
+                2 * ticket_price / win_prob,
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before_1 = await swarm7[relay_1].api.get_tickets_statistics()
@@ -331,7 +331,7 @@ class TestWinProbWithSwarm:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
                 2 * (ticket_count + 1) * ticket_price / win_prob,
-                ticket_price / win_prob,
+                2 * ticket_price / win_prob,
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -348,7 +348,7 @@ class TestWinProbWithSwarm:
                 # them with win prob = 1
                 await asyncio.wait_for(
                     check_unredeemed_tickets_value(
-                        swarm7[relay], unredeemed_value_before + (ticket_count + 2) * ticket_price
+                        swarm7[relay], unredeemed_value_before + (ticket_count + 4) * ticket_price
                     ),
                     30.0,
                 )
@@ -356,8 +356,8 @@ class TestWinProbWithSwarm:
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
                 rejected_value = ticket_statistics.rejected_value
 
-                # Two additional tickets come from the Session establishment
-                assert ticket_statistics.winning_count - statistics_before.winning_count == ticket_count + 2
+                # 4 additional tickets come from the Session establishment and closure
+                assert ticket_statistics.winning_count - statistics_before.winning_count == ticket_count + 4
                 assert rejected_value - rejected_value_before == Balance.zero("wxHOPR")
 
                 # at this point the tickets become neglected, since the channel will be closed
@@ -387,7 +387,7 @@ class TestWinProbWithSwarm:
         async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route],
             3 * ticket_price / win_prob,
-            ticket_price / win_prob,
+            2 * ticket_price / win_prob,
         ):
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()

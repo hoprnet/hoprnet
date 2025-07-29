@@ -84,12 +84,11 @@ hopr-transport = { workspace = true }
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
 mockito = { workspace = true }
+parameterized = { workspace = true }
 serde_yaml = { workspace = true }
-tracing-test = { workspace = true }
 tokio = { workspace = true }
-tokio-util = { workspace = true }
-url = { workspace = true }
 test-log = { workspace = true }
+url = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
