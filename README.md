@@ -21,11 +21,12 @@
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
-  - [Install via Linux package manager](#install-via-linux-package-manager)
+  - [Install via linux package manager](#install-via-linux-package-manager)
 - [Usage](#usage)
   - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
   - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
+  - [REST API](#rest-api)
 - [Testnet accessibility](#testnet-accessibility)
 - [Migrating between releases](#migrating-between-releases)
 - [Develop](#develop)
@@ -43,7 +44,6 @@
   - [Github Actions CI](#github-actions-ci)
   - [End-to-End Testing](#end-to-end-testing)
     - [Running Tests Locally](#running-tests-locally)
-      - [Testing environment](#testing-environment)
       - [Test execution](#test-execution)
 - [Using Fast Sync](#using-fast-sync)
   - [Prerequisites](#prerequisites)
@@ -268,6 +268,10 @@ Special care needs to given to the `network` argument, which defines the specifi
 ### Using Docker Compose with extended HOPR node monitoring
 
 Please follow the documentation for [`docker compose` based deployment](./deploy/compose/README.md).
+
+### REST API
+
+`hoprd` running a REST API exposes an endpoint at `/api-docs/openapi.json` with full OpenApi specification of the used REST API, including the current version of the API.
 
 ## Testnet accessibility
 

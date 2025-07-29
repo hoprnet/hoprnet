@@ -60,7 +60,8 @@ sudo dnf remove -y hoprd
 **Install:**
 
 ```bash
-sudo pacman --noconfirm -U ./hoprd.pkg.tar.zst
+sudo pacman -Syy
+sudo -E pacman --noconfirm -U ./hoprd.pkg.tar.zst
 ```
 
 **Uninstall:**
