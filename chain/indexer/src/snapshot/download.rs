@@ -16,6 +16,7 @@ use std::{
 use backon::Retryable;
 use futures_util::{SinkExt, TryStreamExt};
 use reqwest::Client;
+use smart_default::SmartDefault;
 use sysinfo::Disks;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedWrite};
@@ -32,24 +33,17 @@ use crate::{
 ///
 /// Controls download behavior including size limits, timeouts, and retry attempts
 /// to ensure safe and reliable snapshot downloads.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SmartDefault)]
 pub struct DownloadConfig {
     /// Maximum allowed file size in bytes
+    #[default(_code = "LOGS_SNAPSHOT_DOWNLOADER_MAX_SIZE")]
     pub max_size: u64,
     /// HTTP request timeout duration
+    #[default(_code = "LOGS_SNAPSHOT_DOWNLOADER_TIMEOUT")]
     pub timeout: Duration,
     /// Maximum number of retry attempts for failed downloads
+    #[default(_code = "LOGS_SNAPSHOT_DOWNLOADER_MAX_RETRIES")]
     pub max_retries: u32,
-}
-
-impl Default for DownloadConfig {
-    fn default() -> Self {
-        Self {
-            max_size: LOGS_SNAPSHOT_DOWNLOADER_MAX_SIZE,
-            timeout: LOGS_SNAPSHOT_DOWNLOADER_TIMEOUT,
-            max_retries: LOGS_SNAPSHOT_DOWNLOADER_MAX_RETRIES,
-        }
-    }
 }
 
 /// Downloads snapshot archives from HTTP/HTTPS and file:// URLs.
@@ -153,8 +147,6 @@ impl SnapshotDownloader {
         target_path: &Path,
         max_retries: u32,
     ) -> SnapshotResult<()> {
-        let mut last_error = None;
-
         let backoff = backon::ExponentialBuilder::default().with_max_times(max_retries as usize);
 
         struct Sleeper;
@@ -166,19 +158,21 @@ impl SnapshotDownloader {
             }
         }
 
-        self.download_snapshot_once(url, target_path)
+        (|| async { self.download_snapshot_once(url, target_path).await })
             .retry(backoff)
             .sleep(Sleeper)
-            .when(|err| match err {
-                SnapshotError::TooLarge { .. }
-                | SnapshotError::InsufficientSpace { .. }
-                | SnapshotError::HttpStatus { status: 400..=499 } => false,
-                _ => true,
+            .when(|err| {
+                !matches!(
+                    err,
+                    SnapshotError::TooLarge { .. }
+                        | SnapshotError::InsufficientSpace { .. }
+                        | SnapshotError::HttpStatus { status: 400..=499 },
+                )
             })
-            .notify(|err, dur| {
+            .notify(|err, _dur| {
                 warn!("Download attempt failed: {}", err);
             })
-            .await?
+            .await
     }
 
     /// Performs a single download attempt
