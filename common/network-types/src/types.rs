@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use hickory_resolver::{AsyncResolver, name_server::ConnectionProvider};
+use hickory_resolver::name_server::ConnectionProvider;
 use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
@@ -88,9 +88,9 @@ impl IpOrHost {
                 // which prevents IO access to system-level files.
                 let config = hickory_resolver::config::ResolverConfig::new();
                 let options = hickory_resolver::config::ResolverOpts::default();
-                let resolver = hickory_resolver::AsyncResolver::tokio(config, options);
+                let resolver = hickory_resolver::Resolver::builder_with_config(config, hickory_resolver::name_server::TokioConnectionProvider::default()).with_options(options).build();
             } else {
-                let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
+                let resolver = hickory_resolver::Resolver::builder_tokio()?.build();
             }
         };
 
@@ -99,7 +99,10 @@ impl IpOrHost {
 
     /// Tries to resolve the DNS name and returns all IP addresses found.
     /// If this enum is already an IP address and port, it will simply return it.
-    pub async fn resolve<P: ConnectionProvider>(self, resolver: AsyncResolver<P>) -> std::io::Result<Vec<SocketAddr>> {
+    pub async fn resolve<P: ConnectionProvider>(
+        self,
+        resolver: hickory_resolver::Resolver<P>,
+    ) -> std::io::Result<Vec<SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => Ok(resolver
                 .lookup_ip(name)
@@ -332,6 +335,18 @@ impl SurbMatcher {
             SurbMatcher::Exact(id) => id.pseudonym(),
             SurbMatcher::Pseudonym(p) => *p,
         }
+    }
+}
+
+impl From<HoprPseudonym> for SurbMatcher {
+    fn from(value: HoprPseudonym) -> Self {
+        Self::Pseudonym(value)
+    }
+}
+
+impl From<&HoprPseudonym> for SurbMatcher {
+    fn from(pseudonym: &HoprPseudonym) -> Self {
+        (*pseudonym).into()
     }
 }
 

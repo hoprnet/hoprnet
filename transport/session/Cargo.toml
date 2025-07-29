@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -34,8 +34,8 @@ futures = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 moka = { workspace = true }
-pid = "4.0.0"
-pin-project = "1.1.10"
+pid = { workspace = true }
+pin-project = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_repr = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
@@ -53,14 +53,22 @@ hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-protocol-session = { workspace = true }
 hopr-transport-packet = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-tokio = { workspace = true }
+criterion = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
+hopr-protocol-session = { workspace = true, features = ["session-types"] }
 mockall = { workspace = true }
+rand = { workspace = true }
 test-log = { workspace = true }
+tokio = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["serde_with"]
+
+[[bench]]
+name = "session_bench"
+harness = false

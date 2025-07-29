@@ -110,7 +110,7 @@ pub(crate) struct NodeChannelsResponse {
     all: Vec<ChannelInfoResponse>,
 }
 
-async fn query_topology_info(channel: &ChannelEntry) -> Result<ChannelInfoResponse, HoprLibError> {
+async fn query_topology_info(channel: ChannelEntry) -> Result<ChannelInfoResponse, HoprLibError> {
     Ok(ChannelInfoResponse {
         channel_id: channel.get_id(),
         source: channel.source,
@@ -173,7 +173,7 @@ pub(super) async fn list_channels(
         let topology = hopr
             .all_channels()
             .and_then(|channels| async move {
-                futures::future::try_join_all(channels.iter().map(query_topology_info)).await
+                futures::future::try_join_all(channels.into_iter().map(query_topology_info)).await
             })
             .await;
 
@@ -363,7 +363,7 @@ pub(super) async fn show_channel(
     match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
             Ok(Some(channel)) => {
-                let info = query_topology_info(&channel).await;
+                let info = query_topology_info(channel).await;
                 match info {
                     Ok(info) => (StatusCode::OK, Json(info)).into_response(),
                     Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -531,5 +531,37 @@ pub(super) async fn fund_channel(
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/channels/corrupted"),
+    description = "List corrupted channels due to incorrect indexing.",
+    responses(
+        (status = 200, description = "Corrupted channels retrieved", body = Vec<ChannelInfoResponse>),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Channels",
+)]
+pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    let corrupted = match hopr.corrupted_channels().await {
+        Ok(corrupted) => corrupted,
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    };
+
+    let channels_result =
+        futures::future::try_join_all(corrupted.into_iter().map(|c| query_topology_info(*c.channel()))).await;
+
+    match channels_result {
+        Ok(list) => (StatusCode::OK, Json(list)).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

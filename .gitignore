@@ -213,3 +213,4 @@ result
 deploy/nfpm/nfpm.generated.yaml
 deploy/nfpm/changelog*
 privatekey.asc
+deploy/nfpm/*.1.gz

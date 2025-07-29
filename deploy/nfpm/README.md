@@ -2,72 +2,72 @@
 
 Hoprd has a ready to use package for the following variants:
 
-- Architecture supported: `x86_64` and `aarch64`
-- Supported operativa systems: `linux` and `darwin`
-- Supported linux distributions: `debian`, `readhat` and `archlinux`
+- Supported processor architectures: `x86_64` and `aarch64`
+- Supported operating systems: `Linux` and `macOS`
+- Supported package formats: `deb`, `rpm`, and `pkg.tar.zst`
 
-## Install via debian package manager
+## Install via package manager
 
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+- Visit the [release page](https://github.com/hoprnet/hoprnet/releases)
+- Determine your processor architecture by running `uname -m`.  
+  Note: `arm64` is equivalent to `aarch64`.
+- Choose the appropriate package format for your system: `deb`, `rpm`, or `pkg.tar.zst`.
+- Set the required environment variables before installing the package:
 
 ```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd_${arch}.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd_${arch}.deb
 # You can get Safe address and the Module address from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=
-export HOPRD_MODULE_ADDRESS=
+export HOPRD_SAFE_ADDRESS=<SAFE_WALLET_ADDRESS>
+export HOPRD_MODULE_ADDRESS=<MODULE_ADDRESS>
 # Choose your own local RPC provider or any from https://docs.hoprnet.org/node/custom-rpc-provider
-export HOPRD_PROVIDER=
+export HOPRD_PROVIDER=<CUSTOM_RPC_PROVIDER>
+```
+
+### `.deb` (Debian, Ubuntu and derivatives)
+
+**Install:**
+
+```bash
 sudo apt-get update
-sudo -E apt -y install ./hoprd_${arch}.deb
+sudo -E apt -y install ./hoprd.deb
 ```
 
-Uninstall:
+**Uninstall:**
 
 ```bash
-sudo apt purge hoprd
+sudo apt remove -y hoprd
 ```
 
-## Install via Centos package manager
+---
 
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+### `.rpm` (Fedora, CentOS, RHEL, openSUSE)
+
+**Install:**
 
 ```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd_${arch}.rpm https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd_${arch}.rpm
-# You can get Safe address and the Module address from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=
-export HOPRD_MODULE_ADDRESS=
-# Choose your own local RPC provider or any from https://docs.hoprnet.org/node/custom-rpc-provider
-export HOPRD_PROVIDER=
-sudo -E dnf install -y ./hoprd-${arch}.rpm
+sudo -E dnf install -y ./hoprd.rpm
 ```
 
-Uninstall:
+**Uninstall:**
 
 ```bash
 sudo dnf remove -y hoprd
 ```
 
-## Install via Archlinux package manager
+---
 
-Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+### `.pkg.tar.zst` (Arch Linux, Manjaro)
+
+**Install:**
 
 ```bash
-arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
-curl -s -L -o hoprd_${arch}.pkg.tar.zst https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd_${arch}.pkg.tar.zst
-# You can get Safe address and the Module address from https://hub.hoprnet.org
-export HOPRD_SAFE_ADDRESS=
-export HOPRD_MODULE_ADDRESS=
-# Choose your own local RPC provider or any from https://docs.hoprnet.org/node/custom-rpc-provider
-export HOPRD_PROVIDER=
-sudo pacman --noconfirm -U hoprd-${arch}.pkg.tar.zst
+sudo pacman -Syy
+sudo -E pacman --noconfirm -U ./hoprd.pkg.tar.zst
 ```
 
-Uninstall:
+**Uninstall:**
 
 ```bash
-sudo pacman del hoprd
+sudo pacman -Rs hoprd
 ```
 
 ## Development
@@ -113,6 +113,4 @@ export HOPRD_PROVIDER=
 echo "Optionally create an identifiy file at ./deploy/nfpm/hopr.id"
 just test-package deb aarch64-linux
 just test-package rpm aarch64-linux
-just test-package archlinux aarch64-linux
-
 ```

@@ -90,6 +90,7 @@ pub(crate) struct InternalState {
         channels::list_channels,
         channels::open_channel,
         channels::show_channel,
+        channels::corrupted_channels,
         checks::eligiblez,
         checks::healthyz,
         checks::readyz,
@@ -229,7 +230,7 @@ async fn build_api(
     Router::new()
         .merge(
             Router::new()
-                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
+                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
                 .merge(Scalar::with_url("/scalar", ApiDoc::openapi())),
         )
         .merge(
@@ -285,6 +286,7 @@ async fn build_api(
                 .route("/peers/{destination}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
+                .route("/channels/corrupted", get(channels::corrupted_channels))
                 .route("/channels/{channelId}", get(channels::show_channel))
                 .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
                 .route("/channels/{channelId}", delete(channels::close_channel))

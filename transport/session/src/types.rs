@@ -1,36 +1,26 @@
 use std::{
     fmt::{Debug, Display, Formatter},
     hash::{Hash, Hasher},
-    io::{Error, ErrorKind},
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
 
-use futures::{StreamExt, pin_mut};
-use hopr_crypto_packet::prelude::HoprPacket;
+use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
     prelude::{DestinationRouting, SealedHost},
-    session::state::{SessionConfig, SessionSocket},
+    utils::{AsyncWriteSink, DuplexIO},
 };
 use hopr_primitive_types::prelude::BytesRepresentable;
+use hopr_protocol_session::{
+    AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
+    UnreliableSocket,
+};
 use hopr_transport_packet::prelude::{ApplicationData, Tag};
-use tracing::{debug, error};
+use tracing::{debug, instrument};
 
-use crate::{Capabilities, Capability, capabilities_to_features, errors::TransportSessionError, traits::SendMsg};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_SESSION_INNER_SIZES: hopr_metrics::MultiHistogram =
-        hopr_metrics::MultiHistogram::new(
-            "hopr_session_inner_sizes",
-            "Sizes of data chunks fed from inner session to HOPR protocol",
-            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0],
-            &["session_id"]
-    ).unwrap();
-}
+use crate::{Capabilities, Capability, errors::TransportSessionError};
 
 /// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
 ///
@@ -204,9 +194,30 @@ impl Hash for SessionId {
     }
 }
 
+fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
+    if caps.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+        AcknowledgementMode::Both
+    } else if caps.contains(Capability::RetransmissionAck) {
+        AcknowledgementMode::Full
+    } else {
+        AcknowledgementMode::Partial
+    }
+}
+
+/// Indicates the closure reason of a [`Session`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
+pub enum ClosureReason {
+    /// Write-half of the Session has been closed.
+    WriteClosed,
+    /// Read-part of the Session has been closed (encountered empty read).
+    EmptyRead,
+    /// Session has been evicted from the cache due to inactivity or capacity reasons.
+    Eviction,
+}
+
 /// Helper trait to allow Box aliasing
-trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
-impl<T: futures::AsyncWrite + futures::AsyncRead + Send> AsyncReadWrite for T {}
+trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send + Unpin {}
+impl<T: futures::AsyncWrite + futures::AsyncRead + Send + Unpin> AsyncReadWrite for T {}
 
 /// Describes a node service target.
 /// These are specialized [`SessionTargets`](SessionTarget::ExitNode)
@@ -228,7 +239,7 @@ pub enum SessionTarget {
     ExitNode(ServiceId),
 }
 
-/// Wrapper for incoming [Session] along with other information
+/// Wrapper for incoming [`Session`] along with other information
 /// extracted from the Start protocol during the session establishment.
 #[derive(Debug)]
 pub struct IncomingSession {
@@ -238,76 +249,107 @@ pub struct IncomingSession {
     pub target: SessionTarget,
 }
 
-// TODO: missing docs
+/// Represents the Session protocol socket over HOPR.
+///
+/// This is essentially a HOPR-specific wrapper for [`ReliableSocket`] and [`UnreliableSocket`]
+/// Session protocol sockets.
+#[pin_project::pin_project]
 pub struct Session {
     id: SessionId,
-    inner: Pin<Box<dyn AsyncReadWrite>>,
+    #[pin]
+    inner: Box<dyn AsyncReadWrite>,
     routing: DestinationRouting,
     capabilities: Capabilities,
-    on_close: Option<Box<dyn FnOnce(SessionId) + Send + Sync>>,
+    on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
 }
 
 impl Session {
-    pub fn new(
+    /// Creates a new HOPR Session.
+    ///
+    /// It builds an [`futures::io::AsyncRead`] + [`futures::io::AsyncWrite`] transport
+    /// from the given `hopr` interface and passing it to the appropriate [`UnreliableSocket`] or [`ReliableSocket`]
+    /// based on the given `capabilities`.
+    #[tracing::instrument(skip(hopr, on_close), fields(session_id = %id))]
+    pub fn new<Tx, Rx, C>(
         id: SessionId,
         routing: DestinationRouting,
-        capabilities: Capabilities,
-        tx: Arc<dyn SendMsg + Send + Sync>,
-        rx: Pin<Box<dyn futures::Stream<Item = Box<[u8]>> + Send + Sync>>,
-        on_close: Option<Box<dyn FnOnce(SessionId) + Send + Sync>>,
-    ) -> Self {
-        let inner_session = InnerSession::new(id, routing.clone(), tx, rx);
+        capabilities: C,
+        hopr: (Tx, Rx),
+        on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
+    ) -> Result<Self, TransportSessionError>
+    where
+        Tx: futures::Sink<(DestinationRouting, ApplicationData)> + Send + Sync + Unpin + 'static,
+        Rx: futures::Stream<Item = Box<[u8]>> + Send + Sync + Unpin + 'static,
+        C: Into<Capabilities> + std::fmt::Debug,
+        Tx::Error: std::error::Error + Send + Sync,
+    {
+        let capabilities = capabilities.into();
+        let routing_clone = routing.clone();
+        let transport = DuplexIO(
+            AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
+                move |buf| {
+                    futures::future::ok::<_, std::io::Error>((
+                        routing_clone.clone(),
+                        ApplicationData::new_from_owned(id.tag(), buf),
+                    ))
+                },
+            )),
+            hopr.1.map(Ok::<_, std::io::Error>).into_async_read(),
+        );
 
-        // If we request any capability, we need to use Session protocol
-        if !capabilities.is_empty() {
-            // This is a very coarse assumption, that 3-hop takes at most 3 seconds.
-            // We can no longer base this timeout on the number of hops because
-            // it is not known for SURB-based routing.
-            let rto_base = Duration::from_secs(3);
-
-            let expiration_coefficient =
-                if !capabilities.is_disjoint(Capability::RetransmissionAck | Capability::RetransmissionNack) {
-                    4
-                } else {
-                    1
-                };
-
-            // TODO: tweak the default Session protocol config
-            let cfg = SessionConfig {
-                enabled_features: capabilities_to_features(&capabilities),
-                acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
-                frame_expiration_age: rto_base * expiration_coefficient,
-                rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
-                rto_base_sender: rto_base * 2, // Resend frame if is not acknowledged after this period
+        // Based on the requested capabilities, see if we should use the Session protocol
+        let inner: Box<dyn AsyncReadWrite> = if capabilities.contains(Capability::Segmentation) {
+            // TODO: update config values
+            let socket_cfg = SessionSocketConfig {
+                frame_size: 1500,
+                frame_timeout: Duration::from_millis(800),
+                capacity: 16384,
                 ..Default::default()
             };
-            debug!(
-                session_id = ?id,
-                ?cfg,
-                "opening new session socket"
-            );
 
-            Self {
-                id,
-                inner: Box::pin(SessionSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new(
-                    id,
-                    inner_session,
-                    cfg,
-                )),
-                routing,
-                capabilities,
-                on_close,
+            if capabilities.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+                // TODO: update config values
+                let ack_cfg = AcknowledgementStateConfig {
+                    // This is a very coarse assumption, that a single 3-hop packet
+                    // takes on average 200 ms to deliver.
+                    // We can no longer base this timeout on the number of hops because
+                    // it is not known for SURB-based routing.
+                    expected_packet_latency: Duration::from_millis(200),
+                    mode: caps_to_ack_mode(capabilities),
+                    backoff_base: 0.2,
+                    max_incoming_frame_retries: 1,
+                    max_outgoing_frame_retries: 2,
+                    ..Default::default()
+                };
+
+                // TODO: The NoDelay capability is currently unused
+
+                debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
+
+                Box::new(ReliableSocket::new(
+                    transport,
+                    AcknowledgementState::<{ ApplicationData::PAYLOAD_SIZE }>::new(id, ack_cfg),
+                    socket_cfg,
+                )?)
+            } else {
+                debug!(?socket_cfg, "opening new stateless session socket");
+
+                Box::new(UnreliableSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new_stateless(
+                    id, transport, socket_cfg,
+                )?)
             }
         } else {
-            // Otherwise, no additional sub protocol is necessary
-            Self {
-                id,
-                inner: Box::pin(inner_session),
-                routing,
-                capabilities,
-                on_close,
-            }
-        }
+            debug!("opening raw session socket");
+            Box::new(transport)
+        };
+
+        Ok(Self {
+            id,
+            inner,
+            routing,
+            capabilities,
+            on_close,
+        })
     }
 
     /// ID of this Session.
@@ -336,39 +378,45 @@ impl std::fmt::Debug for Session {
 }
 
 impl futures::AsyncRead for Session {
-    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        let inner = self.inner.as_mut();
-        pin_mut!(inner);
-        inner.poll_read(cx, buf)
+    #[instrument(name = "Session::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
+        let this = self.project();
+        let read = futures::ready!(this.inner.poll_read(cx, buf))?;
+        if read == 0 {
+            tracing::trace!("hopr session empty read");
+            // Empty read signals end of the socket, notify if needed
+            if let Some(notifier) = this.on_close.take() {
+                tracing::trace!("notifying read half closure of session");
+                notifier(*this.id, ClosureReason::EmptyRead);
+            }
+        }
+        Poll::Ready(Ok(read))
     }
 }
 
 impl futures::AsyncWrite for Session {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        let inner = &mut self.inner;
-        pin_mut!(inner);
-        inner.poll_write(cx, buf)
+    #[instrument(name = "Session::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        self.project().inner.poll_write(cx, buf)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let inner = &mut self.inner;
-        pin_mut!(inner);
-        inner.poll_flush(cx)
+    #[instrument(name = "Session::poll_flush", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        self.project().inner.poll_flush(cx)
     }
 
-    fn poll_close(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        let inner = &mut self.inner;
-        pin_mut!(inner);
-        match inner.poll_close(cx) {
-            Poll::Ready(res) => {
-                // Notify about closure if desired
-                if let Some(notifier) = self.on_close.take() {
-                    notifier(self.id);
-                }
-                Poll::Ready(res)
-            }
-            Poll::Pending => Poll::Pending,
+    #[instrument(name = "Session::poll_close", level = "trace", skip(self, cx), fields(session_id = %self.id), ret)]
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        let this = self.project();
+        futures::ready!(this.inner.poll_close(cx))?;
+        tracing::trace!("hopr session closed");
+
+        if let Some(notifier) = this.on_close.take() {
+            tracing::trace!("notifying write half closure of session");
+            notifier(*this.id, ClosureReason::WriteClosed);
         }
+
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -388,245 +436,29 @@ impl tokio::io::AsyncRead for Session {
 
 #[cfg(feature = "runtime-tokio")]
 impl tokio::io::AsyncWrite for Session {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, Error>> {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
         futures::AsyncWrite::poll_write(self.as_mut(), cx, buf)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
         futures::AsyncWrite::poll_flush(self.as_mut(), cx)
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
         futures::AsyncWrite::poll_close(self.as_mut(), cx)
     }
 }
 
-type FuturesBuffer = futures::stream::FuturesUnordered<
-    Pin<Box<dyn std::future::Future<Output = Result<(), TransportSessionError>> + Send>>,
->;
-struct InnerSession {
-    id: SessionId,
-    routing: DestinationRouting,
-    rx: Pin<Box<dyn futures::Stream<Item = Box<[u8]>> + Send + Sync>>,
-    tx: Arc<dyn SendMsg + Send + Sync>,
-    tx_bytes: usize,
-    tx_buffer: FuturesBuffer,
-    rx_buffer: [u8; HoprPacket::PAYLOAD_SIZE],
-    rx_buffer_range: (usize, usize),
-    closed: bool,
-}
-
-impl InnerSession {
-    pub fn new(
-        id: SessionId,
-        routing: DestinationRouting,
-        tx: Arc<dyn SendMsg + Send + Sync>,
-        rx: Pin<Box<dyn futures::Stream<Item = Box<[u8]>> + Send + Sync>>,
-    ) -> Self {
-        Self {
-            id,
-            routing,
-            rx,
-            tx,
-            tx_bytes: 0,
-            tx_buffer: futures::stream::FuturesUnordered::new(),
-            rx_buffer: [0; HoprPacket::PAYLOAD_SIZE],
-            rx_buffer_range: (0, 0),
-            closed: false,
-        }
-    }
-}
-
-impl futures::AsyncWrite for InnerSession {
-    fn poll_write(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        if self.closed {
-            return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, "session closed")));
-        }
-
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_SESSION_INNER_SIZES.observe(&[self.id.as_str()], buf.len() as f64);
-
-        if !self.tx_buffer.is_empty() {
-            loop {
-                match self.tx_buffer.poll_next_unpin(cx) {
-                    Poll::Ready(Some(Ok(()))) => {
-                        continue;
-                    }
-                    Poll::Ready(Some(Err(TransportSessionError::OutOfSurbs))) => {
-                        // Discard messages until SURBs are available
-                        error!(session_id = %self.id, "message discarded due to missing SURB for reply");
-                        continue;
-                    }
-                    Poll::Ready(Some(Err(e))) => {
-                        error!(session_id = %self.id, error = %e, "failed to send the message chunk inside a session");
-                        return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
-                    }
-                    Poll::Ready(None) => {
-                        self.tx_buffer.clear();
-                        return Poll::Ready(Ok(self.tx_bytes));
-                    }
-                    Poll::Pending => {
-                        return Poll::Pending;
-                    }
-                }
-            }
-        }
-
-        let tag = self.id.tag();
-
-        self.tx_buffer.clear();
-        self.tx_bytes = 0;
-
-        for i in
-            0..(buf.len() / ApplicationData::PAYLOAD_SIZE + ((buf.len() % ApplicationData::PAYLOAD_SIZE != 0) as usize))
-        {
-            let start = i * ApplicationData::PAYLOAD_SIZE;
-            let end = ((i + 1) * ApplicationData::PAYLOAD_SIZE).min(buf.len());
-
-            let payload = ApplicationData::new(tag, &buf[start..end]);
-            let sender = self.tx.clone();
-            let routing = self.routing.clone();
-
-            self.tx_buffer
-                .push(Box::pin(async move { sender.send_message(payload, routing).await }));
-
-            self.tx_bytes += end - start;
-        }
-
-        loop {
-            match self.tx_buffer.poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(_))) => {
-                    continue;
-                }
-                Poll::Ready(Some(Err(TransportSessionError::OutOfSurbs))) => {
-                    // Discard messages until SURBs are available
-                    error!(session_id = %self.id, "message discarded due to missing SURB for reply");
-                    continue;
-                }
-                Poll::Ready(Some(Err(error))) => {
-                    error!(session_id = %self.id, %error, "failed to send the message chunk inside a session");
-                    break Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
-                }
-                Poll::Ready(None) => {
-                    self.tx_buffer.clear();
-                    break Poll::Ready(Ok(self.tx_bytes));
-                }
-                Poll::Pending => {
-                    break Poll::Pending;
-                }
-            }
-        }
-    }
-
-    fn poll_flush(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        if self.closed {
-            return Poll::Ready(Err(Error::new(ErrorKind::BrokenPipe, "session closed")));
-        }
-
-        while let Poll::Ready(Some(result)) = self.tx_buffer.poll_next_unpin(cx) {
-            if let Err(error) = result {
-                error!(session_id = %self.id, %error, "failed to send message chunk inside session during flush");
-                return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
-            }
-        }
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(mut self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        self.closed = true;
-        Poll::Ready(Ok(()))
-    }
-}
-
-impl futures::AsyncRead for InnerSession {
-    fn poll_read(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<std::io::Result<usize>> {
-        if self.rx_buffer_range.0 != self.rx_buffer_range.1 {
-            let start = self.rx_buffer_range.0;
-            let copy_len = self.rx_buffer_range.1.min(buf.len());
-
-            buf[..copy_len].copy_from_slice(&self.rx_buffer[start..start + copy_len]);
-
-            self.rx_buffer_range.0 += copy_len;
-            if self.rx_buffer_range.0 == self.rx_buffer_range.1 {
-                self.rx_buffer_range = (0, 0);
-            }
-
-            return Poll::Ready(Ok(copy_len));
-        }
-
-        match self.rx.poll_next_unpin(cx) {
-            Poll::Ready(Some(data)) => {
-                let data_len = data.len();
-                let copy_len = data_len.min(buf.len());
-                if copy_len < data_len {
-                    self.rx_buffer[0..data_len - copy_len].copy_from_slice(&data[copy_len..]);
-                    self.rx_buffer_range = (0, data_len - copy_len);
-                }
-
-                buf[..copy_len].copy_from_slice(&data[..copy_len]);
-
-                Poll::Ready(Ok(copy_len))
-            }
-            Poll::Ready(None) => {
-                Poll::Ready(Ok(0)) // due to convention, Ok(0) indicates EOF
-            }
-            Poll::Pending => Poll::Pending,
-        }
-    }
-}
-
-/// Convenience function to copy data in both directions between a [Session] and arbitrary
-/// async IO stream.
-/// This function is only available with Tokio and will panic with other runtimes.
-#[cfg(feature = "runtime-tokio")]
-pub async fn transfer_session<S>(
-    session: &mut Session,
-    stream: &mut S,
-    max_buffer: usize,
-) -> std::io::Result<(usize, usize)>
-where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
-    // We can always read as much as possible from the Session and then write it to the Stream.
-    // There are two possibilities for the opposite direction:
-    // 1) If Session protocol is used for segmentation, we need to buffer up data at MAX_WRITE_SIZE.
-    // 2) Otherwise, the bare session implements chunking, therefore, data can be written with arbitrary sizes.
-    let into_session_len = if session.capabilities().contains(Capability::Segmentation) {
-        max_buffer.min(SessionSocket::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_WRITE_SIZE)
-    } else {
-        max_buffer
-    };
-
-    debug!(
-        session_id = ?session.id(),
-        egress_buffer = max_buffer,
-        ingress_buffer = into_session_len,
-        "session buffers"
-    );
-
-    hopr_network_types::utils::copy_duplex(session, stream, max_buffer, into_session_len)
-        .await
-        .map(|(a, b)| (a as usize, b as usize))
-}
-
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_network_types::prelude::{RoutingOptions, SurbMatcher};
-    use hopr_primitive_types::prelude::Address;
+    use hopr_crypto_types::prelude::*;
+    use hopr_network_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
 
     use super::*;
-    use crate::traits::MockSendMsg;
 
     #[test]
     fn test_max_decimal_digits_for_n_bytes() {
@@ -634,6 +466,12 @@ mod tests {
         assert_eq!(5, max_decimal_digits_for_n_bytes(size_of::<u16>()));
         assert_eq!(10, max_decimal_digits_for_n_bytes(size_of::<u32>()));
         assert_eq!(20, max_decimal_digits_for_n_bytes(size_of::<u64>()));
+    }
+
+    #[test]
+    fn standard_session_id_must_fit_within_limit() {
+        let id = format!("{}:{}", SimplePseudonym::random(), Tag::Application(Tag::MAX));
+        assert!(id.len() <= MAX_SESSION_ID_STR_LEN);
     }
 
     #[cfg(feature = "serde")]
@@ -659,181 +497,140 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn session_should_identify_with_its_own_id() -> anyhow::Result<()> {
-        let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1u64, HoprPseudonym::random());
-        let (_tx, rx) = futures::channel::mpsc::unbounded();
-        let mock = MockSendMsg::new();
+    #[test_log::test(tokio::test)]
+    async fn test_session_bidirectional_flow_without_segmentation() -> anyhow::Result<()> {
+        let dst: Address = (&ChainKeypair::random()).into();
+        let id = SessionId::new(1234_u64, HoprPseudonym::random());
+        const DATA_LEN: usize = 5000;
 
-        let session = InnerSession::new(
+        let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+        let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+
+        let mut alice_session = Session::new(
             id,
-            DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
-            Arc::new(mock),
-            Box::pin(rx),
-        );
+            DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into()?)),
+            None,
+            (
+                alice_tx,
+                alice_rx
+                    .map(|(_, data)| data.plain_text)
+                    .inspect(|d| debug!("alice rcvd: {}", d.len())),
+            ),
+            None,
+        )?;
 
-        assert_eq!(session.id, id);
+        let mut bob_session = Session::new(
+            id,
+            DestinationRouting::Return(id.pseudonym().into()),
+            None,
+            (
+                bob_tx,
+                bob_rx
+                    .map(|(_, data)| data.plain_text)
+                    .inspect(|d| debug!("bob rcvd: {}", d.len())),
+            ),
+            None,
+        )?;
+
+        let alice_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
+        let bob_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
+
+        let mut bob_recv = [0u8; DATA_LEN];
+        let mut alice_recv = [0u8; DATA_LEN];
+
+        tokio::time::timeout(Duration::from_secs(1), alice_session.write_all(&alice_sent))
+            .await
+            .context("alice write failed")?
+            .context("alice write timed out")?;
+        alice_session.flush().await?;
+
+        tokio::time::timeout(Duration::from_secs(1), bob_session.write_all(&bob_sent))
+            .await
+            .context("bob write failed")?
+            .context("bob write timed out")?;
+        bob_session.flush().await?;
+
+        tokio::time::timeout(Duration::from_secs(1), bob_session.read_exact(&mut bob_recv))
+            .await
+            .context("bob read failed")?
+            .context("bob read timed out")?;
+
+        tokio::time::timeout(Duration::from_secs(1), alice_session.read_exact(&mut alice_recv))
+            .await
+            .context("alice read failed")?
+            .context("alice read timed out")?;
+
+        assert_eq!(&alice_sent, bob_recv.as_slice());
+        assert_eq!(bob_sent, alice_recv);
 
         Ok(())
     }
 
-    #[tokio::test]
-    async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() -> anyhow::Result<()> {
-        let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1u64, HoprPseudonym::random());
-        let (tx, rx) = futures::channel::mpsc::unbounded();
-        let mock = MockSendMsg::new();
+    #[test_log::test(tokio::test)]
+    async fn test_session_bidirectional_flow_with_segmentation() -> anyhow::Result<()> {
+        let dst: Address = (&ChainKeypair::random()).into();
+        let id = SessionId::new(1234_u64, HoprPseudonym::random());
+        const DATA_LEN: usize = 5000;
 
-        let mut session = InnerSession::new(
+        let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+        let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+
+        let mut alice_session = Session::new(
             id,
-            DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
-            Arc::new(mock),
-            Box::pin(rx),
-        );
+            DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into()?)),
+            Capability::Segmentation,
+            (
+                alice_tx,
+                alice_rx
+                    .map(|(_, data)| data.plain_text)
+                    .inspect(|d| debug!("alice rcvd: {}", d.len())),
+            ),
+            None,
+        )?;
 
-        let random_data = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>()
-            .as_ref()
-            .to_vec()
-            .into_boxed_slice();
-
-        assert!(tx.unbounded_send(random_data.clone()).is_ok());
-
-        let mut buffer = vec![0; HoprPacket::PAYLOAD_SIZE * 2];
-
-        let bytes_read = session.read(&mut buffer[..]).await?;
-
-        assert_eq!(bytes_read, random_data.len());
-        assert_eq!(&buffer[..bytes_read], random_data.as_ref());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() -> anyhow::Result<()>
-    {
-        let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1u64, HoprPseudonym::random());
-        let (tx, rx) = futures::channel::mpsc::unbounded();
-        let mock = MockSendMsg::new();
-
-        let mut session = InnerSession::new(
+        let mut bob_session = Session::new(
             id,
-            DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
-            Arc::new(mock),
-            Box::pin(rx),
-        );
+            DestinationRouting::Return(id.pseudonym().into()),
+            Capability::Segmentation,
+            (
+                bob_tx,
+                bob_rx
+                    .map(|(_, data)| data.plain_text)
+                    .inspect(|d| debug!("bob rcvd: {}", d.len())),
+            ),
+            None,
+        )?;
 
-        let random_data = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>()
-            .as_ref()
-            .to_vec()
-            .into_boxed_slice();
+        let alice_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
+        let bob_sent = hopr_crypto_random::random_bytes::<DATA_LEN>();
 
-        assert!(tx.unbounded_send(random_data.clone()).is_ok());
+        let mut bob_recv = [0u8; DATA_LEN];
+        let mut alice_recv = [0u8; DATA_LEN];
 
-        const BUFFER_SIZE: usize = HoprPacket::PAYLOAD_SIZE - 1;
-        let mut buffer = vec![0; BUFFER_SIZE];
+        tokio::time::timeout(Duration::from_secs(1), alice_session.write_all(&alice_sent))
+            .await
+            .context("alice write failed")?
+            .context("alice write timed out")?;
+        alice_session.flush().await?;
 
-        let bytes_read = session.read(&mut buffer[..]).await?;
+        tokio::time::timeout(Duration::from_secs(1), bob_session.write_all(&bob_sent))
+            .await
+            .context("bob write failed")?
+            .context("bob write timed out")?;
+        bob_session.flush().await?;
 
-        assert_eq!(bytes_read, BUFFER_SIZE);
-        assert_eq!(&buffer[..bytes_read], &random_data[..BUFFER_SIZE]);
+        tokio::time::timeout(Duration::from_secs(1), bob_session.read_exact(&mut bob_recv))
+            .await
+            .context("bob read failed")?
+            .context("bob read timed out")?;
 
-        let bytes_read = session.read(&mut buffer[..]).await?;
+        tokio::time::timeout(Duration::from_secs(1), alice_session.read_exact(&mut alice_recv))
+            .await
+            .context("alice read failed")?
+            .context("alice read timed out")?;
 
-        assert_eq!(bytes_read, HoprPacket::PAYLOAD_SIZE - BUFFER_SIZE);
-        assert_eq!(&buffer[..bytes_read], &random_data[BUFFER_SIZE..]);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn session_should_write_data_on_forward_path() -> anyhow::Result<()> {
-        let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1u64, HoprPseudonym::random());
-        let (_tx, rx) = futures::channel::mpsc::unbounded();
-        let mut mock = MockSendMsg::new();
-
-        let data = b"Hello, world!".to_vec().into_boxed_slice();
-
-        mock.expect_send_message()
-            .times(1)
-            .withf(move |data, routing,| {
-                assert_eq!(data.plain_text, b"Hello, world!".to_vec().into_boxed_slice());
-                assert!(matches!(routing, DestinationRouting::Forward {forward_options,..} if forward_options == &RoutingOptions::Hops(1_u32.try_into().expect("must be convertible"))));
-                true
-            })
-            .returning(|_, _| Ok(()));
-
-        let mut session = InnerSession::new(
-            id,
-            DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
-            Arc::new(mock),
-            Box::pin(rx),
-        );
-
-        let bytes_written = session.write(&data).await?;
-        assert_eq!(bytes_written, data.len());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn session_should_write_data_on_return_path() -> anyhow::Result<()> {
-        let id = SessionId::new(1u64, HoprPseudonym::random());
-        let (_tx, rx) = futures::channel::mpsc::unbounded();
-        let mut mock = MockSendMsg::new();
-
-        let data = b"Hello, world!".to_vec().into_boxed_slice();
-
-        mock.expect_send_message()
-            .times(1)
-            .withf(move |data, routing,| {
-                assert_eq!(data.plain_text, b"Hello, world!".to_vec().into_boxed_slice());
-                assert!(matches!(routing, DestinationRouting::Return(SurbMatcher::Pseudonym(pseudonym)) if pseudonym == &id.pseudonym));
-                true
-            })
-            .returning(|_, _| Ok(()));
-
-        let mut session = InnerSession::new(
-            id,
-            DestinationRouting::Return(SurbMatcher::Pseudonym(id.pseudonym)),
-            Arc::new(mock),
-            Box::pin(rx),
-        );
-
-        let bytes_written = session.write(&data).await?;
-        assert_eq!(bytes_written, data.len());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size()
-    -> anyhow::Result<()> {
-        const TO_SEND: usize = ApplicationData::PAYLOAD_SIZE * 2 + 10;
-
-        let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1u64, HoprPseudonym::random());
-        let (_tx, rx) = futures::channel::mpsc::unbounded();
-        let mut mock = MockSendMsg::new();
-
-        let data = hopr_crypto_random::random_bytes::<TO_SEND>()
-            .as_ref()
-            .to_vec()
-            .into_boxed_slice();
-
-        mock.expect_send_message().times(3).returning(|_, _| Ok(()));
-
-        let mut session = InnerSession::new(
-            id,
-            DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
-            Arc::new(mock),
-            Box::pin(rx),
-        );
-
-        let bytes_written = session.write(&data).await?;
-        assert_eq!(bytes_written, TO_SEND);
+        assert_eq!(alice_sent, bob_recv);
+        assert_eq!(bob_sent, alice_recv);
 
         Ok(())
     }

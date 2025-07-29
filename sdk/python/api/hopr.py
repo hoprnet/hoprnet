@@ -95,6 +95,17 @@ class HoprdAPI(ApiLib):
     HOPRd API helper to handle exceptions and logging.
     """
 
+    async def api_version(self) -> Optional[str]:
+        """
+        Returns the API version of the HOPRd node.
+        :return: version: str | undefined
+        """
+
+        openapi_spec = await self.try_req(Method.GET, "/api-docs/openapi.json", dict, use_api_prefix=False)
+        version = openapi_spec.get("info", {}).get("version", None) if isinstance(openapi_spec, dict) else None
+
+        return version
+
     async def balances(self) -> Optional[Balances]:
         """
         Returns the balance of the node.

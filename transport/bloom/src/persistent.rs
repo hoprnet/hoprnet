@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_lock::RwLock;
 use hopr_crypto_types::types::PacketTag;
 use hopr_platform::file::native::{read_file, write};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 use crate::raw::TagBloomFilter;
 
@@ -60,7 +60,7 @@ impl WrappedTagBloomFilter {
         {
             error!(error = %e, "Tag Bloom filter save failed")
         } else {
-            info!("Tag Bloom filter saved successfully")
+            debug!("Tag Bloom filter saved successfully")
         };
     }
 }

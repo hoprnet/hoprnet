@@ -67,6 +67,9 @@ pub mod stream;
 
 pub mod timer;
 
+/// Allows capturing dissected HOPR packets before they are processed by the transport.
+///
+/// Requires the `capture` feature to be enabled.
 #[cfg(feature = "capture")]
 mod capture;
 
@@ -137,6 +140,16 @@ pub enum PeerDiscovery {
     Allow(PeerId),
     Ban(PeerId),
     Announce(PeerId, Vec<Multiaddr>),
+}
+
+#[cfg(feature = "capture")]
+fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
+    use hopr_primitive_types::traits::BytesEncodable;
+    if raw_packet.len() >= hopr_internal_types::tickets::Ticket::SIZE {
+        &raw_packet[raw_packet.len() - hopr_internal_types::tickets::Ticket::SIZE..]
+    } else {
+        &[]
+    }
 }
 
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
@@ -252,7 +265,7 @@ where
                             Ok(v) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
-                                    METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &v.next_hop.to_string()]);
+                                    METRIC_PACKET_COUNT_PER_PEER.increment(&[&v.next_hop.to_string(), "out"]);
                                     METRIC_PACKET_COUNT.increment(&["sent"]);
                                 }
                                 finalizer.finalize(Ok(()));
@@ -264,6 +277,7 @@ where
                                         next_hop: v.next_hop,
                                         data: data_clone.to_bytes().into_vec().into(),
                                         ack_challenge: v.ack_challenge.as_ref().into(),
+                                        ticket: inspect_ticket_data_in_packet(&v.data).into(),
                                     }
                                     .into(),
                                 );
@@ -291,7 +305,8 @@ where
     let me_for_recv = me.clone();
 
     #[cfg(feature = "capture")]
-    let mut capture_clone = capture.clone();
+    let capture_clone = capture.clone();
+
     processes.insert(
         ProtocolProcesses::MsgIn,
         spawn_as_abortable!(async move {
@@ -306,7 +321,10 @@ where
                     trace!(%peer, "protocol message in");
 
                     #[cfg(feature = "capture")]
-                    let mut capture_clone = capture.clone();
+                    let (mut capture_clone, ticket_data_clone) = (
+                        capture.clone(),
+                        inspect_ticket_data_in_packet(&data).to_vec()
+                    );
 
                     async move {
                         let now = std::time::Instant::now();
@@ -329,7 +347,7 @@ where
                             let peer: OffchainPublicKey = match peer.try_into() {
                                 Ok(p) => p,
                                 Err(error) => {
-                                    warn!(%peer, %error, "Dropping packet – cannot convert peer id");
+                                    warn!(%peer, %error, "Dropping packet - cannot convert peer id");
                                     return None;
                                 }
                             };
@@ -368,6 +386,16 @@ where
                                 }
                         }
 
+                        #[cfg(feature = "capture")]
+                        if let Ok(packet) = &res {
+                            let _ = capture_clone.try_send(capture::PacketBeforeTransit::IncomingPacket {
+                                    me: me_pub,
+                                    packet,
+                                    ticket: ticket_data_clone.into(),
+                                }.into()
+                            );
+                        }
+
                         res.ok()
                     }
                 })
@@ -399,12 +427,6 @@ where
                 }
                 })
                 .then_concurrent(move |packet| {
-                    #[cfg(feature = "capture")]
-                    let _ = capture_clone.try_send(capture::PacketBeforeTransit::IncomingPacket {
-                        me: me_pub,
-                        packet: &packet
-                    }.into());
-
                     let mut msg_to_send_tx = wire_msg.0.clone();
                     let db = db.clone();
                     let me = me_for_recv.clone();
@@ -451,6 +473,12 @@ where
                                 is_random: false,
                             }.into();
 
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_PACKET_COUNT_PER_PEER.increment(&[&previous_hop.to_string(), "in"]);
+                                METRIC_PACKET_COUNT.increment(&["received"]);
+                            }
+
                             if let Ok(ack_packet) = db
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
                                 .await
@@ -481,6 +509,7 @@ where
                                 next_hop,
                                 data: data.as_ref().into(),
                                 ack_challenge: Default::default(),
+                                ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
                             }.into();
 
                             msg_to_send_tx
@@ -489,6 +518,11 @@ where
                                 .unwrap_or_else(|_| {
                                     error!("failed to forward a packet to the transport layer");
                                 });
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_PACKET_COUNT.increment(&["forwarded"]);
+                            }
 
                             #[cfg(feature = "capture")]
                             let _ = capture_clone.try_send(captured_packet);

@@ -344,7 +344,7 @@ impl SafeModuleSubcommands {
                     .split(',')
                     .map(|addr| {
                         Address::from_str(addr)
-                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             );
@@ -353,7 +353,7 @@ impl SafeModuleSubcommands {
         node_eth_addresses.extend(
             local_identity
                 .to_addresses()
-                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
                 .map(Address::from),
         );
@@ -498,7 +498,7 @@ impl SafeModuleSubcommands {
                     .split(',')
                     .map(|addr| {
                         Address::from_str(addr)
-                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             );
@@ -507,17 +507,16 @@ impl SafeModuleSubcommands {
         node_eth_addresses.extend(
             local_identity
                 .to_addresses()
-                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
                 .map(Address::from),
         );
 
         // parse safe and module addresses
         let safe_addr = Address::from_str(&new_safe_address)
-            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", new_safe_address)))?;
-        let module_addr = Address::from_str(&new_module_address).map_err(|_| {
-            HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", new_module_address))
-        })?;
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {new_safe_address:?}")))?;
+        let module_addr = Address::from_str(&new_module_address)
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {new_module_address:?}")))?;
         let old_module_addr: Vec<Address> = old_module_address
             .split(',')
             .map(|addr| Address::from_str(addr).unwrap())
@@ -631,7 +630,7 @@ impl SafeModuleSubcommands {
                     .split(',')
                     .map(|addr| {
                         Address::from_str(addr)
-                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             );
@@ -640,7 +639,7 @@ impl SafeModuleSubcommands {
         node_eth_addresses.extend(
             local_identity
                 .to_addresses()
-                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
                 .map(Address::from),
         );
@@ -655,9 +654,9 @@ impl SafeModuleSubcommands {
 
         // parse safe and module addresses
         let safe_addr = Address::from_str(&safe_address)
-            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", safe_address)))?;
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {safe_address:?}")))?;
         let module_addr = Address::from_str(&module_address)
-            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", module_address)))?;
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {module_address:?}")))?;
 
         // read private key
         let signer_private_key = private_key.read_default()?;
@@ -742,7 +741,7 @@ impl SafeModuleSubcommands {
                     .split(',')
                     .map(|addr| {
                         Address::from_str(addr)
-                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             );
@@ -751,16 +750,16 @@ impl SafeModuleSubcommands {
         node_eth_addresses.extend(
             local_identity
                 .to_addresses()
-                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
                 .map(Address::from),
         );
 
         // parse safe and module addresses
         let safe_addr = Address::from_str(&safe_address)
-            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", safe_address)))?;
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {safe_address:?}")))?;
         let module_addr = Address::from_str(&module_address)
-            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", module_address)))?;
+            .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {module_address:?}")))?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_without_signer().await?;

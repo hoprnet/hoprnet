@@ -1,3 +1,4 @@
+use hopr_protocol_session::errors::SessionError;
 use thiserror::Error;
 
 use crate::initiation::StartErrorReason;
@@ -37,6 +38,12 @@ pub enum TransportSessionError {
     #[error("session establishment protocol error: {0}")]
     StartProtocolError(String),
 
+    #[error("packet sending error: {0}")]
+    PacketSendingError(String),
+
+    #[error(transparent)]
+    SessionProtocolError(#[from] SessionError),
+
     #[error(transparent)]
     Manager(#[from] SessionManagerError),
 
@@ -45,6 +52,12 @@ pub enum TransportSessionError {
 
     #[error("session is closed")]
     Closed,
+}
+
+impl From<TransportSessionError> for std::io::Error {
+    fn from(error: TransportSessionError) -> Self {
+        std::io::Error::other(error)
+    }
 }
 
 #[derive(Error, Debug)]
@@ -57,6 +70,8 @@ pub enum SessionManagerError {
     NoChallengeSlots,
     #[error("session with the given id does not exist")]
     NonExistingSession,
+    #[error("number of sessions exceeds the maximum allowed")]
+    TooManySessions,
     #[error("loopback sessions are not allowed")]
     Loopback,
     #[error("non-specific session manager error: {0}")]

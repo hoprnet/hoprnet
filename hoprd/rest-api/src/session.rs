@@ -1,4 +1,11 @@
-use std::{collections::VecDeque, fmt::Formatter, future::Future, net::IpAddr, str::FromStr, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Formatter,
+    future::Future,
+    net::IpAddr,
+    str::FromStr,
+    sync::Arc,
+};
 
 use axum::{
     Error,
@@ -11,11 +18,14 @@ use axum::{
 };
 use axum_extra::extract::Query;
 use base64::Engine;
-use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
+use futures::{
+    AsyncReadExt, AsyncWriteExt, FutureExt, SinkExt, StreamExt, TryStreamExt,
+    future::{AbortHandle, AbortRegistration},
+};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, Hopr, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
-    SessionTarget, SurbBalancerConfig, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, SESSION_MTU, ServiceId, SessionCapabilities, SessionClientConfig, SessionTarget,
+    SurbBalancerConfig, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
@@ -128,7 +138,7 @@ pub struct StoredSessionEntry {
     pub forward_path: RoutingOptions,
     /// Return path used for the Session.
     pub return_path: RoutingOptions,
-    /// The join handle for the Session processing.
+    /// The abort handle for the Session processing.
     pub abort_handle: AbortHandle,
 }
 
@@ -469,12 +479,10 @@ impl SessionClientRequest {
                     }),
                 surb_management: match self.response_buffer {
                     // Buffer worth at least 2 reply packets
-                    Some(buffer_size) if buffer_size.as_u64() >= 2 * SESSION_PAYLOAD_SIZE as u64 => {
-                        Some(SurbBalancerConfig {
-                            target_surb_buffer_size: buffer_size.as_u64() / SESSION_PAYLOAD_SIZE as u64,
-                            ..Default::default()
-                        })
-                    }
+                    Some(buffer_size) if buffer_size.as_u64() >= 2 * SESSION_MTU as u64 => Some(SurbBalancerConfig {
+                        target_surb_buffer_size: buffer_size.as_u64() / SESSION_MTU as u64,
+                        ..Default::default()
+                    }),
                     // No SURBs are set up and maintained, useful for high-send low-reply sessions
                     Some(_) => None,
                     // Use defaults otherwise
@@ -699,6 +707,88 @@ async fn create_tcp_client_binding(
     )
     .await?;
 
+    // Create an abort handler for the listener
+    let (abort_handle, abort_reg) = AbortHandle::new_pair();
+    hopr_async_runtime::prelude::spawn(async move {
+        let active_sessions = Arc::new(std::sync::Mutex::new(HashMap::new()));
+        let active_sessions_clone = active_sessions.clone();
+
+        futures::stream::Abortable::new(tokio_stream::wrappers::TcpListenerStream::new(tcp_listener), abort_reg)
+            .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
+            .for_each(move |accepted_client| {
+                let data = data.clone();
+                let target = target.clone();
+                let hopr = hopr.clone();
+                let active_sessions = active_sessions_clone.clone();
+
+                // Try to pop from the pool only if a client was accepted
+                let maybe_pooled_session = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
+                async move {
+                    match accepted_client {
+                        Ok((sock_addr, stream)) => {
+                            debug!(?sock_addr, "incoming TCP connection");
+                            let session = match maybe_pooled_session {
+                                Some(s) => {
+                                    debug!(session_id = %s.id(), "using pooled session");
+                                    s
+                                }
+                                None => {
+                                    debug!("no more active sessions in the pool, creating a new one");
+                                    match hopr.connect_to(dst, target, data).await {
+                                        Ok(s) => s,
+                                        Err(error) => {
+                                            error!(%error, "failed to establish session");
+                                            return;
+                                        }
+                                    }
+                                }
+                            };
+
+                            let session_id = *session.id();
+                            debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
+
+                            let (abort_handle, abort_reg) = AbortHandle::new_pair();
+                            if let Ok(mut active_sessions) = active_sessions.lock() {
+                                active_sessions.insert(session_id, abort_handle);
+                            }
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
+
+                            hopr_async_runtime::prelude::spawn(
+                                // The stream either terminates naturally (by the client closing the TCP connection)
+                                // or is terminated via the abort handle.
+                                bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).map(
+                                    move |_| async move {
+                                        // Regardless how the session ended, remove the abort handle
+                                        // from the map
+                                        if let Ok(mut active_sessions) = active_sessions.lock() {
+                                            active_sessions.remove(&session_id);
+                                        }
+
+                                        debug!(%session_id, "tcp session has ended");
+
+                                        #[cfg(all(feature = "prometheus", not(test)))]
+                                        METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
+                                    },
+                                ),
+                            );
+                        }
+                        Err(error) => error!(%error, "failed to accept connection"),
+                    }
+                }
+            })
+            .await;
+
+        // Once the listener is done, abort all active sessions created by the listener
+        if let Ok(active_sessions) = active_sessions.lock() {
+            active_sessions.iter().for_each(|(session_id, handle)| {
+                debug!(%session_id, "aborting opened TCP session after listener has been closed");
+                handle.abort()
+            });
+        };
+    });
+
     state.open_listeners.write_arc().await.insert(
         ListenerId(hopr_network_types::types::IpProtocol::TCP, bound_host),
         StoredSessionEntry {
@@ -706,56 +796,7 @@ async fn create_tcp_client_binding(
             target: target_spec.clone(),
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
-            abort_handle: hopr_async_runtime::spawn_as_abortable!(
-                tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
-                    .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
-                    .for_each_concurrent(None, move |accepted_client| {
-                        let data = data.clone();
-                        let target = target.clone();
-                        let hopr = hopr.clone();
-
-                        // Try to pop from the pool only if a client was accepted
-                        let maybe_pooled_session = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
-                        async move {
-                            match accepted_client {
-                                Ok((sock_addr, stream)) => {
-                                    debug!(socket = ?sock_addr, "incoming TCP connection");
-                                    let session = match maybe_pooled_session {
-                                        Some(s) => {
-                                            debug!(session_id = %s.id(), "using pooled session");
-                                            s
-                                        }
-                                        None => {
-                                            debug!("no more active sessions in pool, creating a new one");
-                                            match hopr.connect_to(dst, target, data).await {
-                                                Ok(s) => s,
-                                                Err(error) => {
-                                                    error!(%error, "failed to establish session");
-                                                    return;
-                                                }
-                                            }
-                                        }
-                                    };
-
-                                    debug!(
-                                        socket = ?sock_addr,
-                                        session_id = tracing::field::debug(*session.id()),
-                                        "new session for incoming TCP connection",
-                                    );
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
-
-                                    bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await;
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
-                                }
-                                Err(e) => error!(error = %e, "failed to accept connection"),
-                            }
-                        }
-                    })
-            ),
+            abort_handle,
         },
     );
     Ok(bound_host)
@@ -800,6 +841,30 @@ async fn create_udp_client_binding(
     let open_listeners_clone = state.open_listeners.clone();
     let listener_id = ListenerId(hopr_network_types::types::IpProtocol::UDP, bound_host);
 
+    // Create an abort handle so that the Session can be terminated by aborting
+    // the UDP stream first. Because under the hood, the bind_session_to_stream uses
+    // `transfer_session` which in turn uses `copy_duplex_abortable`, aborting the
+    // `udp_socket` will:
+    //
+    // 1. Initiate graceful shutdown of `udp_socket`
+    // 2. Once done, initiate a graceful shutdown of `session`
+    // 3. Finally, return from the `bind_session_to_stream` which will terminate the spawned task
+    //
+    // This is needed because the `udp_socket` cannot terminate by itself.
+    let (abort_handle, abort_reg) = AbortHandle::new_pair();
+    hopr_async_runtime::prelude::spawn(async move {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
+
+        bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE, Some(abort_reg)).await;
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
+
+        // Once the Session closes, remove it from the list
+        open_listeners_clone.write_arc().await.remove(&listener_id);
+    });
+
     state.open_listeners.write_arc().await.insert(
         listener_id,
         StoredSessionEntry {
@@ -807,18 +872,7 @@ async fn create_udp_client_binding(
             target: target_spec.clone(),
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
-            abort_handle: hopr_async_runtime::spawn_as_abortable!(async move {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
-
-                bind_session_to_stream(session, udp_socket, HOPR_UDP_BUFFER_SIZE).await;
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
-
-                // Once the Session closes, remove it from the list
-                open_listeners_clone.write_arc().await.remove(&listener_id);
-            }),
+            abort_handle,
         },
     );
     Ok(bound_host)
@@ -898,7 +952,7 @@ pub(crate) async fn create_client(
                 destination: args.destination,
                 forward_path: args.forward_path.clone(),
                 return_path: args.return_path.clone(),
-                mtu: SESSION_PAYLOAD_SIZE,
+                mtu: SESSION_MTU,
             }),
         )
             .into_response(),
@@ -954,7 +1008,7 @@ pub(crate) async fn list_clients(
             forward_path: entry.forward_path.clone(),
             return_path: entry.return_path.clone(),
             destination: entry.destination,
-            mtu: SESSION_PAYLOAD_SIZE,
+            mtu: SESSION_MTU,
         })
         .collect::<Vec<_>>();
 
@@ -1152,12 +1206,16 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
     Ok((*udp_socket.bound_address(), udp_socket))
 }
 
-async fn bind_session_to_stream<T>(mut session: HoprSession, mut stream: T, max_buf: usize)
-where
+async fn bind_session_to_stream<T>(
+    mut session: HoprSession,
+    mut stream: T,
+    max_buf: usize,
+    abort_reg: Option<AbortRegistration>,
+) where
     T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
 {
     let session_id = *session.id();
-    match transfer_session(&mut session, &mut stream, max_buf).await {
+    match transfer_session(&mut session, &mut stream, max_buf, abort_reg).await {
         Ok((session_to_stream_bytes, stream_to_session_bytes)) => info!(
             session_id = ?session_id,
             session_to_stream_bytes, stream_to_session_bytes, "client session ended",
@@ -1173,47 +1231,37 @@ where
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use futures::channel::mpsc::UnboundedSender;
+    use futures::{
+        FutureExt, StreamExt,
+        channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    };
+    use futures_time::future::FutureExt as TimeFutureExt;
     use hopr_crypto_types::crypto_traits::Randomizable;
-    use hopr_lib::{ApplicationData, HoprPseudonym, SendMsg};
+    use hopr_lib::{ApplicationData, HoprPseudonym};
     use hopr_network_types::prelude::DestinationRouting;
-    use hopr_transport_session::errors::TransportSessionError;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
 
-    pub struct SendMsgResender {
-        tx: UnboundedSender<Box<[u8]>>,
-    }
+    fn loopback_transport() -> (
+        UnboundedSender<(DestinationRouting, ApplicationData)>,
+        UnboundedReceiver<Box<[u8]>>,
+    ) {
+        let (input_tx, input_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+        let (output_tx, output_rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+        tokio::task::spawn(
+            input_rx
+                .map(|(_, data)| Ok(data.plain_text))
+                .forward(output_tx)
+                .map(|e| tracing::debug!(?e, "loopback transport completed")),
+        );
 
-    impl SendMsgResender {
-        pub fn new(tx: UnboundedSender<Box<[u8]>>) -> Self {
-            Self { tx }
-        }
-    }
-
-    #[hopr_lib::async_trait]
-    impl SendMsg for SendMsgResender {
-        // Mimics the echo server by feeding the data back in instead of sending it over the wire
-        async fn send_message(
-            &self,
-            data: ApplicationData,
-            _: DestinationRouting,
-        ) -> std::result::Result<(), TransportSessionError> {
-            self.tx
-                .clone()
-                .unbounded_send(data.plain_text)
-                .map_err(|_| TransportSessionError::Closed)?;
-
-            Ok(())
-        }
+        (input_tx, output_rx)
     }
 
     #[tokio::test]
     async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received()
     -> anyhow::Result<()> {
-        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-
         let session_id = hopr_lib::HoprSessionId::new(4567u64, HoprPseudonym::random());
         let peer: hopr_lib::Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = hopr_lib::HoprSession::new(
@@ -1222,17 +1270,16 @@ mod tests {
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
-            SessionCapabilities::empty(),
-            Arc::new(SendMsgResender::new(tx)),
-            Box::pin(rx),
             None,
-        );
+            loopback_transport(),
+            None,
+        )?;
 
         let (bound_addr, tcp_listener) = tcp_listen_on(("127.0.0.1", 0)).await.context("listen_on failed")?;
 
         tokio::task::spawn(async move {
             match tcp_listener.accept().await {
-                Ok((stream, _)) => bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await,
+                Ok((stream, _)) => bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, None).await,
                 Err(e) => error!("failed to accept connection: {e}"),
             }
         });
@@ -1255,11 +1302,9 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received()
     -> anyhow::Result<()> {
-        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-
         let session_id = hopr_lib::HoprSessionId::new(4567u64, HoprPseudonym::random());
         let peer: hopr_lib::Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = hopr_lib::HoprSession::new(
@@ -1268,18 +1313,19 @@ mod tests {
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
-            SessionCapabilities::empty(),
-            Arc::new(SendMsgResender::new(tx)),
-            Box::pin(rx),
             None,
-        );
+            loopback_transport(),
+            None,
+        )?;
 
         let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;
 
-        tokio::task::spawn(bind_session_to_stream(
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        let jh = tokio::task::spawn(bind_session_to_stream(
             session,
             udp_listener,
             ApplicationData::PAYLOAD_SIZE,
+            Some(abort_registration),
         ));
 
         let mut udp_stream = ConnectedUdpStream::builder()
@@ -1293,12 +1339,17 @@ mod tests {
 
         for d in data.clone().into_iter() {
             udp_stream.write_all(d).await.context("write failed")?;
+            // ConnectedUdpStream performs flush with each write
         }
 
         for d in data.iter() {
             let mut buf = vec![0; d.len()];
             udp_stream.read_exact(&mut buf).await.context("read failed")?;
         }
+
+        // Once aborted, the bind_session_to_stream task must terminate too
+        abort_handle.abort();
+        jh.timeout(futures_time::time::Duration::from_millis(200)).await??;
 
         Ok(())
     }
