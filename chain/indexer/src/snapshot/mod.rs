@@ -56,6 +56,118 @@ use tracing::{debug, error, info};
 
 use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator};
 
+/// Trait for implementing the snapshot installation step.
+///
+/// This trait abstracts the final installation step of the snapshot workflow,
+/// allowing different implementations for production (database integration)
+/// and testing (filesystem copy) scenarios.
+#[async_trait::async_trait]
+trait SnapshotInstaller {
+    /// Installs the validated snapshot from the temporary directory.
+    ///
+    /// # Arguments
+    /// * `temp_dir` - Directory containing extracted and validated snapshot files
+    /// * `data_dir` - Target directory for installation
+    /// * `extracted_files` - List of files that were extracted from the archive
+    ///
+    /// # Returns
+    /// Result indicating success or failure of installation
+    async fn install_snapshot(
+        &self,
+        temp_dir: &Path,
+        data_dir: &Path,
+        extracted_files: &[String],
+    ) -> SnapshotResult<()>;
+}
+
+/// Shared snapshot workflow implementation.
+///
+/// Contains the common download → extract → validate → install workflow
+/// shared between SnapshotManager and TestSnapshotManager.
+struct SnapshotWorkflow {
+    downloader: SnapshotDownloader,
+    extractor: SnapshotExtractor,
+    validator: SnapshotValidator,
+}
+
+impl SnapshotWorkflow {
+    /// Creates a new snapshot workflow with default components.
+    fn new() -> Result<Self, SnapshotError> {
+        Ok(Self {
+            downloader: SnapshotDownloader::new()?,
+            extractor: SnapshotExtractor::new(),
+            validator: SnapshotValidator::new(),
+        })
+    }
+
+    /// Executes the complete snapshot workflow.
+    ///
+    /// Downloads, extracts, validates, and installs a snapshot using the provided installer.
+    async fn execute_workflow<I: SnapshotInstaller>(
+        &self,
+        installer: &I,
+        url: &str,
+        data_dir: &Path,
+        use_temp_subdir: bool,
+    ) -> SnapshotResult<SnapshotInfo> {
+        info!("Starting snapshot download and setup from: {}", url);
+
+        // Create temporary directory - either as subdirectory or using tempfile
+        let (temp_dir, _temp_guard) = if use_temp_subdir {
+            let temp_dir = data_dir.join("snapshot_temp");
+            fs::create_dir_all(&temp_dir)?;
+            (temp_dir, None)
+        } else {
+            let temp_guard = tempfile::tempdir_in(data_dir)?;
+            let temp_dir = temp_guard.path().to_path_buf();
+            (temp_dir, Some(temp_guard))
+        };
+
+        // Download snapshot
+        let archive_path = temp_dir.join("snapshot.tar.gz");
+        self.downloader.download_snapshot(url, &archive_path).await?;
+
+        // Extract snapshot
+        let extracted_files = self.extractor.extract_snapshot(&archive_path, &temp_dir).await?;
+        debug!("Extracted snapshot files: {:?}", extracted_files);
+
+        // Validate extracted database
+        let db_path = temp_dir.join("hopr_logs.db");
+        let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
+
+        // Install using the provided installer
+        installer
+            .install_snapshot(&temp_dir, data_dir, &extracted_files)
+            .await?;
+
+        // Cleanup temporary directory if we created it manually
+        if use_temp_subdir {
+            if let Err(e) = fs::remove_dir_all(&temp_dir) {
+                error!("Failed to cleanup temp directory: {}", e);
+            }
+        }
+        // tempfile cleanup is automatic via Drop
+
+        info!("Snapshot setup completed successfully");
+        Ok(snapshot_info)
+    }
+
+    /// Returns a reference to the downloader for component testing.
+    fn downloader(&self) -> &SnapshotDownloader {
+        &self.downloader
+    }
+
+    /// Returns a reference to the extractor for component testing.
+    fn extractor(&self) -> &SnapshotExtractor {
+        &self.extractor
+    }
+
+    /// Returns a reference to the validator for component testing.
+    fn validator(&self) -> &SnapshotValidator {
+        &self.validator
+    }
+}
+
 /// Coordinates snapshot download, extraction, validation, and database integration.
 ///
 /// The main interface for snapshot operations in production environments.
@@ -72,9 +184,7 @@ where
     Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
 {
     db: Db,
-    downloader: SnapshotDownloader,
-    extractor: SnapshotExtractor,
-    validator: SnapshotValidator,
+    workflow: SnapshotWorkflow,
 }
 
 impl<Db> SnapshotManager<Db>
@@ -100,9 +210,7 @@ where
     pub fn with_db(db: Db) -> Result<Self, SnapshotError> {
         Ok(Self {
             db,
-            downloader: SnapshotDownloader::new()?,
-            extractor: SnapshotExtractor::new(),
-            validator: SnapshotValidator::new(),
+            workflow: SnapshotWorkflow::new()?,
         })
     }
 
@@ -147,41 +255,29 @@ where
     /// # }
     /// ```
     pub async fn download_and_setup_snapshot(&self, url: &str, data_dir: &Path) -> SnapshotResult<SnapshotInfo> {
-        info!("Starting snapshot download and setup from: {}", url);
+        self.workflow.execute_workflow(self, url, data_dir, true).await
+    }
+}
 
-        // Create temporary directory for download
-        let temp_dir = data_dir.join("snapshot_temp");
-        fs::create_dir_all(&temp_dir)?;
-
-        // We'll clean up the temp directory at the end
-        let temp_dir_for_cleanup = temp_dir.clone();
-
-        // Download snapshot
-        let archive_path = temp_dir.join("snapshot.tar.gz");
-        self.downloader.download_snapshot(url, &archive_path).await?;
-
-        // Extract snapshot
-        let extracted_files = self.extractor.extract_snapshot(&archive_path, &temp_dir).await?;
-        debug!("Extracted snapshot files: {:?}", extracted_files);
-
-        // Validate extracted database
-        let db_path = temp_dir.join("hopr_logs.db");
-        let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
-
-        // Update database
+#[async_trait::async_trait]
+impl<Db> SnapshotInstaller for SnapshotManager<Db>
+where
+    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+{
+    async fn install_snapshot(
+        &self,
+        temp_dir: &Path,
+        _data_dir: &Path,
+        _extracted_files: &[String],
+    ) -> SnapshotResult<()> {
+        // Update database using the imported logs database
         self.db
             .clone()
-            .import_logs_db(temp_dir.clone())
+            .import_logs_db(temp_dir.to_path_buf())
             .await
             .map_err(|e| SnapshotError::Installation(e.to_string()))?;
 
-        // Clean up temporary directory
-        if let Err(e) = fs::remove_dir_all(&temp_dir_for_cleanup) {
-            error!("Failed to cleanup temp directory: {}", e);
-        }
-
-        info!("Snapshot setup completed successfully");
-        Ok(snapshot_info)
+        Ok(())
     }
 }
 
@@ -192,9 +288,7 @@ where
 /// Used in unit tests where database setup would add unnecessary complexity.
 #[cfg(test)]
 pub struct TestSnapshotManager {
-    downloader: SnapshotDownloader,
-    extractor: SnapshotExtractor,
-    validator: SnapshotValidator,
+    workflow: SnapshotWorkflow,
 }
 
 #[cfg(test)]
@@ -202,9 +296,7 @@ impl TestSnapshotManager {
     /// Creates a test snapshot manager without database dependencies.
     pub fn new() -> Result<Self, SnapshotError> {
         Ok(Self {
-            downloader: SnapshotDownloader::new()?,
-            extractor: SnapshotExtractor::new(),
-            validator: SnapshotValidator::new(),
+            workflow: SnapshotWorkflow::new()?,
         })
     }
 
@@ -222,38 +314,23 @@ impl TestSnapshotManager {
     ///
     /// [`SnapshotInfo`] containing validation results
     pub async fn download_and_setup_snapshot(&self, url: &str, data_dir: &Path) -> SnapshotResult<SnapshotInfo> {
-        info!("Starting test snapshot download and setup from: {}", url);
-
-        let temp_dir = tempfile::tempdir_in(data_dir)?;
-        let temp_path = temp_dir.path();
-
-        // Download snapshot
-        let archive_path = temp_path.join("snapshot.tar.gz");
-        self.downloader.download_snapshot(url, &archive_path).await?;
-
-        // Extract snapshot
-        let extracted_files = self.extractor.extract_snapshot(&archive_path, &temp_path).await?;
-        debug!("Extracted snapshot files: {:?}", extracted_files);
-
-        // Validate extracted database
-        let db_path = temp_path.join("hopr_logs.db");
-        let snapshot_info = self.validator.validate_snapshot(&db_path).await?;
-
-        // Install files directly to data directory (test mode)
-        self.install_snapshot_files(&temp_path, data_dir, &extracted_files)
-            .await?;
-
-        info!("Test snapshot setup completed successfully");
-        Ok(snapshot_info)
+        self.workflow.execute_workflow(self, url, data_dir, false).await
     }
+}
 
-    /// Installs snapshot files from temporary directory to final location.
-    ///
-    /// Copies extracted files to the target directory, replacing existing files.
-    async fn install_snapshot_files(&self, temp_dir: &Path, data_dir: &Path, files: &[String]) -> SnapshotResult<()> {
+#[cfg(test)]
+#[async_trait::async_trait]
+impl SnapshotInstaller for TestSnapshotManager {
+    async fn install_snapshot(
+        &self,
+        temp_dir: &Path,
+        data_dir: &Path,
+        extracted_files: &[String],
+    ) -> SnapshotResult<()> {
+        // Install files directly to data directory (test mode)
         fs::create_dir_all(data_dir)?;
 
-        for file in files {
+        for file in extracted_files {
             let src = temp_dir.join(file);
             let dst = data_dir.join(file);
 
@@ -268,20 +345,5 @@ impl TestSnapshotManager {
         }
 
         Ok(())
-    }
-
-    /// Returns a reference to the downloader for component testing.
-    pub fn downloader(&self) -> &SnapshotDownloader {
-        &self.downloader
-    }
-
-    /// Returns a reference to the extractor for component testing.
-    pub fn extractor(&self) -> &SnapshotExtractor {
-        &self.extractor
-    }
-
-    /// Returns a reference to the validator for component testing.
-    pub fn validator(&self) -> &SnapshotValidator {
-        &self.validator
     }
 }

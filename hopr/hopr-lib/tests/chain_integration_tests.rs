@@ -829,7 +829,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 #[test_log::test(tokio::test)]
 async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> {
     // Setup test environment
-    let temp_dir = env::temp_dir().join(format!("hopr_indexer_snapshot_test_{}", std::process::id()));
+    let id = hopr_crypto_random::random_integer(100_000, None);
+    let temp_dir = env::temp_dir().join(format!("hopr_indexer_snapshot_test_{}", id));
     let data_directory = temp_dir.join("hopr_data");
     fs::create_dir_all(&data_directory).await?;
 
@@ -902,7 +903,8 @@ async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> 
 #[test_log::test(tokio::test)]
 async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> {
     // Setup test environment
-    let temp_dir = env::temp_dir().join(format!("hopr_indexer_snapshot_test_{}", std::process::id()));
+    let id = hopr_crypto_random::random_integer(100_000, None);
+    let temp_dir = env::temp_dir().join(format!("hopr_indexer_snapshot_test_{}", id));
     let data_directory = temp_dir.join("hopr_data");
     fs::create_dir_all(&data_directory).await?;
 
