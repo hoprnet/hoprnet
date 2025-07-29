@@ -151,21 +151,6 @@ impl SnapshotWorkflow {
         info!("Snapshot setup completed successfully");
         Ok(snapshot_info)
     }
-
-    /// Returns a reference to the downloader for component testing.
-    fn downloader(&self) -> &SnapshotDownloader {
-        &self.downloader
-    }
-
-    /// Returns a reference to the extractor for component testing.
-    fn extractor(&self) -> &SnapshotExtractor {
-        &self.extractor
-    }
-
-    /// Returns a reference to the validator for component testing.
-    fn validator(&self) -> &SnapshotValidator {
-        &self.validator
-    }
 }
 
 /// Coordinates snapshot download, extraction, validation, and database integration.

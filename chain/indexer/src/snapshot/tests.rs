@@ -311,7 +311,7 @@ mod tests {
         assert!(data_dir.join("hopr_logs.db").exists());
 
         // Also test individual component access
-        let downloader = manager.downloader();
+        let downloader = manager.workflow.downloader;
         let downloaded_archive = data_dir.join("test_download.tar.gz");
         let download_result = downloader.download_snapshot(&file_url, &downloaded_archive).await;
         assert!(download_result.is_ok(), "file:// URL download should succeed");

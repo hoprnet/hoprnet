@@ -268,7 +268,7 @@ impl SnapshotDownloader {
                     // Send chunk to sink
                     sink.send(chunk)
                         .await
-                        .map_err(|e| SnapshotError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+                        .map_err(|e| SnapshotError::Io(std::io::Error::other(e)))?;
 
                     Ok(sink)
                 }
