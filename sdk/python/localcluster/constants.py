@@ -4,7 +4,7 @@ from pathlib import Path
 from sdk.python.api.balance import Balance
 
 logging.basicConfig(format="%(asctime)s %(message)s")
-logging.getLogger().setLevel(logging.DEBUG)
+logging.getLogger().setLevel(logging.INFO)
 
 OPEN_CHANNEL_FUNDING_VALUE_HOPR = Balance("1000 wxHOPR")
 TICKET_PRICE_PER_HOP = Balance("100 wxHOPR")
