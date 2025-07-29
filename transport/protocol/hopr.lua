@@ -206,6 +206,10 @@ local function dissect_hopr_session(buffer, pinfo, tree)
         local seg_flags = seg_tree:add("Sequence flags")
         seg_flags:add(session_fields.seg_terminating, buffer(offset+5,1))
         seg_flags:add(session_fields.seg_seq_len, buffer(offset+5,1))
+        if bit.band(buffer(offset+5,1):uint(), 0x80) ~= 0 then
+            pinfo.cols.info:append(" [F]")
+        end
+
         local data_len = msg_len - 6
         if data_len > 0 then
             local data_buf = buffer(offset+6, data_len)
@@ -223,6 +227,8 @@ local function dissect_hopr_session(buffer, pinfo, tree)
                     seg_tree:add(session_fields.seg_data, data_buf)
                 end
             end
+        else
+            seg_tree:add("No data")
         end
     elseif msg_type == 0x01 then
         -- SegmentRequest[]

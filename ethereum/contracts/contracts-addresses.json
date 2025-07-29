@@ -2,32 +2,32 @@
   "networks": {
     "anvil-localhost": {
       "addresses": {
-        "announcements": "0x9E545E3C0baAB3E08CdfD552C960A1050f373042",
+        "announcements": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
         "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
         "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-        "network_registry": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
+        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
         "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
         "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
         "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-        "ticket_price_oracle": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+        "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
         "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-        "winning_probability_oracle": "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB"
+        "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
       },
       "environment_type": "local",
       "indexer_start_block_number": 5
     },
     "anvil-localhost2": {
       "addresses": {
-        "announcements": "0x9E545E3C0baAB3E08CdfD552C960A1050f373042",
+        "announcements": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
         "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
         "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-        "network_registry": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
+        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
         "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
         "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
         "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-        "ticket_price_oracle": "0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690",
+        "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
         "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-        "winning_probability_oracle": "0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB"
+        "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
       },
       "environment_type": "local",
       "indexer_start_block_number": 5

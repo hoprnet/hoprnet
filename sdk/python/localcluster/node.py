@@ -213,10 +213,6 @@ class Node:
                     "hopr_protocol_session=debug",
                     "hopr_network_types=debug",
                     "isahc=error",
-                    "libp2p_swarm=info",
-                    "libp2p_tcp=info",
-                    "libp2p_dns=info",
-                    "multistream_select=info",
                     "sea_orm=warn",
                     "sqlx=warn",
                 ]
