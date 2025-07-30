@@ -7,15 +7,15 @@
 //!
 //! - **HTTP/HTTPS Downloads**: Secure download with retry logic and progress tracking
 //! - **Local File Support**: Direct installation from local `file://` URLs
-//! - **Archive Extraction**: Safe tar.gz extraction with path traversal protection
+//! - **Archive Extraction**: Safe tar.xz extraction with path traversal protection
 //! - **Database Validation**: SQLite integrity checks and content verification
 //! - **Disk Space Management**: Cross-platform space validation before operations
 //! - **Comprehensive Errors**: Actionable error messages with recovery suggestions
 //!
 //! # URL Support
 //!
-//! - `https://example.com/snapshot.tar.gz` - Remote HTTP/HTTPS downloads
-//! - `file:///path/to/snapshot.tar.gz` - Local file system access
+//! - `https://example.com/snapshot.tar.xz` - Remote HTTP/HTTPS downloads
+//! - `file:///path/to/snapshot.tar.xz` - Local file system access
 //!
 //! # Example
 //!
@@ -27,7 +27,7 @@
 //! let manager = SnapshotManager::with_db(db)?;
 //! let info = manager
 //!     .download_and_setup_snapshot(
-//!         "https://snapshots.hoprnet.org/logs.tar.gz",
+//!         "https://snapshots.hoprnet.org/logs.tar.xz",
 //!         Path::new("/data/hopr")
 //!     )
 //!     .await?;
@@ -124,7 +124,7 @@ impl SnapshotWorkflow {
         };
 
         // Download snapshot
-        let archive_path = temp_dir.join("snapshot.tar.gz");
+        let archive_path = temp_dir.join("snapshot.tar.xz");
         self.downloader.download_snapshot(url, &archive_path).await?;
 
         // Extract snapshot
@@ -161,7 +161,7 @@ impl SnapshotWorkflow {
 /// # Architecture
 ///
 /// - [`SnapshotDownloader`] - HTTP/HTTPS and file:// URL handling with retry logic
-/// - [`SnapshotExtractor`] - Secure tar.gz extraction with path validation
+/// - [`SnapshotExtractor`] - Secure tar.xz extraction with path validation
 /// - [`SnapshotValidator`] - SQLite integrity and content verification
 /// - Database integration via [`HoprDbGeneralModelOperations::import_logs_db`]
 pub struct SnapshotManager<Db>
@@ -203,7 +203,7 @@ where
     ///
     /// Performs the complete snapshot setup workflow:
     /// 1. Downloads archive from URL (HTTP/HTTPS/file://)
-    /// 2. Extracts tar.gz archive safely
+    /// 2. Extracts tar.xz archive safely
     /// 3. Validates database integrity
     /// 4. Installs via [`HoprDbGeneralModelOperations::import_logs_db`]
     /// 5. Cleans up temporary files
@@ -229,12 +229,12 @@ where
     /// # async fn example(manager: SnapshotManager<impl hopr_db_sql::HoprDbGeneralModelOperations + Clone + Send + Sync + 'static>) -> Result<(), Box<dyn std::error::Error>> {
     /// // Download from HTTPS
     /// let info = manager
-    ///     .download_and_setup_snapshot("https://snapshots.hoprnet.org/logs.tar.gz", Path::new("/data"))
+    ///     .download_and_setup_snapshot("https://snapshots.hoprnet.org/logs.tar.xz", Path::new("/data"))
     ///     .await?;
     ///
     /// // Use local file
     /// let info = manager
-    ///     .download_and_setup_snapshot("file:///backups/snapshot.tar.gz", Path::new("/data"))
+    ///     .download_and_setup_snapshot("file:///backups/snapshot.tar.xz", Path::new("/data"))
     ///     .await?;
     /// # Ok(())
     /// # }
@@ -261,73 +261,6 @@ where
             .import_logs_db(temp_dir.to_path_buf())
             .await
             .map_err(|e| SnapshotError::Installation(e.to_string()))?;
-
-        Ok(())
-    }
-}
-
-/// Test-only snapshot manager without database dependencies.
-///
-/// Provides the same snapshot workflow as [`SnapshotManager`] but installs
-/// files directly to the filesystem instead of integrating with a database.
-/// Used in unit tests where database setup would add unnecessary complexity.
-#[cfg(test)]
-pub struct TestSnapshotManager {
-    workflow: SnapshotWorkflow,
-}
-
-#[cfg(test)]
-impl TestSnapshotManager {
-    /// Creates a test snapshot manager without database dependencies.
-    pub fn new() -> Result<Self, SnapshotError> {
-        Ok(Self {
-            workflow: SnapshotWorkflow::new()?,
-        })
-    }
-
-    /// Downloads, extracts, validates, and installs a snapshot (test mode).
-    ///
-    /// Performs the same workflow as [`SnapshotManager::download_and_setup_snapshot`]
-    /// but installs files directly to the filesystem instead of database integration.
-    ///
-    /// # Arguments
-    ///
-    /// * `url` - Snapshot URL (`https://`, `http://`, or `file://` scheme)
-    /// * `data_dir` - Target directory for extracted files
-    ///
-    /// # Returns
-    ///
-    /// [`SnapshotInfo`] containing validation results
-    pub async fn download_and_setup_snapshot(&self, url: &str, data_dir: &Path) -> SnapshotResult<SnapshotInfo> {
-        self.workflow.execute_workflow(self, url, data_dir, false).await
-    }
-}
-
-#[cfg(test)]
-#[async_trait::async_trait]
-impl SnapshotInstaller for TestSnapshotManager {
-    async fn install_snapshot(
-        &self,
-        temp_dir: &Path,
-        data_dir: &Path,
-        extracted_files: &[String],
-    ) -> SnapshotResult<()> {
-        // Install files directly to data directory (test mode)
-        fs::create_dir_all(data_dir)?;
-
-        for file in extracted_files {
-            let src = temp_dir.join(file);
-            let dst = data_dir.join(file);
-
-            // Remove existing file if it exists
-            if dst.exists() {
-                fs::remove_file(&dst)?;
-            }
-
-            // Copy file to final location
-            fs::copy(&src, &dst)?;
-            debug!("Installed snapshot file: {} -> {}", file, dst.display());
-        }
 
         Ok(())
     }

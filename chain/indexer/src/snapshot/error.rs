@@ -45,7 +45,7 @@ pub enum SnapshotError {
 
     #[error(
         "Invalid snapshot format: {0}. Suggestion: The snapshot file format is not supported. Ensure you're using a \
-         valid tar.gz snapshot file."
+         valid tar.xz snapshot file."
     )]
     InvalidFormat(String),
 

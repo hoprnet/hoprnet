@@ -1,4 +1,4 @@
-//! Secure tar.gz archive extraction with path traversal protection.
+//! Secure tar.xz archive extraction with path traversal protection.
 //!
 //! Provides safe extraction of snapshot archives with security validations
 //! to prevent malicious archives from escaping the target directory.
@@ -9,14 +9,17 @@ use std::{
     path::{Component::ParentDir, Path},
 };
 
-use flate2::read::GzDecoder;
-use hopr_async_runtime::prelude::spawn_blocking;
-use tar::Archive;
+use async_compression::futures::bufread::XzDecoder;
+use async_tar::Archive;
+use futures_util::{
+    StreamExt,
+    io::{AllowStdIo, BufReader as FuturesBufReader},
+};
 use tracing::{debug, error, info};
 
 use crate::snapshot::error::{SnapshotError, SnapshotResult};
 
-/// Extracts tar.gz snapshot archives with security validations.
+/// Extracts tar.xz snapshot archives with security validations.
 ///
 /// Provides safe extraction by validating file paths to prevent directory
 /// traversal attacks and ensuring only expected database files are extracted.
@@ -42,14 +45,14 @@ impl SnapshotExtractor {
         }
     }
 
-    /// Extracts a tar.gz snapshot archive safely to the target directory.
+    /// Extracts a tar.xz snapshot archive safely to the target directory.
     ///
     /// Validates each file path to prevent directory traversal attacks and
     /// only extracts expected database files.
     ///
     /// # Arguments
     ///
-    /// * `archive_path` - Path to the tar.gz archive file
+    /// * `archive_path` - Path to the tar.xz archive file
     /// * `target_dir` - Directory where files will be extracted
     ///
     /// # Returns
@@ -67,40 +70,34 @@ impl SnapshotExtractor {
     /// This method validates all file paths to prevent extraction outside
     /// the target directory (path traversal attacks).
     pub async fn extract_snapshot(&self, archive_path: &Path, target_dir: &Path) -> SnapshotResult<Vec<String>> {
-        info!("Extracting snapshot from {:?} to {:?}", archive_path, target_dir);
+        info!(from = %archive_path.display(), to = %target_dir.display(), "Extracting snapshot");
 
         // Create target directory if it doesn't exist
         fs::create_dir_all(target_dir)?;
 
-        let archive_path = archive_path.to_path_buf();
-        let target_dir = target_dir.to_path_buf();
-        let expected_files = self.expected_files.clone();
+        let extracted_files = self.extract_tar_xz(archive_path, target_dir).await?;
 
-        // Run in blocking task to avoid blocking async runtime
-        let extracted_files =
-            spawn_blocking(move || Self::extract_tar_gz(&archive_path, &target_dir, &expected_files)).await??;
-
-        info!("Extracted {} snapshot files", extracted_files.len());
+        info!(nr_of_files = extracted_files.len(), "Extracted snapshot files");
         Ok(extracted_files)
     }
 
-    /// Extracts a tar.gz archive
-    fn extract_tar_gz(
-        archive_path: &Path,
-        target_dir: &Path,
-        expected_files: &[String],
-    ) -> SnapshotResult<Vec<String>> {
-        let file = File::open(archive_path)?;
-        let decoder = GzDecoder::new(file);
-        let mut archive = Archive::new(decoder);
+    /// Extracts a tar.xz archive using async operations
+    async fn extract_tar_xz(&self, archive_path: &Path, target_dir: &Path) -> SnapshotResult<Vec<String>> {
+        // Open file using AllowStdIo to make std::fs::File work with futures-io
+        let file = File::open(archive_path).map_err(SnapshotError::Io)?;
+        let file_reader = AllowStdIo::new(file);
+
+        // Create XZ decoder with parallel decompression using futures-io
+        let buf_reader = FuturesBufReader::new(file_reader);
+        let decoder = XzDecoder::new(buf_reader);
+        let archive = Archive::new(decoder);
 
         let mut extracted_files = Vec::new();
+        let mut entries = archive.entries().map_err(SnapshotError::Io)?;
 
-        // Using a for loop because entries uses references which would be hard to iterated over
-        // otherwise.
-        for entry in archive.entries()? {
-            let mut entry = entry?;
-            let path_buf = entry.path()?.to_path_buf();
+        while let Some(entry_result) = entries.next().await {
+            let mut entry = entry_result.map_err(SnapshotError::Io)?;
+            let path_buf = entry.path().map_err(SnapshotError::Io)?.to_path_buf();
 
             // Security check: prevent directory traversal
             if path_buf.components().any(|c| c == ParentDir) {
@@ -116,16 +113,14 @@ impl SnapshotExtractor {
                 .ok_or_else(|| SnapshotError::InvalidFormat("Invalid filename".to_string()))?;
 
             // Check if this is a file we expect
-            if expected_files.iter().any(|f| f == filename) {
-                let target_path = target_dir.join(filename);
-
+            if self.expected_files.iter().any(|f| f == filename) {
                 // Extract the file
-                entry.unpack(&target_path)?;
+                entry.unpack_in(target_dir).await.map_err(SnapshotError::Io)?;
                 extracted_files.push(filename.to_string());
 
-                debug!("Extracted: {}", filename);
+                debug!(%filename, "Extracted file");
             } else {
-                error!("Skipping unexpected file in archive: {}", filename);
+                error!(%filename, "Skipping unexpected file in archive");
             }
         }
 
@@ -141,25 +136,26 @@ impl SnapshotExtractor {
 
     /// Validates that the archive contains expected files without extracting
     pub async fn validate_archive(&self, archive_path: &Path) -> SnapshotResult<Vec<String>> {
-        let archive_path = archive_path.to_path_buf();
-
-        // Run in blocking task to avoid blocking async runtime
-        spawn_blocking(move || Self::list_archive_contents(&archive_path)).await?
+        self.list_archive_contents(archive_path).await
     }
 
-    /// Lists the contents of a tar.gz archive
-    fn list_archive_contents(archive_path: &Path) -> SnapshotResult<Vec<String>> {
-        let file = File::open(archive_path)?;
-        let decoder = GzDecoder::new(file);
-        let mut archive = Archive::new(decoder);
+    /// Lists the contents of a tar.xz archive
+    async fn list_archive_contents(&self, archive_path: &Path) -> SnapshotResult<Vec<String>> {
+        // Open file using AllowStdIo to make std::fs::File work with futures-io
+        let file = File::open(archive_path).map_err(SnapshotError::Io)?;
+        let file_reader = AllowStdIo::new(file);
+
+        // Create XZ decoder using futures-io
+        let buf_reader = FuturesBufReader::new(file_reader);
+        let decoder = XzDecoder::new(buf_reader);
+        let archive = Archive::new(decoder);
 
         let mut files = Vec::new();
+        let mut entries = archive.entries().map_err(SnapshotError::Io)?;
 
-        // Using a for loop because entries uses references which would be hard to iterated over
-        // otherwise.
-        for entry in archive.entries()? {
-            let entry = entry?;
-            let path = entry.path()?;
+        while let Some(entry_result) = entries.next().await {
+            let entry = entry_result.map_err(SnapshotError::Io)?;
+            let path = entry.path().map_err(SnapshotError::Io)?;
 
             if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
                 files.push(filename.to_string());

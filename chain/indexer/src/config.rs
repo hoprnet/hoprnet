@@ -29,7 +29,7 @@ pub struct IndexerConfig {
     pub enable_logs_snapshot: bool,
 
     /// URL to download logs snapshot from.
-    /// This should point to a publicly accessible tar.gz file containing
+    /// This should point to a publicly accessible tar.xz file containing
     /// the SQLite logs database files.
     ///
     /// Default is None
@@ -77,7 +77,7 @@ impl IndexerConfig {
     ///
     /// Performs comprehensive validation of configuration parameters including:
     /// - URL format and protocol validation (HTTP/HTTPS/file:// supported)
-    /// - File extension validation (.tar.gz required)
+    /// - File extension validation (.tar.xz required)
     /// - Data directory path validation
     /// - Dependency validation (data directory required when snapshots enabled)
     ///
@@ -95,7 +95,7 @@ impl IndexerConfig {
     ///     100,
     ///     true,
     ///     true,
-    ///     Some("https://example.com/snapshot.tar.gz".to_string()),
+    ///     Some("https://example.com/snapshot.tar.xz".to_string()),
     ///     "/tmp/hopr_data".to_string(),
     /// );
     ///
@@ -118,10 +118,10 @@ impl IndexerConfig {
                     return Err("Logs snapshot URL must be a valid HTTP, HTTPS, or file:// URL".to_string());
                 }
 
-                // Check if URL ends with .tar.gz
-                if !url.ends_with(".tar.gz") {
+                // Check if URL ends with .tar.xz
+                if !url.ends_with(".tar.xz") {
                     return Err(format!(
-                        "Logs snapshot URL must point to a .tar.gz file. {url} is incorrect"
+                        "Logs snapshot URL must point to a .tar.xz file. {url} is incorrect"
                     ));
                 }
             }
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn test_full_valid_config() {
         let data_directory = "/tmp/hopr_test_data";
-        let logs_snapshot_url = format!("file:///tmp/snapshot.tar.gz");
+        let logs_snapshot_url = format!("file:///tmp/snapshot.tar.xz");
 
         let cfg = IndexerConfig::new(0, true, true, Some(logs_snapshot_url), data_directory.into());
 
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn test_invalid_url_config() {
         let data_directory = "/tmp/hopr_test_data";
-        let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.gz");
+        let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.xz");
 
         let cfg = IndexerConfig::new(0, true, true, Some(logs_snapshot_url), data_directory.into());
 
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_empty_dir_config() {
-        let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.gz");
+        let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.xz");
 
         let cfg = IndexerConfig::new(0, true, true, Some(logs_snapshot_url), "".to_string());
 

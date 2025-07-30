@@ -833,7 +833,7 @@ async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> 
     let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
 
     // Verify snapshot file exists
-    let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.gz");
+    let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.xz");
     if !snapshot_file_path.exists() {
         anyhow::bail!("Snapshot test file not found at: {}", snapshot_file_path.display());
     }
@@ -908,20 +908,20 @@ async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> 
     let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
 
     // Verify snapshot file exists
-    let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.gz");
+    let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.xz");
     if !snapshot_file_path.exists() {
         anyhow::bail!("Snapshot test file not found at: {}", snapshot_file_path.display());
     }
 
     let mut server = mockito::Server::new_async().await;
     let server_mock = server
-        .mock("GET", "/logs-snapshot.tar.gz")
+        .mock("GET", "/logs-snapshot.tar.xz")
         .with_status(200)
         .with_body_from_file(snapshot_file_path.to_string_lossy().to_string())
         .expect(1)
         .create();
 
-    let logs_snapshot_url = url::Url::parse(format!("{}/logs-snapshot.tar.gz", server.url()).as_str())?;
+    let logs_snapshot_url = url::Url::parse(format!("{}/logs-snapshot.tar.xz", server.url()).as_str())?;
 
     let indexer_cfg = IndexerConfig::new(
         0,

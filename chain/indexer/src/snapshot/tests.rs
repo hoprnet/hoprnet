@@ -1,21 +1,88 @@
 #[cfg(test)]
 mod tests {
-    use std::{fs, fs::File};
+    use std::{fs, io::Cursor, path::Path};
 
-    use flate2::{Compression, write::GzEncoder};
+    use async_compression::futures::bufread::XzEncoder;
+    use async_tar::Builder;
+    use futures_util::io::{AllowStdIo, AsyncReadExt, BufReader as FuturesBufReader};
     use sqlx::{
         Connection, Executor,
         sqlite::{SqliteConnectOptions, SqliteConnection},
     };
-    use tar::Builder;
     use tempfile::TempDir;
+    use tracing::debug;
 
     use crate::{
         IndexerConfig,
         snapshot::{
-            TestSnapshotManager, download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator,
+            SnapshotInfo, SnapshotInstaller, SnapshotWorkflow, download::SnapshotDownloader, error::SnapshotResult,
+            extract::SnapshotExtractor, validate::SnapshotValidator,
         },
     };
+
+    /// Test-only snapshot manager without database dependencies.
+    ///
+    /// Provides the same snapshot workflow as [`SnapshotManager`] but installs
+    /// files directly to the filesystem instead of integrating with a database.
+    /// Used in unit tests where database setup would add unnecessary complexity.
+    pub struct TestSnapshotManager {
+        workflow: SnapshotWorkflow,
+    }
+
+    impl TestSnapshotManager {
+        /// Creates a test snapshot manager without database dependencies.
+        pub fn new() -> SnapshotResult<Self> {
+            Ok(Self {
+                workflow: SnapshotWorkflow::new()?,
+            })
+        }
+
+        /// Downloads, extracts, validates, and installs a snapshot (test mode).
+        ///
+        /// Performs the same workflow as [`SnapshotManager::download_and_setup_snapshot`]
+        /// but installs files directly to the filesystem instead of database integration.
+        ///
+        /// # Arguments
+        ///
+        /// * `url` - Snapshot URL (`https://`, `http://`, or `file://` scheme)
+        /// * `data_dir` - Target directory for extracted files
+        ///
+        /// # Returns
+        ///
+        /// [`SnapshotInfo`] containing validation results
+        pub async fn download_and_setup_snapshot(&self, url: &str, data_dir: &Path) -> SnapshotResult<SnapshotInfo> {
+            self.workflow.execute_workflow(self, url, data_dir, false).await
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl SnapshotInstaller for TestSnapshotManager {
+        async fn install_snapshot(
+            &self,
+            temp_dir: &Path,
+            data_dir: &Path,
+            extracted_files: &[String],
+        ) -> SnapshotResult<()> {
+            // Install files directly to data directory (test mode)
+            fs::create_dir_all(data_dir)?;
+
+            for file in extracted_files {
+                let src = temp_dir.join(file);
+                let dst = data_dir.join(file);
+
+                // Remove existing file if it exists
+                if dst.exists() {
+                    fs::remove_file(&dst)?;
+                }
+
+                // Copy file to final location
+                fs::copy(&src, &dst)?;
+                debug!(from = %file, to = %dst.display(), "Installed snapshot file");
+            }
+
+            Ok(())
+        }
+    }
 
     /// Creates a test SQLite database for testing
     async fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -114,23 +181,32 @@ mod tests {
         Ok(())
     }
 
-    /// Creates a test tar.gz archive containing a SQLite database
+    /// Creates a test tar.xz archive containing a SQLite database
     async fn create_test_archive(temp_dir: &TempDir) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
         // Create the database
         let db_path = temp_dir.path().join("hopr_logs.db");
         create_test_sqlite_db(&db_path).await?;
 
-        // Create archive
-        let archive_path = temp_dir.path().join("test_snapshot.tar.gz");
-        let tar_gz = File::create(&archive_path)?;
-        let enc = GzEncoder::new(tar_gz, Compression::default());
-        let mut tar = Builder::new(enc);
+        // First create uncompressed tar in memory
+        let mut tar_data = Vec::new();
+        {
+            let mut tar = Builder::new(&mut tar_data);
+            tar.append_path_with_name(&db_path, "hopr_logs.db").await?;
+            tar.into_inner().await?;
+        }
 
-        // Add the database file to the archive
-        tar.append_path_with_name(&db_path, "hopr_logs.db")?;
+        // Now compress with xz using async_compression
+        let cursor = Cursor::new(tar_data);
+        let buf_reader = FuturesBufReader::new(AllowStdIo::new(cursor));
+        let mut encoder = XzEncoder::new(buf_reader);
 
-        // Finish the archive
-        tar.into_inner()?.finish()?;
+        // Read compressed data
+        let mut compressed_data = Vec::new();
+        encoder.read_to_end(&mut compressed_data).await?;
+
+        // Write to final archive file
+        let archive_path = temp_dir.path().join("test_snapshot.tar.xz");
+        fs::write(&archive_path, compressed_data)?;
 
         // Clean up the temporary database file to avoid test interference
         fs::remove_file(&db_path)?;
@@ -193,7 +269,7 @@ mod tests {
         let extractor = SnapshotExtractor::new();
 
         // Create invalid archive (just a text file)
-        let archive_path = temp_dir.path().join("invalid.tar.gz");
+        let archive_path = temp_dir.path().join("invalid.tar.xz");
         fs::write(&archive_path, "not a valid archive").unwrap();
 
         let extract_dir = temp_dir.path().join("extracted");
@@ -269,7 +345,7 @@ mod tests {
             0,
             true,
             true,
-            Some("https://example.com/snapshot.tar.gz".to_string()),
+            Some("https://example.com/snapshot.tar.xz".to_string()),
             "".to_string(),
         );
 
@@ -280,7 +356,7 @@ mod tests {
             0,
             true,
             true,
-            Some("https://example.com/snapshot.tar.gz".to_string()),
+            Some("https://example.com/snapshot.tar.xz".to_string()),
             "/tmp/test_data".to_string(),
         );
 
@@ -314,7 +390,7 @@ mod tests {
 
         // Also test individual component access
         let downloader = manager.workflow.downloader;
-        let downloaded_archive = data_dir.join("test_download.tar.gz");
+        let downloaded_archive = data_dir.join("test_download.tar.xz");
         let download_result = downloader.download_snapshot(&file_url, &downloaded_archive).await;
         assert!(download_result.is_ok(), "file:// URL download should succeed");
         assert!(downloaded_archive.exists(), "Downloaded archive should exist");
@@ -327,7 +403,7 @@ mod tests {
             100,
             true,
             true,
-            Some("https://example.com/snapshot.tar.gz".to_string()),
+            Some("https://example.com/snapshot.tar.xz".to_string()),
             "/tmp/hopr_data".to_string(),
         );
 
@@ -336,7 +412,7 @@ mod tests {
         assert_eq!(config.enable_logs_snapshot, true);
         assert_eq!(
             config.logs_snapshot_url,
-            Some("https://example.com/snapshot.tar.gz".to_string())
+            Some("https://example.com/snapshot.tar.xz".to_string())
         );
         assert_eq!(config.data_directory, "/tmp/hopr_data");
 
@@ -349,7 +425,7 @@ mod tests {
             100,
             true,
             true,
-            Some("ftp://example.com/snapshot.tar.gz".to_string()),
+            Some("ftp://example.com/snapshot.tar.xz".to_string()),
             "/tmp/hopr_data".to_string(),
         );
         assert!(invalid_url_config.validate().is_err());
@@ -360,7 +436,7 @@ mod tests {
             100,
             true,
             true,
-            Some("https://example.com/snapshot.tar.gz".to_string()),
+            Some("https://example.com/snapshot.tar.xz".to_string()),
             "".to_string(),
         );
         assert!(empty_dir_config.validate().is_err());

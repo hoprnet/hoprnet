@@ -35,6 +35,7 @@ pub struct SnapshotInfo {
 ///
 /// Performs comprehensive validation including database connectivity,
 /// schema verification, and data integrity checks.
+#[derive(Default)]
 pub struct SnapshotValidator {
     /// Required tables that must exist in valid snapshot databases
     expected_tables: Vec<String>,
@@ -209,11 +210,5 @@ impl SnapshotValidator {
         }
 
         Ok(())
-    }
-}
-
-impl Default for SnapshotValidator {
-    fn default() -> Self {
-        Self::new()
     }
 }

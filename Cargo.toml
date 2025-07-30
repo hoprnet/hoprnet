@@ -62,7 +62,7 @@ async-channel = "2.5.0"
 async-lock = "3.4.0"
 async-signal = "0.2.11"
 async-stream = "0.3.6"
-async_tar = "0.5.0"
+async-tar = "0.5.0"
 async-trait = "0.1.88"
 asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"

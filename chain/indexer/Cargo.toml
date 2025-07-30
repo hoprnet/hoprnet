@@ -35,8 +35,8 @@ async-compression = { workspace = true, features = [
   "xz-parallel",
   "futures-io",
 ] }
-async-tar = "0.4"
-tar = "0.4"
+async-lock = { workspace = true }
+async-tar = { workspace = true }
 async-trait = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
 flate2 = { workspace = true }

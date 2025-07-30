@@ -11,18 +11,19 @@ use std::{
     fs::File,
     path::Path,
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicU64, Ordering},
     },
     time::Duration,
 };
 
+use async_lock::Mutex;
 use backon::{FuturesTimerSleeper, Retryable};
 use futures_util::{AsyncWriteExt, TryStreamExt, io::AllowStdIo};
 use reqwest::Client;
 use smart_default::SmartDefault;
 use sysinfo::Disks;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info};
 
 use crate::{
     constants::{
@@ -162,15 +163,15 @@ impl SnapshotDownloader {
                         | SnapshotError::HttpStatus { status: 400..=499 },
                 )
             })
-            .notify(|err, _dur| {
-                warn!("Download attempt failed: {}", err);
+            .notify(|error, _dur| {
+                error!(%error, "Download attempt failed");
             })
             .await
     }
 
     /// Performs a single download attempt
     async fn download_snapshot_once(&self, url: &str, target_path: &Path) -> SnapshotResult<()> {
-        info!("Downloading snapshot from: {}", url);
+        info!(%url, "Downloading logs snapshot file");
 
         // Check available disk space
         let parent_dir = target_path
@@ -252,7 +253,7 @@ impl SnapshotDownloader {
 
                     // Write chunk to file using AsyncWriteExt
                     {
-                        let mut writer = file_writer.lock().unwrap();
+                        let mut writer = file_writer.lock().await;
                         writer.write_all(&chunk).await.map_err(SnapshotError::Io)?;
                         writer.flush().await.map_err(SnapshotError::Io)?;
                     }
@@ -262,8 +263,8 @@ impl SnapshotDownloader {
             })
             .await?;
 
-        let total_downloaded = downloaded.load(Ordering::Relaxed);
-        info!("Snapshot downloaded {} bytes to {:?}", total_downloaded, target_path);
+        let downloaded_bytes = downloaded.load(Ordering::Relaxed);
+        info!(%downloaded_bytes, to = %target_path.display(), "Logs snapshot file downloaded");
 
         Ok(())
     }
@@ -318,8 +319,8 @@ impl SnapshotDownloader {
         // Copy the file using futures-io instead of tokio::fs
         let copied_bytes = std::fs::copy(canonical_path.clone(), target_path)? as u64;
         info!(
-            "Copied local snapshot file {} bytes from {:?} to {:?}",
-            copied_bytes, canonical_path, target_path
+            %copied_bytes, from = %canonical_path.display(), to = %target_path.display(),
+            "Copied local snapshot file",
         );
 
         Ok(())
@@ -370,12 +371,6 @@ impl SnapshotDownloader {
         }
 
         Ok(())
-    }
-}
-
-impl Default for SnapshotDownloader {
-    fn default() -> Self {
-        Self::new().expect("Failed to create default SnapshotDownloader")
     }
 }
 
