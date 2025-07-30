@@ -45,8 +45,7 @@ futures-timer = { workspace = true }
 futures-util = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
-reqwest = { version = "0.12", features = ["json", "stream"] }
-scopeguard = { workspace = true }
+reqwest = { workspace = true, features = ["json", "stream"] }
 sqlx = { workspace = true }
 smart-default = { workspace = true }
 sysinfo = { workspace = true }

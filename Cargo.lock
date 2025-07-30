@@ -4482,7 +4482,6 @@ dependencies = [
  "multiaddr",
  "primitive-types 0.13.1",
  "reqwest",
- "scopeguard",
  "smart-default",
  "sqlx",
  "sysinfo",
