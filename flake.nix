@@ -336,7 +336,8 @@
             extraContents = [
               dockerHoprdEntrypoint
               package
-            ] ++ deps;
+            ]
+            ++ deps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
           };
