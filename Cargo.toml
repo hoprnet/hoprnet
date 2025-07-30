@@ -78,7 +78,7 @@ bytes = "1.10.1"
 cfg_eval = "0.1.2"
 cfg-if = "1.0.1"
 chrono = { version = "0.4.41", default-features = false }
-clap = { version = "4.5.41", features = ["derive", "env", "string"] }
+clap = { version = "4.5.42", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.7.0", features = ["async_tokio", "html_reports"] }
