@@ -171,3 +171,67 @@ impl Default for SnapshotExtractor {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    use crate::snapshot::test_utils::create_test_archive;
+
+    #[tokio::test]
+    async fn test_extraction() {
+        let temp_dir = TempDir::new().unwrap();
+        let extractor = SnapshotExtractor::new();
+
+        // Create test archive
+        let archive_path = create_test_archive(&temp_dir).await.unwrap();
+
+        // Extract the archive
+        let extract_dir = temp_dir.path().join("extracted");
+        let result = extractor.extract_snapshot(&archive_path, &extract_dir).await;
+
+        assert!(result.is_ok(), "Extraction should succeed");
+        let files = result.unwrap();
+        assert!(files.contains(&"hopr_logs.db".to_string()));
+        assert!(extract_dir.join("hopr_logs.db").exists());
+    }
+
+    #[tokio::test]
+    async fn test_archive_security_validation() {
+        let temp_dir = TempDir::new().unwrap();
+        let extractor = SnapshotExtractor::new();
+
+        // Test with valid archive
+        let archive_path = create_test_archive(&temp_dir).await.unwrap();
+
+        let extract_dir = temp_dir.path().join("extract");
+
+        // verify files before extraction
+        assert!(!extract_dir.parent().unwrap().join("hopr_logs.db").exists());
+
+        let result = extractor.extract_snapshot(&archive_path, &extract_dir).await;
+
+        assert!(result.is_ok());
+
+        // verify files after extraction
+        let extracted_files = result.unwrap();
+        assert!(extracted_files.contains(&"hopr_logs.db".to_string()));
+        assert!(!extract_dir.parent().unwrap().join("hopr_logs.db").exists());
+    }
+
+    #[tokio::test]
+    async fn test_invalid_archive() {
+        let temp_dir = TempDir::new().unwrap();
+        let extractor = SnapshotExtractor::new();
+
+        // Create invalid archive (just a text file)
+        let archive_path = temp_dir.path().join("invalid.tar.xz");
+        fs::write(&archive_path, "not a valid archive").unwrap();
+
+        let extract_dir = temp_dir.path().join("extracted");
+        let result = extractor.extract_snapshot(&archive_path, &extract_dir).await;
+
+        assert!(result.is_err(), "Extraction should fail for invalid archive");
+    }
+}

@@ -98,6 +98,24 @@
               (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
             ];
           };
+          testSrc = fs.toSource {
+            root = ./.;
+            fileset = fs.unions [
+              ./.cargo/config.toml
+              ./Cargo.lock
+              ./README.md
+              ./hopr/hopr-lib/data
+              ./hopr/hopr-lib/tests
+              ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.in.toml
+              ./ethereum/contracts/remappings.txt
+              ./hoprd/hoprd/example_cfg.yaml
+              (fs.fileFilter (file: file.hasExt "rs") ./.)
+              (fs.fileFilter (file: file.hasExt "toml") ./.)
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+            ];
+          };
 
           rust-builder-local = import ./nix/rust-builder.nix {
             inherit
@@ -204,7 +222,11 @@
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { runTests = true; }
+            hoprdBuildArgs
+            // {
+              src = testSrc;
+              runTests = true;
+            }
           );
 
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (

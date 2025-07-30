@@ -423,3 +423,41 @@ fn get_available_disk_space(dir: &Path) -> SnapshotResult<u64> {
         |disk| Ok(disk.available_space()),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn test_disk_space_validation() {
+        let temp_dir = TempDir::new().unwrap();
+        let downloader = SnapshotDownloader::new().expect("Failed to create SnapshotDownloader");
+
+        // Test with available disk space (this should pass)
+        let result = downloader.check_disk_space(temp_dir.path()).await;
+        assert!(result.is_ok());
+
+        // Test with invalid directory path
+        let invalid_path = temp_dir.path().join("nonexistent/nested/path");
+        let result = downloader.check_disk_space(&invalid_path).await;
+        // Should create the directory and succeed
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_error_messages() {
+        let temp_dir = TempDir::new().unwrap();
+        let downloader = SnapshotDownloader::new().expect("Failed to create SnapshotDownloader");
+
+        // Test invalid URL error
+        let result = downloader.download_snapshot("invalid://url", temp_dir.path()).await;
+        assert!(result.is_err());
+
+        // Test file not found error
+        let result = downloader
+            .download_snapshot("https://httpbin.org/status/404", temp_dir.path())
+            .await;
+        assert!(result.is_err());
+    }
+}

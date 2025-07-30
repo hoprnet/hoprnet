@@ -46,9 +46,6 @@ pub mod validate;
 pub use error::{SnapshotError, SnapshotResult};
 pub use validate::SnapshotInfo;
 
-#[cfg(test)]
-mod tests;
-
 use std::{fs, path::Path};
 
 use hopr_db_sql::HoprDbGeneralModelOperations;
@@ -263,5 +260,70 @@ where
             .map_err(|e| SnapshotError::Installation(e.to_string()))?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    use crate::snapshot::test_utils::TestSnapshotManager;
+
+    #[tokio::test]
+    async fn test_snapshot_manager_integration() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create test archive
+        let archive_path = create_test_archive(&temp_dir).await.unwrap();
+
+        // Use TestSnapshotManager for testing
+        let manager = TestSnapshotManager::new().expect("Failed to create TestSnapshotManager");
+        let data_dir = temp_dir.path().join("data");
+        fs::create_dir_all(&data_dir).unwrap();
+
+        // Test file:// URL using TestSnapshotManager
+        let file_url = format!("file://{}", archive_path.display());
+        let result = manager.download_and_setup_snapshot(&file_url, &data_dir).await;
+
+        assert!(result.is_ok(), "TestSnapshotManager should handle file:// URLs");
+        let info = result.unwrap();
+        assert_eq!(info.log_count, 2);
+
+        // Verify the database file was installed
+        assert!(data_dir.join("hopr_logs.db").exists());
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_manager_with_data_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let data_dir = temp_dir.path().join("hopr_data");
+        fs::create_dir_all(&data_dir).unwrap();
+
+        // Create a test archive
+        let archive_path = create_test_archive(&temp_dir).await.unwrap();
+
+        // Test file:// URL support using TestSnapshotManager
+        let manager = TestSnapshotManager::new().expect("Failed to create TestSnapshotManager");
+
+        // Test with file:// URL for local testing
+        let file_url = format!("file://{}", archive_path.display());
+
+        // Test the full workflow through TestSnapshotManager
+        let result = manager.download_and_setup_snapshot(&file_url, &data_dir).await;
+        assert!(result.is_ok(), "TestSnapshotManager should handle complete workflow");
+
+        let info = result.unwrap();
+        assert_eq!(info.log_count, 2);
+
+        // Verify the database file exists in the data directory
+        assert!(data_dir.join("hopr_logs.db").exists());
+
+        // Also test individual component access
+        let downloader = manager.workflow.downloader;
+        let downloaded_archive = data_dir.join("test_download.tar.xz");
+        let download_result = downloader.download_snapshot(&file_url, &downloaded_archive).await;
+        assert!(download_result.is_ok(), "file:// URL download should succeed");
+        assert!(downloaded_archive.exists(), "Downloaded archive should exist");
     }
 }

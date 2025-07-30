@@ -212,3 +212,58 @@ impl SnapshotValidator {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    use crate::snapshot::test_utils::create_test_sqlite_db;
+
+    #[tokio::test]
+    async fn test_validate_ok() {
+        let temp_dir = TempDir::new().unwrap();
+        let validator = SnapshotValidator::new();
+
+        // Create test database
+        let db_path = temp_dir.path().join("hopr_logs.db");
+        create_test_sqlite_db(&db_path).await.unwrap();
+
+        // Validate the database
+        let result = validator.validate_snapshot(&db_path).await;
+
+        assert!(result.is_ok(), "Validation should succeed");
+        let info = result.unwrap();
+        assert_eq!(info.log_count, 2);
+        assert_eq!(info.latest_block, Some(2));
+        assert_eq!(info.tables, 4);
+    }
+
+    #[tokio::test]
+    async fn test_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let validator = SnapshotValidator::new();
+
+        // Try to validate non-existent file
+        let db_path = temp_dir.path().join("nonexistent.db");
+        let result = validator.validate_snapshot(&db_path).await;
+
+        assert!(result.is_err(), "Validation should fail for missing file");
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_file_existence_check() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("hopr_logs.db");
+
+        // Create a test database
+        create_test_sqlite_db(&db_path).await.unwrap();
+
+        let validator = SnapshotValidator::new();
+        let result = validator.validate_snapshot(&db_path).await;
+
+        assert!(result.is_ok());
+        let info = result.unwrap();
+        assert_eq!(info.log_count, 2);
+    }
+}
