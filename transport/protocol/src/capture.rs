@@ -151,6 +151,8 @@ pub enum PacketBeforeTransit<'a> {
     OutgoingPacket {
         me: OffchainPublicKey,
         next_hop: OffchainPublicKey,
+        num_surbs: u8,
+        is_forwarded: bool,
         data: Cow<'a, [u8]>,
         ack_challenge: Cow<'a, [u8]>,
         ticket: Cow<'a, [u8]>,
@@ -179,6 +181,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 data,
                 ack_challenge,
                 ticket,
+                num_surbs,
+                is_forwarded,
             } => {
                 out.push(PacketType::Outgoing as u8);
                 out.extend_from_slice(me.as_ref());
@@ -190,6 +194,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(ack_challenge.as_ref());
                 out.push(ticket.len() as u8);
                 out.extend_from_slice(ticket.as_ref());
+                out.push(num_surbs);
+                out.push(if is_forwarded { 1 } else { 0 });
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
                 direction = PacketDirection::Outgoing;
@@ -307,8 +313,8 @@ mod tests {
         types::{HalfKey, Hash},
     };
     use hopr_internal_types::prelude::{Acknowledgement, TicketBuilder, WinningProbability};
-    use hopr_network_types::session::types::*;
     use hopr_primitive_types::{primitives::EthereumChallenge, traits::BytesEncodable};
+    use hopr_protocol_session::types::*;
     use hopr_transport_packet::prelude::ApplicationData;
     use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
 
@@ -368,7 +374,14 @@ mod tests {
         };
 
         let _ = pcap
-            .send(PacketBeforeTransit::IncomingPacket { me, packet: &packet }.into())
+            .send(
+                PacketBeforeTransit::IncomingPacket {
+                    me,
+                    packet: &packet,
+                    ticket: ticket.to_vec().into(),
+                }
+                .into(),
+            )
             .await;
 
         let msg = SessionMessage::<1000>::Segment(Segment {
@@ -493,6 +506,8 @@ mod tests {
             .to_vec()
             .into(),
             ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -509,6 +524,8 @@ mod tests {
             .to_vec()
             .into(),
             ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -525,6 +542,8 @@ mod tests {
             .to_vec()
             .into(),
             ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -534,11 +553,26 @@ mod tests {
             me,
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
-            data: ApplicationData::new(1u64, &hex!("0104babe02"))
+            data: ApplicationData::new(1u64, &hex!("0103babe02"))
                 .to_bytes()
                 .into_vec()
                 .into(),
             ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
+        };
+
+        let _ = pcap.send(packet.into()).await;
+
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
+            next_hop: *OffchainKeypair::random().public(),
+            ack_challenge: hk.as_ref().into(),
+            data: hex!("deadbeefcafebabe").to_vec().into(),
+            ticket: ticket.to_vec().into(),
+            num_surbs: 0,
+            is_forwarded: true,
         };
 
         let _ = pcap.send(packet.into()).await;
