@@ -422,6 +422,15 @@ impl ResolvedTransportRouting {
             return_paths: vec![],
         }
     }
+
+    /// Returns the number of return paths (SURBs) on the [`ResolvedTransportRouting::Forward`]
+    /// variant, or always 0 on the [`ResolvedTransportRouting::Return`] variant.
+    pub fn count_return_paths(&self) -> usize {
+        match self {
+            ResolvedTransportRouting::Forward { return_paths, .. } => return_paths.len(),
+            ResolvedTransportRouting::Return(..) => 0,
+        }
+    }
 }
 
 #[cfg(test)]

@@ -258,7 +258,8 @@ where
                     let msg_processor = msg_processor_write.clone();
 
                     #[cfg(feature = "capture")]
-                    let (mut capture_clone, data_clone) = (capture_clone.clone(), data.clone());
+                    let (mut capture_clone, data_clone, num_surbs) =
+                        (capture_clone.clone(), data.clone(), routing.count_return_paths() as u8);
 
                     async move {
                         match PacketWrapping::send(&msg_processor, data, routing).await {
@@ -275,6 +276,8 @@ where
                                     capture::PacketBeforeTransit::OutgoingPacket {
                                         me: me_pub,
                                         next_hop: v.next_hop,
+                                        num_surbs,
+                                        is_forwarded: false,
                                         data: data_clone.to_bytes().into_vec().into(),
                                         ack_challenge: v.ack_challenge.as_ref().into(),
                                         ticket: inspect_ticket_data_in_packet(&v.data).into(),
@@ -507,6 +510,8 @@ where
                             let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingPacket {
                                 me: me_pub,
                                 next_hop,
+                                num_surbs: 0,
+                                is_forwarded: true,
                                 data: data.as_ref().into(),
                                 ack_challenge: Default::default(),
                                 ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
