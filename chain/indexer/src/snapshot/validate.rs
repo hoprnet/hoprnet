@@ -35,7 +35,7 @@ pub struct SnapshotInfo {
 ///
 /// Performs comprehensive validation including database connectivity,
 /// schema verification, and data integrity checks.
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq)]
 pub struct SnapshotValidator {
     /// Required tables that must exist in valid snapshot databases
     expected_tables: Vec<String>,
@@ -84,12 +84,12 @@ impl SnapshotValidator {
     /// * [`SnapshotError::Validation`] - Database corruption or schema issues
     /// * [`SnapshotError::Io`] - File access errors
     pub async fn validate_snapshot(&self, db_path: &Path) -> SnapshotResult<SnapshotInfo> {
-        info!("Validating snapshot database at {:?}", db_path);
+        info!(db = %db_path.display(), "Validating logs snapshot database");
 
-        let info = Self::validate_sqlite_db(db_path, &self.expected_tables).await?;
+        let snapshot_info = Self::validate_sqlite_db(db_path, &self.expected_tables).await?;
+        info!(?snapshot_info, "Logs snapshot validation successful");
 
-        info!("Snapshot validation successful: {:?}", info);
-        Ok(info)
+        Ok(snapshot_info)
     }
 
     /// Validates the SQLite database

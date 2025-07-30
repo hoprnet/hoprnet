@@ -51,8 +51,6 @@ smart-default = { workspace = true }
 sysinfo = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["fs", "time"] }
-tokio-util = { workspace = true, features = ["io", "codec", "compat"] }
 tracing = { workspace = true }
 
 hopr-bindings = { workspace = true }

@@ -316,8 +316,8 @@ impl SnapshotDownloader {
             fs::create_dir_all(parent)?;
         }
 
-        // Copy the file using futures-io instead of tokio::fs
-        let copied_bytes = std::fs::copy(canonical_path.clone(), target_path)? as u64;
+        // Copy the file using futures-io
+        let copied_bytes = fs::copy(canonical_path.clone(), target_path)? as u64;
         info!(
             %copied_bytes, from = %canonical_path.display(), to = %target_path.display(),
             "Copied local snapshot file",

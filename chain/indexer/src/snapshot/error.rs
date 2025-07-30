@@ -23,30 +23,19 @@ use thiserror::Error;
 pub enum SnapshotError {
     /// Network-related errors during download operations.
     /// Includes connection failures, DNS issues, and request timeouts.
-    #[error(
-        "Network error: {0}. Suggestion: Check your internet connection and verify the snapshot URL is accessible."
-    )]
+    #[error("Network error: {0}.")]
     Network(#[from] reqwest::Error),
 
-    #[error("IO error: {0}. Suggestion: Ensure the target directory exists and has proper write permissions.")]
+    #[error("IO error: {0}.")]
     Io(#[from] std::io::Error),
 
-    #[error(
-        "Archive extraction error: {0}. Suggestion: The snapshot file may be corrupted. Try downloading it again or \
-         use a different snapshot URL."
-    )]
+    #[error("Archive extraction error: {0}.")]
     Archive(String),
 
-    #[error(
-        "SQLite validation error: {0}. Suggestion: The snapshot database may be corrupted or incompatible. Try using \
-         a different snapshot or disable snapshots with --noLogSnapshot."
-    )]
+    #[error("SQLite validation error: {0}.")]
     Validation(String),
 
-    #[error(
-        "Invalid snapshot format: {0}. Suggestion: The snapshot file format is not supported. Ensure you're using a \
-         valid tar.xz snapshot file."
-    )]
+    #[error("Invalid snapshot format: {0}.")]
     InvalidFormat(String),
 
     #[error("Insufficient disk space: required {required} MB, available {available} MB.")]
@@ -55,31 +44,16 @@ pub enum SnapshotError {
     #[error("Snapshot too large: {size} bytes exceeds maximum {max_size} bytes.")]
     TooLarge { size: u64, max_size: u64 },
 
-    #[error("Task join error: {0}. Suggestion: Internal error occurred. Check system resources and try again.")]
-    TaskJoin(#[from] tokio::task::JoinError),
-
-    #[error(
-        "HTTP response error: status {status}. Suggestion: Server returned error {status}. Check if the snapshot URL \
-         is correct and the server is accessible."
-    )]
+    #[error("HTTP response error: status {status}.")]
     HttpStatus { status: u16 },
 
-    #[error(
-        "Invalid data: {0}. Suggestion: The snapshot data is invalid or corrupted. Try downloading again or use a \
-         different snapshot source."
-    )]
+    #[error("Invalid data: {0}.")]
     InvalidData(String),
 
-    #[error(
-        "Configuration error: {0}. Suggestion: Check your configuration settings and ensure all required parameters \
-         are set correctly."
-    )]
+    #[error("Configuration error: {0}.")]
     Configuration(String),
 
-    #[error(
-        "Timeout error: {0}. Suggestion: The operation timed out. Check your network connection or increase timeout \
-         values."
-    )]
+    #[error("Timeout error: {0}.")]
     Timeout(String),
 
     #[error("Database installation error: {0}.")]
