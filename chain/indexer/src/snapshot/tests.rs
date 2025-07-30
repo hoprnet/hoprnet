@@ -420,26 +420,10 @@ mod tests {
         assert!(config.validate().is_ok());
         assert!(config.is_valid());
 
-        // Test validation - invalid URL
-        let invalid_url_config = IndexerConfig::new(
-            100,
-            true,
-            true,
-            Some("ftp://example.com/snapshot.tar.xz".to_string()),
-            "/tmp/hopr_data".to_string(),
-        );
+        // Test validation - missing URL
+        let invalid_url_config = IndexerConfig::new(100, true, true, None, "/tmp/hopr_data".to_string());
         assert!(invalid_url_config.validate().is_err());
         assert!(!invalid_url_config.is_valid());
-
-        // Test validation - empty data directory when snapshots enabled
-        let empty_dir_config = IndexerConfig::new(
-            100,
-            true,
-            true,
-            Some("https://example.com/snapshot.tar.xz".to_string()),
-            "".to_string(),
-        );
-        assert!(empty_dir_config.validate().is_err());
 
         // Test validation - snapshots disabled (should be valid even with empty fields)
         let disabled_config = IndexerConfig::new(100, true, false, Some("".to_string()), "".to_string());

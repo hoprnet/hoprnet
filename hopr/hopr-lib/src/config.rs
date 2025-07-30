@@ -22,6 +22,26 @@ fn validate_announced(v: &bool) -> Result<(), ValidationError> {
     }
 }
 
+fn validate_logs_snapshot_url(url: &&String) -> Result<(), ValidationError> {
+    if url.is_empty() {
+        return Err(ValidationError::new("Logs snapshot URL must not be empty"));
+    }
+
+    // Basic URL validation (allow file:// for testing)
+    if !url.starts_with("http://") && !url.starts_with("https://") && !url.starts_with("file://") {
+        return Err(ValidationError::new(
+            "Logs snapshot URL must be a valid HTTP, HTTPS, or file:// URL",
+        ));
+    }
+
+    // Check if URL ends with .tar.xz
+    if !url.ends_with(".tar.xz") {
+        return Err(ValidationError::new("Logs snapshot URL must point to a .tar.xz file"));
+    }
+
+    Ok(())
+}
+
 #[inline]
 fn default_network() -> String {
     "anvil-localhost".to_owned()
@@ -62,6 +82,7 @@ pub struct Chain {
     #[serde(default = "just_false")]
     #[default = false]
     pub enable_logs_snapshot: bool,
+    #[validate(custom(function = "validate_logs_snapshot_url"))]
     #[serde(default)]
     pub logs_snapshot_url: Option<String>,
 }

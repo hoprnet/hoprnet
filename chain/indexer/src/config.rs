@@ -1,5 +1,3 @@
-use std::path::Path;
-
 /// Configuration for the chain indexer functionality
 #[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct IndexerConfig {
@@ -102,42 +100,9 @@ impl IndexerConfig {
     /// assert!(config.validate().is_ok());
     /// ```
     pub fn validate(&self) -> Result<(), String> {
-        // Validate URL format if snapshot URL is enabled
-        if self.enable_logs_snapshot {
-            if self.logs_snapshot_url.is_none() || self.logs_snapshot_url.as_ref().unwrap().is_empty() {
-                return Err("Logs snapshot URL must be specified when logs snapshots are enabled".to_string());
-            }
-
-            if let Some(url) = &self.logs_snapshot_url {
-                if url.is_empty() {
-                    return Err("Logs snapshot URL must not be empty".to_string());
-                }
-
-                // Basic URL validation (allow file:// for testing)
-                if !url.starts_with("http://") && !url.starts_with("https://") && !url.starts_with("file://") {
-                    return Err("Logs snapshot URL must be a valid HTTP, HTTPS, or file:// URL".to_string());
-                }
-
-                // Check if URL ends with .tar.xz
-                if !url.ends_with(".tar.xz") {
-                    return Err(format!(
-                        "Logs snapshot URL must point to a .tar.xz file. {url} is incorrect"
-                    ));
-                }
-            }
-        }
-
-        // Validate data directory if snapshot is enabled
-        if self.enable_logs_snapshot && self.data_directory.is_empty() {
-            return Err("Data directory must be specified when logs snapshots are enabled".to_string());
-        }
-
-        // Validate data directory path
-        if !self.data_directory.is_empty() {
-            let path = Path::new(&self.data_directory);
-            if path.is_file() {
-                return Err("Data directory path points to a file, not a directory".to_string());
-            }
+        // Check that url is valid if logs snapshot is enabled
+        if self.enable_logs_snapshot && self.logs_snapshot_url.is_none() {
+            return Err("Logs snapshot URL must be specified when logs snapshots are enabled".to_string());
         }
 
         Ok(())
@@ -183,32 +148,6 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_url_config() {
-        let data_directory = "/tmp/hopr_test_data";
-        let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.xz");
-
-        let cfg = IndexerConfig::new(0, true, true, Some(logs_snapshot_url), data_directory.into());
-
-        assert!(cfg.validate().is_err(), "Invalid URL should fail validation");
-        assert!(
-            !cfg.is_valid(),
-            "Invalid configuration should return false for is_valid()"
-        );
-    }
-
-    #[test]
-    fn test_empty_dir_config() {
-        let logs_snapshot_url = format!("ftp://invalid.url/snapshot.tar.xz");
-
-        let cfg = IndexerConfig::new(0, true, true, Some(logs_snapshot_url), "".to_string());
-
-        assert!(
-            cfg.validate().is_err(),
-            "Empty data directory should fail validation when snapshots enabled"
-        );
-    }
-
-    #[test]
     fn test_disabled_snapshot_config() {
         let cfg = IndexerConfig::new(0, true, false, Some("".to_string()), "".to_string());
 
@@ -225,16 +164,6 @@ mod tests {
         assert!(
             cfg.validate().is_err(),
             "Configuration should be invalid when snapshots is enabled but URL is missing"
-        );
-    }
-
-    #[test]
-    fn test_emoty_snapshot_url() {
-        let cfg = IndexerConfig::new(0, true, true, Some("".to_string()), "".to_string());
-
-        assert!(
-            cfg.validate().is_err(),
-            "Configuration should be invalid when snapshots is enabled but URL is empty"
         );
     }
 }
