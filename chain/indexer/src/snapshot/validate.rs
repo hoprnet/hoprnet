@@ -215,9 +215,9 @@ impl SnapshotValidator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
 
+    use super::*;
     use crate::snapshot::test_utils::create_test_sqlite_db;
 
     #[tokio::test]

@@ -426,8 +426,9 @@ fn get_available_disk_space(dir: &Path) -> SnapshotResult<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_disk_space_validation() {

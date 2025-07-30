@@ -46,13 +46,12 @@ pub mod validate;
 pub(crate) mod test_utils;
 
 // Re-export commonly used types
-pub use error::{SnapshotError, SnapshotResult};
-pub use validate::SnapshotInfo;
-
 use std::{fs, path::Path};
 
+pub use error::{SnapshotError, SnapshotResult};
 use hopr_db_sql::HoprDbGeneralModelOperations;
 use tracing::{debug, error, info};
+pub use validate::SnapshotInfo;
 
 use crate::snapshot::{download::SnapshotDownloader, extract::SnapshotExtractor, validate::SnapshotValidator};
 
@@ -268,10 +267,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
 
-    use super::test_utils::*;
+    use super::{test_utils::*, *};
 
     #[tokio::test]
     async fn test_snapshot_manager_integration() {

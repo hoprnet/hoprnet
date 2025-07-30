@@ -10,11 +10,7 @@ use sqlx::{
 use tempfile::TempDir;
 use tracing::debug;
 
-use crate::{
-    snapshot::{
-        SnapshotInfo, SnapshotInstaller, SnapshotWorkflow, error::SnapshotResult,
-    },
-};
+use crate::snapshot::{SnapshotInfo, SnapshotInstaller, SnapshotWorkflow, error::SnapshotResult};
 
 /// Test-only snapshot manager without database dependencies.
 ///
@@ -134,8 +130,8 @@ pub async fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn
     let dummy_hash20 = vec![0u8; 20];
 
     sqlx::query(
-        "INSERT INTO log (transaction_index, log_index, block_number, block_hash, transaction_hash, address, \
-         topics, data, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO log (transaction_index, log_index, block_number, block_hash, transaction_hash, address, topics, \
+         data, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&block_1_bytes) // transaction_index
     .bind(&block_1_bytes) // log_index
@@ -150,8 +146,8 @@ pub async fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn
     .await?;
 
     sqlx::query(
-        "INSERT INTO log (transaction_index, log_index, block_number, block_hash, transaction_hash, address, \
-         topics, data, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO log (transaction_index, log_index, block_number, block_hash, transaction_hash, address, topics, \
+         data, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&block_2_bytes) // transaction_index
     .bind(&block_2_bytes) // log_index
@@ -178,9 +174,7 @@ pub async fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn
 }
 
 /// Creates a test tar.xz archive containing a SQLite database
-pub(crate) async fn create_test_archive(
-    temp_dir: &TempDir,
-) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+pub(crate) async fn create_test_archive(temp_dir: &TempDir) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     // Create the database
     let db_path = temp_dir.path().join("hopr_logs.db");
     create_test_sqlite_db(&db_path).await?;
@@ -211,4 +205,3 @@ pub(crate) async fn create_test_archive(
 
     Ok(archive_path)
 }
-
