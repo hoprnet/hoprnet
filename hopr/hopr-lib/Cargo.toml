@@ -47,7 +47,7 @@ async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
-backon = { workspace = true, default-features = false }
+backon = { workspace = true, features = ["futures-timer-sleep"] }
 const_format = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }

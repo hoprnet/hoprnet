@@ -1112,15 +1112,6 @@ impl Hopr {
             .with_delay(self.cfg.session.establish_retry_timeout)
             .with_jitter();
 
-        struct Sleeper;
-        impl backon::Sleeper for Sleeper {
-            type Sleep = futures_timer::Delay;
-
-            fn sleep(&self, dur: Duration) -> Self::Sleep {
-                futures_timer::Delay::new(dur)
-            }
-        }
-
         use backon::Retryable;
 
         Ok((|| {
@@ -1129,7 +1120,7 @@ impl Hopr {
             async { self.transport_api.new_session(destination, target, cfg).await }
         })
         .retry(backoff)
-        .sleep(Sleeper)
+        .sleep(backon::FuturesTimerSleeper)
         .await?)
     }
 
