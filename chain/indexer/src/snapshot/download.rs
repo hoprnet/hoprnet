@@ -8,18 +8,20 @@
 
 use std::{
     fs,
+    fs::File,
     path::Path,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     time::Duration,
 };
 
 use backon::{FuturesTimerSleeper, Retryable};
-use futures_util::{SinkExt, TryStreamExt};
+use futures_util::{AsyncWriteExt, TryStreamExt, io::AllowStdIo};
 use reqwest::Client;
 use smart_default::SmartDefault;
 use sysinfo::Disks;
-use tokio::fs::File;
-use tokio_util::codec::{BytesCodec, FramedWrite};
 use tracing::{debug, info, warn};
 
 use crate::{
@@ -206,27 +208,28 @@ impl SnapshotDownloader {
             fs::create_dir_all(parent)?;
         }
 
-        // Stream download to file
-        let file = File::create(target_path).await?;
-
         // Fail if content length is not available
         let total_size = response
             .content_length()
             .ok_or_else(SnapshotError::ContentLengthMissing)?;
 
-        // Convert file to a sink for streaming using FramedWrite with BytesCodec
-        let stream = response.bytes_stream();
-        let file_sink = FramedWrite::new(file, BytesCodec::new());
+        // Create file writer using futures-io
+        let file = File::create(target_path)?;
+        let file_writer = Arc::new(Mutex::new(AllowStdIo::new(file)));
 
         // Use AtomicU64 for thread-safe progress tracking
-        let downloaded = std::sync::Arc::new(AtomicU64::new(0));
-        let downloaded_clone = downloaded.clone();
+        let downloaded = Arc::new(AtomicU64::new(0));
 
+        let stream = response.bytes_stream();
+
+        // Process each chunk with progress tracking and size checking
         stream
             .map_err(SnapshotError::Network)
-            .try_fold(file_sink, move |mut sink, chunk| {
-                let downloaded = downloaded_clone.clone();
+            .try_for_each(|chunk| {
+                let downloaded = downloaded.clone();
+                let file_writer = file_writer.clone();
                 let max_size = self.config.max_size;
+
                 async move {
                     let new_total = downloaded.fetch_add(chunk.len() as u64, Ordering::Relaxed) + chunk.len() as u64;
 
@@ -247,12 +250,14 @@ impl SnapshotDownloader {
                         );
                     }
 
-                    // Send chunk to sink
-                    sink.send(chunk)
-                        .await
-                        .map_err(|e| SnapshotError::Io(std::io::Error::other(e)))?;
+                    // Write chunk to file using AsyncWriteExt
+                    {
+                        let mut writer = file_writer.lock().unwrap();
+                        writer.write_all(&chunk).await.map_err(SnapshotError::Io)?;
+                        writer.flush().await.map_err(SnapshotError::Io)?;
+                    }
 
-                    Ok(sink)
+                    Ok(())
                 }
             })
             .await?;
@@ -310,8 +315,8 @@ impl SnapshotDownloader {
             fs::create_dir_all(parent)?;
         }
 
-        // Copy the file
-        let copied_bytes = tokio::fs::copy(canonical_path.clone(), target_path).await?;
+        // Copy the file using futures-io instead of tokio::fs
+        let copied_bytes = std::fs::copy(canonical_path.clone(), target_path)? as u64;
         info!(
             "Copied local snapshot file {} bytes from {:?} to {:?}",
             copied_bytes, canonical_path, target_path
