@@ -42,6 +42,9 @@ pub mod error;
 pub mod extract;
 pub mod validate;
 
+#[cfg(test)]
+pub(crate) mod test_utils;
+
 // Re-export commonly used types
 pub use error::{SnapshotError, SnapshotResult};
 pub use validate::SnapshotInfo;
@@ -268,7 +271,7 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    use crate::snapshot::test_utils::TestSnapshotManager;
+    use super::test_utils::*;
 
     #[tokio::test]
     async fn test_snapshot_manager_integration() {
