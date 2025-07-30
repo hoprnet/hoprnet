@@ -57,16 +57,18 @@ alloy = { version = "=1.0.16", default-features = false, features = [
 anyhow = "1.0.98"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
+async-compression = "0.4.27"
 async-channel = "2.5.0"
 async-lock = "3.4.0"
 async-signal = "0.2.11"
 async-stream = "0.3.6"
+async_tar = "0.5.0"
 async-trait = "0.1.88"
 asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
 axum = { version = "0.8.4", features = ["ws", "http2"] }
 axum-extra = { version = "0.10.1", features = ["query"] }
-backon = { version = "1.5.1", default-features = false }
+backon = { git = "https://github.com/tolbrino/backon", branch = "tb/202507-expose-future-timer-sleep", default-features = false }
 base64 = "0.22.1"
 bigdecimal = "0.4.8"
 bimap = "0.6.3"
@@ -185,7 +187,6 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 strum = { version = "0.27.1", features = ["derive"] }
 subtle = "2.6.1"
 sysinfo = "0.30"
-tar = "0.4"
 tempfile = "3.20.0"
 test-log = { version = "0.2.18", features = ["trace"] }
 thiserror = "2.0.12"

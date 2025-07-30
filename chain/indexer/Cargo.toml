@@ -31,8 +31,14 @@ alloy = { workspace = true, default-features = false, features = [
   "node-bindings",
 ] }
 async-channel = { workspace = true }
+async-compression = { workspace = true, features = [
+  "xz-parallel",
+  "futures-io",
+] }
+async-tar = "0.4"
+tar = "0.4"
 async-trait = { workspace = true }
-backon = { workspace = true }
+backon = { workspace = true, features = ["futures-timer-sleep"] }
 flate2 = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
@@ -44,11 +50,10 @@ scopeguard = { workspace = true }
 sqlx = { workspace = true }
 smart-default = { workspace = true }
 sysinfo = { workspace = true }
-tar = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "time"] }
-tokio-util = { workspace = true, features = ["io", "codec"] }
+tokio-util = { workspace = true, features = ["io", "codec", "compat"] }
 tracing = { workspace = true }
 
 hopr-bindings = { workspace = true }

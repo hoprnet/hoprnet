@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-use backon::Retryable;
+use backon::{FuturesTimerSleeper, Retryable};
 use futures_util::{SinkExt, TryStreamExt};
 use reqwest::Client;
 use smart_default::SmartDefault;
@@ -71,14 +71,14 @@ pub struct DownloadConfig {
 /// // Download from HTTPS
 /// downloader
 ///     .download_snapshot(
-///         "https://snapshots.hoprnet.org/logs.tar.gz",
-///         Path::new("/tmp/snapshot.tar.gz"),
+///         "https://snapshots.hoprnet.org/logs.tar.xz",
+///         Path::new("/tmp/snapshot.tar.xz"),
 ///     )
 ///     .await?;
 ///
 /// // Copy from local file
 /// downloader
-///     .download_snapshot("file:///backups/snapshot.tar.gz", Path::new("/tmp/snapshot.tar.gz"))
+///     .download_snapshot("file:///backups/snapshot.tar.xz", Path::new("/tmp/snapshot.tar.xz"))
 ///     .await?;
 /// # Ok(())
 /// # }
@@ -149,18 +149,9 @@ impl SnapshotDownloader {
     ) -> SnapshotResult<()> {
         let backoff = backon::ExponentialBuilder::default().with_max_times(max_retries as usize);
 
-        struct Sleeper;
-        impl backon::Sleeper for Sleeper {
-            type Sleep = futures_timer::Delay;
-
-            fn sleep(&self, dur: Duration) -> Self::Sleep {
-                futures_timer::Delay::new(dur)
-            }
-        }
-
         (|| async { self.download_snapshot_once(url, target_path).await })
             .retry(backoff)
-            .sleep(Sleeper)
+            .sleep(FuturesTimerSleeper)
             .when(|err| {
                 !matches!(
                     err,
