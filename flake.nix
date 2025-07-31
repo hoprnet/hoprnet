@@ -336,7 +336,8 @@
             extraContents = [
               dockerHoprdEntrypoint
               package
-            ] ++ deps;
+            ]
+            ++ deps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
           };
@@ -753,43 +754,6 @@
             };
           };
 
-          sign-file = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellApplication {
-              name = "sign-file";
-              runtimeInputs = [
-                pkgs.gnupg
-                pkgs.coreutils
-                pkgs.openssl
-                pkgs.perl
-              ];
-              text = ''
-                set -euo pipefail
-                source_file="$1"
-                echo "Signing file: $source_file"
-                outdir="$(pwd)"
-                basename="$(basename "$source_file")"
-                dirname="$(dirname "$source_file")"
-
-                # Create isolated GPG keyring
-                gnupghome="$(mktemp -d)"
-                export GNUPGHOME="$gnupghome"
-                echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
-
-                # Generate hash and signature
-                cd "$dirname"
-                shasum -a 256 "$basename" > "$outdir/$basename.sha256"
-                echo "Hash written to $outdir/$basename.sha256"
-                gpg --armor --output "$outdir/$basename.sig" --detach-sign "$basename"
-                echo "Signature written to $outdir/$basename.sig"
-                gpg --armor --output "$outdir/$basename.sha256.asc" --sign "$outdir/$basename.sha256"
-                echo "Signature for hash written to $outdir/$basename.sha256.asc"
-
-                # Clean up
-                rm -rf "$gnupghome"
-              '';
-            };
-          };
-
           find-port-ci = flake-utils.lib.mkApp {
             drv = pkgs.writeShellApplication {
               name = "find-port";
@@ -941,7 +905,6 @@
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
-            sign = sign-file;
           };
 
           packages = {

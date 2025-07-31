@@ -151,6 +151,8 @@ pub enum PacketBeforeTransit<'a> {
     OutgoingPacket {
         me: OffchainPublicKey,
         next_hop: OffchainPublicKey,
+        num_surbs: u8,
+        is_forwarded: bool,
         data: Cow<'a, [u8]>,
         ack_challenge: Cow<'a, [u8]>,
         ticket: Cow<'a, [u8]>,
@@ -179,6 +181,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 data,
                 ack_challenge,
                 ticket,
+                num_surbs,
+                is_forwarded,
             } => {
                 out.push(PacketType::Outgoing as u8);
                 out.extend_from_slice(me.as_ref());
@@ -190,6 +194,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(ack_challenge.as_ref());
                 out.push(ticket.len() as u8);
                 out.extend_from_slice(ticket.as_ref());
+                out.push(num_surbs);
+                out.push(if is_forwarded { 1 } else { 0 });
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
                 direction = PacketDirection::Outgoing;
@@ -307,11 +313,8 @@ mod tests {
         types::{HalfKey, Hash},
     };
     use hopr_internal_types::prelude::{Acknowledgement, TicketBuilder, WinningProbability};
-    use hopr_network_types::prelude::{
-        FrameInfo, Segment,
-        protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
-    };
     use hopr_primitive_types::{primitives::EthereumChallenge, traits::BytesEncodable};
+    use hopr_protocol_session::types::*;
     use hopr_transport_packet::prelude::ApplicationData;
     use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
 
@@ -358,7 +361,7 @@ mod tests {
         let msg = SessionMessage::<1000>::Segment(Segment {
             frame_id: 1,
             seq_idx: 0,
-            seq_len: 1,
+            seq_flags: SeqIndicator::new_with_flags(1, true),
             data: Box::new(hex!("474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a")),
         });
 
@@ -381,7 +384,33 @@ mod tests {
             )
             .await;
 
-        let msg = SessionMessage::<1000>::Acknowledge(FrameAcknowledgements::from(vec![1, 2, 100]));
+        let msg = SessionMessage::<1000>::Segment(Segment {
+            frame_id: 2,
+            seq_idx: 0,
+            seq_flags: SeqIndicator::new_with_flags(10, false),
+            data: Box::new(hex!("474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a")),
+        });
+
+        let packet = IncomingPacket::Final {
+            packet_tag: hopr_crypto_random::random_bytes(),
+            previous_hop: *OffchainKeypair::random().public(),
+            sender: SimplePseudonym::random(),
+            plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
+            ack_key: HalfKey::random(),
+        };
+
+        let _ = pcap
+            .send(
+                PacketBeforeTransit::IncomingPacket {
+                    me,
+                    packet: &packet,
+                    ticket: ticket.to_vec().into(),
+                }
+                .into(),
+            )
+            .await;
+
+        let msg = SessionMessage::<1000>::Acknowledge(FrameAcknowledgements::try_from(vec![1, 2, 100])?);
 
         let packet = IncomingPacket::Final {
             packet_tag: hopr_crypto_random::random_bytes(),
@@ -403,18 +432,8 @@ mod tests {
             .await;
 
         let msg = SessionMessage::<1000>::Request(SegmentRequest::from_iter([
-            FrameInfo {
-                frame_id: 15,
-                missing_segments: [0b10100001].into(),
-                total_segments: 8,
-                last_update: std::time::SystemTime::now(),
-            },
-            FrameInfo {
-                frame_id: 11,
-                missing_segments: [0b00100001].into(),
-                total_segments: 8,
-                last_update: std::time::SystemTime::now(),
-            },
+            (15 as FrameId, [0b10100001].into()),
+            (11 as FrameId, [0b00100001].into()),
         ]));
 
         let packet = IncomingPacket::Final {
@@ -487,6 +506,8 @@ mod tests {
             .to_vec()
             .into(),
             ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -503,6 +524,8 @@ mod tests {
             .to_vec()
             .into(),
             ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -519,6 +542,8 @@ mod tests {
             .to_vec()
             .into(),
             ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -528,11 +553,26 @@ mod tests {
             me,
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
-            data: ApplicationData::new(1u64, &hex!("0104babe02"))
+            data: ApplicationData::new(1u64, &hex!("0103babe02"))
                 .to_bytes()
                 .into_vec()
                 .into(),
             ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
+        };
+
+        let _ = pcap.send(packet.into()).await;
+
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
+            next_hop: *OffchainKeypair::random().public(),
+            ack_challenge: hk.as_ref().into(),
+            data: hex!("deadbeefcafebabe").to_vec().into(),
+            ticket: ticket.to_vec().into(),
+            num_surbs: 0,
+            is_forwarded: true,
         };
 
         let _ = pcap.send(packet.into()).await;

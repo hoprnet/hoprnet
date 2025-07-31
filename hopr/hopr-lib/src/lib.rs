@@ -78,9 +78,9 @@ use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::{
     ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_PAYLOAD_SIZE, SendMsg,
-    ServiceId, Session as HoprSession, SessionCapabilities, SessionCapability, SessionClientConfig,
-    SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig, Tag, TicketStatistics,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU, ServiceId,
+    Session as HoprSession, SessionCapabilities, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
+    SessionTarget, SurbBalancerConfig, Tag, TicketStatistics,
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
@@ -1323,6 +1323,11 @@ impl Hopr {
     /// List all channels
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self.hopr_chain_api.all_channels().await?)
+    }
+
+    /// List all corrupted channels
+    pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
+        Ok(self.hopr_chain_api.corrupted_channels().await?)
     }
 
     /// Current safe allowance balance

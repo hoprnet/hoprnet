@@ -338,6 +338,18 @@ impl SurbMatcher {
     }
 }
 
+impl From<HoprPseudonym> for SurbMatcher {
+    fn from(value: HoprPseudonym) -> Self {
+        Self::Pseudonym(value)
+    }
+}
+
+impl From<&HoprPseudonym> for SurbMatcher {
+    fn from(pseudonym: &HoprPseudonym) -> Self {
+        (*pseudonym).into()
+    }
+}
+
 /// Routing information containing forward or return routing options.
 ///
 /// Information in this object represents the minimum required basis
@@ -408,6 +420,15 @@ impl ResolvedTransportRouting {
             pseudonym: HoprPseudonym::random(),
             forward_path,
             return_paths: vec![],
+        }
+    }
+
+    /// Returns the number of return paths (SURBs) on the [`ResolvedTransportRouting::Forward`]
+    /// variant, or always 0 on the [`ResolvedTransportRouting::Return`] variant.
+    pub fn count_return_paths(&self) -> usize {
+        match self {
+            ResolvedTransportRouting::Forward { return_paths, .. } => return_paths.len(),
+            ResolvedTransportRouting::Return(..) => 0,
         }
     }
 }

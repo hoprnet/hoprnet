@@ -82,7 +82,7 @@ impl HoprDb {
         // Indexer database
         let index = PoolOptions::new()
             .min_connections(0)
-            .max_connections(30)
+            .max_connections(1) // single connection to avoid DB lock issues by serializing all operations
             .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_INDEX_FILE_NAME)))
             .await
             .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?;
@@ -90,10 +90,10 @@ impl HoprDb {
         // Peers database
         let peers = PoolOptions::new()
             .min_connections(0) // Default is 0
+            .max_connections(300) // Default is 10
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
             .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
             .max_lifetime(Some(Duration::from_secs(30 * 60))) // This is the default
-            .max_connections(300) // Default is 10
             .connect_with(cfg_template.clone().filename(directory.join(SQL_DB_PEERS_FILE_NAME)))
             .await
             .map_err(|e| crate::errors::DbSqlError::Construction(e.to_string()))?;
