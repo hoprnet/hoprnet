@@ -5,6 +5,7 @@ use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, errors
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use tracing::instrument;
 
 use crate::{
     HoprDbGeneralModelOperations, OptTx,
@@ -256,6 +257,7 @@ impl HoprDbChannelOperations for HoprDb {
         Ok(ret)
     }
 
+    #[instrument(level = "trace", skip(self, tx), err)]
     async fn get_channel_by_parties<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -266,6 +268,7 @@ impl HoprDbChannelOperations for HoprDb {
         let fetch_channel = async move {
             let src_hex = src.to_hex();
             let dst_hex = dst.to_hex();
+            tracing::warn!(%src, %dst, "cache miss on get_channel_by_parties");
             self.nest_transaction(tx)
                 .await?
                 .perform(|tx| {
