@@ -52,6 +52,7 @@
   - [Post-sync Behavior](#post-sync-behavior)
 - [Profiling \& Instrumentation](#profiling--instrumentation)
   - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
+  - [Opentelemetry tracing](#opentelemetry-tracing)
 - [Contact](#contact)
 - [License](#license)
 
@@ -570,6 +571,13 @@ Requires a special build:
 2. Enable the `prof` feature on the `hoprd` package: `cargo build --feature prof`
 
 Once an instrumented tokio is built into hoprd, the application can be instrumented by `tokio_console` as described in the [official crate documentation](https://docs.rs/tokio-console/latest/tokio_console/#instrumenting-the-application).
+
+### Opentelemetry tracing
+`hoprd` is adapted to stream opentelemetry to a compatible endpoint. This behavior is turned off by default. To enable it, these environment variables have to be specified:
+
+- `HOPRD_USE_OPENTELEMETRY` - `true` to enable the opentelemetry streaming, `false` to disable it
+- `OTEL_SERVICE_NAME` - the identifier used to assign traces from this instance to (e.g. `my_hoprd_instance`)
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - URL of an endpoint accepting the opentelemetry format (e.g. http://jaeger:4317/)
 
 ## Contact
 
