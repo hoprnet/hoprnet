@@ -1,10 +1,6 @@
 use std::{marker::PhantomData, time::Duration};
 
-use alloy::{
-    network::ReceiptResponse,
-    providers::PendingTransaction,
-    rpc::types::{TransactionReceipt, TransactionRequest},
-};
+use alloy::{providers::PendingTransaction, rpc::types::TransactionRequest};
 use async_trait::async_trait;
 use futures::{FutureExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
@@ -73,10 +69,7 @@ impl<Rpc: HoprRpcOperations> RpcEthereumClient<Rpc> {
     ///
     /// If the transaction yields a result before the timeout, the result value is returned.
     /// Otherwise, an [RpcError::Timeout] is returned and the transaction sending is aborted.
-    async fn post_tx_with_timeout_and_confirm(
-        &self,
-        tx: TransactionRequest,
-    ) -> hopr_chain_rpc::errors::Result<TransactionReceipt> {
+    async fn post_tx_with_timeout_and_confirm(&self, tx: TransactionRequest) -> hopr_chain_rpc::errors::Result<Hash> {
         let submit_tx = self.rpc.send_transaction_with_confirm(tx).fuse();
         let timeout = sleep(self.cfg.max_tx_submission_wait).fuse();
         pin_mut!(submit_tx, timeout);
@@ -101,8 +94,7 @@ impl<Rpc: HoprRpcOperations + Send + Sync> EthereumClient<TransactionRequest> fo
         &self,
         tx: TransactionRequest,
     ) -> hopr_chain_rpc::errors::Result<Hash> {
-        let receipt = self.post_tx_with_timeout_and_confirm(tx).await?;
-        Ok(receipt.transaction_hash().0.into())
+        self.post_tx_with_timeout_and_confirm(tx).await
     }
 }
 

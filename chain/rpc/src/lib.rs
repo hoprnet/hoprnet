@@ -18,11 +18,7 @@ use std::{
     time::Duration,
 };
 
-use alloy::{
-    primitives::B256,
-    providers::PendingTransaction,
-    rpc::types::{TransactionReceipt, TransactionRequest},
-};
+use alloy::{primitives::B256, providers::PendingTransaction, rpc::types::TransactionRequest};
 use async_trait::async_trait;
 use errors::LogConversionError;
 use futures::Stream;
@@ -300,7 +296,7 @@ pub trait HoprRpcOperations {
     async fn send_transaction(&self, tx: TransactionRequest) -> Result<PendingTransaction>;
 
     /// Sends transaction to the RPC provider, awaits confirmation.
-    async fn send_transaction_with_confirm(&self, tx: TransactionRequest) -> Result<TransactionReceipt>;
+    async fn send_transaction_with_confirm(&self, tx: TransactionRequest) -> Result<Hash>;
 }
 
 /// Structure containing filtered logs that all belong to the same block.

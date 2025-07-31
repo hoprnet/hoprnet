@@ -16,7 +16,7 @@ use alloy::{
     },
     rpc::{
         client::RpcClient,
-        types::{Block, TransactionReceipt, TransactionRequest},
+        types::{Block, TransactionRequest},
     },
     signers::local::PrivateKeySigner,
     sol,
@@ -24,7 +24,10 @@ use alloy::{
 use async_trait::async_trait;
 use hopr_bindings::hoprnodemanagementmodule::HoprNodeManagementModule::{self, HoprNodeManagementModuleInstance};
 use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_crypto_types::{
+    keypairs::{ChainKeypair, Keypair},
+    prelude::Hash,
+};
 use hopr_internal_types::prelude::{EncodedWinProb, WinningProbability};
 use hopr_primitive_types::prelude::*;
 use primitive_types::U256;
@@ -420,7 +423,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         Ok(pending_tx)
     }
 
-    async fn send_transaction_with_confirm(&self, tx: TransactionRequest) -> Result<TransactionReceipt> {
+    async fn send_transaction_with_confirm(&self, tx: TransactionRequest) -> Result<Hash> {
         let sent_tx = self.provider.send_transaction(tx).await?;
 
         let receipt = sent_tx
@@ -432,10 +435,10 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         // Check the transaction status. `status()` returns `true` for successful transactions
         // and `false` for failed or reverted transactions.
         if receipt.status() {
-            Ok(receipt)
+            Ok(Hash::from(receipt.transaction_hash.0))
         } else {
             // Transaction failed, raise an error
-            Err(RpcError::TransactionFailed(receipt.transaction_hash))
+            Err(RpcError::TransactionFailed(Hash::from(receipt.transaction_hash.0)))
         }
     }
 }

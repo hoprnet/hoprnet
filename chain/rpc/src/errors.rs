@@ -1,9 +1,9 @@
 use alloy::{
     contract::Error as AlloyContractError,
-    primitives::FixedBytes,
     providers::{MulticallError, PendingTransactionError},
     transports::{RpcError as AlloyRpcError, TransportErrorKind},
 };
+use hopr_crypto_types::prelude::Hash;
 /// Errors produced by this crate and other error-related types.
 use thiserror::Error;
 
@@ -32,7 +32,7 @@ pub enum RpcError {
     PendingTransactionError(#[from] PendingTransactionError),
 
     #[error("transaction with hash {0} failed on-chain")]
-    TransactionFailed(FixedBytes<32>),
+    TransactionFailed(Hash),
 
     #[error("filter does not contain any criteria")]
     FilterIsEmpty,
