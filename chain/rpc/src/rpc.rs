@@ -16,7 +16,7 @@ use alloy::{
     },
     rpc::{
         client::RpcClient,
-        types::{Block, TransactionRequest},
+        types::{Block, TransactionReceipt, TransactionRequest},
     },
     signers::local::PrivateKeySigner,
     sol,
@@ -411,13 +411,30 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
     async fn send_transaction(&self, tx: TransactionRequest) -> Result<PendingTransaction> {
         let sent_tx = self.provider.send_transaction(tx).await?;
 
-        let receipt = sent_tx
+        let pending_tx = sent_tx
             .with_required_confirmations(self.cfg.finality as u64)
             .register()
             .await
             .map_err(RpcError::PendingTransactionError)?;
 
-        Ok(receipt)
+        Ok(pending_tx)
+    }
+
+    async fn send_transaction_with_confirm(&self, tx: TransactionRequest) -> Result<TransactionReceipt> {
+        let sent_tx = self.provider.send_transaction(tx).await?;
+
+        let receipt = sent_tx
+            .with_required_confirmations(self.cfg.finality as u64)
+            .get_receipt()
+            .await
+            .map_err(RpcError::PendingTransactionError)?;
+
+        if receipt.status() {
+            Ok(receipt)
+        } else {
+            // Transaction failed, raise an error
+            Err(RpcError::TransactionFailed(receipt.transaction_hash))
+        }
     }
 }
 
@@ -567,11 +584,15 @@ mod tests {
         let balance_1: XDaiBalance = rpc.get_xdai_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
-        // Send 1 ETH to some random address
-        let tx = create_native_transfer::<Ethereum>(*RANDY, U256::from(1000000_u32));
-        let tx_hash = rpc.send_transaction(tx).await?;
+        // Test 1: Send 1 ETH to some random address, do not wait for confirmation
+        let tx_1 = create_native_transfer::<Ethereum>(*RANDY, U256::from(1000000_u32));
+        let tx_hash = rpc.send_transaction(tx_1).await?;
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
+
+        // Test 2: Send 1 ETH to some random address, wait for confirmation
+        let tx_2 = create_native_transfer::<Ethereum>(*RANDY, U256::from(1000000_u32));
+        let _receipt = rpc.send_transaction_with_confirm(tx_2).await?;
 
         Ok(())
     }

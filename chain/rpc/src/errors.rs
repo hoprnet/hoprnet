@@ -1,5 +1,6 @@
 use alloy::{
     contract::Error as AlloyContractError,
+    primitives::FixedBytes,
     providers::{MulticallError, PendingTransactionError},
     transports::{RpcError as AlloyRpcError, TransportErrorKind},
 };
@@ -29,6 +30,9 @@ pub enum RpcError {
 
     #[error(transparent)]
     PendingTransactionError(#[from] PendingTransactionError),
+
+    #[error("transaction with hash {0} failed on-chain")]
+    TransactionFailed(FixedBytes<32>),
 
     #[error("filter does not contain any criteria")]
     FilterIsEmpty,

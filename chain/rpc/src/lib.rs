@@ -18,7 +18,11 @@ use std::{
     time::Duration,
 };
 
-use alloy::{primitives::B256, providers::PendingTransaction, rpc::types::TransactionRequest};
+use alloy::{
+    primitives::B256,
+    providers::PendingTransaction,
+    rpc::types::{TransactionReceipt, TransactionRequest},
+};
 use async_trait::async_trait;
 use errors::LogConversionError;
 use futures::Stream;
@@ -292,8 +296,11 @@ pub trait HoprRpcOperations {
     /// Retrieves the on-chain status of node, safe, and module.
     async fn check_node_safe_module_status(&self, node_address: Address) -> Result<NodeSafeModuleStatus>;
 
-    /// Sends transaction to the RPC provider.
+    /// Sends transaction to the RPC provider, does not await confirmation.
     async fn send_transaction(&self, tx: TransactionRequest) -> Result<PendingTransaction>;
+
+    /// Sends transaction to the RPC provider, awaits confirmation.
+    async fn send_transaction_with_confirm(&self, tx: TransactionRequest) -> Result<TransactionReceipt>;
 }
 
 /// Structure containing filtered logs that all belong to the same block.
