@@ -584,7 +584,7 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 ### HOPR packet capture
 
 Using the environment variable `HOPR_CAPTURE_PACKETS` allows capturing customized HOPR packet format to a PCAP file or to a `udpdump` host.
-However, for that to work the `hoprd` binary has to be build with the feature `capture`.
+However, for that to work the `hoprd` binary has to be built with the feature `capture`.
 For ease of use we provide different nix flake outputs that build the `hoprd`
 with the `capture` feature enabled:
 
