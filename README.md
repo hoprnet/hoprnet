@@ -580,6 +580,18 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 - `OTEL_SERVICE_NAME` - the identifier used to assign traces from this instance to (e.g. `my_hoprd_instance`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` - URL of an endpoint accepting the OpenTelemetry format (e.g. http://jaeger:4317/)
 
+### HOPR packet capture
+
+Using the environment variable `HOPR_CAPTURE_PACKETS` allows capturing customized HOPR packet format to a PCAP file or to a `udpdump` host.
+However, for that to work the `hoprd` binary has to be build with the feature `capture`.
+For ease of use we provide different nix flake outputs that build the `hoprd`
+with the `capture` feature enabled:
+
+- `nix build .#hoprd-x86_64-linux-profile`
+- `nix build .#hoprd-aarch64-linux-profile`
+- `nix build .#hoprd-x86_64-darwin-profile`
+- `nix build .#hoprd-aarch64-darwin-profile`
+
 ## Contact
 
 - [X](https://x.com/hoprnet)
