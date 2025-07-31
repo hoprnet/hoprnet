@@ -572,8 +572,8 @@ Requires a special build:
 
 Once an instrumented tokio is built into hoprd, the application can be instrumented by `tokio_console` as described in the [official crate documentation](https://docs.rs/tokio-console/latest/tokio_console/#instrumenting-the-application).
 
-### Opentelemetry tracing
-`hoprd` is adapted to stream opentelemetry to a compatible endpoint. This behavior is turned off by default. To enable it, these environment variables have to be specified:
+### OpenTelemetry tracing
+`hoprd` is adapted to stream OpenTelemetry to a compatible endpoint. This behavior is turned off by default. To enable it, these environment variables have to be specified:
 
 - `HOPRD_USE_OPENTELEMETRY` - `true` to enable the opentelemetry streaming, `false` to disable it
 - `OTEL_SERVICE_NAME` - the identifier used to assign traces from this instance to (e.g. `my_hoprd_instance`)
