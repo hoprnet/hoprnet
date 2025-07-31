@@ -263,6 +263,7 @@ impl TicketManager {
             .caches
             .unrealized_value
             .try_get_with_by_ref(&(channel_id, channel_epoch), async move {
+                tracing::warn!(%channel_id, %channel_epoch, "cache miss on unrealized value");
                 OpenTransaction(
                     tickets_db
                         .begin_with_config(None, None)
