@@ -216,10 +216,20 @@
             }
           );
           hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-linux-profile = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
+
           # CAVEAT: must be built from a darwin system
           hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-x86_64-darwin-profile = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-darwin-profile = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
@@ -950,14 +960,19 @@
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
             inherit pre-commit-check;
-            inherit hoprd-aarch64-linux hoprd-x86_64-linux hoprd-x86_64-linux-dev;
-            inherit hopli-aarch64-linux hopli-x86_64-linux hopli-x86_64-linux-dev;
-            # FIXME: Darwin cross-builds are currently broken.
-            # Follow https://github.com/nixos/nixpkgs/pull/256590
-            inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
-            inherit hopli-aarch64-darwin hopli-x86_64-darwin;
             inherit hoprd-bench;
             inherit hoprd-man hopli-man;
+            # binary packages
+            inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev hoprd-x86_64-linux-profile;
+            inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
+            inherit hopli-x86_64-linux hopli-x86_64-linux-dev;
+            inherit hopli-aarch64-linux;
+            # FIXME: Darwin cross-builds are currently broken.
+            # Follow https://github.com/nixos/nixpkgs/pull/256590
+            inherit hoprd-x86_64-darwin hoprd-x86_64-darwin-profile;
+            inherit hoprd-aarch64-darwin hoprd-aarch64-darwin-profile;
+            inherit hopli-x86_64-darwin;
+            inherit hopli-aarch64-darwin;
             default = hoprd;
           };
 
