@@ -52,7 +52,7 @@
   - [Post-sync Behavior](#post-sync-behavior)
 - [Profiling \& Instrumentation](#profiling--instrumentation)
   - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
-  - [Opentelemetry tracing](#opentelemetry-tracing)
+  - [OpenTelemetry tracing](#opentelemetry-tracing)
 - [Contact](#contact)
 - [License](#license)
 
