@@ -57,6 +57,13 @@ impl IntoCondition for WrappedPeerSelector {
 
 #[async_trait]
 impl HoprDbPeersOperations for HoprDb {
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::add_network_peer",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn add_network_peer(
         &self,
         peer: &PeerId,
@@ -91,6 +98,13 @@ impl HoprDbPeersOperations for HoprDb {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::remove_network_peer",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn remove_network_peer(&self, peer: &PeerId) -> Result<()> {
         let res = hopr_db_entity::network_peer::Entity::delete_many()
             .filter(
@@ -114,6 +128,13 @@ impl HoprDbPeersOperations for HoprDb {
         }
     }
 
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::update_network_peer",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn update_network_peer(&self, new_status: PeerStatus) -> Result<()> {
         let row = hopr_db_entity::network_peer::Entity::find()
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(new_status.id.0.as_ref())))
@@ -157,6 +178,13 @@ impl HoprDbPeersOperations for HoprDb {
         }
     }
 
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::get_network_peer",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         let row = hopr_db_entity::network_peer::Entity::find()
             .filter(
@@ -178,6 +206,7 @@ impl HoprDbPeersOperations for HoprDb {
         }
     }
 
+    #[tracing::instrument(skip(self), name = "HoprDbPeersOperations::get_network_peers", level = "trace", err)]
     async fn get_network_peers<'a>(
         &'a self,
         selector: PeerSelector,
@@ -218,6 +247,13 @@ impl HoprDbPeersOperations for HoprDb {
         }))
     }
 
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::network_peer_stats",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn network_peer_stats(&self, quality_threshold: f64) -> Result<Stats> {
         Ok(Stats {
             good_quality_public: hopr_db_entity::network_peer::Entity::find()
