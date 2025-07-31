@@ -1509,8 +1509,9 @@ dependencies = [
 
 [[package]]
 name = "backon"
-version = "1.5.1"
-source = "git+https://github.com/tolbrino/backon?branch=tb%2F202507-expose-future-timer-sleep#d10742c8696db37d3164158abf266403a63618f7"
+version = "1.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "592277618714fbcecda9a02ba7a8781f319d26532a88553bbacc77ba5d2b3a8d"
 dependencies = [
  "fastrand 2.3.0",
  "futures-timer",
