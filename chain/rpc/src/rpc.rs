@@ -429,6 +429,8 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
             .await
             .map_err(RpcError::PendingTransactionError)?;
 
+        // Check the transaction status. `status()` returns `true` for successful transactions
+        // and `false` for failed or reverted transactions.
         if receipt.status() {
             Ok(receipt)
         } else {
