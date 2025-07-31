@@ -46,8 +46,11 @@ lazy_static::lazy_static! {
         MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
 }
 
+const SLOW_OP_MS: u128 = 150;
+
 impl HoprDb {
     /// Validates a ticket from a forwarded packet and replaces it with a new ticket for the next hop.
+    #[instrument(level = "trace", skip_all, err)]
     async fn validate_and_replace_ticket(
         &self,
         mut fwd: HoprForwardedPacket,
@@ -106,6 +109,7 @@ impl HoprDb {
         // so afterward we are sure the source of the `channel`
         // (which is equal to `previous_hop_addr`) has issued this
         // ticket.
+        let start = std::time::Instant::now();
         let verified_incoming_ticket = spawn_fifo_blocking(move || {
             validate_unacknowledged_ticket(
                 fwd.outgoing.ticket,
@@ -117,6 +121,9 @@ impl HoprDb {
             )
         })
         .await?;
+        if start.elapsed().as_millis() > SLOW_OP_MS {
+            warn!("validate_unacknowledged_ticket took {} ms", start.elapsed().as_millis());
+        }
 
         // We currently take the maximum of the win prob from the incoming ticket
         // and the one configured on this node.
@@ -169,7 +176,7 @@ impl HoprDb {
         Ok(fwd)
     }
 
-    #[instrument(level = "trace", skip(self, ack), err(Debug))]
+    #[instrument(level = "trace", skip(self, ack), err)]
     async fn validate_acknowledgement(
         &self,
         ack: &Acknowledgement,
@@ -495,7 +502,7 @@ impl HoprDbProtocolOperations for HoprDb {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, data, pkt_keypair, sender), fields(sender = %sender), err)]
+    #[tracing::instrument(level = "trace", skip_all, fields(sender = %sender), err)]
     async fn from_recv(
         &self,
         data: Box<[u8]>,
@@ -507,6 +514,7 @@ impl HoprDbProtocolOperations for HoprDb {
         let offchain_keypair = pkt_keypair.clone();
         let myself = self.clone();
 
+        let start = std::time::Instant::now();
         let packet = spawn_fifo_blocking(move || {
             HoprPacket::from_incoming(&data, &offchain_keypair, sender, &myself.caches.key_id_mapper, |p| {
                 myself.caches.pseudonym_openers.remove(p)
@@ -514,6 +522,13 @@ impl HoprDbProtocolOperations for HoprDb {
             .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
         .await?;
+        if start.elapsed().as_millis() > SLOW_OP_MS {
+            warn!(
+                peer = sender.to_peerid_str(),
+                "from_incoming took {} ms",
+                start.elapsed().as_millis()
+            );
+        }
 
         match packet {
             HoprPacket::Final(incoming) => {
@@ -566,10 +581,18 @@ impl HoprDbProtocolOperations for HoprDb {
                 })
             }
             HoprPacket::Forwarded(fwd) => {
-                match self
+                let start = std::time::Instant::now();
+                let validation_res = self
                     .validate_and_replace_ticket(*fwd, &self.chain_key, outgoing_ticket_win_prob, outgoing_ticket_price)
-                    .await
-                {
+                    .await;
+                if start.elapsed().as_millis() > SLOW_OP_MS {
+                    warn!(
+                        peer = sender.to_peerid_str(),
+                        "validate_and_replace_ticket took {} ms",
+                        start.elapsed().as_millis()
+                    );
+                }
+                match validation_res {
                     Ok(fwd) => {
                         let mut payload = Vec::with_capacity(HoprPacket::SIZE);
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());

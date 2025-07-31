@@ -326,6 +326,7 @@ impl HoprDbInfoOperations for HoprDb {
             .caches
             .single_values
             .try_get_with_by_ref(&CachedValueDiscriminants::IndexerDataCache, async move {
+                tracing::warn!("cache miss on get_indexer_data");
                 myself
                     .nest_transaction(tx)
                     .and_then(|op| {
