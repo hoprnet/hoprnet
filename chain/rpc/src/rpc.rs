@@ -432,13 +432,15 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
             .await
             .map_err(RpcError::PendingTransactionError)?;
 
+        let tx_hash = Hash::from(receipt.transaction_hash.0);
+
         // Check the transaction status. `status()` returns `true` for successful transactions
         // and `false` for failed or reverted transactions.
         if receipt.status() {
-            Ok(Hash::from(receipt.transaction_hash.0))
+            Ok(tx_hash)
         } else {
             // Transaction failed, raise an error
-            Err(RpcError::TransactionFailed(Hash::from(receipt.transaction_hash.0)))
+            Err(RpcError::TransactionFailed(tx_hash))
         }
     }
 }
