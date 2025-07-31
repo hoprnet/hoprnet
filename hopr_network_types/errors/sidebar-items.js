@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["NetworkTypeError"],"type":["Result"]};
