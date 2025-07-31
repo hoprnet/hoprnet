@@ -232,6 +232,7 @@
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
+              src = testSrc;
               runTests = true;
               cargoExtraArgs = "-Z panic-abort-tests";
             }
