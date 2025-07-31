@@ -100,7 +100,8 @@ impl SnapshotExtractor {
             let path_buf = entry.path().map_err(SnapshotError::Io)?.to_path_buf();
 
             // Security check: prevent directory traversal
-            if path_buf.components().any(|c| c == ParentDir) {
+            // Although tar archives should not allow this.
+            if !path_is_safe(path_buf.as_path().into()) {
                 return Err(SnapshotError::InvalidFormat(
                     "Archive contains parent directory references".to_string(),
                 ));
@@ -166,6 +167,11 @@ impl SnapshotExtractor {
     }
 }
 
+/// Checks if the path is safe for extraction
+fn path_is_safe(path: &Path) -> bool {
+    !path.components().any(|c| c == ParentDir)
+}
+
 impl Default for SnapshotExtractor {
     fn default() -> Self {
         Self::new()
@@ -185,7 +191,7 @@ mod tests {
         let extractor = SnapshotExtractor::new();
 
         // Create test archive
-        let archive_path = create_test_archive(&temp_dir).await.unwrap();
+        let archive_path = create_test_archive(&temp_dir, None).await.unwrap();
 
         // Extract the archive
         let extract_dir = temp_dir.path().join("extracted");
@@ -203,7 +209,7 @@ mod tests {
         let extractor = SnapshotExtractor::new();
 
         // Test with valid archive
-        let archive_path = create_test_archive(&temp_dir).await.unwrap();
+        let archive_path = create_test_archive(&temp_dir, None).await.unwrap();
 
         let extract_dir = temp_dir.path().join("extract");
 
@@ -233,5 +239,15 @@ mod tests {
         let result = extractor.extract_snapshot(&archive_path, &extract_dir).await;
 
         assert!(result.is_err(), "Extraction should fail for invalid archive");
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn test_path_traversal_protection() {
+        assert!(path_is_safe(Path::new("good.db")));
+
+        assert!(!path_is_safe(Path::new("../malicious.db")));
+        assert!(!path_is_safe(Path::new("../../malicious.db")));
+        assert!(!path_is_safe(Path::new("../back/../malicious.db")));
+        assert!(!path_is_safe(Path::new("forward/../../malicious.db")));
     }
 }

@@ -83,7 +83,7 @@ trait SnapshotInstaller {
 ///
 /// Contains the common download → extract → validate → install workflow
 /// shared between SnapshotManager and TestSnapshotManager.
-struct SnapshotWorkflow {
+pub(crate) struct SnapshotWorkflow {
     downloader: SnapshotDownloader,
     extractor: SnapshotExtractor,
     validator: SnapshotValidator,
@@ -276,7 +276,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test archive
-        let archive_path = create_test_archive(&temp_dir).await.unwrap();
+        let archive_path = create_test_archive(&temp_dir, None).await.unwrap();
 
         // Use TestSnapshotManager for testing
         let manager = TestSnapshotManager::new().expect("Failed to create TestSnapshotManager");
@@ -302,7 +302,7 @@ mod tests {
         fs::create_dir_all(&data_dir).unwrap();
 
         // Create a test archive
-        let archive_path = create_test_archive(&temp_dir).await.unwrap();
+        let archive_path = create_test_archive(&temp_dir, None).await.unwrap();
 
         // Test file:// URL support using TestSnapshotManager
         let manager = TestSnapshotManager::new().expect("Failed to create TestSnapshotManager");

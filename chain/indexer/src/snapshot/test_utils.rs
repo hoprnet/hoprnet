@@ -17,7 +17,7 @@ use crate::snapshot::{SnapshotInfo, SnapshotInstaller, SnapshotWorkflow, error::
 /// Provides the same snapshot workflow as [`SnapshotManager`] but installs
 /// files directly to the filesystem instead of integrating with a database.
 /// Used in unit tests where database setup would add unnecessary complexity.
-pub struct TestSnapshotManager {
+pub(crate) struct TestSnapshotManager {
     pub(crate) workflow: SnapshotWorkflow,
 }
 
@@ -78,6 +78,11 @@ impl SnapshotInstaller for TestSnapshotManager {
 
 /// Creates a test SQLite database for testing
 pub async fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    // Remove any existing file
+    if fs::metadata(path).is_ok() {
+        fs::remove_file(path)?;
+    }
+
     let options = SqliteConnectOptions::new().filename(path).create_if_missing(true);
 
     let mut conn = SqliteConnection::connect_with(&options).await?;
@@ -174,8 +179,12 @@ pub async fn create_test_sqlite_db(path: &std::path::Path) -> Result<(), Box<dyn
 }
 
 /// Creates a test tar.xz archive containing a SQLite database
-pub(crate) async fn create_test_archive(temp_dir: &TempDir) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+pub(crate) async fn create_test_archive(
+    temp_dir: &TempDir,
+    db_target_path: Option<String>,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     // Create the database
+    let db_target_path_final = db_target_path.unwrap_or_else(|| "hopr_logs.db".to_string());
     let db_path = temp_dir.path().join("hopr_logs.db");
     create_test_sqlite_db(&db_path).await?;
 
@@ -183,7 +192,7 @@ pub(crate) async fn create_test_archive(temp_dir: &TempDir) -> Result<std::path:
     let mut tar_data = Vec::new();
     {
         let mut tar = Builder::new(&mut tar_data);
-        tar.append_path_with_name(&db_path, "hopr_logs.db").await?;
+        tar.append_path_with_name(&db_path, db_target_path_final).await?;
         tar.into_inner().await?;
     }
 

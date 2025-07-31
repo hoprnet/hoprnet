@@ -210,7 +210,7 @@ impl SnapshotDownloader {
         }
 
         // Fail if content length is not available
-        let total_size = response
+        let total_bytes = response
             .content_length()
             .ok_or_else(SnapshotError::ContentLengthMissing)?;
 
@@ -232,22 +232,23 @@ impl SnapshotDownloader {
                 let max_size = self.config.max_size;
 
                 async move {
-                    let new_total = downloaded.fetch_add(chunk.len() as u64, Ordering::Relaxed) + chunk.len() as u64;
+                    let received_bytes =
+                        downloaded.fetch_add(chunk.len() as u64, Ordering::Relaxed) + chunk.len() as u64;
 
                     // Check size limit and abort if exceeded
-                    if new_total > max_size {
+                    if received_bytes > max_size {
                         return Err(SnapshotError::TooLarge {
-                            size: new_total,
+                            size: received_bytes,
                             max_size,
                         });
                     }
 
                     // Progress reporting, only per 1MB or at the end
-                    let progress = (new_total as f64 / total_size as f64) * 100.0;
-                    if new_total % (1024 * 1024) == 0 || new_total == total_size {
+                    let progress = (received_bytes as f64 / total_bytes as f64) * 100.0;
+                    if received_bytes % (1024 * 1024) == 0 || received_bytes == total_bytes {
                         debug!(
-                            "Snapshot download progress: {:.1}% ({}/{} bytes)",
-                            progress, new_total, total_size
+                            progress = format!("{:.1}%", progress),
+                            %received_bytes, %total_bytes, "Logs snapshot download progress"
                         );
                     }
 
