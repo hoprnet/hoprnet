@@ -47,7 +47,7 @@ async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
-backon = { workspace = true, default-features = false }
+backon = { workspace = true, features = ["futures-timer-sleep"] }
 const_format = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }
@@ -83,9 +83,12 @@ hopr-transport = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
+mockito = { workspace = true }
 parameterized = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
+test-log = { workspace = true }
+url = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }

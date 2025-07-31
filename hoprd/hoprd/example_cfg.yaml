@@ -288,6 +288,12 @@ hopr:
     # the sync process. Recommended for initial setup or when recovering
     # from a clean state.
     fast_sync: true
+    # Configures whether the node should download a snapshot of logs
+    enable_logs_snapshot: false
+    # URL to download logs snapshot from.
+    # This should point to a publicly accessible tar.xz file containing
+    # the SQLite logs database files.
+    # logs_snapshot_url: "https://logs-snapshots.hoprnet.org/latest-stable.tar.xz"
 # Session Entry/Exit IP forwarding configuration for this node
 # This applies whenever the node is an Exit node of a Session.
 session_ip_forwarding:
