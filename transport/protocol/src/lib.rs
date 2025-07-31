@@ -334,7 +334,7 @@ where
                         let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
                         let elapsed = now.elapsed();
                         if elapsed.as_millis() > SLOW_OP_MS {
-                            warn!(?elapsed, "msg_processor.recv took too long");
+                            warn!(%peer, ?elapsed, "msg_processor.recv took too long");
                         }
 
                         // If there was an error caused by interpretation of the packet data,
