@@ -6,7 +6,7 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
-    crane.url = "github:ipetkov/crane/v0.20.1";
+    crane.url = "github:ipetkov/crane/v0.21.0";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     solc.url = "github:hellwolf/solc.nix";
@@ -88,6 +88,24 @@
               ./Cargo.lock
               ./README.md
               ./hopr/hopr-lib/data
+              ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.in.toml
+              ./ethereum/contracts/remappings.txt
+              ./hoprd/hoprd/example_cfg.yaml
+              (fs.fileFilter (file: file.hasExt "rs") ./.)
+              (fs.fileFilter (file: file.hasExt "toml") ./.)
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+            ];
+          };
+          testSrc = fs.toSource {
+            root = ./.;
+            fileset = fs.unions [
+              ./.cargo/config.toml
+              ./Cargo.lock
+              ./README.md
+              ./hopr/hopr-lib/data
+              ./hopr/hopr-lib/tests
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
@@ -204,7 +222,11 @@
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { runTests = true; }
+            hoprdBuildArgs
+            // {
+              src = testSrc;
+              runTests = true;
+            }
           );
 
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (

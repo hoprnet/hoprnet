@@ -3,7 +3,7 @@ use futures::{AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
 use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_network_types::prelude::{DestinationRouting, RoutingOptions, SurbMatcher};
+use hopr_network_types::prelude::{DestinationRouting, RoutingOptions};
 use hopr_primitive_types::prelude::Address;
 use hopr_transport_packet::prelude::ApplicationData;
 use hopr_transport_session::{Capabilities, Capability, Session, SessionId};

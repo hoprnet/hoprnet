@@ -487,6 +487,9 @@ impl Hopr {
             hopr_chain_indexer::IndexerConfig {
                 start_block_number: resolved_environment.channel_contract_deploy_block as u64,
                 fast_sync: cfg.chain.fast_sync,
+                enable_logs_snapshot: cfg.chain.enable_logs_snapshot,
+                logs_snapshot_url: cfg.chain.logs_snapshot_url.clone(),
+                data_directory: cfg.db.data.clone(),
             },
             tx_indexer_events,
         )?;
@@ -1109,15 +1112,6 @@ impl Hopr {
             .with_delay(self.cfg.session.establish_retry_timeout)
             .with_jitter();
 
-        struct Sleeper;
-        impl backon::Sleeper for Sleeper {
-            type Sleep = futures_timer::Delay;
-
-            fn sleep(&self, dur: Duration) -> Self::Sleep {
-                futures_timer::Delay::new(dur)
-            }
-        }
-
         use backon::Retryable;
 
         Ok((|| {
@@ -1126,7 +1120,7 @@ impl Hopr {
             async { self.transport_api.new_session(destination, target, cfg).await }
         })
         .retry(backoff)
-        .sleep(Sleeper)
+        .sleep(backon::FuturesTimerSleeper)
         .await?)
     }
 
