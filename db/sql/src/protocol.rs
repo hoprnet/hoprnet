@@ -478,8 +478,7 @@ impl HoprDbProtocolOperations for HoprDb {
         // This is a no-op for reply packets
         openers.into_iter().for_each(|(surb_id, opener)| {
             self.caches
-                .pseudonym_openers
-                .insert(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener)
+                .insert_pseudonym_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener)
         });
 
         if let Some(out) = packet.try_as_outgoing() {
@@ -517,7 +516,7 @@ impl HoprDbProtocolOperations for HoprDb {
         let start = std::time::Instant::now();
         let packet = spawn_fifo_blocking(move || {
             HoprPacket::from_incoming(&data, &offchain_keypair, sender, &myself.caches.key_id_mapper, |p| {
-                myself.caches.pseudonym_openers.remove(p)
+                myself.caches.extract_pseudonym_opener(p)
             })
             .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
