@@ -13,7 +13,7 @@ use futures_time::task::Sleep;
 use pin_project::pin_project;
 
 /// Controller for [`RateLimitedStream`] to allow dynamic controlling of the stream's rate.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RateController(Arc<AtomicU64>);
 
 impl Default for RateController {

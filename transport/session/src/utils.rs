@@ -117,3 +117,19 @@ impl<I, S: Clone, F: Clone> Clone for ScoringSink<I, S, F> {
         }
     }
 }
+
+/// Extension trait for [`ScoringSink`].
+pub trait ScoringExt<T>: futures::Sink<T> {
+    /// Attaches a scoring function to the sink.
+    ///
+    /// See [`ScoringSink`].
+    fn scoring<F>(self, score: Arc<AtomicU64>, scoring_fn: F) -> ScoringSink<T, Self, F>
+    where
+        Self: Sized,
+        F: Fn(&T) -> u64,
+    {
+        ScoringSink::new(self, score, scoring_fn)
+    }
+}
+
+impl<I, T: ?Sized> ScoringExt<I> for T where T: futures::Sink<I> {}

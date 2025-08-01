@@ -143,10 +143,10 @@ impl ApplicationData {
         Self::TAG_SIZE + self.plain_text.len()
     }
 
-    /// Returns the estimated number of SURBs the HOPR packet carrying this `ApplicationData`
-    /// instance could hold (or could have held).
-    pub fn estimate_surbs_with_msg(&self) -> usize {
-        HoprPacket::max_surbs_with_message(self.len())
+    /// Returns the estimated number of SURBs the HOPR packet carrying an `ApplicationData` instance
+    /// with `payload` could hold (or could have held).
+    pub fn estimate_surbs_with_msg<T: AsRef<[u8]>>(payload: &T) -> usize {
+        HoprPacket::max_surbs_with_message(payload.as_ref().len().min(Self::PAYLOAD_SIZE) + Tag::SIZE)
     }
 }
 

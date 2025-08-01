@@ -24,7 +24,7 @@ use crate::{
     errors::{SessionManagerError, TransportSessionError},
     initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
     types::ClosureReason,
-    utils::ScoringSink,
+    utils::ScoringExt,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -522,8 +522,8 @@ where
                     let surb_consumption_counter = Arc::new(AtomicU64::new(0));
 
                     // Sender responsible for keep-alive and Session data is counting produced SURBs
-                    let scoring_sender = ScoringSink::new(msg_sender, surb_production_counter.clone(), |(_, data)| {
-                        data.estimate_surbs_with_msg() as u64
+                    let scoring_sender = msg_sender.scoring(surb_production_counter.clone(), |(_, data)| {
+                        ApplicationData::estimate_surbs_with_msg(&data.plain_text) as u64
                     });
 
                     // Spawn the SURB-bearing keep alive stream
@@ -543,7 +543,7 @@ where
 
                     let (surbs_ready_tx, surbs_ready_rx) = futures::channel::oneshot::channel();
                     let mut surbs_ready_tx = Some(surbs_ready_tx);
-                    let (balancer_abort_handle, reg) = AbortHandle::new_pair();
+                    let (balancer_abort_handle, balancer_abort_reg) = AbortHandle::new_pair();
                     hopr_async_runtime::prelude::spawn(
                         futures::stream::Abortable::new(
                             futures_time::stream::interval(
@@ -552,7 +552,7 @@ where
                                     .max(MIN_BALANCER_SAMPLING_INTERVAL)
                                     .into(),
                             ),
-                            reg,
+                            balancer_abort_reg,
                         )
                         .for_each(move |_| {
                             let level = balancer.update();
@@ -749,8 +749,11 @@ where
                 // Reply routing uses SURBs only with the pseudonym of this Session's ID
                 let reply_routing = DestinationRouting::Return(pseudonym.into());
 
+                let (balancer_abort_handle, balancer_abort_reg) = AbortHandle::new_pair();
+
                 // Construct the session
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
                 self.sessions.run_pending_tasks().await;
                 let allocated_slot = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
                     insert_into_next_slot(
@@ -773,7 +776,7 @@ where
                         CachedSession {
                             session_tx: Arc::new(tx_session_data),
                             routing_opts: reply_routing.clone(),
-                            abort_handles: vec![],
+                            abort_handles: vec![balancer_abort_handle],
                         },
                     )
                     .await
@@ -785,17 +788,34 @@ where
                 if let Some(session_id) = allocated_slot {
                     debug!(?session_id, "assigning a new session");
 
-                    // TODO: figure out how to make the rate-limit parameters dynamic
+                    let surb_retrieval_counter = Arc::new(AtomicU64::new(0));
+                    let surb_consumption_counter = Arc::new(AtomicU64::new(0));
+
+                    // Because of SURB scarcity, we may need to control the egress rate of incoming sessions
+                    let egress_rate_control = RateController::new(10_000, Duration::from_secs(1));
+
+                    // Sent packets = SURB consumption estimate
                     let session_msg_sender = msg_sender
                         .clone()
-                        .rate_limit_with_controller(&RateController::new(1000, Duration::from_secs(1)))
+                        .scoring(surb_consumption_counter.clone(), |_| 1u64)
+                        .rate_limit_with_controller(&egress_rate_control)
                         .buffer(20_000);
 
+                    let surb_retrieval_counter_clone = surb_retrieval_counter.clone();
                     let session = Session::new(
                         session_id,
                         reply_routing.clone(),
                         session_req.capabilities,
-                        (session_msg_sender, rx_session_data),
+                        (
+                            session_msg_sender,
+                            rx_session_data.inspect(move |data| {
+                                // Received packets = SURB retrieval estimate
+                                surb_retrieval_counter_clone.fetch_add(
+                                    ApplicationData::estimate_surbs_with_msg(data) as u64,
+                                    std::sync::atomic::Ordering::Relaxed,
+                                );
+                            }),
+                        ),
                         Some(Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             if let Err(error) = close_session_notifier.unbounded_send((session_id, reason)) {
                                 error!(%session_id, %error, %reason, "failed to notify session closure");
@@ -828,6 +848,20 @@ where
                     })?;
 
                     info!(%session_id, "new session established");
+
+                    hopr_async_runtime::prelude::spawn(
+                        futures::stream::Abortable::new(
+                            // TODO: figure out a proper sampling interval
+                            futures_time::stream::interval(Duration::from_millis(100).into()),
+                            balancer_abort_reg,
+                        )
+                        .for_each(move |_| {
+                            // TODO: control the egress rate based on the surb_retrieval_counter and
+                            // surb_consumption_counter
+                            egress_rate_control.set_rate_per_unit(10_000, Duration::from_secs(1));
+                            futures::future::ready(())
+                        }),
+                    );
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     {
