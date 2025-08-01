@@ -18,14 +18,7 @@ use hopr_primitive_types::prelude::Address;
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{
-    IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget,
-    balancer::{RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer, SurbFlowController},
-    errors::{SessionManagerError, TransportSessionError},
-    initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
-    types::ClosureReason,
-    utils::ScoringExt,
-};
+use crate::{IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, balancer::{RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer, SurbFlowController}, errors::{SessionManagerError, TransportSessionError}, initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol}, types::ClosureReason, utils::ScoringExt, SurbBalancerConfig};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -849,16 +842,28 @@ where
 
                     info!(%session_id, "new session established");
 
+                    let mut balancer = SurbBalancer::new(
+                        session_id,
+                        surb_retrieval_counter,
+                        surb_consumption_counter,
+                        KeepAliveController(egress_rate_control),
+                        SurbBalancerConfig {
+                            target_surb_buffer_size: 0,
+                            max_surbs_per_sec: 0,
+                            ..Default::default()
+                        }
+                    );
+
                     hopr_async_runtime::prelude::spawn(
                         futures::stream::Abortable::new(
-                            // TODO: figure out a proper sampling interval
-                            futures_time::stream::interval(Duration::from_millis(100).into()),
+                            futures_time::stream::interval(self.cfg.balancer_sampling_interval.max(MIN_BALANCER_SAMPLING_INTERVAL).into()),
                             balancer_abort_reg,
                         )
                         .for_each(move |_| {
                             // TODO: control the egress rate based on the surb_retrieval_counter and
                             // surb_consumption_counter
-                            egress_rate_control.set_rate_per_unit(10_000, Duration::from_secs(1));
+                            balancer.update();
+                            //egress_rate_control.set_rate_per_unit(10_000, Duration::from_secs(1));
                             futures::future::ready(())
                         }),
                     );

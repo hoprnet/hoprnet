@@ -3,6 +3,8 @@ use std::fmt::Display;
 use pid::Pid;
 
 use crate::balancer::{SurbFlowController, SurbFlowEstimator};
+use crate::errors;
+use crate::errors::SessionManagerError;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -32,34 +34,108 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// Carries finite Proportional, Integral and Derivative controller gains for a PID controller.
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ControllerGains(f64, f64, f64);
+
+impl ControllerGains {
+    /// Creates PID controller gains, returns an error if the gains are not finite.
+    pub fn new(p: f64, i: f64, d: f64) -> errors::Result<Self> {
+        if p.is_finite() && i.is_finite() && d.is_finite() {
+            Ok(Self(p, i, d))
+        } else {
+            Err(SessionManagerError::Other("gains must be finite".into()).into())
+        }
+    }
+
+    /// P gain.
+    #[inline]
+    pub fn p(&self) -> f64 {
+        self.0
+    }
+
+    /// I gain.
+    #[inline]
+    pub fn i(&self) -> f64 {
+        self.1
+    }
+
+    /// D gain.
+    #[inline]
+    pub fn d(&self) -> f64 {
+        self.2
+    }
+}
+
+// Safe to implement Eq, because the floats are finite
+impl Eq for ControllerGains {}
+
+// Default coefficients for the PID controller
+// This might be tweaked in the future.
+const DEFAULT_P_GAIN: f64 = 0.6;
+const DEFAULT_I_GAIN: f64 = 0.7;
+const DEFAULT_D_GAIN: f64 = 0.2;
+
+impl Default for ControllerGains {
+    fn default() -> Self {
+        Self(DEFAULT_P_GAIN, DEFAULT_I_GAIN, DEFAULT_D_GAIN)
+    }
+}
+
+impl TryFrom<(f64, f64, f64)> for ControllerGains {
+    type Error = errors::TransportSessionError;
+
+    fn try_from(value: (f64, f64, f64)) -> Result<Self, Self::Error> {
+        Self::new(value.0, value.1, value.2)
+    }
+}
+
 /// Configuration for the [`SurbBalancer`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SurbBalancerConfig {
-    /// The desired number of SURBs to be always kept as a buffer at the Session counterparty.
+    /// The desired number of SURBs to be always kept as a buffer locally or at the Session counterparty.
     ///
     /// The [`SurbBalancer`] will try to maintain approximately this number of SURBs
-    /// at the counterparty at all times, by regulating the [flow of non-organic SURBs](SurbFlowController).
+    /// locally or remotely (at the counterparty) at all times.
+    ///
+    /// The local buffer is maintained by [regulating](SurbFlowController) the egress from the Session.
+    /// The remote buffer (at session counterparty) is maintained by regulating the flow of non-organic SURBs via [keep-alive messages](crate::initiation::StartProtocol::KeepAlive).
     #[default(5_000)]
     pub target_surb_buffer_size: u64,
-    /// Maximum outflow of non-organic surbs.
+    /// Maximum outflow of SURBs.
+    ///
+    /// - n the context of the local SURB buffer, this is the maximum egress Session traffic
+    /// - In the context of the remote SURB buffer, this is the maximum egress of keep-alive messages to the counterparty
     ///
     /// The default is 2500 (which is 1250 packets/second currently)
     #[default(2_500)]
     pub max_surbs_per_sec: u64,
+    /// PID controller gains.
+    ///
+    /// Default is (0.6, 0.7, 0.2), suitable for active SURB balancing.
+    pub gains: ControllerGains,
 }
 
 /// Runs a continuous process that attempts to [evaluate](SurbFlowEstimator) and
-/// [regulate](SurbFlowController) the flow of non-organic SURBs to the Session counterparty,
-/// to keep the number of SURBs at the counterparty at a certain level.
+/// [regulate](SurbFlowController) the flow of SURBs to the Session counterparty,
+/// to keep the number of SURBs locally or at the counterparty at a certain level.
 ///
 /// Internally, the Balancer uses a PID (Proportional Integral Derivative) controller to
-/// control the rate of SURBs sent to the counterparty
+/// control the rate of SURBs consumed or sent to the counterparty
 /// each time the [`update`](SurbBalancer::update) method is called:
 ///
-/// 1. The size of the SURB buffer at the counterparty is estimated using [`SurbFlowEstimator`].
+/// 1. The size of the SURB buffer at locally or at the counterparty is estimated using [`SurbFlowEstimator`].
 /// 2. Error against a set-point given in [`SurbBalancerConfig`] is evaluated in the PID controller.
 /// 3. The PID controller applies a new SURB flow rate value using the [`SurbFlowController`].
+///
+/// In the local context, the `SurbFlowController` might simply regulate the egress traffic from the
+/// Session, slowing it down to avoid fast SURB drainage.
+///
+/// In the remote context, the `SurbFlowController` might regulate the flow of non-organic SURBs via
+/// Start protocol's [`KeepAlive`](crate::initiation::StartProtocol::KeepAlive) messages to deliver additional
+/// SURBs to the counterparty.
 pub struct SurbBalancer<I, O, F, S> {
     session_id: S,
     pid: Pid<f64>,
@@ -73,12 +149,6 @@ pub struct SurbBalancer<I, O, F, S> {
     last_update: std::time::Instant,
     was_below_target: bool,
 }
-
-// Default coefficients for the PID controller
-// This might be tweaked in the future.
-const DEFAULT_P_GAIN: f64 = 0.6;
-const DEFAULT_I_GAIN: f64 = 0.7;
-const DEFAULT_D_GAIN: f64 = 0.2;
 
 impl<I, O, F, S> SurbBalancer<I, O, F, S>
 where
@@ -101,21 +171,21 @@ where
             std::env::var("HOPR_BALANCER_PID_P_GAIN")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(DEFAULT_P_GAIN),
+                .unwrap_or(cfg.gains.p()),
             max_surbs_per_sec,
         );
         pid.i(
             std::env::var("HOPR_BALANCER_PID_I_GAIN")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(DEFAULT_I_GAIN),
+                .unwrap_or(cfg.gains.i()),
             max_surbs_per_sec,
         );
         pid.d(
             std::env::var("HOPR_BALANCER_PID_D_GAIN")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(DEFAULT_D_GAIN),
+                .unwrap_or(cfg.gains.d()),
             max_surbs_per_sec,
         );
 
