@@ -5,11 +5,9 @@ use std::{
 };
 
 use futures::{
-    FutureExt, SinkExt, StreamExt, TryStreamExt,
-    channel::mpsc::UnboundedSender,
-    future::{AbortHandle, Either},
-    pin_mut,
+    FutureExt, SinkExt, StreamExt, TryStreamExt, channel::mpsc::UnboundedSender, future::AbortHandle, pin_mut,
 };
+use futures_time::future::FutureExt as TimeExt;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
@@ -509,20 +507,19 @@ where
             .await
             .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?;
 
-        // Await session establishment response from the Exit node or timeout
-        pin_mut!(rx_initiation_done);
-        let initiation_done = TryStreamExt::try_next(&mut rx_initiation_done);
-
         // The timeout is given by the number of hops requested
-        let timeout = hopr_async_runtime::prelude::sleep(initiation_timeout_max_one_way(
+        let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
             self.cfg.initiation_timeout_base,
             cfg.forward_path_options.count_hops() + cfg.return_path_options.count_hops() + 2,
-        ));
-        pin_mut!(timeout);
+        )
+        .into();
+
+        // Await session establishment response from the Exit node or timeout
+        pin_mut!(rx_initiation_done);
 
         trace!(challenge, "awaiting session establishment");
-        match futures::future::select(initiation_done, timeout).await {
-            Either::Left((Ok(Some(est)), _)) => {
+        match rx_initiation_done.try_next().timeout(initiation_timeout).await {
+            Ok(Ok(Some(est))) => {
                 // Session has been established, construct it
                 let session_id = est.session_id;
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
@@ -603,18 +600,19 @@ where
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
-                    let timeout = hopr_async_runtime::prelude::sleep(SESSION_READINESS_TIMEOUT);
-                    pin_mut!(timeout);
-                    match futures::future::select(surbs_ready_rx, timeout).await {
-                        Either::Left((Ok(surb_level), _)) => {
+                    match surbs_ready_rx
+                        .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
+                        .await
+                    {
+                        Ok(Ok(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
                         }
-                        Either::Left((Err(_), _)) => {
+                        Ok(Err(_)) => {
                             return Err(
                                 SessionManagerError::Other("surb balancer was cancelled prematurely".into()).into(),
                             );
                         }
-                        Either::Right(_) => {
+                        Err(_) => {
                             warn!(%session_id, "session didn't reach target SURB buffer size");
                         }
                     }
@@ -673,11 +671,11 @@ where
                     Err(SessionManagerError::Loopback.into())
                 }
             }
-            Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
+            Ok(Ok(None)) => Err(SessionManagerError::Other(
                 "internal error: sender has been closed without completing the session establishment".into(),
             )
             .into()),
-            Either::Left((Err(e), _)) => {
+            Ok(Err(e)) => {
                 // The other side did not allow us to establish a session
                 error!(
                     challenge = e.challenge,
@@ -686,7 +684,7 @@ where
                 );
                 Err(TransportSessionError::Rejected(e.reason))
             }
-            Either::Right(_) => {
+            Err(_) => {
                 // Timeout waiting for a session establishment
                 error!(challenge, "session initiation attempt timed out");
 

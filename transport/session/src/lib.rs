@@ -6,6 +6,7 @@
 //! The [`SessionManager`] allows for automatic management of sessions via the Start protocol.
 //!
 //! This crate implements [RFC-0007](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0007-session-protocol).
+
 pub(crate) mod balancer;
 pub mod errors;
 mod initiation;
