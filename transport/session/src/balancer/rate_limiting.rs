@@ -297,10 +297,15 @@ where
                         tracing::trace!("waiting done");
                         *this.state = SinkState::Ready;
                     } else {
-                        // Sleep the minimum amount of time to replenish at least one token
-                        *this.sleep = Some(futures_time::task::sleep(futures_time::time::Duration::from_micros(
-                            current_delay,
-                        )));
+                        if current_delay > 0 {
+                            // Sleep the minimum amount of time to replenish at least one token
+                            *this.sleep = Some(futures_time::task::sleep(futures_time::time::Duration::from_micros(
+                                current_delay,
+                            )));
+                        } else {
+                            *this.sleep =
+                                Some(futures_time::task::sleep(futures_time::time::Duration::from_millis(50)));
+                        }
                     }
                 }
             }
@@ -734,6 +739,53 @@ mod tests {
 
         let collected = rx.collect::<Vec<_>>().await;
         assert_eq!(input.into_iter().cycle().take(10).collect::<Vec<_>>(), collected);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn rate_limited_sink_should_not_send_when_zero_rate() -> anyhow::Result<()> {
+        let (tx, _) = futures::channel::mpsc::unbounded::<i32>();
+        let (tx, _) = tx.rate_limit_per_unit(0, Duration::from_millis(100));
+
+        pin_mut!(tx);
+
+        assert!(
+            tx.send(1i32)
+                .timeout(futures_time::time::Duration::from_millis(100))
+                .await
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn rate_limited_sink_should_recover_after_rate_is_increased() -> anyhow::Result<()> {
+        let (tx, rx) = futures::channel::mpsc::unbounded::<i32>();
+        let (tx, ctl) = tx.rate_limit_per_unit(0, Duration::from_millis(100));
+
+        pin_mut!(tx);
+
+        assert!(
+            tx.send(1i32)
+                .timeout(futures_time::time::Duration::from_millis(100))
+                .await
+                .is_err()
+        );
+
+        ctl.set_rate_per_unit(10, Duration::from_millis(10));
+
+        tx.send(2i32)
+            .timeout(futures_time::time::Duration::from_millis(100))
+            .await??;
+
+        pin_mut!(rx);
+        assert_eq!(
+            Some(2),
+            rx.next()
+                .timeout(futures_time::time::Duration::from_millis(100))
+                .await?
+        );
 
         Ok(())
     }
