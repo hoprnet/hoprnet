@@ -20,6 +20,16 @@ use crate::{
     },
 };
 
+#[cfg(all(not(test), feature = "prometheus"))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_FRAME_FINISH: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
+            "hopr_session_time_to_finish_frame",
+            "Measures time in milliseconds it takes a frame to be reassembled",
+            vec![1.0, 2.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 150.0, 200.0, 250.0, 300.0, 400.0, 500.0],
+        ).unwrap();
+}
+
 /// Reassembler is a stream adaptor that reads [`Segments`](Segment) from the underlying
 /// stream and tries to put them into correct order so they form a [`Frame`].
 ///
@@ -134,6 +144,10 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                                 Ok(_) => {
                                     tracing::trace!(frame_id = builder.frame_id(), %seg_id, "added segment");
                                     if builder.is_complete() {
+                                        #[cfg(feature = "prometheus")]
+                                        METRIC_TIME_TO_FRAME_FINISH
+                                            .observe(builder._created.elapsed().as_millis() as f64);
+
                                         tracing::trace!(frame_id = builder.frame_id(), "frame is complete");
                                         return Poll::Ready(Some(e.finalize().try_into()));
                                     }
@@ -146,6 +160,9 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                         FrameMapEntry::Vacant(e) => {
                             let builder = FrameBuilder::from(item);
                             if builder.is_complete() {
+                                #[cfg(feature = "prometheus")]
+                                METRIC_TIME_TO_FRAME_FINISH.observe(builder._created.elapsed().as_millis() as f64);
+
                                 tracing::trace!(frame_id = builder.frame_id(), "segment frame is complete");
                                 return Poll::Ready(Some(builder.try_into()));
                             } else {

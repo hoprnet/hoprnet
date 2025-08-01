@@ -20,9 +20,19 @@ serde = [
   "dep:bincode",
   "flagset/serde",
   "hopr-network-types/serde",
+  "hopr-protocol-session/serde",
 ]
-runtime-tokio = ["hopr-network-types/runtime-tokio", "dep:tokio"]
-prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
+runtime-tokio = [
+  "hopr-network-types/runtime-tokio",
+  "hopr-protocol-session/runtime-tokio",
+  "dep:tokio",
+]
+prometheus = [
+  "hopr-network-types/prometheus",
+  "hopr-protocol-session/prometheus",
+  "dep:hopr-metrics",
+  "dep:lazy_static",
+]
 
 [dependencies]
 aquamarine = { workspace = true }

@@ -521,7 +521,7 @@ where
 
                     // Sender responsible for keep-alive and Session data is counting produced SURBs
                     let scoring_sender = ScoringSink::new(msg_sender, surb_production_counter.clone(), |(_, data)| {
-                        HoprPacket::max_surbs_with_message(data.len()) as u64
+                        data.estimate_surbs_with_msg() as u64
                     });
 
                     // Spawn the SURB-bearing keep alive stream
@@ -904,7 +904,7 @@ where
                 if self.sessions.get(&session_id).await.is_some() {
                     trace!(?session_id, "received keep-alive request");
                 } else {
-                    error!(%session_id, "received keep-alive request for an unknown session");
+                    debug!(%session_id, "received keep-alive request for an unknown session");
                 }
             }
         }

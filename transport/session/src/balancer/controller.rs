@@ -21,13 +21,13 @@ lazy_static::lazy_static! {
     static ref METRIC_SURBS_CONSUMED: hopr_metrics::metrics::MultiCounter =
         hopr_metrics::metrics::MultiCounter::new(
             "hopr_surb_balancer_surbs_consumed",
-            "Estimations of the number of SURBs consumed by the counterparty",
+            "Estimations of SURBs consumed by the counterparty",
             &["session_id"]
     ).unwrap();
     static ref METRIC_SURBS_PRODUCED: hopr_metrics::metrics::MultiCounter =
         hopr_metrics::metrics::MultiCounter::new(
             "hopr_surb_balancer_surbs_produced",
-            "Estimations of the number of SURBs produced for the counterparty",
+            "Estimations of SURBs produced for the counterparty",
             &["session_id"]
     ).unwrap();
 }
@@ -170,15 +170,14 @@ where
         let error = self.current_target_buffer as i64 - self.cfg.target_surb_buffer_size as i64;
 
         if self.was_below_target && error >= 0 {
-            tracing::debug!(session_id = %self.session_id, current = self.current_target_buffer, "reached target SURB buffer size");
+            tracing::trace!(current = self.current_target_buffer, "reached target SURB buffer size");
             self.was_below_target = false;
         } else if !self.was_below_target && error < 0 {
-            tracing::debug!(session_id = %self.session_id, current = self.current_target_buffer, "SURB buffer size is below target");
+            tracing::trace!(current = self.current_target_buffer, "SURB buffer size is below target");
             self.was_below_target = true;
         }
 
         tracing::trace!(
-            session_id = %self.session_id,
             ?dt,
             delta = target_buffer_change,
             current = self.current_target_buffer,
@@ -192,7 +191,10 @@ where
         let corrected_output = output.output.clamp(0.0, self.cfg.max_surbs_per_sec as f64);
         self.controller.adjust_surb_flow(corrected_output as usize);
 
-        tracing::trace!(control_output = corrected_output, "next control output");
+        tracing::debug!(
+            control_output = corrected_output,
+            "next balancer control output for session"
+        );
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {

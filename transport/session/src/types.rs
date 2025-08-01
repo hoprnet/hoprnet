@@ -304,6 +304,7 @@ impl Session {
                 frame_size: 1500,
                 frame_timeout: Duration::from_millis(800),
                 capacity: 16384,
+                flush_immediately: capabilities.contains(Capability::NoDelay),
                 ..Default::default()
             };
 
@@ -321,8 +322,6 @@ impl Session {
                     max_outgoing_frame_retries: 2,
                     ..Default::default()
                 };
-
-                // TODO: The NoDelay capability is currently unused
 
                 debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
 

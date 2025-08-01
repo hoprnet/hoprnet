@@ -10,9 +10,10 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["hashbrown"]
-serde = ["dep:serde", "hopr-crypto-packet/serde"]
+serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 session-types = []
 
 [dependencies]
@@ -26,10 +27,12 @@ futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
 hex = { workspace = true }
 hashbrown = { workspace = true, optional = true }
+lazy_static = { workspace = true, optional = true }
 pin-project = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -40,6 +43,7 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -53,7 +57,6 @@ test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true, features = ["io-util", "io-std", "net", "signal"] }
 tokio-util = { workspace = true }
 
-hopr-protocol-session = { workspace = true }
 hopr-network-types = { workspace = true, features = [
   "capture",
   "runtime-tokio",
