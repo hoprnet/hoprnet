@@ -4966,6 +4966,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-protocol-start"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "hopr-crypto-packet",
+ "hopr-transport-packet",
+ "serde",
+ "serde_cbor_2",
+ "strum 0.27.2",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "hopr-strategy"
 version = "0.14.1"
 dependencies = [
@@ -8930,6 +8943,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bef2ebfde456fb76bbcf9f59315333decc4fda0b2b44b420243c11e0f5ec1f5"
 dependencies = [
  "half 1.8.3",
+ "serde",
+]
+
+[[package]]
+name = "serde_cbor_2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34aec2709de9078e077090abd848e967abab63c9fb3fdb5d4799ad359d8d482c"
+dependencies = [
+ "half 2.6.0",
  "serde",
 ]
 

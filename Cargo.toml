@@ -32,6 +32,7 @@ members = [
   "misc/metrics",
   "misc/platform",
   "protocols/session",
+  "protocols/start",
   "transport/api",
   "transport/bloom",
   "transport/identity",
