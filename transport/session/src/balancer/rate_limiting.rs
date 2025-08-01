@@ -296,16 +296,14 @@ where
 
                         tracing::trace!("waiting done");
                         *this.state = SinkState::Ready;
+                    } else if current_delay > 0 {
+                        // Sleep the minimum amount of time to replenish at least one token
+                        *this.sleep = Some(futures_time::task::sleep(futures_time::time::Duration::from_micros(
+                            current_delay,
+                        )));
                     } else {
-                        if current_delay > 0 {
-                            // Sleep the minimum amount of time to replenish at least one token
-                            *this.sleep = Some(futures_time::task::sleep(futures_time::time::Duration::from_micros(
-                                current_delay,
-                            )));
-                        } else {
-                            *this.sleep =
-                                Some(futures_time::task::sleep(futures_time::time::Duration::from_millis(50)));
-                        }
+                        // Sleep for some fixed duration if the rate is 0
+                        *this.sleep = Some(futures_time::task::sleep(futures_time::time::Duration::from_millis(50)));
                     }
                 }
             }

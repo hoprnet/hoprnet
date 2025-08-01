@@ -37,19 +37,23 @@ flagset::flags! {
     #[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
     pub enum Capability : u8 {
         /// Frame segmentation.
-        Segmentation = 0b1000,
+        Segmentation = 0b0000_1000,
         /// Frame retransmission (ACK-based)
         ///
         /// Implies [`Segmentation`].
-        RetransmissionAck = 0b1100,
+        RetransmissionAck = 0b0000_1100,
         /// Frame retransmission (NACK-based)
         ///
         /// Implies [`Segmentation`].
-        RetransmissionNack = 0b1010,
+        RetransmissionNack = 0b000_1010,
         /// Disable packet buffering.
         ///
         /// Implies [`Segmentation`].
-        NoDelay = 0b1001,
+        NoDelay = 0b0000_1001,
+        /// Disable SURB-based egress rate control.
+        ///
+        /// This applies only to the recipient of the Session (Exit).
+        NoRateControl = 0b0001_0000,
     }
 }
 

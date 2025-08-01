@@ -2,9 +2,11 @@ use std::fmt::Display;
 
 use pid::Pid;
 
-use crate::balancer::{SurbFlowController, SurbFlowEstimator};
-use crate::errors;
-use crate::errors::SessionManagerError;
+use crate::{
+    balancer::{SurbFlowController, SurbFlowEstimator},
+    errors,
+    errors::SessionManagerError,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -101,13 +103,15 @@ pub struct SurbBalancerConfig {
     /// locally or remotely (at the counterparty) at all times.
     ///
     /// The local buffer is maintained by [regulating](SurbFlowController) the egress from the Session.
-    /// The remote buffer (at session counterparty) is maintained by regulating the flow of non-organic SURBs via [keep-alive messages](crate::initiation::StartProtocol::KeepAlive).
+    /// The remote buffer (at session counterparty) is maintained by regulating the flow of non-organic SURBs via
+    /// [keep-alive messages](crate::initiation::StartProtocol::KeepAlive).
     #[default(5_000)]
     pub target_surb_buffer_size: u64,
     /// Maximum outflow of SURBs.
     ///
-    /// - n the context of the local SURB buffer, this is the maximum egress Session traffic
-    /// - In the context of the remote SURB buffer, this is the maximum egress of keep-alive messages to the counterparty
+    /// - In the context of the local SURB buffer, this is the maximum egress Session traffic.
+    /// - In the context of the remote SURB buffer, this is the maximum egress of keep-alive messages to the
+    ///   counterparty.
     ///
     /// The default is 2500 (which is 1250 packets/second currently)
     #[default(2_500)]
@@ -116,6 +120,12 @@ pub struct SurbBalancerConfig {
     ///
     /// Default is (0.6, 0.7, 0.2), suitable for active SURB balancing.
     pub gains: ControllerGains,
+    /// If set to `true`, the control output will be inverted with respect to `max_surbs_per_sec`
+    /// (i.e.: `output = max_surbs_per_sec - output`).
+    ///
+    /// Default is false
+    #[default(false)]
+    pub invert_output: bool,
 }
 
 /// Runs a continuous process that attempts to [evaluate](SurbFlowEstimator) and
@@ -258,7 +268,13 @@ where
         );
 
         let output = self.pid.next_control_output(self.current_target_buffer as f64);
-        let corrected_output = output.output.clamp(0.0, self.cfg.max_surbs_per_sec as f64);
+
+        // Clamp the control output between [0, max_surbs_per_sec] and invert if needed
+        let mut corrected_output = output.output.clamp(0.0, self.cfg.max_surbs_per_sec as f64);
+        if self.cfg.invert_output {
+            corrected_output = self.cfg.max_surbs_per_sec as f64 - corrected_output;
+        }
+
         self.controller.adjust_surb_flow(corrected_output as usize);
 
         tracing::debug!(

@@ -165,6 +165,8 @@ pub enum SessionCapability {
     RetransmissionAckOnly,
     /// Disable packet buffering
     NoDelay,
+    /// Disable SURB-based egress rate control at the Exit.
+    NoRateControl,
 }
 
 impl From<SessionCapability> for hopr_lib::SessionCapabilities {
@@ -176,6 +178,7 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
             }
             SessionCapability::RetransmissionAckOnly => hopr_lib::SessionCapability::RetransmissionAck.into(),
             SessionCapability::NoDelay => hopr_lib::SessionCapability::NoDelay.into(),
+            SessionCapability::NoRateControl => hopr_lib::SessionCapability::NoRateControl.into(),
         }
     }
 }
