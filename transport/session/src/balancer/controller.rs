@@ -174,28 +174,7 @@ where
     ) -> Self {
         // Initialize the PID controller with default tuned gains
         let max_surbs_per_sec = cfg.max_surbs_per_sec as f64;
-        let mut pid = Pid::new(cfg.target_surb_buffer_size as f64, max_surbs_per_sec);
-        pid.p(
-            std::env::var("HOPR_BALANCER_PID_P_GAIN")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(cfg.gains.p()),
-            max_surbs_per_sec,
-        );
-        pid.i(
-            std::env::var("HOPR_BALANCER_PID_I_GAIN")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(cfg.gains.i()),
-            max_surbs_per_sec,
-        );
-        pid.d(
-            std::env::var("HOPR_BALANCER_PID_D_GAIN")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(cfg.gains.d()),
-            max_surbs_per_sec,
-        );
+        let pid = Pid::new(cfg.target_surb_buffer_size as f64, max_surbs_per_sec);
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -204,7 +183,7 @@ where
             METRIC_CONTROL_OUTPUT.set(&[&sid], 0.0);
         }
 
-        Self {
+        let mut ret = Self {
             surb_production_estimator,
             surb_consumption_estimator,
             controller,
@@ -216,7 +195,10 @@ where
             last_surbs_used: 0,
             last_update: std::time::Instant::now(),
             was_below_target: true,
-        }
+        };
+
+        ret.reconfigure(cfg);
+        ret
     }
 
     /// Computes the next control update and adjusts the [`SurbFlowController`] rate accordingly.
@@ -296,6 +278,47 @@ where
     #[allow(unused)]
     pub fn set_exact_target_buffer_size(&mut self, target_buffer_size: u64) {
         self.current_target_buffer = target_buffer_size;
+    }
+
+    /// Gets the current configuration.
+    pub fn config(&self) -> &SurbBalancerConfig {
+        &self.cfg
+    }
+
+    /// Allows reconfiguring the instance.
+    pub fn reconfigure(&mut self, cfg: SurbBalancerConfig) {
+        let max_surbs_per_sec = cfg.max_surbs_per_sec as f64;
+        self.pid.setpoint = cfg.target_surb_buffer_size as f64;
+        self.pid.output_limit = cfg.max_surbs_per_sec as f64;
+        self.pid.p(
+            std::env::var("HOPR_BALANCER_PID_P_GAIN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(cfg.gains.p()),
+            max_surbs_per_sec,
+        );
+        self.pid.i(
+            std::env::var("HOPR_BALANCER_PID_I_GAIN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(cfg.gains.i()),
+            max_surbs_per_sec,
+        );
+        self.pid.d(
+            std::env::var("HOPR_BALANCER_PID_D_GAIN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(cfg.gains.d()),
+            max_surbs_per_sec,
+        );
+        tracing::debug!(
+            session_id = %self.session_id,
+            p = self.pid.kp,
+            i = self.pid.ki,
+            d = self.pid.kd,
+            target = self.pid.setpoint,
+            "reconfigured balancer"
+        );
     }
 }
 
