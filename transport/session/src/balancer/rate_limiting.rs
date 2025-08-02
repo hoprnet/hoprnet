@@ -9,17 +9,36 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::Stream;
 use futures_time::task::Sleep;
 use pin_project::pin_project;
 
 /// Controller for [`RateLimitedStream`] to allow dynamic controlling of the stream's rate.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RateController(Arc<AtomicU64>);
+
+impl Default for RateController {
+    fn default() -> Self {
+        Self(Arc::new(AtomicU64::new(0)))
+    }
+}
+
+fn rate_from_delay(delay_micros: u64) -> f64 {
+    if delay_micros > 0 {
+        1.0 / Duration::from_micros(delay_micros).as_secs_f64()
+    } else {
+        0.0
+    }
+}
 
 #[allow(unused)]
 impl RateController {
     const MIN_DELAY: Duration = Duration::from_micros(100);
+
+    pub fn new(elements_per_unit: usize, unit: Duration) -> Self {
+        let rc = RateController::default();
+        rc.set_rate_per_unit(elements_per_unit, unit);
+        rc
+    }
 
     /// Update the rate limit (elements per unit).
     pub fn set_rate_per_unit(&self, elements_per_unit: usize, unit: Duration) {
@@ -29,8 +48,7 @@ impl RateController {
             // Calculate the next allowable time based on the rate
             let rate_per_sec = (elements_per_unit as f64 / unit.as_secs_f64());
 
-            // Convert to duration (seconds per element) and subtract the duration
-            // it took to yield the element from the inner stream
+            // Convert to duration (seconds per element)
             let new_rate = Duration::from_secs_f64(1.0 / rate_per_sec)
                 .max(Self::MIN_DELAY)
                 .as_micros()
@@ -42,18 +60,23 @@ impl RateController {
         }
     }
 
+    /// Checks whether the rate is set to 0 at this controller.
+    pub fn has_zero_rate(&self) -> bool {
+        self.0.load(Ordering::Relaxed) == 0
+    }
+
+    /// Gets the delay per element (inverse rate).
+    pub fn get_delay_per_element(&self) -> Duration {
+        Duration::from_micros(self.0.load(Ordering::Relaxed))
+    }
+
     /// Get the current rate limit per time unit.
     pub fn get_rate_per_sec(&self) -> f64 {
-        let delim = self.0.load(Ordering::Relaxed);
-        if delim > 0 {
-            1.0 / Duration::from_micros(delim).as_secs_f64()
-        } else {
-            0.0
-        }
+        rate_from_delay(self.0.load(Ordering::Relaxed))
     }
 }
 
-enum State {
+enum StreamState {
     Read,
     NoRate,
     Wait,
@@ -61,44 +84,45 @@ enum State {
 
 /// A stream adapter that yields elements at a controlled rate, with dynamic rate adjustment.
 ///
-/// See [`RateLimitExt::rate_limit_per_unit`].
+/// See [`RateLimitStreamExt::rate_limit_per_unit`].
+#[must_use = "streams do nothing unless polled"]
 #[pin_project]
-pub struct RateLimitedStream<S: Stream> {
+pub struct RateLimitedStream<S: futures::Stream> {
     #[pin]
     inner: S,
     item: Option<S::Item>,
     #[pin]
     delay: Option<Sleep>,
-    state: State,
+    state: StreamState,
     delay_time: Arc<AtomicU64>,
 }
 
-impl<S: Stream> RateLimitedStream<S> {
+impl<S: futures::Stream> RateLimitedStream<S> {
+    /// Creates a stream with rate limit controllable using the given controller.
+    pub fn new_with_controller(stream: S, controller: &RateController) -> Self {
+        Self {
+            inner: stream,
+            item: None,
+            delay: None,
+            state: if controller.0.load(Ordering::Relaxed) > 0 {
+                StreamState::Read
+            } else {
+                StreamState::NoRate
+            },
+            delay_time: controller.0.clone(),
+        }
+    }
+
     /// Creates a stream with some initial rate limit of elements per a time unit.
     pub fn new_with_rate_per_unit(stream: S, initial_rate_per_unit: usize, unit: Duration) -> (Self, RateController) {
-        let rc = RateController(Arc::new(AtomicU64::new(0)));
-        rc.set_rate_per_unit(initial_rate_per_unit, unit);
-
-        (
-            Self {
-                inner: stream,
-                item: None,
-                delay: None,
-                state: if initial_rate_per_unit > 0 {
-                    State::Read
-                } else {
-                    State::NoRate
-                },
-                delay_time: rc.0.clone(),
-            },
-            rc,
-        )
+        let rc = RateController::new(initial_rate_per_unit, unit);
+        (Self::new_with_controller(stream, &rc), rc)
     }
 }
 
-impl<S, T> Stream for RateLimitedStream<S>
+impl<S, T> futures::Stream for RateLimitedStream<S>
 where
-    S: Stream<Item = T> + Unpin,
+    S: futures::Stream<Item = T> + Unpin,
 {
     type Item = T;
 
@@ -107,7 +131,7 @@ where
 
         loop {
             match this.state {
-                State::Read => {
+                StreamState::Read => {
                     let yield_start = Instant::now();
                     if let Some(item) = futures::ready!(this.inner.as_mut().poll_next(cx)) {
                         *this.item = Some(item);
@@ -117,16 +141,16 @@ where
                                 .saturating_sub(yield_start.elapsed())
                                 .max(RateController::MIN_DELAY);
                             *this.delay = Some(futures_time::task::sleep(wait.into()));
-                            *this.state = State::Wait;
+                            *this.state = StreamState::Wait;
                         } else {
                             *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
-                            *this.state = State::NoRate;
+                            *this.state = StreamState::NoRate;
                         }
                     } else {
                         return Poll::Ready(None);
                     }
                 }
-                State::NoRate => {
+                StreamState::NoRate => {
                     if let Some(mut delay) = this.delay.as_mut().as_pin_mut() {
                         let _ = futures::ready!(delay.as_mut().poll(cx));
                     }
@@ -134,19 +158,19 @@ where
                     if delay_time > 0 {
                         *this.delay = Some(futures_time::task::sleep(Duration::from_micros(delay_time).into()));
                         if this.item.is_some() {
-                            *this.state = State::Wait;
+                            *this.state = StreamState::Wait;
                         } else {
-                            *this.state = State::Read;
+                            *this.state = StreamState::Read;
                         }
                     } else {
                         *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
-                        *this.state = State::NoRate;
+                        *this.state = StreamState::NoRate;
                     }
                 }
-                State::Wait => {
+                StreamState::Wait => {
                     if let Some(mut delay) = this.delay.as_mut().as_pin_mut() {
                         let _ = futures::ready!(delay.as_mut().poll(cx));
-                        *this.state = State::Read;
+                        *this.state = StreamState::Read;
                         return Poll::Ready(this.item.take());
                     }
                 }
@@ -156,9 +180,10 @@ where
 }
 
 /// Extension trait to add rate limiting to any stream
-pub trait RateLimitExt: Stream + Sized {
-    /// Creates a rate-limited stream that yields elements at the given rate. Moreover,
-    /// the rate can be controlled dynamically during the lifetime of the stream by using
+pub trait RateLimitStreamExt: futures::Stream + Sized {
+    /// Creates a rate-limited stream that yields elements at the given rate.
+    ///
+    /// The rate can be controlled dynamically during the lifetime of the stream by using
     /// the returned [`RateController`].
     ///
     /// If `elements_per_unit` is 0, the stream will not yield until the limit is changed
@@ -170,16 +195,188 @@ pub trait RateLimitExt: Stream + Sized {
     ) -> (RateLimitedStream<Self>, RateController) {
         RateLimitedStream::new_with_rate_per_unit(self, elements_per_unit, unit)
     }
+
+    /// Creates a rate-limited stream that yields elements at the given rate.
+    ///
+    /// The rate can be controlled dynamically during the lifetime of the stream by using
+    /// the given [`RateController`].
+    ///
+    /// If the `controller` has [zero rate](RateController::has_zero_rate),
+    /// the stream will not yield until the limit is
+    /// changed using the [`RateController`] to a non-zero value.
+    fn rate_limit_with_controller(self, controller: &RateController) -> RateLimitedStream<Self> {
+        RateLimitedStream::new_with_controller(self, controller)
+    }
 }
 
-impl<S: Stream + Sized> RateLimitExt for S {}
+impl<S: futures::Stream + Sized> RateLimitStreamExt for S {}
+
+/// A sink adapter that allows ingesting items at a controlled rate, with dynamic rate adjustment.
+///
+/// If the underlying Sink is cloneable, this object will be cloneable too, each clone having
+/// the same rate-limit. Therefore, the total rate-limit is multiple of the number of clones
+/// of this sink.
+///
+/// See [`RateLimitSinkExt::rate_limit_per_unit`].
+#[must_use = "sinks do nothing unless polled"]
+#[pin_project]
+pub struct RateLimitedSink<S> {
+    #[pin]
+    inner: S,
+    delay_micros: Arc<AtomicU64>,
+    tokens: u64,
+    last_check: Option<Instant>,
+    #[pin]
+    sleep: Option<Sleep>,
+    state: SinkState,
+}
+
+enum SinkState {
+    Ready,
+    Waiting,
+}
+
+impl<S> RateLimitedSink<S> {
+    /// Creates a sink with ingestion rate controllable using the given controller.
+    pub fn new_with_controller(inner: S, controller: &RateController) -> Self {
+        Self {
+            inner,
+            delay_micros: controller.0.clone(),
+            tokens: 0,
+            last_check: None,
+            sleep: None,
+            state: SinkState::Ready,
+        }
+    }
+
+    /// Creates a sink with some initial rate limit of elements per a time unit.
+    pub fn new_with_rate_per_unit(inner: S, initial_rate_per_unit: usize, unit: Duration) -> (Self, RateController) {
+        let rc = RateController::new(initial_rate_per_unit, unit);
+        (Self::new_with_controller(inner, &rc), rc)
+    }
+}
+
+impl<S, Item> futures::Sink<Item> for RateLimitedSink<S>
+where
+    S: futures::Sink<Item> + Unpin,
+{
+    type Error = S::Error;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
+        let mut this = self.project();
+
+        loop {
+            let current_delay = this.delay_micros.load(Ordering::Relaxed);
+            let current_rate_limit = rate_from_delay(current_delay);
+
+            if let Some(last_check) = this.last_check.as_mut() {
+                *this.tokens += (current_rate_limit * last_check.elapsed().as_secs_f64()).round() as u64;
+                *last_check = Instant::now();
+            } else {
+                // This happens only on the first poll_ready
+                *this.last_check = Some(Instant::now());
+            }
+
+            match this.state {
+                SinkState::Ready => {
+                    if *this.tokens > 0 {
+                        futures::ready!(this.inner.as_mut().poll_ready(cx))?;
+
+                        tracing::trace!(tokens = *this.tokens, "tokens left");
+                        return Poll::Ready(Ok(()));
+                    } else {
+                        tracing::trace!("no tokens left");
+                        *this.state = SinkState::Waiting;
+                    }
+                }
+                SinkState::Waiting => {
+                    if let Some(sleep) = this.sleep.as_mut().as_pin_mut() {
+                        futures::ready!(sleep.poll(cx));
+                        this.sleep.set(None);
+
+                        tracing::trace!("waiting done");
+                        *this.state = SinkState::Ready;
+                    } else if current_delay > 0 {
+                        // Sleep the minimum amount of time to replenish at least one token
+                        *this.sleep = Some(futures_time::task::sleep(futures_time::time::Duration::from_micros(
+                            current_delay,
+                        )));
+                    } else {
+                        // Sleep for some fixed duration if the rate is 0
+                        *this.sleep = Some(futures_time::task::sleep(futures_time::time::Duration::from_millis(50)));
+                    }
+                }
+            }
+        }
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: Item) -> Result<(), S::Error> {
+        let this = self.project();
+        if *this.tokens > 0 {
+            *this.tokens -= 1;
+            tracing::trace!("token consumed");
+            this.inner.start_send(item)
+        } else {
+            panic!("start_send called without poll_ready");
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
+        self.project().inner.poll_close(cx)
+    }
+}
+
+impl<S: Clone> Clone for RateLimitedSink<S> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            delay_micros: self.delay_micros.clone(),
+            tokens: 0,
+            last_check: None,
+            sleep: None,
+            state: SinkState::Ready,
+        }
+    }
+}
+
+/// Extension trait to add rate limiting to any sink.
+pub trait RateLimitSinkExt<T>: futures::Sink<T> + Sized {
+    /// Creates a rate-limited sink that allows ingesting items at the given rate.
+    ///
+    /// The rate can be controlled dynamically during the lifetime of the sink by using
+    /// the returned [`RateController`].
+    ///
+    /// If `elements_per_unit` is 0, the sink will not ingest items until the limit is changed
+    /// using the [`RateController`] to a non-zero value.
+    fn rate_limit_per_unit(self, elements_per_unit: usize, unit: Duration) -> (RateLimitedSink<Self>, RateController) {
+        RateLimitedSink::new_with_rate_per_unit(self, elements_per_unit, unit)
+    }
+
+    /// Creates a rate-limited sink that allows ingesting items at the given rate.
+    ///
+    /// The rate can be controlled dynamically during the lifetime of the sink by using
+    /// the given [`RateController`].
+    ///
+    /// If the `controller` has [zero rate](RateController::has_zero_rate),
+    /// the sink will not ingest items until the limit is
+    /// changed using the [`RateController`] to a non-zero value.
+    fn rate_limit_with_controller(self, controller: &RateController) -> RateLimitedSink<Self> {
+        RateLimitedSink::new_with_controller(self, controller)
+    }
+}
+
+impl<T, S: futures::Sink<T> + Sized> RateLimitSinkExt<T> for S {}
 
 #[cfg(test)]
 mod tests {
     use std::time::{Duration, Instant};
 
     use futures::{
-        pin_mut,
+        SinkExt, pin_mut,
         stream::{self, StreamExt},
     };
     use futures_time::future::FutureExt;
@@ -474,5 +671,120 @@ mod tests {
         // Verify results
         assert_eq!(items.len(), 10, "Should have received all 10 items");
         assert_eq!(new_rate, 20, "Rate should have been changed to 20");
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn rate_limited_sink_should_respect_rate() -> anyhow::Result<()> {
+        let (tx, rx) = futures::channel::mpsc::unbounded::<i32>();
+        let (tx, _) = tx.rate_limit_per_unit(5, Duration::from_millis(100));
+
+        let input = (0..10).collect::<Vec<_>>();
+
+        let start = Instant::now();
+        pin_mut!(tx);
+        tx.send_all(&mut futures::stream::iter(input.clone()).map(Ok))
+            .timeout(futures_time::time::Duration::from_millis(500))
+            .await??;
+
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed >= Duration::from_millis(200),
+            "sending took too little {elapsed:?}"
+        );
+
+        tx.close().await?;
+
+        let collected = rx.collect::<Vec<_>>().await;
+        assert_eq!(input, collected);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn rate_limited_sink_should_replenish_when_idle() -> anyhow::Result<()> {
+        let (tx, rx) = futures::channel::mpsc::unbounded::<i32>();
+        let (tx, _) = tx.rate_limit_per_unit(5, Duration::from_millis(100));
+
+        pin_mut!(tx);
+
+        let input = (0..5).collect::<Vec<_>>();
+
+        let start = Instant::now();
+        tx.send_all(&mut futures::stream::iter(input.clone()).map(Ok))
+            .timeout(futures_time::time::Duration::from_millis(500))
+            .await??;
+
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed < Duration::from_millis(120),
+            "sending took too much {elapsed:?}"
+        );
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let start = Instant::now();
+        tx.send_all(&mut futures::stream::iter(input.clone()).map(Ok))
+            .timeout(futures_time::time::Duration::from_millis(500))
+            .await??;
+
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed < Duration::from_millis(120),
+            "sending took too much {elapsed:?}"
+        );
+
+        tx.close().await?;
+
+        let collected = rx.collect::<Vec<_>>().await;
+        assert_eq!(input.into_iter().cycle().take(10).collect::<Vec<_>>(), collected);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn rate_limited_sink_should_not_send_when_zero_rate() -> anyhow::Result<()> {
+        let (tx, _) = futures::channel::mpsc::unbounded::<i32>();
+        let (tx, _) = tx.rate_limit_per_unit(0, Duration::from_millis(100));
+
+        pin_mut!(tx);
+
+        assert!(
+            tx.send(1i32)
+                .timeout(futures_time::time::Duration::from_millis(100))
+                .await
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn rate_limited_sink_should_recover_after_rate_is_increased() -> anyhow::Result<()> {
+        let (tx, rx) = futures::channel::mpsc::unbounded::<i32>();
+        let (tx, ctl) = tx.rate_limit_per_unit(0, Duration::from_millis(100));
+
+        pin_mut!(tx);
+
+        assert!(
+            tx.send(1i32)
+                .timeout(futures_time::time::Duration::from_millis(100))
+                .await
+                .is_err()
+        );
+
+        ctl.set_rate_per_unit(10, Duration::from_millis(10));
+
+        tx.send(2i32)
+            .timeout(futures_time::time::Duration::from_millis(100))
+            .await??;
+
+        pin_mut!(rx);
+        assert_eq!(
+            Some(2),
+            rx.next()
+                .timeout(futures_time::time::Duration::from_millis(100))
+                .await?
+        );
+
+        Ok(())
     }
 }

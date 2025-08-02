@@ -5,26 +5,23 @@ use std::{
 };
 
 use futures::{
-    FutureExt, SinkExt, StreamExt, TryStreamExt,
-    channel::mpsc::UnboundedSender,
-    future::{AbortHandle, Either},
-    pin_mut,
+    FutureExt, SinkExt, StreamExt, TryStreamExt, channel::mpsc::UnboundedSender, future::AbortHandle, pin_mut,
 };
+use futures_time::future::FutureExt as TimeExt;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
+use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget,
-    balancer::{RateController, RateLimitExt, SurbBalancer, SurbFlowController},
+    Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    balancer::{RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer, SurbFlowController},
     errors::{SessionManagerError, TransportSessionError},
-    initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
-    types::ClosureReason,
-    utils::ScoringSink,
+    types::{ByteCapabilities, ClosureReason, HoprStartProtocol},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -96,9 +93,19 @@ pub struct SessionManagerConfig {
     /// The sampling interval for SURB balancer.
     /// It will make SURB control decisions regularly at this interval.
     ///
-    /// Default is 500 milliseconds.
-    #[default(Duration::from_millis(500))]
+    /// Default is 100 milliseconds.
+    #[default(Duration::from_millis(100))]
     pub balancer_sampling_interval: Duration,
+
+    /// Initial packets per second egress rate on an incoming Session.
+    ///
+    /// This applies to incoming Sessions without the [`Capability::NoRateControl`] flag set.
+    /// The SURB balancer will then gradually increase the egress rate as more SURBs are received,
+    /// all the way until [`MAX_RETURN_PACKETS_PER_SEC`].
+    ///
+    /// Default is 10 packets/second.
+    #[default(10)]
+    pub initial_return_session_egress_rate: usize,
 }
 
 fn close_session(session_id: SessionId, session_data: CachedSession, reason: ClosureReason) {
@@ -128,6 +135,8 @@ where
     V: Clone + Send + Sync + 'static,
     F: Fn(Option<K>) -> K,
 {
+    cache.run_pending_tasks().await;
+
     let initial = generator(None);
     let mut next = initial;
     loop {
@@ -160,7 +169,7 @@ where
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
 
-/// Maximum time to wait for counterparty to receive the target amount of SURBs.
+/// Maximum time to wait for counterparty to receive the target number of SURBs.
 const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 
 // Needs to use an UnboundedSender instead of oneshot
@@ -187,16 +196,20 @@ pub enum DispatchResult {
     Unrelated(ApplicationData),
 }
 
-pub(crate) struct KeepAliveController(pub(crate) RateController);
+/// Wraps a [`RateController`] as [`SurbFlowController`] with the given correction
+/// factor on time unit.
+///
+/// For example, when this is used to control flow of keep-alive messages (carrying SURBs),
+/// the correction factor is `HoprPacket::MAX_SURBS_IN_PACKET` - which is the number of SURBs
+/// a single keep-alive message can bear.
+///
+/// In another case, when this is used to control the egress of a Session, each outgoing packet
+/// consumes only a single SURB and therefore the correction factor is `1`.
+pub(crate) struct SurbControllerWithCorrection(pub RateController, pub u32);
 
-impl SurbFlowController for KeepAliveController {
+impl SurbFlowController for SurbControllerWithCorrection {
     fn adjust_surb_flow(&self, surbs_per_sec: usize) {
-        // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
-        // so the correction by this factor is applied.
-        self.0.set_rate_per_unit(
-            surbs_per_sec,
-            HoprPacket::MAX_SURBS_IN_PACKET as u32 * Duration::from_secs(1),
-        );
+        self.0.set_rate_per_unit(surbs_per_sec, self.1 * Duration::from_secs(1));
     }
 }
 
@@ -204,25 +217,28 @@ fn spawn_keep_alive_stream<S>(
     session_id: SessionId,
     sender: S,
     routing: DestinationRouting,
-) -> (KeepAliveController, AbortHandle)
+) -> (SurbControllerWithCorrection, AbortHandle)
 where
     S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    let elem = StartProtocol::KeepAlive(session_id.into());
+    let elem = HoprStartProtocol::KeepAlive(session_id.into());
 
     // The stream is suspended until the caller sets a rate via the Controller
-    let (ka_stream, controller) = futures::stream::repeat(elem).rate_limit_per_unit(0, Duration::from_secs(1));
+    let controller = RateController::new(0, Duration::from_secs(1));
 
-    let (abort_handle, reg) = AbortHandle::new_pair();
+    let (ka_stream, abort_handle) =
+        futures::stream::abortable(futures::stream::repeat(elem).rate_limit_with_controller(&controller));
+
     let sender_clone = sender.clone();
     let fwd_routing_clone = routing.clone();
 
     // This task will automatically terminate once the returned abort handle is used.
     debug!(%session_id, "spawning keep-alive stream");
     hopr_async_runtime::prelude::spawn(
-        futures::stream::Abortable::new(ka_stream, reg)
+        ka_stream
             .map(move |msg| ApplicationData::try_from(msg).map(|m| (fwd_routing_clone.clone(), m)))
+            .map_err(TransportSessionError::from)
             .try_for_each_concurrent(None, move |msg| {
                 let mut sender_clone = sender_clone.clone();
                 async move {
@@ -241,7 +257,12 @@ where
             }),
     );
 
-    (KeepAliveController(controller), abort_handle)
+    // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
+    // so the correction by this factor is applied.
+    (
+        SurbControllerWithCorrection(controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
+        abort_handle,
+    )
 }
 
 type SessionNotifiers = (
@@ -262,10 +283,43 @@ type SessionNotifiers = (
 /// the [message transport `S`](SendMsg) is required.
 /// Such transport must also be `Clone`, since it will be cloned into the created [`Session`] objects.
 ///
-/// The manager also can take care of [SURB balancing](SurbBalancerConfig) per Session. When enabled,
-/// a desired target level of SURBs at the Session counterparty is set. According to measured
-/// inflow and outflow of SURBS to/from the counterparty, the production of non-organic SURBs
-/// through keep-alive messages (sent to counterparty) is controlled to maintain that target level.
+/// ## SURB balancing
+/// The manager also can take care of automatic [SURB balancing](SurbBalancerConfig) per Session.
+///
+/// With each packet sent from the session initiator over to the receiving party, zero to 2 SURBs might be delivered.
+/// When the receiving party wants to send reply packets back, it must consume 1 SURB per packet. This
+/// means that if the difference between the SURBs delivered and SURBs consumed is negative, the receiving party
+/// might soon run out of SURBs. If SURBs run out, the reply packets will be dropped, causing likely quality of
+/// service degradation.
+///
+/// In an attempt to counter this effect, there are two co-existing automated modes of SURB balancing:
+/// *local SURB balancing* and *remote SURB balancing*.
+///
+/// ### Local SURB balancing
+/// Local SURB balancing is performed on the sessions that were initiated by another party (and are
+/// therefore incoming to us).
+/// The local SURB balancing mechanism continuously evaluates the rate of SURB consumption and retrieval,
+/// and if SURBs are running out, the packet egress shaping takes effect. This by itself does not
+/// avoid the depletion of SURBs, but slows it down in the hope that the initiating party can deliver
+/// more SURBs over time. This might happen either organically by sending effective payloads that
+/// allow non-zero number of SURBs in the packet, or non-organically by delivering KeepAlive messages
+/// via *remote SURB balancing*.
+///
+/// The egress shaping is done automatically, unless the Session initiator sets the [`Capability::NoRateControl`]
+/// flag during Session initiation.
+///
+/// ### Remote SURB balancing
+/// Remote SURB balancing is performed by the Session initiator. The SURB balancer estimates the number of SURBs
+/// delivered to the other party, and also the number of SURBs consumed by seeing the amount of traffic received
+/// in replies.
+/// When enabled, a desired target level of SURBs at the Session counterparty is set. According to measured
+/// inflow and outflow of SURBS to/from the counterparty, the production of non-organic SURBs is started
+/// via keep-alive messages (sent to counterparty) and is controlled to maintain that target level.
+///
+/// In other words, the Session initiator tries to compensate for the usage of SURBs by the counterparty by
+/// sending new ones via the keep-alive messages.
+///
+/// This mechanism is configurable via the `surb_management` field in [`SessionClientConfig`].
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
@@ -293,16 +347,21 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
 /// Smallest possible interval for balancer sampling.
 pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
 
+/// Maximum number of packets per second on a return path Session.
+///
+/// This is currently ~20 MB/s
+pub const MAX_RETURN_PACKETS_PER_SEC: usize = 20_000;
+
 impl<S> SessionManager<S>
 where
     S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
-    S::Error: std::error::Error + Send + Sync + 'static,
+    S::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
     pub fn new(mut cfg: SessionManagerConfig) -> Self {
         let min_session_tag_range_reservation = ReservedTag::range().end;
         debug_assert!(
-            min_session_tag_range_reservation > StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG.as_u64(),
+            min_session_tag_range_reservation > HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG.as_u64(),
             "invalid tag reservation range"
         );
 
@@ -435,9 +494,7 @@ where
         target: SessionTarget,
         cfg: SessionClientConfig,
     ) -> crate::errors::Result<Session> {
-        self.session_initiations.run_pending_tasks().await;
         self.sessions.run_pending_tasks().await;
-
         if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
         }
@@ -461,10 +518,10 @@ where
 
         // Prepare the session initiation message in the Start protocol
         trace!(challenge, ?cfg, "initiating session with config");
-        let start_session_msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
+        let start_session_msg = HoprStartProtocol::StartSession(StartInitiation {
             challenge,
             target,
-            capabilities: cfg.capabilities,
+            capabilities: ByteCapabilities(cfg.capabilities),
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -482,20 +539,19 @@ where
             .await
             .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?;
 
-        // Await session establishment response from the Exit node or timeout
-        pin_mut!(rx_initiation_done);
-        let initiation_done = TryStreamExt::try_next(&mut rx_initiation_done);
-
         // The timeout is given by the number of hops requested
-        let timeout = hopr_async_runtime::prelude::sleep(initiation_timeout_max_one_way(
+        let initiation_timeout: futures_time::time::Duration = initiation_timeout_max_one_way(
             self.cfg.initiation_timeout_base,
             cfg.forward_path_options.count_hops() + cfg.return_path_options.count_hops() + 2,
-        ));
-        pin_mut!(timeout);
+        )
+        .into();
+
+        // Await session establishment response from the Exit node or timeout
+        pin_mut!(rx_initiation_done);
 
         trace!(challenge, "awaiting session establishment");
-        match futures::future::select(initiation_done, timeout).await {
-            Either::Left((Ok(Some(est)), _)) => {
+        match rx_initiation_done.try_next().timeout(initiation_timeout).await {
+            Ok(Ok(Some(est))) => {
                 // Session has been established, construct it
                 let session_id = est.session_id;
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
@@ -519,10 +575,17 @@ where
                     let surb_production_counter = Arc::new(AtomicU64::new(0));
                     let surb_consumption_counter = Arc::new(AtomicU64::new(0));
 
-                    // Sender responsible for keep-alive and Session data is counting produced SURBs
-                    let scoring_sender = ScoringSink::new(msg_sender, surb_production_counter.clone(), |(_, data)| {
-                        HoprPacket::max_surbs_with_message(data.len()) as u64
-                    });
+                    // Sender responsible for keep-alive and Session data will be counting produced SURBs
+                    let surb_production_counter_clone = surb_production_counter.clone();
+                    let scoring_sender =
+                        msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationData)| {
+                            // Count how many SURBs we sent with each packet
+                            surb_production_counter_clone.fetch_add(
+                                ApplicationData::estimate_surbs_with_msg(&data.plain_text) as u64,
+                                std::sync::atomic::Ordering::Relaxed,
+                            );
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        });
 
                     // Spawn the SURB-bearing keep alive stream
                     let (ka_controller, ka_abort_handle) =
@@ -541,7 +604,7 @@ where
 
                     let (surbs_ready_tx, surbs_ready_rx) = futures::channel::oneshot::channel();
                     let mut surbs_ready_tx = Some(surbs_ready_tx);
-                    let (balancer_abort_handle, reg) = AbortHandle::new_pair();
+                    let (balancer_abort_handle, balancer_abort_reg) = AbortHandle::new_pair();
                     hopr_async_runtime::prelude::spawn(
                         futures::stream::Abortable::new(
                             futures_time::stream::interval(
@@ -550,7 +613,7 @@ where
                                     .max(MIN_BALANCER_SAMPLING_INTERVAL)
                                     .into(),
                             ),
-                            reg,
+                            balancer_abort_reg,
                         )
                         .for_each(move |_| {
                             let level = balancer.update();
@@ -569,18 +632,19 @@ where
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
-                    let timeout = hopr_async_runtime::prelude::sleep(SESSION_READINESS_TIMEOUT);
-                    pin_mut!(timeout);
-                    match futures::future::select(surbs_ready_rx, timeout).await {
-                        Either::Left((Ok(surb_level), _)) => {
+                    match surbs_ready_rx
+                        .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
+                        .await
+                    {
+                        Ok(Ok(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
                         }
-                        Either::Left((Err(_), _)) => {
+                        Ok(Err(_)) => {
                             return Err(
                                 SessionManagerError::Other("surb balancer was cancelled prematurely".into()).into(),
                             );
                         }
-                        Either::Right(_) => {
+                        Err(_) => {
                             warn!(%session_id, "session didn't reach target SURB buffer size");
                         }
                     }
@@ -639,11 +703,11 @@ where
                     Err(SessionManagerError::Loopback.into())
                 }
             }
-            Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
+            Ok(Ok(None)) => Err(SessionManagerError::Other(
                 "internal error: sender has been closed without completing the session establishment".into(),
             )
             .into()),
-            Either::Left((Err(e), _)) => {
+            Ok(Err(e)) => {
                 // The other side did not allow us to establish a session
                 error!(
                     challenge = e.challenge,
@@ -652,7 +716,7 @@ where
                 );
                 Err(TransportSessionError::Rejected(e.reason))
             }
-            Either::Right(_) => {
+            Err(_) => {
                 // Timeout waiting for a session establishment
                 error!(challenge, "session initiation attempt timed out");
 
@@ -677,7 +741,7 @@ where
                 .ok_or(SessionManagerError::NotStarted)?
                 .send((
                     session_data.routing_opts.clone(),
-                    StartProtocol::KeepAlive((*id).into()).try_into()?,
+                    HoprStartProtocol::KeepAlive((*id).into()).try_into()?,
                 ))
                 .await
                 .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?)
@@ -697,7 +761,7 @@ where
         pseudonym: HoprPseudonym,
         data: ApplicationData,
     ) -> crate::errors::Result<DispatchResult> {
-        if data.application_tag == StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG {
+        if data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we handle it
             trace!(tag = %data.application_tag, "dispatching Start protocol message");
             return self
@@ -730,8 +794,8 @@ where
         pseudonym: HoprPseudonym,
         data: ApplicationData,
     ) -> crate::errors::Result<()> {
-        match StartProtocol::<SessionId>::try_from(data)? {
-            StartProtocol::StartSession(session_req) => {
+        match HoprStartProtocol::try_from(data)? {
+            HoprStartProtocol::StartSession(session_req) => {
                 trace!(challenge = session_req.challenge, "received session initiation request");
 
                 debug!(%pseudonym, "got new session request, searching for a free session slot");
@@ -747,9 +811,13 @@ where
                 // Reply routing uses SURBs only with the pseudonym of this Session's ID
                 let reply_routing = DestinationRouting::Return(pseudonym.into());
 
-                // Construct the session
+                // The abort handle for the balancer now must be created now,
+                // regardless of the NoRateControl flat in the request.
+                // The aborting the AbortHandle with an unused registration will be a no-op.
+                let (balancer_abort_handle, balancer_abort_reg) = AbortHandle::new_pair();
+
+                // Search for a free Session ID slot
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-                self.sessions.run_pending_tasks().await;
                 let allocated_slot = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
                     insert_into_next_slot(
                         &self.sessions,
@@ -771,7 +839,7 @@ where
                         CachedSession {
                             session_tx: Arc::new(tx_session_data),
                             routing_opts: reply_routing.clone(),
-                            abort_handles: vec![],
+                            abort_handles: vec![balancer_abort_handle],
                         },
                     )
                     .await
@@ -781,19 +849,102 @@ where
                 };
 
                 if let Some(session_id) = allocated_slot {
-                    debug!(?session_id, "assigning a new session");
+                    debug!(%session_id, ?session_req, "assigned a new session");
 
-                    let session = Session::new(
-                        session_id,
-                        reply_routing.clone(),
-                        session_req.capabilities,
-                        (msg_sender.clone(), rx_session_data),
-                        Some(Box::new(move |session_id: SessionId, reason: ClosureReason| {
-                            if let Err(error) = close_session_notifier.unbounded_send((session_id, reason)) {
-                                error!(%session_id, %error, %reason, "failed to notify session closure");
-                            }
-                        })),
-                    )?;
+                    let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
+                        if let Err(error) = close_session_notifier.unbounded_send((session_id, reason)) {
+                            error!(%session_id, %error, %reason, "failed to notify session closure");
+                        }
+                    });
+
+                    let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
+                        let surb_retrieval_counter = Arc::new(AtomicU64::new(0));
+                        let surb_consumption_counter = Arc::new(AtomicU64::new(0));
+
+                        // Because of SURB scarcity, control the egress rate of incoming sessions
+                        let egress_rate_control =
+                            RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
+
+                        let surb_consumption_counter_clone = surb_consumption_counter.clone();
+                        let surb_retrieval_counter_clone = surb_retrieval_counter.clone();
+
+                        let session = Session::new(
+                            session_id,
+                            reply_routing.clone(),
+                            session_req.capabilities,
+                            (
+                                // Sent packets = SURB consumption estimate
+                                msg_sender
+                                    .clone()
+                                    .with(move |(routing, data): (DestinationRouting, ApplicationData)| {
+                                        // Each outgoing packet consumes one SURB
+                                        surb_consumption_counter_clone
+                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                        futures::future::ok::<_, S::Error>((routing, data))
+                                    })
+                                    .rate_limit_with_controller(&egress_rate_control)
+                                    .buffer(2 * MAX_RETURN_PACKETS_PER_SEC),
+                                // Received packets = SURB retrieval estimate
+                                rx_session_data.inspect(move |data| {
+                                    // Count the number of SURBs delivered with each incoming packet
+                                    surb_retrieval_counter_clone.fetch_add(
+                                        ApplicationData::estimate_surbs_with_msg(data) as u64,
+                                        std::sync::atomic::Ordering::Relaxed,
+                                    );
+                                }),
+                            ),
+                            Some(closure_notifier),
+                        )?;
+
+                        // The SURB balancer will start intervening by rate-limiting the
+                        // egress of the Session, once the estimated number of SURBs drops below
+                        // the target defined here. Otherwise, the maximum egresss is allowed.
+                        let return_balancer_cfg = SurbBalancerConfig {
+                            target_surb_buffer_size: 100,
+                            max_surbs_per_sec: MAX_RETURN_PACKETS_PER_SEC as u64,
+                            invert_output: true,
+                            ..Default::default()
+                        };
+                        debug!(%session_id, ?return_balancer_cfg, "spawning return SURB balancer");
+
+                        let mut balancer = SurbBalancer::new(
+                            session_id,
+                            surb_retrieval_counter,
+                            surb_consumption_counter,
+                            SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
+                            return_balancer_cfg,
+                        );
+
+                        hopr_async_runtime::prelude::spawn(
+                            futures::stream::Abortable::new(
+                                futures_time::stream::interval(
+                                    self.cfg
+                                        .balancer_sampling_interval
+                                        .max(MIN_BALANCER_SAMPLING_INTERVAL)
+                                        .into(),
+                                ),
+                                balancer_abort_reg,
+                            )
+                            .for_each(move |_| {
+                                balancer.update();
+                                futures::future::ready(())
+                            })
+                            .then(move |_| {
+                                debug!(%session_id, "return balancer done");
+                                futures::future::ready(())
+                            }),
+                        );
+
+                        session
+                    } else {
+                        Session::new(
+                            session_id,
+                            reply_routing.clone(),
+                            session_req.capabilities,
+                            (msg_sender.clone(), rx_session_data),
+                            Some(closure_notifier),
+                        )?
+                    };
 
                     // Extract useful information about the session from the Start protocol message
                     let incoming_session = IncomingSession {
@@ -810,7 +961,7 @@ where
 
                     // Notify the sender that the session has been established.
                     // Set our peer ID in the session ID sent back to them.
-                    let data = StartProtocol::SessionEstablished(StartEstablished {
+                    let data = HoprStartProtocol::SessionEstablished(StartEstablished {
                         orig_challenge: session_req.challenge,
                         session_id,
                     });
@@ -834,7 +985,7 @@ where
 
                     // Notify the sender that the session could not be established
                     let reason = StartErrorReason::NoSlotsAvailable;
-                    let data = StartProtocol::<SessionId>::SessionError(StartErrorType {
+                    let data = HoprStartProtocol::SessionError(StartErrorType {
                         challenge: session_req.challenge,
                         reason,
                     });
@@ -849,7 +1000,7 @@ where
                     METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()])
                 }
             }
-            StartProtocol::SessionEstablished(est) => {
+            HoprStartProtocol::SessionEstablished(est) => {
                 trace!(
                     session_id = ?est.session_id,
                     "received session establishment confirmation"
@@ -868,7 +1019,7 @@ where
                     error!(%session_id, challenge, "session establishment attempt expired");
                 }
             }
-            StartProtocol::SessionError(error) => {
+            HoprStartProtocol::SessionError(error) => {
                 trace!(
                     challenge = error.challenge,
                     error = ?error.reason,
@@ -899,12 +1050,12 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_RECEIVED_SESSION_ERRS.increment(&[&error.reason.to_string()])
             }
-            StartProtocol::KeepAlive(msg) => {
-                let session_id = msg.id;
+            HoprStartProtocol::KeepAlive(msg) => {
+                let session_id = msg.session_id;
                 if self.sessions.get(&session_id).await.is_some() {
                     trace!(?session_id, "received keep-alive request");
                 } else {
-                    error!(%session_id, "received keep-alive request for an unknown session");
+                    debug!(%session_id, "received keep-alive request for an unknown session");
                 }
             }
         }
@@ -920,13 +1071,11 @@ mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_primitive_types::prelude::Address;
+    use hopr_protocol_start::StartProtocolDiscriminants;
     use tokio::time::timeout;
 
     use super::*;
-    use crate::{
-        Capabilities, Capability, balancer::SurbBalancerConfig, initiation::StartProtocolDiscriminants,
-        types::SessionTarget,
-    };
+    use crate::{Capabilities, Capability, balancer::SurbBalancerConfig, types::SessionTarget};
 
     #[async_trait::async_trait]
     trait SendMsg {
@@ -956,7 +1105,7 @@ mod tests {
     }
 
     fn msg_type(data: &ApplicationData, expected: StartProtocolDiscriminants) -> bool {
-        StartProtocol::<SessionId>::decode(data.application_tag, &data.plain_text)
+        HoprStartProtocol::decode(data.application_tag, &data.plain_text)
             .map(|d| StartProtocolDiscriminants::from(d) == expected)
             .unwrap_or(false)
     }
@@ -1661,6 +1810,7 @@ mod tests {
                         surb_management: Some(SurbBalancerConfig {
                             target_surb_buffer_size: 10,
                             max_surbs_per_sec: 100,
+                            ..Default::default()
                         }),
                         ..Default::default()
                     },

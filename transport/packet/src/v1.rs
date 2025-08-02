@@ -1,5 +1,6 @@
 use std::{fmt::Formatter, ops::Range};
 
+use hopr_crypto_packet::prelude::HoprPacket;
 use strum::IntoEnumIterator;
 
 /// List of all reserved application tags for the protocol.
@@ -137,8 +138,15 @@ impl ApplicationData {
     }
 
     #[allow(clippy::len_without_is_empty)]
+    #[inline]
     pub fn len(&self) -> usize {
         Self::TAG_SIZE + self.plain_text.len()
+    }
+
+    /// Returns the estimated number of SURBs the HOPR packet carrying an `ApplicationData` instance
+    /// with `payload` could hold (or could have held).
+    pub fn estimate_surbs_with_msg<T: AsRef<[u8]>>(payload: &T) -> usize {
+        HoprPacket::max_surbs_with_message(payload.as_ref().len().min(Self::PAYLOAD_SIZE) + Tag::SIZE)
     }
 }
 
