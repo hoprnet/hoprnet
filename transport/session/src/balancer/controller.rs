@@ -38,7 +38,6 @@ lazy_static::lazy_static! {
 
 /// Carries finite Proportional, Integral and Derivative controller gains for a PID controller.
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ControllerGains(f64, f64, f64);
 
 impl ControllerGains {
@@ -95,7 +94,6 @@ impl TryFrom<(f64, f64, f64)> for ControllerGains {
 
 /// Configuration for the [`SurbBalancer`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SurbBalancerConfig {
     /// The desired number of SURBs to be always kept as a buffer locally or at the Session counterparty.
     ///

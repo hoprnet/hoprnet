@@ -1,7 +1,8 @@
 use thiserror::Error;
 
+/// Lists all possible errors.
 #[derive(Error, Debug)]
-pub enum StartError {
+pub enum StartProtocolError {
     #[error("unknown start protocol tag")]
     UnknownTag,
     #[error("invalid start protocol version")]
@@ -16,4 +17,4 @@ pub enum StartError {
     CborError(#[from] serde_cbor_2::Error),
 }
 
-pub type Result<T> = std::result::Result<T, StartError>;
+pub type Result<T> = std::result::Result<T, StartProtocolError>;

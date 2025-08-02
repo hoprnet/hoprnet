@@ -12,15 +12,57 @@ use hopr_network_types::{
     prelude::{DestinationRouting, SealedHost},
     utils::{AsyncWriteSink, DuplexIO},
 };
-use hopr_primitive_types::prelude::BytesRepresentable;
+use hopr_primitive_types::{errors::GeneralError, prelude::BytesRepresentable};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
 };
+use hopr_protocol_start::StartProtocol;
 use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, instrument};
 
 use crate::{Capabilities, Capability, errors::TransportSessionError};
+
+/// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ByteCapabilities(pub Capabilities);
+
+impl TryFrom<u8> for ByteCapabilities {
+    type Error = GeneralError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Capabilities::new(value)
+            .map(Self)
+            .map_err(|_| GeneralError::ParseError("capabilities".into()))
+    }
+}
+
+impl From<ByteCapabilities> for u8 {
+    fn from(value: ByteCapabilities) -> Self {
+        *value.0.as_ref()
+    }
+}
+
+impl From<ByteCapabilities> for Capabilities {
+    fn from(value: ByteCapabilities) -> Self {
+        value.0
+    }
+}
+
+impl From<Capabilities> for ByteCapabilities {
+    fn from(value: Capabilities) -> Self {
+        Self(value)
+    }
+}
+
+impl AsRef<Capabilities> for ByteCapabilities {
+    fn as_ref(&self) -> &Capabilities {
+        &self.0
+    }
+}
+
+/// Start protocol instantiation for HOPR.
+pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities>;
 
 /// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
 ///
@@ -83,7 +125,6 @@ impl SessionId {
     }
 }
 
-#[cfg(feature = "serde")]
 impl serde::Serialize for SessionId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -97,7 +138,6 @@ impl serde::Serialize for SessionId {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for SessionId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -228,8 +268,7 @@ pub type ServiceId = u32;
 
 /// Defines what should happen with the data at the recipient where the
 /// data from the established session are supposed to be forwarded to some `target`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SessionTarget {
     /// Target is running over UDP with the given IP address and port.
     UdpStream(SealedHost),
@@ -473,19 +512,14 @@ mod tests {
         assert!(id.len() <= MAX_SESSION_ID_STR_LEN);
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn session_id_should_serialize_and_deserialize_correctly() -> anyhow::Result<()> {
-        const SESSION_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
-            .with_little_endian()
-            .with_variable_int_encoding();
-
         let pseudonym = HoprPseudonym::random();
         let tag: Tag = 1234u64.into();
 
         let session_id_1 = SessionId::new(tag, pseudonym);
-        let data = bincode::serde::encode_to_vec(session_id_1, SESSION_BINCODE_CONFIGURATION)?;
-        let session_id_2: SessionId = bincode::serde::decode_from_slice(&data, SESSION_BINCODE_CONFIGURATION)?.0;
+        let data = serde_cbor_2::to_vec(&session_id_1)?;
+        let session_id_2: SessionId = serde_cbor_2::from_slice(&data)?;
 
         assert_eq!(tag, session_id_2.tag());
         assert_eq!(pseudonym, *session_id_2.pseudonym());

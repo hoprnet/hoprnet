@@ -4970,6 +4970,7 @@ name = "hopr-protocol-start"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aquamarine",
  "hopr-crypto-packet",
  "hopr-transport-packet",
  "serde",
@@ -5267,11 +5268,8 @@ name = "hopr-transport-session"
 version = "0.11.0"
 dependencies = [
  "anyhow",
- "aquamarine",
  "arrayvec",
  "async-trait",
- "bincode",
- "criterion",
  "flagset",
  "futures",
  "futures-time",
@@ -5284,6 +5282,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-primitive-types",
  "hopr-protocol-session",
+ "hopr-protocol-start",
  "hopr-transport-packet",
  "lazy_static",
  "mockall",
@@ -5292,8 +5291,8 @@ dependencies = [
  "pin-project",
  "rand 0.8.5",
  "serde",
+ "serde_cbor_2",
  "serde_repr",
- "serde_with",
  "smart-default",
  "strum 0.27.2",
  "test-log",
