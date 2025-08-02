@@ -18,7 +18,6 @@ use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
-use moka::ops::compute::CompResult;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -114,7 +113,7 @@ pub struct SessionManagerConfig {
     pub initial_return_session_egress_rate: usize,
 }
 
-fn close_session(session_id: SessionId, session_data: CachedSession, reason: ClosureReason) {
+fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
     debug!(?session_id, ?reason, "closing session");
 
     if reason != ClosureReason::EmptyRead {
@@ -185,7 +184,7 @@ type SessionInitiationCache =
     moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
 
 #[derive(Clone)]
-struct CachedSession {
+struct SessionSlot {
     // Sender needs to be put in Arc, so that no clones are made by `moka`.
     // This makes sure that the entire channel closes once the one and only sender is closed.
     session_tx: Arc<UnboundedSender<Box<[u8]>>>,
@@ -331,7 +330,7 @@ type SessionNotifiers = (
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
-    sessions: moka::future::Cache<SessionId, CachedSession>,
+    sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
 }
@@ -505,6 +504,7 @@ where
         L: FnMut(u64) + Send + Sync + 'static,
     {
         debug!(%session_id, ?balancer_cfg, "spawning SURB balancer");
+
         let mut balancer = SurbBalancer::new(
             session_id,
             surb_production,
@@ -732,7 +732,7 @@ where
                     .entry(session_id)
                     .and_compute_with(|entry| {
                         futures::future::ready(if entry.is_none() {
-                            moka::ops::compute::Op::Put(CachedSession {
+                            moka::ops::compute::Op::Put(SessionSlot {
                                 session_tx: Arc::new(tx),
                                 routing_opts: forward_routing,
                                 abort_handles,
@@ -837,8 +837,8 @@ where
             })
             .await
         {
-            CompResult::ReplacedWith(_) => Ok(()),
-            CompResult::Unchanged(_) => {
+            moka::ops::compute::CompResult::ReplacedWith(_) => Ok(()),
+            moka::ops::compute::CompResult::Unchanged(_) => {
                 Err(SessionManagerError::Other("session does not use SURB balancing".into()).into())
             }
             _ => Err(SessionManagerError::NonExistingSession.into()),
@@ -925,7 +925,7 @@ where
                     };
                     SessionId::new(next_tag, pseudonym)
                 },
-                CachedSession {
+                SessionSlot {
                     session_tx: Arc::new(tx_session_data),
                     routing_opts: reply_routing.clone(),
                     abort_handles: vec![],
@@ -995,22 +995,24 @@ where
                     ..Default::default()
                 };
 
+                // Assign the SURB balancer and abort handles to the already allocated Session
                 let (balancer_abort_handle, balancer_abort_reg) = AbortHandle::new_pair();
-                if matches!(
-                    self.sessions
-                        .entry(session_id)
-                        .and_compute_with(
-                            |entry| if let Some(mut cached_session) = entry.map(|c| c.into_value()) {
-                                cached_session.abort_handles.push(balancer_abort_handle);
-                                cached_session.surb_mgmt = Some(return_balancer_cfg);
-                                futures::future::ready(moka::ops::compute::Op::Put(cached_session))
-                            } else {
-                                futures::future::ready(moka::ops::compute::Op::Nop)
-                            }
-                        )
-                        .await,
-                    moka::ops::compute::CompResult::ReplacedWith(_)
-                ) {
+                if let moka::ops::compute::CompResult::ReplacedWith(_) = self
+                    .sessions
+                    .entry(session_id)
+                    .and_compute_with(|entry| {
+                        if let Some(mut cached_session) = entry.map(|c| c.into_value()) {
+                            cached_session.abort_handles.push(balancer_abort_handle);
+                            cached_session.surb_mgmt = Some(return_balancer_cfg);
+                            futures::future::ready(moka::ops::compute::Op::Put(cached_session))
+                        } else {
+                            futures::future::ready(moka::ops::compute::Op::Nop)
+                        }
+                    })
+                    .await
+                {
+                    // Spawn the SURB balancer only once we know we have registered the
+                    // abort handle with the pre-allocated Session slot
                     self.spawn_surb_flow_sampling(
                         session_id,
                         (surb_retrieval_counter, surb_consumption_counter),
@@ -1020,6 +1022,7 @@ where
                         Some(balancer_abort_reg),
                     );
                 } else {
+                    // This should never happen, but be sure we handle this error
                     return Err(SessionManagerError::Other(
                         "failed to spawn SURB balancer - inconsistent cache".into(),
                     )
@@ -1493,7 +1496,7 @@ mod tests {
             .sessions
             .insert(
                 SessionId::new(16u64, alice_pseudonym),
-                CachedSession {
+                SessionSlot {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
@@ -1592,7 +1595,7 @@ mod tests {
             .sessions
             .insert(
                 SessionId::new(16u64, alice_pseudonym),
-                CachedSession {
+                SessionSlot {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(alice_pseudonym.into()),
                     abort_handles: Vec::new(),
