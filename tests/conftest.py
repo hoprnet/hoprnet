@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import re
+import yaml
 from subprocess import PIPE, STDOUT, CalledProcessError, Popen
 
 import pytest
@@ -72,10 +73,69 @@ def nodes_with_lower_outgoing_win_prob():
     """Nodes with outgoing ticket winning probability"""
     return ["6"]
 
-
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
 
+def first_two_from(values: list):
+    return [(left, right) for left, right in itertools.product(values, repeat=2) if left != right]
+
+@pytest.fixture(scope="function", autouse=True)
+def config_to_yaml(request):
+    """
+    Fixture to convert the nodes_config parameter to yaml
+    """
+    if "nodes_config" in request.fixturenames:
+        nodes_config = request.getfixturevalue("nodes_config")
+        yaml_config = yaml.dump(nodes_config, default_flow_style=False)
+        request.config.cache.set("yaml_config", yaml_config)
+
+@pytest.fixture(scope="function")
+async def swarm3(request, base_port):
+
+    params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
+    extra_env_configs = None
+
+    yaml_config_str = request.config.cache.get("yaml_config", None)
+
+    if yaml_config_str is not None:
+        loaded_node_configs = yaml.safe_load(yaml_config_str)
+        request.config.cache.set("yaml_config", None)
+        extra_env_configs = [{} for _ in range(6)]
+        if loaded_node_configs:
+            for idx, (key, value) in enumerate(loaded_node_configs.items()):
+                if key.startswith("local"):
+                    index = int(key[5:]) - 1
+                    if 0 <= index < len(extra_env_configs):
+                        if isinstance(value, dict):
+                            extra_env_configs[index] = value
+                        elif value is None:
+                            extra_env_configs[index] = {}
+                else:
+                    extra_env_configs[index] = {}
+
+    try:
+        cluster, anvil = await localcluster.bringup(
+            params_path,
+            test_mode=True,
+            fully_connected=False,
+            use_nat=True,
+            base_port=base_port,
+            extra_env=extra_env_configs  # Pass the processed configs
+        )
+
+        yield cluster.nodes
+
+        cluster.clean_up()
+        anvil.kill()
+    except RuntimeError:
+        pytest.fail("Failed to bring up the cluster")
+
+
+@pytest.fixture(scope="function")
+async def swarm3_reset(request):
+    request.config.cache.set("yaml_config", None)
+
+    yield
 
 @pytest.fixture(scope="session")
 async def base_port(request):
