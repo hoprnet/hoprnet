@@ -24,6 +24,11 @@ pub use utils::transfer_session;
 pub const SESSION_MTU: usize =
     hopr_protocol_session::session_socket_mtu::<{ hopr_transport_packet::v1::ApplicationData::PAYLOAD_SIZE }>();
 
+/// Size of the HOPR SURB in bytes.
+///
+/// This is the re-export of [`hopr_crypto_packet::HoprSurb::SIZE`].
+pub const SURB_SIZE: usize = hopr_crypto_packet::HoprSurb::SIZE;
+
 flagset::flags! {
     /// Individual capabilities of a Session.
     #[repr(u8)]
