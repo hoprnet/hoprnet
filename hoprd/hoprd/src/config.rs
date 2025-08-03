@@ -238,12 +238,17 @@ impl HoprdConfig {
             }
         }
 
-        // The --no*/--disable* CLI flags are Count-based, therefore, if they equal to 0,
+        // The --enable*/--no*/--disable* CLI flags are Count-based, therefore, if they equal to 0,
         // it means they have not been specified on the CLI and thus the
         // corresponding config value should be enabled.
 
         cfg.hopr.chain.fast_sync = cli_args.no_fast_sync == 0;
         cfg.hopr.chain.keep_logs = cli_args.no_keep_logs == 0;
+        cfg.hopr.chain.enable_logs_snapshot = cli_args.enable_logs_snapshot != 0;
+
+        if let Some(x) = cli_args.logs_snapshot_url {
+            cfg.hopr.chain.logs_snapshot_url = Some(x);
+        }
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {

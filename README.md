@@ -52,15 +52,17 @@
   - [Post-sync Behavior](#post-sync-behavior)
 - [Profiling \& Instrumentation](#profiling--instrumentation)
   - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
+  - [OpenTelemetry tracing](#opentelemetry-tracing)
+  - [HOPR packet capture](#hopr-packet-capture)
 - [Contact](#contact)
 - [License](#license)
 
 ## About
 
-The HOPR project produces multiple artifacts that allow running, maintaining and modiyfing the HOPR node. The most relevant components for production use cases are:
+The HOPR project produces multiple artifacts that allow running, maintaining and modifying the HOPR node. The most relevant components for production use cases are:
 
 1. [hopr-lib](https://hoprnet.github.io/hoprnet/hopr_lib/index.html)
-   - A fully self-contained referential implementation of the HOPR protocol over a libp2p based connection mechanism that can be incroporated into another projects as a transport layer.
+   - A fully self-contained referential implementation of the HOPR protocol over a libp2p based connection mechanism that can be incorporated into other projects as a transport layer.
 2. [hoprd](https://hoprnet.github.io/hoprnet/hoprd/index.html)
    - Daemon application providing a higher level interface for creating a HOPR protocol compliant node that can use a dedicated REST API.
 3. [hoprd-api-schema](https://hoprnet.github.io/hoprnet/hoprd_api_schema/index.html)
@@ -177,6 +179,10 @@ Options:
           Disables keeping RPC logs in the logs database after they were processed. [env: HOPRD_INDEXER_DISABLE_KEEP_LOGS=]
       --noFastSync...
           Disables using fast sync at node start. [env: HOPRD_INDEXER_DISABLE_FAST_SYNC=]
+      --enableLogsSnapshot...
+          Enables downloading logs snapshot at node start. If this is set to true, the node will attempt to download logs snapshot from the configured `logsSnapshotUrl`. [env: HOPRD_ENABLE_LOGS_SNAPSHOT=]
+      --logsSnapshotUrl <LOGS_SNAPSHOT_URL>
+          URL to download logs snapshot from. If none is provided or configured in the configuration file, the node will not attempt to download any logs snapshot. [env: HOPRD_LOGS_SNAPSHOT_URL=]
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
@@ -213,8 +219,8 @@ On top of the default configuration options generated for the command line, the 
 
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
-- `HOPRD_USE_OPENTELEMETRY` - enable the opentelemetry output for this node
-- `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
+- `HOPRD_USE_OPENTELEMETRY` - enable the OpenTelemetry output for this node
+- `OTEL_SERVICE_NAME` - the name of this node for the OpenTelemetry service
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
 - `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
@@ -260,11 +266,11 @@ hoprd
   --host "0.0.0.0:9091"
   # specify password for accessing REST API
   --apiToken <MY_TOKEN>
-  # an network is defined as a chain plus a number of deployed smart contract addresses to use on that chain
+  # a network is defined as a chain plus a number of deployed smart contract addresses to use on that chain
   --network doufur
 ```
 
-Special care needs to given to the `network` argument, which defines the specific network `hoprd` node should join. Only nodes within the same network can communicate using the HOPR protocol.
+Special care needs to be given to the `network` argument, which defines the specific network `hoprd` node should join. Only nodes within the same network can communicate using the HOPR protocol.
 
 ### Using Docker Compose with extended HOPR node monitoring
 
@@ -331,7 +337,7 @@ direnv allow .
 #### Nix flake outputs
 
 We provide a couple of packages, apps and shells to make building and
-development easier, to get the full list execute:. You may get the full list like so:
+development easier. You may get the full list like so:
 
 ```bash
 nix flake show
@@ -359,7 +365,7 @@ This will in particular run `clippy` for the entire Rust codebase.
 
 #### Generate the Python SDK
 
-No Python SDK is available to connect to the HOPRd API. However, you can generate one using the [generate-python-sdk.sh](/scripts/generate-python-sdk.sh) script.
+A Python SDK is not distributed but can be generated to connect to the HOPRd API using the [generate-python-sdk.sh](/scripts/generate-python-sdk.sh) script.
 
 Prerequisites:
 
@@ -531,8 +537,8 @@ To generate the logs database, you need:
 The following files in the node's database folder are required:
 
 - `hopr_logs.db` - Main logs database
-- `hopr_logs.db-shm` - Auxiliary file
-- `hopr_logs.db-wal` - Auxiliary file
+- `hopr_logs.db-shm` - Shared memory file (auxiliary)
+- `hopr_logs.db-wal` - Write-Ahead Log file (auxiliary)
 
 ### Configuration Steps
 
@@ -566,6 +572,26 @@ Requires a special build:
 2. Enable the `prof` feature on the `hoprd` package: `cargo build --feature prof`
 
 Once an instrumented tokio is built into hoprd, the application can be instrumented by `tokio_console` as described in the [official crate documentation](https://docs.rs/tokio-console/latest/tokio_console/#instrumenting-the-application).
+
+### OpenTelemetry tracing
+
+`hoprd` is adapted to stream OpenTelemetry to a compatible endpoint. This behavior is turned off by default. To enable it, these environment variables have to be specified:
+
+- `HOPRD_USE_OPENTELEMETRY` - `true` to enable the OpenTelemetry streaming, `false` to disable it
+- `OTEL_SERVICE_NAME` - the identifier used to assign traces from this instance to (e.g. `my_hoprd_instance`)
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - URL of an endpoint accepting the OpenTelemetry format (e.g. http://jaeger:4317/)
+
+### HOPR packet capture
+
+Using the environment variable `HOPR_CAPTURE_PACKETS` allows capturing customized HOPR packet format to a PCAP file or to a `udpdump` host.
+However, for that to work the `hoprd` binary has to be built with the feature `capture`.
+For ease of use we provide different nix flake outputs that build the `hoprd`
+with the `capture` feature enabled:
+
+- `nix build .#hoprd-x86_64-linux-profile`
+- `nix build .#hoprd-aarch64-linux-profile`
+- `nix build .#hoprd-x86_64-darwin-profile`
+- `nix build .#hoprd-aarch64-darwin-profile`
 
 ## Contact
 

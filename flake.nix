@@ -6,7 +6,7 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
-    crane.url = "github:ipetkov/crane/v0.20.1";
+    crane.url = "github:ipetkov/crane/v0.21.0";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     solc.url = "github:hellwolf/solc.nix";
@@ -88,6 +88,24 @@
               ./Cargo.lock
               ./README.md
               ./hopr/hopr-lib/data
+              ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.in.toml
+              ./ethereum/contracts/remappings.txt
+              ./hoprd/hoprd/example_cfg.yaml
+              (fs.fileFilter (file: file.hasExt "rs") ./.)
+              (fs.fileFilter (file: file.hasExt "toml") ./.)
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+            ];
+          };
+          testSrc = fs.toSource {
+            root = ./.;
+            fileset = fs.unions [
+              ./.cargo/config.toml
+              ./Cargo.lock
+              ./README.md
+              ./hopr/hopr-lib/data
+              ./hopr/hopr-lib/tests
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
@@ -198,18 +216,33 @@
             }
           );
           hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-linux-profile = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
+
           # CAVEAT: must be built from a darwin system
           hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-x86_64-darwin-profile = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-darwin-profile = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { runTests = true; }
+            hoprdBuildArgs
+            // {
+              src = testSrc;
+              runTests = true;
+            }
           );
 
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
+              src = testSrc;
               runTests = true;
               cargoExtraArgs = "-Z panic-abort-tests";
             }
@@ -927,14 +960,19 @@
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
             inherit pre-commit-check;
-            inherit hoprd-aarch64-linux hoprd-x86_64-linux hoprd-x86_64-linux-dev;
-            inherit hopli-aarch64-linux hopli-x86_64-linux hopli-x86_64-linux-dev;
-            # FIXME: Darwin cross-builds are currently broken.
-            # Follow https://github.com/nixos/nixpkgs/pull/256590
-            inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
-            inherit hopli-aarch64-darwin hopli-x86_64-darwin;
             inherit hoprd-bench;
             inherit hoprd-man hopli-man;
+            # binary packages
+            inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev hoprd-x86_64-linux-profile;
+            inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
+            inherit hopli-x86_64-linux hopli-x86_64-linux-dev;
+            inherit hopli-aarch64-linux;
+            # FIXME: Darwin cross-builds are currently broken.
+            # Follow https://github.com/nixos/nixpkgs/pull/256590
+            inherit hoprd-x86_64-darwin hoprd-x86_64-darwin-profile;
+            inherit hoprd-aarch64-darwin hoprd-aarch64-darwin-profile;
+            inherit hopli-x86_64-darwin;
+            inherit hopli-aarch64-darwin;
             default = hoprd;
           };
 

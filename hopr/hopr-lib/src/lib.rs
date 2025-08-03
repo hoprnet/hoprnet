@@ -487,6 +487,9 @@ impl Hopr {
             hopr_chain_indexer::IndexerConfig {
                 start_block_number: resolved_environment.channel_contract_deploy_block as u64,
                 fast_sync: cfg.chain.fast_sync,
+                enable_logs_snapshot: cfg.chain.enable_logs_snapshot,
+                logs_snapshot_url: cfg.chain.logs_snapshot_url.clone(),
+                data_directory: cfg.db.data.clone(),
             },
             tx_indexer_events,
         )?;
@@ -1109,15 +1112,6 @@ impl Hopr {
             .with_delay(self.cfg.session.establish_retry_timeout)
             .with_jitter();
 
-        struct Sleeper;
-        impl backon::Sleeper for Sleeper {
-            type Sleep = futures_timer::Delay;
-
-            fn sleep(&self, dur: Duration) -> Self::Sleep {
-                futures_timer::Delay::new(dur)
-            }
-        }
-
         use backon::Retryable;
 
         Ok((|| {
@@ -1126,7 +1120,7 @@ impl Hopr {
             async { self.transport_api.new_session(destination, target, cfg).await }
         })
         .retry(backoff)
-        .sleep(Sleeper)
+        .sleep(backon::FuturesTimerSleeper)
         .await?)
     }
 
@@ -1341,13 +1335,9 @@ impl Hopr {
     pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self
-            .hopr_chain_api
-            .actions_ref()
-            .withdraw(recipient, amount)
-            .await?
-            .await?
-            .tx_hash)
+        let awaiter = self.hopr_chain_api.actions_ref().withdraw(recipient, amount).await?;
+
+        Ok(awaiter.await?.tx_hash)
     }
 
     /// Withdraw on-chain native assets to a given address
@@ -1356,13 +1346,13 @@ impl Hopr {
     pub async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self
+        let awaiter = self
             .hopr_chain_api
             .actions_ref()
             .withdraw_native(recipient, amount)
-            .await?
-            .await?
-            .tx_hash)
+            .await?;
+
+        Ok(awaiter.await?.tx_hash)
     }
 
     pub async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> errors::Result<OpenChannelResult> {
@@ -1384,13 +1374,13 @@ impl Hopr {
     pub async fn fund_channel(&self, channel_id: &Hash, amount: HoprBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self
+        let awaiter = self
             .hopr_chain_api
             .actions_ref()
             .fund_channel(*channel_id, amount)
-            .await?
-            .await
-            .map(|confirm| confirm.tx_hash)?)
+            .await?;
+
+        Ok(awaiter.await?.tx_hash)
     }
 
     pub async fn close_channel(

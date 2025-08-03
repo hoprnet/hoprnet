@@ -167,6 +167,25 @@ pub struct CliArgs {
     pub no_fast_sync: u8,
 
     #[arg(
+        long = "enableLogsSnapshot",
+        env = "HOPRD_ENABLE_LOGS_SNAPSHOT",
+        help = "Enables downloading logs snapshot at node start. If this is set to true, the node will attempt to \
+                download logs snapshot from the configured `logsSnapshotUrl`.",
+        value_name = "ENABLE_LOGS_SNAPSHOT",
+        action = ArgAction::Count
+    )]
+    pub enable_logs_snapshot: u8,
+
+    #[arg(
+        long = "logsSnapshotUrl",
+        env = "HOPRD_LOGS_SNAPSHOT_URL",
+        help = "URL to download logs snapshot from. If none is provided or configured in the configuration file, the \
+                node will not attempt to download any logs snapshot.",
+        value_name = "LOGS_SNAPSHOT_URL"
+    )]
+    pub logs_snapshot_url: Option<String>,
+
+    #[arg(
         long = "maxBlockRange",
         help = "Maximum number of blocks that can be fetched in a batch request from the RPC provider.",
         env = "HOPRD_MAX_BLOCK_RANGE",

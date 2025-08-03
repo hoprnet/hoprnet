@@ -257,35 +257,35 @@ impl TicketManager {
         let channel_epoch = selector.channel_identifiers[0].1;
         let selector: WrappedTicketSelector = selector.into();
 
-        let transaction = OpenTransaction(
-            self.tickets_db
-                .begin_with_config(None, None)
-                .await
-                .map_err(crate::errors::DbSqlError::BackendError)?,
-            crate::TargetDb::Tickets,
-        );
-
+        let tickets_db = self.tickets_db.clone();
         let selector_clone = selector.clone();
         Ok(self
             .caches
             .unrealized_value
             .try_get_with_by_ref(&(channel_id, channel_epoch), async move {
-                transaction
-                    .perform(|tx| {
-                        Box::pin(async move {
-                            ticket::Entity::find()
-                                .filter(selector_clone)
-                                .stream(tx.as_ref())
-                                .await
-                                .map_err(crate::errors::DbSqlError::from)?
-                                .map_err(crate::errors::DbSqlError::from)
-                                .try_fold(HoprBalance::zero(), |value, t| async move {
-                                    Ok(value + HoprBalance::from_be_bytes(t.amount))
-                                })
-                                .await
-                        })
+                tracing::warn!(%channel_id, %channel_epoch, "cache miss on unrealized value");
+                OpenTransaction(
+                    tickets_db
+                        .begin_with_config(None, None)
+                        .await
+                        .map_err(DbSqlError::BackendError)?,
+                    crate::TargetDb::Tickets,
+                )
+                .perform(|tx| {
+                    Box::pin(async move {
+                        ticket::Entity::find()
+                            .filter(selector_clone)
+                            .stream(tx.as_ref())
+                            .await
+                            .map_err(crate::errors::DbSqlError::from)?
+                            .map_err(crate::errors::DbSqlError::from)
+                            .try_fold(HoprBalance::zero(), |value, t| async move {
+                                Ok(value + HoprBalance::from_be_bytes(t.amount))
+                            })
+                            .await
                     })
-                    .await
+                })
+                .await
             })
             .await?)
     }

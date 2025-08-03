@@ -7,6 +7,7 @@ use hopr_crypto_types::{
     types::{Challenge, HalfKey, HalfKeyChallenge, Response},
 };
 use hopr_primitive_types::prelude::*;
+use tracing::instrument;
 
 use crate::errors::{PacketError, Result};
 
@@ -206,6 +207,7 @@ pub struct ProofOfRelayOutput {
 /// * `secret` shared secret with the creator of the packet
 /// * `pors` `ProofOfRelayString` as included within the packet
 /// * `challenge` the ticket challenge of the incoming ticket
+#[instrument(level = "trace", skip_all, err)]
 pub fn pre_verify(
     secret: &SharedSecret,
     pors: &ProofOfRelayString,
