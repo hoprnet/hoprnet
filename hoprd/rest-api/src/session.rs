@@ -1088,14 +1088,11 @@ pub(crate) async fn list_clients(
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "sessionId": "0x5112D584a1C72Fc25017:487",
         "responseBuffer": "2 MB",
         "maxSurbUpstream": "2 Mbps"
     }))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SessionReconfigureRequest {
-    /// ID of the Session to reconfigure.
-    pub session_id: String,
+pub(crate) struct SessionConfig {
     /// The amount of response data the Session counterparty can deliver back to us,
     /// without us sending any SURBs to them.
     ///
@@ -1124,10 +1121,13 @@ pub(crate) struct SessionReconfigureRequest {
 
 #[utoipa::path(
     post,
-    path = const_format::formatcp!("{BASE_PATH}/session/adjust"),
+    path = const_format::formatcp!("{BASE_PATH}/session/config/{{id}}"),
     description = "Updates configuration of an existing active session.",
+    params(
+        ("id" = String, Path, description = "Session ID", example = "0x5112D584a1C72Fc25017:487"),
+    ),
     request_body(
-            content = SessionReconfigureRequest,
+            content = SessionConfig,
             description = "Allows updating of several parameters of an existing active session.",
             content_type = "application/json"),
     responses(
@@ -1144,7 +1144,34 @@ pub(crate) struct SessionReconfigureRequest {
 )]
 pub(crate) async fn adjust_session(
     State(state): State<Arc<InternalState>>,
-    Json(args): Json<SessionReconfigureRequest>,
+    Path(session_id): Path<String>,
+    Json(args): Json<SessionConfig>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
+}
+
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/session/config/{{id}}"),
+    description = "Gets configuration of an existing active session.",
+    params(
+        ("id" = String, Path, description = "Session ID", example = "0x5112D584a1C72Fc25017:487"),
+    ),
+    responses(
+            (status = 200, description = "Retrieved session configuration.", body = SessionConfig),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Given session ID does not refer to a valid Session", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Session"
+)]
+pub(crate) async fn session_config(
+    State(state): State<Arc<InternalState>>,
+    Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
