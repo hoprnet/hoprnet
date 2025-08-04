@@ -27,6 +27,7 @@ use crate::{
     },
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprStartProtocol},
+    utils::insert_into_next_slot,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -127,48 +128,6 @@ fn close_session(session_id: SessionId, session_data: SessionSlot, reason: Closu
 
     #[cfg(all(feature = "prometheus", not(test)))]
     METRIC_ACTIVE_SESSIONS.decrement(1.0);
-}
-
-/// This function will use the given generator to generate an initial seeding key.
-/// It will check whether the given cache already contains a value for that key, and if not,
-/// calls the generator (with the previous value) to generate a new seeding key and retry.
-/// The function either finds a suitable free slot, inserting the `value` and returns the found key,
-/// or terminates with `None` when `gen` returns the initial seed again.
-async fn insert_into_next_slot<K, V, F>(cache: &moka::future::Cache<K, V>, generator: F, value: V) -> Option<K>
-where
-    K: Copy + std::hash::Hash + Eq + Send + Sync + 'static,
-    V: Clone + Send + Sync + 'static,
-    F: Fn(Option<K>) -> K,
-{
-    cache.run_pending_tasks().await;
-
-    let initial = generator(None);
-    let mut next = initial;
-    loop {
-        let insertion_result = cache
-            .entry(next)
-            .and_try_compute_with(|e| {
-                if e.is_none() {
-                    futures::future::ok::<_, ()>(moka::ops::compute::Op::Put(value.clone()))
-                } else {
-                    futures::future::ok::<_, ()>(moka::ops::compute::Op::Nop)
-                }
-            })
-            .await;
-
-        // If we inserted successfully, break the loop and return the insertion key
-        if let Ok(moka::ops::compute::CompResult::Inserted(_)) = insertion_result {
-            return Some(next);
-        }
-
-        // Otherwise, generate the next key
-        next = generator(Some(next));
-
-        // If generated keys made it to full loop, return failure
-        if next == initial {
-            return None;
-        }
-    }
 }
 
 /// The first challenge value used in Start protocol to initiate a session.
@@ -1005,7 +964,7 @@ where
                     ..Default::default()
                 };
 
-                // Assign the SURB balancer and abort handles to the already allocated Session
+                // Assign the SURB balancer and abort handles to the already allocated Session slot
                 let (balancer_abort_handle, balancer_abort_reg) = AbortHandle::new_pair();
                 if let moka::ops::compute::CompResult::ReplacedWith(_) = self
                     .sessions
@@ -1221,28 +1180,6 @@ mod tests {
         HoprStartProtocol::decode(data.application_tag, &data.plain_text)
             .map(|d| StartProtocolDiscriminants::from(d) == expected)
             .unwrap_or(false)
-    }
-
-    #[tokio::test]
-    async fn test_insert_into_next_slot() -> anyhow::Result<()> {
-        let cache = moka::future::Cache::new(10);
-
-        for i in 0..5 {
-            let v = insert_into_next_slot(&cache, |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0), "foo".to_string())
-                .await
-                .ok_or(anyhow!("should insert"))?;
-            assert_eq!(v, i);
-            assert_eq!(Some("foo".to_string()), cache.get(&i).await);
-        }
-
-        assert!(
-            insert_into_next_slot(&cache, |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0), "foo".to_string())
-                .await
-                .is_none(),
-            "must not find slot when full"
-        );
-
-        Ok(())
     }
 
     #[test_log::test(tokio::test)]

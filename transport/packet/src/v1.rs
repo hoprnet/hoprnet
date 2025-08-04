@@ -1,5 +1,5 @@
-use std::{fmt::Formatter, ops::Range};
-use std::str::FromStr;
+use std::{fmt::Formatter, ops::Range, str::FromStr};
+
 use hopr_crypto_packet::prelude::HoprPacket;
 use strum::IntoEnumIterator;
 

@@ -80,7 +80,7 @@ pub use hopr_transport::{
     ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
     OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU, SURB_SIZE, ServiceId,
     Session as HoprSession, SessionCapabilities, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
-    SessionTarget, SurbBalancerConfig, Tag, TicketStatistics,
+    SessionManagerError, SessionTarget, SurbBalancerConfig, Tag, TicketStatistics, TransportSessionError,
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
@@ -1133,13 +1133,20 @@ impl Hopr {
     }
 
     #[cfg(feature = "session-client")]
-    pub async fn get_session_surb_balancer_config(&self, id: &HoprSessionId) -> errors::Result<Option<SurbBalancerConfig>> {
+    pub async fn get_session_surb_balancer_config(
+        &self,
+        id: &HoprSessionId,
+    ) -> errors::Result<Option<SurbBalancerConfig>> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
     }
 
     #[cfg(feature = "session-client")]
-    pub async fn update_session_surb_balancer_config(&self, id: &HoprSessionId, cfg: SurbBalancerConfig) -> errors::Result<()> {
+    pub async fn update_session_surb_balancer_config(
+        &self,
+        id: &HoprSessionId,
+        cfg: SurbBalancerConfig,
+    ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }

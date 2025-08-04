@@ -26,8 +26,9 @@ use futures::{
 };
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, Hopr, HoprSession, HoprSessionId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities,
-    SessionClientConfig, SessionTarget, SurbBalancerConfig, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, HoprSessionId, HoprTransportError, SESSION_MTU, SURB_SIZE, ServiceId,
+    SessionCapabilities, SessionClientConfig, SessionManagerError, SessionTarget, SurbBalancerConfig,
+    TransportSessionError, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
@@ -512,21 +513,11 @@ impl SessionClientRequest {
                         // Only Segmentation capability for UDP per default
                         _ => SessionCapability::Segmentation.into(),
                     }),
-                surb_management: match self.response_buffer {
-                    // Buffer worth at least 2 reply packets
-                    Some(buffer_size) if buffer_size.as_u64() >= 2 * SESSION_MTU as u64 => Some(SurbBalancerConfig {
-                        target_surb_buffer_size: buffer_size.as_u64() / SESSION_MTU as u64,
-                        max_surbs_per_sec: self
-                            .max_surb_upstream
-                            .map(|b| (b.as_bps() as usize / (8 * SURB_SIZE)) as u64)
-                            .unwrap_or_else(|| SurbBalancerConfig::default().max_surbs_per_sec),
-                        ..Default::default()
-                    }),
-                    // No additional SURBs are set up and maintained, useful for high-send low-reply sessions
-                    Some(_) => None,
-                    // Use defaults otherwise
-                    None => Some(SurbBalancerConfig::default()),
-                },
+                surb_management: SessionConfig {
+                    response_buffer: self.response_buffer,
+                    max_surb_upstream: self.max_surb_upstream,
+                }
+                .into(),
                 ..Default::default()
             },
         ))
@@ -1119,6 +1110,39 @@ pub(crate) struct SessionConfig {
     pub max_surb_upstream: Option<human_bandwidth::re::bandwidth::Bandwidth>,
 }
 
+impl From<SessionConfig> for Option<SurbBalancerConfig> {
+    fn from(value: SessionConfig) -> Self {
+        match value.response_buffer {
+            // Buffer worth at least 2 reply packets
+            Some(buffer_size) if buffer_size.as_u64() >= 2 * SESSION_MTU as u64 => Some(SurbBalancerConfig {
+                target_surb_buffer_size: buffer_size.as_u64() / SESSION_MTU as u64,
+                max_surbs_per_sec: value
+                    .max_surb_upstream
+                    .map(|b| (b.as_bps() as usize / (8 * SURB_SIZE)) as u64)
+                    .unwrap_or_else(|| SurbBalancerConfig::default().max_surbs_per_sec),
+                ..Default::default()
+            }),
+            // No additional SURBs are set up and maintained, useful for high-send low-reply sessions
+            Some(_) => None,
+            // Use defaults otherwise
+            None => Some(SurbBalancerConfig::default()),
+        }
+    }
+}
+
+impl From<SurbBalancerConfig> for SessionConfig {
+    fn from(value: SurbBalancerConfig) -> Self {
+        Self {
+            response_buffer: Some(bytesize::ByteSize::b(
+                value.target_surb_buffer_size * SESSION_MTU as u64,
+            )),
+            max_surb_upstream: Some(human_bandwidth::re::bandwidth::Bandwidth::from_bps(
+                value.max_surbs_per_sec * (8 * SURB_SIZE) as u64,
+            )),
+        }
+    }
+}
+
 #[utoipa::path(
     post,
     path = const_format::formatcp!("{BASE_PATH}/session/config/{{id}}"),
@@ -1132,8 +1156,10 @@ pub(crate) struct SessionConfig {
             content_type = "application/json"),
     responses(
             (status = 204, description = "Successfully updated the configuration"),
+            (status = 400, description = "Invalid configuration.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Given session ID does not refer to an existing Session", body = ApiError),
+            (status = 406, description = "Session cannot be reconfigured.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError),
     ),
     security(
@@ -1147,7 +1173,23 @@ pub(crate) async fn adjust_session(
     Path(session_id): Path<String>,
     Json(args): Json<SessionConfig>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
+    let session_id = HoprSessionId::from_str(&session_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
+
+    if let Some(cfg) = Option::<SurbBalancerConfig>::from(args) {
+        match state.hopr.update_session_surb_balancer_config(&session_id, cfg).await {
+            Ok(_) => Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response()),
+            Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Manager(
+                SessionManagerError::NonExistingSession,
+            )))) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
+            Err(e) => Err((
+                StatusCode::NOT_ACCEPTABLE,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )),
+        }
+    } else {
+        Err::<_, (StatusCode, ApiErrorStatus)>((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))
+    }
 }
 
 #[utoipa::path(
@@ -1175,27 +1217,18 @@ pub(crate) async fn session_config(
     Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let session_id = HoprSessionId::from_str(&session_id)
-        .map_err(|_| {
-            (
-                StatusCode::BAD_REQUEST,
-                ApiErrorStatus::InvalidSessionId,
-            )
-        })?;
+        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
 
     match state.hopr.get_session_surb_balancer_config(&session_id).await {
         Ok(Some(cfg)) => {
-            // TODO: add corrections here
-            let cfg = SessionConfig {
-                response_buffer: Some(cfg.target_surb_buffer_size),
-                max_surb_upstream: Some(cfg.max_surb_upstream),
-            };
-            Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(cfg)).into_response())
-        },
+            Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(SessionConfig::from(cfg))).into_response())
+        }
         Ok(None) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
-        Err(e) => Err((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string()))),
+        Err(e) => Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )),
     }
-
-
 }
 
 #[derive(

@@ -2,17 +2,21 @@ use std::{
     fmt::{Debug, Display, Formatter},
     hash::{Hash, Hasher},
     pin::Pin,
+    str::FromStr,
     task::{Context, Poll},
     time::Duration,
 };
-use std::str::FromStr;
+
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
     prelude::{DestinationRouting, SealedHost},
     utils::{AsyncWriteSink, DuplexIO},
 };
-use hopr_primitive_types::{errors::GeneralError, prelude::BytesRepresentable};
+use hopr_primitive_types::{
+    errors::GeneralError,
+    prelude::{BytesRepresentable, ToHex},
+};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
@@ -20,8 +24,8 @@ use hopr_protocol_session::{
 use hopr_protocol_start::StartProtocol;
 use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, instrument};
-use hopr_primitive_types::prelude::ToHex;
-use crate::{Capabilities, Capability, errors::TransportSessionError, errors};
+
+use crate::{Capabilities, Capability, errors::TransportSessionError};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -133,10 +137,12 @@ impl FromStr for SessionId {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.split_once(Self::DELIMITER)
             .ok_or(TransportSessionError::InvalidSessionId)
-            .and_then(|(pseudonym, tag)| match (HoprPseudonym::from_hex(pseudonym), Tag::from_str(tag)) {
-                (Ok(p), Ok(t)) => Ok(Self::new(t, p)),
-                _ => Err(TransportSessionError::InvalidSessionId),
-            })
+            .and_then(
+                |(pseudonym, tag)| match (HoprPseudonym::from_hex(pseudonym), Tag::from_str(tag)) {
+                    (Ok(p), Ok(t)) => Ok(Self::new(t, p)),
+                    _ => Err(TransportSessionError::InvalidSessionId),
+                },
+            )
     }
 }
 

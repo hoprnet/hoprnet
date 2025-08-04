@@ -80,7 +80,7 @@ pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_MTU, SURB_SIZE,
     ServiceId, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
-    errors::TransportSessionError,
+    errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use hopr_transport_ticket_aggregation::{
@@ -678,8 +678,12 @@ where
         Ok(self.smgr.get_surb_balancer_config(id).await?)
     }
 
-    pub async fn update_session_surb_balancing_cfg(&self, id: &SessionId, cfg: SurbBalancerConfig) -> errors::Result<()> {
-        Ok(self.smgr.update_surb_balancer_config(id, cfg)?)
+    pub async fn update_session_surb_balancing_cfg(
+        &self,
+        id: &SessionId,
+        cfg: SurbBalancerConfig,
+    ) -> errors::Result<()> {
+        Ok(self.smgr.update_surb_balancer_config(id, cfg).await?)
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
