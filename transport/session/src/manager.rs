@@ -1,6 +1,6 @@
 use std::{
     ops::Range,
-    sync::{Arc, OnceLock, atomic::AtomicU64},
+    sync::{Arc, OnceLock},
     time::Duration,
 };
 
@@ -23,7 +23,8 @@ use tracing::{debug, error, info, trace, warn};
 use crate::{
     Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
-        RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer, SurbFlowController, SurbFlowEstimator,
+        AtomicSurbFlowEstimator, RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer,
+        SurbFlowController, SurbFlowEstimator,
     },
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprStartProtocol},
@@ -447,30 +448,23 @@ where
         self.session_notifiers.get().is_some()
     }
 
-    fn spawn_surb_flow_sampling<I, O, F, L>(
+    fn spawn_surb_flow_sampling<E, F, L>(
         &self,
         session_id: SessionId,
-        (surb_production, surb_consumption): (I, O),
+        surb_estimator: E,
         surb_controller: F,
         balancer_cfg: SurbBalancerConfig,
         mut level_cb: L,
         abort_reg: Option<AbortRegistration>,
     ) -> AbortHandle
     where
-        I: SurbFlowEstimator + Send + Sync + 'static,
-        O: SurbFlowEstimator + Send + Sync + 'static,
+        E: SurbFlowEstimator + Send + Sync + 'static,
         F: SurbFlowController + Send + Sync + 'static,
         L: FnMut(u64) + Send + Sync + 'static,
     {
         debug!(%session_id, ?balancer_cfg, "spawning SURB balancer");
 
-        let mut balancer = SurbBalancer::new(
-            session_id,
-            surb_production,
-            surb_consumption,
-            surb_controller,
-            balancer_cfg,
-        );
+        let mut balancer = SurbBalancer::new(session_id, surb_estimator, surb_controller, balancer_cfg);
 
         let (abort_handle, abort_reg) = abort_reg
             .map(|reg| (reg.handle(), reg))
@@ -599,15 +593,14 @@ where
                     .ok_or(SessionManagerError::NotStarted)?;
 
                 let (session, surb_mgmt) = if let Some(balancer_config) = cfg.surb_management {
-                    let surb_production_counter = Arc::new(AtomicU64::new(0));
-                    let surb_consumption_counter = Arc::new(AtomicU64::new(0));
+                    let surb_estimator = AtomicSurbFlowEstimator::default();
 
                     // Sender responsible for keep-alive and Session data will be counting produced SURBs
-                    let surb_production_counter_clone = surb_production_counter.clone();
+                    let surb_estimator_clone = surb_estimator.clone();
                     let scoring_sender =
                         msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationData)| {
                             // Count how many SURBs we sent with each packet
-                            surb_production_counter_clone.fetch_add(
+                            surb_estimator_clone.produced.fetch_add(
                                 ApplicationData::estimate_surbs_with_msg(&data.plain_text) as u64,
                                 std::sync::atomic::Ordering::Relaxed,
                             );
@@ -624,7 +617,7 @@ where
                     let mut surbs_ready_tx = Some(surbs_ready_tx);
                     let balancer_abort_handle = self.spawn_surb_flow_sampling(
                         session_id,
-                        (surb_production_counter, surb_consumption_counter.clone()),
+                        surb_estimator.clone(),
                         ka_controller,
                         balancer_config,
                         move |level: u64| {
@@ -664,7 +657,9 @@ where
                                 scoring_sender,
                                 rx.inspect(move |_| {
                                     // Received packets = SURB consumption estimate
-                                    surb_consumption_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                    surb_estimator
+                                        .consumed
+                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 }),
                             ),
                             Some(notifier),
@@ -917,15 +912,13 @@ where
             });
 
             let session = if !session_req.capabilities.0.contains(Capability::NoRateControl) {
-                let surb_retrieval_counter = Arc::new(AtomicU64::new(0));
-                let surb_consumption_counter = Arc::new(AtomicU64::new(0));
+                let surb_estimator = AtomicSurbFlowEstimator::default();
 
                 // Because of SURB scarcity, control the egress rate of incoming sessions
                 let egress_rate_control =
                     RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
 
-                let surb_consumption_counter_clone = surb_consumption_counter.clone();
-                let surb_retrieval_counter_clone = surb_retrieval_counter.clone();
+                let surb_estimator_clone = surb_estimator.clone();
 
                 let session = Session::new(
                     session_id,
@@ -937,7 +930,9 @@ where
                             .clone()
                             .with(move |(routing, data): (DestinationRouting, ApplicationData)| {
                                 // Each outgoing packet consumes one SURB
-                                surb_consumption_counter_clone.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                surb_estimator_clone
+                                    .consumed
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 futures::future::ok::<_, S::Error>((routing, data))
                             })
                             .rate_limit_with_controller(&egress_rate_control)
@@ -945,7 +940,7 @@ where
                         // Received packets = SURB retrieval estimate
                         rx_session_data.inspect(move |data| {
                             // Count the number of SURBs delivered with each incoming packet
-                            surb_retrieval_counter_clone.fetch_add(
+                            surb_estimator_clone.produced.fetch_add(
                                 ApplicationData::estimate_surbs_with_msg(data) as u64,
                                 std::sync::atomic::Ordering::Relaxed,
                             );
@@ -984,7 +979,7 @@ where
                     // abort handle with the pre-allocated Session slot
                     self.spawn_surb_flow_sampling(
                         session_id,
-                        (surb_retrieval_counter, surb_consumption_counter),
+                        surb_estimator,
                         SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
                         return_balancer_cfg,
                         |_| {},

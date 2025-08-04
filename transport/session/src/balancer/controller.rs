@@ -3,7 +3,7 @@ use std::fmt::Display;
 use pid::Pid;
 
 use crate::{
-    balancer::{SurbFlowController, SurbFlowEstimator},
+    balancer::{SimpleSurbFlowEstimator, SurbFlowController, SurbFlowEstimator},
     errors,
     errors::SessionManagerError,
 };
@@ -22,16 +22,10 @@ lazy_static::lazy_static! {
             "hopr_surb_balancer_control_output",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_SURBS_CONSUMED: hopr_metrics::metrics::MultiCounter =
-        hopr_metrics::metrics::MultiCounter::new(
-            "hopr_surb_balancer_surbs_consumed",
-            "Estimations of SURBs consumed by the counterparty",
-            &["session_id"]
-    ).unwrap();
-    static ref METRIC_SURBS_PRODUCED: hopr_metrics::metrics::MultiCounter =
-        hopr_metrics::metrics::MultiCounter::new(
-            "hopr_surb_balancer_surbs_produced",
-            "Estimations of SURBs produced for the counterparty",
+    static ref METRIC_SURB_RATE: hopr_metrics::metrics::MultiGauge =
+        hopr_metrics::metrics::MultiGauge::new(
+            "hopr_surb_balancer_surbs_rate",
+            "Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss)",
             &["session_id"]
     ).unwrap();
 }
@@ -144,34 +138,25 @@ pub struct SurbBalancerConfig {
 /// In the remote context, the `SurbFlowController` might regulate the flow of non-organic SURBs via
 /// Start protocol's [`KeepAlive`](crate::initiation::StartProtocol::KeepAlive) messages to deliver additional
 /// SURBs to the counterparty.
-pub struct SurbBalancer<I, O, F, S> {
+pub struct SurbBalancer<E, F, S> {
     session_id: S,
     pid: Pid<f64>,
-    surb_production_estimator: O,
-    surb_consumption_estimator: I,
+    surb_estimator: E,
     controller: F,
     cfg: SurbBalancerConfig,
     current_target_buffer: u64,
-    last_surbs_delivered: u64,
-    last_surbs_used: u64,
+    last_estimator_state: SimpleSurbFlowEstimator,
     last_update: std::time::Instant,
     was_below_target: bool,
 }
 
-impl<I, O, F, S> SurbBalancer<I, O, F, S>
+impl<E, F, S> SurbBalancer<E, F, S>
 where
-    O: SurbFlowEstimator,
-    I: SurbFlowEstimator,
+    E: SurbFlowEstimator,
     F: SurbFlowController,
     S: Display,
 {
-    pub fn new(
-        session_id: S,
-        surb_production_estimator: O,
-        surb_consumption_estimator: I,
-        controller: F,
-        cfg: SurbBalancerConfig,
-    ) -> Self {
+    pub fn new(session_id: S, surb_estimator: E, controller: F, cfg: SurbBalancerConfig) -> Self {
         // Initialize the PID controller with default tuned gains
         let max_surbs_per_sec = cfg.max_surbs_per_sec as f64;
         let pid = Pid::new(cfg.target_surb_buffer_size as f64, max_surbs_per_sec);
@@ -184,15 +169,13 @@ where
         }
 
         let mut ret = Self {
-            surb_production_estimator,
-            surb_consumption_estimator,
+            surb_estimator,
             controller,
             pid,
             cfg,
             session_id,
             current_target_buffer: 0,
-            last_surbs_delivered: 0,
-            last_surbs_used: 0,
+            last_estimator_state: Default::default(),
             last_update: std::time::Instant::now(),
             was_below_target: true,
         };
@@ -212,18 +195,14 @@ where
 
         self.last_update = std::time::Instant::now();
 
-        // Number of SURBs sent to the counterparty since the last update
-        let current_surbs_delivered = self.surb_production_estimator.estimate_surb_turnout();
-        let surbs_delivered_delta = current_surbs_delivered - self.last_surbs_delivered;
-        self.last_surbs_delivered = current_surbs_delivered;
+        // Take a snapshot of the active SURB estimator and calculate the balance change
+        let snapshot = SimpleSurbFlowEstimator::from(&self.surb_estimator);
+        let Some(target_buffer_change) = snapshot.estimated_surb_buffer_change(&self.last_estimator_state) else {
+            tracing::error!("non-monotonic change in SURB estimators");
+            return self.current_target_buffer;
+        };
 
-        // Number of SURBs used by the counterparty since the last update
-        let current_surbs_used = self.surb_consumption_estimator.estimate_surb_turnout();
-        let surbs_used_delta = current_surbs_used - self.last_surbs_used;
-        self.last_surbs_used = current_surbs_used;
-
-        // Estimated change in counterparty's SURB buffer
-        let target_buffer_change = surbs_delivered_delta as i64 - surbs_used_delta as i64;
+        self.last_estimator_state = snapshot;
         self.current_target_buffer = self.current_target_buffer.saturating_add_signed(target_buffer_change);
 
         // Error from the desired target SURB buffer size at counterparty
@@ -240,10 +219,9 @@ where
         tracing::trace!(
             ?dt,
             delta = target_buffer_change,
+            rate = target_buffer_change as f64 / dt.as_secs_f64(),
             current = self.current_target_buffer,
             error,
-            rate_up = surbs_delivered_delta as f64 / dt.as_secs_f64(),
-            rate_down = surbs_used_delta as f64 / dt.as_secs_f64(),
             "estimated SURB buffer change"
         );
 
@@ -267,8 +245,7 @@ where
             let sid = self.session_id.to_string();
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], error as f64);
             METRIC_CONTROL_OUTPUT.set(&[&sid], corrected_output);
-            METRIC_SURBS_CONSUMED.increment_by(&[&sid], surbs_used_delta);
-            METRIC_SURBS_PRODUCED.increment_by(&[&sid], surbs_delivered_delta);
+            METRIC_SURB_RATE.set(&[&sid], target_buffer_change as f64 / dt.as_secs_f64());
         }
 
         self.current_target_buffer
@@ -327,7 +304,7 @@ mod tests {
     use std::sync::{Arc, atomic::AtomicU64};
 
     use super::*;
-    use crate::balancer::MockSurbFlowController;
+    use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController};
 
     #[test_log::test]
     fn surb_balancer_should_start_increase_level_when_below_target() {
@@ -346,12 +323,10 @@ mod tests {
                 production_rate_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed);
             });
 
-        let surb_production_count = Arc::new(AtomicU64::new(0));
-        let surb_consumption_count = Arc::new(AtomicU64::new(0));
+        let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
             "test",
-            surb_production_count.clone(),
-            surb_consumption_count.clone(),
+            surb_estimator.clone(),
             controller,
             SurbBalancerConfig::default(),
         );
@@ -359,11 +334,11 @@ mod tests {
         let mut last_update = 0;
         for i in 0..steps {
             std::thread::sleep(step_duration);
-            surb_production_count.fetch_add(
+            surb_estimator.produced.fetch_add(
                 production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(),
                 std::sync::atomic::Ordering::Relaxed,
             );
-            surb_consumption_count.fetch_add(
+            surb_estimator.consumed.fetch_add(
                 consumption_rate * step_duration.as_secs(),
                 std::sync::atomic::Ordering::Relaxed,
             );
@@ -394,12 +369,10 @@ mod tests {
                 production_rate_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed);
             });
 
-        let surb_production_count = Arc::new(AtomicU64::new(0));
-        let surb_consumption_count = Arc::new(AtomicU64::new(0));
+        let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
             "test",
-            surb_production_count.clone(),
-            surb_consumption_count.clone(),
+            surb_estimator.clone(),
             controller,
             SurbBalancerConfig::default(),
         );
@@ -407,11 +380,11 @@ mod tests {
         let mut last_update = 0;
         for i in 0..steps {
             std::thread::sleep(step_duration);
-            surb_production_count.fetch_add(
+            surb_estimator.produced.fetch_add(
                 production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(),
                 std::sync::atomic::Ordering::Relaxed,
             );
-            surb_consumption_count.fetch_add(
+            surb_estimator.consumed.fetch_add(
                 consumption_rate * step_duration.as_secs(),
                 std::sync::atomic::Ordering::Relaxed,
             );

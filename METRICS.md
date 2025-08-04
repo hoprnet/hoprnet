@@ -84,5 +84,4 @@ scrape_configs:
 - `hopr_session_inner_sizes`: Sizes of data chunks fed from inner session to HOPR protocol, keys: `session_id`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0
 - `hopr_surb_balancer_target_error_estimate`: Target error estimation by the SURB balancer, keys: `session_id`
 - `hopr_surb_balancer_control_output`: hopr_surb_balancer_control_output, keys: `session_id`
-- `hopr_surb_balancer_surbs_consumed`: Estimations of SURBs consumed by the counterparty, keys: `session_id`
-- `hopr_surb_balancer_surbs_produced`: Estimations of SURBs produced for the counterparty, keys: `session_id`
+- `hopr_surb_balancer_surbs_rate`: Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss), keys: `session_id`
