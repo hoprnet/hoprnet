@@ -674,6 +674,14 @@ where
         Ok(self.smgr.ping_session(id).await?)
     }
 
+    pub async fn session_surb_balancing_cfg(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
+        Ok(self.smgr.get_surb_balancer_config(id).await?)
+    }
+
+    pub async fn update_session_surb_balancing_cfg(&self, id: &SessionId, cfg: SurbBalancerConfig) -> errors::Result<()> {
+        Ok(self.smgr.update_surb_balancer_config(id, cfg)?)
+    }
+
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
     pub async fn send_message(&self, msg: Box<[u8]>, routing: DestinationRouting, tag: Tag) -> errors::Result<()> {
         if let Tag::Reserved(reserved_tag) = tag {

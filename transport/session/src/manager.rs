@@ -206,7 +206,7 @@ pub enum DispatchResult {
 /// Wraps a [`RateController`] as [`SurbFlowController`] with the given correction
 /// factor on time unit.
 ///
-/// For example, when this is used to control flow of keep-alive messages (carrying SURBs),
+/// For example, when this is used to control the flow of keep-alive messages (carrying SURBs),
 /// the correction factor is `HoprPacket::MAX_SURBS_IN_PACKET` - which is the number of SURBs
 /// a single keep-alive message can bear.
 ///
@@ -810,9 +810,9 @@ where
         self.sessions.iter().map(|(k, _)| *k).collect()
     }
 
-    /// Update the configuration of the SURB balancer on the given [`SessionId`].
+    /// Updates the configuration of the SURB balancer on the given [`SessionId`].
     ///
-    /// Returns an error if a Session with the given `id` does not exist, or
+    /// Returns an error if the Session with the given `id` does not exist, or
     /// if it does not use SURB balancing.
     pub async fn update_surb_balancer_config(
         &self,
@@ -842,6 +842,16 @@ where
                 Err(SessionManagerError::Other("session does not use SURB balancing".into()).into())
             }
             _ => Err(SessionManagerError::NonExistingSession.into()),
+        }
+    }
+
+    /// Retrieves the configuration of SURB balancing for the given Session.
+    ///
+    /// Returns an error if the Session with the given `id` does not exist.
+    pub async fn get_surb_balancer_config(&self, id: &SessionId) -> crate::errors::Result<Option<SurbBalancerConfig>> {
+        match self.sessions.get(id).await {
+            Some(session) => Ok(session.surb_mgmt),
+            None => Err(SessionManagerError::NonExistingSession.into()),
         }
     }
 

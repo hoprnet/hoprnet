@@ -5,10 +5,10 @@ mod rate_limiting;
 pub use controller::{SurbBalancer, SurbBalancerConfig};
 pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
 
-/// Allows estimating the flow of SURBs in a Session (production or depletion).
+/// Allows estimating the flow of SURBs in a Session (production or consumption).
 #[cfg_attr(test, mockall::automock)]
 pub trait SurbFlowEstimator {
-    /// Estimates the number of SURBs produced or depleted, depending on the context.
+    /// Estimates the number of SURBs produced or consumed, depending on the context.
     fn estimate_surb_turnout(&self) -> u64;
 }
 
@@ -18,9 +18,9 @@ impl SurbFlowEstimator for std::sync::Arc<std::sync::atomic::AtomicU64> {
     }
 }
 
-/// Allows controlling the flow of non-organic SURBs in a Session.
+/// Allows controlling the production or consumption of SURBs in a Session.
 #[cfg_attr(test, mockall::automock)]
 pub trait SurbFlowController {
-    /// Adjusts the amount of non-organic SURB flow.
+    /// Adjusts the amount of SURB production or consumption.
     fn adjust_surb_flow(&self, surbs_per_sec: usize);
 }

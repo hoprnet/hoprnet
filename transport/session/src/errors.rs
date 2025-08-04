@@ -18,6 +18,9 @@ pub enum TransportSessionError {
     #[error("no surb available for sending reply data")]
     OutOfSurbs,
 
+    #[error("unparseable session id")]
+    InvalidSessionId,
+
     #[error("the other party rejected session initiation with error: {0}")]
     Rejected(hopr_protocol_start::StartErrorReason),
 

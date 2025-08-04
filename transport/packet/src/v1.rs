@@ -1,5 +1,5 @@
 use std::{fmt::Formatter, ops::Range};
-
+use std::str::FromStr;
 use hopr_crypto_packet::prelude::HoprPacket;
 use strum::IntoEnumIterator;
 
@@ -108,6 +108,14 @@ impl<'a> serde::Deserialize<'a> for Tag {
 impl std::fmt::Display for Tag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_u64())
+    }
+}
+
+impl FromStr for Tag {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        u64::from_str(s).map(Tag::from)
     }
 }
 

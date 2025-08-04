@@ -394,6 +394,8 @@ enum ApiErrorStatus {
     InvalidQuality,
     NotReady,
     ListenHostAlreadyUsed,
+    SessionNotFound,
+    InvalidSessionId,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

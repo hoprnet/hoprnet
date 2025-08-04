@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-
+use std::str::FromStr;
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
@@ -20,8 +20,8 @@ use hopr_protocol_session::{
 use hopr_protocol_start::StartProtocol;
 use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, instrument};
-
-use crate::{Capabilities, Capability, errors::TransportSessionError};
+use hopr_primitive_types::prelude::ToHex;
+use crate::{Capabilities, Capability, errors::TransportSessionError, errors};
 
 /// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -100,9 +100,11 @@ pub struct SessionId {
 }
 
 impl SessionId {
+    const DELIMITER: char = ':';
+
     pub fn new<T: Into<Tag>>(tag: T, pseudonym: HoprPseudonym) -> Self {
         let tag = tag.into();
-        let mut cached = format!("{pseudonym}:{tag}");
+        let mut cached = format!("{pseudonym}{}{tag}", Self::DELIMITER);
         cached.truncate(MAX_SESSION_ID_STR_LEN);
 
         Self {
@@ -122,6 +124,19 @@ impl SessionId {
 
     pub fn as_str(&self) -> &str {
         &self.cached
+    }
+}
+
+impl FromStr for SessionId {
+    type Err = TransportSessionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.split_once(Self::DELIMITER)
+            .ok_or(TransportSessionError::InvalidSessionId)
+            .and_then(|(pseudonym, tag)| match (HoprPseudonym::from_hex(pseudonym), Tag::from_str(tag)) {
+                (Ok(p), Ok(t)) => Ok(Self::new(t, p)),
+                _ => Err(TransportSessionError::InvalidSessionId),
+            })
     }
 }
 
@@ -497,6 +512,15 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use super::*;
+
+    #[test]
+    fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
+        let id = SessionId::new(1234_u64, HoprPseudonym::random());
+        assert_eq!(id.as_str(), id.to_string());
+        assert_eq!(id, SessionId::from_str(id.as_str())?);
+
+        Ok(())
+    }
 
     #[test]
     fn test_max_decimal_digits_for_n_bytes() {

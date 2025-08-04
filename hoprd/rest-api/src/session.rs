@@ -1133,7 +1133,7 @@ pub(crate) struct SessionConfig {
     responses(
             (status = 204, description = "Successfully updated the configuration"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 404, description = "Given session ID does not refer to a valid Session", body = ApiError),
+            (status = 404, description = "Given session ID does not refer to an existing Session", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError),
     ),
     security(
@@ -1159,8 +1159,9 @@ pub(crate) async fn adjust_session(
     ),
     responses(
             (status = 200, description = "Retrieved session configuration.", body = SessionConfig),
+            (status = 400, description = "Invalid session ID.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 404, description = "Given session ID does not refer to a valid Session", body = ApiError),
+            (status = 404, description = "Given session ID does not refer to an existing Session", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError),
     ),
     security(
@@ -1173,7 +1174,28 @@ pub(crate) async fn session_config(
     State(state): State<Arc<InternalState>>,
     Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
+    let session_id = HoprSessionId::from_str(&session_id)
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                ApiErrorStatus::InvalidSessionId,
+            )
+        })?;
+
+    match state.hopr.get_session_surb_balancer_config(&session_id).await {
+        Ok(Some(cfg)) => {
+            // TODO: add corrections here
+            let cfg = SessionConfig {
+                response_buffer: Some(cfg.target_surb_buffer_size),
+                max_surb_upstream: Some(cfg.max_surb_upstream),
+            };
+            Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(cfg)).into_response())
+        },
+        Ok(None) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
+        Err(e) => Err((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnknownFailure(e.to_string()))),
+    }
+
+
 }
 
 #[derive(
