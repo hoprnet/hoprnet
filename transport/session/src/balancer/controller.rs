@@ -97,7 +97,7 @@ pub struct SurbBalancerConfig {
     /// The local buffer is maintained by [regulating](SurbFlowController) the egress from the Session.
     /// The remote buffer (at session counterparty) is maintained by regulating the flow of non-organic SURBs via
     /// [keep-alive messages](crate::initiation::StartProtocol::KeepAlive).
-    #[default(5_000)]
+    #[default(7_000)]
     pub target_surb_buffer_size: u64,
     /// Maximum outflow of SURBs.
     ///
@@ -105,8 +105,8 @@ pub struct SurbBalancerConfig {
     /// - In the context of the remote SURB buffer, this is the maximum egress of keep-alive messages to the
     ///   counterparty.
     ///
-    /// The default is 2500 (which is 1250 packets/second currently)
-    #[default(2_500)]
+    /// The default is 5000 (which is 2500 packets/second currently)
+    #[default(5_000)]
     pub max_surbs_per_sec: u64,
     /// PID controller gains.
     ///
@@ -142,7 +142,7 @@ pub struct SurbBalancer<E, F, S> {
     session_id: S,
     pid: Pid<f64>,
     surb_estimator: E,
-    controller: F,
+    flow_control: F,
     cfg: SurbBalancerConfig,
     current_target_buffer: u64,
     last_estimator_state: SimpleSurbFlowEstimator,
@@ -156,7 +156,7 @@ where
     F: SurbFlowController,
     S: Display,
 {
-    pub fn new(session_id: S, surb_estimator: E, controller: F, cfg: SurbBalancerConfig) -> Self {
+    pub fn new(session_id: S, surb_estimator: E, flow_control: F, cfg: SurbBalancerConfig) -> Self {
         // Initialize the PID controller with default tuned gains
         let max_surbs_per_sec = cfg.max_surbs_per_sec as f64;
         let pid = Pid::new(cfg.target_surb_buffer_size as f64, max_surbs_per_sec);
@@ -170,7 +170,7 @@ where
 
         let mut ret = Self {
             surb_estimator,
-            controller,
+            flow_control,
             pid,
             cfg,
             session_id,
@@ -233,12 +233,12 @@ where
             corrected_output = self.cfg.max_surbs_per_sec as f64 - corrected_output;
         }
 
-        self.controller.adjust_surb_flow(corrected_output as usize);
-
         tracing::debug!(
             control_output = corrected_output,
             "next balancer control output for session"
         );
+
+        self.flow_control.adjust_surb_flow(corrected_output as usize);
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -328,7 +328,11 @@ mod tests {
             "test",
             surb_estimator.clone(),
             controller,
-            SurbBalancerConfig::default(),
+            SurbBalancerConfig {
+                target_surb_buffer_size: 5_000,
+                max_surbs_per_sec: 2500,
+                ..Default::default()
+            },
         );
 
         let mut last_update = 0;

@@ -104,16 +104,21 @@ mod tests {
 
     #[test]
     fn test_estimated_surb_buffer_change() {
-        let estimator = SimpleSurbFlowEstimator {
+        let estimator_1 = SimpleSurbFlowEstimator {
             produced: 10,
             consumed: 5,
         };
-        let estimator2 = SimpleSurbFlowEstimator {
+        let estimator_2 = SimpleSurbFlowEstimator {
             produced: 15,
             consumed: 11,
         };
-        assert_eq!(estimator.estimated_surb_buffer_change(&estimator), Some(0));
-        assert_eq!(estimator2.estimated_surb_buffer_change(&estimator), Some(-1));
-        assert_eq!(estimator.estimated_surb_buffer_change(&estimator2), None);
+        let estimator_3 = SimpleSurbFlowEstimator {
+            produced: 25,
+            consumed: 16,
+        };
+        assert_eq!(estimator_1.estimated_surb_buffer_change(&estimator_1), Some(0));
+        assert_eq!(estimator_2.estimated_surb_buffer_change(&estimator_1), Some(-1));
+        assert_eq!(estimator_3.estimated_surb_buffer_change(&estimator_2), Some(5));
+        assert_eq!(estimator_1.estimated_surb_buffer_change(&estimator_2), None);
     }
 }

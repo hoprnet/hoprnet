@@ -75,7 +75,7 @@ pub struct SessionManagerConfig {
     /// to be managed by the manager.
     ///
     /// When reached, creating [new sessions](SessionManager::new_session) will return
-    /// an [`SessionManagerError::TooManySessions`], and incoming sessions will be rejected
+    /// the [`SessionManagerError::TooManySessions`] error, and incoming sessions will be rejected
     /// with [`StartErrorReason::NoSlotsAvailable`] Start protocol error.
     ///
     /// Default is 128, minimum is 1; maximum is given by the `session_tag_range`.
@@ -232,6 +232,7 @@ where
     )
 }
 
+/// Incoming session notifier and session closure notifier
 type SessionNotifiers = (
     UnboundedSender<IncomingSession>,
     UnboundedSender<(SessionId, ClosureReason)>,
@@ -267,7 +268,7 @@ type SessionNotifiers = (
 /// therefore incoming to us).
 /// The local SURB balancing mechanism continuously evaluates the rate of SURB consumption and retrieval,
 /// and if SURBs are running out, the packet egress shaping takes effect. This by itself does not
-/// avoid the depletion of SURBs, but slows it down in the hope that the initiating party can deliver
+/// avoid the depletion of SURBs but slows it down in the hope that the initiating party can deliver
 /// more SURBs over time. This might happen either organically by sending effective payloads that
 /// allow non-zero number of SURBs in the packet, or non-organically by delivering KeepAlive messages
 /// via *remote SURB balancing*.
@@ -324,7 +325,7 @@ where
     S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
-    /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
+    /// Creates a new instance given the [`config`](SessionManagerConfig).
     pub fn new(mut cfg: SessionManagerConfig) -> Self {
         let min_session_tag_range_reservation = ReservedTag::range().end;
         debug_assert!(
@@ -372,8 +373,8 @@ where
         }
     }
 
-    /// Starts the instance with the given [transport](SendMsg) implementation
-    /// and a channel that is used to notify when a new incoming session is opened to us.
+    /// Starts the instance with the given `msg_sender` `Sink`
+    /// and a channel `new_session_notifier` used to notify when a new incoming session is opened to us.
     ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
@@ -871,6 +872,7 @@ where
         let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         // Search for a free Session ID slot
+        self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated
         let allocated_slot = if self.cfg.maximum_sessions > self.sessions.entry_count() as usize {
             insert_into_next_slot(
                 &self.sessions,
@@ -1274,6 +1276,7 @@ mod tests {
                     SessionTarget::TcpStream(target.clone()),
                     SessionClientConfig {
                         pseudonym: alice_pseudonym.into(),
+                        capabilities: Capability::NoRateControl | Capability::Segmentation,
                         surb_management: None,
                         ..Default::default()
                     },
@@ -1287,11 +1290,29 @@ mod tests {
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
         assert_eq!(
-            alice_session.capabilities(),
-            &Capabilities::from(Capability::Segmentation)
+            *alice_session.capabilities(),
+            Capability::Segmentation | Capability::NoRateControl
         );
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
+
+        assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions().await);
+        assert_eq!(None, alice_mgr.get_surb_balancer_config(alice_session.id()).await?);
+        assert!(
+            alice_mgr
+                .update_surb_balancer_config(alice_session.id(), SurbBalancerConfig::default())
+                .await
+                .is_err()
+        );
+
+        assert_eq!(vec![*bob_session.session.id()], bob_mgr.active_sessions().await);
+        assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id()).await?);
+        assert!(
+            bob_mgr
+                .update_surb_balancer_config(bob_session.session.id(), SurbBalancerConfig::default())
+                .await
+                .is_err()
+        );
 
         tokio::time::sleep(Duration::from_millis(100)).await;
         alice_session.close().await?;
@@ -1385,6 +1406,7 @@ mod tests {
                     SessionTarget::TcpStream(target.clone()),
                     SessionClientConfig {
                         pseudonym: alice_pseudonym.into(),
+                        capabilities: Capability::NoRateControl | Capability::Segmentation,
                         surb_management: None,
                         ..Default::default()
                     },
@@ -1398,8 +1420,8 @@ mod tests {
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
         assert_eq!(
-            alice_session.capabilities(),
-            &Capabilities::from(Capability::Segmentation)
+            *alice_session.capabilities(),
+            Capability::Segmentation | Capability::NoRateControl,
         );
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
@@ -1415,6 +1437,55 @@ mod tests {
         futures::stream::iter(ahs)
             .for_each(|ah| async move { ah.abort() })
             .await;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_update_surb_balancer_config() -> anyhow::Result<()> {
+        let alice_pseudonym = HoprPseudonym::random();
+        let session_id = SessionId::new(16u64, alice_pseudonym);
+        let balancer_cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 1000,
+            max_surbs_per_sec: 100,
+            ..Default::default()
+        };
+
+        let alice_mgr =
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationData)>>::new(Default::default());
+
+        let (dummy_tx, _) = futures::channel::mpsc::unbounded();
+        alice_mgr
+            .sessions
+            .insert(
+                session_id,
+                SessionSlot {
+                    session_tx: Arc::new(dummy_tx),
+                    routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+                    abort_handles: Vec::new(),
+                    surb_mgmt: Some(balancer_cfg.clone()),
+                },
+            )
+            .await;
+
+        let actual_cfg = alice_mgr
+            .get_surb_balancer_config(&session_id)
+            .await?
+            .ok_or(anyhow!("session must have a surb balancer config"))?;
+        assert_eq!(actual_cfg, balancer_cfg);
+
+        let new_cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 2000,
+            max_surbs_per_sec: 200,
+            ..Default::default()
+        };
+        alice_mgr.update_surb_balancer_config(&session_id, new_cfg).await?;
+
+        let actual_cfg = alice_mgr
+            .get_surb_balancer_config(&session_id)
+            .await?
+            .ok_or(anyhow!("session must have a surb balancer config"))?;
+        assert_eq!(actual_cfg, new_cfg);
 
         Ok(())
     }
@@ -1845,6 +1916,12 @@ mod tests {
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
+        let balancer_cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 10,
+            max_surbs_per_sec: 100,
+            ..Default::default()
+        };
+
         pin_mut!(new_session_rx_bob);
         let (alice_session, bob_session) = timeout(
             Duration::from_secs(2),
@@ -1854,11 +1931,8 @@ mod tests {
                     SessionTarget::TcpStream(target.clone()),
                     SessionClientConfig {
                         pseudonym: alice_pseudonym.into(),
-                        surb_management: Some(SurbBalancerConfig {
-                            target_surb_buffer_size: 10,
-                            max_surbs_per_sec: 100,
-                            ..Default::default()
-                        }),
+                        capabilities: Capability::NoRateControl.into(),
+                        surb_management: Some(balancer_cfg),
                         ..Default::default()
                     },
                 ),
@@ -1871,6 +1945,12 @@ mod tests {
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
+
+        assert_eq!(
+            Some(balancer_cfg),
+            alice_mgr.get_surb_balancer_config(alice_session.id()).await?
+        );
+        assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id()).await?);
 
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
