@@ -144,7 +144,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                                 Ok(_) => {
                                     tracing::trace!(frame_id = builder.frame_id(), %seg_id, "added segment");
                                     if builder.is_complete() {
-                                        #[cfg(feature = "prometheus")]
+                                        #[cfg(all(not(test), feature = "prometheus"))]
                                         METRIC_TIME_TO_FRAME_FINISH
                                             .observe(builder._created.elapsed().as_millis() as f64);
 
@@ -160,7 +160,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                         FrameMapEntry::Vacant(e) => {
                             let builder = FrameBuilder::from(item);
                             if builder.is_complete() {
-                                #[cfg(feature = "prometheus")]
+                                #[cfg(all(not(test), feature = "prometheus"))]
                                 METRIC_TIME_TO_FRAME_FINISH.observe(builder._created.elapsed().as_millis() as f64);
 
                                 tracing::trace!(frame_id = builder.frame_id(), "segment frame is complete");
