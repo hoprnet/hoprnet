@@ -25,6 +25,7 @@ use crate::{
     balancer::{
         AtomicSurbFlowEstimator, RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer,
         SurbBalancerController, SurbFlowController, SurbFlowEstimator, pid::PidBalancerController,
+        simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprStartProtocol},
@@ -107,8 +108,6 @@ pub struct SessionManagerConfig {
     /// Initial packets per second egress rate on an incoming Session.
     ///
     /// This applies to incoming Sessions without the [`Capability::NoRateControl`] flag set.
-    /// The SURB balancer will then gradually increase the egress rate as more SURBs are received,
-    /// all the way until [`MAX_RETURN_PACKETS_PER_SEC`].
     ///
     /// Default is 10 packets/second.
     #[default(10)]
@@ -315,12 +314,8 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
 /// Smallest possible interval for balancer sampling.
 pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
 
-/// Maximum number of packets per second on a return path Session.
-///
-/// This is currently ~20 MB/s
-pub const MAX_RETURN_PACKETS_PER_SEC: usize = 20_000;
-
-pub const DEFAULT_RETURN_TARGET_BUFFER: u64 = 1000;
+/// Minimum time the SURB buffer must endure if no SURBs are being produced.
+pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(5);
 
 impl<S> SessionManager<S>
 where
@@ -544,9 +539,9 @@ where
             target,
             capabilities: ByteCapabilities(cfg.capabilities),
             additional_data: if !cfg.capabilities.contains(Capability::NoRateControl) {
-                cfg.surb_management
-                    .map(|c| c.target_surb_buffer_size as u32)
-                    .unwrap_or(DEFAULT_RETURN_TARGET_BUFFER as u32)
+                cfg.surb_management.map(|c| c.target_surb_buffer_size as u32).unwrap_or(
+                    (self.cfg.initial_return_session_egress_rate as u64 * MIN_SURB_BUFFER_DURATION.as_secs()) as u32,
+                )
             } else {
                 0
             },
@@ -858,7 +853,7 @@ where
         Ok(DispatchResult::Unrelated(data))
     }
 
-    async fn handle_session_initiation(
+    async fn handle_incoming_session_initiation(
         &self,
         pseudonym: HoprPseudonym,
         session_req: StartInitiation<SessionTarget, ByteCapabilities>,
@@ -931,6 +926,9 @@ where
 
                 let surb_estimator_clone = surb_estimator.clone();
 
+                let target_surb_buffer_size = (session_req.additional_data as u64)
+                    .max(self.cfg.initial_return_session_egress_rate as u64 * MIN_SURB_BUFFER_DURATION.as_secs());
+
                 let session = Session::new(
                     session_id,
                     reply_routing.clone(),
@@ -947,7 +945,7 @@ where
                                 futures::future::ok::<_, S::Error>((routing, data))
                             })
                             .rate_limit_with_controller(&egress_rate_control)
-                            .buffer(2 * MAX_RETURN_PACKETS_PER_SEC),
+                            .buffer((2 * target_surb_buffer_size) as usize),
                         // Received packets = SURB retrieval estimate
                         rx_session_data.inspect(move |data| {
                             // Count the number of SURBs delivered with each incoming packet
@@ -962,11 +960,11 @@ where
 
                 // The SURB balancer will start intervening by rate-limiting the
                 // egress of the Session, once the estimated number of SURBs drops below
-                // the target defined here. Otherwise, the maximum egresss is allowed.
+                // the target defined here. Otherwise, the maximum egress is allowed.
                 let return_balancer_cfg = SurbBalancerConfig {
-                    target_surb_buffer_size: (session_req.additional_data as u64).max(DEFAULT_RETURN_TARGET_BUFFER),
-                    max_surbs_per_sec: MAX_RETURN_PACKETS_PER_SEC as u64,
-                    invert_output: true,
+                    target_surb_buffer_size,
+                    // At maximum egress, the SURB buffer drains in `MIN_SURB_BUFFER_DURATION` seconds
+                    max_surbs_per_sec: target_surb_buffer_size / MIN_SURB_BUFFER_DURATION.as_secs(),
                     ..Default::default()
                 };
 
@@ -991,7 +989,7 @@ where
                     self.spawn_surb_balancer_control_loop(
                         SurbBalancer::new(
                             session_id,
-                            PidBalancerController::default(),
+                            SimpleBalancerController::default(),
                             surb_estimator,
                             SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
                             return_balancer_cfg,
@@ -1079,7 +1077,7 @@ where
     ) -> crate::errors::Result<()> {
         match HoprStartProtocol::try_from(data)? {
             HoprStartProtocol::StartSession(session_req) => {
-                self.handle_session_initiation(pseudonym, session_req).await?;
+                self.handle_incoming_session_initiation(pseudonym, session_req).await?;
             }
             HoprStartProtocol::SessionEstablished(est) => {
                 trace!(

@@ -1,8 +1,11 @@
 mod controller;
-/// Contains implementation of [`SurbBalancerController`] using a Proportional Integral Derivative (PID) controller.
+/// Contains implementation of the [`SurbBalancerController`] trait using a Proportional Integral Derivative (PID)
+/// controller.
 pub mod pid;
 #[allow(dead_code)]
 mod rate_limiting;
+/// Contains simple proportional output implementation of the [`SurbBalancerController`] trait.
+pub mod simple;
 
 pub use controller::{SurbBalancer, SurbBalancerConfig};
 pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
