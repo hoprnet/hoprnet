@@ -1,6 +1,6 @@
 version = 1
 revision = 2
-requires-python = ">=3.13, <3.14"
+requires-python = "==3.13.*"
 
 [options]
 exclude-newer = "2025-07-18T00:00:00Z"
@@ -637,11 +637,11 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "pytest", specifier = ">=8.3.3" },
-    { name = "pytest-asyncio", specifier = ">=0.24.0" },
+    { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-timeout", specifier = ">=2.3.1" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "websocket-client", specifier = ">=1.5.1" },
-    { name = "websockets", specifier = ">=13.1" },
+    { name = "websockets", specifier = ">=15.0.1" },
 ]
 
 [[package]]
