@@ -26,7 +26,8 @@ let
     # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
     "RUST_BACKTRACE=full"
     "LD_LIBRARY_PATH=${libPath}"
-  ] ++ env;
+  ]
+  ++ env;
   ExposedPorts = extraPorts;
 in
 pkgs.dockerTools.buildLayeredImage (
