@@ -24,7 +24,7 @@ class Anvil:
         self.cfg_file.parent.mkdir(parents=True, exist_ok=True)
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
 
-        logging.info(f"Anvil initializing on port {self.port}")
+        logging.info(f"Anvil listening on port {self.port}")
 
     def run(self, state=AnvilState.DUMP):
         logging.info("Starting and waiting for local anvil server to be up " + f"({state.name.lower()} state enabled)")
