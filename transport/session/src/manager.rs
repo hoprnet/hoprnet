@@ -107,11 +107,23 @@ pub struct SessionManagerConfig {
 
     /// Initial packets per second egress rate on an incoming Session.
     ///
-    /// This applies to incoming Sessions without the [`Capability::NoRateControl`] flag set.
+    /// This only applies to incoming Sessions without the [`Capability::NoRateControl`] flag set.
     ///
     /// Default is 10 packets/second.
     #[default(10)]
     pub initial_return_session_egress_rate: usize,
+    /// Minimum period of time for which a SURB buffer at the Exit must
+    /// endure if no SURBs are being received.
+    ///
+    /// In other words, it is the minimum period of time an Exit must withstand when
+    /// no SURBs are received from the Entry at all. To do so, the egress traffic
+    /// will be shaped accordingly to meet this requirement.
+    ///
+    /// This only applies to incoming Sessions without the [`Capability::NoRateControl`] flag set.
+    ///
+    /// Default is 5 seconds, minimum is 1 second.
+    #[default(Duration::from_secs(5))]
+    pub minimum_surb_buffer_duration: Duration,
 }
 
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
@@ -151,6 +163,7 @@ struct SessionSlot {
     abort_handles: Vec<AbortHandle>,
     // Allows reconfiguring of the SURB balancer on-the-fly
     surb_mgmt: Option<SurbBalancerConfig>,
+    surb_estimator: Option<AtomicSurbFlowEstimator>,
 }
 
 /// Indicates the result of processing a message.
@@ -315,7 +328,7 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
 pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Minimum time the SURB buffer must endure if no SURBs are being produced.
-pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(5);
+pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
 
 impl<S> SessionManager<S>
 where
@@ -540,7 +553,12 @@ where
             capabilities: ByteCapabilities(cfg.capabilities),
             additional_data: if !cfg.capabilities.contains(Capability::NoRateControl) {
                 cfg.surb_management.map(|c| c.target_surb_buffer_size as u32).unwrap_or(
-                    (self.cfg.initial_return_session_egress_rate as u64 * MIN_SURB_BUFFER_DURATION.as_secs()) as u32,
+                    (self.cfg.initial_return_session_egress_rate as u64
+                        * self
+                            .cfg
+                            .minimum_surb_buffer_duration
+                            .max(MIN_SURB_BUFFER_DURATION)
+                            .as_secs()) as u32,
                 )
             } else {
                 0
@@ -696,6 +714,7 @@ where
                                 routing_opts: forward_routing,
                                 abort_handles,
                                 surb_mgmt,
+                                surb_estimator: None,
                             })
                         } else {
                             moka::ops::compute::Op::Nop
@@ -900,6 +919,7 @@ where
                     routing_opts: reply_routing.clone(),
                     abort_handles: vec![],
                     surb_mgmt: None,
+                    surb_estimator: None,
                 },
             )
             .await
@@ -928,7 +948,12 @@ where
                     // TODO: externalize this const - currently capped by SURB RB's capacity
                     session_req.additional_data.min(10_000) as u64
                 } else {
-                    self.cfg.initial_return_session_egress_rate as u64 * MIN_SURB_BUFFER_DURATION.as_secs()
+                    self.cfg.initial_return_session_egress_rate as u64
+                        * self
+                            .cfg
+                            .minimum_surb_buffer_duration
+                            .max(MIN_SURB_BUFFER_DURATION)
+                            .as_secs()
                 };
 
                 let surb_estimator_clone = surb_estimator.clone();
@@ -966,8 +991,13 @@ where
                 // the target defined here. Otherwise, the maximum egress is allowed.
                 let return_balancer_cfg = SurbBalancerConfig {
                     target_surb_buffer_size,
-                    // At maximum egress, the SURB buffer drains in `MIN_SURB_BUFFER_DURATION` seconds
-                    max_surbs_per_sec: target_surb_buffer_size / MIN_SURB_BUFFER_DURATION.as_secs(),
+                    // At maximum egress, the SURB buffer drains in `minimum_surb_buffer_duration` seconds
+                    max_surbs_per_sec: target_surb_buffer_size
+                        / self
+                            .cfg
+                            .minimum_surb_buffer_duration
+                            .max(MIN_SURB_BUFFER_DURATION)
+                            .as_secs(),
                     ..Default::default()
                 };
 
@@ -980,6 +1010,7 @@ where
                         if let Some(mut cached_session) = entry.map(|c| c.into_value()) {
                             cached_session.abort_handles.push(balancer_abort_handle);
                             cached_session.surb_mgmt = Some(return_balancer_cfg);
+                            cached_session.surb_estimator = Some(surb_estimator.clone());
                             futures::future::ready(moka::ops::compute::Op::Put(cached_session))
                         } else {
                             futures::future::ready(moka::ops::compute::Op::Nop)
@@ -1134,8 +1165,14 @@ where
             }
             HoprStartProtocol::KeepAlive(msg) => {
                 let session_id = msg.session_id;
-                if self.sessions.get(&session_id).await.is_some() {
+                if let Some(session_slot) = self.sessions.get(&session_id).await {
                     trace!(?session_id, "received keep-alive request");
+                    // If the session has a SURB flow estimator, increase the number of received SURBs.
+                    // This applies to the incoming sessions currently
+                    if let Some(estimator) = session_slot.surb_estimator.as_ref() {
+                        // Two SURBs per Keep-Alive message
+                        estimator.produced.fetch_add(2, std::sync::atomic::Ordering::Relaxed);
+                    }
                 } else {
                     debug!(%session_id, "received keep-alive request for an unknown session");
                 }
@@ -1477,6 +1514,7 @@ mod tests {
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
                     surb_mgmt: Some(balancer_cfg.clone()),
+                    surb_estimator: None,
                 },
             )
             .await;
@@ -1527,6 +1565,7 @@ mod tests {
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                     abort_handles: Vec::new(),
                     surb_mgmt: None,
+                    surb_estimator: None,
                 },
             )
             .await;
@@ -1626,6 +1665,7 @@ mod tests {
                     routing_opts: DestinationRouting::Return(alice_pseudonym.into()),
                     abort_handles: Vec::new(),
                     surb_mgmt: None,
+                    surb_estimator: None,
                 },
             )
             .await;
@@ -1832,8 +1872,9 @@ mod tests {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
+        let bob_cfg = SessionManagerConfig::default();
         let alice_mgr = SessionManager::new(Default::default());
-        let bob_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(bob_cfg.clone());
 
         let mut alice_transport = MockMsgSender::new();
         let mut bob_transport = MockMsgSender::new();
@@ -1971,7 +2012,11 @@ mod tests {
         assert_eq!(remote_cfg.target_surb_buffer_size, balancer_cfg.target_surb_buffer_size);
         assert_eq!(
             remote_cfg.max_surbs_per_sec,
-            remote_cfg.target_surb_buffer_size / MIN_SURB_BUFFER_DURATION.as_secs()
+            remote_cfg.target_surb_buffer_size
+                / bob_cfg
+                    .minimum_surb_buffer_duration
+                    .max(MIN_SURB_BUFFER_DURATION)
+                    .as_secs()
         );
 
         // Let the Surb balancer send enough KeepAlive messages
