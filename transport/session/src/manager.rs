@@ -320,6 +320,8 @@ pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
 /// This is currently ~20 MB/s
 pub const MAX_RETURN_PACKETS_PER_SEC: usize = 20_000;
 
+pub const DEFAULT_RETURN_TARGET_BUFFER: u64 = 1000;
+
 impl<S> SessionManager<S>
 where
     S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
@@ -544,6 +546,13 @@ where
             challenge,
             target,
             capabilities: ByteCapabilities(cfg.capabilities),
+            additional_data: if !cfg.capabilities.contains(Capability::NoRateControl) {
+                cfg.surb_management
+                    .map(|c| c.target_surb_buffer_size as u32)
+                    .unwrap_or(DEFAULT_RETURN_TARGET_BUFFER as u32)
+            } else {
+                0
+            },
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -955,7 +964,7 @@ where
                 // egress of the Session, once the estimated number of SURBs drops below
                 // the target defined here. Otherwise, the maximum egresss is allowed.
                 let return_balancer_cfg = SurbBalancerConfig {
-                    target_surb_buffer_size: 100,
+                    target_surb_buffer_size: (session_req.additional_data as u64).max(DEFAULT_RETURN_TARGET_BUFFER),
                     max_surbs_per_sec: MAX_RETURN_PACKETS_PER_SEC as u64,
                     invert_output: true,
                     ..Default::default()
@@ -1085,7 +1094,7 @@ where
                     }
                     debug!(?session_id, challenge, "session establishment complete");
                 } else {
-                    error!(%session_id, challenge, "session establishment attempt expired");
+                    error!(%session_id, challenge, "unknown session establishment attempt or expired");
                 }
             }
             HoprStartProtocol::SessionError(error) => {

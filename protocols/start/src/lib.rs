@@ -28,10 +28,12 @@ pub type StartChallenge = u64;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 #[repr(u8)]
 pub enum StartErrorReason {
+    /// Unknown error.
+    Unknown = 0,
     /// No more slots are available at the recipient.
-    NoSlotsAvailable,
+    NoSlotsAvailable = 1,
     /// Recipient is busy.
-    Busy,
+    Busy = 2,
 }
 
 /// Error message in the Start protocol.
@@ -48,6 +50,9 @@ pub struct StartErrorType {
 /// ## Generic parameters
 /// - `T` is the session target
 /// - `C` are session capabilities
+///
+/// The `additional_data` are set dependent on the `capabilities`
+/// or set to `0x00000000` to be ignored.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StartInitiation<T, C> {
     /// Random challenge for this initiation.
@@ -56,6 +61,8 @@ pub struct StartInitiation<T, C> {
     pub target: T,
     /// Capabilities of the session.
     pub capabilities: C,
+    /// Additional options (might be `capabilities` dependent), ignored if `0x00000000`.
+    pub additional_data: u32,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.
@@ -115,6 +122,8 @@ pub struct KeepAliveMessage<I> {
     pub session_id: I,
     /// Reserved for future use, always zero currently.
     pub flags: u8,
+    /// Additional data (might be `flags` dependent), ignored if `0x00000000`.
+    pub additional_data: u32,
 }
 
 impl<I> From<I> for KeepAliveMessage<I> {
@@ -122,6 +131,7 @@ impl<I> From<I> for KeepAliveMessage<I> {
         Self {
             session_id: value,
             flags: 0,
+            additional_data: 0,
         }
     }
 }
@@ -145,28 +155,34 @@ where
         out.push(Self::START_PROTOCOL_VERSION);
         out.push(StartProtocolDiscriminants::from(&self) as u8);
 
+        let mut data = Vec::with_capacity(ApplicationData::PAYLOAD_SIZE - 2);
         match self {
             StartProtocol::StartSession(init) => {
-                out.extend_from_slice(&init.challenge.to_be_bytes());
-                out.push(init.capabilities.into());
+                data.extend_from_slice(&init.challenge.to_be_bytes());
+                data.push(init.capabilities.into());
+                data.extend_from_slice(&init.additional_data.to_be_bytes());
                 let target = serde_cbor_2::to_vec(&init.target)?;
-                out.extend_from_slice(&target);
+                data.extend_from_slice(&target);
             }
             StartProtocol::SessionEstablished(est) => {
-                out.extend_from_slice(&est.orig_challenge.to_be_bytes());
+                data.extend_from_slice(&est.orig_challenge.to_be_bytes());
                 let session_id = serde_cbor_2::to_vec(&est.session_id)?;
-                out.extend(session_id);
+                data.extend(session_id);
             }
             StartProtocol::SessionError(err) => {
-                out.extend_from_slice(&err.challenge.to_be_bytes());
-                out.push(err.reason as u8);
+                data.extend_from_slice(&err.challenge.to_be_bytes());
+                data.push(err.reason as u8);
             }
             StartProtocol::KeepAlive(ping) => {
-                out.push(ping.flags);
+                data.push(ping.flags);
+                data.extend_from_slice(&ping.additional_data.to_be_bytes());
                 let session_id = serde_cbor_2::to_vec(&ping.session_id)?;
-                out.extend(session_id);
+                data.extend(session_id);
             }
         }
+
+        out.extend_from_slice(&(data.len() as u16).to_be_bytes());
+        out.extend(data);
 
         Ok((Self::START_PROTOCOL_MESSAGE_TAG, out.into_boxed_slice()))
     }
@@ -180,7 +196,7 @@ where
             return Err(StartProtocolError::UnknownTag);
         }
 
-        if data.len() < 3 {
+        if data.len() < 5 {
             return Err(StartProtocolError::InvalidLength);
         }
 
@@ -188,60 +204,85 @@ where
             return Err(StartProtocolError::InvalidVersion);
         }
 
+        let disc = data[1];
+        let len = u16::from_be_bytes(
+            data[2..4]
+                .try_into()
+                .map_err(|_| StartProtocolError::ParseError("len".into()))?,
+        ) as usize;
+        let data_offset = 2 + size_of::<u16>();
+
+        if data.len() < data_offset + len {
+            return Err(StartProtocolError::InvalidLength);
+        }
+
         Ok(
-            match StartProtocolDiscriminants::from_repr(data[1]).ok_or(StartProtocolError::UnknownMessage)? {
+            match StartProtocolDiscriminants::from_repr(disc).ok_or(StartProtocolError::UnknownMessage)? {
                 StartProtocolDiscriminants::StartSession => {
-                    if data.len() <= 2 + size_of::<StartChallenge>() + 1 {
+                    if data.len() <= data_offset + size_of::<StartChallenge>() + 1 + size_of::<u32>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
                     StartProtocol::StartSession(StartInitiation {
                         challenge: StartChallenge::from_be_bytes(
-                            data[2..2 + size_of::<StartChallenge>()]
+                            data[data_offset..data_offset + size_of::<StartChallenge>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("init.challenge".into()))?,
                         ),
-                        capabilities: data[2 + size_of::<StartChallenge>()]
+                        capabilities: data[data_offset + size_of::<StartChallenge>()]
                             .try_into()
                             .map_err(|_| StartProtocolError::ParseError("init.capabilities".into()))?,
-                        target: serde_cbor_2::from_slice(&data[2 + size_of::<StartChallenge>() + 1..])?,
+                        additional_data: u32::from_be_bytes(
+                            data[data_offset + size_of::<StartChallenge>() + 1
+                                ..data_offset + size_of::<StartChallenge>() + 1 + size_of::<u32>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("init.additional_data".into()))?,
+                        ),
+                        target: serde_cbor_2::from_slice(
+                            &data[data_offset + size_of::<StartChallenge>() + 1 + size_of::<u32>()..],
+                        )?,
                     })
                 }
                 StartProtocolDiscriminants::SessionEstablished => {
-                    if data.len() <= 2 + size_of::<StartChallenge>() {
+                    if data.len() <= data_offset + size_of::<StartChallenge>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
                     StartProtocol::SessionEstablished(StartEstablished {
                         orig_challenge: StartChallenge::from_be_bytes(
-                            data[2..2 + size_of::<StartChallenge>()]
+                            data[data_offset..data_offset + size_of::<StartChallenge>()]
                                 .try_into()
-                                .map_err(|_| StartProtocolError::ParseError("init.challenge".into()))?,
+                                .map_err(|_| StartProtocolError::ParseError("est.challenge".into()))?,
                         ),
-                        session_id: serde_cbor_2::from_slice(&data[2 + size_of::<StartChallenge>()..])?,
+                        session_id: serde_cbor_2::from_slice(&data[data_offset + size_of::<StartChallenge>()..])?,
                     })
                 }
                 StartProtocolDiscriminants::SessionError => {
-                    if data.len() < 2 + size_of::<StartChallenge>() + 1 {
+                    if data.len() < data_offset + size_of::<StartChallenge>() + 1 {
                         return Err(StartProtocolError::InvalidLength);
                     }
                     StartProtocol::SessionError(StartErrorType {
                         challenge: StartChallenge::from_be_bytes(
-                            data[2..2 + size_of::<StartChallenge>()]
+                            data[data_offset..data_offset + size_of::<StartChallenge>()]
                                 .try_into()
-                                .map_err(|_| StartProtocolError::ParseError("init.challenge".into()))?,
+                                .map_err(|_| StartProtocolError::ParseError("err.challenge".into()))?,
                         ),
-                        reason: StartErrorReason::from_repr(data[2 + size_of::<StartChallenge>()])
-                            .ok_or(StartProtocolError::ParseError("init.reason".into()))?,
+                        reason: StartErrorReason::from_repr(data[data_offset + size_of::<StartChallenge>()])
+                            .ok_or(StartProtocolError::ParseError("err.reason".into()))?,
                     })
                 }
                 StartProtocolDiscriminants::KeepAlive => {
-                    if data.len() <= 3 {
+                    if data.len() <= data_offset + size_of::<u32>() {
                         return Err(StartProtocolError::InvalidLength);
                     }
 
                     StartProtocol::KeepAlive(KeepAliveMessage {
-                        flags: data[2],
-                        session_id: serde_cbor_2::from_slice(&data[3..])?,
+                        flags: data[data_offset],
+                        additional_data: u32::from_be_bytes(
+                            data[data_offset + 1..data_offset + 1 + size_of::<u32>()]
+                                .try_into()
+                                .map_err(|_| StartProtocolError::ParseError("ka.additional_data".into()))?,
+                        ),
+                        session_id: serde_cbor_2::from_slice(&data[data_offset + 1 + size_of::<u32>()..])?,
                     })
                 }
             },
@@ -292,6 +333,7 @@ mod tests {
             challenge: 0,
             target: "127.0.0.1:1234".to_string(),
             capabilities: Default::default(),
+            additional_data: 0x12345678,
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
@@ -310,6 +352,7 @@ mod tests {
             challenge: 0,
             target: "127.0.0.1:1234".to_string(),
             capabilities: 0xff,
+            additional_data: 0xffffffff,
         });
 
         let len = msg.encode()?.1.len();
@@ -360,6 +403,7 @@ mod tests {
         let msg_1 = StartProtocol::KeepAlive(KeepAliveMessage {
             session_id: 10_i32,
             flags: 0,
+            additional_data: 0xffffffff,
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
@@ -379,6 +423,7 @@ mod tests {
             target: "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530"
                 .to_string(),
             capabilities: 0x80,
+            additional_data: 0xffffffff,
         });
 
         assert!(
@@ -412,6 +457,7 @@ mod tests {
         let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
             flags: 0xff,
+            additional_data: 0xffffffff,
         });
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
@@ -427,6 +473,7 @@ mod tests {
         let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
             flags: 0xff,
+            additional_data: 0xffffffff,
         });
         let len = msg.encode()?.1.len();
         assert!(

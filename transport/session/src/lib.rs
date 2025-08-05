@@ -16,7 +16,7 @@ mod utils;
 pub use balancer::SurbBalancerConfig;
 pub use hopr_network_types::types::*;
 pub use manager::{DispatchResult, MIN_BALANCER_SAMPLING_INTERVAL, SessionManager, SessionManagerConfig};
-pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget};
+pub use types::{ByteCapabilities, IncomingSession, ServiceId, Session, SessionId, SessionTarget};
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;
 
@@ -109,6 +109,7 @@ mod tests {
                 "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
             )),
             capabilities: Capabilities::full().into(),
+            additional_data: 0xffffffff,
         });
 
         assert!(
@@ -142,6 +143,7 @@ mod tests {
         let msg = HoprStartProtocol::KeepAlive(KeepAliveMessage {
             session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
             flags: 0xff,
+            additional_data: 0xffffffff,
         });
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
@@ -157,6 +159,7 @@ mod tests {
         let msg = HoprStartProtocol::KeepAlive(KeepAliveMessage {
             session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
             flags: 0xff,
+            additional_data: 0xffffffff,
         });
         let len = msg.encode()?.1.len();
         assert!(

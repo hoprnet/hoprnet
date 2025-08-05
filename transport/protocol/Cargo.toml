@@ -61,6 +61,8 @@ hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-protocol-session = { workspace = true, features = ["session-types"] }
+hopr-protocol-start = { workspace = true }
+hopr-transport-session = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-probe = { workspace = true }
 

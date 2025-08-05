@@ -312,11 +312,14 @@ mod tests {
         prelude::{ChainKeypair, Keypair, OffchainKeypair, SimplePseudonym},
         types::{HalfKey, Hash},
     };
-    use hopr_internal_types::prelude::{Acknowledgement, TicketBuilder, WinningProbability};
+    use hopr_internal_types::prelude::{Acknowledgement, HoprPseudonym, TicketBuilder, WinningProbability};
+    use hopr_network_types::types::SealedHost;
     use hopr_primitive_types::{primitives::EthereumChallenge, traits::BytesEncodable};
     use hopr_protocol_session::types::*;
+    use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
     use hopr_transport_packet::prelude::ApplicationData;
     use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
+    use hopr_transport_session::{ByteCapabilities, Capability, SessionId, SessionTarget};
 
     use super::*;
 
@@ -553,10 +556,89 @@ mod tests {
             me,
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
-            data: ApplicationData::new(1u64, &hex!("0103babe02"))
-                .to_bytes()
-                .into_vec()
-                .into(),
+            data: ApplicationData::try_from(hopr_protocol_start::StartProtocol::<
+                SessionId,
+                SessionTarget,
+                ByteCapabilities,
+            >::StartSession(StartInitiation {
+                challenge: 0x01234567_89abcdef,
+                target: SessionTarget::UdpStream(SealedHost::Plain("some-dns-name.com:1234".parse()?)),
+                capabilities: (Capability::Segmentation | Capability::NoRateControl).into(),
+                additional_data: 0x12345678,
+            }))?
+            .to_bytes()
+            .into_vec()
+            .into(),
+            ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
+        };
+
+        let _ = pcap.send(packet.into()).await;
+
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
+            next_hop: *OffchainKeypair::random().public(),
+            ack_challenge: hk.as_ref().into(),
+            data: ApplicationData::try_from(hopr_protocol_start::StartProtocol::<
+                SessionId,
+                SessionTarget,
+                ByteCapabilities,
+            >::SessionError(StartErrorType {
+                challenge: 0x01234567_89abcdef,
+                reason: StartErrorReason::Busy,
+            }))?
+            .to_bytes()
+            .into_vec()
+            .into(),
+            ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
+        };
+
+        let _ = pcap.send(packet.into()).await;
+
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
+            next_hop: *OffchainKeypair::random().public(),
+            ack_challenge: hk.as_ref().into(),
+            data: ApplicationData::try_from(hopr_protocol_start::StartProtocol::<
+                SessionId,
+                SessionTarget,
+                ByteCapabilities,
+            >::SessionEstablished(StartEstablished {
+                orig_challenge: 0x01234567_89abcdef,
+                session_id: SessionId::new(1234u64, HoprPseudonym::random()),
+            }))?
+            .to_bytes()
+            .into_vec()
+            .into(),
+            ticket: ticket.to_vec().into(),
+            num_surbs: 2,
+            is_forwarded: false,
+        };
+
+        let _ = pcap.send(packet.into()).await;
+
+        let hk = HalfKey::random().to_challenge();
+        let packet = PacketBeforeTransit::OutgoingPacket {
+            me,
+            next_hop: *OffchainKeypair::random().public(),
+            ack_challenge: hk.as_ref().into(),
+            data: ApplicationData::try_from(hopr_protocol_start::StartProtocol::<
+                SessionId,
+                SessionTarget,
+                ByteCapabilities,
+            >::KeepAlive(KeepAliveMessage {
+                session_id: SessionId::new(1234u64, HoprPseudonym::random()),
+                flags: 0xff,
+                additional_data: 0xffffffff,
+            }))?
+            .to_bytes()
+            .into_vec()
+            .into(),
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
