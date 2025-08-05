@@ -1,12 +1,6 @@
 use std::fmt::Display;
 
-use pid::Pid;
-
-use crate::{
-    balancer::{SimpleSurbFlowEstimator, SurbFlowController, SurbFlowEstimator},
-    errors,
-    errors::SessionManagerError,
-};
+use crate::balancer::{SimpleSurbFlowEstimator, SurbBalancerController, SurbFlowController, SurbFlowEstimator};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -28,62 +22,6 @@ lazy_static::lazy_static! {
             "Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss)",
             &["session_id"]
     ).unwrap();
-}
-
-/// Carries finite Proportional, Integral and Derivative controller gains for a PID controller.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ControllerGains(f64, f64, f64);
-
-impl ControllerGains {
-    /// Creates PID controller gains, returns an error if the gains are not finite.
-    pub fn new(p: f64, i: f64, d: f64) -> errors::Result<Self> {
-        if p.is_finite() && i.is_finite() && d.is_finite() {
-            Ok(Self(p, i, d))
-        } else {
-            Err(SessionManagerError::Other("gains must be finite".into()).into())
-        }
-    }
-
-    /// P gain.
-    #[inline]
-    pub fn p(&self) -> f64 {
-        self.0
-    }
-
-    /// I gain.
-    #[inline]
-    pub fn i(&self) -> f64 {
-        self.1
-    }
-
-    /// D gain.
-    #[inline]
-    pub fn d(&self) -> f64 {
-        self.2
-    }
-}
-
-// Safe to implement Eq, because the floats are finite
-impl Eq for ControllerGains {}
-
-// Default coefficients for the PID controller
-// This might be tweaked in the future.
-const DEFAULT_P_GAIN: f64 = 0.6;
-const DEFAULT_I_GAIN: f64 = 0.7;
-const DEFAULT_D_GAIN: f64 = 0.2;
-
-impl Default for ControllerGains {
-    fn default() -> Self {
-        Self(DEFAULT_P_GAIN, DEFAULT_I_GAIN, DEFAULT_D_GAIN)
-    }
-}
-
-impl TryFrom<(f64, f64, f64)> for ControllerGains {
-    type Error = errors::TransportSessionError;
-
-    fn try_from(value: (f64, f64, f64)) -> Result<Self, Self::Error> {
-        Self::new(value.0, value.1, value.2)
-    }
 }
 
 /// Configuration for the [`SurbBalancer`].
@@ -108,10 +46,6 @@ pub struct SurbBalancerConfig {
     /// The default is 5000 (which is 2500 packets/second currently)
     #[default(5_000)]
     pub max_surbs_per_sec: u64,
-    /// PID controller gains.
-    ///
-    /// Default is (0.6, 0.7, 0.2), suitable for active SURB balancing.
-    pub gains: ControllerGains,
     /// If set to `true`, the control output will be inverted with respect to `max_surbs_per_sec`
     /// (i.e.: `output = max_surbs_per_sec - output`).
     ///
@@ -124,13 +58,13 @@ pub struct SurbBalancerConfig {
 /// [regulate](SurbFlowController) the flow of SURBs to the Session counterparty,
 /// to keep the number of SURBs locally or at the counterparty at a certain level.
 ///
-/// Internally, the Balancer uses a PID (Proportional Integral Derivative) controller to
+/// Internally, the Balancer uses an implementation of [`SurbBalancerController`] to
 /// control the rate of SURBs consumed or sent to the counterparty
 /// each time the [`update`](SurbBalancer::update) method is called:
 ///
 /// 1. The size of the SURB buffer at locally or at the counterparty is estimated using [`SurbFlowEstimator`].
-/// 2. Error against a set-point given in [`SurbBalancerConfig`] is evaluated in the PID controller.
-/// 3. The PID controller applies a new SURB flow rate value using the [`SurbFlowController`].
+/// 2. Error against a set-point given in [`SurbBalancerConfig`] is evaluated in the `SurbBalancerController`.
+/// 3. The `SurbBalancerController` applies a new SURB flow rate value using the [`SurbFlowController`].
 ///
 /// In the local context, the `SurbFlowController` might simply regulate the egress traffic from the
 /// Session, slowing it down to avoid fast SURB drainage.
@@ -138,9 +72,9 @@ pub struct SurbBalancerConfig {
 /// In the remote context, the `SurbFlowController` might regulate the flow of non-organic SURBs via
 /// Start protocol's [`KeepAlive`](crate::initiation::StartProtocol::KeepAlive) messages to deliver additional
 /// SURBs to the counterparty.
-pub struct SurbBalancer<E, F, S> {
+pub struct SurbBalancer<C, E, F, S> {
     session_id: S,
-    pid: Pid<f64>,
+    controller: C,
     surb_estimator: E,
     flow_control: F,
     cfg: SurbBalancerConfig,
@@ -150,17 +84,14 @@ pub struct SurbBalancer<E, F, S> {
     was_below_target: bool,
 }
 
-impl<E, F, S> SurbBalancer<E, F, S>
+impl<C, E, F, S> SurbBalancer<C, E, F, S>
 where
+    C: SurbBalancerController,
     E: SurbFlowEstimator,
     F: SurbFlowController,
     S: Display,
 {
-    pub fn new(session_id: S, surb_estimator: E, flow_control: F, cfg: SurbBalancerConfig) -> Self {
-        // Initialize the PID controller with default tuned gains
-        let max_surbs_per_sec = cfg.max_surbs_per_sec as f64;
-        let pid = Pid::new(cfg.target_surb_buffer_size as f64, max_surbs_per_sec);
-
+    pub fn new(session_id: S, controller: C, surb_estimator: E, flow_control: F, cfg: SurbBalancerConfig) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             let sid = session_id.to_string();
@@ -171,7 +102,7 @@ where
         let mut ret = Self {
             surb_estimator,
             flow_control,
-            pid,
+            controller,
             cfg,
             session_id,
             current_target_buffer: 0,
@@ -182,6 +113,11 @@ where
 
         ret.reconfigure(cfg);
         ret
+    }
+
+    /// Gets the Session ID the instance was created with.
+    pub fn session_id(&self) -> &S {
+        &self.session_id
     }
 
     /// Computes the next control update and adjusts the [`SurbFlowController`] rate accordingly.
@@ -225,12 +161,12 @@ where
             "estimated SURB buffer change"
         );
 
-        let output = self.pid.next_control_output(self.current_target_buffer as f64);
+        let output = self.controller.next_control_output(self.current_target_buffer);
 
         // Clamp the control output between [0, max_surbs_per_sec] and invert if needed
-        let mut corrected_output = output.output.clamp(0.0, self.cfg.max_surbs_per_sec as f64);
+        let mut corrected_output = output.clamp(0, self.cfg.max_surbs_per_sec);
         if self.cfg.invert_output {
-            corrected_output = self.cfg.max_surbs_per_sec as f64 - corrected_output;
+            corrected_output = self.cfg.max_surbs_per_sec.saturating_sub(corrected_output);
         }
 
         tracing::debug!(
@@ -244,7 +180,7 @@ where
         {
             let sid = self.session_id.to_string();
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], error as f64);
-            METRIC_CONTROL_OUTPUT.set(&[&sid], corrected_output);
+            METRIC_CONTROL_OUTPUT.set(&[&sid], corrected_output as f64);
             METRIC_SURB_RATE.set(&[&sid], target_buffer_change as f64 / dt.as_secs_f64());
         }
 
@@ -264,38 +200,9 @@ where
 
     /// Allows reconfiguring the instance.
     pub fn reconfigure(&mut self, cfg: SurbBalancerConfig) {
-        let max_surbs_per_sec = cfg.max_surbs_per_sec as f64;
-        self.pid.setpoint = cfg.target_surb_buffer_size as f64;
-        self.pid.output_limit = cfg.max_surbs_per_sec as f64;
-        self.pid.p(
-            std::env::var("HOPR_BALANCER_PID_P_GAIN")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(cfg.gains.p()),
-            max_surbs_per_sec,
-        );
-        self.pid.i(
-            std::env::var("HOPR_BALANCER_PID_I_GAIN")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(cfg.gains.i()),
-            max_surbs_per_sec,
-        );
-        self.pid.d(
-            std::env::var("HOPR_BALANCER_PID_D_GAIN")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(cfg.gains.d()),
-            max_surbs_per_sec,
-        );
-        tracing::debug!(
-            session_id = %self.session_id,
-            p = self.pid.kp,
-            i = self.pid.ki,
-            d = self.pid.kd,
-            target = self.pid.setpoint,
-            "reconfigured balancer"
-        );
+        self.controller
+            .set_target_and_limit(cfg.target_surb_buffer_size, cfg.max_surbs_per_sec);
+        tracing::debug!(session_id = %self.session_id, ?cfg, "reconfigured balancer");
     }
 }
 
@@ -304,7 +211,7 @@ mod tests {
     use std::sync::{Arc, atomic::AtomicU64};
 
     use super::*;
-    use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController};
+    use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController, pid::PidBalancerController};
 
     #[test_log::test]
     fn surb_balancer_should_start_increase_level_when_below_target() {
@@ -326,6 +233,7 @@ mod tests {
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
             "test",
+            PidBalancerController::default(),
             surb_estimator.clone(),
             controller,
             SurbBalancerConfig {
@@ -376,6 +284,7 @@ mod tests {
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
             "test",
+            PidBalancerController::default(),
             surb_estimator.clone(),
             controller,
             SurbBalancerConfig::default(),

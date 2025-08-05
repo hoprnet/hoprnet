@@ -18,13 +18,13 @@ use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
     Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer,
-        SurbFlowController, SurbFlowEstimator,
+        SurbBalancerController, SurbFlowController, SurbFlowEstimator, pid::PidBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprStartProtocol},
@@ -451,23 +451,20 @@ where
         self.session_notifiers.get().is_some()
     }
 
-    fn spawn_surb_flow_sampling<E, F, L>(
+    #[instrument(level = "debug", skip_all, fields(session_id = %balancer.session_id()))]
+    fn spawn_surb_balancer_control_loop<C, E, F, L>(
         &self,
-        session_id: SessionId,
-        surb_estimator: E,
-        surb_controller: F,
-        balancer_cfg: SurbBalancerConfig,
+        mut balancer: SurbBalancer<C, E, F, SessionId>,
         mut level_cb: L,
         abort_reg: Option<AbortRegistration>,
     ) -> AbortHandle
     where
+        C: SurbBalancerController + Send + Sync + 'static,
         E: SurbFlowEstimator + Send + Sync + 'static,
         F: SurbFlowController + Send + Sync + 'static,
         L: FnMut(u64) + Send + Sync + 'static,
     {
-        debug!(%session_id, ?balancer_cfg, "spawning SURB balancer");
-
-        let mut balancer = SurbBalancer::new(session_id, surb_estimator, surb_controller, balancer_cfg);
+        debug!(cfg = ?balancer.config(), "spawning SURB balancer");
 
         let (abort_handle, abort_reg) = abort_reg
             .map(|reg| (reg.handle(), reg))
@@ -488,7 +485,7 @@ where
             pin_mut!(sampling_stream);
             while sampling_stream.next().await.is_some() {
                 if let Some(new_cfg) = sessions
-                    .get(&session_id)
+                    .get(balancer.session_id())
                     .await
                     .and_then(|c| c.surb_mgmt)
                     .filter(|new_cfg| balancer.config() != new_cfg)
@@ -499,7 +496,7 @@ where
                 level_cb(balancer.update());
             }
 
-            debug!(%session_id, "balancer done");
+            debug!(session_id = %balancer.session_id(), "balancer done");
         });
 
         abort_handle
@@ -625,11 +622,14 @@ where
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     let (surbs_ready_tx, surbs_ready_rx) = futures::channel::oneshot::channel();
                     let mut surbs_ready_tx = Some(surbs_ready_tx);
-                    let balancer_abort_handle = self.spawn_surb_flow_sampling(
-                        session_id,
-                        surb_estimator.clone(),
-                        ka_controller,
-                        balancer_config,
+                    let balancer_abort_handle = self.spawn_surb_balancer_control_loop(
+                        SurbBalancer::new(
+                            session_id,
+                            PidBalancerController::default(),
+                            surb_estimator.clone(),
+                            ka_controller,
+                            balancer_config,
+                        ),
                         move |level: u64| {
                             if surbs_ready_tx.is_some() && level >= balancer_config.target_surb_buffer_size / 2 {
                                 let _ = surbs_ready_tx.take().unwrap().send(level);
@@ -988,11 +988,14 @@ where
                 {
                     // Spawn the SURB balancer only once we know we have registered the
                     // abort handle with the pre-allocated Session slot
-                    self.spawn_surb_flow_sampling(
-                        session_id,
-                        surb_estimator,
-                        SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
-                        return_balancer_cfg,
+                    self.spawn_surb_balancer_control_loop(
+                        SurbBalancer::new(
+                            session_id,
+                            PidBalancerController::default(),
+                            surb_estimator,
+                            SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
+                            return_balancer_cfg,
+                        ),
                         |_| {},
                         Some(balancer_abort_reg),
                     );

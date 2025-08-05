@@ -1,4 +1,6 @@
 mod controller;
+/// Contains implementation of [`SurbBalancerController`] using a Proportional Integral Derivative (PID) controller.
+pub mod pid;
 #[allow(dead_code)]
 mod rate_limiting;
 
@@ -44,6 +46,14 @@ pub trait SurbFlowEstimator {
 pub trait SurbFlowController {
     /// Adjusts the amount of SURB production or consumption.
     fn adjust_surb_flow(&self, surbs_per_sec: usize);
+}
+
+/// Trait abstracting a controller used in the [`SurbBalancer`].
+pub trait SurbBalancerController {
+    /// Updates the controller's target (setpoint) and output limit.
+    fn set_target_and_limit(&mut self, target: u64, output_limit: u64);
+    /// Queries the controller for the next control output based on the `current_buffer_level` of SURBs.
+    fn next_control_output(&mut self, current_buffer_level: u64) -> u64;
 }
 
 /// Implementation of [`SurbFlowEstimator`] that tracks the number of produced
