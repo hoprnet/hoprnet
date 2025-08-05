@@ -924,11 +924,14 @@ where
                 let egress_rate_control =
                     RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
 
+                let target_surb_buffer_size = if session_req.additional_data > 0 {
+                    // TODO: externalize this const - currently capped by SURB RB's capacity
+                    session_req.additional_data.min(10_000) as u64
+                } else {
+                    self.cfg.initial_return_session_egress_rate as u64 * MIN_SURB_BUFFER_DURATION.as_secs()
+                };
+
                 let surb_estimator_clone = surb_estimator.clone();
-
-                let target_surb_buffer_size = (session_req.additional_data as u64)
-                    .max(self.cfg.initial_return_session_egress_rate as u64 * MIN_SURB_BUFFER_DURATION.as_secs());
-
                 let session = Session::new(
                     session_id,
                     reply_routing.clone(),
@@ -1941,7 +1944,7 @@ mod tests {
                     SessionTarget::TcpStream(target.clone()),
                     SessionClientConfig {
                         pseudonym: alice_pseudonym.into(),
-                        capabilities: Capability::NoRateControl.into(),
+                        capabilities: None.into(),
                         surb_management: Some(balancer_cfg),
                         ..Default::default()
                     },
@@ -1960,7 +1963,16 @@ mod tests {
             Some(balancer_cfg),
             alice_mgr.get_surb_balancer_config(alice_session.id()).await?
         );
-        assert_eq!(None, bob_mgr.get_surb_balancer_config(bob_session.session.id()).await?);
+
+        let remote_cfg = bob_mgr
+            .get_surb_balancer_config(bob_session.session.id())
+            .await?
+            .ok_or(anyhow!("no remote config at bob"))?;
+        assert_eq!(remote_cfg.target_surb_buffer_size, balancer_cfg.target_surb_buffer_size);
+        assert_eq!(
+            remote_cfg.max_surbs_per_sec,
+            remote_cfg.target_surb_buffer_size / MIN_SURB_BUFFER_DURATION.as_secs()
+        );
 
         // Let the Surb balancer send enough KeepAlive messages
         tokio::time::sleep(Duration::from_millis(1500)).await;
