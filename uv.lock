@@ -1,6 +1,6 @@
 version = 1
 revision = 2
-requires-python = "==3.13.*"
+requires-python = ">=3.13, <3.14"
 
 [options]
 exclude-newer = "2025-07-18T00:00:00Z"
@@ -296,7 +296,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "ruff", specifier = ">=0.12.1" },
+    { name = "ruff", specifier = ">=0.12.4" },
     { name = "tests", virtual = "tests" },
 ]
 lint = [{ name = "black", specifier = "==25.1.0" }]
@@ -599,10 +599,10 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.12.13" },
+    { name = "aiohttp", specifier = ">=3.12.14" },
     { name = "api-lib", specifier = ">=0.0.3" },
     { name = "base58", specifier = ">=2.1.1" },
-    { name = "cryptography", specifier = ">=45.0.4" },
+    { name = "cryptography", specifier = ">=45.0.5" },
     { name = "pynacl", specifier = ">=1.5.0" },
 ]
 

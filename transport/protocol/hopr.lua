@@ -46,7 +46,7 @@ local function dissect_hopr_start(buffer, pinfo, tree)
 
     subtree:add(start_fields.type, buffer(offset,1))
     local type = buffer(offset, 1):uint()
-    pinfo.cols.info:append(", " .. start_msg_types[type] or "Unknown")
+    pinfo.cols.info:append(", " .. (start_msg_types[type] or "Unknown"))
     offset = offset + 1
 
     subtree:add(start_fields.msg, buffer(offset))
@@ -308,7 +308,10 @@ local hopr_fields = {
     previous_hop_peer_id = ProtoField.stringz("hopr.previous_hop_peer_id", "Previous Hop (Peer ID)"),
     next_hop = ProtoField.bytes("hopr.next_hop", "Next Hop"),
     next_hop_peer_id = ProtoField.stringz("hopr.next_hop_peer_id", "Next Hop (Peer ID)"),
+    num_surbs = ProtoField.uint8("hopr.num_surbs", "Number of SURBs"),
+    is_fwd = ProtoField.bool("hopr.is_forwarded", "Is forwarded"),
     data_len = ProtoField.uint16("hopr.data_len", "Data Length"),
+    raw_data = ProtoField.bytes("hopr.raw_data", "Raw packet data"),
 
     -- Ticket fields
     ticket_channel_id = ProtoField.bytes("hopr.ticket.channel_id", "Channel ID"),
@@ -494,7 +497,7 @@ local function dissect_appdata(buffer, tree, offset, data_len, pinfo)
             appdata_tree:add(hopr_fields.appdata_type, 16)
             dissect_hopr_session(data_field, pinfo, appdata_tree)
         else
-            pinfo.cols.info:append(", Unknown application tag")
+            pinfo.cols.info:append(", Unknown")
             appdata_tree:add(hopr_fields.appdata_type, 15)
             appdata_tree:add(hopr_fields.appdata_data, data_field)
         end
@@ -631,12 +634,28 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = dissect_ticket(buffer, out_tree, offset)
 
+        local num_surbs = buffer(offset, 1):uint()
+        offset = offset + 1
+
+        local is_fwd = buffer(offset, 1):uint() == 1
+        offset = offset + 1
+
+        if is_fwd == false then
+            out_tree:add(hopr_fields.num_surbs, num_surbs)
+        end
+        out_tree:add(hopr_fields.is_fwd, is_fwd)
+
         local data_len_field = buffer(offset, 2)
         local data_len = data_len_field:uint()
         out_tree:add(hopr_fields.data_len, data_len_field)
         offset = offset + 2
 
-        offset = dissect_appdata(buffer, out_tree, offset, data_len, pinfo)
+        if is_fwd then
+            out_tree:add(hopr_fields.raw_data, buffer(offset, data_len))
+            offset = offset + data_len
+        else
+            offset = dissect_appdata(buffer, out_tree, offset, data_len, pinfo)
+        end
 
     elseif pkt_type == 3 then -- AcknowledgementIn
         if length < 1 + 16 + 32 + 32 + 96 then

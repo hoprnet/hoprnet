@@ -263,7 +263,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
                     self.rpc_operations.clone(),
                 ),
                 self.db.clone(),
-                self.indexer_cfg,
+                self.indexer_cfg.clone(),
                 self.indexer_events_tx.clone(),
             )
             .start()

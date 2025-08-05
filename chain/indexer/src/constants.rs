@@ -1,3 +1,9 @@
+use std::time::Duration;
+
+pub const LOGS_SNAPSHOT_DOWNLOADER_MAX_SIZE: u64 = 2 * 1024 * 1024 * 1024; // 2GB max
+pub const LOGS_SNAPSHOT_DOWNLOADER_TIMEOUT: Duration = Duration::from_secs(1800); // 30 minutes
+pub const LOGS_SNAPSHOT_DOWNLOADER_MAX_RETRIES: u32 = 3;
+
 pub mod topics {
     use alloy::{primitives::B256, sol_types::SolEvent};
     use hopr_bindings::{

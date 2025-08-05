@@ -107,17 +107,16 @@ let
     inherit pname pnameSuffix version;
     CARGO_PROFILE = actualCargoProfile;
 
-    nativeBuildInputs =
-      [
-        llvmPackages.bintools
-        solcDefault
-        foundryBin
-        pkg-config
-        libiconv
-      ]
-      ++ stdenv.extraNativeBuildInputs
-      ++ darwinNativeBuildInputs
-      ++ linuxNativeBuildInputs;
+    nativeBuildInputs = [
+      llvmPackages.bintools
+      solcDefault
+      foundryBin
+      pkg-config
+      libiconv
+    ]
+    ++ stdenv.extraNativeBuildInputs
+    ++ darwinNativeBuildInputs
+    ++ linuxNativeBuildInputs;
     buildInputs = buildInputs ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
