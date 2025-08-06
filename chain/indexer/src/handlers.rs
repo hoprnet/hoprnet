@@ -407,11 +407,11 @@ where
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(DbSqlError::CorruptedChannelEntry(_)) => {
-                        error!(%source, %destination, %channel_id, "corrupted channel entry");
+                        error!(%source, %destination, %channel_id, "failed to begin channel update: corrupted channel entry");
                         return Ok(None);
                     }
                     Err(e) => {
-                        error!(%source, %destination, %channel_id, %e, "error beginning channel update");
+                        error!(%source, %destination, %channel_id, %e, "failed to begin channel update");
                         return Err(e.into());
                     }
                 };
