@@ -324,7 +324,7 @@ impl HoprDb {
             .pragma("busy_timeout", "1000") // 1000ms
     }
 
-    /// Default SQLite config values for all DBs with RW access.
+    /// Default SQLite config values for all DBs with RO (read-only) access.
     fn common_connection_cfg_ro(cfg: HoprDbConfig) -> SqliteConnectOptions {
         SqliteConnectOptions::default()
             .create_if_missing(cfg.create_if_missing)
