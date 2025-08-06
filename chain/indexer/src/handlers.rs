@@ -404,7 +404,17 @@ where
                 let destination: Address = channel_opened.destination.into();
                 let channel_id = generate_channel_id(&source, &destination);
 
-                let maybe_channel = self.db.begin_channel_update(tx.into(), &channel_id).await?;
+                let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
+                    Ok(channel) => channel,
+                    Err(DbSqlError::CorruptedChannelEntry(_)) => {
+                        error!(%source, %destination, %channel_id, "corrupted channel entry");
+                        return Ok(None);
+                    }
+                    Err(e) => {
+                        error!(%source, %destination, %channel_id, %e, "error beginning channel update");
+                        return Err(e.into());
+                    }
+                };
 
                 let channel = if let Some(channel_edits) = maybe_channel {
                     // Check that we're not receiving the Open event without the channel being Close prior, or that the
@@ -2588,12 +2598,72 @@ mod tests {
 
         assert!(
             db.get_channel_by_id(None, &channel.get_id()).await?.is_none(),
-            "channel should be deleted",
+            "channel should not be returned as marked as corrupted",
         );
 
         db.get_corrupted_channel_by_id(None, &channel.get_id())
             .await?
             .context("a value should be present")?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn corrupted_channel_editing_should_not_panic() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let rpc_operations = MockIndexerRpcOperations::new();
+        // ==> set mock expectations here
+        let clonable_rpc_operations = ClonableMockOperations {
+            //
+            inner: Arc::new(rpc_operations),
+        };
+        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+
+        let channel = ChannelEntry::new(
+            *SELF_CHAIN_ADDRESS,
+            *COUNTERPARTY_CHAIN_ADDRESS,
+            0.into(),
+            primitive_types::U256::zero(),
+            ChannelStatus::Open,
+            3.into(),
+        );
+
+        db.upsert_channel(None, channel).await?;
+
+        // set the channel as corrupted
+        let editor = match db.begin_channel_update(None, &channel.get_id()).await? {
+            Some(editor) => editor,
+            None => return Err(anyhow::anyhow!("Failed to begin channel update")),
+        };
+
+        db.finish_channel_update(None, editor.set_corrupted()).await?;
+
+        db.get_corrupted_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("channel should be set a corrupted at this point")?;
+
+        let encoded_data = ().abi_encode();
+        let channel_opened_log = SerializableLog {
+            address: handlers.addresses.channels,
+            topics: vec![
+                hopr_bindings::hoprchannels::HoprChannels::ChannelOpened::SIGNATURE_HASH.into(),
+                // ChannelOpenedFilter::signature().into(),
+                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()).into(),
+            ],
+            data: encoded_data,
+            ..test_log()
+        };
+
+        db.begin_transaction()
+            .await?
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log, true).await }))
+            .await
+            .context("Channel should stay open without panicking")?;
+
+        db.get_corrupted_channel_by_id(None, &channel.get_id())
+            .await?
+            .context("channel should still be set a corrupted")?;
 
         Ok(())
     }
