@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-rpc"
-version = "0.7.1"
+version = "0.7.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Abstraction over Ethereum RPC provider client"
@@ -31,7 +31,7 @@ lazy_static = { workspace = true }
 moka = { workspace = true }
 primitive-types = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
-reqwest = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true, features = ["brotli", "zstd"] }
 serde = { workspace = true }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
