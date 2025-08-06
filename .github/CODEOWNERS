@@ -7,46 +7,46 @@
 # Last updated: 2025-08-06
 
 # Default owners for everything
-* @Teebor-Choka @tolbrino @lukas-pohanka @jeandemeusy @QYuQianchen @ausiasarmesto
+* @Teebor-Choka @tolbrino @NumberFour8 @jeandemeusy @QYuQianchen @ausias-armesto
 
 # GitHub Actions workflows and CI/CD
-/.github/ @ausiasarmesto @tolbrino @Teebor-Choka
-/deploy/ @ausiasarmesto @Teebor-Choka
-/scripts/ @ausiasarmesto @Teebor-Choka
+/.github/ @ausias-armesto @tolbrino @Teebor-Choka
+/deploy/ @ausias-armesto @Teebor-Choka
+/scripts/ @ausias-armesto @Teebor-Choka
 
 # Top-level products
-/hoprd/ @Teebor-Choka @lukas-pohanka @tolbrino
-/hopli/ @qYuQianchen @ausiasarmesto @jeandemeusy
+/hoprd/ @Teebor-Choka @NumberFour8 @tolbrino
+/hopli/ @qYuQianchen @ausias-armesto @jeandemeusy
 
 # Protocol and networking
-/transport/ @lukas-pohanka @Teebor-Choka @tolbrino
-/crypto/ @lukas-pohanka @Teebor-Choka
-/protocols/ @lukas-pohanka @Teebor-Choka
+/transport/ @NumberFour8 @Teebor-Choka @tolbrino
+/crypto/ @NumberFour8 @Teebor-Choka
+/protocols/ @NumberFour8 @Teebor-Choka
 
 # Blockchain and smart contracts
-/chain/ @Teebor-Choka @tolbrino @lukas-pohanka @qYuQianchen
+/chain/ @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen
 /ethereum/ @QYuQianchen @tolbrino
 *.sol @QYuQianchen
 
 # Common utilities and logic
-/common/ @lukas-pohanka @Teebor-Choka @jeandemeusy @qYuQianchen @tolbrino
-/logic/ @lukas-pohanka @Teebor-Choka @jeandemeusy @qYuQianchen @tolbrino
-/hopr/ @lukas-pohanka @Teebor-Choka @jeandemeusy @qYuQianchen
-/db/ @lukas-pohanka @Teebor-Choka
+/common/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+/logic/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+/hopr/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen
+/db/ @NumberFour8 @Teebor-Choka
 
 # Testing
-/tests/ @jeandemeusy @Teebor-Choka @qYuQianchen
+/tests/ @jeandemeusy @Teebor-Choka @QYuQianchen
 /sdk/ @jeandemeusy @Teebor-Choka
 
 # Documentation
-/docs/ @andrius @jeandemeusy
+/docs/ @Jaguaras @jeandemeusy
 
 # Build and configuration
-*.nix @tolbrino @ausiasarmesto @Teebor-Choka
-*.toml @Teebor-Choka @lukas-pohanka
+*.nix @tolbrino @ausias-armesto @Teebor-Choka
+*.toml @Teebor-Choka @NumberFour8
 
 # Secure changes to critical files
 /.github/CODEOWNERS @tolbrino
 
 # Emergency contacts (for critical issues)
-# Lead maintainers: @Teebor-Choka @tolbrino @lukas-pohanka @QYuQianchen @jeandemeusy
+# Lead maintainers: @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen @jeandemeusy
