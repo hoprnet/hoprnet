@@ -329,7 +329,7 @@ type SessionNotifiers = (
 ///    `maximum_surb_buffer_size / max_surb_buffer_duration` value configured at the counterparty.
 ///
 /// In this situation, the maximum Session egress from Exit to the Entry is given by the
-/// `maximum_surb_buffer_size / max_surb_buffer_duration` ratio. If there's enough bandwidth,
+/// `maximum_surb_buffer_size / max_surb_buffer_duration` ratio. If there is enough bandwidth,
 /// the (remote) SURB balancer sending SURBs to the Exit will stabilize roughly at this rate of SURBs/sec,
 /// and the whole system will be in equilibrium during the Session's lifetime (under ideal network conditions).
 ///
@@ -358,7 +358,7 @@ type SessionNotifiers = (
 /// The Exit will limit the egress roughly to the rate of natural SURB occurrence in the ingress.
 ///
 /// This configuration could potentially only lead to an equilibrium when uploading non-full packets
-/// (ones that can carry at least a single SURB) and the Exit's egress is limiting itself to such rate.
+/// (ones that can carry at least a single SURB), and the Exit's egress is limiting itself to such a rate.
 /// If Exit's egress reaches low values due to SURB scarcity, the upper layer protocols over Session might break.
 ///
 /// #### 4. No SURB balancing on each side
@@ -368,7 +368,7 @@ type SessionNotifiers = (
 /// In this situation, no additional SURBs are being produced by the Entry and no Session egress rate-limiting
 /// takes place at the Exit.
 ///
-/// This configuration can only lead to an equilibrium, when Entry sends non-full packets (ones that carry
+/// This configuration can only lead to an equilibrium when Entry sends non-full packets (ones that carry
 /// at least a single SURB) and the Exit is consuming the SURBs (Session egress) at slower or equal rate.
 /// Such configuration is very fragile, as any disturbances in the SURB flow might lead to packet drop
 /// at the Exit's egress.
@@ -1098,7 +1098,13 @@ where
                     self.spawn_surb_balancer_control_loop(
                         SurbBalancer::new(
                             session_id,
-                            SimpleBalancerController::default(),
+                            // Allow automatic setpoint increase by >= 20% increments
+                            SimpleBalancerController::with_increasing_setpoint(
+                                0.2,
+                                Duration::from_secs(60)
+                                    .div_duration_f64(self.cfg.balancer_sampling_interval)
+                                    .round() as usize,
+                            ),
                             surb_estimator,
                             SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
                             return_balancer_cfg,
