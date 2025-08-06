@@ -27,6 +27,7 @@ pub mod proxy;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, OnceLock},
+    time::Duration,
 };
 
 use async_lock::RwLock;
@@ -240,7 +241,6 @@ where
                 ),
                 channel_graph.clone(),
             ),
-            db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(SessionManagerConfig {
@@ -251,7 +251,10 @@ where
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                 initial_return_session_egress_rate: 10,
+                minimum_surb_buffer_duration: Duration::from_secs(5),
+                maximum_surb_buffer_size: db.get_surb_rb_size(),
             }),
+            db,
             cfg,
         }
     }

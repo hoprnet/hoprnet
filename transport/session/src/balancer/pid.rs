@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use pid::Pid;
 
 use crate::{balancer::SurbBalancerController, errors, errors::SessionManagerError};
@@ -14,6 +16,25 @@ impl PidControllerGains {
         } else {
             Err(SessionManagerError::Other("gains must be finite".into()).into())
         }
+    }
+
+    /// Uses PID controller gains from the env variables or uses the defaults if not set.
+    pub fn from_env_or_default() -> Self {
+        let default = Self::default();
+        Self(
+            std::env::var("HOPR_BALANCER_PID_P_GAIN")
+                .ok()
+                .and_then(|v| f64::from_str(&v).ok())
+                .unwrap_or(default.0),
+            std::env::var("HOPR_BALANCER_PID_P_GAIN")
+                .ok()
+                .and_then(|v| f64::from_str(&v).ok())
+                .unwrap_or(default.1),
+            std::env::var("HOPR_BALANCER_PID_P_GAIN")
+                .ok()
+                .and_then(|v| f64::from_str(&v).ok())
+                .unwrap_or(default.2),
+        )
     }
 
     /// P gain.
@@ -64,12 +85,20 @@ pub struct PidBalancerController(Pid<f64>);
 
 impl PidBalancerController {
     /// Creates new instance given the `setpoint`, `output_limit` and PID gains (P,I and D).
-    fn new(setpoint: u64, output_limit: u64, gains: PidControllerGains) -> Self {
+    pub fn new(setpoint: u64, output_limit: u64, gains: PidControllerGains) -> Self {
         let mut pid = Pid::new(setpoint as f64, output_limit as f64);
         pid.p(gains.p(), output_limit as f64);
         pid.i(gains.i(), output_limit as f64);
         pid.d(gains.d(), output_limit as f64);
         Self(pid)
+    }
+
+    /// Creates new instance with setpoint and output limit set to 0.
+    ///
+    /// Needs to be [reconfigured](SurbBalancerController::set_target_and_limit) in order to function
+    /// correctly.
+    pub fn from_gains(gains: PidControllerGains) -> Self {
+        Self::new(0, 0, gains)
     }
 }
 

@@ -418,6 +418,10 @@ impl Hopr {
             create_if_missing: cfg.db.initialize,
             force_create: cfg.db.force_initialize,
             log_slow_queries: std::time::Duration::from_millis(150),
+            surb_ring_buffer_size: std::env::var("HOPR_SURB_RB_SIZE")
+                .ok()
+                .and_then(|s| usize::from_str(&s).ok())
+                .unwrap_or_else(|| HoprDbConfig::default().surb_ring_buffer_size),
         };
         let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 

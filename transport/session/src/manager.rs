@@ -24,7 +24,8 @@ use crate::{
     Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer,
-        SurbBalancerController, SurbFlowController, SurbFlowEstimator, pid::PidBalancerController,
+        SurbBalancerController, SurbFlowController, SurbFlowEstimator,
+        pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
@@ -124,6 +125,15 @@ pub struct SessionManagerConfig {
     /// Default is 5 seconds, minimum is 1 second.
     #[default(Duration::from_secs(5))]
     pub minimum_surb_buffer_duration: Duration,
+    /// Indicates the maximum number of SURBs in the SURB buffer to be requested when creating a new Session.
+    ///
+    /// This value is theoretically capped by the size of the global transport SURB ring buffer,
+    /// so values greater than that do not make sense. This value should be ideally set equal
+    /// to the size of the global transport SURB RB.
+    ///
+    /// Default is 10 000 SURBs.
+    #[default(10_000)]
+    pub maximum_surb_buffer_size: usize,
 }
 
 fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
@@ -257,11 +267,13 @@ type SessionNotifiers = (
 /// This way, the `SessionManager` takes care of proper Start sub-protocol message processing
 /// and correct dispatch of Session-related packets to individual existing Sessions.
 ///
-/// Secondly, the manager can initiate new outgoing sessions via [`SessionManager::new_session`].
+/// Secondly, the manager can initiate new outgoing sessions via [`SessionManager::new_session`],
+/// probe sessions using [`SessionManager::ping_session`]
+/// and list them via [SessionManager::active_sessions].
 ///
 /// Since the `SessionManager` operates over the HOPR protocol,
-/// the [message transport `S`](SendMsg) is required.
-/// Such transport must also be `Clone`, since it will be cloned into the created [`Session`] objects.
+/// the message transport `S` is required.
+/// Such transport must also be `Clone`, since it will be cloned into all the created [`Session`] objects.
 ///
 /// ## SURB balancing
 /// The manager also can take care of automatic [SURB balancing](SurbBalancerConfig) per Session.
@@ -300,6 +312,66 @@ type SessionNotifiers = (
 /// sending new ones via the keep-alive messages.
 ///
 /// This mechanism is configurable via the `surb_management` field in [`SessionClientConfig`].
+///
+/// ### Possible scenarios
+/// There are 4 different scenarios of local vs. remote SURB balancing configuration, but
+/// an equilibrium (= matching the SURB production and consumption) is most likely to be reached
+/// only when both are configured (the ideal case below):
+///
+/// #### 1. Ideal local and remote SURB balancing
+/// 1. The Session recipient (Exit) set the `initial_return_session_egress_rate`,
+/// `max_surb_buffer_duration` and `maximum_surb_buffer_size` values in the [`SessionManagerConfig`].
+/// 2. The Session initiator (Entry) sets the [`target_surb_buffer_size`](SurbBalancerConfig)
+/// which matches the [`maximum_surb_buffer_size`](SessionManagerConfig) of the counterparty.
+/// 3. The Session initiator (Entry) does *NOT* set the [`Capability::NoRateControl`] capability flag when opening
+///    Session.
+/// 4. The Session initiator (Entry) sets [`max_surbs_per_sec`](SurbBalancerConfig) slightly higher
+/// than the `maximum_surb_buffer_size / max_surb_buffer_duration` value configured at the counterparty.
+///
+/// In this situation, the maximum Session egress from Exit to the Entry is given by the
+/// `maximum_surb_buffer_size / max_surb_buffer_duration` ratio. If there's enough bandwidth,
+/// the (remote) SURB balancer sending SURBs to the Exit will stabilize roughly at this rate of SURBs/sec,
+/// and the whole system will be in equilibrium during the Session's lifetime (under ideal network conditions).
+///
+/// #### 2. Remote SURB balancing only
+/// 1. The Session initiator (Entry) *DOES* set the [`Capability::NoRateControl`] capability flag when opening Session.
+/// 2. The Session initiator (Entry) sets `max_surbs_per_sec` and `target_surb_buffer_size` values in
+///    [`SurbBalancerConfig`]
+///
+/// In this one-sided situation, the Entry node floods the Exit node with SURBs,
+/// only based on its estimated consumption of SURBs at the Exit. The Exit's egress is not
+/// rate-limited at all. If the Exit runs out of SURBs at any point in time, it will simply drop egress packets.
+///
+/// This configuration could potentially only lead to an equilibrium
+/// when the `SurbBalancer` at the Entry can react fast enough to Exit's demand.
+///
+/// #### 3. Local SURB balancing only
+/// 1. The Session recipient (Exit) set the `initial_return_session_egress_rate`,
+/// `max_surb_buffer_duration` and `maximum_surb_buffer_size` values in the [`SessionManagerConfig`].
+/// 2. The Session initiator (Entry) does *NOT* set the [`Capability::NoRateControl`] capability flag when opening
+///    Session.
+/// 3. The Session initiator (Entry) does *NOT* set the [`SurbBalancerConfig`] at all when opening Session.
+///
+/// In this one-sided situation, the Entry node does not provide any additional SURBs at all (except the
+/// ones which are naturally carried by the egress packets which have space to hold SURBs). It relies
+/// only on the Session egress limiting of the Exit node.
+/// The Exit will limit the egress roughly to the rate of natural SURB occurrence in the ingress.
+///
+/// This configuration could potentially only lead to an equilibrium when uploading non-full packets
+/// (ones that can carry at least a single SURB) and the Exit's egress is limiting itself to such rate.
+/// If Exit's egress reaches low values due to SURB scarcity, the upper layer protocols over Session might break.
+///
+/// #### 4. No SURB balancing on each side
+/// 1. The Session initiator (Entry) *DOES* set the [`Capability::NoRateControl`] capability flag when opening Session.
+/// 2. The Session initiator (Entry) does *NOT* set the [`SurbBalancerConfig`] at all when opening Session.
+///
+/// In this situation, no additional SURBs are being produced by the Entry and no Session egress rate-limiting
+/// takes place at the Exit.
+///
+/// This configuration can only lead to an equilibrium, when Entry sends non-full packets (ones that carry
+/// at least a single SURB) and the Exit is consuming the SURBs (Session egress) at slower or equal rate.
+/// Such configuration is very fragile, as any disturbances in the SURB flow might lead to packet drop
+/// at the Exit's egress.
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
@@ -612,6 +684,9 @@ where
                     })
                     .ok_or(SessionManagerError::NotStarted)?;
 
+                // NOTE: the Exit node can have different `max_surb_buffer_size`
+                // setting on the Session manager, so it does not make sense to cap it here
+                // with our maximum value.
                 let (session, surb_mgmt) = if let Some(balancer_config) = cfg.surb_management {
                     let surb_estimator = AtomicSurbFlowEstimator::default();
 
@@ -638,7 +713,8 @@ where
                     let balancer_abort_handle = self.spawn_surb_balancer_control_loop(
                         SurbBalancer::new(
                             session_id,
-                            PidBalancerController::default(),
+                            // The setpoint and output limit is immediately reconfigured by SurbBalancer
+                            PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
                             surb_estimator.clone(),
                             ka_controller,
                             balancer_config,
@@ -945,8 +1021,7 @@ where
                     RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
 
                 let target_surb_buffer_size = if session_req.additional_data > 0 {
-                    // TODO: externalize this const - currently capped by SURB RB's capacity
-                    session_req.additional_data.min(10_000) as u64
+                    (session_req.additional_data as u64).min(self.cfg.maximum_surb_buffer_size as u64)
                 } else {
                     self.cfg.initial_return_session_egress_rate as u64
                         * self

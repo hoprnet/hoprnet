@@ -41,6 +41,8 @@ pub struct HoprDbConfig {
     pub force_create: bool,
     #[default(Duration::from_secs(5))]
     pub log_slow_queries: Duration,
+    #[default(10_000)]
+    pub surb_ring_buffer_size: usize,
 }
 
 /// Main database handle for HOPR node operations.
@@ -66,6 +68,7 @@ pub struct HoprDb {
     pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
     pub(crate) ticket_manager: Arc<TicketManager>,
+    pub(crate) cfg: HoprDbConfig,
 }
 
 /// Filename for the blockchain indexing database.
@@ -134,7 +137,7 @@ impl HoprDb {
         )
         .await?;
 
-        Self::new_sqlx_sqlite(chain_key, index, peers, tickets, logs).await
+        Self::new_sqlx_sqlite(chain_key, index, peers, tickets, logs, cfg).await
     }
 
     pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self> {
@@ -152,6 +155,7 @@ impl HoprDb {
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| DbSqlError::Construction(e.to_string()))?,
+            Default::default(),
         )
         .await
     }
@@ -162,6 +166,7 @@ impl HoprDb {
         peers_db_pool: SqlitePool,
         tickets_db_pool: SqlitePool,
         logs_db_pool: SqlitePool,
+        cfg: HoprDbConfig,
     ) -> Result<Self> {
         let index_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db_pool.clone());
 
@@ -248,6 +253,7 @@ impl HoprDb {
             tickets_db,
             peers_db,
             logs_db,
+            cfg,
         })
     }
 

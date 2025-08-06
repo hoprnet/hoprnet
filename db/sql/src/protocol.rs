@@ -19,8 +19,8 @@ use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 
 use crate::{
-    channels::HoprDbChannelOperations, db::HoprDb, errors::DbSqlError, info::HoprDbInfoOperations,
-    prelude::HoprDbTicketOperations,
+    cache::SurbRingBuffer, channels::HoprDbChannelOperations, db::HoprDb, errors::DbSqlError,
+    info::HoprDbInfoOperations, prelude::HoprDbTicketOperations,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -333,6 +333,10 @@ impl HoprDbProtocolOperations for HoprDb {
         }
     }
 
+    fn get_surb_rb_size(&self) -> usize {
+        self.cfg.surb_ring_buffer_size
+    }
+
     #[tracing::instrument(level = "trace", skip(self, data))]
     async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket> {
         let next_peer = self.resolve_chain_key(&destination).await?.ok_or_else(|| {
@@ -535,11 +539,12 @@ impl HoprDbProtocolOperations for HoprDb {
                 if !incoming.surbs.is_empty() {
                     let num_surbs = incoming.surbs.len();
 
-                    // TODO: make the capacity of the SURB RB configurable
                     self.caches
                         .surbs_per_pseudonym
                         .entry_by_ref(&incoming.sender)
-                        .or_default() // Default capacity SurbRingBuffer
+                        .or_insert_with(futures::future::always_ready(|| {
+                            SurbRingBuffer::new(self.cfg.surb_ring_buffer_size)
+                        }))
                         .await
                         .value()
                         .push(incoming.surbs)?;

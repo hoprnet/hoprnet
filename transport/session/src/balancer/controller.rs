@@ -35,6 +35,11 @@ pub struct SurbBalancerConfig {
     /// The local buffer is maintained by [regulating](SurbFlowController) the egress from the Session.
     /// The remote buffer (at session counterparty) is maintained by regulating the flow of non-organic SURBs via
     /// [keep-alive messages](crate::initiation::StartProtocol::KeepAlive).
+    ///
+    /// It does not make sense to set this value higher than the [`max_surb_buffer_size`](crate::SessionManagerConfig)
+    /// configuration at the counterparty.
+    ///
+    /// Default is 7000 SURBs.
     #[default(7_000)]
     pub target_surb_buffer_size: u64,
     /// Maximum outflow of SURBs.
