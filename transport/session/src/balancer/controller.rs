@@ -24,12 +24,12 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Configuration for the [`SurbBalancer`].
+/// Configuration for the `SurbBalancer`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct SurbBalancerConfig {
     /// The desired number of SURBs to be always kept as a buffer locally or at the Session counterparty.
     ///
-    /// The [`SurbBalancer`] will try to maintain approximately this number of SURBs
+    /// The `SurbBalancer` will try to maintain approximately this number of SURBs
     /// locally or remotely (at the counterparty) at all times.
     ///
     /// The local buffer is maintained by [regulating](SurbFlowController) the egress from the Session.

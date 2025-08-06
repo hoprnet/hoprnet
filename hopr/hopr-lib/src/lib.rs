@@ -420,7 +420,7 @@ impl Hopr {
             log_slow_queries: std::time::Duration::from_millis(150),
             surb_ring_buffer_size: std::env::var("HOPR_SURB_RB_SIZE")
                 .ok()
-                .and_then(|s| usize::from_str(&s).ok())
+                .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
                 .unwrap_or_else(|| HoprDbConfig::default().surb_ring_buffer_size),
         };
         let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
@@ -1101,7 +1101,7 @@ impl Hopr {
     }
 
     /// Create a client session connection returning a session object that implements
-    /// [`AsyncRead`] and [`AsyncWrite`] and can bu used as a read/write binary session.
+    /// [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`] and can bu used as a read/write binary session.
     #[cfg(feature = "session-client")]
     pub async fn connect_to(
         &self,

@@ -1,4 +1,4 @@
-/// Convenience function to copy data in both directions between a [`Session`] and arbitrary
+/// Convenience function to copy data in both directions between a [`Session`](crate::Session) and arbitrary
 /// async IO stream.
 /// This function is only available with Tokio and will panic with other runtimes.
 ///

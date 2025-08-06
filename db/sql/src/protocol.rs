@@ -542,7 +542,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     self.caches
                         .surbs_per_pseudonym
                         .entry_by_ref(&incoming.sender)
-                        .or_insert_with(futures::future::always_ready(|| {
+                        .or_insert_with(futures::future::lazy(|_| {
                             SurbRingBuffer::new(self.cfg.surb_ring_buffer_size)
                         }))
                         .await

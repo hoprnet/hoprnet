@@ -257,7 +257,7 @@ impl HoprDb {
         })
     }
 
-    /// Starts ticket processing by the [TicketManager] with an optional new ticket notifier.
+    /// Starts ticket processing by the `TicketManager` with an optional new ticket notifier.
     /// Without calling this method, tickets will not be persisted into the DB.
     ///
     /// If the notifier is given, it will receive notifications once new ticket has been

@@ -30,9 +30,9 @@ pub struct SessionSocketConfig {
     ///
     /// The size is always greater or equal to the MTU `C` of the underlying transport, and
     /// less or equal to:
-    /// - (`C` -  [`SessionMessage::SEGMENT_OVERHEAD`]) * ([`SeqIndicator::MAX`] + 1) for stateless sockets, or
+    /// - (`C` -  `SessionMessage::SEGMENT_OVERHEAD`) * (`SeqIndicator::MAX` + 1) for stateless sockets, or
     /// - (`C` - `SessionMessage::SEGMENT_OVERHEAD`) * min(`SeqIndicator::MAX` + 1,
-    ///   [`SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`]) for stateful sockets
+    ///   `SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`) for stateful sockets
     ///
     /// Default is 1500 bytes.
     #[default(1500)]

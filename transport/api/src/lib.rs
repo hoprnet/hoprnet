@@ -2,8 +2,7 @@
 //! into a unified [`crate::HoprTransport`] object with the goal of isolating the transport layer
 //! and defining a fully specified transport API.
 //!
-//! It also implements the Session negotiation via Start sub-protocol.
-//! See the [`hopr_transport_session::initiation`] module for details on Start sub-protocol.
+//! See also the `hopr_protocol_start` crate for details on Start sub-protocol which initiates a Session.
 //!
 //! As such, the transport layer components should be only those that are directly necessary to:
 //!

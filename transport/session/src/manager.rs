@@ -64,7 +64,7 @@ lazy_static::lazy_static! {
 pub struct SessionManagerConfig {
     /// Ranges of tags available for Sessions.
     ///
-    /// **NOTE**: If the range starts lower than [`MIN_SESSION_TAG_RANGE_RESERVATION`],
+    /// **NOTE**: If the range starts lower than [`ReservedTag`] range end,
     /// it will be automatically transformed to start at this value.
     /// This is due to the reserved range by the Start sub-protocol.
     ///
@@ -319,14 +319,14 @@ type SessionNotifiers = (
 /// only when both are configured (the ideal case below):
 ///
 /// #### 1. Ideal local and remote SURB balancing
-/// 1. The Session recipient (Exit) set the `initial_return_session_egress_rate`,
-/// `max_surb_buffer_duration` and `maximum_surb_buffer_size` values in the [`SessionManagerConfig`].
-/// 2. The Session initiator (Entry) sets the [`target_surb_buffer_size`](SurbBalancerConfig)
-/// which matches the [`maximum_surb_buffer_size`](SessionManagerConfig) of the counterparty.
+/// 1. The Session recipient (Exit) set the `initial_return_session_egress_rate`, `max_surb_buffer_duration` and
+///    `maximum_surb_buffer_size` values in the [`SessionManagerConfig`].
+/// 2. The Session initiator (Entry) sets the [`target_surb_buffer_size`](SurbBalancerConfig) which matches the
+///    [`maximum_surb_buffer_size`](SessionManagerConfig) of the counterparty.
 /// 3. The Session initiator (Entry) does *NOT* set the [`Capability::NoRateControl`] capability flag when opening
 ///    Session.
-/// 4. The Session initiator (Entry) sets [`max_surbs_per_sec`](SurbBalancerConfig) slightly higher
-/// than the `maximum_surb_buffer_size / max_surb_buffer_duration` value configured at the counterparty.
+/// 4. The Session initiator (Entry) sets [`max_surbs_per_sec`](SurbBalancerConfig) slightly higher than the
+///    `maximum_surb_buffer_size / max_surb_buffer_duration` value configured at the counterparty.
 ///
 /// In this situation, the maximum Session egress from Exit to the Entry is given by the
 /// `maximum_surb_buffer_size / max_surb_buffer_duration` ratio. If there's enough bandwidth,
@@ -346,8 +346,8 @@ type SessionNotifiers = (
 /// when the `SurbBalancer` at the Entry can react fast enough to Exit's demand.
 ///
 /// #### 3. Local SURB balancing only
-/// 1. The Session recipient (Exit) set the `initial_return_session_egress_rate`,
-/// `max_surb_buffer_duration` and `maximum_surb_buffer_size` values in the [`SessionManagerConfig`].
+/// 1. The Session recipient (Exit) set the `initial_return_session_egress_rate`, `max_surb_buffer_duration` and
+///    `maximum_surb_buffer_size` values in the [`SessionManagerConfig`].
 /// 2. The Session initiator (Entry) does *NOT* set the [`Capability::NoRateControl`] capability flag when opening
 ///    Session.
 /// 3. The Session initiator (Entry) does *NOT* set the [`SurbBalancerConfig`] at all when opening Session.
