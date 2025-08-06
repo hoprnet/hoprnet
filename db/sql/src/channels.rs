@@ -386,7 +386,7 @@ impl HoprDbChannelOperations for HoprDb {
                         .and(channel::Column::ClosureTime.gt(Utc::now()))),
             )
             .filter(channel::Column::Corrupted.eq(false))
-            .stream(&self.index_db)
+            .stream(self.index_db.readonly())
             .await?
             .map_err(DbSqlError::from)
             .and_then(|m| async move { Ok(ChannelEntry::try_from(m)?) })

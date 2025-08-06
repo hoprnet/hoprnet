@@ -16,12 +16,10 @@ runtime-tokio = [
   "sea-orm/runtime-tokio-rustls",
   "sea-query-binder/runtime-tokio-rustls",
   "sqlx/runtime-tokio-rustls",
+  "sqlx/runtime-tokio",
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
-sqlite = [
-  "sea-query/backend-sqlite",
-  "sea-query-binder/sqlx-sqlite",
-]
+sqlite = ["sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite"]
 
 [dependencies]
 async-lock = { workspace = true }
@@ -71,7 +69,7 @@ sea-orm = { workspace = true }
 sea-query-binder = { workspace = true, default-features = false, features = [
   "with-chrono",
 ] }
-sqlx = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio"] }
 tokio = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

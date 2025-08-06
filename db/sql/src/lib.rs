@@ -201,7 +201,7 @@ impl HoprDbGeneralModelOperations for HoprDb {
     /// Retrieves raw database connection to the given [DB](TargetDb).
     fn conn(&self, target_db: TargetDb) -> &DatabaseConnection {
         match target_db {
-            TargetDb::Index => &self.index_db,
+            TargetDb::Index => self.index_db.readonly(), // TODO: no write access needed here, deserves better wrapping
             TargetDb::Tickets => &self.tickets_db,
             TargetDb::Peers => &self.peers_db,
             TargetDb::Logs => &self.logs_db,
@@ -212,7 +212,8 @@ impl HoprDbGeneralModelOperations for HoprDb {
     async fn begin_transaction_in_db(&self, target_db: TargetDb) -> Result<OpenTransaction> {
         match target_db {
             TargetDb::Index => Ok(OpenTransaction(
-                self.index_db.begin_with_config(None, None).await?,
+                self.index_db.readwrite().begin_with_config(None, None).await?, /* TODO: cannot estimate intent,
+                                                                                 * must be readwrite */
                 target_db,
             )),
             // TODO: when adding Postgres support, redirect `Tickets` and `Peers` into `self.db`
