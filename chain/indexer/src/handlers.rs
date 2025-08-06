@@ -385,8 +385,7 @@ where
 
                         let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?.ok_or(
                             CoreEthereumIndexerError::ProcessError(format!(
-                                "channel closed event for channel {} did not return an updated channel",
-                                channel_id
+                                "channel closed event for channel {channel_id} did not return an updated channel",
                             )),
                         )?;
 
@@ -620,8 +619,7 @@ where
                         )
                         .await?
                         .ok_or(CoreEthereumIndexerError::ProcessError(format!(
-                            "ticket redeemed event for channel {} did not return an updated channel",
-                            channel_id
+                            "ticket redeemed event for channel {channel_id} did not return an updated channel",
                         )))?;
 
                     // Neglect all the tickets in this channel
