@@ -52,11 +52,11 @@ pub(crate) struct DbConnection {
 
 #[cfg(feature = "sqlite")]
 impl DbConnection {
-    pub fn readonly(&self) -> &sea_orm::DatabaseConnection {
+    pub fn read_only(&self) -> &sea_orm::DatabaseConnection {
         &self.ro
     }
 
-    pub fn readwrite(&self) -> &sea_orm::DatabaseConnection {
+    pub fn read_write(&self) -> &sea_orm::DatabaseConnection {
         &self.rw
     }
 }
@@ -309,7 +309,7 @@ impl HoprDb {
         }
     }
 
-    /// Default SQLite config values for all DBs with RW access.
+    /// Default SQLite config values for all DBs with RW  (read-write) access.
     fn common_connection_cfg_rw(cfg: HoprDbConfig) -> SqliteConnectOptions {
         SqliteConnectOptions::default()
             .create_if_missing(cfg.create_if_missing)

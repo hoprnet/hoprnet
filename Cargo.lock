@@ -4495,7 +4495,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4699,7 +4699,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
