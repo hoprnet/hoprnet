@@ -258,7 +258,7 @@ class TestSessionWithSwarm:
                 # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
                 await asyncio.sleep(1.0)
 
-                # Session uses Response buffer
+                # Session uses Response buffer and Exit egress rate control
                 async with HoprSession(
                     Protocol.TCP,
                     src=swarm7[route[0]],
@@ -311,6 +311,7 @@ class TestSessionWithSwarm:
     async def test_session_communication_with_udp_loopback_service(self, route, swarm7: dict[str, Node]):
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
 
+        # Session uses NO Response buffer and NO Exit egress rate control
         async with HoprSession(
             Protocol.UDP,
             src=swarm7[route[0]],
@@ -319,6 +320,7 @@ class TestSessionWithSwarm:
             return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
             loopback=True,
             use_response_buffer=None,
+            capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=False, no_rate_control=True),
         ) as session:
             assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
 
@@ -367,7 +369,7 @@ class TestSessionWithSwarm:
             # Generate random text content to be served
             expected = "".join(random.choices(string.ascii_letters + string.digits, k=DOWNLOAD_FILE_SIZE))
 
-            # Session uses Response buffer
+            # Session uses Response buffer and Exit egress rate control
             with run_https_server(expected) as dst_sock_port:
                 async with HoprSession(
                     Protocol.TCP,
@@ -401,6 +403,7 @@ class TestSessionWithSwarm:
         async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route], packet_count * ticket_price, packet_count * ticket_price
         ):
+            # Session uses Response buffer and Exit egress rate control
             logging.info(f"Opening session for route '{route}'")
             async with HoprSession(
                 Protocol.UDP,

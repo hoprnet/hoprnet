@@ -43,6 +43,7 @@ class SessionCapabilitiesBody(RequestData):
     segmentation: bool = APIfield("Segmentation", False)
     retransmission_ack_only: bool = APIfield("RetransmissionAckOnly", False)
     no_delay: bool = APIfield("NoDelay", False)
+    no_rate_control: bool = APIfield("NoRateControl", False)
 
 
 @dataclass
