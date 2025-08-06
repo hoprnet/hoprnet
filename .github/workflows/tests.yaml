@@ -157,6 +157,10 @@ jobs:
 
   build-candidate-binaries:
     name: Build Candidate Binaries
+    needs:
+      - tests-unit
+      - tests-unit-nightly
+      - tests-smart-contracts
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 20
     strategy:

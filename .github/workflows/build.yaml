@@ -25,6 +25,8 @@ concurrency:
 
 jobs:
   build-docker:
+    needs:
+      - docs
     strategy:
       matrix:
         package:
@@ -58,6 +60,8 @@ jobs:
     secrets: inherit
 
   build-binaries:
+    needs:
+      - docs
     strategy:
       fail-fast: false
       matrix:

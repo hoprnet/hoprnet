@@ -34,6 +34,9 @@ jobs:
 
   audit:
     name: Audit
+    needs:
+      - pre-commit
+      - lint
     uses: ./.github/workflows/checks-audit.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
@@ -50,6 +53,9 @@ jobs:
 
   zizmor:
     name: Zizmor
+    needs:
+      - pre-commit
+      - lint
     uses: ./.github/workflows/checks-zizmor.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
