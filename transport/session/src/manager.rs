@@ -18,7 +18,7 @@ use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{Instrument, debug, error, info, instrument, trace, warn};
 
 use crate::{
     Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
@@ -64,7 +64,7 @@ lazy_static::lazy_static! {
 pub struct SessionManagerConfig {
     /// Ranges of tags available for Sessions.
     ///
-    /// **NOTE**: If the range starts lower than [`ReservedTag`] range end,
+    /// **NOTE**: If the range starts lower than [`ReservedTag`]'s range end,
     /// it will be automatically transformed to start at this value.
     /// This is due to the reserved range by the Start sub-protocol.
     ///
@@ -532,24 +532,23 @@ where
     }
 
     #[instrument(level = "debug", skip_all, fields(session_id = %balancer.session_id()))]
-    fn spawn_surb_balancer_control_loop<C, E, F, L>(
+    fn spawn_surb_balancer_control_loop<C, E, F>(
         &self,
         mut balancer: SurbBalancer<C, E, F, SessionId>,
-        mut level_cb: L,
+        surb_decay: Option<(Duration, f64)>,
         abort_reg: Option<AbortRegistration>,
-    ) -> AbortHandle
+    ) -> (impl futures::Stream<Item = u64>, AbortHandle)
     where
         C: SurbBalancerController + Send + Sync + 'static,
         E: SurbFlowEstimator + Send + Sync + 'static,
         F: SurbFlowController + Send + Sync + 'static,
-        L: FnMut(u64) + Send + Sync + 'static,
     {
-        debug!(cfg = ?balancer.config(), "spawning SURB balancer");
-
+        // Get abort handle and registration (or create new ones)
         let (abort_handle, abort_reg) = abort_reg
             .map(|reg| (reg.handle(), reg))
             .unwrap_or_else(AbortHandle::new_pair);
 
+        // Start an interval stream at which the balancer will sample and perform updates
         let sampling_stream = futures::stream::Abortable::new(
             futures_time::stream::interval(
                 self.cfg
@@ -560,26 +559,87 @@ where
             abort_reg,
         );
 
+        let (level_tx, level_rx) = futures::channel::mpsc::unbounded();
         let sessions = self.sessions.clone();
-        hopr_async_runtime::prelude::spawn(async move {
-            pin_mut!(sampling_stream);
-            while sampling_stream.next().await.is_some() {
-                if let Some(new_cfg) = sessions
-                    .get(balancer.session_id())
-                    .await
-                    .and_then(|c| c.surb_mgmt)
-                    .filter(|new_cfg| balancer.config() != new_cfg)
-                {
-                    balancer.reconfigure(new_cfg);
+        hopr_async_runtime::prelude::spawn(
+            async move {
+                pin_mut!(sampling_stream);
+                let mut last_sample = std::time::Instant::now();
+                while sampling_stream.next().await.is_some() {
+                    // Check if the balancer needs to be reconfigured
+                    if let Some(new_cfg) = sessions
+                        .get(balancer.session_id())
+                        .await
+                        .and_then(|c| c.surb_mgmt)
+                        .filter(|c| {
+                            c.target_surb_buffer_size != balancer.controller().target()
+                                || c.max_surbs_per_sec != balancer.controller().output_limit()
+                        })
+                    {
+                        balancer
+                            .controller_mut()
+                            .set_target_and_limit(new_cfg.target_surb_buffer_size, new_cfg.max_surbs_per_sec);
+                        debug!(?new_cfg, "surb balancer has been reconfigured");
+                    }
+
+                    let target_before_update = balancer.controller().target();
+
+                    // Perform controller update (this internally samples the SurbFlowEstimator)
+                    // and send an update about the current level to the outgoing stream
+                    let level = balancer.update();
+                    let _ = level_tx.unbounded_send(level);
+
+                    // See if the setpoint has been updated at the controller as a result
+                    // of the update step.
+                    // This applies only to the SimpleBalancerController
+                    let target_after_update = balancer.controller().target();
+                    if target_before_update != target_after_update {
+                        if let moka::ops::compute::CompResult::ReplacedWith(_) = sessions
+                            .entry_by_ref(balancer.session_id())
+                            .and_compute_with(|entry| {
+                                futures::future::ready(match entry.map(|e| e.into_value()) {
+                                    None => moka::ops::compute::Op::Nop,
+                                    Some(mut updated_slot) => {
+                                        if let Some(balancer_cfg) = &mut updated_slot.surb_mgmt {
+                                            balancer_cfg.target_surb_buffer_size = target_before_update;
+                                            moka::ops::compute::Op::Put(updated_slot)
+                                        } else {
+                                            moka::ops::compute::Op::Nop
+                                        }
+                                    }
+                                })
+                            })
+                            .await
+                        {
+                            debug!(
+                                target_before_update,
+                                target_after_update, "controller setpoint has changed after update"
+                            );
+                        } else {
+                            error!("failed to update controller setpoint after it changed")
+                        }
+                    }
+
+                    // If SURB decaying was enabled, check if the decay window has elapsed
+                    // and calculate the number of SURBs that will be discarded
+                    if let Some(num_decayed_surbs) = surb_decay
+                        .as_ref()
+                        .filter(|(t, _)| last_sample.elapsed() > *t)
+                        .map(|(_, decay_coeff)| (balancer.controller().target() as f64 * *decay_coeff).round() as u64)
+                    {
+                        balancer.set_current_target_buffer(level.saturating_sub(num_decayed_surbs));
+                        trace!(num_decayed_surbs, "surbs were discarded due to automatic decay");
+                    }
+
+                    last_sample = std::time::Instant::now();
                 }
 
-                level_cb(balancer.update());
+                debug!("balancer done");
             }
+            .in_current_span(),
+        );
 
-            debug!(session_id = %balancer.session_id(), "balancer done");
-        });
-
-        abort_handle
+        (level_rx, abort_handle)
     }
 
     /// Initiates a new outgoing Session to `destination` with the given configuration.
@@ -708,9 +768,8 @@ where
                     abort_handles.push(ka_abort_handle);
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
-                    let (surbs_ready_tx, surbs_ready_rx) = futures::channel::oneshot::channel();
-                    let mut surbs_ready_tx = Some(surbs_ready_tx);
-                    let balancer_abort_handle = self.spawn_surb_balancer_control_loop(
+                    debug!(%session_id, ?balancer_config ,"spawning entry SURB balancer");
+                    let (level_stream, balancer_abort_handle) = self.spawn_surb_balancer_control_loop(
                         SurbBalancer::new(
                             session_id,
                             // The setpoint and output limit is immediately reconfigured by SurbBalancer
@@ -719,31 +778,32 @@ where
                             ka_controller,
                             balancer_config,
                         ),
-                        move |level: u64| {
-                            if surbs_ready_tx.is_some() && level >= balancer_config.target_surb_buffer_size / 2 {
-                                let _ = surbs_ready_tx.take().unwrap().send(level);
-                            }
-                        },
+                        // TODO: make this configurable
+                        Some((Duration::from_secs(60), 0.05)),
                         None,
                     );
                     abort_handles.push(balancer_abort_handle);
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
-                    match surbs_ready_rx
+                    match level_stream
+                        .skip_while(|current_level| {
+                            futures::future::ready(*current_level < balancer_config.target_surb_buffer_size / 2)
+                        })
+                        .next()
                         .timeout(futures_time::time::Duration::from(SESSION_READINESS_TIMEOUT))
                         .await
                     {
-                        Ok(Ok(surb_level)) => {
+                        Ok(Some(surb_level)) => {
                             info!(%session_id, surb_level, "session is ready");
                         }
-                        Ok(Err(_)) => {
+                        Ok(None) => {
                             return Err(
                                 SessionManagerError::Other("surb balancer was cancelled prematurely".into()).into(),
                             );
                         }
                         Err(_) => {
-                            warn!(%session_id, "session didn't reach target SURB buffer size");
+                            warn!(%session_id, "session didn't reach target SURB buffer size in time");
                         }
                     }
 
@@ -1020,6 +1080,8 @@ where
                 let egress_rate_control =
                     RateController::new(self.cfg.initial_return_session_egress_rate, Duration::from_secs(1));
 
+                // The Session request carries a "hint" as additional data telling what
+                // the Session initiator has configured as its target buffer size in the Balancer.
                 let target_surb_buffer_size = if session_req.additional_data > 0 {
                     (session_req.additional_data as u64).min(self.cfg.maximum_surb_buffer_size as u64)
                 } else {
@@ -1064,7 +1126,7 @@ where
                 // The SURB balancer will start intervening by rate-limiting the
                 // egress of the Session, once the estimated number of SURBs drops below
                 // the target defined here. Otherwise, the maximum egress is allowed.
-                let return_balancer_cfg = SurbBalancerConfig {
+                let balancer_config = SurbBalancerConfig {
                     target_surb_buffer_size,
                     // At maximum egress, the SURB buffer drains in `minimum_surb_buffer_duration` seconds
                     max_surbs_per_sec: target_surb_buffer_size
@@ -1073,7 +1135,6 @@ where
                             .minimum_surb_buffer_duration
                             .max(MIN_SURB_BUFFER_DURATION)
                             .as_secs(),
-                    ..Default::default()
                 };
 
                 // Assign the SURB balancer and abort handles to the already allocated Session slot
@@ -1084,7 +1145,7 @@ where
                     .and_compute_with(|entry| {
                         if let Some(mut cached_session) = entry.map(|c| c.into_value()) {
                             cached_session.abort_handles.push(balancer_abort_handle);
-                            cached_session.surb_mgmt = Some(return_balancer_cfg);
+                            cached_session.surb_mgmt = Some(balancer_config);
                             cached_session.surb_estimator = Some(surb_estimator.clone());
                             futures::future::ready(moka::ops::compute::Op::Put(cached_session))
                         } else {
@@ -1095,11 +1156,13 @@ where
                 {
                     // Spawn the SURB balancer only once we know we have registered the
                     // abort handle with the pre-allocated Session slot
-                    self.spawn_surb_balancer_control_loop(
+                    debug!(%session_id, ?balancer_config ,"spawning exit SURB balancer");
+                    let _ = self.spawn_surb_balancer_control_loop(
                         SurbBalancer::new(
                             session_id,
                             // Allow automatic setpoint increase by >= 20% increments
                             SimpleBalancerController::with_increasing_setpoint(
+                                // TODO: make this configurable
                                 0.2,
                                 Duration::from_secs(60)
                                     .div_duration_f64(self.cfg.balancer_sampling_interval)
@@ -1107,9 +1170,9 @@ where
                             ),
                             surb_estimator,
                             SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
-                            return_balancer_cfg,
+                            balancer_config,
                         ),
-                        |_| {},
+                        None,
                         Some(balancer_abort_reg),
                     );
                 } else {

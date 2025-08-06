@@ -53,6 +53,10 @@ pub trait SurbFlowController {
 
 /// Trait abstracting a controller used in the [`SurbBalancer`].
 pub trait SurbBalancerController {
+    /// Gets the current target (setpoint).
+    fn target(&self) -> u64;
+    /// Gets the current output limit.
+    fn output_limit(&self) -> u64;
     /// Updates the controller's target (setpoint) and output limit.
     fn set_target_and_limit(&mut self, target: u64, output_limit: u64);
     /// Queries the controller for the next control output based on the `current_buffer_level` of SURBs.

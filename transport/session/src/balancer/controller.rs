@@ -51,12 +51,6 @@ pub struct SurbBalancerConfig {
     /// The default is 5000 (which is 2500 packets/second currently)
     #[default(5_000)]
     pub max_surbs_per_sec: u64,
-    /// If set to `true`, the control output will be inverted with respect to `max_surbs_per_sec`
-    /// (i.e.: `output = max_surbs_per_sec - output`).
-    ///
-    /// Default is false
-    #[default(false)]
-    pub invert_output: bool,
 }
 
 /// Runs a continuous process that attempts to [evaluate](SurbFlowEstimator) and
@@ -82,7 +76,6 @@ pub struct SurbBalancer<C, E, F, S> {
     controller: C,
     surb_estimator: E,
     flow_control: F,
-    cfg: SurbBalancerConfig,
     current_target_buffer: u64,
     last_estimator_state: SimpleSurbFlowEstimator,
     last_update: std::time::Instant,
@@ -96,7 +89,7 @@ where
     F: SurbFlowController,
     S: Display,
 {
-    pub fn new(session_id: S, controller: C, surb_estimator: E, flow_control: F, cfg: SurbBalancerConfig) -> Self {
+    pub fn new(session_id: S, mut controller: C, surb_estimator: E, flow_control: F, cfg: SurbBalancerConfig) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             let sid = session_id.to_string();
@@ -104,20 +97,18 @@ where
             METRIC_CONTROL_OUTPUT.set(&[&sid], 0.0);
         }
 
-        let mut ret = Self {
+        controller.set_target_and_limit(cfg.target_surb_buffer_size, cfg.max_surbs_per_sec);
+
+        Self {
             surb_estimator,
             flow_control,
             controller,
-            cfg,
             session_id,
             current_target_buffer: 0,
             last_estimator_state: Default::default(),
             last_update: std::time::Instant::now(),
             was_below_target: true,
-        };
-
-        ret.reconfigure(cfg);
-        ret
+        }
     }
 
     /// Gets the Session ID the instance was created with.
@@ -147,7 +138,7 @@ where
         self.current_target_buffer = self.current_target_buffer.saturating_add_signed(target_buffer_change);
 
         // Error from the desired target SURB buffer size at counterparty
-        let error = self.current_target_buffer as i64 - self.cfg.target_surb_buffer_size as i64;
+        let error = self.current_target_buffer as i64 - self.controller.target() as i64;
 
         if self.was_below_target && error >= 0 {
             tracing::trace!(current = self.current_target_buffer, "reached target SURB buffer size");
@@ -167,25 +158,15 @@ where
         );
 
         let output = self.controller.next_control_output(self.current_target_buffer);
+        tracing::debug!(output, "next balancer control output for session");
 
-        // Clamp the control output between [0, max_surbs_per_sec] and invert if needed
-        let mut corrected_output = output.clamp(0, self.cfg.max_surbs_per_sec);
-        if self.cfg.invert_output {
-            corrected_output = self.cfg.max_surbs_per_sec.saturating_sub(corrected_output);
-        }
-
-        tracing::debug!(
-            control_output = corrected_output,
-            "next balancer control output for session"
-        );
-
-        self.flow_control.adjust_surb_flow(corrected_output as usize);
+        self.flow_control.adjust_surb_flow(output as usize);
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             let sid = self.session_id.to_string();
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], error as f64);
-            METRIC_CONTROL_OUTPUT.set(&[&sid], corrected_output as f64);
+            METRIC_CONTROL_OUTPUT.set(&[&sid], output as f64);
             METRIC_SURB_RATE.set(&[&sid], target_buffer_change as f64 / dt.as_secs_f64());
         }
 
@@ -193,21 +174,18 @@ where
     }
 
     /// Allows setting the target buffer size when its value is known exactly.
-    #[allow(unused)]
-    pub fn set_exact_target_buffer_size(&mut self, target_buffer_size: u64) {
+    pub fn set_current_target_buffer(&mut self, target_buffer_size: u64) {
         self.current_target_buffer = target_buffer_size;
     }
 
-    /// Gets the current configuration.
-    pub fn config(&self) -> &SurbBalancerConfig {
-        &self.cfg
+    /// Gets reference to the [`SurbBalancerController`].
+    pub fn controller(&self) -> &C {
+        &self.controller
     }
 
-    /// Allows reconfiguring the instance.
-    pub fn reconfigure(&mut self, cfg: SurbBalancerConfig) {
-        self.controller
-            .set_target_and_limit(cfg.target_surb_buffer_size, cfg.max_surbs_per_sec);
-        tracing::debug!(session_id = %self.session_id, ?cfg, "reconfigured balancer");
+    /// Gets mutable reference to the [`SurbBalancerController`].
+    pub fn controller_mut(&mut self) -> &mut C {
+        &mut self.controller
     }
 }
 

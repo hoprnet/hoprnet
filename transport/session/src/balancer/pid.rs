@@ -110,6 +110,14 @@ impl Default for PidBalancerController {
 }
 
 impl SurbBalancerController for PidBalancerController {
+    fn target(&self) -> u64 {
+        self.0.setpoint as u64
+    }
+
+    fn output_limit(&self) -> u64 {
+        self.0.output_limit as u64
+    }
+
     fn set_target_and_limit(&mut self, target: u64, output_limit: u64) {
         self.0.setpoint = target as f64;
         self.0.output_limit = output_limit as f64;

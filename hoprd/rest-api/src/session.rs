@@ -1120,7 +1120,6 @@ impl From<SessionConfig> for Option<SurbBalancerConfig> {
                     .max_surb_upstream
                     .map(|b| (b.as_bps() as usize / (8 * SURB_SIZE)) as u64)
                     .unwrap_or_else(|| SurbBalancerConfig::default().max_surbs_per_sec),
-                ..Default::default()
             }),
             // No additional SURBs are set up and maintained, useful for high-send low-reply sessions
             Some(_) => None,

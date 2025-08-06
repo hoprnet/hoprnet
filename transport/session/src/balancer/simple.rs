@@ -10,21 +10,11 @@ use crate::balancer::SurbBalancerController;
 /// See [`SimpleBalancerController::with_increasing_setpoint`] for details.
 ///
 /// If the controller is constructed via the `Default` constructor, no setpoint increase takes place.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct SimpleBalancerController {
     setpoint: u64,
     limit: u64,
     increasing: Option<(f64, NoSumSMA<f64>)>,
-}
-
-impl Default for SimpleBalancerController {
-    fn default() -> Self {
-        Self {
-            setpoint: 0,
-            limit: 0,
-            increasing: None,
-        }
-    }
 }
 
 impl SimpleBalancerController {
@@ -43,15 +33,17 @@ impl SimpleBalancerController {
             increasing: Some((ratio_threshold.clamp(0.0, 1.0), NoSumSMA::new(window_size.max(1)))),
         }
     }
-
-    /// Gets the current value of the setpoint.
-    #[allow(unused)]
-    pub fn setpoint(&self) -> u64 {
-        self.setpoint
-    }
 }
 
 impl SurbBalancerController for SimpleBalancerController {
+    fn target(&self) -> u64 {
+        self.setpoint
+    }
+
+    fn output_limit(&self) -> u64 {
+        self.limit
+    }
+
     fn set_target_and_limit(&mut self, target: u64, output_limit: u64) {
         self.limit = output_limit;
         self.setpoint = target;
@@ -81,24 +73,24 @@ mod tests {
     fn test_simple_balancer() {
         let mut controller = SimpleBalancerController::default();
         controller.set_target_and_limit(100, 100);
-        assert_eq!(100, controller.setpoint());
+        assert_eq!(100, controller.target());
         assert_eq!(controller.next_control_output(10), 10);
         assert_eq!(controller.next_control_output(100), 100);
         assert_eq!(controller.next_control_output(101), 100);
-        assert_eq!(100, controller.setpoint());
+        assert_eq!(100, controller.target());
     }
 
     #[test]
     fn test_simple_balance_with_increasing_setpoint() {
         let mut controller = SimpleBalancerController::with_increasing_setpoint(0.2, 3);
         controller.set_target_and_limit(100, 100);
-        assert_eq!(100, controller.setpoint());
+        assert_eq!(100, controller.target());
 
         assert_eq!(100, controller.next_control_output(101));
-        assert_eq!(100, controller.setpoint());
+        assert_eq!(100, controller.target());
         assert_eq!(100, controller.next_control_output(120));
-        assert_eq!(100, controller.setpoint());
+        assert_eq!(100, controller.target());
         assert_eq!(100, controller.next_control_output(200));
-        assert_eq!(140, controller.setpoint());
+        assert_eq!(140, controller.target());
     }
 }
