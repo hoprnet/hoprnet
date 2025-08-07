@@ -38,6 +38,12 @@ class CreateSessionBody(RequestData):
 
 
 @dataclass
+class SetSessionConfigBody(RequestData):
+    response_buffer: str = APIfield("responseBuffer")
+    max_surb_upstream: str = APIfield("maxSurbUpstream")
+
+
+@dataclass
 class SessionCapabilitiesBody(RequestData):
     retransmission: bool = APIfield("Retransmission", False)
     segmentation: bool = APIfield("Segmentation", False)

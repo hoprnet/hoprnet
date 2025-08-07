@@ -117,6 +117,14 @@ class Session(JsonResponse):
     forward_path: str = APIfield("forwardPath")
     return_path: str = APIfield("returnPath")
     mtu: int = APIfield()
+    surb_len: int = APIfield("surbLen")
+    active_clients: list[str] = APIfield("activeClients")
+
+
+@APIobject
+class SessionConfig:
+    response_buffer: str = APIfield("responseBuffer")
+    max_surb_upstream: str = APIfield("maxSurbUpstream")
 
 
 @APIobject

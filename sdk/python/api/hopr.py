@@ -20,6 +20,7 @@ from .request_objects import (
     GetChannelsBody,
     OpenChannelBody,
     SessionCapabilitiesBody,
+    SetSessionConfigBody,
     WithdrawBody,
 )
 from .response_objects import (
@@ -34,6 +35,7 @@ from .response_objects import (
     OpenedChannel,
     Ping,
     Session,
+    SessionConfig,
     Ticket,
     TicketPrice,
     TicketProbability,
@@ -303,6 +305,24 @@ class HoprdAPI(ApiLib):
         :return: list[Session]
         """
         return await self.try_req(Method.GET, f"/session/{protocol.name.lower()}", list[Session])
+
+    async def session_get_config(self, session_id: str) -> Optional[SessionConfig]:
+        """
+        Gets the configurable parameters of a Session.
+        :param: session_id: String
+        :return: SessionConfig
+        """
+        return await self.try_req(Method.GET, f"/session/config/{session_id}", SessionConfig)
+
+    async def session_set_config(self, session_id: str, cfg: SessionConfig):
+        """
+        Sets the configurable parameters of a Session.
+        :param: session_id: String
+        :param: cfg: SessionConfig
+        :return: SessionConfig
+        """
+        data = SetSessionConfigBody(cfg.response_buffer, cfg.max_surb_upstream)
+        return await self.try_req(Method.POST, f"/session/config/{session_id}", data=data)
 
     async def session_client(
         self,

@@ -109,6 +109,7 @@ pub(crate) struct InternalState {
         session::create_client,
         session::list_clients,
         session::adjust_session,
+        session::session_config,
         session::close_client,
         tickets::aggregate_tickets_in_channel,
         tickets::redeem_all_tickets,

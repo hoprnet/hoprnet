@@ -811,7 +811,7 @@ async fn create_tcp_client_binding(
                             hopr_async_runtime::prelude::spawn(
                                 // The stream either terminates naturally (by the client closing the TCP connection)
                                 // or is terminated via the abort handle.
-                                bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).map(
+                                bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).then(
                                     move |_| async move {
                                         // Regardless how the session ended, remove the abort handle
                                         // from the map
@@ -904,7 +904,7 @@ async fn create_udp_client_binding(
     // This is needed because the `udp_socket` cannot terminate by itself.
     let (abort_handle, abort_reg) = AbortHandle::new_pair();
     let clients = Arc::new(DashMap::new());
-    // TODO: add multiple client support to UDP sessions
+    // TODO: add multiple client support to UDP sessions (#7370)
     clients.insert(*session.id(), (bind_host, abort_handle.clone()));
     hopr_async_runtime::prelude::spawn(async move {
         #[cfg(all(feature = "prometheus", not(test)))]
