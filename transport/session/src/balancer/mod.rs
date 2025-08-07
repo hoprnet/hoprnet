@@ -4,11 +4,14 @@ mod controller;
 pub mod pid;
 #[allow(dead_code)]
 mod rate_limiting;
-/// Contains simple proportional output implementation of the [`SurbBalancerController`] trait.
+/// Contains a simple proportional output implementation of the [`SurbBalancerController`] trait.
 pub mod simple;
 
-pub use controller::{SurbBalancer, SurbBalancerConfig};
+pub use controller::{BalancerConfigFeedback, SurbBalancer, SurbBalancerConfig};
 pub use rate_limiting::{RateController, RateLimitSinkExt, RateLimitStreamExt};
+
+/// Smallest possible interval for balancer sampling.
+pub const MIN_BALANCER_SAMPLING_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
 
 /// Allows estimating the flow of SURBs in a Session (production or consumption).
 pub trait SurbFlowEstimator {
@@ -112,6 +115,24 @@ impl SurbFlowEstimator for AtomicSurbFlowEstimator {
 
     fn estimate_surbs_produced(&self) -> u64 {
         self.produced.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+/// Wraps a [`RateController`] as [`SurbFlowController`] with the given correction
+/// factor on time unit.
+///
+/// For example, when this is used to control the flow of keep-alive messages (carrying SURBs),
+/// the correction factor is `HoprPacket::MAX_SURBS_IN_PACKET` - which is the number of SURBs
+/// a single keep-alive message can bear.
+///
+/// In another case, when this is used to control the egress of a Session, each outgoing packet
+/// consumes only a single SURB and therefore the correction factor is `1`.
+pub struct SurbControllerWithCorrection(pub RateController, pub u32);
+
+impl SurbFlowController for SurbControllerWithCorrection {
+    fn adjust_surb_flow(&self, surbs_per_sec: usize) {
+        self.0
+            .set_rate_per_unit(surbs_per_sec, self.1 * std::time::Duration::from_secs(1));
     }
 }
 

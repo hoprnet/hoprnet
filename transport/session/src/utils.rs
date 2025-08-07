@@ -1,3 +1,19 @@
+use std::time::Duration;
+
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use hopr_async_runtime::AbortHandle;
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_network_types::prelude::DestinationRouting;
+use hopr_transport_packet::prelude::ApplicationData;
+use tracing::{debug, error};
+
+use crate::{
+    SessionId,
+    balancer::{RateController, RateLimitStreamExt, SurbControllerWithCorrection},
+    errors::TransportSessionError,
+    types::HoprStartProtocol,
+};
+
 /// Convenience function to copy data in both directions between a [`Session`](crate::Session) and arbitrary
 /// async IO stream.
 /// This function is only available with Tokio and will panic with other runtimes.
@@ -88,6 +104,58 @@ where
             return None;
         }
     }
+}
+
+pub(crate) fn spawn_keep_alive_stream<S>(
+    session_id: SessionId,
+    sender: S,
+    routing: DestinationRouting,
+) -> (SurbControllerWithCorrection, AbortHandle)
+where
+    S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+{
+    let elem = HoprStartProtocol::KeepAlive(session_id.into());
+
+    // The stream is suspended until the caller sets a rate via the Controller
+    let controller = RateController::new(0, Duration::from_secs(1));
+
+    let (ka_stream, abort_handle) =
+        futures::stream::abortable(futures::stream::repeat(elem).rate_limit_with_controller(&controller));
+
+    let sender_clone = sender.clone();
+    let fwd_routing_clone = routing.clone();
+
+    // This task will automatically terminate once the returned abort handle is used.
+    debug!(%session_id, "spawning keep-alive stream");
+    hopr_async_runtime::prelude::spawn(
+        ka_stream
+            .map(move |msg| ApplicationData::try_from(msg).map(|m| (fwd_routing_clone.clone(), m)))
+            .map_err(TransportSessionError::from)
+            .try_for_each_concurrent(None, move |msg| {
+                let mut sender_clone = sender_clone.clone();
+                async move {
+                    sender_clone
+                        .send(msg)
+                        .await
+                        .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))
+                }
+            })
+            .then(move |res| {
+                match res {
+                    Ok(_) => debug!(%session_id, "keep-alive stream done"),
+                    Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
+                }
+                futures::future::ready(())
+            }),
+    );
+
+    // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
+    // so the correction by this factor is applied.
+    (
+        SurbControllerWithCorrection(controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
+        abort_handle,
+    )
 }
 
 #[cfg(test)]

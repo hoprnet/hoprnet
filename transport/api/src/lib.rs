@@ -252,6 +252,9 @@ where
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: Duration::from_secs(5),
                 maximum_surb_buffer_size: db.get_surb_rb_size(),
+                // Allow a 15% increase of the target SURB buffer on incoming Sessions
+                // if the SURB buffer level has surpassed it by at least 15% in the last 2 minutes.
+                growable_target_surb_buffer: Some((Duration::from_secs(120), 0.15)),
             }),
             db,
             cfg,

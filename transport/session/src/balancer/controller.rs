@@ -1,6 +1,14 @@
-use std::fmt::Display;
+use std::time::Duration;
 
-use crate::balancer::{SimpleSurbFlowEstimator, SurbBalancerController, SurbFlowController, SurbFlowEstimator};
+use futures::{StreamExt, future::AbortRegistration, pin_mut};
+use hopr_async_runtime::AbortHandle;
+use tracing::{Instrument, debug, error, instrument, trace};
+
+use super::{
+    MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator, SurbBalancerController, SurbFlowController,
+    SurbFlowEstimator,
+};
+use crate::SessionId;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -24,8 +32,18 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// Allows updating [`SurbBalancerConfig`] from the [control loop](spawn_surb_balancer_control_loop).
+#[cfg_attr(test, mockall::automock)]
+#[async_trait::async_trait]
+pub trait BalancerConfigFeedback {
+    /// Gets current [`SurbBalancerConfig`] for a Session with `id`.
+    async fn get_config(&self, id: &SessionId) -> crate::errors::Result<SurbBalancerConfig>;
+    /// Updates current [`SurbBalancerConfig`] for a Session with `id`.
+    async fn on_config_update(&self, id: &SessionId, cfg: SurbBalancerConfig) -> crate::errors::Result<()>;
+}
+
 /// Configuration for the `SurbBalancer`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+#[derive(Clone, Copy, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct SurbBalancerConfig {
     /// The desired number of SURBs to be always kept as a buffer locally or at the Session counterparty.
     ///
@@ -51,6 +69,15 @@ pub struct SurbBalancerConfig {
     /// The default is 5000 (which is 2500 packets/second currently)
     #[default(5_000)]
     pub max_surbs_per_sec: u64,
+
+    /// Sets what percentage of the target buffer size should be discarded at each window.
+    ///
+    /// The [`SurbBalancer`] will discard the given percentage of `target_surb_buffer_size` at each
+    /// window with the given `Duration`.
+    ///
+    /// The default is `(60, 0.05)` (5% of the target buffer size is discarded every 60 seconds).
+    #[default(_code = "Some((Duration::from_secs(60), 0.05))")]
+    pub surb_decay: Option<(Duration, f64)>,
 }
 
 /// Runs a continuous process that attempts to [evaluate](SurbFlowEstimator) and
@@ -71,25 +98,31 @@ pub struct SurbBalancerConfig {
 /// In the remote context, the `SurbFlowController` might regulate the flow of non-organic SURBs via
 /// Start protocol's [`KeepAlive`](crate::initiation::StartProtocol::KeepAlive) messages to deliver additional
 /// SURBs to the counterparty.
-pub struct SurbBalancer<C, E, F, S> {
-    session_id: S,
+pub struct SurbBalancer<C, E, F> {
+    session_id: SessionId,
     controller: C,
     surb_estimator: E,
     flow_control: F,
-    current_target_buffer: u64,
+    current_buffer: u64,
     last_estimator_state: SimpleSurbFlowEstimator,
     last_update: std::time::Instant,
+    last_decay: std::time::Instant,
     was_below_target: bool,
 }
 
-impl<C, E, F, S> SurbBalancer<C, E, F, S>
+impl<C, E, F> SurbBalancer<C, E, F>
 where
-    C: SurbBalancerController,
-    E: SurbFlowEstimator,
-    F: SurbFlowController,
-    S: Display,
+    C: SurbBalancerController + Send + Sync + 'static,
+    E: SurbFlowEstimator + Send + Sync + 'static,
+    F: SurbFlowController + Send + Sync + 'static,
 {
-    pub fn new(session_id: S, mut controller: C, surb_estimator: E, flow_control: F, cfg: SurbBalancerConfig) -> Self {
+    pub fn new(
+        session_id: SessionId,
+        mut controller: C,
+        surb_estimator: E,
+        flow_control: F,
+        cfg: SurbBalancerConfig,
+    ) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             let sid = session_id.to_string();
@@ -104,25 +137,21 @@ where
             flow_control,
             controller,
             session_id,
-            current_target_buffer: 0,
+            current_buffer: 0,
             last_estimator_state: Default::default(),
             last_update: std::time::Instant::now(),
+            last_decay: std::time::Instant::now(),
             was_below_target: true,
         }
     }
 
-    /// Gets the Session ID the instance was created with.
-    pub fn session_id(&self) -> &S {
-        &self.session_id
-    }
-
     /// Computes the next control update and adjusts the [`SurbFlowController`] rate accordingly.
-    #[tracing::instrument(level = "trace", skip(self), fields(session_id = %self.session_id))]
-    pub fn update(&mut self) -> u64 {
+    #[tracing::instrument(level = "trace", skip_all)]
+    fn update(&mut self, surb_decay: Option<&(Duration, f64)>) -> u64 {
         let dt = self.last_update.elapsed();
-        if dt < std::time::Duration::from_millis(10) {
-            tracing::debug!("time elapsed since last update is too short, skipping update");
-            return self.current_target_buffer;
+        if dt < Duration::from_millis(10) {
+            debug!("time elapsed since last update is too short, skipping update");
+            return self.current_buffer;
         }
 
         self.last_update = std::time::Instant::now();
@@ -130,35 +159,47 @@ where
         // Take a snapshot of the active SURB estimator and calculate the balance change
         let snapshot = SimpleSurbFlowEstimator::from(&self.surb_estimator);
         let Some(target_buffer_change) = snapshot.estimated_surb_buffer_change(&self.last_estimator_state) else {
-            tracing::error!("non-monotonic change in SURB estimators");
-            return self.current_target_buffer;
+            error!("non-monotonic change in SURB estimators");
+            return self.current_buffer;
         };
 
         self.last_estimator_state = snapshot;
-        self.current_target_buffer = self.current_target_buffer.saturating_add_signed(target_buffer_change);
+        self.current_buffer = self.current_buffer.saturating_add_signed(target_buffer_change);
+
+        // If SURB decaying is enabled, check if the decay window has elapsed
+        // and calculate the number of SURBs that will be discarded
+        if let Some(num_decayed_surbs) = surb_decay
+            .as_ref()
+            .filter(|(t, _)| self.last_decay.elapsed() > *t)
+            .map(|(_, decay_coeff)| (self.controller.target() as f64 * *decay_coeff).round() as u64)
+        {
+            self.current_buffer = self.current_buffer.saturating_sub(num_decayed_surbs);
+            self.last_decay = std::time::Instant::now();
+            trace!(num_decayed_surbs, "SURBs were discarded due to automatic decay");
+        }
 
         // Error from the desired target SURB buffer size at counterparty
-        let error = self.current_target_buffer as i64 - self.controller.target() as i64;
+        let error = self.current_buffer as i64 - self.controller.target() as i64;
 
         if self.was_below_target && error >= 0 {
-            tracing::trace!(current = self.current_target_buffer, "reached target SURB buffer size");
+            trace!(current = self.current_buffer, "reached target SURB buffer size");
             self.was_below_target = false;
         } else if !self.was_below_target && error < 0 {
-            tracing::trace!(current = self.current_target_buffer, "SURB buffer size is below target");
+            trace!(current = self.current_buffer, "SURB buffer size is below target");
             self.was_below_target = true;
         }
 
-        tracing::trace!(
+        trace!(
             ?dt,
             delta = target_buffer_change,
             rate = target_buffer_change as f64 / dt.as_secs_f64(),
-            current = self.current_target_buffer,
+            current = self.current_buffer,
             error,
             "estimated SURB buffer change"
         );
 
-        let output = self.controller.next_control_output(self.current_target_buffer);
-        tracing::debug!(output, "next balancer control output for session");
+        let output = self.controller.next_control_output(self.current_buffer);
+        debug!(output, "next balancer control output for session");
 
         self.flow_control.adjust_surb_flow(output as usize);
 
@@ -170,28 +211,96 @@ where
             METRIC_SURB_RATE.set(&[&sid], target_buffer_change as f64 / dt.as_secs_f64());
         }
 
-        self.current_target_buffer
+        self.current_buffer
     }
 
-    /// Allows setting the target buffer size when its value is known exactly.
-    pub fn set_current_target_buffer(&mut self, target_buffer_size: u64) {
-        self.current_target_buffer = target_buffer_size;
-    }
+    /// Spawns a new task that performs updates of the given [`SurbBalancer`] at the given `sampling_interval`.
+    ///
+    /// If `surb_decay` is given, SURBs are removed at each window as the given percentage of the target buffer.
+    /// If `cfg_feedback` is given, [`SurbBalancerConfig`] can be queried for updates and also updated
+    /// if the underlying [`SurbBalancerController`] also does target updates.
+    ///
+    /// Returns a stream of current estimated buffer levels, and also an `AbortHandle`
+    /// to terminate the loop. If `abort_reg` was given, the returned `AbortHandle` corresponds
+    /// to it.
+    #[instrument(level = "debug", skip_all, fields(session_id = %self.session_id))]
+    pub fn start_control_loop<B>(
+        mut self,
+        sampling_interval: Duration,
+        cfg_feedback: B,
+        abort_reg: Option<AbortRegistration>,
+    ) -> (impl futures::Stream<Item = u64>, AbortHandle)
+    where
+        B: BalancerConfigFeedback + Send + Sync + 'static,
+    {
+        // Get abort handle and registration (or create new ones)
+        let (abort_handle, abort_reg) = abort_reg
+            .map(|reg| (reg.handle(), reg))
+            .unwrap_or_else(AbortHandle::new_pair);
 
-    /// Gets reference to the [`SurbBalancerController`].
-    pub fn controller(&self) -> &C {
-        &self.controller
-    }
+        // Start an interval stream at which the balancer will sample and perform updates
+        let sampling_stream = futures::stream::Abortable::new(
+            futures_time::stream::interval(sampling_interval.max(MIN_BALANCER_SAMPLING_INTERVAL).into()),
+            abort_reg,
+        );
 
-    /// Gets mutable reference to the [`SurbBalancerController`].
-    pub fn controller_mut(&mut self) -> &mut C {
-        &mut self.controller
+        let (level_tx, level_rx) = futures::channel::mpsc::unbounded();
+        hopr_async_runtime::prelude::spawn(
+            async move {
+                pin_mut!(sampling_stream);
+                while sampling_stream.next().await.is_some() {
+                    let Ok(mut current_cfg) = cfg_feedback.get_config(&self.session_id).await else {
+                        error!("cannot get config for session");
+                        break;
+                    };
+
+                    // Check if the balancer controller needs to be reconfigured
+                    if current_cfg.target_surb_buffer_size != self.controller.target()
+                        || current_cfg.max_surbs_per_sec != self.controller.output_limit()
+                    {
+                        self.controller
+                            .set_target_and_limit(current_cfg.target_surb_buffer_size, current_cfg.max_surbs_per_sec);
+                        debug!(?current_cfg, "surb balancer has been reconfigured");
+                    }
+
+                    let target_before_update = self.controller.target();
+
+                    // Perform controller update (this internally samples the SurbFlowEstimator)
+                    // and send an update about the current level to the outgoing stream
+                    let level = self.update(current_cfg.surb_decay.as_ref());
+                    let _ = level_tx.unbounded_send(level);
+
+                    // See if the setpoint has been updated at the controller as a result
+                    // of the update step, because some controllers (such as the SimpleBalancerController)
+                    // permit that.
+                    let target_after_update = self.controller.target();
+                    if target_before_update != target_after_update {
+                        current_cfg.target_surb_buffer_size = target_after_update;
+                        match cfg_feedback.on_config_update(&self.session_id, current_cfg).await {
+                            Ok(_) => debug!(
+                                target_before_update,
+                                target_after_update, "controller setpoint has changed after update"
+                            ),
+                            Err(error) => error!(%error, "failed to update controller setpoint after it changed"),
+                        }
+                    }
+                }
+
+                debug!("balancer done");
+            }
+            .in_current_span(),
+        );
+
+        (level_rx, abort_handle)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, atomic::AtomicU64};
+
+    use hopr_crypto_random::Randomizable;
+    use hopr_internal_types::prelude::HoprPseudonym;
 
     use super::*;
     use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController, pid::PidBalancerController};
@@ -215,7 +324,7 @@ mod tests {
 
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
-            "test",
+            SessionId::new(1234_u64, HoprPseudonym::random()),
             PidBalancerController::default(),
             surb_estimator.clone(),
             controller,
@@ -238,7 +347,7 @@ mod tests {
                 std::sync::atomic::Ordering::Relaxed,
             );
 
-            let next_update = balancer.update();
+            let next_update = balancer.update(None);
             assert!(
                 i == 0 || next_update > last_update,
                 "{next_update} should be greater than {last_update}"
@@ -266,7 +375,7 @@ mod tests {
 
         let surb_estimator = AtomicSurbFlowEstimator::default();
         let mut balancer = SurbBalancer::new(
-            "test",
+            SessionId::new(1234_u64, HoprPseudonym::random()),
             PidBalancerController::default(),
             surb_estimator.clone(),
             controller,
@@ -285,7 +394,7 @@ mod tests {
                 std::sync::atomic::Ordering::Relaxed,
             );
 
-            let next_update = balancer.update();
+            let next_update = balancer.update(None);
             assert!(
                 i == 0 || next_update < last_update,
                 "{next_update} should be greater than {last_update}"

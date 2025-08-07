@@ -5,31 +5,28 @@ use std::{
 };
 
 use futures::{
-    FutureExt, SinkExt, StreamExt, TryStreamExt,
-    channel::mpsc::UnboundedSender,
-    future::{AbortHandle, AbortRegistration},
-    pin_mut,
+    FutureExt, SinkExt, StreamExt, TryStreamExt, channel::mpsc::UnboundedSender, future::AbortHandle, pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
-use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
-use tracing::{Instrument, debug, error, info, instrument, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
-        AtomicSurbFlowEstimator, RateController, RateLimitSinkExt, RateLimitStreamExt, SurbBalancer,
-        SurbBalancerController, SurbFlowController, SurbFlowEstimator,
+        AtomicSurbFlowEstimator, BalancerConfigFeedback, RateController, RateLimitSinkExt, SurbBalancer,
+        SurbControllerWithCorrection,
         pid::{PidBalancerController, PidControllerGains},
         simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
     types::{ByteCapabilities, ClosureReason, HoprStartProtocol},
+    utils,
     utils::insert_into_next_slot,
 };
 
@@ -59,8 +56,110 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
+    debug!(?session_id, ?reason, "closing session");
+
+    if reason != ClosureReason::EmptyRead {
+        // Closing the data sender will also cause it to close from the read side
+        session_data.session_tx.close_channel();
+        trace!(?session_id, "data tx channel closed on session");
+    }
+
+    // Terminate any additional tasks spawned by the Session
+    session_data.abort_handles.into_iter().for_each(|h| h.abort());
+
+    #[cfg(all(feature = "prometheus", not(test)))]
+    METRIC_ACTIVE_SESSIONS.decrement(1.0);
+}
+
+fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
+    base * (hops as u32)
+}
+
+/// Minimum time the SURB buffer must endure if no SURBs are being produced.
+pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
+
+/// The first challenge value used in Start protocol to initiate a session.
+pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
+
+/// Maximum time to wait for counterparty to receive the target number of SURBs.
+const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
+
+// Needs to use an UnboundedSender instead of oneshot
+// because Moka cache requires the value to be Clone, which oneshot Sender is not.
+// It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
+type SessionInitiationCache =
+    moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
+
+#[derive(Clone)]
+struct SessionSlot {
+    // Sender needs to be put in Arc, so that no clones are made by `moka`.
+    // This makes sure that the entire channel closes once the one and only sender is closed.
+    session_tx: Arc<UnboundedSender<Box<[u8]>>>,
+    routing_opts: DestinationRouting,
+    abort_handles: Vec<AbortHandle>,
+    // Allows reconfiguring of the SURB balancer on-the-fly
+    surb_mgmt: Option<SurbBalancerConfig>,
+    surb_estimator: Option<AtomicSurbFlowEstimator>,
+}
+
+/// Allows forward and backward propagation of SURB management configuration changes.
+struct SessionCacheBalancerFeedback(moka::future::Cache<SessionId, SessionSlot>);
+
+#[async_trait::async_trait]
+impl BalancerConfigFeedback for SessionCacheBalancerFeedback {
+    async fn get_config(&self, id: &SessionId) -> crate::errors::Result<SurbBalancerConfig> {
+        self.0
+            .get(id)
+            .await
+            .ok_or(SessionManagerError::NonExistingSession)?
+            .surb_mgmt
+            .ok_or(SessionManagerError::Other("missing surb balancer config".into()).into())
+    }
+
+    async fn on_config_update(&self, id: &SessionId, cfg: SurbBalancerConfig) -> crate::errors::Result<()> {
+        if let moka::ops::compute::CompResult::ReplacedWith(_) = self
+            .0
+            .entry_by_ref(id)
+            .and_compute_with(|entry| {
+                futures::future::ready(match entry.map(|e| e.into_value()) {
+                    None => moka::ops::compute::Op::Nop,
+                    Some(mut updated_slot) => {
+                        if let Some(balancer_cfg) = &mut updated_slot.surb_mgmt {
+                            *balancer_cfg = cfg;
+                            moka::ops::compute::Op::Put(updated_slot)
+                        } else {
+                            moka::ops::compute::Op::Nop
+                        }
+                    }
+                })
+            })
+            .await
+        {
+            Ok(())
+        } else {
+            Err(SessionManagerError::NonExistingSession.into())
+        }
+    }
+}
+
+/// Indicates the result of processing a message.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DispatchResult {
+    /// Session or Start protocol message has been processed successfully.
+    Processed,
+    /// The message was not related to Start or Session protocol.
+    Unrelated(ApplicationData),
+}
+
+/// Incoming session notifier and session closure notifier
+type SessionNotifiers = (
+    UnboundedSender<IncomingSession>,
+    UnboundedSender<(SessionId, ClosureReason)>,
+);
+
 /// Configuration for the [`SessionManager`].
-#[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+#[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
 pub struct SessionManagerConfig {
     /// Ranges of tags available for Sessions.
     ///
@@ -134,131 +233,17 @@ pub struct SessionManagerConfig {
     /// Default is 10 000 SURBs.
     #[default(10_000)]
     pub maximum_surb_buffer_size: usize,
+
+    /// Determines if the `target_surb_buffer_size` can grow if the simple moving average of the
+    /// current SURB buffer size estimate surpasses the given threshold over the given period.
+    ///
+    /// This only applies if the used [`SurbBalancerController`] has this option.
+    ///
+    /// The default is `(60, 0.20)` (20% growth if the average SURB buffer size surpasses 20%
+    /// of the target buffer size in a 60-second window).
+    #[default(_code = "Some((Duration::from_secs(60), 0.20))")]
+    pub growable_target_surb_buffer: Option<(Duration, f64)>,
 }
-
-fn close_session(session_id: SessionId, session_data: SessionSlot, reason: ClosureReason) {
-    debug!(?session_id, ?reason, "closing session");
-
-    if reason != ClosureReason::EmptyRead {
-        // Closing the data sender will also cause it to close from the read side
-        session_data.session_tx.close_channel();
-        trace!(?session_id, "data tx channel closed on session");
-    }
-
-    // Terminate any additional tasks spawned by the Session
-    session_data.abort_handles.into_iter().for_each(|h| h.abort());
-
-    #[cfg(all(feature = "prometheus", not(test)))]
-    METRIC_ACTIVE_SESSIONS.decrement(1.0);
-}
-
-/// The first challenge value used in Start protocol to initiate a session.
-pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
-
-/// Maximum time to wait for counterparty to receive the target number of SURBs.
-const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
-
-// Needs to use an UnboundedSender instead of oneshot
-// because Moka cache requires the value to be Clone, which oneshot Sender is not.
-// It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
-type SessionInitiationCache =
-    moka::future::Cache<StartChallenge, UnboundedSender<Result<StartEstablished<SessionId>, StartErrorType>>>;
-
-#[derive(Clone)]
-struct SessionSlot {
-    // Sender needs to be put in Arc, so that no clones are made by `moka`.
-    // This makes sure that the entire channel closes once the one and only sender is closed.
-    session_tx: Arc<UnboundedSender<Box<[u8]>>>,
-    routing_opts: DestinationRouting,
-    abort_handles: Vec<AbortHandle>,
-    // Allows reconfiguring of the SURB balancer on-the-fly
-    surb_mgmt: Option<SurbBalancerConfig>,
-    surb_estimator: Option<AtomicSurbFlowEstimator>,
-}
-
-/// Indicates the result of processing a message.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DispatchResult {
-    /// Session or Start protocol message has been processed successfully.
-    Processed,
-    /// The message was not related to Start or Session protocol.
-    Unrelated(ApplicationData),
-}
-
-/// Wraps a [`RateController`] as [`SurbFlowController`] with the given correction
-/// factor on time unit.
-///
-/// For example, when this is used to control the flow of keep-alive messages (carrying SURBs),
-/// the correction factor is `HoprPacket::MAX_SURBS_IN_PACKET` - which is the number of SURBs
-/// a single keep-alive message can bear.
-///
-/// In another case, when this is used to control the egress of a Session, each outgoing packet
-/// consumes only a single SURB and therefore the correction factor is `1`.
-pub(crate) struct SurbControllerWithCorrection(pub RateController, pub u32);
-
-impl SurbFlowController for SurbControllerWithCorrection {
-    fn adjust_surb_flow(&self, surbs_per_sec: usize) {
-        self.0.set_rate_per_unit(surbs_per_sec, self.1 * Duration::from_secs(1));
-    }
-}
-
-fn spawn_keep_alive_stream<S>(
-    session_id: SessionId,
-    sender: S,
-    routing: DestinationRouting,
-) -> (SurbControllerWithCorrection, AbortHandle)
-where
-    S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
-    S::Error: std::error::Error + Send + Sync + 'static,
-{
-    let elem = HoprStartProtocol::KeepAlive(session_id.into());
-
-    // The stream is suspended until the caller sets a rate via the Controller
-    let controller = RateController::new(0, Duration::from_secs(1));
-
-    let (ka_stream, abort_handle) =
-        futures::stream::abortable(futures::stream::repeat(elem).rate_limit_with_controller(&controller));
-
-    let sender_clone = sender.clone();
-    let fwd_routing_clone = routing.clone();
-
-    // This task will automatically terminate once the returned abort handle is used.
-    debug!(%session_id, "spawning keep-alive stream");
-    hopr_async_runtime::prelude::spawn(
-        ka_stream
-            .map(move |msg| ApplicationData::try_from(msg).map(|m| (fwd_routing_clone.clone(), m)))
-            .map_err(TransportSessionError::from)
-            .try_for_each_concurrent(None, move |msg| {
-                let mut sender_clone = sender_clone.clone();
-                async move {
-                    sender_clone
-                        .send(msg)
-                        .await
-                        .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))
-                }
-            })
-            .then(move |res| {
-                match res {
-                    Ok(_) => debug!(%session_id, "keep-alive stream done"),
-                    Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
-                }
-                futures::future::ready(())
-            }),
-    );
-
-    // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
-    // so the correction by this factor is applied.
-    (
-        SurbControllerWithCorrection(controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
-        abort_handle,
-    )
-}
-
-/// Incoming session notifier and session closure notifier
-type SessionNotifiers = (
-    UnboundedSender<IncomingSession>,
-    UnboundedSender<(SessionId, ClosureReason)>,
-);
 
 /// Manages lifecycles of Sessions.
 ///
@@ -369,8 +354,8 @@ type SessionNotifiers = (
 /// takes place at the Exit.
 ///
 /// This configuration can only lead to an equilibrium when Entry sends non-full packets (ones that carry
-/// at least a single SURB) and the Exit is consuming the SURBs (Session egress) at slower or equal rate.
-/// Such configuration is very fragile, as any disturbances in the SURB flow might lead to packet drop
+/// at least a single SURB) and the Exit is consuming the SURBs (Session egress) at a slower or equal rate.
+/// Such configuration is very fragile, as any disturbances in the SURB flow might lead to a packet drop
 /// at the Exit's egress.
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
@@ -391,16 +376,6 @@ impl<S> Clone for SessionManager<S> {
         }
     }
 }
-
-fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
-    base * (hops as u32)
-}
-
-/// Smallest possible interval for balancer sampling.
-pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
-
-/// Minimum time the SURB buffer must endure if no SURBs are being produced.
-pub const MIN_SURB_BUFFER_DURATION: Duration = Duration::from_secs(1);
 
 impl<S> SessionManager<S>
 where
@@ -531,115 +506,34 @@ where
         self.session_notifiers.get().is_some()
     }
 
-    #[instrument(level = "debug", skip_all, fields(session_id = %balancer.session_id()))]
-    fn spawn_surb_balancer_control_loop<C, E, F>(
-        &self,
-        mut balancer: SurbBalancer<C, E, F, SessionId>,
-        surb_decay: Option<(Duration, f64)>,
-        abort_reg: Option<AbortRegistration>,
-    ) -> (impl futures::Stream<Item = u64>, AbortHandle)
-    where
-        C: SurbBalancerController + Send + Sync + 'static,
-        E: SurbFlowEstimator + Send + Sync + 'static,
-        F: SurbFlowController + Send + Sync + 'static,
-    {
-        // Get abort handle and registration (or create new ones)
-        let (abort_handle, abort_reg) = abort_reg
-            .map(|reg| (reg.handle(), reg))
-            .unwrap_or_else(AbortHandle::new_pair);
-
-        // Start an interval stream at which the balancer will sample and perform updates
-        let sampling_stream = futures::stream::Abortable::new(
-            futures_time::stream::interval(
-                self.cfg
-                    .balancer_sampling_interval
-                    .max(MIN_BALANCER_SAMPLING_INTERVAL)
-                    .into(),
-            ),
-            abort_reg,
-        );
-
-        let (level_tx, level_rx) = futures::channel::mpsc::unbounded();
-        let sessions = self.sessions.clone();
-        hopr_async_runtime::prelude::spawn(
-            async move {
-                pin_mut!(sampling_stream);
-                let mut last_sample = std::time::Instant::now();
-                while sampling_stream.next().await.is_some() {
-                    // Check if the balancer needs to be reconfigured
-                    if let Some(new_cfg) = sessions
-                        .get(balancer.session_id())
-                        .await
-                        .and_then(|c| c.surb_mgmt)
-                        .filter(|c| {
-                            c.target_surb_buffer_size != balancer.controller().target()
-                                || c.max_surbs_per_sec != balancer.controller().output_limit()
-                        })
-                    {
-                        balancer
-                            .controller_mut()
-                            .set_target_and_limit(new_cfg.target_surb_buffer_size, new_cfg.max_surbs_per_sec);
-                        debug!(?new_cfg, "surb balancer has been reconfigured");
-                    }
-
-                    let target_before_update = balancer.controller().target();
-
-                    // Perform controller update (this internally samples the SurbFlowEstimator)
-                    // and send an update about the current level to the outgoing stream
-                    let level = balancer.update();
-                    let _ = level_tx.unbounded_send(level);
-
-                    // See if the setpoint has been updated at the controller as a result
-                    // of the update step.
-                    // This applies only to the SimpleBalancerController
-                    let target_after_update = balancer.controller().target();
-                    if target_before_update != target_after_update {
-                        if let moka::ops::compute::CompResult::ReplacedWith(_) = sessions
-                            .entry_by_ref(balancer.session_id())
-                            .and_compute_with(|entry| {
-                                futures::future::ready(match entry.map(|e| e.into_value()) {
-                                    None => moka::ops::compute::Op::Nop,
-                                    Some(mut updated_slot) => {
-                                        if let Some(balancer_cfg) = &mut updated_slot.surb_mgmt {
-                                            balancer_cfg.target_surb_buffer_size = target_before_update;
-                                            moka::ops::compute::Op::Put(updated_slot)
-                                        } else {
-                                            moka::ops::compute::Op::Nop
-                                        }
-                                    }
-                                })
-                            })
-                            .await
-                        {
-                            debug!(
-                                target_before_update,
-                                target_after_update, "controller setpoint has changed after update"
-                            );
-                        } else {
-                            error!("failed to update controller setpoint after it changed")
-                        }
-                    }
-
-                    // If SURB decaying was enabled, check if the decay window has elapsed
-                    // and calculate the number of SURBs that will be discarded
-                    if let Some(num_decayed_surbs) = surb_decay
-                        .as_ref()
-                        .filter(|(t, _)| last_sample.elapsed() > *t)
-                        .map(|(_, decay_coeff)| (balancer.controller().target() as f64 * *decay_coeff).round() as u64)
-                    {
-                        balancer.set_current_target_buffer(level.saturating_sub(num_decayed_surbs));
-                        trace!(num_decayed_surbs, "surbs were discarded due to automatic decay");
-                    }
-
-                    last_sample = std::time::Instant::now();
-                }
-
-                debug!("balancer done");
+    async fn insert_session_slot(&self, session_id: SessionId, slot: SessionSlot) -> crate::errors::Result<()> {
+        // We currently do not support loopback Sessions on ourselves.
+        let abort_handles_clone = slot.abort_handles.clone();
+        if let moka::ops::compute::CompResult::Inserted(_) = self
+            .sessions
+            .entry(session_id)
+            .and_compute_with(|entry| {
+                futures::future::ready(if entry.is_none() {
+                    moka::ops::compute::Op::Put(slot)
+                } else {
+                    moka::ops::compute::Op::Nop
+                })
+            })
+            .await
+        {
+            #[cfg(all(feature = "prometheus", not(test)))]
+            {
+                METRIC_NUM_INITIATED_SESSIONS.increment();
+                METRIC_ACTIVE_SESSIONS.increment(1.0);
             }
-            .in_current_span(),
-        );
 
-        (level_rx, abort_handle)
+            Ok(())
+        } else {
+            // Session already exists; it means it is most likely a loopback attempt
+            error!(%session_id, "session already exists - loopback attempt");
+            abort_handles_clone.into_iter().for_each(|ah| ah.abort());
+            Err(SessionManagerError::Loopback.into())
+        }
     }
 
     /// Initiates a new outgoing Session to `destination` with the given configuration.
@@ -730,7 +624,6 @@ where
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-                let mut abort_handles = Vec::new();
                 let notifier = self
                     .session_notifiers
                     .get()
@@ -747,7 +640,7 @@ where
                 // NOTE: the Exit node can have different `max_surb_buffer_size`
                 // setting on the Session manager, so it does not make sense to cap it here
                 // with our maximum value.
-                let (session, surb_mgmt) = if let Some(balancer_config) = cfg.surb_management {
+                if let Some(balancer_config) = cfg.surb_management {
                     let surb_estimator = AtomicSurbFlowEstimator::default();
 
                     // Sender responsible for keep-alive and Session data will be counting produced SURBs
@@ -762,27 +655,43 @@ where
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
+                    let mut abort_handles = Vec::new();
+
                     // Spawn the SURB-bearing keep alive stream
                     let (ka_controller, ka_abort_handle) =
-                        spawn_keep_alive_stream(session_id, scoring_sender.clone(), forward_routing.clone());
+                        utils::spawn_keep_alive_stream(session_id, scoring_sender.clone(), forward_routing.clone());
                     abort_handles.push(ka_abort_handle);
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     debug!(%session_id, ?balancer_config ,"spawning entry SURB balancer");
-                    let (level_stream, balancer_abort_handle) = self.spawn_surb_balancer_control_loop(
-                        SurbBalancer::new(
-                            session_id,
-                            // The setpoint and output limit is immediately reconfigured by SurbBalancer
-                            PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
-                            surb_estimator.clone(),
-                            ka_controller,
-                            balancer_config,
-                        ),
-                        // TODO: make this configurable
-                        Some((Duration::from_secs(60), 0.05)),
+                    let balancer = SurbBalancer::new(
+                        session_id,
+                        // The setpoint and output limit is immediately reconfigured by SurbBalancer
+                        PidBalancerController::from_gains(PidControllerGains::from_env_or_default()),
+                        surb_estimator.clone(),
+                        ka_controller,
+                        balancer_config,
+                    );
+
+                    let (level_stream, balancer_abort_handle) = balancer.start_control_loop(
+                        self.cfg.balancer_sampling_interval,
+                        SessionCacheBalancerFeedback(self.sessions.clone()),
                         None,
                     );
                     abort_handles.push(balancer_abort_handle);
+
+                    // If the insertion fails prematurely, it will also kill all the abort handles
+                    self.insert_session_slot(
+                        session_id,
+                        SessionSlot {
+                            session_tx: Arc::new(tx),
+                            routing_opts: forward_routing.clone(),
+                            abort_handles,
+                            surb_mgmt: Some(balancer_config),
+                            surb_estimator: None,
+                        },
+                    )
+                    .await?;
 
                     // Wait for enough SURBs to be sent to the counterparty
                     // TODO: consider making this interactive = other party reports the exact level periodically
@@ -807,68 +716,43 @@ where
                         }
                     }
 
-                    (
-                        Session::new(
-                            session_id,
-                            forward_routing.clone(),
-                            cfg.capabilities,
-                            (
-                                scoring_sender,
-                                rx.inspect(move |_| {
-                                    // Received packets = SURB consumption estimate
-                                    surb_estimator
-                                        .consumed
-                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                }),
-                            ),
-                            Some(notifier),
-                        )?,
-                        Some(balancer_config),
+                    Session::new(
+                        session_id,
+                        forward_routing,
+                        cfg.capabilities,
+                        (
+                            scoring_sender,
+                            rx.inspect(move |_| {
+                                // Received packets = SURB consumption estimate
+                                surb_estimator
+                                    .consumed
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }),
+                        ),
+                        Some(notifier),
                     )
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
-                    (
-                        Session::new(
-                            session_id,
-                            forward_routing.clone(),
-                            cfg.capabilities,
-                            (msg_sender, rx),
-                            Some(notifier),
-                        )?,
-                        None,
+
+                    self.insert_session_slot(
+                        session_id,
+                        SessionSlot {
+                            session_tx: Arc::new(tx),
+                            routing_opts: forward_routing.clone(),
+                            abort_handles: vec![],
+                            surb_mgmt: None,
+                            surb_estimator: None,
+                        },
                     )
-                };
+                    .await?;
 
-                // We currently do not support loopback Sessions on ourselves.
-                if let moka::ops::compute::CompResult::Inserted(_) = self
-                    .sessions
-                    .entry(session_id)
-                    .and_compute_with(|entry| {
-                        futures::future::ready(if entry.is_none() {
-                            moka::ops::compute::Op::Put(SessionSlot {
-                                session_tx: Arc::new(tx),
-                                routing_opts: forward_routing,
-                                abort_handles,
-                                surb_mgmt,
-                                surb_estimator: None,
-                            })
-                        } else {
-                            moka::ops::compute::Op::Nop
-                        })
-                    })
-                    .await
-                {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    {
-                        METRIC_NUM_INITIATED_SESSIONS.increment();
-                        METRIC_ACTIVE_SESSIONS.increment(1.0);
-                    }
-
-                    Ok(session)
-                } else {
-                    // Session already exists; it means it is most likely a loopback attempt
-                    error!(%session_id, "session already exists - loopback attempt");
-                    Err(SessionManagerError::Loopback.into())
+                    Session::new(
+                        session_id,
+                        forward_routing,
+                        cfg.capabilities,
+                        (msg_sender, rx),
+                        Some(notifier),
+                    )
                 }
             }
             Ok(Ok(None)) => Err(SessionManagerError::Other(
@@ -1135,6 +1019,9 @@ where
                             .minimum_surb_buffer_duration
                             .max(MIN_SURB_BUFFER_DURATION)
                             .as_secs(),
+                    // No SURB decay at the Exit, since we know almost exactly how many SURBs
+                    // were received
+                    surb_decay: None,
                 };
 
                 // Assign the SURB balancer and abort handles to the already allocated Session slot
@@ -1157,22 +1044,25 @@ where
                     // Spawn the SURB balancer only once we know we have registered the
                     // abort handle with the pre-allocated Session slot
                     debug!(%session_id, ?balancer_config ,"spawning exit SURB balancer");
-                    let _ = self.spawn_surb_balancer_control_loop(
-                        SurbBalancer::new(
-                            session_id,
-                            // Allow automatic setpoint increase by >= 20% increments
+                    let balancer = SurbBalancer::new(
+                        session_id,
+                        if let Some((duration, ratio_threshold)) = self.cfg.growable_target_surb_buffer.as_ref() {
+                            // Allow automatic setpoint increase
                             SimpleBalancerController::with_increasing_setpoint(
-                                // TODO: make this configurable
-                                0.2,
-                                Duration::from_secs(60)
-                                    .div_duration_f64(self.cfg.balancer_sampling_interval)
-                                    .round() as usize,
-                            ),
-                            surb_estimator,
-                            SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
-                            balancer_config,
-                        ),
-                        None,
+                                *ratio_threshold,
+                                duration.div_duration_f64(self.cfg.balancer_sampling_interval).round() as usize,
+                            )
+                        } else {
+                            SimpleBalancerController::default()
+                        },
+                        surb_estimator,
+                        SurbControllerWithCorrection(egress_rate_control, 1), // 1 SURB per egress packet
+                        balancer_config,
+                    );
+
+                    let _ = balancer.start_control_loop(
+                        self.cfg.balancer_sampling_interval,
+                        SessionCacheBalancerFeedback(self.sessions.clone()),
                         Some(balancer_abort_reg),
                     );
                 } else {
