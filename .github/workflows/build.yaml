@@ -10,9 +10,10 @@ on:
   pull_request_target:
     types:
       - opened
-      - synchronize
-      - reopened
       - ready_for_review
+      - reopened
+      - review_requested
+      - synchronize
 
 permissions:
   contents: write
