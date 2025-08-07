@@ -26,7 +26,7 @@
 # Blockchain and smart contracts
 /chain/ @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen
 /ethereum/ @QYuQianchen @tolbrino
-*.sol @QYuQianchen
+*.sol @QYuQianchen @tolbrino
 
 # Common utilities and logic
 /common/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
@@ -46,7 +46,7 @@
 *.toml @Teebor-Choka @NumberFour8
 
 # Secure changes to critical files
-/.github/CODEOWNERS @tolbrino
+/.github/CODEOWNERS @tolbrino @QYuQianchen
 
 # Emergency contacts (for critical issues)
 # Lead maintainers: @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen @jeandemeusy
