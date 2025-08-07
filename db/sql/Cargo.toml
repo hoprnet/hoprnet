@@ -14,7 +14,6 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "sea-orm/runtime-tokio",
   "sea-orm/runtime-tokio-rustls",
-  "sea-query-binder/runtime-tokio-rustls",
   "sqlx/runtime-tokio-rustls",
   "sqlx/runtime-tokio",
 ]
@@ -68,6 +67,7 @@ rand = { workspace = true }
 sea-orm = { workspace = true }
 sea-query-binder = { workspace = true, default-features = false, features = [
   "with-chrono",
+  "runtime-tokio-rustls",
 ] }
 sqlx = { workspace = true, features = ["runtime-tokio"] }
 tokio = { workspace = true }
