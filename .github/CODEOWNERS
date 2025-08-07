@@ -1,0 +1,52 @@
+# CODEOWNERS for hoprnet
+# This file defines the default code owners for different parts of the repository.
+# Code owners are automatically requested for review when someone opens a pull request
+# that modifies code that they own.
+#
+# Based on Git commit history analysis from the last 6 months.
+# Last updated: 2025-08-06
+
+# Default owners for everything
+* @Teebor-Choka @tolbrino @NumberFour8 @jeandemeusy @QYuQianchen @ausias-armesto
+
+# GitHub Actions workflows and CI/CD
+/.github/ @ausias-armesto @tolbrino @Teebor-Choka
+/deploy/ @ausias-armesto @Teebor-Choka
+/scripts/ @ausias-armesto @Teebor-Choka
+
+# Top-level products
+/hoprd/ @Teebor-Choka @NumberFour8 @tolbrino
+/hopli/ @qYuQianchen @ausias-armesto @jeandemeusy
+
+# Protocol and networking
+/transport/ @NumberFour8 @Teebor-Choka @tolbrino
+/crypto/ @NumberFour8 @Teebor-Choka
+/protocols/ @NumberFour8 @Teebor-Choka
+
+# Blockchain and smart contracts
+/chain/ @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen
+/ethereum/ @QYuQianchen @tolbrino
+*.sol @QYuQianchen @tolbrino
+
+# Common utilities and logic
+/common/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+/logic/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen @tolbrino
+/hopr/ @NumberFour8 @Teebor-Choka @jeandemeusy @QYuQianchen
+/db/ @NumberFour8 @Teebor-Choka
+
+# Testing
+/tests/ @jeandemeusy @Teebor-Choka @QYuQianchen
+/sdk/ @jeandemeusy @Teebor-Choka
+
+# Documentation
+/docs/ @Jaguaras @jeandemeusy
+
+# Build and configuration
+*.nix @tolbrino @ausias-armesto @Teebor-Choka
+*.toml @Teebor-Choka @NumberFour8
+
+# Secure changes to critical files
+/.github/CODEOWNERS @tolbrino @QYuQianchen
+
+# Emergency contacts (for critical issues)
+# Lead maintainers: @Teebor-Choka @tolbrino @NumberFour8 @QYuQianchen @jeandemeusy

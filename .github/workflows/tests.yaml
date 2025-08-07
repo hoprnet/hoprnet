@@ -14,7 +14,6 @@ on:
   pull_request_target:
     types:
       - synchronize
-      - ready_for_review
 
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.workflow}}
@@ -26,7 +25,6 @@ jobs:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     env:
-      needs_nix_setup: false
       CI: "true"
     steps:
       - name: Harden Runner
@@ -41,20 +39,6 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
-
-      - name: Install Nix
-        if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        if: env.needs_nix_setup == 'true'
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
 
       - name: Run unit tests
         run: nix build -L .#hopr-test
@@ -65,7 +49,6 @@ jobs:
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
     env:
-      needs_nix_setup: false
       CI: "true"
     steps:
       - name: Harden Runner
@@ -89,20 +72,6 @@ jobs:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Install Nix
-        if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        if: env.needs_nix_setup == 'true'
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
-
       - name: Run unit tests nightly
         run: |
           nix build -L .#hopr-test-nightly
@@ -112,8 +81,6 @@ jobs:
     name: Smart Contracts
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
-    env:
-      needs_nix_setup: false
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
@@ -135,20 +102,6 @@ jobs:
         with:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Install Nix
-        if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        if: env.needs_nix_setup == 'true'
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
 
       - name: Run tests
         run: nix develop -L -c make -j smart-contract-test
@@ -180,20 +133,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
 
-      - name: Install Nix
-        if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        if: env.needs_nix_setup == 'true'
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
-
       - name: Build binary
         run: nix build .#${{ matrix.binary }}-candidate
 
@@ -203,8 +142,6 @@ jobs:
     needs:
       - build-candidate-binaries
     timeout-minutes: 30
-    env:
-      needs_nix_setup: true
     strategy:
       fail-fast: false
       matrix:
@@ -238,20 +175,6 @@ jobs:
           google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           login-artifact-registry: "false"
           install-sdk: "true"
-
-      - name: Install Nix
-        if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        if: env.needs_nix_setup == 'true'
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
 
       - name: Find base port
         id: find_base_port

@@ -4451,7 +4451,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-indexer"
-version = "0.9.1"
+version = "0.9.2"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4495,7 +4495,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4699,7 +4699,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -8150,6 +8150,7 @@ version = "0.12.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbc931937e6ca3a06e3b6c0aa7841849b160a90351d6ab467a8b9b9959767531"
 dependencies = [
+ "async-compression",
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
