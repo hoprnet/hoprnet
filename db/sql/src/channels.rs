@@ -133,7 +133,7 @@ pub trait HoprDbChannelOperations {
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
 
     /// Inserts a corrupted channel entry.
-    async fn insert_corrupted_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
+    async fn insert_corrupted_channel<'a>(&'a self, tx: OptTx<'a>, channel_id: ChannelId) -> Result<()>;
 }
 
 #[async_trait]
@@ -431,27 +431,17 @@ impl HoprDbChannelOperations for HoprDb {
         Ok(())
     }
 
-    async fn insert_corrupted_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
+    async fn insert_corrupted_channel<'a>(&'a self, tx: OptTx<'a>, channel_id: ChannelId) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let mut model = channel::ActiveModel::from(channel_entry);
+                    let mut model = channel::ActiveModel::from(channel_id);
                     model.corrupted = Set(true);
                     Ok::<_, DbSqlError>(model.save(tx.as_ref()).await?)
                 })
             })
             .await?;
-
-        // Finally, invalidate any unrealized values from the cache.
-        // This might be a no-op if the channel was not in the cache
-        // like for channels that are not ours.
-        let channel_id = channel_entry.get_id();
-        let channel_epoch = channel_entry.channel_epoch;
-        self.caches
-            .unrealized_value
-            .invalidate(&(channel_id, channel_epoch))
-            .await;
 
         Ok(())
     }
@@ -521,20 +511,13 @@ mod tests {
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
 
-        let ce = ChannelEntry::new_from_id(generate_channel_id(&a, &b));
+        let channel_id = generate_channel_id(&a, &b);
 
-        db.insert_corrupted_channel(None, ce.clone()).await?;
+        db.insert_corrupted_channel(None, channel_id).await?;
 
-        let from_db = db
-            .get_corrupted_channel_by_id(None, &ce.get_id())
+        db.get_corrupted_channel_by_id(None, &channel_id)
             .await?
             .context("corrupted channel must be present")?;
-
-        assert_eq!(
-            ce.get_id(),
-            from_db.channel().get_id(),
-            "corrupted channels must be equal"
-        );
 
         Ok(())
     }

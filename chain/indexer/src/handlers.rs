@@ -281,9 +281,7 @@ where
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
                     error!(%channel_id, "observed balance decreased event for a channel that does not exist");
-                    self.db
-                        .insert_corrupted_channel(tx.into(), ChannelEntry::new_from_id(channel_id))
-                        .await?;
+                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -349,9 +347,7 @@ where
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
                     error!(%channel_id, "observed balance increased event for a channel that does not exist");
-                    self.db
-                        .insert_corrupted_channel(tx.into(), ChannelEntry::new_from_id(channel_id))
-                        .await?;
+                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -428,9 +424,7 @@ where
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
                     error!(%channel_id, "observed closure finalization event for a channel that does not exist.");
-                    self.db
-                        .insert_corrupted_channel(tx.into(), ChannelEntry::new_from_id(channel_id))
-                        .await?;
+                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -644,9 +638,7 @@ where
                     Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                 } else {
                     error!(%channel_id, "observed ticket redeem on a channel that we don't have in the DB");
-                    self.db
-                        .insert_corrupted_channel(tx.into(), ChannelEntry::new_from_id(channel_id))
-                        .await?;
+                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -682,9 +674,7 @@ where
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     error!(%channel_id, "observed channel closure initiation on a channel that we don't have in the DB");
-                    self.db
-                        .insert_corrupted_channel(tx.into(), ChannelEntry::new_from_id(channel_id))
-                        .await?;
+                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }

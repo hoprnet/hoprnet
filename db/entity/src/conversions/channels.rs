@@ -1,11 +1,11 @@
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::{
-    channels::{ChannelStatus, CorruptedChannelEntry},
+    channels::{ChannelId, ChannelStatus, CorruptedChannelEntry},
     prelude::ChannelEntry,
 };
 use hopr_primitive_types::{
     balance::HoprBalance,
-    prelude::{IntoEndian, ToHex, U256},
+    prelude::{Address, IntoEndian, ToHex, U256},
 };
 use sea_orm::Set;
 
@@ -107,6 +107,19 @@ impl TryFrom<channel::Model> for CorruptedChannelEntry {
 
     fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
         (&value).try_into()
+    }
+}
+
+impl From<ChannelId> for channel::ActiveModel {
+    fn from(value: ChannelId) -> Self {
+        channel::ActiveModel {
+            channel_id: Set(value.to_hex()),
+            source: Set(Address::default().to_hex()), // Default to empty address
+            destination: Set(Address::default().to_hex()), // Default to empty address
+            balance: Set(HoprBalance::default().amount().to_be_bytes().into()), //
+            status: Set(i8::from(ChannelStatus::Open)), // Default to Open status
+            ..Default::default()
+        }
     }
 }
 
