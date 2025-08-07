@@ -1,4 +1,3 @@
-use hopr_crypto_types::types::Hash;
 use hopr_internal_types::{
     channels::{ChannelId, ChannelStatus, CorruptedChannelEntry},
     prelude::ChannelEntry,
@@ -101,7 +100,7 @@ impl TryFrom<&channel::Model> for CorruptedChannelEntry {
             ));
         }
 
-        let channel_id = Hash::from_hex(value.channel_id.as_str())
+        let channel_id = ChannelId::from_hex(value.channel_id.as_str())
             .map_err(|_| DbEntityError::ConversionError("invalid channel ID".into()))?;
 
         Ok(channel_id.into())
@@ -112,26 +111,26 @@ impl TryFrom<channel::Model> for CorruptedChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
-        (&value).try_into()
-    }
-}
-
-impl From<ChannelId> for channel::ActiveModel {
-    fn from(value: ChannelId) -> Self {
-        channel::ActiveModel {
-            channel_id: Set(value.to_hex()),
-            source: Set(Address::default().to_hex()), // Default to empty address
-            destination: Set(Address::default().to_hex()), // Default to empty address
-            balance: Set(HoprBalance::default().amount().to_be_bytes().into()), //
-            status: Set(i8::from(ChannelStatus::Open)), // Default to Open status
-            ..Default::default()
+        if !value.corrupted {
+            return Err(DbEntityError::ConversionError(
+                "cannot convert non-corrupted channel model to CorruptedChannelEntry".into(),
+            ));
         }
+
+        (&value).try_into()
     }
 }
 
 impl From<CorruptedChannelEntry> for channel::ActiveModel {
     fn from(value: CorruptedChannelEntry) -> Self {
-        let mut ret = channel::ActiveModel::from(value.channel_id().clone());
+        let mut ret = channel::ActiveModel {
+            channel_id: Set(value.channel_id().to_hex()),
+            source: Set(Address::default().to_hex()), // Default to empty address
+            destination: Set(Address::default().to_hex()), // Default to empty address
+            balance: Set(HoprBalance::default().amount().to_be_bytes().into()), //
+            status: Set(i8::from(ChannelStatus::Open)), // Default to Open status
+            ..Default::default()
+        };
         ret.corrupted = Set(true);
         ret
     }

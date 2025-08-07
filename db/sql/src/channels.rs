@@ -436,7 +436,8 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let mut model = channel::ActiveModel::from(channel_id);
+                    let channel: CorruptedChannelEntry = channel_id.into();
+                    let mut model: channel::ActiveModel = channel.into();
                     model.corrupted = Set(true);
                     Ok::<_, DbSqlError>(model.save(tx.as_ref()).await?)
                 })
@@ -518,6 +519,11 @@ mod tests {
         db.get_corrupted_channel_by_id(None, &channel_id)
             .await?
             .context("corrupted channel must be present")?;
+
+        assert!(
+            db.get_channel_by_id(None, &channel_id).await?.is_none(),
+            "should not be able to get a corrupted channel by ID"
+        );
 
         Ok(())
     }

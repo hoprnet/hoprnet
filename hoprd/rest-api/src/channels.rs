@@ -569,7 +569,7 @@ pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) 
         Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     };
 
-    let channels_ids: Vec<Hash> = corrupted.into_iter().map(|c| c.channel_id()).collect();
+    let channels_ids: Vec<Hash> = corrupted.into_iter().map(|c| *c.channel_id()).collect();
 
     (StatusCode::OK, Json(CorruptedChannelsResponse { channels_ids })).into_response()
 }

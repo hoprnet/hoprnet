@@ -101,27 +101,6 @@ impl ChannelEntry {
         }
     }
 
-    /// Creates a channel entry without automatically generating the ID.
-    pub fn new_with_id(
-        source: Address,
-        destination: Address,
-        balance: HoprBalance,
-        ticket_index: U256,
-        status: ChannelStatus,
-        channel_epoch: U256,
-        id: ChannelId,
-    ) -> Self {
-        ChannelEntry {
-            source,
-            destination,
-            balance,
-            ticket_index,
-            status,
-            channel_epoch,
-            id,
-        }
-    }
-
     /// Generates the channel ID using the source and destination address
     pub fn get_id(&self) -> ChannelId {
         self.id
@@ -275,18 +254,18 @@ impl ChannelChange {
 /// A wrapper around [`Hash`] representing a Channel that is corrupted.
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CorruptedChannelEntry(Hash);
+pub struct CorruptedChannelEntry(ChannelId);
 
-impl From<Hash> for CorruptedChannelEntry {
-    fn from(value: Hash) -> Self {
+impl From<ChannelId> for CorruptedChannelEntry {
+    fn from(value: ChannelId) -> Self {
         CorruptedChannelEntry(value)
     }
 }
 
 impl CorruptedChannelEntry {
     /// Returns the channel ID of the corrupted channel.
-    pub fn channel_id(&self) -> ChannelId {
-        self.0
+    pub fn channel_id(&self) -> &ChannelId {
+        &self.0
     }
 }
 
