@@ -1,3 +1,4 @@
+use hopr_crypto_types::types::Hash;
 use hopr_internal_types::{
     channels::{ChannelStatus, CorruptedChannelEntry},
     prelude::ChannelEntry,
@@ -118,12 +119,14 @@ impl From<CorruptedChannelEntry> for channel::ActiveModel {
 }
 
 fn model_to_channel_entry_unchecked(model: &channel::Model) -> Result<ChannelEntry, DbEntityError> {
-    Ok(ChannelEntry::new(
+    Ok(ChannelEntry::new_with_id(
         model.source.parse()?,
         model.destination.parse()?,
         HoprBalance::from(U256::from_be_bytes(&model.balance)),
         U256::from_be_bytes(&model.ticket_index),
         model.try_into()?,
         U256::from_be_bytes(&model.epoch),
+        Hash::from_hex(model.channel_id.as_str())
+            .map_err(|_| DbEntityError::ConversionError("invalid channel ID".into()))?,
     ))
 }

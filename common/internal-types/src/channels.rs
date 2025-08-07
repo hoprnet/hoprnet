@@ -101,6 +101,40 @@ impl ChannelEntry {
         }
     }
 
+    /// Creates a channel entry only with a given ID. Should be used only for a corrupted channel
+    pub fn new_from_id(id: ChannelId) -> Self {
+        ChannelEntry {
+            source: Address::default(),
+            destination: Address::default(),
+            balance: HoprBalance::default(),
+            ticket_index: U256::default(),
+            status: ChannelStatus::Open,
+            channel_epoch: U256::default(),
+            id,
+        }
+    }
+
+    /// Creates a channel entry without automatically generating the ID.
+    pub fn new_with_id(
+        source: Address,
+        destination: Address,
+        balance: HoprBalance,
+        ticket_index: U256,
+        status: ChannelStatus,
+        channel_epoch: U256,
+        id: ChannelId,
+    ) -> Self {
+        ChannelEntry {
+            source,
+            destination,
+            balance,
+            ticket_index,
+            status,
+            channel_epoch,
+            id,
+        }
+    }
+
     /// Generates the channel ID using the source and destination address
     pub fn get_id(&self) -> ChannelId {
         self.id
