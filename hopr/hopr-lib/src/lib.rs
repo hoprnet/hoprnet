@@ -25,6 +25,7 @@ use std::{
     fmt::{Display, Formatter},
     ops::Deref,
     path::PathBuf,
+    str::FromStr,
     sync::{Arc, atomic::Ordering},
     time::Duration,
 };
@@ -93,7 +94,6 @@ use tracing::{debug, error, info, trace, warn};
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_platform::time::native::current_time,
-    std::str::FromStr,
 };
 
 use crate::{

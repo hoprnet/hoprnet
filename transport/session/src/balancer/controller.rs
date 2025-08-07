@@ -170,7 +170,7 @@ where
         // and calculate the number of SURBs that will be discarded
         if let Some(num_decayed_surbs) = surb_decay
             .as_ref()
-            .filter(|(t, _)| self.last_decay.elapsed() > *t)
+            .filter(|(decay_window, _)| &self.last_decay.elapsed() > decay_window)
             .map(|(_, decay_coeff)| (self.controller.target() as f64 * *decay_coeff).round() as u64)
         {
             self.current_buffer = self.current_buffer.saturating_sub(num_decayed_surbs);

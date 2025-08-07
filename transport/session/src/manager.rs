@@ -357,6 +357,36 @@ pub struct SessionManagerConfig {
 /// at least a single SURB) and the Exit is consuming the SURBs (Session egress) at a slower or equal rate.
 /// Such configuration is very fragile, as any disturbances in the SURB flow might lead to a packet drop
 /// at the Exit's egress.
+///
+/// ### SURB decay
+/// In a hypothetical scenario of a non-zero packet loss, the Session initiator (Entry) might send a
+/// certain number of SURBs to the Session recipient (Exit), but only a portion of it is actually delivered.
+/// The Entry has no way of knowing that and assumes that everything has been delivered.
+/// A similar problem happens when the Exit uses SURBs to construct return packets, but only a portion
+/// of those packets is actually delivered to the Entry. At this point, the Entry also subtracts
+/// fewer SURBs from its SURB estimate at the Exit.
+///
+/// In both situations, the Entry thinks there are more SURBs available at the Exit than there really are.
+///
+/// To compensate for a potential packet loss, the Entry's estimation of Exit's SURB buffer is regularly
+/// diminished by a percentage of the `target_surb_buffer_size`, even if no incoming traffic from the
+/// Exit is detected.
+///
+/// This behavior can be controlled via the `surb_decay` field of [`SurbBalancerConfig`].
+///
+/// ### Automatic `target_surb_buffer_size` increase
+/// This mechanism only applies to the Session recipient (Exit) and on Sessions without the
+/// [`Capability::NoRateControl`] flag set.
+/// In this case, the Exit throttles the Session egress based on the ratio between
+/// of the estimated SURB balance and the *hint* of Entry's `target_surb_buffer_size` set during the Session initiation.
+///
+/// However, as the Entry might [increase](SessionManager::update_surb_balancer_config) the `target_surb_buffer_size`
+/// of the Session dynamically, the new value is never hinted again to the Exit (this only happens once during
+/// the Session initiation).
+/// For this reason, the Exit then might observe the ratio going higher than 1. When this happens consistently
+/// over some given time period, the Exit can decide to increase the initial hint to the newly observed value.
+///
+/// See the `growable_target_surb_buffer` field in the [`SessionManagerConfig`] for details.
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<SessionNotifiers>>,
