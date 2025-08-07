@@ -259,8 +259,8 @@ where
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?
                         .ok_or(CoreEthereumIndexerError::ProcessError(format!(
-                            "channel balance decreased event for channel {} did not return an updated channel",
-                            channel_id
+                            "channel balance decreased event for channel {channel_id} did not return an updated \
+                             channel"
                         )))?;
 
                     if is_synced
@@ -314,8 +314,8 @@ where
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?
                         .ok_or(CoreEthereumIndexerError::ProcessError(format!(
-                            "channel balance increased event for channel {} did not return an updated channel",
-                            channel_id
+                            "channel balance increased event for channel {channel_id} did not return an updated \
+                             channel"
                         )))?;
 
                     if updated_channel.source == self.chain_key.public().to_address() && is_synced {
