@@ -56,7 +56,13 @@ impl SurbBalancerController for SimpleBalancerController {
             sma.push(ratio);
             if let Some(avg) = sma.average().filter(|avg| *avg >= *threshold + 1.0) {
                 let new_setpoint = (avg * self.setpoint as f64).round() as u64;
-                tracing::debug!(old_setpoint = self.setpoint, new_setpoint, "setpoint increased");
+                tracing::debug!(
+                    old_setpoint = self.setpoint,
+                    new_setpoint,
+                    avg,
+                    ?sma,
+                    "setpoint increased"
+                );
                 self.setpoint = new_setpoint;
             }
         }

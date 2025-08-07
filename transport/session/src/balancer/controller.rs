@@ -170,7 +170,7 @@ where
         // and calculate the number of SURBs that will be discarded
         if let Some(num_decayed_surbs) = surb_decay
             .as_ref()
-            .filter(|(decay_window, _)| &self.last_decay.elapsed() > decay_window)
+            .filter(|(decay_window, _)| &self.last_decay.elapsed() >= decay_window)
             .map(|(_, decay_coeff)| (self.controller.target() as f64 * *decay_coeff).round() as u64)
         {
             self.current_buffer = self.current_buffer.saturating_sub(num_decayed_surbs);
@@ -303,7 +303,9 @@ mod tests {
     use hopr_internal_types::prelude::HoprPseudonym;
 
     use super::*;
-    use crate::balancer::{AtomicSurbFlowEstimator, MockSurbFlowController, pid::PidBalancerController};
+    use crate::balancer::{
+        AtomicSurbFlowEstimator, MockSurbFlowController, pid::PidBalancerController, simple::SimpleBalancerController,
+    };
 
     #[test_log::test]
     fn surb_balancer_should_start_increase_level_when_below_target() {
@@ -401,5 +403,148 @@ mod tests {
             );
             last_update = next_update;
         }
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn surb_balancer_should_start_decrease_level_when_above_target_and_decay_enabled() {
+        const NUM_STEPS: usize = 5;
+        let session_id = SessionId::new(1234_u64, HoprPseudonym::random());
+        let cfg = SurbBalancerConfig {
+            target_surb_buffer_size: 5_000,
+            max_surbs_per_sec: 2500,
+            surb_decay: Some((Duration::from_millis(200), 0.05)),
+            ..Default::default()
+        };
+
+        let mut mock_balancer_feedback = MockBalancerConfigFeedback::new();
+        mock_balancer_feedback
+            .expect_get_config()
+            .with(mockall::predicate::eq(session_id))
+            .times(NUM_STEPS)
+            .returning(move |_| Ok(cfg));
+
+        mock_balancer_feedback.expect_on_config_update().never();
+
+        let mut mock_flow_ctl = MockSurbFlowController::new();
+        mock_flow_ctl
+            .expect_adjust_surb_flow()
+            .times(NUM_STEPS)
+            .returning(|_| ());
+
+        let mut balancer = SurbBalancer::new(
+            session_id,
+            PidBalancerController::default(),
+            SimpleSurbFlowEstimator::default(),
+            mock_flow_ctl,
+            cfg,
+        );
+
+        balancer.current_buffer = 5000;
+
+        let (stream, handle) = balancer.start_control_loop(Duration::from_millis(100), mock_balancer_feedback, None);
+        let levels = stream.take(NUM_STEPS).collect::<Vec<_>>().await;
+        handle.abort();
+
+        assert_eq!(levels, vec![5000, 4750, 4750, 4500, 4500]);
+    }
+
+    struct IterSurbFlowEstimator<P, C>(std::sync::Mutex<P>, std::sync::Mutex<C>);
+
+    impl<P, C> IterSurbFlowEstimator<P, C> {
+        fn new<I1, I2>(production: I1, consumption: I2) -> Self
+        where
+            I1: IntoIterator<Item = u64, IntoIter = P>,
+            I2: IntoIterator<Item = u64, IntoIter = C>,
+        {
+            Self(
+                std::sync::Mutex::new(production.into_iter()),
+                std::sync::Mutex::new(consumption.into_iter()),
+            )
+        }
+    }
+
+    impl<P, C> SurbFlowEstimator for IterSurbFlowEstimator<P, C>
+    where
+        P: Iterator<Item = u64>,
+        C: Iterator<Item = u64>,
+    {
+        fn estimate_surbs_consumed(&self) -> u64 {
+            self.1.lock().ok().and_then(|mut it| it.next()).unwrap_or(0)
+        }
+
+        fn estimate_surbs_produced(&self) -> u64 {
+            self.0.lock().ok().and_then(|mut it| it.next()).unwrap_or(0)
+        }
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn surb_balancer_should_increase_target_when_using_simple_controller() {
+        let session_id = SessionId::new(1234_u64, HoprPseudonym::random());
+        let cfg_1 = SurbBalancerConfig {
+            target_surb_buffer_size: 4500,
+            max_surbs_per_sec: 2500,
+            surb_decay: None,
+            ..Default::default()
+        };
+
+        let cfg_2 = SurbBalancerConfig {
+            target_surb_buffer_size: 5500,
+            max_surbs_per_sec: 2500,
+            surb_decay: None,
+            ..Default::default()
+        };
+
+        let mut seq = mockall::Sequence::new();
+
+        let mut mock_balancer_feedback = MockBalancerConfigFeedback::new();
+        mock_balancer_feedback
+            .expect_get_config()
+            .times(3)
+            .in_sequence(&mut seq)
+            .with(mockall::predicate::eq(session_id))
+            .returning(move |_| {
+                tracing::trace!("get config 1");
+                Ok(cfg_1)
+            });
+
+        mock_balancer_feedback
+            .expect_on_config_update()
+            .once()
+            .in_sequence(&mut seq)
+            .with(mockall::predicate::eq(session_id), mockall::predicate::eq(cfg_2))
+            .returning(|_, _| {
+                tracing::trace!("on config update");
+                Ok(())
+            });
+
+        mock_balancer_feedback
+            .expect_get_config()
+            .times(2)
+            .in_sequence(&mut seq)
+            .with(mockall::predicate::eq(session_id))
+            .returning(move |_| {
+                tracing::trace!("get config 2");
+                Ok(cfg_2)
+            });
+
+        let mut mock_flow_ctl = MockSurbFlowController::new();
+        mock_flow_ctl.expect_adjust_surb_flow().times(5).returning(|_| ());
+
+        let mut balancer = SurbBalancer::new(
+            session_id,
+            SimpleBalancerController::with_increasing_setpoint(0.2, 5),
+            IterSurbFlowEstimator::new([1000, 2000, 3000, 3000, 3000], vec![500, 1000, 1500, 1500, 1500]),
+            mock_flow_ctl,
+            cfg_1,
+        );
+
+        balancer.current_buffer = 4500;
+
+        let (stream, handle) = balancer.start_control_loop(Duration::from_millis(100), mock_balancer_feedback, None);
+
+        let levels = stream.take(5).collect::<Vec<_>>().await;
+        handle.abort();
+
+        assert_eq!(levels, vec![5000, 5500, 6000, 6000, 6000]);
     }
 }
