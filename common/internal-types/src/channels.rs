@@ -272,19 +272,21 @@ impl ChannelChange {
     }
 }
 
-/// A wrapper around [`ChannelEntry`] representing a Channel that is corrupted.
+/// A wrapper around [`Hash`] representing a Channel that is corrupted.
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CorruptedChannelEntry(ChannelEntry);
+pub struct CorruptedChannelEntry(Hash);
+
+impl From<Hash> for CorruptedChannelEntry {
+    fn from(value: Hash) -> Self {
+        CorruptedChannelEntry(value)
+    }
+}
 
 impl CorruptedChannelEntry {
-    pub fn new(channel: ChannelEntry) -> Self {
-        CorruptedChannelEntry(channel)
-    }
-
-    /// Returns the inner `ChannelEntry`.
-    pub fn channel(&self) -> &ChannelEntry {
-        &self.0
+    /// Returns the channel ID of the corrupted channel.
+    pub fn channel_id(&self) -> ChannelId {
+        self.0
     }
 }
 

@@ -54,10 +54,15 @@ impl TryFrom<&channel::Model> for ChannelEntry {
                 "cannot convert corrupted channel model to ChannelEntry".into(),
             ));
         }
-        match model_to_channel_entry_unchecked(&value) {
-            Ok(channel_entry) => Ok(channel_entry),
-            Err(e) => Err(e),
-        }
+
+        Ok(ChannelEntry::new(
+            value.source.parse()?,
+            value.destination.parse()?,
+            HoprBalance::from(U256::from_be_bytes(&value.balance)),
+            U256::from_be_bytes(&value.ticket_index),
+            value.try_into()?,
+            U256::from_be_bytes(&value.epoch),
+        ))
     }
 }
 
@@ -95,10 +100,11 @@ impl TryFrom<&channel::Model> for CorruptedChannelEntry {
                 "cannot convert non-corrupted channel model to CorruptedChannelEntry".into(),
             ));
         }
-        match model_to_channel_entry_unchecked(&value) {
-            Ok(channel_entry) => Ok(CorruptedChannelEntry::new(channel_entry)),
-            Err(e) => Err(e),
-        }
+
+        let channel_id = Hash::from_hex(value.channel_id.as_str())
+            .map_err(|_| DbEntityError::ConversionError("invalid channel ID".into()))?;
+
+        Ok(channel_id.into())
     }
 }
 
@@ -125,21 +131,8 @@ impl From<ChannelId> for channel::ActiveModel {
 
 impl From<CorruptedChannelEntry> for channel::ActiveModel {
     fn from(value: CorruptedChannelEntry) -> Self {
-        let mut ret = channel::ActiveModel::from(value.channel().clone());
+        let mut ret = channel::ActiveModel::from(value.channel_id().clone());
         ret.corrupted = Set(true);
         ret
     }
-}
-
-fn model_to_channel_entry_unchecked(model: &channel::Model) -> Result<ChannelEntry, DbEntityError> {
-    Ok(ChannelEntry::new_with_id(
-        model.source.parse()?,
-        model.destination.parse()?,
-        HoprBalance::from(U256::from_be_bytes(&model.balance)),
-        U256::from_be_bytes(&model.ticket_index),
-        model.try_into()?,
-        U256::from_be_bytes(&model.epoch),
-        Hash::from_hex(model.channel_id.as_str())
-            .map_err(|_| DbEntityError::ConversionError("invalid channel ID".into()))?,
-    ))
 }

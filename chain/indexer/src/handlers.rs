@@ -2739,17 +2739,9 @@ mod tests {
             .await?;
 
         // Check that the channel is still marked as corrupted
-        let after_channel = db
-            .get_corrupted_channel_by_id(None, &channel.get_id())
+        db.get_corrupted_channel_by_id(None, &channel.get_id())
             .await?
             .context("channel should still be set a corrupted")?;
-
-        // check that the balance was not updated
-        assert_eq!(
-            after_channel.channel().balance,
-            channel.balance,
-            "balance should not be updated for corrupted channel"
-        );
 
         Ok(())
     }
@@ -2789,16 +2781,9 @@ mod tests {
             .await?;
 
         // Check that the dummy corrupted channel was created
-        let after_channel = db
-            .get_corrupted_channel_by_id(None, &channel_id)
+        db.get_corrupted_channel_by_id(None, &channel_id)
             .await?
             .context("channel should be set a corrupted")?;
-
-        assert_eq!(
-            after_channel.channel().get_id(),
-            channel_id,
-            "channel id should match the one from the event"
-        );
 
         Ok(())
     }
