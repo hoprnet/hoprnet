@@ -59,7 +59,7 @@
 
 ## About
 
-The HOPR project produces multiple artifacts that allow running, maintaining and modifying the HOPR node. 
+The HOPR project produces multiple artifacts that allow running, maintaining and modifying the HOPR node.
 The most relevant components for production use cases are:
 
 1. [hopr-lib](https://hoprnet.github.io/hoprnet/hopr_lib/index.html)
