@@ -427,7 +427,6 @@ where
 
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
-                    // Should never ever happen as we create a channel entry on event handling
                     error!(%channel_id, "observed closure finalization event for a channel that does not exist.");
                     self.db
                         .insert_corrupted_channel(tx.into(), ChannelEntry::new_from_id(channel_id))

@@ -397,7 +397,7 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
-        let parties: ChannelParties = ChannelParties(channel_entry.source, channel_entry.destination);
+        let parties = ChannelParties(channel_entry.source, channel_entry.destination);
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
