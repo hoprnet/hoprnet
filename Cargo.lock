@@ -4451,7 +4451,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-indexer"
-version = "0.9.1"
+version = "0.9.2"
 dependencies = [
  "alloy",
  "anyhow",
