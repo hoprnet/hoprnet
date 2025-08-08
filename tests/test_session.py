@@ -310,13 +310,13 @@ class TestSessionWithSwarm:
     @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))
     async def test_session_parameter_reconfiguration(self, route, swarm7: dict[str, Node]):
         async with HoprSession(
-                Protocol.UDP,
-                src=swarm7[route[0]],
-                dest=swarm7[route[-1]],
-                fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
-                return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
-                use_response_buffer="512 kB",
-                capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=False),
+            Protocol.UDP,
+            src=swarm7[route[0]],
+            dest=swarm7[route[-1]],
+            fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+            return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
+            use_response_buffer="512 kB",
+            capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=False),
         ) as session:
             assert len(session.active_clients) == 1
             session_id = session.active_clients[0]
@@ -336,7 +336,6 @@ class TestSessionWithSwarm:
             cfg = await swarm7[route[0]].api.session_get_config(session_id)
             assert cfg is not None
             assert cfg.response_buffer == "1024 kB"
-
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))
