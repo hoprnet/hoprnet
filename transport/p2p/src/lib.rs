@@ -35,6 +35,7 @@ mod behavior;
 
 use std::fmt::Debug;
 
+pub use behavior::discovery::Event as DiscoveryEvent;
 use futures::{AsyncRead, AsyncWrite, Stream};
 use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;

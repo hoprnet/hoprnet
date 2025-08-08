@@ -30,8 +30,8 @@ class Snapshot:
 
         # copy node data and env files
         for i in range(self.cluster.size):
-            source_dir: Path = self.parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            target_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+            source_dir: Path = self.parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i + 1}")
+            target_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i + 1}")
 
             shutil.copy(source_dir.joinpath("./hoprd.id"), target_dir)
             shutil.copy(source_dir.joinpath("./.env"), target_dir)
@@ -65,9 +65,6 @@ class Snapshot:
             self.sdir.joinpath("barebone.cfg.yaml"),
             self.sdir.joinpath("default.cfg.yaml"),
         ]
-
-        for i in range(self.cluster.size):
-            node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
 
         for f in expected_files:
             if not f.exists():

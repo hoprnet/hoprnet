@@ -7,9 +7,25 @@ name: Create DappNode Release
 on:
   workflow_call:
     inputs:
-      base_branch:
+      source_repo:
         required: true
         type: string
+      source_branch:
+        required: true
+        type: string
+      network:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      network:
+        type: choice
+        options:
+          - rotsee
+          - dufour
+        required: true
+        description: 'Package network (rotsee: testnet, dufour: mainnet)'
+        default: rotsee
 
 concurrency:
   group: dappnode
@@ -22,16 +38,36 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Set environment variables
+        id: vars
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            echo "The workflow is triggered by other pipeline"
+            echo "source_repo=${{ inputs.source_repo }}" | tee -a $GITHUB_OUTPUT
+            echo "source_branch=${{ inputs.source_branch }}"  | tee -a $GITHUB_OUTPUT
+          else
+            echo "The workflow is triggered manually"
+            echo "source_repo=${{ github.repository }}" | tee -a $GITHUB_OUTPUT
+            echo "source_branch=${{ github.ref_name }}" | tee -a $GITHUB_OUTPUT
+          fi
+          network="${{ inputs.network || github.event.inputs.network }}"
+          if [[ "${network}" == "dufour" ]]; then
+              echo "dappnode_repository=dappnode/DAppNodePackage-Hopr" | tee -a $GITHUB_OUTPUT
+            else
+              echo "dappnode_repository=dappnode/DAppNodePackage-Hopr-testnet" | tee -a $GITHUB_OUTPUT
+            fi
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          ref: ${{ inputs.base_branch }}
+          repository: ${{ steps.vars.outputs.source_repo }}
+          ref: ${{ steps.vars.outputs.source_branch }}
 
       - name: Setup GCP
         id: gcp
@@ -45,8 +81,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          repository: dappnode/DAppNodePackage-Hopr
-          path: "./DAppNodePackage-Hopr"
+          repository: ${{ steps.vars.outputs.dappnode_repository }}
+          path: "./DAppNodePackage-Hopr-repo"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: main
 
@@ -61,7 +97,7 @@ jobs:
           # Retrieve the Docker tag in the format "tag@version" for the current version
           docker_tag=$(gcloud artifacts docker tags list ${{ vars.DOCKER_IMAGE_REGISTRY }}/hoprd --filter=tag:${{ steps.setup.outputs.current_version }} --format="csv[no-heading](tag,version)" | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
           yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" docker-compose.yml
-        working-directory: "./DAppNodePackage-Hopr"
+        working-directory: "./DAppNodePackage-Hopr-repo"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
@@ -71,7 +107,7 @@ jobs:
           title: "Update to release ${{ steps.setup.outputs.current_version }}"
           body: "This pull request contains the changes needed to bump Hoprd to version ${{ steps.setup.outputs.current_version }}"
           branch: bot/update-${{ steps.setup.outputs.current_version }}
-          path: "./DAppNodePackage-Hopr"
+          path: "./DAppNodePackage-Hopr-repo"
           delete-branch: true
           assignees: ${{ github.actor }}
           reviewers: "ausias-armesto,tolbrino,NumberFour8,Teebor-Choka,QYuQianchen"

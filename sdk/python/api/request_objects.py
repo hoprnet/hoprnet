@@ -1,163 +1,66 @@
-from decimal import Decimal, ROUND_UP
+from dataclasses import dataclass
+from typing import Any, List, Union
+
+from api_lib.objects.request import APIfield, RequestData
 
 
-class ApiRequestObject:
-    def __init__(self, *args, **kwargs):
-        if not hasattr(self, "keys"):
-            self.keys = {}
-
-        if args:
-            kwargs.update(args[0])
-
-        kwargs = {k: v for k, v in kwargs.items() if not k.startswith("__")}
-        kwargs.pop("self", None)
-
-        if set(kwargs.keys()) != set(self.keys.keys()):
-            raise ValueError(f"Keys mismatch: {set(kwargs.keys())} != {set(self.keys.keys())}")
-
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-        self.post_init()
-
-    @property
-    def as_dict(self) -> dict:
-        return {value: getattr(self, key) for key, value in self.keys.items()}
-
-    @property
-    def as_header_string(self) -> str:
-        attrs_as_dict = {value: getattr(self, key) for key, value in self.keys.items()}
-        return "&".join([f"{k}={v}" for k, v in attrs_as_dict.items()])
-
-    def post_init(self):
-        pass
+@dataclass
+class OpenChannelBody(RequestData):
+    amount: str = APIfield("amount")
+    destination: str = APIfield("destination")
 
 
-class OpenChannelBody(ApiRequestObject):
-    keys = {
-        "amount": "amount",
-        "destination": "destination",
-    }
-
-    def __init__(self, amount: Decimal, destination: str):
-        super().__init__(vars())
-
-    def post_init(self):
-        self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
+@dataclass
+class FundChannelBody(RequestData):
+    amount: str = APIfield("amount")
 
 
-class FundChannelBody(ApiRequestObject):
-    keys = {"amount": "amount"}
-
-    def __init__(self, amount: Decimal):
-        super().__init__(vars())
-
-    def post_init(self):
-        self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
+@dataclass
+class GetChannelsBody(RequestData):
+    full_topology: bool = APIfield("fullTopology", False)
+    including_closed: bool = APIfield("includingClosed", False)
 
 
-class GetChannelsBody(ApiRequestObject):
-    keys = {
-        "full_topology": "fullTopology",
-        "including_closed": "includingClosed",
-    }
-
-    def __init__(self, full_topology: str, including_closed: str):
-        super().__init__(vars())
+@dataclass
+class GetPeersBody(RequestData):
+    quality: float = APIfield("quality")
 
 
-class GetPeersBody(ApiRequestObject):
-    keys = {"quality": "quality"}
-
-    def __init__(self, quality: float):
-        super().__init__(vars())
-
-
-class CreateSessionBody(ApiRequestObject):
-    keys = {
-        "capabilities": "capabilities",
-        "destination": "destination",
-        "listen_host": "listenHost",
-        "forward_path": "forwardPath",
-        "return_path": "returnPath",
-        "target": "target",
-        "response_buffer": "responseBuffer",
-    }
-
-    def __init__(
-        self,
-        capabilities: list,
-        destination: str,
-        listen_host: str,
-        forward_path: str,
-        return_path: str,
-        target: str,
-        response_buffer: str,
-    ):
-        super().__init__(vars())
+@dataclass
+class CreateSessionBody(RequestData):
+    capabilities: List[Any] = APIfield("capabilities")
+    destination: str = APIfield("destination")
+    listen_host: str = APIfield("listenHost")
+    forward_path: Union[str, dict] = APIfield("forwardPath")
+    return_path: Union[str, dict] = APIfield("returnPath")
+    target: Union[str, dict] = APIfield("target")
+    response_buffer: str = APIfield("responseBuffer")
 
 
-class SessionCapabilitiesBody(ApiRequestObject):
-    keys = {
-        "retransmission": "Retransmission",
-        "segmentation": "Segmentation",
-        "retransmission_ack_only": "RetransmissionAckOnly",
-        "no_delay": "NoDelay",
-    }
-
-    def __init__(
-        self,
-        retransmission: bool = False,
-        segmentation: bool = False,
-        retransmission_ack_only: bool = False,
-        no_delay: bool = False,
-    ):
-        super().__init__(vars())
-
-    @property
-    def as_array(self) -> list:
-        return [self.keys[var] for var in vars(self) if var in self.keys and vars(self)[var]]
+@dataclass
+class SessionCapabilitiesBody(RequestData):
+    retransmission: bool = APIfield("Retransmission", False)
+    segmentation: bool = APIfield("Segmentation", False)
+    retransmission_ack_only: bool = APIfield("RetransmissionAckOnly", False)
+    no_delay: bool = APIfield("NoDelay", False)
 
 
-class SessionPathBodyRelayers(ApiRequestObject):
-    keys = {
-        "relayers": "IntermediatePath",
-    }
-
-    def __init__(self, relayers: list[str]):
-        super().__init__(vars())
+@dataclass
+class SessionPathBodyRelayers(RequestData):
+    relayers: List[str] = APIfield("IntermediatePath")
 
 
-class SessionPathBodyHops(ApiRequestObject):
-    keys = {
-        "hops": "Hops",
-    }
-
-    def __init__(self, hops: int = 0):
-        super().__init__(vars())
-
-    def post_init(self):
-        self.hops = int(self.hops)
+@dataclass
+class SessionPathBodyHops(RequestData):
+    hops: int = APIfield("Hops")
 
 
-class SessionTargetBody(ApiRequestObject):
-    keys = {
-        "service": "Service",
-    }
-
-    def __init__(self, service: int = 0):
-        super().__init__(vars())
+@dataclass
+class SessionTargetBody(RequestData):
+    service: int = APIfield("Service")
 
 
-class SendMessageBody(ApiRequestObject):
-    keys = {"body": "body", "hops": "hops", "path": "path", "destination": "destination", "tag": "tag"}
-
-    def __init__(self, body: str, hops: int, path: list[str], destination: str, tag: int):
-        super().__init__(vars())
-
-
-class WithdrawBody(ApiRequestObject):
-    keys = {"address": "address", "amount": "amount"}
-
-    def __init__(self, address: str, amount: str):
-        super().__init__(vars())
+@dataclass
+class WithdrawBody(RequestData):
+    address: str = APIfield("address")
+    amount: str = APIfield("amount")

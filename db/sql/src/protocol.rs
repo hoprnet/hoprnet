@@ -46,8 +46,11 @@ lazy_static::lazy_static! {
         MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
 }
 
+const SLOW_OP_MS: u128 = 150;
+
 impl HoprDb {
     /// Validates a ticket from a forwarded packet and replaces it with a new ticket for the next hop.
+    #[instrument(level = "trace", skip_all, err)]
     async fn validate_and_replace_ticket(
         &self,
         mut fwd: HoprForwardedPacket,
@@ -106,6 +109,7 @@ impl HoprDb {
         // so afterward we are sure the source of the `channel`
         // (which is equal to `previous_hop_addr`) has issued this
         // ticket.
+        let start = std::time::Instant::now();
         let verified_incoming_ticket = spawn_fifo_blocking(move || {
             validate_unacknowledged_ticket(
                 fwd.outgoing.ticket,
@@ -117,6 +121,9 @@ impl HoprDb {
             )
         })
         .await?;
+        if start.elapsed().as_millis() > SLOW_OP_MS {
+            warn!("validate_unacknowledged_ticket took {} ms", start.elapsed().as_millis());
+        }
 
         // We currently take the maximum of the win prob from the incoming ticket
         // and the one configured on this node.
@@ -169,6 +176,7 @@ impl HoprDb {
         Ok(fwd)
     }
 
+    #[instrument(level = "trace", skip(self, ack), err)]
     async fn validate_acknowledgement(
         &self,
         ack: &Acknowledgement,
@@ -239,7 +247,7 @@ impl HoprDb {
 
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
-    #[instrument(level = "trace", skip(self, ack))]
+    #[instrument(level = "trace", skip(self, ack), err(Debug), ret)]
     async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()> {
         let result = self.validate_acknowledgement(&ack).await?;
         match &result {
@@ -301,6 +309,7 @@ impl HoprDbProtocolOperations for HoprDb {
         })?)
     }
 
+    #[tracing::instrument(level = "trace", skip(self, matcher), err)]
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)> {
         let pseudonym = matcher.pseudonym();
         let surbs_for_pseudonym = self
@@ -469,8 +478,7 @@ impl HoprDbProtocolOperations for HoprDb {
         // This is a no-op for reply packets
         openers.into_iter().for_each(|(surb_id, opener)| {
             self.caches
-                .pseudonym_openers
-                .insert(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener)
+                .insert_pseudonym_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener)
         });
 
         if let Some(out) = packet.try_as_outgoing() {
@@ -493,7 +501,7 @@ impl HoprDbProtocolOperations for HoprDb {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, data, pkt_keypair, sender), fields(sender = %sender))]
+    #[tracing::instrument(level = "trace", skip_all, fields(sender = %sender), err)]
     async fn from_recv(
         &self,
         data: Box<[u8]>,
@@ -501,17 +509,25 @@ impl HoprDbProtocolOperations for HoprDb {
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-    ) -> Result<Option<IncomingPacket>> {
+    ) -> Result<IncomingPacket> {
         let offchain_keypair = pkt_keypair.clone();
         let myself = self.clone();
 
+        let start = std::time::Instant::now();
         let packet = spawn_fifo_blocking(move || {
             HoprPacket::from_incoming(&data, &offchain_keypair, sender, &myself.caches.key_id_mapper, |p| {
-                myself.caches.pseudonym_openers.remove(p)
+                myself.caches.extract_pseudonym_opener(p)
             })
             .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
         .await?;
+        if start.elapsed().as_millis() > SLOW_OP_MS {
+            warn!(
+                peer = sender.to_peerid_str(),
+                "from_incoming took {} ms",
+                start.elapsed().as_millis()
+            );
+        }
 
         match packet {
             HoprPacket::Final(incoming) => {
@@ -528,53 +544,66 @@ impl HoprDbProtocolOperations for HoprDb {
                         .value()
                         .push(incoming.surbs)?;
 
-                    tracing::trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
+                    trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
                 }
 
-                if let Some(ack_key) = incoming.ack_key {
-                    Ok(Some(IncomingPacket::Final {
+                Ok(match incoming.ack_key {
+                    None => {
+                        // The contained payload represents an Acknowledgement
+                        IncomingPacket::Acknowledgement {
+                            packet_tag: incoming.packet_tag,
+                            previous_hop: incoming.previous_hop,
+                            ack: incoming
+                                .plain_text
+                                .as_ref()
+                                .try_into()
+                                .map_err(|_| DbSqlError::DecodingError)
+                                .and_then(|ack: Acknowledgement| {
+                                    ack.validate(&incoming.previous_hop)
+                                        .map_err(|e| DbSqlError::AcknowledgementValidationError(e.to_string()))
+                                })
+                                .inspect_err(|error| {
+                                    tracing::error!(%error, "failed to decode the acknowledgement");
+
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_RECEIVED_ACKS.increment(&["false"]);
+                                })?,
+                        }
+                    }
+                    Some(ack_key) => IncomingPacket::Final {
                         packet_tag: incoming.packet_tag,
                         previous_hop: incoming.previous_hop,
                         sender: incoming.sender,
                         plain_text: incoming.plain_text,
                         ack_key,
-                    }))
-                } else {
-                    // The contained payload represents an Acknowledgement
-                    let ack: Acknowledgement = incoming.plain_text.as_ref().try_into().map_err(|error| {
-                        tracing::error!(%error, "failed to decode the acknowledgement");
-
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_RECEIVED_ACKS.increment(&["false"]);
-
-                        DbSqlError::DecodingError
-                    })?;
-
-                    let ack = ack
-                        .validate(&incoming.previous_hop)
-                        .map_err(|e| crate::errors::DbSqlError::AcknowledgementValidationError(e.to_string()))?;
-                    self.handle_acknowledgement(ack).await?;
-
-                    Ok(None)
-                }
+                    },
+                })
             }
             HoprPacket::Forwarded(fwd) => {
-                match self
+                let start = std::time::Instant::now();
+                let validation_res = self
                     .validate_and_replace_ticket(*fwd, &self.chain_key, outgoing_ticket_win_prob, outgoing_ticket_price)
-                    .await
-                {
+                    .await;
+                if start.elapsed().as_millis() > SLOW_OP_MS {
+                    warn!(
+                        peer = sender.to_peerid_str(),
+                        "validate_and_replace_ticket took {} ms",
+                        start.elapsed().as_millis()
+                    );
+                }
+                match validation_res {
                     Ok(fwd) => {
                         let mut payload = Vec::with_capacity(HoprPacket::SIZE);
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        Ok(Some(IncomingPacket::Forwarded {
+                        Ok(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
                             ack: Acknowledgement::new(fwd.ack_key, pkt_keypair),
-                        }))
+                        })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
@@ -599,6 +628,7 @@ impl HoprDbProtocolOperations for HoprDb {
 }
 
 impl HoprDb {
+    #[tracing::instrument(level = "trace", skip(self, channel))]
     async fn create_multihop_ticket(
         &self,
         channel: ChannelEntry,

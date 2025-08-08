@@ -2,13 +2,14 @@ import asyncio
 import logging
 import random
 import re
-from decimal import Decimal
 
 import pytest
 
 from sdk.python.api import Protocol
+from sdk.python.api.balance import Balance
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
+from sdk.python.api.response_objects import Metrics
 from sdk.python.localcluster.constants import OPEN_CHANNEL_FUNDING_VALUE_HOPR
 from sdk.python.localcluster.node import Node
 
@@ -74,8 +75,8 @@ class TestIntegrationWithSwarm:
             addr = await node.api.addresses()
             assert re.match("^0x[0-9a-fA-F]{40}$", addr.native) is not None
             balances = await node.api.balances()
-            assert balances.native > 0
-            assert balances.safe_hopr > 0
+            assert balances.native > Balance.zero("xDai")
+            assert balances.safe_hopr > Balance.zero("wxHOPR")
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -166,16 +167,9 @@ class TestIntegrationWithSwarm:
         "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
     async def test_reset_ticket_statistics_from_metrics(self, src: str, mid: str, dest: str, swarm7: dict[str, Node]):
-        def count_metrics(metrics: str):
+        def count_metrics(metrics: Metrics):
             types = ["neglected", "redeemed", "rejected"]
-            count = 0
-            for line in metrics.splitlines():
-                count += (
-                    line.startswith("hopr_tickets_incoming_statistics")
-                    and any(t in line for t in types)
-                    and line.split()[-1] != "0"
-                )
-            return count
+            return sum(metrics.hopr_tickets_incoming_statistics.get(t, 0) for t in types)
 
         ticket_price = await get_ticket_price(swarm7[src])
 
@@ -257,7 +251,7 @@ class TestIntegrationWithSwarm:
 
                     # And it should be seen as rejected eventually
                     await asyncio.wait_for(
-                        check_rejected_tickets_value(swarm7[mid], rejected_value_before + ticket_price), 5.0
+                        check_rejected_tickets_value(swarm7[mid], rejected_value_before + ticket_price), 10.0
                     )
 
                 # Redeem all remaining tickets
@@ -342,18 +336,25 @@ class TestIntegrationWithSwarm:
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_native_withdraw(self, peer, swarm7: dict[str, Node]):
         before_balance = (await swarm7[peer].api.balances()).native
-        assert before_balance > 0
+        assert before_balance > Balance.zero("xDai")
 
         # Withdraw some native balance into the Safe address
         amount = before_balance / 10
-        await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "xDai")
+        await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address)
 
-        await asyncio.wait_for(check_native_balance_below(swarm7[peer], before_balance - amount), 120.0)
+        await asyncio.wait_for(check_native_balance_below(swarm7[peer], before_balance - amount), 60.0)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_ticket_price_is_default(self, peer, swarm7: dict[str, Node]):
         price = await swarm7[peer].api.ticket_price()
 
-        assert isinstance(price.value, Decimal)
-        assert price.value > 0
+        assert isinstance(price.value, Balance)
+        assert price.value > Balance.zero("wxHOPR")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+    async def test_hoprd_check_api_version(self, peer, swarm7: dict[str, Node]):
+        version = await swarm7[peer].api.api_version()
+
+        assert re.match(r"^\d+\.\d+\.\d+$", version) is not None, "Version should be in the format X.Y.Z"

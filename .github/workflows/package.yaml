@@ -1,0 +1,166 @@
+---
+#################################################################################
+# Pipeline to package artifacts
+#################################################################################
+name: Package
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+      packager:
+        required: true
+        type: string
+      extension:
+        required: true
+        type: string
+      workflow_run_id:
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ inputs.branch }}-package-${{ inputs.target }}-${{ inputs.packager }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  package:
+    name: Package
+    runs-on: ${{ inputs.runner }}
+    if: github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.branch }}
+
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        with:
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
+
+      - name: Download artifacts from parent workflow run
+        id: download
+        run: |
+          set -euo pipefail  # Enable strict error handling
+          mkdir -p ./dist/bin
+
+          # Fetch artifacts metadata
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ inputs.workflow_run_id }}/artifacts \
+            -o artifacts.json || { echo "Failed to fetch artifacts metadata"; exit 1; }
+          mkdir -p ./dist/bin
+
+          # Extract hoprd artifact URL
+          hoprd_url=$(jq -r '.artifacts[] | select(.name == "hoprd-${{ inputs.target }}").archive_download_url' artifacts.json)
+          if [[ -z "$hoprd_url" ]]; then
+            echo "Error: hoprd artifact URL not found for target '${{ inputs.target }}'"
+            exit 1
+          fi
+
+          # Download and unzip hoprd artifact
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hoprd_url" -o hoprd-${{ inputs.target }}.zip || { echo "Failed to download hoprd artifact"; exit 1; }
+          unzip -o hoprd-${{ inputs.target }}.zip -d ./dist/bin || { echo "Failed to unzip hoprd artifact"; exit 1; }
+
+          # Extract hopli artifact URL
+          hopli_url=$(jq -r '.artifacts[] | select(.name == "hopli-${{ inputs.target }}").archive_download_url' artifacts.json)
+          if [[ -z "$hopli_url" ]]; then
+            echo "Error: hopli artifact URL not found for target '${{ inputs.target }}'"
+            exit 1
+          fi
+
+          # Download and unzip hopli artifact
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hopli_url" -o hopli-${{ inputs.target }}.zip || { echo "Failed to download hopli artifact"; exit 1; }
+          unzip -o hopli-${{ inputs.target }}.zip -d ./dist/bin || { echo "Failed to unzip hopli artifact"; exit 1; }
+
+          current_version=$(./scripts/get-current-version.sh)
+          architecture=${{ inputs.target }}
+          # Remove suffix from architecture
+          architecture=${architecture%-linux}
+          echo "package_file_name=hoprd_${current_version}_${architecture}" | tee -a $GITHUB_OUTPUT
+          echo "current_version=${current_version}" | tee -a $GITHUB_OUTPUT
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt install -y help2man just
+          if [[ "${{ inputs.target }}" == "x86_64-linux" ]]; then
+            nfpm_url=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | jq -r '.assets[] | select(.name | endswith("amd64.deb")) | .browser_download_url')
+          else
+            nfpm_url=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | jq -r '.assets[] | select(.name | endswith("arm64.deb")) | .browser_download_url')
+          fi
+          curl -L -o nfpm.deb "$nfpm_url"
+          sudo apt install -y ./nfpm.deb
+
+      - name: Create man pages
+        run: |
+          help2man --name="HOPR node executable" --no-info --output ./deploy/nfpm/hoprd.1 ./dist/bin/hoprd
+          gzip -9n ./deploy/nfpm/hoprd.1
+          help2man --name="HOPR CLI helper tool" --no-info --output ./deploy/nfpm/hopli.1 ./dist/bin/hopli
+          gzip -9n ./deploy/nfpm/hopli.1
+
+      - name: Create Changelog
+        run: |
+          ./scripts/generate-changelog.sh "${{ steps.download.outputs.current_version }}" "${{ inputs.packager }}" true > ./deploy/nfpm/changelog
+          if [[ "${{ inputs.packager }}" == "deb" ]]; then
+            gzip -9 -c ./deploy/nfpm/changelog > ./deploy/nfpm/changelog.gz
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create package
+        run: just package ${{ inputs.packager }} ${{ inputs.target }}
+
+      - name: Create signatures
+        run: just sign-file "${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}"
+        env:
+          GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+
+      - name: Test package
+        if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        timeout-minutes: 30
+        continue-on-error: true
+        run: |
+          echo "${{ secrets.TEST_OS_PACKAGE_HOPR_IDENTITY_FILE }}" | base64 -d > ${{ github.workspace }}/deploy/nfpm/hopr.id
+          chmod 600 ${{ github.workspace }}/deploy/nfpm/hopr.id
+          nix develop -c just test-package ${{ inputs.packager }} ${{ inputs.target }}
+        env:
+          HOPRD_PASSWORD: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PASSWORD }}
+          HOPRD_SAFE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_SAFE_ADDRESS }}
+          HOPRD_MODULE_ADDRESS: ${{ secrets.TEST_OS_PACKAGE_HOPRD_MODULE_ADDRESS }}
+          HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
+          GCP_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+
+      - name: Publish package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}
+
+      - name: Publish package hash
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.sha256
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sha256
+
+      - name: Publish package signature
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.asc
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.asc
+

@@ -35,6 +35,7 @@ use futures::{
     SinkExt, Stream, StreamExt,
     channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
     future::AbortHandle,
+    stream::{self},
 };
 use hopr_async_runtime::prelude::{sleep, spawn};
 pub use hopr_chain_actions::errors::ChainActionsError;
@@ -77,9 +78,9 @@ use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::{
     ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_PAYLOAD_SIZE, SendMsg,
-    ServiceId, Session as HoprSession, SessionCapabilities, SessionCapability, SessionClientConfig,
-    SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig, Tag, TicketStatistics,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU, ServiceId,
+    Session as HoprSession, SessionCapabilities, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
+    SessionTarget, SurbBalancerConfig, Tag, TicketStatistics,
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
@@ -142,7 +143,7 @@ pub enum HoprState {
 
 impl Display for HoprState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -231,8 +232,17 @@ where
             }
 
             match event.event_type {
-                ChainEventType::Announcement{peer, multiaddresses, ..} => {
-                    Some(PeerDiscovery::Announce(peer, multiaddresses))
+                ChainEventType::Announcement{peer, address, multiaddresses} => {
+                    let allowed = db
+                        .is_allowed_in_network_registry(None, &address)
+                        .await
+                        .unwrap_or(false);
+
+                    Some(vec![PeerDiscovery::Announce(peer, multiaddresses), if allowed {
+                        PeerDiscovery::Allow(peer)
+                    } else {
+                        PeerDiscovery::Ban(peer)
+                    }])
                 }
                 ChainEventType::ChannelOpened(channel) |
                 ChainEventType::ChannelClosureInitiated(channel) |
@@ -291,7 +301,7 @@ where
                                         hopr_chain_types::chain_events::NetworkRegistryStatus::Denied => PeerDiscovery::Ban(peer_id),
                                     };
 
-                                    Some(res)
+                                    Some(vec![res])
                                 } else {
                                     error!("Failed to unwrap as offchain key at this point");
                                     None
@@ -300,8 +310,8 @@ where
                                 None
                             }
                         }
-                        Err(e) => {
-                            error!(error = %e, "on_network_registry_node_allowed failed");
+                        Err(error) => {
+                            error!(%error, "on_network_registry_node_allowed failed");
                             None
                         },
                     }
@@ -312,7 +322,9 @@ where
                 }
             }
         }
-    }))
+    })
+    .flat_map(stream::iter)
+)
 }
 
 /// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
@@ -475,6 +487,9 @@ impl Hopr {
             hopr_chain_indexer::IndexerConfig {
                 start_block_number: resolved_environment.channel_contract_deploy_block as u64,
                 fast_sync: cfg.chain.fast_sync,
+                enable_logs_snapshot: cfg.chain.enable_logs_snapshot,
+                logs_snapshot_url: cfg.chain.logs_snapshot_url.clone(),
+                data_directory: cfg.db.data.clone(),
             },
             tx_indexer_events,
         )?;
@@ -685,12 +700,46 @@ impl Hopr {
         )
         .await;
 
-        // terminated once all senders are dropped and no items in the receiver remain
-        let indexer_peer_update_tx_2 = indexer_peer_update_tx.clone();
+        {
+            // This has to happen before the indexing process starts in order to make sure that the pre-existing data is
+            // properly populated into the transport mechanism before the synced data in the follow up process.
+            info!("Syncing peer announcements and network registry updates from previous runs");
+            let accounts = self.db.get_accounts(None, true).await?;
+            for account in accounts.into_iter() {
+                match account.entry_type {
+                    AccountType::NotAnnounced => {}
+                    AccountType::Announced { multiaddr, .. } => {
+                        indexer_peer_update_tx
+                            .send(PeerDiscovery::Announce(account.public_key.into(), vec![multiaddr]))
+                            .await
+                            .map_err(|e| {
+                                HoprLibError::GeneralError(format!("Failed to send peer discovery announcement: {e}"))
+                            })?;
+
+                        let allow_status = if self
+                            .db
+                            .is_allowed_in_network_registry(None, &account.chain_addr)
+                            .await?
+                        {
+                            PeerDiscovery::Allow(account.public_key.into())
+                        } else {
+                            PeerDiscovery::Ban(account.public_key.into())
+                        };
+
+                        indexer_peer_update_tx.send(allow_status).await.map_err(|e| {
+                            HoprLibError::GeneralError(format!(
+                                "Failed to send peer discovery network registry event: {e}"
+                            ))
+                        })?;
+                    }
+                }
+            }
+        }
+
         spawn(async move {
             indexer_event_pipeline
                 .map(Ok)
-                .forward(indexer_peer_update_tx_2)
+                .forward(indexer_peer_update_tx)
                 .await
                 .expect("The index to transport event chain failed");
         });
@@ -747,8 +796,7 @@ impl Hopr {
                 "Something is wrong with the safe module configuration",
             );
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
-                "Safe and module are not configured correctly {:?}",
-                safe_module_configuration,
+                "Safe and module are not configured correctly {safe_module_configuration:?}",
             ))));
         }
 
@@ -826,38 +874,6 @@ impl Hopr {
                 }
             }
 
-            info!("Syncing peer announcements and network registry updates from previous runs");
-            let accounts = self.db.get_accounts(None, true).await?;
-            for account in accounts.into_iter() {
-                match account.entry_type {
-                    AccountType::NotAnnounced => {}
-                    AccountType::Announced { multiaddr, .. } => {
-                        indexer_peer_update_tx
-                            .send(PeerDiscovery::Announce(account.public_key.into(), vec![multiaddr]))
-                            .await
-                            .map_err(|e| {
-                                HoprLibError::GeneralError(format!("Failed to send peer discovery announcement: {e}"))
-                            })?;
-
-                        let allow_status = if self
-                            .db
-                            .is_allowed_in_network_registry(None, &account.chain_addr)
-                            .await?
-                        {
-                            PeerDiscovery::Allow(account.public_key.into())
-                        } else {
-                            PeerDiscovery::Ban(account.public_key.into())
-                        };
-
-                        indexer_peer_update_tx.send(allow_status).await.map_err(|e| {
-                            HoprLibError::GeneralError(format!(
-                                "Failed to send peer discovery network registry event: {e}"
-                            ))
-                        })?;
-                    }
-                }
-            }
-
             // Initialize node latencies and scores in the channel graph:
             // Sync only those nodes that we know that had a good quality
             // Other nodes will be repopulated into the channel graph during heartbeat
@@ -903,7 +919,7 @@ impl Hopr {
 
         processes.insert(
             HoprLibProcesses::OnReceivedAcknowledgement,
-            hopr_async_runtime::spawn_as_abortable(async move {
+            hopr_async_runtime::spawn_as_abortable!(async move {
                 while let Some(ack) = on_ack_tkt_rx.next().await {
                     if let Err(error) = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
                         &*multi_strategy_ack_ticket,
@@ -923,7 +939,7 @@ impl Hopr {
         {
             processes.insert(
                 HoprLibProcesses::SessionServer,
-                hopr_async_runtime::spawn_as_abortable(_session_rx.for_each_concurrent(None, move |session| {
+                hopr_async_runtime::spawn_as_abortable!(_session_rx.for_each_concurrent(None, move |session| {
                     let serve_handler = serve_handler.clone();
                     async move {
                         let session_id = *session.session.id();
@@ -962,7 +978,7 @@ impl Hopr {
         let db_clone = self.db.clone();
         processes.insert(
             HoprLibProcesses::TicketIndexFlush,
-            hopr_async_runtime::spawn_as_abortable(Box::pin(execute_on_tick(
+            hopr_async_runtime::spawn_as_abortable!(Box::pin(execute_on_tick(
                 Duration::from_secs(5),
                 move || {
                     let db_clone = db_clone.clone();
@@ -992,7 +1008,7 @@ impl Hopr {
         let strategy_interval = self.cfg.strategy.execution_interval;
         processes.insert(
             HoprLibProcesses::StrategyTick,
-            hopr_async_runtime::spawn_as_abortable(async move {
+            hopr_async_runtime::spawn_as_abortable!(async move {
                 execute_on_tick(
                     Duration::from_secs(strategy_interval),
                     move || {
@@ -1096,15 +1112,6 @@ impl Hopr {
             .with_delay(self.cfg.session.establish_retry_timeout)
             .with_jitter();
 
-        struct Sleeper;
-        impl backon::Sleeper for Sleeper {
-            type Sleep = futures_timer::Delay;
-
-            fn sleep(&self, dur: Duration) -> Self::Sleep {
-                futures_timer::Delay::new(dur)
-            }
-        }
-
         use backon::Retryable;
 
         Ok((|| {
@@ -1113,7 +1120,7 @@ impl Hopr {
             async { self.transport_api.new_session(destination, target, cfg).await }
         })
         .retry(backoff)
-        .sleep(Sleeper)
+        .sleep(backon::FuturesTimerSleeper)
         .await?)
     }
 
@@ -1312,6 +1319,11 @@ impl Hopr {
         Ok(self.hopr_chain_api.all_channels().await?)
     }
 
+    /// List all corrupted channels
+    pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
+        Ok(self.hopr_chain_api.corrupted_channels().await?)
+    }
+
     /// Current safe allowance balance
     pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
         Ok(self.hopr_chain_api.safe_allowance().await?)
@@ -1323,13 +1335,9 @@ impl Hopr {
     pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self
-            .hopr_chain_api
-            .actions_ref()
-            .withdraw(recipient, amount)
-            .await?
-            .await?
-            .tx_hash)
+        let awaiter = self.hopr_chain_api.actions_ref().withdraw(recipient, amount).await?;
+
+        Ok(awaiter.await?.tx_hash)
     }
 
     /// Withdraw on-chain native assets to a given address
@@ -1338,13 +1346,13 @@ impl Hopr {
     pub async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self
+        let awaiter = self
             .hopr_chain_api
             .actions_ref()
             .withdraw_native(recipient, amount)
-            .await?
-            .await?
-            .tx_hash)
+            .await?;
+
+        Ok(awaiter.await?.tx_hash)
     }
 
     pub async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> errors::Result<OpenChannelResult> {
@@ -1366,13 +1374,13 @@ impl Hopr {
     pub async fn fund_channel(&self, channel_id: &Hash, amount: HoprBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        Ok(self
+        let awaiter = self
             .hopr_chain_api
             .actions_ref()
             .fund_channel(*channel_id, amount)
-            .await?
-            .await
-            .map(|confirm| confirm.tx_hash)?)
+            .await?;
+
+        Ok(awaiter.await?.tx_hash)
     }
 
     pub async fn close_channel(

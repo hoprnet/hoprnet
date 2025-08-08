@@ -7,10 +7,13 @@ name: Build DappNode
 on:
   workflow_call:
     inputs:
-      branch:
+      source_repo:
         required: true
         type: string
-      repository:
+      source_branch:
+        required: true
+        type: string
+      dappnode_repository:
         required: true
         type: string
       labels:
@@ -28,18 +31,18 @@ on:
         default: rotsee
 
 concurrency:
-  group: dappnode-${{ inputs.repository }}
+  group: dappnode-${{ inputs.dappnode_repository }}-${{ inputs.source_branch || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
   build:
-    # The original event_name registered is 'pull_request' even the trigger action is 'workflow_call'
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(inputs.labels, format('package:{0},',inputs.repository)))
+    # The original event_name registered is 'pull_request_target' even the trigger action is 'workflow_call'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && contains(inputs.labels, format('package:{0},',inputs.dappnode_repository)))
     name: Build package
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: false # sudo is needed for docker compose installation
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -47,29 +50,31 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
             echo "The workflow is triggered by other pipeline"
-            echo "GITHUB_REF_NAME=${{ inputs.branch }}" >> "$GITHUB_OUTPUT"
-            echo "DAPPNODE_REPOSITORY=${{ inputs.repository }}" >> "$GITHUB_OUTPUT"
-            if [[ "${{ inputs.repository }}" == "DAppNodePackage-Hopr-testnet" ]]; then
-              echo "HOPRD_NETWORK=rotsee" >> "$GITHUB_OUTPUT"
+            echo "source_repo=${{ inputs.source_repo }}" | tee -a $GITHUB_OUTPUT
+            echo "source_branch=${{ inputs.source_branch }}"  | tee -a $GITHUB_OUTPUT
+            echo "dappnode_repository=${{ inputs.dappnode_repository }}" | tee -a $GITHUB_OUTPUT
+            if [[ "${{ inputs.dappnode_repository }}" == "DAppNodePackage-Hopr-testnet" ]]; then
+              echo "HOPRD_NETWORK=rotsee" | tee -a $GITHUB_OUTPUT
             else
-              echo "HOPRD_NETWORK=dufour" >> "$GITHUB_OUTPUT"
+              echo "HOPRD_NETWORK=dufour" | tee -a $GITHUB_OUTPUT
             fi
           else
             echo "The workflow is triggered manually"
-            echo "GITHUB_REF_NAME=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "source_repo=${{ github.repository }}" | tee -a $GITHUB_OUTPUT
+            echo "source_branch=${{ github.ref_name }}" | tee -a $GITHUB_OUTPUT
             if [[ "${{ github.event.inputs.network }}" == "rotsee" ]]; then
-              echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr-testnet" >> "$GITHUB_OUTPUT"
-              echo "HOPRD_NETWORK=rotsee" >> "$GITHUB_OUTPUT"
+              echo "dappnode_repository=DAppNodePackage-Hopr-testnet" | tee -a $GITHUB_OUTPUT
+              echo "HOPRD_NETWORK=rotsee" | tee -a $GITHUB_OUTPUT
             else
-              echo "DAPPNODE_REPOSITORY=DAppNodePackage-Hopr" >> "$GITHUB_OUTPUT"
-              echo "HOPRD_NETWORK=dufour" >> "$GITHUB_OUTPUT"
+              echo "dappnode_repository=DAppNodePackage-Hopr" | tee -a $GITHUB_OUTPUT
+              echo "HOPRD_NETWORK=dufour" | tee -a $GITHUB_OUTPUT
             fi
           fi
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       - name: Set up Docker Compose
         run: |
@@ -80,7 +85,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          ref: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
+          repository: ${{ steps.vars.outputs.source_repo }}
+          ref: ${{ steps.vars.outputs.source_branch }}
 
       - name: Setup GCP
         id: gcp
@@ -99,7 +105,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          repository: dappnode/${{ steps.vars.outputs.DAPPNODE_REPOSITORY }}
+          repository: dappnode/${{ steps.vars.outputs.dappnode_repository }}
           path: "./dappnode"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: main
@@ -149,9 +155,9 @@ jobs:
           DEVELOPER_ADDRESS: "0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E"
 
       - name: Create comment
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request_target'
         uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4.0.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
-            The latest dAppNode package for ${{ inputs.repository }} has been built and uploaded with IPFS hash: ${{ steps.publish.outputs.ipfs_hash }}
+            The latest dAppNode package for ${{ inputs.dappnode_repository }} has been built and uploaded with IPFS hash: ${{ steps.publish.outputs.ipfs_hash }}

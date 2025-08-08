@@ -76,7 +76,20 @@ hopr:
     # If left empty, the node will behave as if only `!Passive` strategy
     # was given.
     strategies:
-      - !Aggregating
+      - !AutoRedeeming
+        #
+        # Channel strategy that performs automatic redemption of
+        # a winning acknowledged ticket
+        #
+        # If set, the strategy will redeem only aggregated tickets.
+        redeem_only_aggregated: true
+        # If set, all tickets will be redeemed on channel closure.
+        redeem_all_on_close: true
+        # Sets the minimum value of a ticket to be able to redeem it.
+        minimum_redeem_ticket_value: "0.09 wxHOPR"
+        #
+        ############################################
+        # - !Aggregating
         # Strategy performing automatic ticket aggregation
         # once the number of unredeemed tickets in a channel goes
         # over the given threshold.
@@ -84,30 +97,20 @@ hopr:
         # Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
         # in that channel when exceeded.
         # This condition is independent of `unrealized_balance_ratio`.
-        aggregation_threshold: 100
+        #
+        # aggregation_threshold: 100
+        #
         # Percentage of unrealized balance in unaggregated tickets in a channel
         # that triggers the ticket aggregation when exceeded.
         # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
         # This condition is independent of `aggregation_threshold`.
-        unrealized_balance_ratio: 0.9
+        # unrealized_balance_ratio: 0.9
         # If set, the strategy will automatically aggregate tickets in channel that has transitioned
         # to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
         # or `unrealized_balance_ratio` thresholds are met on that channel.
         # If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
-        aggregate_on_channel_close: true
         #
-        ############################################
-        #
-        # Channel strategy that performs automatic redemption of
-        # a winning acknowledged ticket
-        #
-      - !AutoRedeeming
-        # If set, the strategy will redeem only aggregated tickets.
-        redeem_only_aggregated: true
-        # If set, all tickets will be redeemed on channel closure.
-        redeem_all_on_close: true
-        # Sets the minimum value of a ticket to be able to redeem it.
-        minimum_redeem_ticket_value: "0.09 wxHOPR"
+        # aggregate_on_channel_close: true
         #
         ############################################
         #
@@ -176,15 +179,16 @@ hopr:
         # this number of seconds.
         max_closure_overdue: 300
 
-  # Configuration of the heartbeat mechanism for probing
-  # other nodes in the HOPR network.
+  # Configuration of the heartbeat mechanism for probing other nodes in the HOPR network.
   probe:
     # The maximum time in seconds to wait for a probe to finish
-    timeout: 10
+    timeout: 3
     # The maximum number of concurrent heartbeat probes
     max_parallel_probes: 50
     # The time interval for which to consider peer reprobing in seconds
     recheck_threshold: 60
+    # The delay between individual probing rounds for neighbor discovery
+    interval: 5
   # Defines how the quality of nodes in the HOPR network
   # is evaluated and criteria for nodes to be considered of good/bad quality.
   # This is closely related to the heartbeat mechanism.
@@ -284,6 +288,12 @@ hopr:
     # the sync process. Recommended for initial setup or when recovering
     # from a clean state.
     fast_sync: true
+    # Configures whether the node should download a snapshot of logs
+    enable_logs_snapshot: false
+    # URL to download logs snapshot from.
+    # This should point to a publicly accessible tar.xz file containing
+    # the SQLite logs database files.
+    # logs_snapshot_url: "https://logs-snapshots.hoprnet.org/latest-stable.tar.xz"
 # Session Entry/Exit IP forwarding configuration for this node
 # This applies whenever the node is an Exit node of a Session.
 session_ip_forwarding:

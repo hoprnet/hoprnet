@@ -23,6 +23,7 @@ where
         &self,
         matcher: hopr_network_types::types::SurbMatcher,
     ) -> hopr_db_api::errors::Result<(hopr_db_api::protocol::HoprSenderId, hopr_db_api::protocol::HoprSurb)> {
+        tracing::trace!(target: "db_proxy", "Finding SURB with matcher: {:?}", matcher);
         self.db.find_surb(matcher).await
     }
 

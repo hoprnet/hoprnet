@@ -2,9 +2,11 @@ import asyncio
 import logging
 import os
 import tempfile
-from decimal import Decimal
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
+from typing import Optional
+
+from api_lib.headers.authorization import Bearer
 
 from ..api import HoprdAPI
 from . import utils
@@ -43,7 +45,7 @@ class Node:
         identity_path: str,
         cfg_file: str,
         base_port: int,
-        api_addr: str = None,
+        api_addr: Optional[str] = None,
         use_nat: bool = False,
         remove_temp_data: bool = True,
     ):
@@ -82,7 +84,7 @@ class Node:
 
     @property
     def api(self):
-        return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", self.api_token)
+        return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", Bearer(self.api_token), "/api/v4")
 
     def prepare(self):
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
@@ -198,7 +200,7 @@ class Node:
 
     def setup(self, password: str, config_file: Path, dir: Path, log_tag: str):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
-        log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
+        log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "info"
 
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
@@ -207,11 +209,10 @@ class Node:
                     log_level,
                     "hyper_util=warn",
                     "hickory_resolver=warn",
+                    "hopr_transport_session=debug",
+                    "hopr_protocol_session=debug",
+                    "hopr_network_types=debug",
                     "isahc=error",
-                    "libp2p_swarm=info",
-                    "libp2p_tcp=info",
-                    "libp2p_dns=info",
-                    "multistream_select=info",
                     "sea_orm=warn",
                     "sqlx=warn",
                 ]
@@ -222,6 +223,7 @@ class Node:
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
             "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
+            "HOPR_CAPTURE_PACKETS": self.dir.joinpath(f"capture_{self.id}.pcap"),
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 
@@ -262,7 +264,7 @@ class Node:
         ready = False
 
         while not ready:
-            # we choose a long timeout here to accomodate the node just starting
+            # we choose a long timeout here to accommodate the node just starting
             peers_info = await asyncio.wait_for(self.api.peers(), timeout=10)
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 

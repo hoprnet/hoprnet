@@ -1,0 +1,75 @@
+---
+name: hoprd
+arch: "${ARCHITECTURE}"
+platform: linux
+version: "${RELEASE_VERSION}"
+section: net
+priority: optional
+maintainer: Hoprnet <tech@hoprnet.org>
+description: |
+  HOPR node is a privacy-preserving messaging protocol.
+  The HOPR node is the core of the HOPR network, enabling users to run a node
+  and earn rewards for relaying messages while preserving the privacy of the 
+  users' data. This package contains the HOPR node daemon (hoprd) and the 
+  command line interface (hopli) to interact with it.
+
+license: GNU General Public License v3.0
+homepage: https://hoprnet.org
+depends:
+  - systemd
+  - curl
+  - logrotate
+  - jq
+
+contents:
+  # Binaries
+  - src: ./dist/bin/hoprd
+    dst: /usr/bin/hoprd
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  - src: ./dist/bin/hopli
+    dst: /usr/bin/hopli
+    file_info:
+      mode: 0755
+      owner: root
+      group: root
+  # Configuration files
+  - src: ./deploy/nfpm/logrotate.conf
+    dst: /etc/logrotate.d/hoprd
+    type: config
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  - src: ./deploy/nfpm/hoprd-sample.cfg.yaml
+    dst: /etc/hoprd/hoprd-sample.cfg.yaml
+    type: config
+    file_info:
+      mode: 0644
+      owner: root
+      group: root
+  - src: ./deploy/nfpm/hoprd.service
+    dst: /usr/lib/systemd/system/hoprd.service
+  - src: ./deploy/nfpm/copyright
+    dst: /usr/share/doc/hoprd/copyright
+  - src: ./deploy/nfpm/changelog.gz
+    dst: /usr/share/doc/hoprd/changelog.gz
+    packager: deb
+    file_info:
+      mode: 0644
+  - src: ./deploy/nfpm/hoprd.1.gz
+    dst: /usr/share/man/man1/hoprd.1.gz
+    file_info:
+      mode: 0644
+  - src: ./deploy/nfpm/hopli.1.gz
+    dst: /usr/share/man/man1/hopli.1.gz
+    file_info:
+      mode: 0644
+
+scripts:
+  preinstall: ./deploy/nfpm/package-pre-install.sh
+  postinstall: ./deploy/nfpm/package-post-install.sh
+  preremove: ./deploy/nfpm/package-pre-uninstall.sh
+  postremove: ./deploy/nfpm/package-post-uninstall.sh

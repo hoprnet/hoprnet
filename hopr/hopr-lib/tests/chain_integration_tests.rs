@@ -1,6 +1,6 @@
 mod common;
 
-use std::time::Duration;
+use std::{env, path::Path, time::Duration};
 
 use alloy::primitives::{B256, U256};
 use common::create_rpc_client_to_anvil_with_snapshot;
@@ -25,12 +25,13 @@ use hopr_chain_rpc::{
     client::SnapshotRequestor,
     rpc::{RpcOperations, RpcOperationsConfig},
 };
-use hopr_chain_types::{chain_events::ChainEventType, utils::create_anvil};
+use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType, utils::create_anvil};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
+use tokio::fs;
 use tracing::info;
 
 use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node};
@@ -140,13 +141,13 @@ async fn start_node_chain_logic(
 
     let mut node_tasks = Vec::new();
 
-    node_tasks.push(spawn_as_abortable(async move {
+    node_tasks.push(spawn_as_abortable!(async move {
         action_queue.start().await;
     }));
 
     // Action state tracking
     let (sce_tx, sce_rx) = async_channel::unbounded();
-    node_tasks.push(spawn_as_abortable(async move {
+    node_tasks.push(spawn_as_abortable!(async move {
         let rx = sce_rx.clone();
         pin_mut!(rx);
 
@@ -257,10 +258,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         max_action_confirmation_wait: Duration::from_secs(60), // lower action confirmation limit
     };
 
-    let indexer_cfg = IndexerConfig {
-        start_block_number: 1,
-        fast_sync: false,
-    };
+    let indexer_cfg = IndexerConfig::new(1, false, false, None, "/tmp/test_hopr_data".to_string());
 
     // Setup ALICE
     info!("Starting up ALICE");
@@ -274,7 +272,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         safe_cfgs[0],
         rpc_cfg.clone(),
         actions_cfg,
-        indexer_cfg,
+        indexer_cfg.clone(),
     )
     .await?;
 
@@ -819,6 +817,166 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     futures::future::join_all(alice_node.node_tasks.into_iter().map(|ah| async move { ah.abort() })).await;
     futures::future::join_all(bob_node.node_tasks.into_iter().map(|ah| async move { ah.abort() })).await;
+
+    Ok(())
+}
+
+#[test_log::test(tokio::test)]
+async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> {
+    // Setup test environment
+    let id = hopr_crypto_random::random_integer(100_000, None);
+    let temp_dir = env::temp_dir().join(format!("hopr_indexer_snapshot_test_{}", id));
+    let data_directory = temp_dir.join("hopr_data");
+    fs::create_dir_all(&data_directory).await?;
+
+    let chain_key = ChainKeypair::random();
+    let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
+
+    // Verify snapshot file exists
+    let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.xz");
+    if !snapshot_file_path.exists() {
+        anyhow::bail!("Snapshot test file not found at: {}", snapshot_file_path.display());
+    }
+
+    let logs_snapshot_url = format!("file://{}", snapshot_file_path.display());
+
+    let indexer_cfg = IndexerConfig::new(
+        0,
+        true,
+        true,
+        Some(logs_snapshot_url),
+        data_directory.to_string_lossy().to_string(),
+    );
+
+    let requestor_in = SnapshotRequestor::new(SNAPSHOT_ALICE_RX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+
+    let http_requestor_in = DefaultHttpRequestor::new();
+    let anvil = alloy::node_bindings::Anvil::new().spawn();
+    let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_in.clone(), &anvil);
+    let rpc = RpcOperations::new(
+        json_rpc_client,
+        http_requestor_in.clone(),
+        &chain_key,
+        RpcOperationsConfig::default(),
+        None,
+    )?;
+
+    let handlers = ContractEventHandlers::new(
+        ContractAddresses::default(),
+        chain_key.public().to_address(),
+        chain_key.clone(),
+        db.clone(),
+        rpc.clone(),
+    );
+
+    let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, async_channel::unbounded().0);
+
+    // Verify database is initially empty (as expected for snapshot test)
+    let initial_logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
+    let initial_index_empty = db.index_is_empty().await?;
+
+    // These conditions should be true for a fresh database that would benefit from snapshot
+    assert_eq!(initial_logs_count, 0, "Fresh database should have no logs");
+    assert!(initial_index_empty, "Fresh database index should be empty");
+
+    // run snapshot fetch
+    indexer.pre_start().await?;
+
+    // now we can check if the logs were imported
+    let logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
+    let index_empty = db.index_is_empty().await?;
+
+    assert_eq!(logs_count, 72, "Imported database should have logs");
+    assert!(index_empty, "Imported database index should be empty");
+
+    Ok(())
+}
+
+#[test_log::test(tokio::test)]
+async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> {
+    // Setup test environment
+    let id = hopr_crypto_random::random_integer(100_000, None);
+    let temp_dir = env::temp_dir().join(format!("hopr_indexer_snapshot_test_{}", id));
+    let data_directory = temp_dir.join("hopr_data");
+    fs::create_dir_all(&data_directory).await?;
+
+    let chain_key = ChainKeypair::random();
+    let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
+
+    // Verify snapshot file exists
+    let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.xz");
+    if !snapshot_file_path.exists() {
+        anyhow::bail!("Snapshot test file not found at: {}", snapshot_file_path.display());
+    }
+
+    let mut server = mockito::Server::new_async().await;
+    let server_mock = server
+        .mock("GET", "/logs-snapshot.tar.xz")
+        .with_status(200)
+        .with_body_from_file(snapshot_file_path.to_string_lossy().to_string())
+        .expect(1)
+        .create();
+
+    let logs_snapshot_url = url::Url::parse(format!("{}/logs-snapshot.tar.xz", server.url()).as_str())?;
+
+    let indexer_cfg = IndexerConfig::new(
+        0,
+        true,
+        true,
+        Some(logs_snapshot_url.into()),
+        data_directory.to_string_lossy().to_string(),
+    );
+
+    let requestor_in = SnapshotRequestor::new(SNAPSHOT_ALICE_RX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+
+    let http_requestor_in = DefaultHttpRequestor::new();
+    let anvil = alloy::node_bindings::Anvil::new().spawn();
+    let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_in.clone(), &anvil);
+    let rpc = RpcOperations::new(
+        json_rpc_client,
+        http_requestor_in.clone(),
+        &chain_key,
+        RpcOperationsConfig::default(),
+        None,
+    )?;
+
+    let handlers = ContractEventHandlers::new(
+        ContractAddresses::default(),
+        chain_key.public().to_address(),
+        chain_key.clone(),
+        db.clone(),
+        rpc.clone(),
+    );
+
+    let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, async_channel::unbounded().0);
+
+    // Verify database is initially empty (as expected for snapshot test)
+    let initial_logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
+    let initial_index_empty = db.index_is_empty().await?;
+
+    // These conditions should be true for a fresh database that would benefit from snapshot
+    assert_eq!(initial_logs_count, 0, "Fresh database should have no logs");
+    assert!(initial_index_empty, "Fresh database index should be empty");
+
+    // run snapshot fetch
+    indexer.pre_start().await?;
+
+    // now we can check if the logs were imported
+    let logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
+    let index_empty = db.index_is_empty().await?;
+
+    server_mock.assert();
+
+    assert_eq!(logs_count, 72, "Imported database should have logs");
+    assert!(index_empty, "Imported database index should be empty");
 
     Ok(())
 }

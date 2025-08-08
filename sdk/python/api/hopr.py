@@ -1,22 +1,20 @@
-import asyncio
 import base64
 import logging
 import random
-from decimal import Decimal, ROUND_UP
 from typing import Optional
 
-import aiohttp
 import base58
 import nacl.bindings
 import nacl.public
 import nacl.signing  # Ensure nacl.signing is imported correctly
 import nacl.utils
+from api_lib import ApiLib
+from api_lib.method import Method
 from nacl.public import SealedBox  # Import SealedBox explicitly
 
-from .http_method import HTTPMethod
+from .balance import Balance
 from .protocol import Protocol
 from .request_objects import (
-    ApiRequestObject,
     CreateSessionBody,
     FundChannelBody,
     GetChannelsBody,
@@ -32,6 +30,7 @@ from .response_objects import (
     Configuration,
     ConnectedPeer,
     Infos,
+    Metrics,
     OpenedChannel,
     Ping,
     Session,
@@ -45,6 +44,7 @@ MESSAGE_TAG = 0x1245
 
 
 def getlogger():
+    logging.getLogger("api-lib").setLevel(logging.CRITICAL)
     logger = logging.getLogger("hopr-api")
     logger.setLevel(logging.ERROR)
 
@@ -90,95 +90,48 @@ def seal_with_address(address: str, plain_text: bytes, random_padding_len: int =
         raise ValueError(f"seal failed: {str(e)}")
 
 
-class HoprdAPI:
+class HoprdAPI(ApiLib):
     """
     HOPRd API helper to handle exceptions and logging.
     """
 
-    def __init__(self, url: str, token: str):
-        self.host = url
-        self.headers = {"Authorization": f"Bearer {token}"}
-        self.prefix = "/api/v4/"
+    async def api_version(self) -> Optional[str]:
+        """
+        Returns the API version of the HOPRd node.
+        :return: version: str | undefined
+        """
 
-    @property
-    def log_prefix(cls) -> str:
-        return "api"
+        openapi_spec = await self.try_req(Method.GET, "/api-docs/openapi.json", dict, use_api_prefix=False)
+        version = openapi_spec.get("info", {}).get("version", None) if isinstance(openapi_spec, dict) else None
 
-    async def __call(self, method: HTTPMethod, endpoint: str, data: ApiRequestObject = None, use_api_path: bool = True):
-        try:
-            headers = {"Content-Type": "application/json"}
-            async with aiohttp.ClientSession(headers=self.headers) as s:
-                url = f"{self.host}{self.prefix if use_api_path else '/'}{endpoint}"
-                logging.debug(f"Calling {method.value} {url}")
-                async with getattr(s, method.value)(
-                    url=url,
-                    json={} if data is None else data.as_dict,
-                    headers=headers,
-                ) as res:
-                    try:
-                        data = await res.json()
-                    except Exception:
-                        data = await res.text()
-
-                    return (res.status // 200) == 1, data
-
-        except OSError as e:
-            logging.error(f"OSError calling {method.value} {endpoint}: {e}")
-
-        except Exception as e:
-            logging.error(f"Exception calling {method.value} {endpoint}. error is: {e}")
-
-        return (False, None)
-
-    async def __call_api(
-        self,
-        method: HTTPMethod,
-        endpoint: str,
-        data: ApiRequestObject = None,
-        timeout: int = 60,
-        use_api_path: bool = True,
-    ) -> tuple[bool, Optional[object]]:
-        try:
-            return await asyncio.wait_for(
-                asyncio.create_task(self.__call(method, endpoint, data, use_api_path)),
-                timeout=timeout,
-            )
-
-        except asyncio.TimeoutError:
-            logging.error(f"TimeoutError calling {method} {endpoint}")
-            return (False, None)
+        return version
 
     async def balances(self) -> Optional[Balances]:
         """
         Returns the balance of the node.
         :return: balances: Balances | undefined
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "account/balances")
-        return Balances(response) if is_ok else None
+        return await self.try_req(Method.GET, "/account/balances", Balances)
 
-    async def open_channel(self, destination: str, amount: Decimal) -> Optional[OpenedChannel]:
+    async def open_channel(self, destination: str, amount: Balance) -> Optional[OpenedChannel]:
         """
         Opens a channel with the given peer_address and amount.
         :param: peer_address: str
-        :param: amount: Decimal
+        :param: amount: Balance
         :return: channel id: str | undefined
         """
-        data = OpenChannelBody(amount, destination)
+        data = OpenChannelBody(amount.as_str, destination)
+        return await self.try_req(Method.POST, "/channels", OpenedChannel, data=data)
 
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "channels", data)
-        return OpenedChannel(response) if is_ok else None
-
-    async def fund_channel(self, channel_id: str, amount: Decimal) -> bool:
+    async def fund_channel(self, channel_id: str, amount: Balance) -> bool:
         """
         Funds a given channel.
         :param: channel_id: str
         :param: amount: float
         :return: bool
         """
-        data = FundChannelBody(amount)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, f"channels/{channel_id}/fund", data)
-        return is_ok
+        data = FundChannelBody(amount.as_str)
+        return await self.try_req(Method.POST, f"/channels/{channel_id}/fund", data=data, return_state=True)
 
     async def close_channel(self, channel_id: str) -> bool:
         """
@@ -186,8 +139,7 @@ class HoprdAPI:
         :param: channel_id: str
         :return: bool
         """
-        is_ok, _ = await self.__call_api(HTTPMethod.DELETE, f"channels/{channel_id}")
-        return is_ok
+        return await self.try_req(Method.DELETE, f"/channels/{channel_id}", return_state=True)
 
     async def channel_redeem_tickets(self, channel_id: str) -> bool:
         """
@@ -195,38 +147,35 @@ class HoprdAPI:
         :param: channel_id: str
         :return: bool
         """
-        is_ok, _ = await self.__call_api(HTTPMethod.POST, f"channels/{channel_id}/tickets/redeem")
-        return is_ok
+        return await self.try_req(Method.POST, f"/channels/{channel_id}/tickets/redeem", return_state=True)
 
     async def all_channels(self, include_closed: bool) -> Optional[Channels]:
         """
         Returns all channels.
         :return: channels: list
         """
-        params = GetChannelsBody("true", "true" if include_closed else "false")
-
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
-        return Channels(response, "all") if is_ok else None
+        params = GetChannelsBody(True, include_closed)
+        response = await self.try_req(Method.GET, f"/channels?{params.as_header_string}", dict)
+        return Channels(response, "all") if response else response
 
     async def incoming_channels(self, include_closed: bool = False):
         """
         Returns all incoming channels.
         :return: channels: list
         """
-        params = GetChannelsBody("true", "true" if include_closed else "false")
-
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
-        return Channels(response, "incoming") if is_ok else None
+        params = GetChannelsBody(True, include_closed)
+        response = await self.try_req(Method.GET, f"/channels?{params.as_header_string}", dict)
+        return Channels(response, "incoming") if response else response
 
     async def outgoing_channels(self, include_closed: bool = False):
         """
         Returns all outgoing channels.
         :return: channels: list
         """
-        params = GetChannelsBody("true", "true" if include_closed else "false")
+        params = GetChannelsBody(True, include_closed)
+        response = await self.try_req(Method.GET, f"/channels?{params.as_header_string}", dict)
 
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
-        return Channels(response, "outgoing") if is_ok else None
+        return Channels(response, "outgoing") if response else response
 
     async def get_channel(self, channel_id: str) -> Optional[Channel]:
         """
@@ -234,8 +183,7 @@ class HoprdAPI:
         :param: channel_id: str
         :return: channel: response
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels/{channel_id}")
-        return Channel(response) if is_ok else None
+        return await self.try_req(Method.GET, f"/channels/{channel_id}", Channel)
 
     async def channels_aggregate_tickets(self, channel_id: str) -> bool:
         """
@@ -243,8 +191,7 @@ class HoprdAPI:
         :param: channel_id: str
         :return: bool
         """
-        is_ok, _ = await self.__call_api(HTTPMethod.POST, f"channels/{channel_id}/tickets/aggregate")
-        return is_ok
+        return await self.try_req(Method.POST, f"/channels/{channel_id}/tickets/aggregate", return_state=True)
 
     async def channel_get_tickets(self, channel_id: str) -> Optional[list[Ticket]]:
         """
@@ -252,16 +199,14 @@ class HoprdAPI:
         :param: channel_id: str
         :return: tickets: response
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels/{channel_id}/tickets")
-        return [Ticket(entry) for entry in response] if is_ok else []
+        return await self.try_req(Method.GET, f"/channels/{channel_id}/tickets", list[Ticket])
 
     async def tickets_redeem(self):
         """
         Redeems all tickets.
         :return: bool
         """
-        is_ok, _ = await self.__call_api(HTTPMethod.POST, "tickets/redeem")
-        return is_ok
+        return await self.try_req(Method.POST, "/tickets/redeem", return_state=True)
 
     async def peers(
         self,
@@ -270,9 +215,9 @@ class HoprdAPI:
         Returns a list of peers.
         :return: peers: list
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "node/peers")
+        response = await self.try_req(Method.GET, "/node/peers", dict)
 
-        if not is_ok:
+        if response is None:
             return []
 
         if "connected" not in response:
@@ -287,91 +232,77 @@ class HoprdAPI:
         :param: destination: str
         :return: response: dict
         """
-        is_ok, response = await self.__call_api(HTTPMethod.POST, f"peers/{destination}/ping")
-        return Ping(response) if is_ok else None
+        return await self.try_req(Method.POST, f"/peers/{destination}/ping", Ping)
 
     async def addresses(self) -> Optional[Addresses]:
         """
         Returns the address of the node.
         :return: address: str | undefined
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "account/addresses")
-
-        return Addresses(response) if is_ok else None
+        return await self.try_req(Method.GET, "/account/addresses", Addresses)
 
     async def config(self) -> Optional[Configuration]:
         """
         Returns some configurations value of the node.
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "node/configuration")
-
-        return Configuration(response["config"]) if is_ok else None
+        response = await self.try_req(Method.GET, "/node/configuration", dict)
+        return Configuration(response["config"]) if response else response
 
     async def node_info(self) -> Optional[Infos]:
         """
         Gets informations about the HOPRd node.
         :return: Infos
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "node/info")
-        return Infos(response) if is_ok else None
+        return await self.try_req(Method.GET, "/node/info", Infos)
 
     async def ticket_price(self) -> Optional[TicketPrice]:
         """
         Gets the ticket price set by the oracle.
         :return: TicketPrice
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "network/price")
-        return TicketPrice(response) if is_ok else None
+        return await self.try_req(Method.GET, "/network/price", TicketPrice)
 
     async def ticket_min_win_prob(self) -> Optional[TicketProbability]:
         """
         Gets the minimum ticket winning probability set by the oracle.
         :return: TicketProbability
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "network/probability")
-        return TicketProbability(response) if is_ok else None
+        return await self.try_req(Method.GET, "/network/probability", TicketProbability)
 
-    async def withdraw(self, amount: str, receipient: str, currency: str):
+    async def withdraw(self, amount: Balance, recipient: str):
         """
-        Withdraws the given amount of token (Native or HOPR) to the given receipient.
+        Withdraws the given amount of token (Native or HOPR) to the given recipient.
         :param: amount: str
-        :param: receipient: str
-        :param: currency: str
+        :param: recipient: str
         :return:
         """
-        data = WithdrawBody(receipient, amount=f"{amount} {currency}")
-        is_ok, _ = await self.__call_api(HTTPMethod.POST, "account/withdraw", data=data)
-        return is_ok
+        data = WithdrawBody(recipient, amount=amount.as_str)
+        return await self.try_req(Method.POST, "/account/withdraw", data=data, return_state=True)
 
-    async def metrics(self):
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "metrics", use_api_path=False)
-
-        return response if is_ok else None
+    async def metrics(self) -> Optional[Metrics]:
+        return await self.try_req(Method.GET, "/metrics", Metrics, use_api_prefix=False)
 
     async def get_tickets_statistics(self) -> Optional[TicketStatistics]:
         """
         Returns the ticket statistics of the node.
         :return: statistics: dict
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, "tickets/statistics")
-        return TicketStatistics(response) if is_ok else None
+        return await self.try_req(Method.GET, "/tickets/statistics", TicketStatistics)
 
     async def reset_tickets_statistics(self):
         """
         Resets the ticket statistics of the node.
         :return: bool
         """
-        is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "tickets/statistics")
-        return is_ok
+        return await self.try_req(Method.DELETE, "/tickets/statistics", return_state=True)
 
-    async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> list[Session]:
+    async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> Optional[list[Session]]:
         """
         Lists existing Session listeners for the given IP protocol
         :param: protocol: Protocol
         :return: list[Session]
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"session/{protocol.name.lower()}")
-        return [Session(s) for s in response] if is_ok else None
+        return await self.try_req(Method.GET, f"/session/{protocol.name.lower()}", list[Session])
 
     async def session_client(
         self,
@@ -412,63 +343,36 @@ class HoprdAPI:
             capabilities.as_array, destination, listen_on, forward_path, return_path, actual_target, response_buffer
         )
 
-        is_ok, response = await self.__call_api(HTTPMethod.POST, f"session/{protocol.name.lower()}", data)
-
-        return Session(response) if is_ok else None
+        return await self.try_req(Method.POST, f"/session/{protocol.name.lower()}", Session, data=data)
 
     async def session_close_client(self, session: Session) -> bool:
         """
         Closes an existing Session listener for the given IP protocol, IP and port.
         :param: session: Session
         """
-
-        is_ok, response = await self.__call_api(
-            HTTPMethod.DELETE,
-            f"session/{session.protocol}/{session.ip}/{session.port}",
-        )
-
-        return is_ok
+        path = f"/session/{session.protocol}/{session.ip}/{session.port}"
+        return await self.try_req(Method.DELETE, path, return_state=True)
 
     async def readyz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is ready. Return True if `readyz` returns 200 after max `timeout` seconds.
         """
-        return await HoprdAPI.is_url_returning_200(f"{self.host}/readyz", timeout)
+        return await self.timeout_check_success("/readyz", timeout)
 
     async def healthyz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is healthy. Return True if `healthyz` returns 200 after max `timeout` seconds.
         """
-        return await HoprdAPI.is_url_returning_200(f"{self.host}/healthyz", timeout)
+        return await self.timeout_check_success("/healthyz", timeout)
 
     async def startedz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is started. Return True if `startedz` returns 200 after max `timeout` seconds.
         """
-        return await HoprdAPI.is_url_returning_200(f"{self.host}/startedz", timeout)
+        return await self.timeout_check_success("/startedz", timeout)
 
     async def eligiblez(self, timeout: int = 20) -> bool:
         """
         Checks if the node is eligible. Return True if `eligiblez` returns 200 after max `timeout` seconds.
         """
-        return await HoprdAPI.is_url_returning_200(f"{self.host}/eligiblez", timeout)
-
-    @classmethod
-    async def is_url_returning_200(cls, url, timeout):
-        async def check_url():
-            ready = False
-
-            async with aiohttp.ClientSession() as s:
-                while not ready:
-                    try:
-                        ready = (await s.get(url, timeout=0.3)).status == 200
-                        await asyncio.sleep(0.5)
-                    except Exception:
-                        await asyncio.sleep(0.2)
-
-                return ready
-
-        try:
-            return await asyncio.wait_for(check_url(), timeout=timeout)
-        except Exception:
-            return False
+        return await self.timeout_check_success("/eligiblez", timeout)

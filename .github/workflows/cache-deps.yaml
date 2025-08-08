@@ -10,12 +10,15 @@ env:
 on:
   workflow_call:
     inputs:
-      branch:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
         required: true
         type: string
 
 concurrency:
-  group: ${{ github.ref }}-cache-deps
+  group: ${{ inputs.source_branch || github.ref_name }}-cache-deps
   cancel-in-progress: true
 jobs:
   cargo:
@@ -23,7 +26,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -31,7 +34,8 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
-          ref: ${{ inputs.branch }}
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_branch }}
           persist-credentials: false
 
       - name: Replace the crates.io registry with a private proxy registry

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-sql"
-version = "0.14.2"
+version = "0.15.0"
 edition = "2021"
 description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"
@@ -60,7 +60,8 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-tokio = { workspace = true }
+hex-literal = { workspace = true }
+lazy_static = { workspace = true }
 rand = { workspace = true }
 sea-orm = { workspace = true, features = ["runtime-tokio-rustls"] }
 sea-query-binder = { workspace = true, default-features = false, features = [
@@ -69,9 +70,10 @@ sea-query-binder = { workspace = true, default-features = false, features = [
   "runtime-tokio-rustls",
 ] }
 sqlx = { workspace = true, features = ["runtime-tokio-rustls"] }
-lazy_static = { workspace = true }
+tokio = { workspace = true }
+
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-random = { workspace = true }
-hex-literal = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["hopr-db-migration"]

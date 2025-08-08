@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "0.8.0"
+version = "0.8.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -12,15 +12,18 @@ crate-type = ["rlib"]
 default = []
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
+capture = ["dep:pcap-file"]
 
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
+pcap-file = { workspace = true, optional = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
@@ -51,15 +54,15 @@ hopr-transport-packet = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
-async-channel = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
-more-asserts = { workspace = true }
 serial_test = { workspace = true }
-tracing-test = { workspace = true }
+hopr-network-types = { workspace = true }
+hopr-protocol-session = { workspace = true, features = ["session-types"] }
 hopr-transport-mixer = { workspace = true }
+hopr-transport-probe = { workspace = true }
 
 [[bench]]
 name = "protocol_throughput_emulated"

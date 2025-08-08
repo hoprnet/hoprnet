@@ -6,7 +6,7 @@ use std::{
 use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use tracing::{debug, error};
+use tracing::{debug, error, instrument};
 
 use crate::{
     errors,
@@ -611,6 +611,7 @@ impl Ticket {
     /// the given `issuer` argument. This is possible due this specific instantiation of the ECDSA
     /// over the secp256k1 curve.
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
+    #[instrument(level = "trace", skip_all, err)]
     pub fn verify(self, issuer: &Address, domain_separator: &Hash) -> Result<VerifiedTicket, Box<Ticket>> {
         let ticket_hash = self.get_hash(domain_separator);
 
@@ -629,12 +630,14 @@ impl Ticket {
     }
 
     /// Returns true if this ticket aggregates multiple tickets.
+    #[inline]
     pub fn is_aggregated(&self) -> bool {
         // Aggregated tickets have always an index offset > 1
         self.index_offset > 1
     }
 
     /// Returns the decoded winning probability of the ticket
+    #[inline]
     pub fn win_prob(&self) -> WinningProbability {
         WinningProbability(self.encoded_win_prob)
     }
@@ -722,6 +725,7 @@ pub struct VerifiedTicket(Ticket, Hash, Address);
 
 impl VerifiedTicket {
     /// Returns the verified encoded winning probability of the ticket
+    #[inline]
     pub fn win_prob(&self) -> WinningProbability {
         self.0.win_prob()
     }
@@ -762,12 +766,14 @@ impl VerifiedTicket {
     }
 
     /// Ticket with already verified signature.
+    #[inline]
     pub fn verified_ticket(&self) -> &Ticket {
         &self.0
     }
 
     /// Fixed ticket hash that is guaranteed to be equal to
     /// [`Ticket::get_hash`] of [`VerifiedTicket::verified_ticket`].
+    #[inline]
     pub fn verified_hash(&self) -> &Hash {
         &self.1
     }
@@ -775,6 +781,7 @@ impl VerifiedTicket {
     /// Verified issuer of the ticket.
     /// The returned address is guaranteed to be equal to the signer
     /// recovered from the [`VerifiedTicket::verified_ticket`]'s signature.
+    #[inline]
     pub fn verified_issuer(&self) -> &Address {
         &self.2
     }
@@ -788,6 +795,7 @@ impl VerifiedTicket {
     }
 
     /// Deconstructs self back into the unverified [Ticket].
+    #[inline]
     pub fn leak(self) -> Ticket {
         self.0
     }

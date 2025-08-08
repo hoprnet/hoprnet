@@ -24,6 +24,7 @@ runtime-tokio = [
 [dependencies]
 async-trait = { workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = [
   "noise",

@@ -55,10 +55,7 @@ let
   solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
 
   cargoTarget =
-    if hostPlatform.config == "armv7l-unknown-linux-gnueabihf" then
-      "armv7-unknown-linux-gnueabihf"
-    else
-      hostPlatform.config;
+    if hostPlatform.config == "arm64-apple-darwin" then "aarch64-apple-darwin" else hostPlatform.config;
 
   rustToolchainFun =
     if useRustNightly then
@@ -71,29 +68,36 @@ let
 
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchainFun;
 
-  # mold is only supported on Linux, so falling back to lld on Darwin
+  # mold is only supported on Linux builds, so falling back to lld for Darwin
   linker = if buildPlatform.isDarwin then "lld" else "mold";
 
   buildEnvBase = {
     CARGO_BUILD_TARGET = cargoTarget;
     "CARGO_TARGET_${envCase cargoTarget}_LINKER" = "${pkgs.stdenv.cc.targetPrefix}cc";
     HOST_CC = "${pkgs.stdenv.cc.nativePrefix}cc";
-    CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
   };
+  buildEnvCross =
+    if isCross then
+      {
+        # For cross-compilation, don't use mold/lld as it can cause issues
+        CARGO_BUILD_RUSTFLAGS = "";
+      }
+    else
+      {
+        CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
+      };
   buildEnvStatic =
     if isStatic then
       {
-        CARGO_BUILD_RUSTFLAGS = "${buildEnvBase.CARGO_BUILD_RUSTFLAGS} -C target-feature=+crt-static";
+        CARGO_BUILD_RUSTFLAGS = "${buildEnvCross.CARGO_BUILD_RUSTFLAGS} -C target-feature=+crt-static";
       }
     else
       { };
 
-  buildEnv = buildEnvBase // buildEnvStatic;
+  buildEnv = buildEnvBase // buildEnvCross // buildEnvStatic;
 
 in
 {
-  # inherit rustToolchain;
-
   callPackage = (
     package: args:
     let

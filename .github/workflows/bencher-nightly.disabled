@@ -1,0 +1,33 @@
+---
+#################################################################################
+# Pipeline triggered nightly to check benchmark results 
+#################################################################################
+name: Nightly Benchmarks
+
+env:
+  RUST_BACKTRACE: "1"
+
+on:
+  schedule:
+    - cron: "2 0 * * *" # Every day at 02:00 UTC
+
+concurrency:
+  group: ${{ github.ref }}-bencher-nightly
+  cancel-in-progress: true
+
+jobs:
+  bencher-nightly-master:
+    name: Benchmarks
+    uses: ./.github/workflows/bencher.yaml
+    secrets: inherit
+    with:
+      branch: master
+      type: scheduled
+  bencher-nightly-release-kaunas:
+    name: Benchmarks
+    uses: ./.github/workflows/bencher.yaml
+    needs: bencher-nightly-master # Ensure that the master branch job is completed before running this one to avoid overloading the server
+    secrets: inherit
+    with:
+      branch: release/kaunas
+      type: scheduled

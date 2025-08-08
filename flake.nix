@@ -4,14 +4,13 @@
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
-    crane.url = "github:ipetkov/crane/v0.20.1";
+    crane.url = "github:ipetkov/crane/v0.21.0";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
-    # use change to add solc 0.8.24
-    solc.url = "github:hoprnet/solc.nix/tb/20240129-solc-0.8.24";
-    pre-commit.url = "github:cachix/pre-commit-hooks.nix";
+    solc.url = "github:hellwolf/solc.nix";
+    pre-commit.url = "github:cachix/git-hooks.nix";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     flake-root.url = "github:srid/flake-root";
 
@@ -89,6 +88,24 @@
               ./Cargo.lock
               ./README.md
               ./hopr/hopr-lib/data
+              ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.in.toml
+              ./ethereum/contracts/remappings.txt
+              ./hoprd/hoprd/example_cfg.yaml
+              (fs.fileFilter (file: file.hasExt "rs") ./.)
+              (fs.fileFilter (file: file.hasExt "toml") ./.)
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+            ];
+          };
+          testSrc = fs.toSource {
+            root = ./.;
+            fileset = fs.unions [
+              ./.cargo/config.toml
+              ./Cargo.lock
+              ./README.md
+              ./hopr/hopr-lib/data
+              ./hopr/hopr-lib/tests
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
@@ -177,19 +194,6 @@
             isCross = true;
           };
 
-          rust-builder-armv7l-linux = import ./nix/rust-builder.nix {
-            inherit
-              nixpkgs
-              rust-overlay
-              crane
-              foundry
-              solc
-              localSystem
-              ;
-            crossSystem = pkgs.lib.systems.examples.armv7l-hf-multiplatform;
-            isCross = true;
-          };
-
           hoprdBuildArgs = {
             inherit src depsSrc rev;
             cargoExtraArgs = "-p hoprd-api";
@@ -200,23 +204,45 @@
           # also used for Docker image
           hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           # also used for Docker image
+          hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
+          # also used for Docker image
           hoprd-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { CARGO_PROFILE = "dev"; }
+            hoprdBuildArgs
+            // {
+              CARGO_PROFILE = "dev";
+              cargoExtraArgs = "-F capture";
+            }
           );
           hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
-          hoprd-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-linux-profile = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
+
           # CAVEAT: must be built from a darwin system
           hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-x86_64-darwin-profile = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-darwin-profile = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { runTests = true; }
+            hoprdBuildArgs
+            // {
+              src = testSrc;
+              runTests = true;
+            }
           );
 
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
+              src = testSrc;
               runTests = true;
               cargoExtraArgs = "-Z panic-abort-tests";
             }
@@ -226,7 +252,11 @@
             hoprdBuildArgs // { runClippy = true; }
           );
           hoprd-dev = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { CARGO_PROFILE = "dev"; }
+            hoprdBuildArgs
+            // {
+              CARGO_PROFILE = "dev";
+              cargoExtraArgs = "-F capture";
+            }
           );
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hoprd-candidate =
@@ -259,7 +289,6 @@
             hopliBuildArgs // { CARGO_PROFILE = "dev"; }
           );
           hopli-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
-          hopli-armv7l-linux = rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix hopliBuildArgs;
           # CAVEAT: must be built from a darwin system
           hopli-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
           # CAVEAT: must be built from a darwin system
@@ -268,20 +297,10 @@
           hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (
             hopliBuildArgs // { runClippy = true; }
           );
+
           hopli-dev = rust-builder-local.callPackage ./nix/rust-package.nix (
             hopliBuildArgs // { CARGO_PROFILE = "dev"; }
           );
-          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
-          hopli-candidate =
-            if buildPlatform.isLinux && buildPlatform.isx86_64 then
-              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
-              )
-            else
-              rust-builder-local.callPackage ./nix/rust-package.nix (
-                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
-              );
-
           profileDeps = with pkgs; [
             gdb
             # FIXME: heaptrack would be useful, but it adds 700MB to the image size (unpacked)
@@ -322,6 +341,25 @@
             fi
           '';
 
+          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
+          hopli-candidate =
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
+                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
+              )
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix (
+                hopliBuildArgs // { CARGO_PROFILE = "candidate"; }
+              );
+
+          # Man pages
+          man-pages = pkgs.callPackage ./nix/man-pages.nix {
+            hoprd = hoprd-dev;
+            hopli = hopli-dev;
+          };
+          hoprd-man = man-pages.hoprd-man;
+          hopli-man = man-pages.hopli-man;
+
           # FIXME: the docker image built is not working on macOS arm platforms
           # and will simply lead to a non-working image. Likely, some form of
           # cross-compilation or distributed build is required.
@@ -331,14 +369,15 @@
             extraContents = [
               dockerHoprdEntrypoint
               package
-            ] ++ deps;
+            ]
+            ++ deps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
           };
           hoprd-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-x86_64-linux [ ]);
           hoprd-dev-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-x86_64-linux-dev [ ]);
           hoprd-profile-docker = import ./nix/docker-builder.nix (
-            hoprdDockerArgs hoprd-x86_64-linux profileDeps
+            hoprdDockerArgs hoprd-x86_64-linux-profile profileDeps
           );
 
           hopliDockerArgs = package: deps: {
@@ -470,6 +509,7 @@
               hopli
               jq
               lsof
+              openssl
               plutoSrc
               python313
               runtimeShellPackage
@@ -516,6 +556,9 @@
 
             '';
             config = {
+              Env = [
+                "LD_LIBRARY_PATH=${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH"
+              ];
               Cmd = [
                 "/bin/tini"
                 "--"
@@ -524,7 +567,7 @@
               ];
               ExposedPorts = {
                 "8545/tcp" = { };
-                "3001-3006/tcp" = { };
+                "3003-3018/tcp" = { };
                 "10001-10101/tcp" = { };
               };
             };
@@ -616,6 +659,12 @@
               };
             };
             tools = pkgs;
+            excludes = [
+              "vendor/"
+              "ethereum/contracts/"
+              "ethereum/bindings/src/codegen"
+              ".gcloudignore"
+            ];
           };
 
           check-bindings =
@@ -664,6 +713,10 @@
               pre-commit-check
               solcDefault
               ;
+            extraPackages = with pkgs; [
+              nfpm
+              envsubst
+            ];
           };
           ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
           testShell = import ./nix/testShell.nix {
@@ -673,6 +726,16 @@
               crane
               solcDefault
               ;
+          };
+          ciTestDevShell = import ./nix/ciTestShell.nix {
+            inherit
+              pkgs
+              config
+              crane
+              solcDefault
+              ;
+            hoprd = hoprd-dev;
+            hopli = hopli-dev;
           };
           ciTestShell = import ./nix/ciTestShell.nix {
             inherit
@@ -723,6 +786,7 @@
               '';
             };
           };
+
           find-port-ci = flake-utils.lib.mkApp {
             drv = pkgs.writeShellApplication {
               name = "find-port";
@@ -765,6 +829,8 @@
               "Makefile"
               "db/entity/src/codegen/*"
               "deploy/compose/grafana/config.monitoring"
+              "deploy/nfpm/nfpm.yaml"
+              ".github/workflows/build-binaries.yaml"
               "docs/*"
               "ethereum/bindings/src/codegen/*"
               "ethereum/contracts/Makefile"
@@ -894,13 +960,19 @@
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
             inherit pre-commit-check;
-            inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-x86_64-linux;
-            inherit hopli-aarch64-linux hopli-armv7l-linux hopli-x86_64-linux;
+            inherit hoprd-bench;
+            inherit hoprd-man hopli-man;
+            # binary packages
+            inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev hoprd-x86_64-linux-profile;
+            inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
+            inherit hopli-x86_64-linux hopli-x86_64-linux-dev;
+            inherit hopli-aarch64-linux;
             # FIXME: Darwin cross-builds are currently broken.
             # Follow https://github.com/nixos/nixpkgs/pull/256590
-            inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
-            inherit hopli-aarch64-darwin hopli-x86_64-darwin;
-            inherit hoprd-bench;
+            inherit hoprd-x86_64-darwin hoprd-x86_64-darwin-profile;
+            inherit hoprd-aarch64-darwin hoprd-aarch64-darwin-profile;
+            inherit hopli-x86_64-darwin;
+            inherit hopli-aarch64-darwin;
             default = hoprd;
           };
 
@@ -908,6 +980,7 @@
           devShells.ci = ciShell;
           devShells.test = testShell;
           devShells.citest = ciTestShell;
+          devShells.citestdev = ciTestDevShell;
           devShells.docs = docsShell;
 
           formatter = config.treefmt.build.wrapper;
@@ -915,7 +988,9 @@
       # platforms which are supported as build environments
       systems = [
         "x86_64-linux"
-        "aarch64-linux"
+        # NOTE: blocked by missing support in solc, see
+        # https://github.com/ethereum/solidity/issues/11351
+        # "aarch64-linux"
         "aarch64-darwin"
         "x86_64-darwin"
       ];

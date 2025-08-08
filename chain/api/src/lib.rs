@@ -35,7 +35,9 @@ pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
 pub use hopr_internal_types::channels::ChannelEntry;
-use hopr_internal_types::{account::AccountEntry, prelude::ChannelDirection, tickets::WinningProbability};
+use hopr_internal_types::{
+    account::AccountEntry, channels::CorruptedChannelEntry, prelude::ChannelDirection, tickets::WinningProbability,
+};
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
 
@@ -107,7 +109,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
 }
 
 fn build_transport_client(url: &str) -> Result<Http<ReqwestClient>> {
-    let parsed_url = url::Url::parse(url).unwrap_or_else(|_| panic!("failed to parse URL: {}", url));
+    let parsed_url = url::Url::parse(url).unwrap_or_else(|_| panic!("failed to parse URL: {url}"));
     Ok(ReqwestTransport::new(parsed_url))
 }
 
@@ -247,7 +249,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         processes.insert(
             HoprChainProcess::OutgoingOnchainActionQueue,
-            spawn_as_abortable(self.action_queue.clone().start()),
+            spawn_as_abortable!(self.action_queue.clone().start()),
         );
         processes.insert(
             HoprChainProcess::Indexer,
@@ -261,7 +263,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
                     self.rpc_operations.clone(),
                 ),
                 self.db.clone(),
-                self.indexer_cfg,
+                self.indexer_cfg.clone(),
                 self.indexer_events_tx.clone(),
             )
             .start()
@@ -289,8 +291,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             .map_err(HoprChainError::from)
             .and_then(|v| {
                 v.ok_or(errors::HoprChainError::Api(format!(
-                    "Channel entry not available {}-{}",
-                    src, dest
+                    "Channel entry not available {src}-{dest}"
                 )))
             })
     }
@@ -305,6 +306,10 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self.db.get_all_channels(None).await?)
+    }
+
+    pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
+        Ok(self.db.get_corrupted_channels(None).await?)
     }
 
     pub async fn ticket_price(&self) -> errors::Result<Option<HoprBalance>> {

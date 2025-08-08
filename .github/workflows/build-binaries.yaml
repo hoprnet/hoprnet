@@ -8,7 +8,10 @@ name: Build binaries
 on:
   workflow_call:
     inputs:
-      branch:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
         required: true
         type: string
       binary:
@@ -44,26 +47,27 @@ on:
           - aarch64-linux
           - aarch64-darwin
           - x86_64-darwin
-          - armv7l-linux
         required: true
         description: 'Architecture to build for'
 
 concurrency:
-  group: ${{ github.ref }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
+  group: ${{ inputs.source_branch || github.ref_name }}-build-binary-${{ inputs.binary }}-${{ inputs.target }}
   cancel-in-progress: true
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   binary:
+    name: Binary
     if: >-
-      github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
+      github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
     runs-on: ${{ github.event.inputs.runner || inputs.runner }}
     timeout-minutes: 60
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -71,28 +75,26 @@ jobs:
         id: vars
         run: |
           declare branch binary target package_suffix runner_needs_nix_setup
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
             echo "The workflow is triggered by other pipeline"
-            branch=${{ inputs.branch }}
+            repo=${{ inputs.source_repo }}
+            branch=${{ inputs.source_branch }}
             binary=${{ inputs.binary }}
             target=${{ inputs.target }}
           else
             echo "The workflow is triggered manually"
+            repo=${{ github.repository }}
             branch=${{ github.ref_name }}
             binary=${{ github.event.inputs.binary }}
             target=${{ github.event.inputs.target }}
           fi
           case "${target}" in
-            "x86_64-linux")
+          "x86_64-linux")
               package_suffix="-x86_64-linux"
               runner_needs_nix_setup=false
               ;;
           "aarch64-linux")
             package_suffix="-aarch64-linux"
-            runner_needs_nix_setup=false
-            ;;
-          "armv7l-linux")
-            package_suffix="-armv7l-linux"
             runner_needs_nix_setup=false
             ;;
           *)
@@ -101,7 +103,8 @@ jobs:
             ;;
           esac
           echo "Invocation parameters:"
-          echo "branch=${branch}" | tee -a $GITHUB_OUTPUT
+          echo "source_repo=${repo}" | tee -a $GITHUB_OUTPUT
+          echo "source_branch=${branch}" | tee -a $GITHUB_OUTPUT
           echo "binary=${binary}" | tee -a $GITHUB_OUTPUT
           echo "target=${target}" | tee -a $GITHUB_OUTPUT
           echo "package_suffix=${package_suffix}" | tee -a $GITHUB_OUTPUT
@@ -112,11 +115,12 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          ref: ${{ steps.vars.outputs.branch }}
+          repository: ${{ steps.vars.outputs.source_repo }}
+          ref: ${{ steps.vars.outputs.source_branch }}
 
       - name: Install Nix
         if: steps.vars.outputs.runner_needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           nix_path: nixpkgs=channel:nixos-24.05
@@ -132,8 +136,30 @@ jobs:
       - name: Build ${{ steps.vars.outputs.binary }} binaries
         run: nix build -L .#${{ steps.vars.outputs.binary }}${{ steps.vars.outputs.package_suffix }}
 
-      - name: Upload ${{ steps.vars.outputs.binary }} binaries
+      - name: Create ${{ steps.vars.outputs.binary }} signature
+        run: |
+          mkdir -p ${{ github.workspace }}/dist/bin
+          cp ${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }} ${{ github.workspace }}/dist/bin/
+          nix develop -L .#ci -c bash -c 'just sign-file "${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}"'
+        env:
+          GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+
+      - name: Publish ${{ steps.vars.outputs.binary }} binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
-          path: ${{ github.workspace }}/result/bin/*
+          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}
+
+      - name: Publish Github Workflow artifact hash
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sha256
+          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.sha256
+
+      - name: Publish Github Workflow artifact signature
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.asc
+          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.asc
+
+

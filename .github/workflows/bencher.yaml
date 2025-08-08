@@ -10,7 +10,10 @@ env:
 on:
   workflow_call: # This workflow is called from other workflow
     inputs:
-      branch:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
         required: true
         type: string
       type:
@@ -29,7 +32,7 @@ jobs:
     timeout-minutes: 150
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -38,26 +41,35 @@ jobs:
         id: vars
         run: |
           # Safely get branch name without template injection
-          if [ -n "$INPUT_BRANCH" ]; then
-            BRANCH_NAME="$INPUT_BRANCH"
+          if [[ "${EVENT_NAME}" == "pull_request_target" ]]; then
+            echo "The workflow is triggered by other pipeline"
+            source_repo=${SOURCE_REPO}
+            source_branch=${SOURCE_BRANCH}
           else
-            BRANCH_NAME="$GITHUB_REF_NAME"
+            echo "The workflow is triggered manually"
+            source_repo=${GITHUB_REPOSITORY}
+            source_branch=${GITHUB_REF_NAME}
           fi
-          echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_OUTPUT
-          FORMATTED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
-          echo "FORMATTED_BRANCH=$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
+          echo "source_repo=${source_repo}" | tee -a $GITHUB_OUTPUT
+          echo "source_branch=${source_branch}" | tee -a $GITHUB_OUTPUT
+          FORMATTED_BRANCH=$(echo "$source_branch" | sed 's/\//-/g')
+          echo "FORMATTED_BRANCH=$FORMATTED_BRANCH" | tee -a $GITHUB_OUTPUT
         env:
-          INPUT_BRANCH: ${{ inputs.branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_REPO: ${{ inputs.source_repo }}
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.vars.outputs.BRANCH_NAME }}
+          repository: ${{ steps.vars.outputs.source_repo }}
+          ref: ${{ steps.vars.outputs.source_branch }}
           persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -93,7 +105,7 @@ jobs:
           fi
 
       - name: Setup Bencher
-        uses: bencherdev/bencher@v0.5.1
+        uses: bencherdev/bencher@v0.5.3
 
       - name: Execute benchmarks
         run: |
@@ -111,7 +123,7 @@ jobs:
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH_NAME: ${{ steps.vars.outputs.BRANCH_NAME }}
+          BRANCH_NAME: ${{ steps.vars.outputs.source_branch }}
           COMMIT_HASH: ${{ github.sha }}
           BENCHER_TESTBED: ${{ steps.testbed.outputs.BENCHER_TESTBED }}
 
@@ -126,5 +138,5 @@ jobs:
           to: "HOPRd"
           topic: "Core"
           content: |
-            The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ github.sha }}) have dropped by more than 5%.
+            The benchmark results for branch `${{ steps.vars.outputs.source_repo }} ${{ steps.vars.outputs.source_branch }}` at commit (${{ github.sha }}) have dropped by more than 5%.
             Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.

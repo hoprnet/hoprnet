@@ -1,174 +1,127 @@
-import logging
 from decimal import Decimal
-from typing import Any
 
+from api_lib.objects.response import (
+    APIfield,
+    APImetric,
+    APIobject,
+    JsonResponse,
+    MetricResponse,
+)
+
+from .balance import Balance
 from .channelstatus import ChannelStatus
 
 
-def _convert(value: Any):
-    if value is None:
-        return None
-
-    if isinstance(value, int) or isinstance(value, float):
-        return value
-
-    if isinstance(value, str):
-        try:
-            float_value = float(value)
-        except ValueError:
-            return value
-
-        if "." in value:
-            return float_value
-        else:
-            return int(value)
-
-    return value
+@APIobject
+class Addresses(JsonResponse):
+    native: str = APIfield()
 
 
-def _parse_balance_string(balance_str):
-    """Parse a balance string with currency units and return the amount as a big decimal"""
-    try:
-        return Decimal(balance_str.split()[0])
-    except (ValueError, AttributeError, IndexError) as e:
-        raise ValueError(f"Failed to parse balance string: {balance_str}") from e
+@APIobject
+class Balances(JsonResponse):
+    hopr: Balance = APIfield()
+    native: Balance = APIfield()
+    safe_native: Balance = APIfield("safeNative")
+    safe_hopr: Balance = APIfield("safeHopr")
+    safe_hopr_allowance: Balance = APIfield("safeHoprAllowance")
 
 
-class ApiResponseObject:
-    def __init__(self, data: dict):
-        for key, value in self.keys.items():
-            v = data
-            for subkey in value.split("/"):
-                v = v.get(subkey, None)
-                if v is None:
-                    continue
+@APIobject
+class Infos(JsonResponse):
+    hopr_node_safe: bool = APIfield("hoprNodeSafe")
 
-            setattr(self, key, _convert(v))
 
-        self.post_init()
+@APIobject
+class ConnectedPeer(JsonResponse):
+    address: str = APIfield()
+    version: str = APIfield("reportedVersion")
+    quality: float = APIfield()
 
-    def post_init(self):
-        pass
+
+@APIobject
+class Channel(JsonResponse):
+    balance: Balance = APIfield()
+    channel_epoch: int = APIfield("channelEpoch")
+    id: str = APIfield("channelId")
+    closure_time: int = APIfield("closureTime")
+    destination: str = APIfield()
+    source: str = APIfield()
+    status: ChannelStatus = APIfield()
+    ticket_index: int = APIfield("ticketIndex")
+
+
+@APIobject
+class Ticket(JsonResponse):
+    amount: Balance = APIfield()
+    channel_epoch: int = APIfield("channelEpoch")
+    channel_id: str = APIfield("channelId")
+    index: int = APIfield()
+    index_offset: int = APIfield("indexOffset")
+    signature: str = APIfield()
+    winn_prob: Decimal = APIfield("winProb")
+
+
+@APIobject
+class TicketPrice(JsonResponse):
+    value: Balance = APIfield("price")
+
+
+@APIobject
+class TicketProbability(JsonResponse):
+    _value: Decimal = APIfield("probability")
 
     @property
-    def is_null(self):
-        return all(getattr(self, key) is None for key in self.keys.keys())
+    def value(self) -> Decimal:
+        return self._value.quantize(Decimal("1e-8"))
 
-    @property
-    def as_dict(self) -> dict:
-        return {key: getattr(self, key) for key in self.keys.keys()}
-
-    def __str__(self):
-        return str(self.__dict__)
-
-    def __repr__(self):
-        return str(self)
-
-    def __eq__(self, other):
-        return all(getattr(self, key) == getattr(other, key) for key in self.keys.keys())
+    @value.setter
+    def value(self, value: Decimal):
+        if not isinstance(value, Decimal):
+            raise TypeError("Value must be a Decimal instance")
+        self._value = value
 
 
-class Addresses(ApiResponseObject):
-    keys = {"native": "native"}
+@APIobject
+class TicketStatistics(JsonResponse):
+    neglected_value: Balance = APIfield("neglectedValue")
+    redeemed_value: Balance = APIfield("redeemedValue")
+    rejected_value: Balance = APIfield("rejectedValue")
+    unredeemed_value: Balance = APIfield("unredeemedValue")
+    winning_count: int = APIfield("winningCount")
 
 
-class Balances(ApiResponseObject):
-    keys = {
-        "hopr": "hopr",
-        "native": "native",
-        "safe_native": "safeNative",
-        "safe_hopr": "safeHopr",
-        "safe_hopr_allowance": "safeHoprAllowance",
-    }
-
-    def post_init(self):
-        self.hopr = _parse_balance_string(self.hopr)
-        self.native = _parse_balance_string(self.native)
-        self.safe_native = _parse_balance_string(self.safe_native)
-        self.safe_hopr = _parse_balance_string(self.safe_hopr)
-        self.safe_hopr_allowance = _parse_balance_string(self.safe_hopr_allowance)
+@APIobject
+class Configuration(JsonResponse):
+    safe_address: str = APIfield("hopr/safe_module/safe_address")
+    module_address: str = APIfield("hopr/safe_module/module_address")
 
 
-class Infos(ApiResponseObject):
-    keys = {"hopr_node_safe": "hoprNodeSafe"}
+@APIobject
+class OpenedChannel(JsonResponse):
+    id: str = APIfield("channelId")
 
 
-class ConnectedPeer(ApiResponseObject):
-    keys = {"address": "address", "version": "reportedVersion", "quality": "quality"}
+@APIobject
+class Ping(JsonResponse):
+    latency: float = APIfield()
+    version: str = APIfield("reportedVersion")
 
 
-class Channel(ApiResponseObject):
-    keys = {
-        "balance": "balance",
-        "channel_epoch": "channelEpoch",
-        "id": "channelId",
-        "closure_time": "closureTime",
-        "destination": "destination",
-        "source": "source",
-        "status": "status",
-        "ticket_index": "ticketIndex",
-    }
-
-    def post_init(self):
-        self.balance = _parse_balance_string(self.balance)
-        self.status = ChannelStatus.fromString(self.status)
+@APIobject
+class Session(JsonResponse):
+    destination: str = APIfield()
+    ip: str = APIfield()
+    port: int = APIfield()
+    protocol: str = APIfield()
+    target: str = APIfield()
+    forward_path: str = APIfield("forwardPath")
+    return_path: str = APIfield("returnPath")
+    mtu: int = APIfield()
 
 
-class Ticket(ApiResponseObject):
-    keys = {
-        "amount": "amount",
-        "channel_epoch": "channelEpoch",
-        "channel_id": "channelId",
-        "index": "index",
-        "index_offset": "indexOffset",
-        "signature": "signature",
-        "winn_prob": "winProb",
-    }
-
-    def post_init(self):
-        self.amount = _parse_balance_string(self.amount)
-
-
-class TicketPrice(ApiResponseObject):
-    keys = {"value": "price"}
-
-    def post_init(self):
-        self.value = _parse_balance_string(self.value)
-
-
-class TicketProbability(ApiResponseObject):
-    keys = {"value": "probability"}
-
-    def post_init(self):
-        self.value = float(self.value)
-
-
-class TicketStatistics(ApiResponseObject):
-    keys = {
-        "neglected_value": "neglectedValue",
-        "redeemed_value": "redeemedValue",
-        "rejected_value": "rejectedValue",
-        "unredeemed_value": "unredeemedValue",
-        "winning_count": "winningCount",
-    }
-
-    def post_init(self):
-        self.rejected_value = _parse_balance_string(self.rejected_value)
-        self.neglected_value = _parse_balance_string(self.neglected_value)
-        self.redeemed_value = _parse_balance_string(self.redeemed_value)
-        self.unredeemed_value = _parse_balance_string(self.unredeemed_value)
-
-
-class Configuration(ApiResponseObject):
-    keys = {"safe_address": "hopr/safe_module/safe_address", "module_address": "hopr/safe_module/module_address"}
-
-
-class OpenedChannel(ApiResponseObject):
-    keys = {"id": "channelId", "receipt": "transactionReceipt"}
-
-
-class Ping(ApiResponseObject):
-    keys = {"latency": "latency", "version": "reportedVersion"}
+@APIobject
+class Metrics(MetricResponse):
+    hopr_tickets_incoming_statistics: dict = APImetric(["statistic"])
 
 
 class Channels:
@@ -184,16 +137,3 @@ class Channels:
 
     def __repr__(self):
         return str(self)
-
-
-class Session(ApiResponseObject):
-    keys = {
-        "destination": "destination",
-        "ip": "ip",
-        "port": "port",
-        "protocol": "protocol",
-        "target": "target",
-        "forward_path": "forwardPath",
-        "return_path": "returnPath",
-        "mtu": "mtu",
-    }

@@ -102,10 +102,6 @@ async def bringup(
     cluster.load_addresses()
     cluster.load_native_addresses()
 
-    # add nodes to network registry
-    cluster.add_nodes_to_network_registry()
-    await asyncio.sleep(2.5)
-
     # wait before contract deployments are finalized
     await asyncio.sleep(2.5)
 

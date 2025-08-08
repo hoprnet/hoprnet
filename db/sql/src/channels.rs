@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
-use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelude::Channel};
+use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, errors::DbEntityError, prelude::Channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use tracing::instrument;
 
 use crate::{
     HoprDbGeneralModelOperations, OptTx,
@@ -50,6 +51,12 @@ impl ChannelEditor {
         self
     }
 
+    /// Set the corrupted state.
+    pub fn set_corrupted(mut self) -> Self {
+        self.model.corrupted = Set(true);
+        self
+    }
+
     /// If set, the channel will be deleted, no other edits will be done.
     pub fn delete(mut self) -> Self {
         self.delete = true;
@@ -60,10 +67,19 @@ impl ChannelEditor {
 /// Defines DB API for accessing information about HOPR payment channels.
 #[async_trait]
 pub trait HoprDbChannelOperations {
-    /// Retrieves channel by its channel ID hash.
+    /// Retrieves non-corrupted channel by its channel ID hash.
     ///
     /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>>;
+
+    /// Retrieves corrupted channel by its channel ID hash.
+    ///
+    /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
+    async fn get_corrupted_channel_by_id<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        id: &Hash,
+    ) -> Result<Option<CorruptedChannelEntry>>;
 
     /// Start changes to channel entry.
     /// If the channel with the given ID exists, the [ChannelEditor] is returned.
@@ -72,7 +88,10 @@ pub trait HoprDbChannelOperations {
 
     /// Commits changes of the channel to the database.
     /// Returns the updated channel, or on deletion, the deleted channel entry.
-    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
+    ///
+    /// It can also return `None` if the channel entry is being set as corrupted and a proper `ChannelEntry` cannot be
+    /// created.
+    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>>;
 
     /// Retrieves the channel by source and destination.
     /// This operation should be able to use cache since it can be also called from
@@ -101,10 +120,13 @@ pub trait HoprDbChannelOperations {
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Outgoing, my_node)`
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    /// Retrieves all channel information from the DB.
+    /// Retrieves all non-corrupted channels information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s
+    /// Retrieves all corrupted channels information from the DB.
+    async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<CorruptedChannelEntry>>;
+
+    /// Returns a stream of all non-corrupted channels that are `Open` or `PendingToClose` with an active grace period.s
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>>;
 
     /// Inserts or updates the given channel entry.
@@ -122,6 +144,34 @@ impl HoprDbChannelOperations for HoprDb {
                     Ok::<_, DbSqlError>(
                         if let Some(model) = Channel::find()
                             .filter(channel::Column::ChannelId.eq(id_hex))
+                            .filter(channel::Column::Corrupted.eq(false))
+                            .one(tx.as_ref())
+                            .await?
+                        {
+                            Some(model.try_into()?)
+                        } else {
+                            None
+                        },
+                    )
+                })
+            })
+            .await
+    }
+
+    async fn get_corrupted_channel_by_id<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        id: &Hash,
+    ) -> Result<Option<CorruptedChannelEntry>> {
+        let id_hex = id.to_hex();
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Ok::<_, DbSqlError>(
+                        if let Some(model) = Channel::find()
+                            .filter(channel::Column::ChannelId.eq(id_hex))
+                            .filter(channel::Column::Corrupted.eq(true))
                             .one(tx.as_ref())
                             .await?
                         {
@@ -141,28 +191,34 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbSqlError>(
-                        if let Some(model) = Channel::find()
-                            .filter(channel::Column::ChannelId.eq(id_hex))
-                            .one(tx.as_ref())
-                            .await?
-                        {
-                            Some(ChannelEditor {
-                                orig: model.clone().try_into()?,
-                                model: model.into_active_model(),
-                                delete: false,
-                            })
-                        } else {
-                            None
-                        },
-                    )
+                    match Channel::find()
+                        .filter(channel::Column::ChannelId.eq(id_hex.clone()))
+                        .one(tx.as_ref())
+                        .await?
+                    {
+                        Some(model) => {
+                            if model.corrupted {
+                                Err(DbSqlError::CorruptedChannelEntry(
+                                    Hash::from_hex(&model.channel_id).map_err(DbSqlError::from)?,
+                                ))
+                            } else {
+                                Ok(Some(ChannelEditor {
+                                    orig: ChannelEntry::try_from(model.clone())?,
+                                    model: model.into_active_model(),
+                                    delete: false,
+                                }))
+                            }
+                        }
+                        None => Ok(None),
+                    }
                 })
             })
             .await
     }
 
-    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
+    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>> {
         let epoch = editor.model.epoch.clone();
+
         let parties = ChannelParties(editor.orig.source, editor.orig.destination);
         let ret = self
             .nest_transaction(tx)
@@ -171,10 +227,16 @@ impl HoprDbChannelOperations for HoprDb {
                 Box::pin(async move {
                     if !editor.delete {
                         let model = editor.model.update(tx.as_ref()).await?;
-                        Ok::<_, DbSqlError>(model.try_into()?)
+                        match ChannelEntry::try_from(model) {
+                            Ok(channel) => Ok::<_, DbSqlError>(Some(channel)),
+                            Err(DbEntityError::InvalidCorruptionFlag(_)) => {
+                                Ok::<_, DbSqlError>(None) // If the channel entry cannot be created, return None
+                            }
+                            Err(e) => Err(DbSqlError::from(e)),
+                        }
                     } else {
                         editor.model.delete(tx.as_ref()).await?;
-                        Ok::<_, DbSqlError>(editor.orig)
+                        Ok::<_, DbSqlError>(Some(editor.orig))
                     }
                 })
             })
@@ -195,6 +257,7 @@ impl HoprDbChannelOperations for HoprDb {
         Ok(ret)
     }
 
+    #[instrument(level = "trace", skip(self, tx), err)]
     async fn get_channel_by_parties<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -205,6 +268,7 @@ impl HoprDbChannelOperations for HoprDb {
         let fetch_channel = async move {
             let src_hex = src.to_hex();
             let dst_hex = dst.to_hex();
+            tracing::warn!(%src, %dst, "cache miss on get_channel_by_parties");
             self.nest_transaction(tx)
                 .await?
                 .perform(|tx| {
@@ -213,6 +277,7 @@ impl HoprDbChannelOperations for HoprDb {
                             if let Some(model) = Channel::find()
                                 .filter(channel::Column::Source.eq(src_hex))
                                 .filter(channel::Column::Destination.eq(dst_hex))
+                                .filter(channel::Column::Corrupted.eq(false))
                                 .one(tx.as_ref())
                                 .await?
                             {
@@ -253,6 +318,7 @@ impl HoprDbChannelOperations for HoprDb {
                             ChannelDirection::Incoming => channel::Column::Destination.eq(target_hex),
                             ChannelDirection::Outgoing => channel::Column::Source.eq(target_hex),
                         })
+                        .filter(channel::Column::Corrupted.eq(false))
                         .all(tx.as_ref())
                         .await?
                         .into_iter()
@@ -279,12 +345,30 @@ impl HoprDbChannelOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     Channel::find()
+                        .filter(channel::Column::Corrupted.eq(false))
                         .stream(tx.as_ref())
                         .await?
                         .map_err(DbSqlError::from)
                         .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
                         .try_collect()
                         .await
+                })
+            })
+            .await
+    }
+
+    async fn get_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<CorruptedChannelEntry>> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    Channel::find()
+                        .filter(channel::Column::Corrupted.eq(true))
+                        .all(tx.as_ref())
+                        .await?
+                        .into_iter()
+                        .map(|x| CorruptedChannelEntry::try_from(x).map_err(DbSqlError::from))
+                        .collect::<Result<Vec<_>>>()
                 })
             })
             .await
@@ -301,6 +385,7 @@ impl HoprDbChannelOperations for HoprDb {
                         )))
                         .and(channel::Column::ClosureTime.gt(Utc::now()))),
             )
+            .filter(channel::Column::Corrupted.eq(false))
             .stream(&self.index_db)
             .await?
             .map_err(DbSqlError::from)

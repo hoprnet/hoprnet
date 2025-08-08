@@ -209,3 +209,7 @@ vendor/cargo/.DS_Store
 # nix generated files
 result
 .pre-commit-config.yaml
+deploy/nfpm/nfpm.generated.yaml
+deploy/nfpm/changelog*
+privatekey.asc
+deploy/nfpm/*.1.gz

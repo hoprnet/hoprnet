@@ -11,26 +11,26 @@ env:
 on:
   merge_group:
     types: [checks_requested]
-  pull_request:
+  pull_request_target:
     types:
       - synchronize
       - ready_for_review
 
 concurrency:
-  group: ${{ github.workflow}}-${{ github.ref }}-test
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.workflow}}
   cancel-in-progress: true
 
 jobs:
   tests-unit:
+    name: Unit Tests
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
-    if: github.event.pull_request.draft == false
     env:
       needs_nix_setup: false
       CI: "true"
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -38,11 +38,13 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -58,6 +60,7 @@ jobs:
         run: nix build -L .#hopr-test
 
   tests-unit-nightly:
+    name: Unit Tests Nightly
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
@@ -66,7 +69,7 @@ jobs:
       CI: "true"
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -74,11 +77,13 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # v2.1.10
+        uses: google-github-actions/auth@140bb5113ffb6b65a7e9b937a81fa96cf5064462 # v2.1.11
         if: ${{ !env.ACT }}
         with:
           token_format: "access_token"
@@ -86,7 +91,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -104,13 +109,14 @@ jobs:
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger
+    name: Smart Contracts
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
     env:
       needs_nix_setup: false
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -118,11 +124,13 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # v2.1.10
+        uses: google-github-actions/auth@140bb5113ffb6b65a7e9b937a81fa96cf5064462 # v2.1.11
         if: ${{ !env.ACT }}
         with:
           token_format: "access_token"
@@ -130,7 +138,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -160,7 +168,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -168,11 +176,13 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -189,6 +199,7 @@ jobs:
 
   tests-smoke:
     runs-on: self-hosted-hoprnet-bigger
+    name: Smoke Tests
     needs:
       - build-candidate-binaries
     timeout-minutes: 30
@@ -208,7 +219,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -216,6 +227,8 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
           persist-credentials: false
 
       - name: Setup GCP
@@ -228,7 +241,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -266,7 +279,7 @@ jobs:
           HOPR_SMOKETEST_BASE_PORT: ${{ steps.find_base_port.outputs.base-port }}
 
       - name: Upload snapshot
-        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
+        uses: google-github-actions/upload-cloud-storage@7c73f5d6eae167341002e9c946f7479a609c588e # v2.2.3
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
           path: ${{ steps.find_base_port.outputs.snapshot-dir }}
@@ -283,9 +296,11 @@ jobs:
 
           # Copy files, delete all but the log files
           cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
-          find ${test_name}/ -type f ! -name "hoprd.log" -delete
+          find ${test_name}/ -type f ! -name "hoprd.log" ! -name "*.pcap" -delete
           cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
 
           # Create tarball and upload to GCP
           tar -czvf ${test_name}.tgz ${test_name}/
           gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
+
+          echo "Download logs from: https://console.cloud.google.com/storage/browser/hoprnet-test-logs/pr-${{ github.event.pull_request.number }}"

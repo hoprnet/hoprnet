@@ -18,6 +18,8 @@ pub const DEFAULT_AUTO_PATH_QUALITY_THRESHOLD: f64 = 0.95;
 
 pub const DEFAULT_MAX_FIRST_HOP_LATENCY_THRESHOLD: Duration = Duration::from_millis(250);
 
+pub const DEFAULT_CANNOT_DIAL_PENALTY: Duration = Duration::from_secs(60 * 60); // 1 hour
+
 /// Configuration for the [`crate::network::Network`] object
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, SmartDefault, PartialEq)]

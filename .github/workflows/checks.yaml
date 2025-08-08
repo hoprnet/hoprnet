@@ -1,0 +1,57 @@
+---
+################################################################################
+# Main pipeline to run checks hoprnet
+################################################################################
+name: Checks
+
+on:
+  merge_group:
+    types: [checks_requested]
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  actions: read
+  security-events: write
+  contents: read
+
+concurrency:
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-checks
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    name: Pre-commit
+    uses: ./.github/workflows/checks-pre-commit.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets: inherit
+
+  audit:
+    name: Audit
+    uses: ./.github/workflows/checks-audit.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets: inherit
+
+  lint:
+    name: Lint
+    uses: ./.github/workflows/checks-lint.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets: inherit
+
+  zizmor:
+    name: Zizmor
+    uses: ./.github/workflows/checks-zizmor.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets: inherit

@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = ["sdk-localcluster", "sdk-api"]
 
+[tool.uv]
+exclude-newer = "2025-07-18T00:00:00Z"
+
 [tool.uv.sources]
 sdk-localcluster = { workspace = true }
 sdk-api = { workspace = true }
@@ -15,7 +18,7 @@ tests = { workspace = true }
 members = ["sdk/python/localcluster", "sdk/python/api", "tests"]
 
 [dependency-groups]
-dev = ["ruff>=0.11.13", "tests"]
+dev = ["ruff>=0.12.4", "tests"]
 lint = ["black==25.1.0"]
 
 [tool.black]

@@ -30,7 +30,7 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -73,5 +73,5 @@ jobs:
     uses: ./.github/workflows/open-release.yaml
     with:
       release_type: Patch
-      base_branch: "release/${{ github.event.inputs.tag_release_name }}"
+      source_branch: "release/${{ github.event.inputs.tag_release_name }}"
     secrets: inherit

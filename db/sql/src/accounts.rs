@@ -16,6 +16,7 @@ use sea_orm::{
     Set, sea_query::Expr,
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
+use tracing::instrument;
 
 use crate::{
     HoprDbGeneralModelOperations, OptTx,
@@ -399,6 +400,7 @@ impl HoprDbAccountOperations for HoprDb {
             .await
     }
 
+    #[instrument(level = "trace", skip_all, err)]
     async fn translate_key<'a, T: Into<ChainOrPacketKey> + Send + Sync>(
         &'a self,
         tx: OptTx<'a>,
@@ -411,6 +413,7 @@ impl HoprDbAccountOperations for HoprDb {
                 .try_get_with_by_ref(
                     &chain_key,
                     self.nest_transaction(tx).and_then(|op| {
+                        tracing::warn!(?chain_key, "cache miss on chain key lookup");
                         op.perform(|tx| {
                             Box::pin(async move {
                                 let maybe_model = Account::find()
@@ -428,16 +431,17 @@ impl HoprDbAccountOperations for HoprDb {
                 )
                 .await?
                 .map(ChainOrPacketKey::PacketKey),
-            ChainOrPacketKey::PacketKey(packey_key) => self
+            ChainOrPacketKey::PacketKey(packet_key) => self
                 .caches
                 .offchain_to_chain
                 .try_get_with_by_ref(
-                    &packey_key,
+                    &packet_key,
                     self.nest_transaction(tx).and_then(|op| {
+                        tracing::warn!(?packet_key, "cache miss on packet key lookup");
                         op.perform(|tx| {
                             Box::pin(async move {
                                 let maybe_model = Account::find()
-                                    .filter(account::Column::PacketKey.eq(packey_key.to_string()))
+                                    .filter(account::Column::PacketKey.eq(packet_key.to_string()))
                                     .one(tx.as_ref())
                                     .await?;
                                 if let Some(m) = maybe_model {

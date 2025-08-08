@@ -4,6 +4,7 @@ import os
 import random
 from pathlib import Path
 from subprocess import CalledProcessError, run
+from typing import Optional
 
 import pytest
 
@@ -261,8 +262,8 @@ def create_safe_module(extra_prefix: str, private_key: str, manager_private_key:
         capture_output=True,
     )
 
-    safe_address: str = None
-    module_address: str = None
+    safe_address: Optional[str] = None
+    module_address: Optional[str] = None
 
     for el in res.stdout.decode("utf-8").split("\n"):
         logging.info(el)

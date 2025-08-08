@@ -95,7 +95,7 @@ pub struct Balance<C: Currency>(U256, C);
 const WEI_PREFIX: &str = "wei";
 
 lazy_static::lazy_static! {
-    static ref BALANCE_REGEX: regex::Regex = regex::Regex::new(&format!("^([\\d\\s.]*\\d)\\s+({}[_\\s]?)?([A-Za-z]+)$", WEI_PREFIX)).unwrap();
+    static ref BALANCE_REGEX: regex::Regex = regex::Regex::new(&format!("^([\\d\\s.]*\\d)\\s+({WEI_PREFIX}[_\\s]?)?([A-Za-z]+)$")).unwrap();
 }
 
 impl<C: Currency> Display for Balance<C> {

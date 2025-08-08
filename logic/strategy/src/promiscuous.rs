@@ -25,7 +25,6 @@
 use std::{
     collections::HashMap,
     fmt::{Debug, Display, Formatter},
-    str::FromStr,
     time::Duration,
 };
 
@@ -38,7 +37,6 @@ use hopr_internal_types::prelude::*;
 use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
 use hopr_primitive_types::prelude::*;
 use rand::seq::SliceRandom;
-use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, error, info, trace, warn};
@@ -203,13 +201,6 @@ pub struct PromiscuousStrategyConfig {
     #[serde(default = "just_true")]
     #[default(true)]
     pub enforce_max_channels: bool,
-
-    /// Specifies a minimum version (in semver syntax) of the peer the strategy should open a channel to.
-    ///
-    /// Default is ">=2.2.1"
-    #[serde_as(as = "DisplayFromStr")]
-    #[default(">=2.2.1".parse().expect("should be valid default version"))]
-    pub minimum_peer_version: semver::VersionReq,
 }
 
 impl validator::Validate for PromiscuousStrategyConfig {
@@ -257,13 +248,6 @@ impl validator::Validate for PromiscuousStrategyConfig {
             errors.add(
                 "max_channels",
                 validator::ValidationError::new("must be greater than 0"),
-            );
-        }
-
-        if semver::VersionReq::parse(self.minimum_peer_version.to_string().as_str()).is_err() {
-            errors.add(
-                "minimum_peer_version",
-                validator::ValidationError::new("must be a valid semver expression"),
             );
         }
 
@@ -326,32 +310,16 @@ where
                     }
                 })
                 .filter_map(|status| async move {
-                    // Check if peer reports any version
-                    if let Some(version) = status.peer_version.clone().and_then(|v| {
-                        semver::Version::from_str(&v)
-                            .ok() // Workaround for https://github.com/dtolnay/semver/issues/315
-                            .map(|v| Version::new(v.major, v.major, v.patch))
-                    }) {
-                        // Check if the reported version matches the version semver expression
-                        if self.cfg.minimum_peer_version.matches(&version) {
-                            // Resolve peer's chain key and average quality
-                            if let Ok(addr) = self
-                                .db
-                                .resolve_chain_key(&status.id.0)
-                                .await
-                                .and_then(|addr| addr.ok_or(DbSqlError::MissingAccount.into()))
-                            {
-                                Some((addr, (status.get_average_quality(), status.heartbeats_sent)))
-                            } else {
-                                error!(address = %status.id.1, "could not find on-chain address");
-                                None
-                            }
-                        } else {
-                            debug!(peer = %status.id.1, ?version, "version of peer does not match the expectation");
-                            None
-                        }
+                    // Resolve peer's chain key and average quality
+                    if let Ok(addr) = self
+                        .db
+                        .resolve_chain_key(&status.id.0)
+                        .await
+                        .and_then(|addr| addr.ok_or(DbSqlError::MissingAccount.into()))
+                    {
+                        Some((addr, (status.get_average_quality(), status.heartbeats_sent)))
                     } else {
-                        error!(peer = %status.id.1, "cannot get version");
+                        error!(address = %status.id.1, "could not find on-chain address");
                         None
                     }
                 })
@@ -725,7 +693,6 @@ mod tests {
                 .await?;
 
             let mut status = db.get_network_peer(peer).await?.expect("should be present");
-            status.peer_version = Some("2.2.0".into());
             status.heartbeats_sent = 200;
             while status.get_average_quality() < quality {
                 status.update_quality(quality);
@@ -788,18 +755,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_semver() -> anyhow::Result<()> {
-        // See https://github.com/dtolnay/semver/issues/315
-        let ver: semver::Version = "2.1.0-rc.3+commit.f75bc6c8".parse()?;
-        let stripped = semver::Version::new(ver.major, ver.minor, ver.patch);
-        let req = semver::VersionReq::from_str(">=2.0.0")?;
-
-        assert!(req.matches(&stripped), "constraint must match");
-
-        Ok(())
-    }
-
     #[test_log::test(tokio::test)]
     async fn test_promiscuous_strategy_tick_decisions() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
@@ -814,19 +769,17 @@ mod tests {
         let for_closing = mock_channel(db.clone(), PEERS[5].0, 10.into()).await?;
 
         // Peer 3 has an accepted pre-release version
-        let mut status_3 = db
+        let status_3 = db
             .get_network_peer(&PEERS[3].1)
             .await?
             .context("peer should be present")?;
-        status_3.peer_version = Some("2.1.0-rc.3+commit.f75bc6c8".into());
         db.update_network_peer(status_3).await?;
 
         // Peer 10 has an old node version
-        let mut status_10 = db
+        let status_10 = db
             .get_network_peer(&PEERS[9].1)
             .await?
             .context("peer should be present")?;
-        status_10.peer_version = Some("1.92.0".into());
         db.update_network_peer(status_10).await?;
 
         let strat_cfg = PromiscuousStrategyConfig {
@@ -835,7 +788,6 @@ mod tests {
             network_quality_close_threshold: 0.3,
             new_channel_stake: 10.into(),
             minimum_safe_balance: 50.into(),
-            minimum_peer_version: ">=2.2.0".parse()?,
             initial_delay: Duration::ZERO,
             ..Default::default()
         };
@@ -844,8 +796,8 @@ mod tests {
         // - There are max 3 channels and also 3 are currently opened.
         // - Strategy will close channel to peer 5, because it has quality 0.1
         // - Because of the closure, this means there can be 1 additional channel opened:
-        // - Strategy can open channel either to peer 3, 4 or 10 (with qualities 0.8, 0.98 and 1.0 respectively)
-        // - It will ignore peer 10 even though it has the highest quality, but does not meet minimum node version
+        // - Strategy can open channel either to peer 3, 4 or 9 (with qualities 0.8, 0.98 and 1.0 respectively)
+        // - It will ignore peer 9 even though it has the highest quality, but does not meet minimum node version
         // - It will prefer peer 4 because it has higher quality than node 3
 
         let mut actions = MockChannelAct::new();
@@ -859,7 +811,7 @@ mod tests {
         actions
             .expect_open_channel()
             .times(1)
-            .withf(move |dst, b| PEERS[4].0.eq(dst) && new_stake.eq(b))
+            .withf(move |dst, b| PEERS[9].0.eq(dst) && new_stake.eq(b))
             .return_once(move |_, _| Ok(ok(mock_action_confirmation_opening(PEERS[4].0, new_stake)).boxed()));
 
         let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, actions);

@@ -538,9 +538,8 @@ pub struct OffchainPublicKey {
 
 impl std::fmt::Debug for OffchainPublicKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OffchainPublicKey")
-            .field("compressed", &self.compressed)
-            .finish()
+        // Intentionally same as display
+        write!(f, "{}", self.to_hex())
     }
 }
 

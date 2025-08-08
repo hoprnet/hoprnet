@@ -16,7 +16,7 @@ from .constants import (
 )
 from .node import Node
 
-GLOBAL_TIMEOUT = 200
+GLOBAL_TIMEOUT = 60
 
 
 class Cluster:
@@ -203,7 +203,7 @@ class Cluster:
 
         # prepare folders
         for node_id in range(self.size):
-            MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{node_id+1}").mkdir(parents=True, exist_ok=True)
+            MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{node_id + 1}").mkdir(parents=True, exist_ok=True)
 
         # Remove old identities
         for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}/*.id"):
