@@ -21,7 +21,19 @@ lazy_static::lazy_static! {
     static ref METRIC_CONTROL_OUTPUT: hopr_metrics::metrics::MultiGauge =
         hopr_metrics::metrics::MultiGauge::new(
             "hopr_surb_balancer_control_output",
-            "hopr_surb_balancer_control_output",
+            "Control output of the SURB balancer",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_CURRENT_BUFFER: hopr_metrics::metrics::MultiGauge =
+        hopr_metrics::metrics::MultiGauge::new(
+            "hopr_surb_balancer_current_buffer_estimate",
+            "Estimated number of SURBs in the buffer",
+            &["session_id"]
+    ).unwrap();
+    static ref METRIC_CURRENT_TARGET: hopr_metrics::metrics::MultiGauge =
+        hopr_metrics::metrics::MultiGauge::new(
+            "hopr_surb_balancer_current_buffer_target",
+            "Current target (setpoint) number of SURBs in the buffer",
             &["session_id"]
     ).unwrap();
     static ref METRIC_SURB_RATE: hopr_metrics::metrics::MultiGauge =
@@ -192,7 +204,7 @@ where
             self.was_below_target = true;
         }
 
-        debug!(
+        trace!(
             ?dt,
             delta = target_buffer_change,
             rate = target_buffer_change as f64 / dt.as_secs_f64(),
@@ -202,13 +214,15 @@ where
         );
 
         let output = self.controller.next_control_output(self.current_buffer);
-        debug!(output, "next balancer control output for session");
+        trace!(output, "next balancer control output for session");
 
         self.flow_control.adjust_surb_flow(output as usize);
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             let sid = self.session_id.to_string();
+            METRIC_CURRENT_BUFFER.set(&[&sid], self.current_buffer as f64);
+            METRIC_CURRENT_TARGET.set(&[&sid], self.controller.bounds().target() as f64);
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], error as f64);
             METRIC_CONTROL_OUTPUT.set(&[&sid], output as f64);
             METRIC_SURB_RATE.set(&[&sid], target_buffer_change as f64 / dt.as_secs_f64());
