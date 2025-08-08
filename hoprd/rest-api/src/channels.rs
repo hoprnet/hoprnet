@@ -543,7 +543,7 @@ pub(super) async fn fund_channel(
 /// Response body for the list of corrupted channels.
 pub(crate) struct CorruptedChannelsResponse {
     #[schema(value_type = Vec<String>)]
-    channels_ids: Vec<Hash>,
+    channels_ids: Vec<String>,
 }
 
 #[utoipa::path(
@@ -569,7 +569,7 @@ pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) 
         Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     };
 
-    let channels_ids: Vec<Hash> = corrupted.into_iter().map(|c| *c.channel_id()).collect();
+    let channels_ids: Vec<String> = corrupted.into_iter().map(|c| c.channel_id().to_string()).collect();
 
     (StatusCode::OK, Json(CorruptedChannelsResponse { channels_ids })).into_response()
 }
