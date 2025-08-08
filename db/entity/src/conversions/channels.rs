@@ -1,10 +1,7 @@
-use hopr_internal_types::{
-    channels::{ChannelId, ChannelStatus, CorruptedChannelEntry},
-    prelude::ChannelEntry,
-};
+use hopr_internal_types::{channels::ChannelStatus, prelude::ChannelEntry};
 use hopr_primitive_types::{
     balance::HoprBalance,
-    prelude::{Address, IntoEndian, ToHex, U256},
+    prelude::{IntoEndian, ToHex, U256},
 };
 use sea_orm::Set;
 
@@ -48,12 +45,6 @@ impl TryFrom<&channel::Model> for ChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
-        if value.corrupted {
-            return Err(DbEntityError::InvalidCorruptionFlag(
-                "cannot convert corrupted channel model to ChannelEntry".into(),
-            ));
-        }
-
         Ok(ChannelEntry::new(
             value.source.parse()?,
             value.destination.parse()?,
@@ -82,55 +73,9 @@ impl From<ChannelEntry> for channel::ActiveModel {
             balance: Set(value.balance.amount().to_be_bytes().into()),
             epoch: Set(value.channel_epoch.to_be_bytes().into()),
             ticket_index: Set(value.ticket_index.to_be_bytes().into()),
-            corrupted: Set(false),
             ..Default::default()
         };
         ret.set_status(value.status);
         ret
-    }
-}
-
-impl TryFrom<&channel::Model> for CorruptedChannelEntry {
-    type Error = DbEntityError;
-
-    fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
-        if !value.corrupted {
-            return Err(DbEntityError::ConversionError(
-                "cannot convert non-corrupted channel model to CorruptedChannelEntry".into(),
-            ));
-        }
-
-        let channel_id = ChannelId::from_hex(value.channel_id.as_str())
-            .map_err(|_| DbEntityError::ConversionError("invalid channel ID".into()))?;
-
-        Ok(channel_id.into())
-    }
-}
-
-impl TryFrom<channel::Model> for CorruptedChannelEntry {
-    type Error = DbEntityError;
-
-    fn try_from(value: channel::Model) -> Result<Self, Self::Error> {
-        if !value.corrupted {
-            return Err(DbEntityError::ConversionError(
-                "cannot convert non-corrupted channel model to CorruptedChannelEntry".into(),
-            ));
-        }
-
-        (&value).try_into()
-    }
-}
-
-impl From<CorruptedChannelEntry> for channel::ActiveModel {
-    fn from(value: CorruptedChannelEntry) -> Self {
-        channel::ActiveModel {
-            channel_id: Set(value.channel_id().to_hex()),
-            source: Set(Address::default().to_hex()), // Default to empty address
-            destination: Set(Address::default().to_hex()), // Default to empty address
-            balance: Set(HoprBalance::default().amount().to_be_bytes().into()), //
-            status: Set(i8::from(ChannelStatus::Open)), // Default to Open status
-            corrupted: Set(true),
-            ..Default::default()
-        }
     }
 }

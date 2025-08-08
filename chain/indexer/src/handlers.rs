@@ -234,10 +234,6 @@ where
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
-                    Err(DbSqlError::CorruptedChannelEntry(_)) => {
-                        error!(%channel_id, "failed to begin channel update on on_channel_balance_decreased_event: corrupted channel entry");
-                        return Ok(None);
-                    }
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_channel_balance_decreased_event");
                         return Err(e.into());
@@ -281,7 +277,7 @@ where
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
                     error!(%channel_id, "observed balance decreased event for a channel that does not exist");
-                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -290,10 +286,6 @@ where
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
-                    Err(DbSqlError::CorruptedChannelEntry(_)) => {
-                        error!(%channel_id, "failed to begin channel update on on_channel_balance_increased_event: corrupted channel entry");
-                        return Ok(None);
-                    }
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_channel_balance_increased_event");
                         return Err(e.into());
@@ -347,7 +339,7 @@ where
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
                     error!(%channel_id, "observed balance increased event for a channel that does not exist");
-                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -356,10 +348,6 @@ where
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
-                    Err(DbSqlError::CorruptedChannelEntry(_)) => {
-                        error!(%channel_id, "failed to begin channel update on on_channel_closed_event: corrupted channel entry");
-                        return Ok(None);
-                    }
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_channel_closed_event");
                         return Err(e.into());
@@ -424,7 +412,7 @@ where
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
                     error!(%channel_id, "observed closure finalization event for a channel that does not exist.");
-                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -435,10 +423,6 @@ where
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
-                    Err(DbSqlError::CorruptedChannelEntry(_)) => {
-                        error!(%source, %destination, %channel_id, "failed to begin channel update on on_channel_opened_event: corrupted channel entry");
-                        return Ok(None);
-                    }
                     Err(e) => {
                         error!(%source, %destination, %channel_id, %e, "failed to begin channel update on on_channel_opened_event");
                         return Err(e.into());
@@ -452,9 +436,8 @@ where
                     if channel_edits.entry().status != ChannelStatus::Closed {
                         warn!(%source, %destination, %channel_id, "received Open event for a channel that is not Closed, marking it as corrupted");
 
-                        self.db
-                            .finish_channel_update(tx.into(), channel_edits.set_corrupted())
-                            .await?;
+                        self.db.finish_channel_update(tx.into(), channel_edits.delete()).await?;
+                        self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
 
                         return Ok(None);
                     }
@@ -510,10 +493,6 @@ where
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
-                    Err(DbSqlError::CorruptedChannelEntry(_)) => {
-                        error!(%channel_id, "failed to begin channel update on on_ticket_redeemed_event: corrupted channel entry");
-                        return Ok(None);
-                    }
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_ticket_redeemed_event");
                         return Err(e.into());
@@ -576,9 +555,8 @@ where
 
                                     let entry_str = channel_edits.entry().to_string();
 
-                                    self.db
-                                        .finish_channel_update(tx.into(), channel_edits.set_corrupted())
-                                        .await?;
+                                    self.db.finish_channel_update(tx.into(), channel_edits.delete()).await?;
+                                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
 
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
@@ -638,7 +616,7 @@ where
                     Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                 } else {
                     error!(%channel_id, "observed ticket redeem on a channel that we don't have in the DB");
-                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -646,10 +624,6 @@ where
                 let channel_id = closure_initiated.channelId.0.into();
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
-                    Err(DbSqlError::CorruptedChannelEntry(_)) => {
-                        error!(%channel_id, "failed to begin channel update on on_outgoing_channel_closure_initiated_event: corrupted channel entry");
-                        return Ok(None);
-                    }
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_outgoing_channel_closure_initiated_event");
                         return Err(e.into());
@@ -674,7 +648,7 @@ where
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     error!(%channel_id, "observed channel closure initiation on a channel that we don't have in the DB");
-                    self.db.insert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -1220,6 +1194,7 @@ mod tests {
         accounts::{ChainOrPacketKey, HoprDbAccountOperations},
         api::{info::DomainSeparator, tickets::HoprDbTicketOperations},
         channels::HoprDbChannelOperations,
+        corrupted_channels::HoprDbCorruptedChannelOperations,
         db::HoprDb,
         info::HoprDbInfoOperations,
         prelude::HoprDbResolverOperations,
@@ -2667,90 +2642,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn corrupted_channel_editing_should_not_panic() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        let channel = ChannelEntry::new(
-            *SELF_CHAIN_ADDRESS,
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            0.into(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            3.into(),
-        );
-
-        db.upsert_channel(None, channel).await?;
-
-        // set the channel as corrupted
-        let editor = match db.begin_channel_update(None, &channel.get_id()).await? {
-            Some(editor) => editor,
-            None => return Err(anyhow::anyhow!("Failed to begin channel update")),
-        };
-
-        db.finish_channel_update(None, editor.set_corrupted()).await?;
-
-        db.get_corrupted_channel_by_id(None, &channel.get_id())
-            .await?
-            .context("channel should be set a corrupted at this point")?;
-
-        let encoded_data = ().abi_encode();
-        let handlers_clone = handlers.clone();
-        let channel_opened_log = SerializableLog {
-            address: handlers_clone.addresses.channels,
-            topics: vec![
-                hopr_bindings::hoprchannels::HoprChannels::ChannelOpened::SIGNATURE_HASH.into(),
-                // ChannelOpenedFilter::signature().into(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
-                H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()).into(),
-            ],
-            data: encoded_data,
-            ..test_log()
-        };
-
-        db.begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers_clone.process_log_event(tx, channel_opened_log, true).await }))
-            .await
-            .context("Channel should stay open without panicking")?;
-
-        // Attempt to increase balance
-        let solidity_balance: HoprBalance = primitive_types::U256::from((1u128 << 96) - 1).into();
-
-        let encoded_data = (solidity_balance.amount().to_be_bytes()).abi_encode();
-
-        let balance_increased_log = SerializableLog {
-            address: handlers.addresses.channels,
-            topics: vec![
-                hopr_bindings::hoprchannels::HoprChannels::ChannelBalanceIncreased::SIGNATURE_HASH.into(),
-                // ChannelBalanceIncreasedFilter::signature().into(),
-                H256::from_slice(channel.get_id().as_ref()).into(),
-            ],
-            data: encoded_data,
-            ..test_log()
-        };
-
-        db.begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_increased_log, true).await }))
-            .await?;
-
-        // Check that the channel is still marked as corrupted
-        db.get_corrupted_channel_by_id(None, &channel.get_id())
-            .await?
-            .context("channel should still be set a corrupted")?;
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn event_for_non_existing_channel_should_create_dummy_channel() -> anyhow::Result<()> {
+    async fn event_for_non_existing_channel_should_create_corrupted_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
@@ -2783,7 +2675,7 @@ mod tests {
             .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_increased_log, true).await }))
             .await?;
 
-        // Check that the dummy corrupted channel was created
+        // Check that the corrupted channel was created
         db.get_corrupted_channel_by_id(None, &channel_id)
             .await?
             .context("channel should be set a corrupted")?;
