@@ -5,6 +5,15 @@ pragma solidity ^0.8;
  * @title HoprNodeManagementModule interface
  */
 interface IHoprNodeManagementModule {
-    function isHoprNodeManagementModule() external view returns (bool);
+    /**
+     * @notice Returns a descriptive version of the NodeManagementModule contract.
+     * @return The version string.
+     */
+    // solhint-disable-next-line func-name-mixedcase
+    function VERSION() external view returns (string memory);
+
+    /**
+     * @notice Returns if a node is included in the NodeManagementModule contract.
+     */
     function isNode(address nodeAddress) external view returns (bool);
 }

@@ -193,8 +193,10 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
         _helperTokenTransferFromMock(src, amount1);
 
+        bytes32 channelId = keccak256(abi.encodePacked(src, dest));
+
         vm.expectEmit(true, true, false, true, address(hoprChannels));
-        emit ChannelOpened(src, dest);
+        emit ChannelOpened(channelId, src, dest);
 
         vm.startPrank(src);
         hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount1));
@@ -233,7 +235,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperTokenTransferFromMock(safeContract, amount1);
 
         vm.expectEmit(true, true, false, true, address(hoprChannels));
-        emit ChannelOpened(src, dest);
+        emit ChannelOpened(channelId, src, dest);
 
         vm.startPrank(safeContract);
         hoprChannels.fundChannelSafe(src, dest, HoprChannels.Balance.wrap(amount1));

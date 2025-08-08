@@ -46,7 +46,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     using TargetUtils for Target;
     using EnumerableTargetSet for TargetSet;
 
-    bool public constant isHoprNodeManagementModule = true;
+    string public constant override VERSION = "2.0.0";
+
     // address to send delegated multisend calls to
     address public multisend;
     // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs

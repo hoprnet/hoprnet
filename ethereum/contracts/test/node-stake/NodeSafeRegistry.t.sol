@@ -359,8 +359,6 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
             abi.encode(modules, SENTINEL_MODULES)
         );
 
-        vm.mockCall(modules[0], abi.encodeWithSignature("isHoprNodeManagementModule()"), abi.encode(isModuleSet));
-
         vm.mockCall(modules[0], abi.encodeWithSignature("isNode(address)", nodeAddress), abi.encode(isNodeIncluded));
     }
 

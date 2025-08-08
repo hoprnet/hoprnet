@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.19;
+pragma solidity >=0.7.0 <0.9.0;
 
 import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
 import { IERC1820Registry } from "openzeppelin-contracts/utils/introspection/IERC1820Registry.sol";
@@ -24,7 +24,7 @@ abstract contract HoprChannelsEvents {
      * Includes source and destination separately because mapping
      * (source, destination) -> channelId destroys information.
      */
-    event ChannelOpened(address indexed source, address indexed destination);
+    event ChannelOpened(bytes32 indexed channelId, address indexed source, address indexed destination);
 
     /**
      * Emitted once balance of a channel is increased, e.g. after opening a
@@ -791,7 +791,7 @@ contract HoprChannels is
             channel.status = ChannelStatus.OPEN;
 
             indexEvent(abi.encodePacked(ChannelOpened.selector, selfAddress, account));
-            emit ChannelOpened(selfAddress, account);
+            emit ChannelOpened(channelId, selfAddress, account);
         }
 
         indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
