@@ -146,7 +146,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                                     if builder.is_complete() {
                                         #[cfg(all(not(test), feature = "prometheus"))]
                                         METRIC_TIME_TO_FRAME_FINISH
-                                            .observe(builder._created.elapsed().as_millis() as f64);
+                                            .observe(builder.created.elapsed().as_millis() as f64);
 
                                         tracing::trace!(frame_id = builder.frame_id(), "frame is complete");
                                         return Poll::Ready(Some(e.finalize().try_into()));
@@ -161,7 +161,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                             let builder = FrameBuilder::from(item);
                             if builder.is_complete() {
                                 #[cfg(all(not(test), feature = "prometheus"))]
-                                METRIC_TIME_TO_FRAME_FINISH.observe(builder._created.elapsed().as_millis() as f64);
+                                METRIC_TIME_TO_FRAME_FINISH.observe(builder.created.elapsed().as_millis() as f64);
 
                                 tracing::trace!(frame_id = builder.frame_id(), "segment frame is complete");
                                 return Poll::Ready(Some(builder.try_into()));

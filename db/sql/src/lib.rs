@@ -7,6 +7,7 @@
 pub mod accounts;
 mod cache;
 pub mod channels;
+pub mod corrupted_channels;
 pub mod db;
 pub mod errors;
 pub mod info;
@@ -33,6 +34,7 @@ pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
 use crate::{
     accounts::HoprDbAccountOperations,
     channels::HoprDbChannelOperations,
+    corrupted_channels::HoprDbCorruptedChannelOperations,
     db::HoprDb,
     errors::{DbSqlError, Result},
     info::HoprDbInfoOperations,
@@ -274,6 +276,7 @@ pub trait HoprDbAllOperations:
     HoprDbGeneralModelOperations
     + HoprDbAccountOperations
     + HoprDbChannelOperations
+    + HoprDbCorruptedChannelOperations
     + HoprDbInfoOperations
     + HoprDbLogOperations
     + HoprDbPeersOperations
@@ -289,5 +292,5 @@ pub mod prelude {
     pub use hopr_db_api::{logs::*, peers::*, protocol::*, resolver::*, tickets::*};
 
     pub use super::*;
-    pub use crate::{accounts::*, channels::*, db::*, errors::*, info::*, registry::*};
+    pub use crate::{accounts::*, channels::*, corrupted_channels::*, db::*, errors::*, info::*, registry::*};
 }

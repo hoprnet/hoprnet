@@ -33,6 +33,8 @@ use crate::{
 
 pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
+pub const MIN_SURB_RING_BUFFER_SIZE: usize = 1024;
+
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct HoprDbConfig {
     #[default(true)]
@@ -89,7 +91,7 @@ pub struct HoprDb {
     pub(crate) cfg: HoprDbConfig,
 }
 
-/// Filename for the blockchain indexing database.
+/// Filename for the blockchain-indexing database.
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
 /// Filename for the network peers database.
 pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
@@ -106,6 +108,11 @@ impl HoprDb {
             lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
             lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
         }
+
+        let cfg = HoprDbConfig {
+            surb_ring_buffer_size: cfg.surb_ring_buffer_size.max(MIN_SURB_RING_BUFFER_SIZE),
+            ..cfg
+        };
 
         fs::create_dir_all(directory)
             .map_err(|_e| DbSqlError::Construction(format!("cannot create main database directory {directory:?}")))?;

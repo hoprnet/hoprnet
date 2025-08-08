@@ -419,12 +419,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> futures::io::AsyncWrit
 impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncRead for SessionSocket<C, S> {
     #[instrument(name = "SessionSocket::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id()))]
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         let slice = buf.initialize_unfilled();
-        let n = futures::ready!(self.project().downstream_frames_out.as_mut().poll_read(cx, slice))?;
+        let n = std::task::ready!(futures::AsyncRead::poll_read(self.as_mut(), cx, slice))?;
         buf.advance(n);
         Poll::Ready(Ok(()))
     }
@@ -433,20 +433,18 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncRead f
 #[cfg(feature = "runtime-tokio")]
 impl<const C: usize, S: SocketState<C> + Clone + 'static> tokio::io::AsyncWrite for SessionSocket<C, S> {
     #[instrument(name = "SessionSocket::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
-        self.project().upstream_frames_in.as_mut().poll_write(cx, buf)
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
+        futures::AsyncWrite::poll_write(self.as_mut(), cx, buf)
     }
 
     #[instrument(name = "SessionSocket::poll_flush", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        self.project().upstream_frames_in.as_mut().poll_flush(cx)
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        futures::AsyncWrite::poll_flush(self.as_mut(), cx)
     }
 
     #[instrument(name = "SessionSocket::poll_shutdown", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        let this = self.project();
-        let _ = this.state.stop();
-        this.upstream_frames_in.as_mut().poll_close(cx)
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        futures::AsyncWrite::poll_close(self.as_mut(), cx)
     }
 }
 
