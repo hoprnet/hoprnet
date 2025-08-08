@@ -537,13 +537,13 @@ pub(super) async fn fund_channel(
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "channelsIds": ["0x188c4462b75e46f0c7262d7f48d182447b93a93c"],
+        "channelIds": ["0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f"],
 }))]
 #[serde(rename_all = "camelCase")]
-/// Response body for funding a channel.
+/// Response body for the list of corrupted channels.
 pub(crate) struct CorruptedChannelsResponse {
-    #[schema(value_type = String)]
-    channels_ids: Vec<Hash>,
+    #[schema(value_type = Vec<String>)]
+    channel_ids: Vec<String>,
 }
 
 #[utoipa::path(
@@ -551,7 +551,7 @@ pub(crate) struct CorruptedChannelsResponse {
     path = const_format::formatcp!("{BASE_PATH}/channels/corrupted"),
     description = "List corrupted channels due to incorrect indexing.",
     responses(
-        (status = 200, description = "Corrupted channels retrieved", body = Vec<String>),
+        (status = 200, description = "Corrupted channels retrieved", body = CorruptedChannelsResponse),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
         (status = 422, description = "Unknown failure", body = ApiError)
     ),
@@ -569,7 +569,7 @@ pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) 
         Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     };
 
-    let channels_ids: Vec<Hash> = corrupted.into_iter().map(|c| *c.channel_id()).collect();
+    let channel_ids: Vec<String> = corrupted.into_iter().map(|c| c.channel_id().to_string()).collect();
 
-    (StatusCode::OK, Json(CorruptedChannelsResponse { channels_ids })).into_response()
+    (StatusCode::OK, Json(CorruptedChannelsResponse { channel_ids })).into_response()
 }
