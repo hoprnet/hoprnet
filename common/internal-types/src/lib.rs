@@ -7,18 +7,13 @@ pub mod account;
 pub mod announcement;
 /// Implements types related to HOPR payment channels.
 pub mod channels;
-/// Implements types for tickets.
-pub mod tickets;
-// Implements types related to HOPR corrupted channels.
-pub mod corrupted_channels;
 /// Enumerates all errors in this crate.
 pub mod errors;
 /// Types related to internal HOPR protocol logic.
 pub mod protocol;
+/// Implements types for tickets.
+pub mod tickets;
 #[doc(hidden)]
 pub mod prelude {
-    pub use super::{
-        account::*, announcement::*, channels::*, corrupted_channels::*, errors::CoreTypesError, protocol::*,
-        tickets::*,
-    };
+    pub use super::{account::*, announcement::*, channels::*, errors::CoreTypesError, protocol::*, tickets::*};
 }

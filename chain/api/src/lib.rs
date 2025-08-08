@@ -36,8 +36,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
 pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::{
-    account::AccountEntry, corrupted_channels::CorruptedChannelEntry, prelude::ChannelDirection,
-    tickets::WinningProbability,
+    account::AccountEntry, channels::CorruptedChannelEntry, prelude::ChannelDirection, tickets::WinningProbability,
 };
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};

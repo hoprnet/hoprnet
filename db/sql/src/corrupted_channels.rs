@@ -2,29 +2,15 @@ use async_trait::async_trait;
 use futures::TryStreamExt;
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{corrupted_channel, prelude::CorruptedChannel};
-use hopr_internal_types::{corrupted_channels::CorruptedChannelEntry, prelude::*};
+use hopr_internal_types::{channels::CorruptedChannelEntry, prelude::*};
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::{
     HoprDbGeneralModelOperations, OptTx,
     db::HoprDb,
     errors::{DbSqlError, Result},
 };
-
-/// API for editing [CorruptedChannelEntry] in the DB.
-pub struct CorruptedChannelEditor {
-    orig: CorruptedChannelEntry,
-    model: corrupted_channel::ActiveModel,
-    delete: bool,
-}
-
-impl CorruptedChannelEditor {
-    /// Original channel entry **before** the edits.
-    pub fn entry(&self) -> &CorruptedChannelEntry {
-        &self.orig
-    }
-}
 
 /// Defines DB API for accessing information about HOPR payment channels.
 #[async_trait]
@@ -36,26 +22,6 @@ pub trait HoprDbCorruptedChannelOperations {
         &'a self,
         tx: OptTx<'a>,
         id: &Hash,
-    ) -> Result<Option<CorruptedChannelEntry>>;
-
-    /// Start changes to channel entry.
-    /// If the channel with the given ID exists, the [CorruptedChannelEditor] is returned.
-    /// Use [`HoprDbCorruptedChannelOperations::finish_corrupted_channel_update`] to commit edits to the DB when done.
-    async fn begin_corrupted_channel_update<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        id: &Hash,
-    ) -> Result<Option<CorruptedChannelEditor>>;
-
-    /// Commits changes of the corrupted channel to the database.
-    /// Returns the updated corrupted channel, or on deletion, the deleted channel entry.
-    ///
-    /// It can also return `None` if the channel entry is being set as corrupted and a proper `CorruptedChannelEntry`
-    /// cannot be created.
-    async fn finish_corrupted_channel_update<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        editor: CorruptedChannelEditor,
     ) -> Result<Option<CorruptedChannelEntry>>;
 
     /// Retrieves all corrupted channels information from the DB.
@@ -91,60 +57,6 @@ impl HoprDbCorruptedChannelOperations for HoprDb {
                 })
             })
             .await
-    }
-
-    async fn begin_corrupted_channel_update<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        id: &Hash,
-    ) -> Result<Option<CorruptedChannelEditor>> {
-        let id_hex = id.to_hex();
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    match CorruptedChannel::find()
-                        .filter(corrupted_channel::Column::ChannelId.eq(id_hex.clone()))
-                        .one(tx.as_ref())
-                        .await?
-                    {
-                        Some(model) => Ok(Some(CorruptedChannelEditor {
-                            orig: CorruptedChannelEntry::try_from(model.clone())?,
-                            model: model.into_active_model(),
-                            delete: false,
-                        })),
-                        None => Ok(None),
-                    }
-                })
-            })
-            .await
-    }
-
-    async fn finish_corrupted_channel_update<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        editor: CorruptedChannelEditor,
-    ) -> Result<Option<CorruptedChannelEntry>> {
-        let ret = self
-            .nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    if !editor.delete {
-                        let model = editor.model.update(tx.as_ref()).await?;
-                        match CorruptedChannelEntry::try_from(model) {
-                            Ok(channel) => Ok::<_, DbSqlError>(Some(channel)),
-                            Err(e) => Err(DbSqlError::from(e)),
-                        }
-                    } else {
-                        editor.model.delete(tx.as_ref()).await?;
-                        Ok::<_, DbSqlError>(Some(editor.orig))
-                    }
-                })
-            })
-            .await?;
-
-        Ok(ret)
     }
 
     async fn get_all_corrupted_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<CorruptedChannelEntry>> {
@@ -225,9 +137,9 @@ mod tests {
             .await
             .context("Inserting a corrupted channel should not fail")?;
 
-        db.upsert_corrupted_channel(None, channel_id)
-            .await
-            .context("Inserting a duplicate corrupted channel should not fail")?;
+        let res = db.upsert_corrupted_channel(None, channel_id).await;
+
+        println!("Result of second insert: {:?}", res);
 
         let all_channels = db.get_all_corrupted_channels(None).await?;
 
