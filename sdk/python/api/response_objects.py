@@ -122,7 +122,7 @@ class Session(JsonResponse):
 
 
 @APIobject
-class SessionConfig:
+class SessionConfig(JsonResponse):
     response_buffer: str = APIfield("responseBuffer")
     max_surb_upstream: str = APIfield("maxSurbUpstream")
 

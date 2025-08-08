@@ -713,7 +713,7 @@ async fn create_tcp_client_binding(
     bind_host: std::net::SocketAddr,
     state: Arc<InternalState>,
     args: SessionClientRequest,
-) -> Result<std::net::SocketAddr, (StatusCode, ApiErrorStatus)> {
+) -> Result<(std::net::SocketAddr, Option<HoprSessionId>), (StatusCode, ApiErrorStatus)> {
     let target_spec = args.target.clone();
     let (dst, target, data) = args
         .clone()
@@ -850,14 +850,14 @@ async fn create_tcp_client_binding(
             abort_handle,
         },
     );
-    Ok(bound_host)
+    Ok((bound_host, None))
 }
 
 async fn create_udp_client_binding(
     bind_host: std::net::SocketAddr,
     state: Arc<InternalState>,
     args: SessionClientRequest,
-) -> Result<std::net::SocketAddr, (StatusCode, ApiErrorStatus)> {
+) -> Result<(std::net::SocketAddr, Option<HoprSessionId>), (StatusCode, ApiErrorStatus)> {
     let target_spec = args.target.clone();
     let (dst, target, data) = args
         .clone()
@@ -905,7 +905,8 @@ async fn create_udp_client_binding(
     let (abort_handle, abort_reg) = AbortHandle::new_pair();
     let clients = Arc::new(DashMap::new());
     // TODO: add multiple client support to UDP sessions (#7370)
-    clients.insert(*session.id(), (bind_host, abort_handle.clone()));
+    let session_id = *session.id();
+    clients.insert(session_id, (bind_host, abort_handle.clone()));
     hopr_async_runtime::prelude::spawn(async move {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
@@ -930,7 +931,7 @@ async fn create_udp_client_binding(
             clients,
         },
     );
-    Ok(bound_host)
+    Ok((bound_host, Some(session_id)))
 }
 
 /// Creates a new client session returning the given session listening host and port over TCP or UDP.
@@ -980,20 +981,15 @@ pub(crate) async fn create_client(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let bind_host: std::net::SocketAddr = build_binding_host(args.listen_host.as_deref(), state.default_listen_host);
 
-    if bind_host.port() > 0
-        && state
-            .open_listeners
-            .read_arc()
-            .await
-            .contains_key(&ListenerId(protocol.into(), bind_host))
-    {
+    let listener_id = ListenerId(protocol.into(), bind_host);
+    if bind_host.port() > 0 && state.open_listeners.read_arc().await.contains_key(&listener_id) {
         return Err((StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed));
     }
 
     debug!("binding {protocol} session listening socket to {bind_host}");
-    let bound_host = match protocol {
-        IpProtocol::TCP => create_tcp_client_binding(bind_host, state, args.clone()).await?,
-        IpProtocol::UDP => create_udp_client_binding(bind_host, state, args.clone()).await?,
+    let (bound_host, udp_session_id) = match protocol {
+        IpProtocol::TCP => create_tcp_client_binding(bind_host, state.clone(), args.clone()).await?,
+        IpProtocol::UDP => create_udp_client_binding(bind_host, state.clone(), args.clone()).await?,
     };
 
     Ok::<_, (StatusCode, ApiErrorStatus)>(
@@ -1009,7 +1005,7 @@ pub(crate) async fn create_client(
                 return_path: args.return_path.clone(),
                 mtu: SESSION_MTU,
                 surb_len: SURB_SIZE,
-                active_clients: vec![],
+                active_clients: udp_session_id.into_iter().map(|s| s.to_string()).collect(),
             }),
         )
             .into_response(),
@@ -1034,9 +1030,9 @@ pub(crate) async fn create_client(
                 "protocol": "tcp",
                 "ip": "127.0.0.1",
                 "port": 5542,
-                "surb_len": 400,
+                "surbLen": 400,
                 "mtu": 1020,
-                "active_clients": []
+                "activeClients": []
             }
         ])),
         (status = 400, description = "Invalid IP protocol.", body = ApiError),

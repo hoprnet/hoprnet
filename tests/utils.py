@@ -366,6 +366,18 @@ class HoprSession:
             s.close()
 
     @property
+    def surb_len(self):
+        if self._session is None:
+            raise Exception("Session is not open")
+        return self._session.surb_len
+
+    @property
+    def active_clients(self):
+        if self._session is None:
+            raise Exception("Session is not open")
+        return self._session.active_clients
+
+    @property
     def mtu(self):
         if self._session is None:
             raise Exception("Session is not open")

@@ -315,7 +315,7 @@ class TestSessionWithSwarm:
             dest=swarm7[route[-1]],
             fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
             return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
-            use_response_buffer="512 kB",
+            use_response_buffer="1002 kB",  # currently set to be the exact multiple of the MTU
             capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=False),
         ) as session:
             assert len(session.active_clients) == 1
@@ -323,19 +323,19 @@ class TestSessionWithSwarm:
 
             entry = await swarm7[route[0]].api.session_list_clients(Protocol.UDP)
             assert len(entry) == 1
-            assert len(entry.active_clients) == 1
-            assert entry.active_clients[0] == session_id
+            assert len(entry[0].active_clients) == 1
+            assert entry[0].active_clients[0] == session_id
 
             cfg = await swarm7[route[0]].api.session_get_config(session_id)
             assert cfg is not None
-            assert cfg.response_buffer == "512 kB"
+            assert cfg.response_buffer == "978.5 KiB"  # correction from kB to KiB
 
-            cfg.response_buffer = "1024 kB"
+            cfg.response_buffer = "2004 kB"
             await swarm7[route[0]].api.session_set_config(session_id, cfg)
 
             cfg = await swarm7[route[0]].api.session_get_config(session_id)
             assert cfg is not None
-            assert cfg.response_buffer == "1024 kB"
+            assert cfg.response_buffer == "1.9 MiB" # correction from kB to MiB
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))

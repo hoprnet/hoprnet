@@ -367,7 +367,7 @@ class HoprdAPI(ApiLib):
 
     async def session_close_client(self, session: Session) -> bool:
         """
-        Closes an existing Session listener for the given IP protocol, IP and port.
+        Closes an existing Session listener for the given IP protocol, IP address and port.
         :param: session: Session
         """
         path = f"/session/{session.protocol}/{session.ip}/{session.port}"
