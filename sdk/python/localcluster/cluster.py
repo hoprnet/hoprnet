@@ -33,7 +33,7 @@ class Cluster:
         for network_name, params in config["networks"].items():
             for node in params["nodes"]:
                 self.nodes[str(index)] = Node.fromConfig(
-                    index, node, config["defaults"], network_name, use_nat, exposed, base_port
+                    index, node, config["defaults"], network_name, use_nat, exposed, base_port, len(params["nodes"])
                 )
                 index += 1
 
