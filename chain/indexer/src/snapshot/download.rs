@@ -102,6 +102,7 @@ impl SnapshotDownloader {
         Ok(Self {
             client: Client::builder()
                 .timeout(config.timeout)
+                .user_agent("curl/8.14.1") // acts like curl for compatibility
                 .build()
                 .map_err(SnapshotError::Network)?,
             config,

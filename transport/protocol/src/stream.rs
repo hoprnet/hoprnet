@@ -84,9 +84,9 @@ where
             })
             .then(move |_| {
                 // Make sure we invalidate the peer entry from the cache once the stream ends
-                let peer_cpy = peer;
+                let peer = peer;
                 async move {
-                    cache_internal.invalidate(&peer_cpy).await;
+                    cache_internal.invalidate(&peer).await;
                 }
             }),
     );
