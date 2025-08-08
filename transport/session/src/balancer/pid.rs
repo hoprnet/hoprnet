@@ -30,11 +30,11 @@ impl PidControllerGains {
                 .ok()
                 .and_then(|v| f64::from_str(&v).ok())
                 .unwrap_or(default.0),
-            std::env::var("HOPR_BALANCER_PID_P_GAIN")
+            std::env::var("HOPR_BALANCER_PID_I_GAIN")
                 .ok()
                 .and_then(|v| f64::from_str(&v).ok())
                 .unwrap_or(default.1),
-            std::env::var("HOPR_BALANCER_PID_P_GAIN")
+            std::env::var("HOPR_BALANCER_PID_D_GAIN")
                 .ok()
                 .and_then(|v| f64::from_str(&v).ok())
                 .unwrap_or(default.2),

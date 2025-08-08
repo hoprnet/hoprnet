@@ -608,14 +608,17 @@ where
             target,
             capabilities: ByteCapabilities(cfg.capabilities),
             additional_data: if !cfg.capabilities.contains(Capability::NoRateControl) {
-                cfg.surb_management.map(|c| c.target_surb_buffer_size as u32).unwrap_or(
-                    (self.cfg.initial_return_session_egress_rate as u64
-                        * self
-                            .cfg
-                            .minimum_surb_buffer_duration
-                            .max(MIN_SURB_BUFFER_DURATION)
-                            .as_secs()) as u32,
-                )
+                cfg.surb_management
+                    .map(|c| c.target_surb_buffer_size)
+                    .unwrap_or(
+                        self.cfg.initial_return_session_egress_rate as u64
+                            * self
+                                .cfg
+                                .minimum_surb_buffer_duration
+                                .max(MIN_SURB_BUFFER_DURATION)
+                                .as_secs(),
+                    )
+                    .min(u32::MAX as u64) as u32
             } else {
                 0
             },
@@ -1080,9 +1083,10 @@ where
                             // Allow automatic setpoint increase
                             SimpleBalancerController::with_increasing_setpoint(
                                 *ratio_threshold,
-                                growth_window
+                                (growth_window
                                     .div_duration_f64(self.cfg.balancer_sampling_interval)
-                                    .round() as usize,
+                                    .round() as usize)
+                                    .max(1),
                             )
                         } else {
                             SimpleBalancerController::default()

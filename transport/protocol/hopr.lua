@@ -73,6 +73,11 @@ local function dissect_hopr_start(buffer, pinfo, tree)
     offset = offset + 2
 
     if type == 0x00 then -- Session Initiation
+        if len < 13 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "payload too short for Session Initiation ("..len.." < 13)")
+            return offset + len
+        end
+
         local init_subtree = subtree:add("Session Initiation")
         init_subtree:add(start_fields.challenge, buffer(offset, 8):uint64())
         offset = offset + 8
@@ -94,18 +99,33 @@ local function dissect_hopr_start(buffer, pinfo, tree)
         end
         offset = offset + len - 13
     elseif type == 0x01 then -- Session Established
+        if len < 8 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "payload too short for Session Initiation ("..len.." < 8)")
+            return offset + len
+        end
+
         local est_subtree = subtree:add("Session Established")
         est_subtree:add(start_fields.challenge, buffer(offset, 8):uint64())
         offset = offset + 8
         est_subtree:add(start_fields.session_id, buffer(offset))
         offset = offset + len - 8
     elseif type == 0x02 then -- Session Initiation Error
+        if len < 9 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "payload too short for Session Initiation ("..len.." < 9)")
+            return offset + len
+        end
+
         local err_subtree = subtree:add("Session Error")
         err_subtree:add(start_fields.challenge, buffer(offset, 8):uint64())
         offset = offset + 8
         err_subtree:add(start_fields.err_reason, buffer(offset):uint())
         offset = offset + 1
     elseif type == 0x03 then -- Keep-Alive
+        if len < 5 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "payload too short for Session Initiation ("..len.." < 13)")
+            return offset + len
+        end
+
         local ka_subtree = subtree:add("Keep-Alive")
         ka_subtree:add(start_fields.flags, buffer(offset, 1):uint())
         offset = offset + 1

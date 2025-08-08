@@ -335,7 +335,7 @@ class TestSessionWithSwarm:
 
             cfg = await swarm7[route[0]].api.session_get_config(session_id)
             assert cfg is not None
-            assert cfg.response_buffer == "1.9 MiB" # correction from kB to MiB
+            assert cfg.response_buffer == "1.9 MiB"  # correction from kB to MiB
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))
