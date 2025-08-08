@@ -103,9 +103,8 @@ impl HoprDbCorruptedChannelOperations for HoprDb {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
-    use hopr_internal_types::channels::generate_channel_id;
-    use hopr_primitive_types::prelude::Address;
+    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair, types::Hash};
 
     use crate::{corrupted_channels::HoprDbCorruptedChannelOperations, db::HoprDb};
 
@@ -113,7 +112,7 @@ mod tests {
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let channel_id = generate_channel_id(&Address::default(), &Address::default());
+        let channel_id = Hash::from(random_bytes());
 
         db.upsert_corrupted_channel(None, channel_id).await?;
 
@@ -130,16 +129,15 @@ mod tests {
     #[tokio::test]
     async fn test_insert_duplicates_should_not_insert() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
-
-        let channel_id = generate_channel_id(&Address::default(), &Address::default());
+        let channel_id = Hash::from(random_bytes());
 
         db.upsert_corrupted_channel(None, channel_id)
             .await
             .context("Inserting a corrupted channel should not fail")?;
 
-        let res = db.upsert_corrupted_channel(None, channel_id).await;
-
-        println!("Result of second insert: {:?}", res);
+        db.upsert_corrupted_channel(None, channel_id)
+            .await
+            .context("Inserting a duplicate corrupted channel should not fail")?;
 
         let all_channels = db.get_all_corrupted_channels(None).await?;
 

@@ -232,11 +232,6 @@ where
             HoprChannelsEvents::ChannelBalanceDecreased(balance_decreased) => {
                 let channel_id = balance_decreased.channelId.0.into();
 
-                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
-                    warn!(%channel_id, "observed balance decreased event for a channel that is corrupted");
-                    return Ok(None);
-                }
-
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
@@ -288,11 +283,6 @@ where
             }
             HoprChannelsEvents::ChannelBalanceIncreased(balance_increased) => {
                 let channel_id = balance_increased.channelId.0.into();
-
-                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
-                    warn!(%channel_id, "observed balance increased event for a channel that is corrupted");
-                    return Ok(None);
-                }
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -355,11 +345,6 @@ where
             }
             HoprChannelsEvents::ChannelClosed(channel_closed) => {
                 let channel_id = channel_closed.channelId.0.into();
-
-                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
-                    warn!(%channel_id, "observed channel closed event for a channel that is corrupted");
-                    return Ok(None);
-                }
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -434,11 +419,6 @@ where
                 let destination: Address = channel_opened.destination.into();
                 let channel_id = generate_channel_id(&source, &destination);
 
-                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
-                    warn!(%channel_id, "observed channel opened event for a channel that is corrupted");
-                    return Ok(None);
-                }
-
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
@@ -508,11 +488,6 @@ where
             }
             HoprChannelsEvents::TicketRedeemed(ticket_redeemed) => {
                 let channel_id = ticket_redeemed.channelId.0.into();
-
-                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
-                    warn!(%channel_id, "observed ticket redeemed event for a channel that is corrupted");
-                    return Ok(None);
-                }
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -645,11 +620,6 @@ where
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiated(closure_initiated) => {
                 let channel_id = closure_initiated.channelId.0.into();
-
-                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
-                    warn!(%channel_id, "observed channel closure initiated event for a channel that is corrupted");
-                    return Ok(None);
-                }
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
