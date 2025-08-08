@@ -127,6 +127,6 @@ impl SurbBalancerController for PidBalancerController {
     }
 
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {
-        self.0.next_control_output(current_buffer_level as f64).output as u64
+        self.0.next_control_output(current_buffer_level as f64).output.max(0.0) as u64
     }
 }
