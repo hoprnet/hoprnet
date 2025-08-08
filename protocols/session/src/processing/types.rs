@@ -14,6 +14,8 @@ pub struct FrameBuilder {
     seg_remaining: SeqNum,
     recv_bytes: usize,
     pub(crate) last_recv: Instant,
+    #[cfg(all(not(test), feature = "prometheus"))]
+    pub(crate) created: Instant,
 }
 
 impl From<Segment> for FrameBuilder {
@@ -25,6 +27,8 @@ impl From<Segment> for FrameBuilder {
             seg_remaining: value.seq_flags.seq_len() - 1,
             recv_bytes: value.data.len(),
             last_recv: Instant::now(),
+            #[cfg(all(not(test), feature = "prometheus"))]
+            created: Instant::now(),
         };
 
         ret.segments[idx as usize] = Some(value);

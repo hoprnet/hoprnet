@@ -615,10 +615,10 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
                     }
                     State::Flushing(len) => {
                         // Explicitly flush after each data sent
-                        ready!(sender.poll_flush_unpin(cx))?;
+                        let res = ready!(sender.poll_flush_unpin(cx)).map(|_| len);
                         *this.state = State::Writing;
 
-                        return Poll::Ready(Ok(len));
+                        return Poll::Ready(res);
                     }
                 }
             }

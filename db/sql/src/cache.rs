@@ -18,7 +18,7 @@ use hopr_primitive_types::{
     balance::HoprBalance,
     prelude::{Address, KeyIdent, U256},
 };
-use moka::{Expiry, future::Cache};
+use moka::{Expiry, future::Cache, notification::RemovalCause};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::errors::DbSqlError;
@@ -161,8 +161,9 @@ impl Default for HoprDbCaches {
             // if not used.
             pseudonym_openers: moka::sync::Cache::builder()
                 .time_to_idle(Duration::from_secs(600))
+                .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::trace!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                    tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
                 })
                 .max_capacity(10_000)
                 .build(),
@@ -170,8 +171,9 @@ impl Default for HoprDbCaches {
             // For each Pseudonym, there's an RB of SURBs and their IDs.
             surbs_per_pseudonym: Cache::builder()
                 .time_to_idle(Duration::from_secs(600))
+                .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
-                    tracing::trace!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                    tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
                 })
                 .max_capacity(10_000)
                 .build(),
@@ -187,9 +189,11 @@ impl HoprDbCaches {
                 moka::sync::Cache::builder()
                     .time_to_live(Duration::from_secs(3600))
                     .eviction_listener(|sender_id, _reply_opener, cause| {
-                        tracing::trace!(?sender_id, ?cause, "evicting reply opener for sender id");
+                        if cause != RemovalCause::Explicit {
+                            tracing::warn!(?sender_id, ?cause, "evicting reply opener for sender id");
+                        }
                     })
-                    .max_capacity(10_000)
+                    .max_capacity(100_000)
                     .build()
             })
             .insert(sender_id.surb_id(), opener);

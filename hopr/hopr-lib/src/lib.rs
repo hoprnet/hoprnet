@@ -25,6 +25,7 @@ use std::{
     fmt::{Display, Formatter},
     ops::Deref,
     path::PathBuf,
+    str::FromStr,
     sync::{Arc, atomic::Ordering},
     time::Duration,
 };
@@ -78,9 +79,9 @@ use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::{
     ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU, ServiceId,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU, SURB_SIZE, ServiceId,
     Session as HoprSession, SessionCapabilities, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
-    SessionTarget, SurbBalancerConfig, Tag, TicketStatistics,
+    SessionManagerError, SessionTarget, SurbBalancerConfig, Tag, TicketStatistics, TransportSessionError,
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
@@ -93,7 +94,6 @@ use tracing::{debug, error, info, trace, warn};
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_platform::time::native::current_time,
-    std::str::FromStr,
 };
 
 use crate::{
@@ -418,6 +418,10 @@ impl Hopr {
             create_if_missing: cfg.db.initialize,
             force_create: cfg.db.force_initialize,
             log_slow_queries: std::time::Duration::from_millis(150),
+            surb_ring_buffer_size: std::env::var("HOPR_SURB_RB_SIZE")
+                .ok()
+                .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
+                .unwrap_or_else(|| HoprDbConfig::default().surb_ring_buffer_size),
         };
         let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 
@@ -1097,7 +1101,7 @@ impl Hopr {
     }
 
     /// Create a client session connection returning a session object that implements
-    /// [`AsyncRead`] and [`AsyncWrite`] and can bu used as a read/write binary session.
+    /// [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`] and can bu used as a read/write binary session.
     #[cfg(feature = "session-client")]
     pub async fn connect_to(
         &self,
@@ -1130,6 +1134,25 @@ impl Hopr {
     pub async fn keep_alive_session(&self, id: &HoprSessionId) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.probe_session(id).await?)
+    }
+
+    #[cfg(feature = "session-client")]
+    pub async fn get_session_surb_balancer_config(
+        &self,
+        id: &HoprSessionId,
+    ) -> errors::Result<Option<SurbBalancerConfig>> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
+    }
+
+    #[cfg(feature = "session-client")]
+    pub async fn update_session_surb_balancer_config(
+        &self,
+        id: &HoprSessionId,
+        cfg: SurbBalancerConfig,
+    ) -> errors::Result<()> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }
 
     /// Send a message to another peer in the network

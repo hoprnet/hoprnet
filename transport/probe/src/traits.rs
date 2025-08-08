@@ -20,7 +20,7 @@ pub trait ProbeStatusUpdate {
 /// to the network layer.
 #[async_trait]
 pub trait DbOperations {
-    /// Attempts to find SURB and its ID given the [`SurbMatcher`].
+    /// Attempts to find SURB and its ID given the [`SurbMatcher`](hopr_network_types::types::SurbMatcher).
     async fn find_surb(
         &self,
         matcher: hopr_network_types::types::SurbMatcher,

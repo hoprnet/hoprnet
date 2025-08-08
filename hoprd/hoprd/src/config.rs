@@ -345,7 +345,8 @@ fn just_true() -> bool {
     true
 }
 
-/// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`]) and the Entry node.
+/// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`](crate::exit::HoprServerIpForwardingReactor))
+/// and the Entry node.
 #[serde_as]
 #[derive(
     Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize, validator::Validate,
