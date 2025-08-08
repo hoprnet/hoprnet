@@ -6,6 +6,7 @@ use std::{
 use futures::StreamExt;
 pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
 use hopr_platform::time::current_time;
+use hopr_primitive_types::sma::SMA;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
@@ -260,6 +261,7 @@ where
                 },
             }
 
+            tracing::trace!(%peer, quality = entry.quality, quality_avg = entry.quality_avg.average(), "Updating peer status in the store");
             self.db.update_network_peer(entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]

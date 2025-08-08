@@ -57,12 +57,14 @@ pub struct OpenTransaction(DatabaseTransaction, TargetDb);
 impl OpenTransaction {
     /// Executes the given `callback` inside the transaction
     /// and commits the transaction if it succeeds or rollbacks otherwise.
+    #[tracing::instrument(level = "trace", name = "Sql::perform_in_transaction", skip_all, err)]
     pub async fn perform<F, T, E>(self, callback: F) -> std::result::Result<T, E>
     where
         F: for<'c> FnOnce(&'c OpenTransaction) -> BoxFuture<'c, std::result::Result<T, E>> + Send,
         T: Send,
         E: std::error::Error + From<DbSqlError>,
     {
+        let start = std::time::Instant::now();
         let res = callback(&self).await;
 
         if res.is_ok() {
@@ -70,6 +72,13 @@ impl OpenTransaction {
         } else {
             self.rollback().await?;
         }
+
+        tracing::trace!(
+            elapsed_ms = start.elapsed().as_millis(),
+            was_successful = res.is_ok(),
+            "transaction completed",
+        );
+
         res
     }
 
