@@ -2,7 +2,11 @@ use std::str::FromStr;
 
 use pid::Pid;
 
-use crate::{balancer::SurbBalancerController, errors, errors::SessionManagerError};
+use crate::{
+    balancer::{BalancerControllerBounds, SurbBalancerController},
+    errors,
+    errors::SessionManagerError,
+};
 
 /// Carries finite Proportional, Integral and Derivative controller gains for a PID controller.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -110,20 +114,16 @@ impl Default for PidBalancerController {
 }
 
 impl SurbBalancerController for PidBalancerController {
-    fn target(&self) -> u64 {
-        self.0.setpoint as u64
+    fn bounds(&self) -> BalancerControllerBounds {
+        BalancerControllerBounds::new(self.0.setpoint as u64, self.0.output_limit as u64)
     }
 
-    fn output_limit(&self) -> u64 {
-        self.0.output_limit as u64
-    }
-
-    fn set_target_and_limit(&mut self, target: u64, output_limit: u64) {
-        self.0.setpoint = target as f64;
-        self.0.output_limit = output_limit as f64;
-        self.0.p_limit = output_limit as f64;
-        self.0.i_limit = output_limit as f64;
-        self.0.d_limit = output_limit as f64;
+    fn set_target_and_limit(&mut self, bounds: BalancerControllerBounds) {
+        let mut pid = Pid::new(bounds.target() as f64, bounds.output_limit() as f64);
+        pid.p(self.0.kp, bounds.output_limit() as f64);
+        pid.i(self.0.ki, bounds.output_limit() as f64);
+        pid.d(self.0.kd, bounds.output_limit() as f64);
+        self.0 = pid;
     }
 
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64 {

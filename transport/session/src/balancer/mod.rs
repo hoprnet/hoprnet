@@ -54,14 +54,33 @@ pub trait SurbFlowController {
     fn adjust_surb_flow(&self, surbs_per_sec: usize);
 }
 
+/// Represents the setpoint (target) and output limit of a controller.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BalancerControllerBounds(u64, u64);
+
+impl BalancerControllerBounds {
+    /// Creates a new instance.
+    pub fn new(target: u64, output_limit: u64) -> Self {
+        Self(target, output_limit)
+    }
+
+    /// Gets the target (setpoint) of a controller.
+    pub fn target(&self) -> u64 {
+        self.0
+    }
+
+    /// Gets the output limit of a controller.
+    pub fn output_limit(&self) -> u64 {
+        self.1
+    }
+}
+
 /// Trait abstracting a controller used in the [`SurbBalancer`].
 pub trait SurbBalancerController {
-    /// Gets the current target (setpoint).
-    fn target(&self) -> u64;
-    /// Gets the current output limit.
-    fn output_limit(&self) -> u64;
+    /// Gets the current bounds of the controller.
+    fn bounds(&self) -> BalancerControllerBounds;
     /// Updates the controller's target (setpoint) and output limit.
-    fn set_target_and_limit(&mut self, target: u64, output_limit: u64);
+    fn set_target_and_limit(&mut self, bounds: BalancerControllerBounds);
     /// Queries the controller for the next control output based on the `current_buffer_level` of SURBs.
     fn next_control_output(&mut self, current_buffer_level: u64) -> u64;
 }

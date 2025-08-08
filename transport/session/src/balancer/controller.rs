@@ -5,8 +5,8 @@ use hopr_async_runtime::AbortHandle;
 use tracing::{Instrument, debug, error, instrument, trace};
 
 use super::{
-    MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator, SurbBalancerController, SurbFlowController,
-    SurbFlowEstimator,
+    BalancerControllerBounds, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator, SurbBalancerController,
+    SurbFlowController, SurbFlowEstimator,
 };
 use crate::SessionId;
 
@@ -130,7 +130,10 @@ where
             METRIC_CONTROL_OUTPUT.set(&[&sid], 0.0);
         }
 
-        controller.set_target_and_limit(cfg.target_surb_buffer_size, cfg.max_surbs_per_sec);
+        controller.set_target_and_limit(BalancerControllerBounds::new(
+            cfg.target_surb_buffer_size,
+            cfg.max_surbs_per_sec,
+        ));
 
         Self {
             surb_estimator,
@@ -171,7 +174,7 @@ where
         if let Some(num_decayed_surbs) = surb_decay
             .as_ref()
             .filter(|(decay_window, _)| &self.last_decay.elapsed() >= decay_window)
-            .map(|(_, decay_coeff)| (self.controller.target() as f64 * *decay_coeff).round() as u64)
+            .map(|(_, decay_coeff)| (self.controller.bounds().target() as f64 * *decay_coeff).round() as u64)
         {
             self.current_buffer = self.current_buffer.saturating_sub(num_decayed_surbs);
             self.last_decay = std::time::Instant::now();
@@ -179,7 +182,7 @@ where
         }
 
         // Error from the desired target SURB buffer size at counterparty
-        let error = self.current_buffer as i64 - self.controller.target() as i64;
+        let error = self.current_buffer as i64 - self.controller.bounds().target() as i64;
 
         if self.was_below_target && error >= 0 {
             trace!(current = self.current_buffer, "reached target SURB buffer size");
@@ -189,7 +192,7 @@ where
             self.was_below_target = true;
         }
 
-        trace!(
+        debug!(
             ?dt,
             delta = target_buffer_change,
             rate = target_buffer_change as f64 / dt.as_secs_f64(),
@@ -254,16 +257,18 @@ where
                         break;
                     };
 
+                    let current_bounds = BalancerControllerBounds::new(
+                        current_cfg.target_surb_buffer_size,
+                        current_cfg.max_surbs_per_sec,
+                    );
+
                     // Check if the balancer controller needs to be reconfigured
-                    if current_cfg.target_surb_buffer_size != self.controller.target()
-                        || current_cfg.max_surbs_per_sec != self.controller.output_limit()
-                    {
-                        self.controller
-                            .set_target_and_limit(current_cfg.target_surb_buffer_size, current_cfg.max_surbs_per_sec);
+                    if current_bounds != self.controller.bounds() {
+                        self.controller.set_target_and_limit(current_bounds);
                         debug!(?current_cfg, "surb balancer has been reconfigured");
                     }
 
-                    let target_before_update = self.controller.target();
+                    let bounds_before_update = self.controller.bounds();
 
                     // Perform controller update (this internally samples the SurbFlowEstimator)
                     // and send an update about the current level to the outgoing stream
@@ -273,15 +278,17 @@ where
                     // See if the setpoint has been updated at the controller as a result
                     // of the update step, because some controllers (such as the SimpleBalancerController)
                     // permit that.
-                    let target_after_update = self.controller.target();
-                    if target_before_update != target_after_update {
-                        current_cfg.target_surb_buffer_size = target_after_update;
+                    let bounds_after_update = self.controller.bounds();
+                    if bounds_before_update != bounds_after_update {
+                        current_cfg.target_surb_buffer_size = bounds_after_update.target();
+                        current_cfg.max_surbs_per_sec = bounds_after_update.output_limit();
                         match cfg_feedback.on_config_update(&self.session_id, current_cfg).await {
                             Ok(_) => debug!(
-                                target_before_update,
-                                target_after_update, "controller setpoint has changed after update"
+                                ?bounds_before_update,
+                                ?bounds_after_update,
+                                "controller bounds has changed after update"
                             ),
-                            Err(error) => error!(%error, "failed to update controller setpoint after it changed"),
+                            Err(error) => error!(%error, "failed to update controller bounds after it changed"),
                         }
                     }
                 }
