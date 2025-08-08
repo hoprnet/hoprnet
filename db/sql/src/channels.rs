@@ -131,6 +131,9 @@ pub trait HoprDbChannelOperations {
 
     /// Inserts or updates the given channel entry.
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
+
+    /// Inserts a corrupted channel entry.
+    async fn insert_corrupted_channel<'a>(&'a self, tx: OptTx<'a>, channel_id: ChannelId) -> Result<()>;
 }
 
 #[async_trait]
@@ -427,6 +430,22 @@ impl HoprDbChannelOperations for HoprDb {
 
         Ok(())
     }
+
+    async fn insert_corrupted_channel<'a>(&'a self, tx: OptTx<'a>, channel_id: ChannelId) -> Result<()> {
+        self.nest_transaction(tx)
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let channel: CorruptedChannelEntry = channel_id.into();
+                    let mut model: channel::ActiveModel = channel.into();
+                    model.corrupted = Set(true);
+                    Ok::<_, DbSqlError>(model.save(tx.as_ref()).await?)
+                })
+            })
+            .await?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -435,7 +454,7 @@ mod tests {
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_internal_types::{
-        channels::ChannelStatus,
+        channels::{ChannelStatus, generate_channel_id},
         prelude::{ChannelDirection, ChannelEntry},
     };
     use hopr_primitive_types::prelude::Address;
@@ -482,6 +501,53 @@ mod tests {
             .context("channel must be present")?;
 
         assert_eq!(ce, from_db, "channels must be equal");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_insert_corrupted_channel() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+
+        let a = Address::from(random_bytes());
+        let b = Address::from(random_bytes());
+
+        let channel_id = generate_channel_id(&a, &b);
+
+        db.insert_corrupted_channel(None, channel_id).await?;
+
+        db.get_corrupted_channel_by_id(None, &channel_id)
+            .await?
+            .context("corrupted channel must be present")?;
+
+        assert!(
+            db.get_channel_by_id(None, &channel_id).await?.is_none(),
+            "should not be able to get a corrupted channel by ID"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_insert_corrupted_channel_that_exists_should_fail() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+
+        let a = Address::from(random_bytes());
+        let b = Address::from(random_bytes());
+
+        let channel_entry = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into());
+
+        db.upsert_channel(None, channel_entry).await?;
+
+        db.get_channel_by_id(None, &channel_entry.get_id())
+            .await?
+            .context("channel must be present")?;
+
+        let res = db.insert_corrupted_channel(None, channel_entry.get_id()).await;
+        assert!(
+            res.is_err(),
+            "should not be able to insert a corrupted channel that already exists"
+        );
 
         Ok(())
     }
