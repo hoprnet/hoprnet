@@ -50,8 +50,8 @@ pub trait HoprDbCorruptedChannelOperations {
     /// Commits changes of the corrupted channel to the database.
     /// Returns the updated corrupted channel, or on deletion, the deleted channel entry.
     ///
-    /// It can also return `None` if the channel entry is being set as corrupted and a proper `CorruptedChannelEntry` cannot be
-    /// created.
+    /// It can also return `None` if the channel entry is being set as corrupted and a proper `CorruptedChannelEntry`
+    /// cannot be created.
     async fn finish_corrupted_channel_update<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -225,7 +225,6 @@ mod tests {
             .await
             .context("Inserting a corrupted channel should not fail")?;
 
-        // Attempt to insert the same channel again should fail
         db.upsert_corrupted_channel(None, channel_id)
             .await
             .context("Inserting a duplicate corrupted channel should not fail")?;

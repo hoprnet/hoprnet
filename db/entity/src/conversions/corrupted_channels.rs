@@ -1,5 +1,4 @@
-use hopr_internal_types::channels::ChannelId;
-use hopr_internal_types::corrupted_channels::CorruptedChannelEntry;
+use hopr_internal_types::{channels::ChannelId, corrupted_channels::CorruptedChannelEntry};
 use hopr_primitive_types::prelude::ToHex;
 use sea_orm::Set;
 

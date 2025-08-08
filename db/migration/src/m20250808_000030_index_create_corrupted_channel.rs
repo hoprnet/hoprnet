@@ -41,6 +41,15 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .drop_table(Table::drop().table(CorruptedChannel::Table).to_owned())
+            .await?;
+
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Channel::Table)
+                    .add_column(ColumnDef::new(Channel::Corrupted).boolean().default(false).to_owned())
+                    .to_owned(),
+            )
             .await
     }
 }
