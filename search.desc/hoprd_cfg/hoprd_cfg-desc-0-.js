@@ -1,0 +1,1 @@
+searchState.loadedDescShard("hoprd_cfg", 0, "Hoprd configuration utility <code>hoprd-cfg</code>\nPrint the default YAML config for the hoprd\nReturns the argument unchanged.\nCalls <code>U::from(self)</code>.\nValidate the config at this path")

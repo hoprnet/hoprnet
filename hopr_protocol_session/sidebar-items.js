@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AcknowledgementMode"],"fn":["session_socket_mtu"],"mod":["errors"],"struct":["AcknowledgementState","AcknowledgementStateConfig","SessionSocket","SessionSocketConfig","Stateless"],"trait":["SessionSocketExt","SocketState"],"type":["ReliableSocket","UnreliableSocket"]};
