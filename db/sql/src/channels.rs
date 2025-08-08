@@ -529,6 +529,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_insert_corrupted_channel_that_exists_should_fail() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+
+        let a = Address::from(random_bytes());
+        let b = Address::from(random_bytes());
+
+        let channel_entry = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into());
+
+        db.upsert_channel(None, channel_entry).await?;
+
+        db.get_channel_by_id(None, &channel_entry.get_id())
+            .await?
+            .context("channel must be present")?;
+
+        let res = db.insert_corrupted_channel(None, channel_entry.get_id()).await;
+        assert!(
+            res.is_err(),
+            "should not be able to insert a corrupted channel that already exists"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_channel_get_for_destination_that_does_not_exist_returns_none() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 

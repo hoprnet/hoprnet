@@ -123,15 +123,14 @@ impl TryFrom<channel::Model> for CorruptedChannelEntry {
 
 impl From<CorruptedChannelEntry> for channel::ActiveModel {
     fn from(value: CorruptedChannelEntry) -> Self {
-        let mut ret = channel::ActiveModel {
+        channel::ActiveModel {
             channel_id: Set(value.channel_id().to_hex()),
             source: Set(Address::default().to_hex()), // Default to empty address
             destination: Set(Address::default().to_hex()), // Default to empty address
             balance: Set(HoprBalance::default().amount().to_be_bytes().into()), //
             status: Set(i8::from(ChannelStatus::Open)), // Default to Open status
+            corrupted: Set(true),
             ..Default::default()
-        };
-        ret.corrupted = Set(true);
-        ret
+        }
     }
 }
