@@ -232,6 +232,11 @@ where
             HoprChannelsEvents::ChannelBalanceDecreased(balance_decreased) => {
                 let channel_id = balance_decreased.channelId.0.into();
 
+                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
+                    warn!(%channel_id, "observed balance decreased event for a channel that is corrupted");
+                    return Ok(None);
+                }
+
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
@@ -284,6 +289,11 @@ where
             HoprChannelsEvents::ChannelBalanceIncreased(balance_increased) => {
                 let channel_id = balance_increased.channelId.0.into();
 
+                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
+                    warn!(%channel_id, "observed balance increased event for a channel that is corrupted");
+                    return Ok(None);
+                }
+
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
@@ -293,7 +303,7 @@ where
                 };
 
                 trace!(
-                    channel_id = %channel_id,
+                    %channel_id,
                     is_channel = maybe_channel.is_some(),
                     "on_channel_balance_increased_event",
                 );
@@ -344,7 +354,12 @@ where
                 }
             }
             HoprChannelsEvents::ChannelClosed(channel_closed) => {
-                let channel_id = Hash::from(channel_closed.channelId.0);
+                let channel_id = channel_closed.channelId.0.into();
+
+                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
+                    warn!(%channel_id, "observed channel closed event for a channel that is corrupted");
+                    return Ok(None);
+                }
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -355,7 +370,7 @@ where
                 };
 
                 trace!(
-                    channel_id = %channel_id,
+                    %channel_id,
                     is_channel = maybe_channel.is_some(),
                     "on_channel_closed_event",
                 );
@@ -394,18 +409,16 @@ where
                         }
                         updated_channel
                     } else {
-                        // Closed channels that are not our own, we be safely removed
-                        // from the database
+                        // Closed channels that are not our own can be safely removed from the database
                         let updated_channel = self
                             .db
                             .finish_channel_update(tx.into(), channel_edits.delete())
                             .await?
                             .ok_or(CoreEthereumIndexerError::ProcessError(format!(
-                                "channel closed event for channel {} did not return an updated channel",
-                                Hash::from(channel_closed.channelId.0)
+                                "channel closed event for channel {channel_id} did not return an updated channel",
                             )))?;
 
-                        debug!(channel_id = %channel_id, "foreign closed closed channel was deleted");
+                        debug!(%channel_id, "foreign closed closed channel was deleted");
                         updated_channel
                     };
 
@@ -420,6 +433,11 @@ where
                 let source: Address = channel_opened.source.into();
                 let destination: Address = channel_opened.destination.into();
                 let channel_id = generate_channel_id(&source, &destination);
+
+                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
+                    warn!(%channel_id, "observed channel opened event for a channel that is corrupted");
+                    return Ok(None);
+                }
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -490,6 +508,11 @@ where
             }
             HoprChannelsEvents::TicketRedeemed(ticket_redeemed) => {
                 let channel_id = ticket_redeemed.channelId.0.into();
+
+                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
+                    warn!(%channel_id, "observed ticket redeemed event for a channel that is corrupted");
+                    return Ok(None);
+                }
 
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -622,6 +645,12 @@ where
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiated(closure_initiated) => {
                 let channel_id = closure_initiated.channelId.0.into();
+
+                if self.db.get_corrupted_channel_by_id(None, &channel_id).await?.is_some() {
+                    warn!(%channel_id, "observed channel closure initiated event for a channel that is corrupted");
+                    return Ok(None);
+                }
+
                 let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
@@ -641,8 +670,8 @@ where
                         .finish_channel_update(tx.into(), channel_edits.change_status(new_status))
                         .await?
                         .ok_or(CoreEthereumIndexerError::ProcessError(format!(
-                            "channel closure initiation event for channel {} did not return an updated channel",
-                            Hash::from(closure_initiated.channelId.0)
+                            "channel closure initiation event for channel {channel_id} did not return an updated \
+                             channel",
                         )))?;
 
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
