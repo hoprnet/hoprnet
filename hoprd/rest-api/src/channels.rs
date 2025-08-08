@@ -537,12 +537,12 @@ pub(super) async fn fund_channel(
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "channelsIds": ["0x188c4462b75e46f0c7262d7f48d182447b93a93c"],
+        "channelsIds": ["0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f"],
 }))]
 #[serde(rename_all = "camelCase")]
-/// Response body for funding a channel.
+/// Response body for the list of corrupted channels.
 pub(crate) struct CorruptedChannelsResponse {
-    #[schema(value_type = String)]
+    #[schema(value_type = Vec<String>)]
     channels_ids: Vec<Hash>,
 }
 
