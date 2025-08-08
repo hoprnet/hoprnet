@@ -15,7 +15,7 @@ mod utils;
 
 pub use balancer::{MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
 pub use hopr_network_types::types::*;
-pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
+pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
 pub use types::{ByteCapabilities, IncomingSession, ServiceId, Session, SessionId, SessionTarget};
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;

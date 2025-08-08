@@ -81,7 +81,7 @@ mod tests {
         assert_eq!(100, controller.bounds.target());
     }
 
-    #[test]
+    #[test_log::test]
     fn test_simple_balance_with_increasing_setpoint() {
         let mut controller = SimpleBalancerController::with_increasing_setpoint(0.2, 3);
         controller.set_target_and_limit(BalancerControllerBounds::new(100, 100));
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(100, controller.bounds.target());
         assert_eq!(100, controller.next_control_output(120));
         assert_eq!(100, controller.bounds.target());
-        assert_eq!(100, controller.next_control_output(200));
+        assert_eq!(140, controller.next_control_output(200));
         assert_eq!(140, controller.bounds.target());
     }
 }

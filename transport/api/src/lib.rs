@@ -245,16 +245,16 @@ where
             smgr: SessionManager::new(SessionManagerConfig {
                 // TODO(v3.1): Use the entire range of tags properly
                 session_tag_range: (16..65535),
-                maximum_sessions: 16,
+                maximum_sessions: cfg.session.maximum_sessions as usize,
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: Duration::from_secs(5),
                 maximum_surb_buffer_size: db.get_surb_rb_size(),
-                // Allow a 15% increase of the target SURB buffer on incoming Sessions
-                // if the SURB buffer level has surpassed it by at least 15% in the last 2 minutes.
-                growable_target_surb_buffer: Some((Duration::from_secs(120), 0.15)),
+                // Allow a 10% increase of the target SURB buffer on incoming Sessions
+                // if the SURB buffer level has surpassed it by at least 10% in the last 2 minutes.
+                growable_target_surb_buffer: Some((Duration::from_secs(120), 0.10)),
             }),
             db,
             cfg,

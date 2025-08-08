@@ -1076,11 +1076,13 @@ where
                     debug!(%session_id, ?balancer_config ,"spawning exit SURB balancer");
                     let balancer = SurbBalancer::new(
                         session_id,
-                        if let Some((duration, ratio_threshold)) = self.cfg.growable_target_surb_buffer.as_ref() {
+                        if let Some((growth_window, ratio_threshold)) = self.cfg.growable_target_surb_buffer.as_ref() {
                             // Allow automatic setpoint increase
                             SimpleBalancerController::with_increasing_setpoint(
                                 *ratio_threshold,
-                                duration.div_duration_f64(self.cfg.balancer_sampling_interval).round() as usize,
+                                growth_window
+                                    .div_duration_f64(self.cfg.balancer_sampling_interval)
+                                    .round() as usize,
                             )
                         } else {
                             SimpleBalancerController::default()

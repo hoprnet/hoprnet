@@ -1077,7 +1077,7 @@ pub(crate) async fn list_clients(
 }
 
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "responseBuffer": "2 MB",
         "maxSurbUpstream": "2 Mbps"
