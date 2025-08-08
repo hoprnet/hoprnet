@@ -2014,10 +2014,10 @@ mod tests {
                 hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
                     data.plain_text.as_ref(),
                 )
-                .expect("must be a session message")
-                .try_as_segment()
-                .expect("must be a segment")
-                .is_terminating()
+                .ok()
+                .and_then(|m| m.try_as_segment())
+                .map(|s| s.is_terminating())
+                .unwrap_or(false)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {
