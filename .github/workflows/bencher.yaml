@@ -62,7 +62,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ steps.vars.outputs.source_repo }}
           ref: ${{ steps.vars.outputs.source_branch }}
