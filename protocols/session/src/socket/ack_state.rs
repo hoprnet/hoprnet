@@ -492,9 +492,10 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 ack.into_iter()
                     .inspect(|frame_id| tracing::trace!(frame_id, "frame acknowledged"))
                     .map(|frame_id| (RetriedFrameId::no_retries(frame_id), Skip).into()),
-            ) {
-                tracing::error!(%error, "failed to cancel frame resend");
-            }
+            )
+        {
+            tracing::error!(%error, "failed to cancel frame resend");
+        }
 
         Ok(())
     }
