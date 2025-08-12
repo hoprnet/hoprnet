@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-indexer"
-version = "0.9.0"
+version = "0.9.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -45,7 +45,7 @@ futures-timer = { workspace = true }
 futures-util = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
-reqwest = { workspace = true, features = ["json", "stream"] }
+reqwest = { workspace = true, features = ["json", "stream", "brotli", "zstd"] }
 sqlx = { workspace = true }
 smart-default = { workspace = true }
 sysinfo = { workspace = true }

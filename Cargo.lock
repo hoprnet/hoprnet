@@ -4421,7 +4421,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.6.2"
+version = "0.7.0"
 dependencies = [
  "alloy",
  "async-channel 2.5.0",
@@ -4451,7 +4451,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-indexer"
-version = "0.9.0"
+version = "0.9.4"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4495,7 +4495,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4670,7 +4670,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-entity"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4699,7 +4699,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.15.0"
+version = "0.17.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4743,7 +4743,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.9.1"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4869,7 +4869,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-path"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -5001,7 +5001,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "async-lock 3.4.0",
  "async-trait",
@@ -5362,7 +5362,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.1.1"
+version = "4.1.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -8150,6 +8150,7 @@ version = "0.12.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbc931937e6ca3a06e3b6c0aa7841849b160a90351d6ab467a8b9b9959767531"
 dependencies = [
+ "async-compression",
  "base64 0.22.1",
  "bytes",
  "encoding_rs",

@@ -94,7 +94,7 @@ async def base_port(request):
 
 @pytest.fixture(scope="session")
 async def swarm7(request, base_port):
-    params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
+    params_path = PWD.joinpath("sdk/python/localcluster.test.params.yml")
     try:
         cluster, anvil = await localcluster.bringup(
             params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port
