@@ -487,15 +487,14 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             .ok_or(SessionError::StateNotRunning)?;
 
         // Frame acknowledged, we will not need to resend it
-        if self.cfg.mode.is_full_ack_enabled() {
-            if let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
+        if self.cfg.mode.is_full_ack_enabled()
+            && let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
                 ack.into_iter()
                     .inspect(|frame_id| tracing::trace!(frame_id, "frame acknowledged"))
                     .map(|frame_id| (RetriedFrameId::no_retries(frame_id), Skip).into()),
             ) {
                 tracing::error!(%error, "failed to cancel frame resend");
             }
-        }
 
         Ok(())
     }
