@@ -77,7 +77,7 @@ fn split_range<'a>(
 // impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
-    fn stream_logs(&self, filters: Vec<Filter>, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
+    fn stream_logs(&self, filters: Vec<Filter>, from_block: u64, to_block: u64) -> BoxStream<'_, Result<Log>> {
         let fetch_ranges = split_range(filters, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
         debug!(
