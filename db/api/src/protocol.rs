@@ -27,6 +27,9 @@ pub trait HoprDbProtocolOperations {
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)>;
 
+    /// Returns the current maximum number of SURBs the `SurbRingBuffer` can hold.
+    fn get_surb_rb_size(&self) -> usize;
+
     /// Process the data into an outgoing packet that is not going to be acknowledged.
     async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket>;
 

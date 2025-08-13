@@ -1533,6 +1533,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bandwidth"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a464cd54c99441ba44d3d09f6f980f8c29d068645022852ab66cbaad42ef6a0"
+dependencies = [
+ "rustversion",
+ "serde",
+]
+
+[[package]]
 name = "base-x"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4739,6 +4749,7 @@ dependencies = [
  "thiserror 2.0.14",
  "tokio",
  "tracing",
+ "validator",
 ]
 
 [[package]]
@@ -4944,9 +4955,10 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
+ "hopr-metrics",
  "hopr-network-types",
  "hopr-primitive-types",
- "hopr-protocol-session",
+ "lazy_static",
  "mockall",
  "parameterized",
  "parking_lot",
@@ -4954,6 +4966,7 @@ dependencies = [
  "rand 0.8.5",
  "ringbuffer",
  "serde",
+ "serde_bytes",
  "smart-default",
  "strum 0.27.2",
  "test-log",
@@ -4961,6 +4974,20 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "hopr-protocol-start"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aquamarine",
+ "hopr-crypto-packet",
+ "hopr-transport-packet",
+ "serde",
+ "serde_cbor_2",
+ "strum 0.27.2",
+ "thiserror 2.0.14",
 ]
 
 [[package]]
@@ -5225,11 +5252,13 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-protocol-session",
+ "hopr-protocol-start",
  "hopr-transport-bloom",
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-packet",
  "hopr-transport-probe",
+ "hopr-transport-session",
  "lazy_static",
  "libp2p",
  "moka",
@@ -5249,14 +5278,11 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "anyhow",
- "aquamarine",
  "arrayvec",
  "async-trait",
- "bincode",
- "criterion",
  "flagset",
  "futures",
  "futures-time",
@@ -5269,6 +5295,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-primitive-types",
  "hopr-protocol-session",
+ "hopr-protocol-start",
  "hopr-transport-packet",
  "lazy_static",
  "mockall",
@@ -5277,8 +5304,8 @@ dependencies = [
  "pin-project",
  "rand 0.8.5",
  "serde",
+ "serde_cbor_2",
  "serde_repr",
- "serde_with",
  "smart-default",
  "strum 0.27.2",
  "test-log",
@@ -5362,7 +5389,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.1.2"
+version = "4.2.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5371,6 +5398,7 @@ dependencies = [
  "base64 0.22.1",
  "bytesize",
  "const_format",
+ "dashmap",
  "either",
  "futures",
  "futures-concurrency",
@@ -5383,6 +5411,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hopr-transport-session",
+ "human-bandwidth",
  "lazy_static",
  "oas3",
  "regex",
@@ -5469,6 +5498,16 @@ name = "httpdate"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
+
+[[package]]
+name = "human-bandwidth"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a5afe042873d564e1fccc5d50983e1e6341ffcae8fb7603c6c542de7129a785"
+dependencies = [
+ "bandwidth",
+ "serde",
+]
 
 [[package]]
 name = "humantime"
@@ -8948,6 +8987,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bef2ebfde456fb76bbcf9f59315333decc4fda0b2b44b420243c11e0f5ec1f5"
 dependencies = [
  "half 1.8.3",
+ "serde",
+]
+
+[[package]]
+name = "serde_cbor_2"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34aec2709de9078e077090abd848e967abab63c9fb3fdb5d4799ad359d8d482c"
+dependencies = [
+ "half 2.6.0",
  "serde",
 ]
 

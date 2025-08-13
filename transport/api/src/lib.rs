@@ -2,8 +2,7 @@
 //! into a unified [`crate::HoprTransport`] object with the goal of isolating the transport layer
 //! and defining a fully specified transport API.
 //!
-//! It also implements the Session negotiation via Start sub-protocol.
-//! See the [`hopr_transport_session::initiation`] module for details on Start sub-protocol.
+//! See also the `hopr_protocol_start` crate for details on Start sub-protocol which initiates a Session.
 //!
 //! As such, the transport layer components should be only those that are directly necessary to:
 //!
@@ -27,6 +26,7 @@ pub mod proxy;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, OnceLock},
+    time::Duration,
 };
 
 use async_lock::RwLock;
@@ -78,8 +78,9 @@ use hopr_transport_protocol::{
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_MTU, ServiceId,
-    Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, errors::TransportSessionError,
+    Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_MTU, SURB_SIZE,
+    ServiceId, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use hopr_transport_ticket_aggregation::{
@@ -239,17 +240,23 @@ where
                 ),
                 channel_graph.clone(),
             ),
-            db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(SessionManagerConfig {
                 // TODO(v3.1): Use the entire range of tags properly
                 session_tag_range: (16..65535),
-                maximum_sessions: 16,
+                maximum_sessions: cfg.session.maximum_sessions as usize,
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+                initial_return_session_egress_rate: 10,
+                minimum_surb_buffer_duration: Duration::from_secs(5),
+                maximum_surb_buffer_size: db.get_surb_rb_size(),
+                // Allow a 10% increase of the target SURB buffer on incoming Sessions
+                // if the SURB buffer level has surpassed it by at least 10% in the last 2 minutes.
+                growable_target_surb_buffer: Some((Duration::from_secs(120), 0.10)),
             }),
+            db,
             cfg,
         }
     }
@@ -670,6 +677,18 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn probe_session(&self, id: &SessionId) -> errors::Result<()> {
         Ok(self.smgr.ping_session(id).await?)
+    }
+
+    pub async fn session_surb_balancing_cfg(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
+        Ok(self.smgr.get_surb_balancer_config(id).await?)
+    }
+
+    pub async fn update_session_surb_balancing_cfg(
+        &self,
+        id: &SessionId,
+        cfg: SurbBalancerConfig,
+    ) -> errors::Result<()> {
+        Ok(self.smgr.update_surb_balancer_config(id, cfg).await?)
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]

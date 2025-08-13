@@ -1,5 +1,8 @@
 //! Contains implementation of a `Session` message protocol.
 //!
+//! The implementation in this crate follows
+//! the HOPR [`RFC-0007`](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0007-session-protocol).
+//!
 //! # What is `Session` protocol?
 //! `Session` protocol is a simple protocol for unreliable networks that implements
 //! basic TCP-like features, such as segmentation, retransmission and acknowledgement.

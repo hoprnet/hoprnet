@@ -35,7 +35,7 @@ pub enum TicketAggregationError {
     DatabaseError(#[from] hopr_db_api::errors::DbError),
 }
 
-/// Result used by the crate, based on the [ProtocolError] error type.
+/// Result used by the crate, based on the [`TicketAggregationError`] error type.
 pub type Result<T> = core::result::Result<T, TicketAggregationError>;
 
 #[cfg(all(feature = "prometheus", not(test)))]
