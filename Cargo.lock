@@ -4749,6 +4749,7 @@ dependencies = [
  "thiserror 2.0.14",
  "tokio",
  "tracing",
+ "validator",
 ]
 
 [[package]]
@@ -4986,7 +4987,7 @@ dependencies = [
  "serde",
  "serde_cbor_2",
  "strum 0.27.2",
- "thiserror 2.0.12",
+ "thiserror 2.0.14",
 ]
 
 [[package]]

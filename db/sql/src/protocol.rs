@@ -333,6 +333,7 @@ impl HoprDbProtocolOperations for HoprDb {
         }
     }
 
+    #[inline]
     fn get_surb_rb_size(&self) -> usize {
         self.cfg.surb_ring_buffer_size
     }

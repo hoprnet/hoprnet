@@ -22,6 +22,7 @@ use sqlx::{
     sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
 };
 use tracing::{debug, log::LevelFilter};
+use validator::Validate;
 
 use crate::{
     HoprDbAllOperations,
@@ -35,7 +36,7 @@ pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 *
 
 pub const MIN_SURB_RING_BUFFER_SIZE: usize = 1024;
 
-#[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
+#[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 pub struct HoprDbConfig {
     #[default(true)]
     pub create_if_missing: bool,
@@ -44,6 +45,7 @@ pub struct HoprDbConfig {
     #[default(Duration::from_secs(5))]
     pub log_slow_queries: Duration,
     #[default(10_000)]
+    #[validate(range(min = MIN_SURB_RING_BUFFER_SIZE))]
     pub surb_ring_buffer_size: usize,
 }
 
@@ -109,10 +111,8 @@ impl HoprDb {
             lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
         }
 
-        let cfg = HoprDbConfig {
-            surb_ring_buffer_size: cfg.surb_ring_buffer_size.max(MIN_SURB_RING_BUFFER_SIZE),
-            ..cfg
-        };
+        cfg.validate()
+            .map_err(|e| DbSqlError::Construction(format!("failed configuration validation: {e}")))?;
 
         fs::create_dir_all(directory)
             .map_err(|_e| DbSqlError::Construction(format!("cannot create main database directory {directory:?}")))?;
