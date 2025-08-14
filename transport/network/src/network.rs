@@ -198,7 +198,12 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
-            self.refresh_metrics(&stats)
+            self.refresh_metrics(&stats);
+            tracing::info!(
+                health = %health_from_stats(&stats, self.am_i_public),
+                trigger = "peer removal",
+                "Network health updated"
+            );
         }
 
         Ok(())
@@ -267,7 +272,12 @@ where
             #[cfg(all(feature = "prometheus", not(test)))]
             {
                 let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
-                self.refresh_metrics(&stats)
+                self.refresh_metrics(&stats);
+                tracing::info!(
+                    health = %health_from_stats(&stats, self.am_i_public),
+                    trigger = "peer update",
+                    "Network health updated"
+                );
             }
 
             Ok(())
