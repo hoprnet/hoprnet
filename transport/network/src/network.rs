@@ -265,7 +265,7 @@ where
                 },
             }
 
-            tracing::trace!(%peer, quality = entry.quality, quality_avg = entry.quality_avg.average(), "Updating peer status in the store");
+            tracing::trace!(%peer, quality = entry.quality, quality_avg = hopr_primitive_types::sma::SMA::average(&entry.quality_avg), "Updating peer status in the store");
             self.db.update_network_peer(entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
