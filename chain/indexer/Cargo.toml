@@ -39,9 +39,7 @@ async-lock = { workspace = true }
 async-tar = { workspace = true }
 async-trait = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
-flate2 = { workspace = true }
 futures = { workspace = true }
-futures-timer = { workspace = true }
 futures-util = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
