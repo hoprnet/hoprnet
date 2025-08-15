@@ -197,9 +197,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
-        let node_cfg_value =
-            serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
-
         let api_cfg = cfg.api.clone();
 
         let listen_address = match &cfg.api.host.address {
@@ -216,13 +213,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let session_listener_sockets = Arc::new(RwLock::new(HashMap::new()));
 
+        let cfg_as_redacted_string = cfg.as_redacted_string()?;
+
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
 
         processes.push(HoprdProcesses::RestApi(hopr_async_runtime::spawn_as_abortable!(
             async move {
                 if let Err(e) = serve_api(RestApiParameters {
                     listener: api_listener,
-                    hoprd_cfg: node_cfg_value,
+                    hoprd_cfg: cfg_as_redacted_string,
                     cfg: api_cfg,
                     hopr: node_clone,
                     session_listener_sockets,
