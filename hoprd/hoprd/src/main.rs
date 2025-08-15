@@ -199,6 +199,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cfg.api.enable {
         let api_cfg = cfg.api.clone();
 
+        let node_cfg_value =
+            serde_yaml::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
+
         let listen_address = match &cfg.api.host.address {
             hopr_lib::HostType::IPv4(a) | hopr_lib::HostType::Domain(a) => {
                 format!("{a}:{}", cfg.api.host.port)
@@ -213,15 +216,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let session_listener_sockets = Arc::new(RwLock::new(HashMap::new()));
 
-        let cfg_as_redacted_string = cfg.as_redacted_string()?;
-
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
 
         processes.push(HoprdProcesses::RestApi(hopr_async_runtime::spawn_as_abortable!(
             async move {
                 if let Err(e) = serve_api(RestApiParameters {
                     listener: api_listener,
-                    hoprd_cfg: cfg_as_redacted_string,
+                    hoprd_cfg: node_cfg_value,
                     cfg: api_cfg,
                     hopr: node_clone,
                     session_listener_sockets,

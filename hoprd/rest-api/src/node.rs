@@ -52,7 +52,7 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
     path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
     description = "Get the configuration of the running node",
     responses(
-        (status = 200, description = "Fetched node configuration", body = HashMap<String, String>, example = "network: anvil-localhost\nprovider: http://127.0.0.1:8545\n"),
+        (status = 200, description = "Fetched node configuration", body = String, example = "network: anvil-localhost\nprovider: http://127.0.0.1:8545\n"),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
     ),
     security(
@@ -62,7 +62,7 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
     tag = "Configuration"
     )]
 pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
+    (StatusCode::OK, axum_yaml::Yaml(state.hoprd_cfg.clone())).into_response()
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]

@@ -1508,6 +1508,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-yaml"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8479914fbb8cba0ecfbc19e39d88e2728d863e7c5ba1f2944f878904f504a70"
+dependencies = [
+ "async-trait",
+ "axum-core 0.5.2",
+ "bytes",
+ "http",
+ "mime",
+ "serde",
+ "serde_path_to_error",
+ "serde_yaml",
+]
+
+[[package]]
 name = "backon"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5390,6 +5406,7 @@ dependencies = [
  "async-lock 3.4.1",
  "axum 0.8.4",
  "axum-extra",
+ "axum-yaml",
  "base64 0.22.1",
  "bytesize",
  "const_format",
@@ -5413,6 +5430,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "serde_yaml",
  "smart-default",
  "strum 0.27.2",
  "test-log",
