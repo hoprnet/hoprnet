@@ -6,10 +6,10 @@ import "forge-std/Test.sol";
 import { HoprNodeManagementModule } from "../../src/node-stake/permissioned-module/NodeManagementModule.sol";
 import { HoprCapabilityPermissions } from "../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
 import { HoprNodeStakeFactory, HoprNodeStakeFactoryEvents } from "../../src/node-stake/NodeStakeFactory.sol";
-import { Safe } from "safe-contracts/Safe.sol";
-import { SafeSuiteLib } from "../../src/utils/SafeSuiteLib.sol";
+import { Safe } from "safe-contracts-1.4.1/Safe.sol";
+import { SafeSuiteLibV141 } from "../../src/utils/SafeSuiteLibV141.sol";
 import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
-import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 
 contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
     using ClonesUpgradeable for address;
@@ -45,15 +45,15 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         // there's code in Singleton contract
         assertTrue(hasSingletonContract());
         // there's code in Safe Singleton
-        assertGt(SafeSuiteLib.SAFE_Safe_ADDRESS.code.length, 0);
+        assertGt(SafeSuiteLibV141.SAFE_Safe_ADDRESS.code.length, 0);
         // there's code in Safe Proxy Factory
-        assertGt(SafeSuiteLib.SAFE_SafeProxyFactory_ADDRESS.code.length, 0);
+        assertGt(SafeSuiteLibV141.SAFE_SafeProxyFactory_ADDRESS.code.length, 0);
         // there's code in Safe MultiSendCallOnly
-        assertGt(SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS.code.length, 0);
+        assertGt(SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS.code.length, 0);
         // there's code in Safe CompatibilityFallbackHandler
-        assertGt(SafeSuiteLib.SAFE_CompatibilityFallbackHandler_ADDRESS.code.length, 0);
+        assertGt(SafeSuiteLibV141.SAFE_CompatibilityFallbackHandler_ADDRESS.code.length, 0);
         // safe version matches
-        assertEq(factory.safeVersion(), SafeSuiteLib.SAFE_VERSION);
+        assertEq(factory.safeVersion(), SafeSuiteLibV141.SAFE_VERSION);
     }
 
     /**
@@ -119,7 +119,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         // module multisend should beSafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS
         assertEq(
             HoprNodeManagementModule(module).multisend(),
-            SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS,
+            SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS,
             "Wrong module owner"
         );
 

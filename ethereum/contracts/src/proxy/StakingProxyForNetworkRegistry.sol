@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
-import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
+import { Ownable } from "openzeppelin-contracts-4.9.2/access/Ownable.sol";
+import { Math } from "openzeppelin-contracts-4.9.2/utils/math/Math.sol";
 import { IHoprNetworkRegistryRequirement } from "../interfaces/INetworkRegistryRequirement.sol";
 
 /**

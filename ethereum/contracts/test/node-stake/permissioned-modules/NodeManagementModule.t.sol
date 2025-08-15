@@ -6,11 +6,11 @@ import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 import "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
 import "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
 import "../../utils/CapabilityLibrary.sol";
-import "../../../src/utils/SafeSuiteLib.sol";
+import "../../../src/utils/SafeSuiteLibV141.sol";
 import "../../utils/SafeSingleton.sol";
 import "../../../src/interfaces/IAvatar.sol";
 import "../../../src/Crypto.sol";
-import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 import { SimplifiedModuleEvents } from "../../../src/node-stake/permissioned-module/SimplifiedModule.sol";
 
 /**

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.0 <0.9.0;
 
-import { Enum } from "safe-contracts/common/Enum.sol";
+import { Enum } from "safe-contracts-1.4.1/common/Enum.sol";
 import { HoprChannels } from "../../Channels.sol";
 import { EnumerableTargetSet, TargetSet } from "../../utils/EnumerableTargetSet.sol";
 import {

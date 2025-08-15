@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-import "openzeppelin-contracts/utils/Multicall.sol";
+import "openzeppelin-contracts-4.9.2/utils/Multicall.sol";
 
 import { HoprMultiSig } from "./MultiSig.sol";
 import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";

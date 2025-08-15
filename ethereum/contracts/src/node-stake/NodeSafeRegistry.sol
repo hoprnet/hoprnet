@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import { ECDSA } from "openzeppelin-contracts-4.9.2/utils/cryptography/ECDSA.sol";
 import { IAvatar } from "../interfaces/IAvatar.sol";
 import { IHoprNodeManagementModule } from "../interfaces/INodeManagementModule.sol";
-import { Address } from "openzeppelin-contracts/utils/Address.sol";
+import { Address } from "openzeppelin-contracts-4.9.2/utils/Address.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {
     /**

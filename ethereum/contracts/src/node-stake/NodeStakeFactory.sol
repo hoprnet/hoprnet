@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
-import { Address } from "openzeppelin-contracts/utils/Address.sol";
-import { SafeSuiteLib } from "../utils/SafeSuiteLib.sol";
-import { SafeProxy } from "safe-contracts/proxies/SafeProxy.sol";
-import { SafeProxyFactory } from "safe-contracts/proxies/SafeProxyFactory.sol";
-import { Safe } from "safe-contracts/Safe.sol";
-import { Enum } from "safe-contracts/common/Enum.sol";
+import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
+import { Address } from "openzeppelin-contracts-4.9.2/utils/Address.sol";
+import { SafeSuiteLibV141 } from "../utils/SafeSuiteLibV141.sol";
+import { SafeProxy } from "safe-contracts-1.4.1/proxies/SafeProxy.sol";
+import { SafeProxyFactory } from "safe-contracts-1.4.1/proxies/SafeProxyFactory.sol";
+import { Safe } from "safe-contracts-1.4.1/Safe.sol";
+import { Enum } from "safe-contracts-1.4.1/common/Enum.sol";
 
 abstract contract HoprNodeStakeFactoryEvents {
     event NewHoprNodeStakeModule(address indexed moduleImplementation, address instance); // Emit when a new module is
@@ -67,7 +67,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {
      * @dev Returns the version of Safe deployments
      */
     function safeVersion() public pure returns (string memory) {
-        return SafeSuiteLib.SAFE_VERSION;
+        return SafeSuiteLibV141.SAFE_VERSION;
     }
 
     /**
@@ -110,22 +110,22 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents {
             1, // threshold
             address(0),
             hex"00",
-            SafeSuiteLib.SAFE_CompatibilityFallbackHandler_ADDRESS,
+            SafeSuiteLibV141.SAFE_CompatibilityFallbackHandler_ADDRESS,
             address(0),
             0,
             address(0)
         );
 
         // 2. Deploy Safe proxy
-        SafeProxy safeProxy = SafeProxyFactory(SafeSuiteLib.SAFE_SafeProxyFactory_ADDRESS).createProxyWithNonce(
-            SafeSuiteLib.SAFE_Safe_ADDRESS, safeInitializer, nonce
+        SafeProxy safeProxy = SafeProxyFactory(SafeSuiteLibV141.SAFE_SafeProxyFactory_ADDRESS).createProxyWithNonce(
+            SafeSuiteLibV141.SAFE_Safe_ADDRESS, safeInitializer, nonce
         );
         address payable safeProxyAddr = payable(address(safeProxy));
 
         // Add Safe and multisend to the module, then transfer ownership to the module
         bytes memory moduleInitializer = abi.encodeWithSignature(
             "initialize(bytes)",
-            abi.encode(address(safeProxy), SafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS, defaultTarget)
+            abi.encode(address(safeProxy), SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS, defaultTarget)
         );
         moduleProxy.functionCall(moduleInitializer);
 

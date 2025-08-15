@@ -4,7 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import { Script } from "forge-std/Script.sol";
 
 import "./utils/NetworkConfig.s.sol";
-import "../src/utils/SafeSuiteLib.sol";
+import "../src/utils/SafeSuiteLibV141.sol";
 import "../test/utils/SafeSingleton.sol";
 
 contract SafeSuiteSetupScript is Script, NetworkConfig, SafeSingletonFixtureTest {

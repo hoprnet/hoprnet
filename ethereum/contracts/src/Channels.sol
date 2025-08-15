@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.7.0 <0.9.0;
 
-import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
-import { IERC1820Registry } from "openzeppelin-contracts/utils/introspection/IERC1820Registry.sol";
-import { ERC1820Implementer } from "openzeppelin-contracts/utils/introspection/ERC1820Implementer.sol";
-import { IERC20 } from "openzeppelin-contracts/token/ERC20/IERC20.sol";
-import { IERC777Recipient } from "openzeppelin-contracts/token/ERC777/IERC777Recipient.sol";
-import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
+import { Multicall } from "openzeppelin-contracts-4.9.2/utils/Multicall.sol";
+import { IERC1820Registry } from "openzeppelin-contracts-4.9.2/utils/introspection/IERC1820Registry.sol";
+import { ERC1820Implementer } from "openzeppelin-contracts-4.9.2/utils/introspection/ERC1820Implementer.sol";
+import { IERC20 } from "openzeppelin-contracts-4.9.2/token/ERC20/IERC20.sol";
+import { IERC777Recipient } from "openzeppelin-contracts-4.9.2/token/ERC777/IERC777Recipient.sol";
+import { ECDSA } from "openzeppelin-contracts-4.9.2/utils/cryptography/ECDSA.sol";
 
 import { HoprCrypto } from "./Crypto.sol";
 import { HoprLedger } from "./Ledger.sol";

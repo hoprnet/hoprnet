@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
  * This contract follows the principle of `zodiac/core/Module.sol`
  * but implement differently in order to overwrite functionalities
  */
-import { Enum } from "safe-contracts/common/Enum.sol";
+import { Enum } from "safe-contracts-1.4.1/common/Enum.sol";
 import { SimplifiedModule } from "./SimplifiedModule.sol";
 import { HoprCapabilityPermissions, Role, GranularPermission } from "./CapabilityPermissions.sol";
 import { HoprChannels } from "../../Channels.sol";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.19;
 
-import { Ownable2Step } from "openzeppelin-contracts/access/Ownable2Step.sol";
+import { Ownable2Step } from "openzeppelin-contracts-4.9.2/access/Ownable2Step.sol";
 
 type WinProb is uint56;
 
