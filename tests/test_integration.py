@@ -358,3 +358,10 @@ class TestIntegrationWithSwarm:
         version = await swarm7[peer].api.api_version()
 
         assert re.match(r"^\d+\.\d+\.\d+$", version) is not None, "Version should be in the format X.Y.Z"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+    async def test_hoprd_configuration_endpoint(self, peer, swarm7: dict[str, Node]):
+        cfg = await swarm7[peer].api.config()
+
+        cfg.contains("0.9 wxHOPR", "Configuration should contain the default wxHOPR token value")
