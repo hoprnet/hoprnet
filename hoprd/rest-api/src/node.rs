@@ -52,7 +52,7 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
     path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
     description = "Get the configuration of the running node",
     responses(
-        (status = 200, description = "Fetched node configuration", body = String, example = "network: anvil-localhost\nprovider: http://127.0.0.1:8545\n"),
+        (status = 200, description = "Fetched node configuration", content_type = "application/yaml", body = String, example = "network: anvil-localhost\nprovider: http://127.0.0.1:8545\n"),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
     ),
     security(

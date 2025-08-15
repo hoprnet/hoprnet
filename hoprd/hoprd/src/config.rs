@@ -493,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn test_config_should_be_serializable_into_string() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_config_should_be_serializable_into_string() -> anyhow::Result<()> {
         let cfg = example_cfg()?;
 
         let from_yaml: HoprdConfig = serde_yaml::from_str(include_str!("../example_cfg.yaml"))?;
@@ -504,7 +504,7 @@ mod tests {
     }
 
     #[test]
-    fn test_config_should_be_deserializable_from_a_string_in_a_file() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_config_should_be_deserializable_from_a_string_in_a_file() -> anyhow::Result<()> {
         let mut config_file = NamedTempFile::new()?;
         let mut prepared_config_file = config_file.reopen()?;
 
