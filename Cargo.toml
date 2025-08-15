@@ -64,7 +64,7 @@ async-lock = "3.4.1"
 async-signal = "0.2.3"
 async-stream = "0.3.6"
 async-tar = "0.5.0"
-async-trait = "0.1.88"
+async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
 axum = { version = "0.8.4", features = ["ws", "http2"] }
@@ -82,7 +82,7 @@ bytes = "1.10.1"
 cfg_eval = "0.1.2"
 cfg-if = "1.0.1"
 chrono = { version = "0.4.41", default-features = false }
-clap = { version = "4.5.44", features = ["derive", "env", "string"] }
+clap = { version = "4.5.45", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.7.0", features = ["async_tokio", "html_reports"] }
@@ -141,9 +141,9 @@ primitive-types = { version = "0.13.1", features = ["serde"] }
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones
-rayon = "1.10.0"
+rayon = "1.11.0"
 regex = "1.11.1"
-reqwest = { version = "0.12.22", features = ["json"] }
+reqwest = { version = "0.12.23", features = ["json"] }
 ringbuffer = "0.16.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
