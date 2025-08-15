@@ -4,7 +4,7 @@ use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use hopr_async_runtime::AbortHandle;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::prelude::DestinationRouting;
-use hopr_transport_packet::prelude::ApplicationData;
+use hopr_protocol_app::prelude::ApplicationData;
 use tracing::{debug, error};
 
 use crate::{

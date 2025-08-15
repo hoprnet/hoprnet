@@ -22,7 +22,7 @@ pub use utils::transfer_session;
 
 /// Number of bytes that can be sent in a single Session protocol payload.
 pub const SESSION_MTU: usize =
-    hopr_protocol_session::session_socket_mtu::<{ hopr_transport_packet::v1::ApplicationData::PAYLOAD_SIZE }>();
+    hopr_protocol_session::session_socket_mtu::<{ hopr_protocol_app::v1::ApplicationData::PAYLOAD_SIZE }>();
 
 /// Size of the HOPR SURB in bytes.
 ///
@@ -86,11 +86,11 @@ mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::HoprPseudonym;
+    use hopr_protocol_app::v1::ApplicationData;
     use hopr_protocol_session::session_socket_mtu;
     use hopr_protocol_start::{
         KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
     };
-    use hopr_transport_packet::v1::ApplicationData;
 
     use super::*;
     use crate::types::HoprStartProtocol;

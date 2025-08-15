@@ -9,7 +9,7 @@ use hopr_internal_types::protocol::HoprPseudonym;
 use hopr_network_types::types::{ResolvedTransportRouting, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag};
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag};
 use hopr_transport_protocol::processor::{PacketError, PacketSendFinalizer};
 use libp2p_identity::PeerId;
 
@@ -293,7 +293,7 @@ mod tests {
     use futures::future::BoxFuture;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_network_types::prelude::SurbMatcher;
-    use hopr_transport_packet::prelude::Tag;
+    use hopr_protocol_app::prelude::Tag;
 
     use super::*;
 

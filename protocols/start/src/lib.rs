@@ -17,7 +17,7 @@
 /// Contains errors raised by the Start protocol.
 pub mod errors;
 
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
 use crate::errors::StartProtocolError;
 
@@ -323,7 +323,7 @@ where
 #[cfg(test)]
 mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
-    use hopr_transport_packet::prelude::Tag;
+    use hopr_protocol_app::prelude::Tag;
 
     use super::*;
 

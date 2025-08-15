@@ -1,5 +1,5 @@
 use hopr_primitive_types::prelude::GeneralError;
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
 /// Serializable and deserializable enum for the probe message content
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumDiscriminants)]

@@ -81,9 +81,9 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
 use hopr_internal_types::{prelude::HoprPseudonym, protocol::Acknowledgement};
 use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_protocol_app::prelude::ApplicationData;
 use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
-use hopr_transport_packet::prelude::ApplicationData;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, error, trace, warn};
 

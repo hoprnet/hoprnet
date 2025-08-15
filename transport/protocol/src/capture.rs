@@ -315,9 +315,9 @@ mod tests {
     use hopr_internal_types::prelude::{Acknowledgement, HoprPseudonym, TicketBuilder, WinningProbability};
     use hopr_network_types::types::SealedHost;
     use hopr_primitive_types::{primitives::EthereumChallenge, traits::BytesEncodable};
+    use hopr_protocol_app::prelude::ApplicationData;
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
-    use hopr_transport_packet::prelude::ApplicationData;
     use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
     use hopr_transport_session::{ByteCapabilities, Capability, SessionId, SessionTarget};
 

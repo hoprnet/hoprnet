@@ -12,8 +12,8 @@ use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{

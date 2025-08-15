@@ -17,8 +17,8 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
 use hopr_primitive_types::prelude::*;
+use hopr_protocol_app::prelude::ApplicationData;
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_packet::prelude::ApplicationData;
 use hopr_transport_protocol::{
     DEFAULT_PRICE_PER_PACKET,
     processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},

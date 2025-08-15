@@ -67,11 +67,11 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
 hopr-path = { workspace = true }
+hopr-protocol-app = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
 hopr-transport-p2p = { workspace = true }
-hopr-transport-packet = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
