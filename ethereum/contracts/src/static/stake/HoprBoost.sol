@@ -36,8 +36,8 @@ contract HoprBoost is IHoprBoost, AccessControlEnumerable, ERC721URIStorage, ERC
    */
   constructor(address newAdmin, string memory baseTokenURI) ERC721('HOPR Boost NFT', 'HOPR Boost') {
     _baseTokenURI = baseTokenURI;
-    _setupRole(DEFAULT_ADMIN_ROLE, newAdmin);
-    _setupRole(MINTER_ROLE, newAdmin);
+    _grantRole(DEFAULT_ADMIN_ROLE, newAdmin);
+    _grantRole(MINTER_ROLE, newAdmin);
   }
 
   /**
