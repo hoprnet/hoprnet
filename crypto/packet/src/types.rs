@@ -104,23 +104,22 @@ pub struct PacketParts<S: SphinxSuite, H: SphinxHeaderSpec> {
 }
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
-    /// Mask for the flags in the first byte.
-    const F_MASK: u8 = Self::N_MASK.wrapping_neg();
     /// Size of the message header.
     ///
     /// This is currently 1 byte to indicate the number of SURBs that precede the message.
     pub const HEADER_LEN: usize = 1;
+    // 15 SURBs
+
+    const MASK: u8 = Self::MAX_SURBS_PER_MESSAGE as u8;
     /// The number of SURBs in a `PacketMessage` is intentionally limited so that
     /// the upper 4 bits remain reserved for additional flags.
-    pub const MAX_SURBS_PER_MESSAGE: usize = 31;
-    /// Mask for the number of SURBs in the first byte.
-    const N_MASK: u8 = Self::MAX_SURBS_PER_MESSAGE as u8;
+    pub const MAX_SURBS_PER_MESSAGE: usize = 0b0000_1111;
 
     /// Converts this instance into [`PacketParts`].
     pub fn try_into_parts(self) -> Result<PacketParts<S, H>, SphinxError> {
         let data = self.0.into_unpadded()?;
-        let num_surbs = (data[0] & Self::N_MASK) as usize;
-        let flags = (data[0] & Self::F_MASK) >> Self::N_MASK.trailing_ones();
+        let num_surbs = (data[0] & Self::MASK) as usize;
+        let flags = (data[0] & Self::MASK) >> Self::MASK.trailing_ones();
 
         if num_surbs > 0 {
             let surb_end = num_surbs * SURB::<S, H>::SIZE;
@@ -160,7 +159,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
             return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
         }
 
-        if flags > Self::F_MASK >> Self::N_MASK.trailing_ones() {
+        if flags > Self::MASK {
             return Err(GeneralError::ParseError("HoprPacketMessage.flags not valid".into()).into());
         }
 
@@ -170,8 +169,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
         }
 
         let mut ret = Vec::with_capacity(PaddedPayload::<P>::SIZE);
-        let flags_and_len = ((flags & (Self::F_MASK >> Self::N_MASK.trailing_ones())) << Self::N_MASK.trailing_ones())
-            | (surbs.len() as u8 & Self::N_MASK);
+        let flags_and_len = (flags << Self::MASK.trailing_ones()) | (surbs.len() as u8 & Self::MASK);
         ret.push(flags_and_len);
         for surb in surbs.into_iter().map(|s| s.into_boxed()) {
             ret.extend_from_slice(surb.as_ref());
