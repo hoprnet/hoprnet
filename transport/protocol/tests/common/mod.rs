@@ -333,13 +333,15 @@ pub async fn resolve_mock_path(
 
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
     (0..size)
-        .map(|i| ApplicationData {
-            application_tag: if i == 0 {
-                random_integer(16u64, Some(65535u64)).into()
-            } else {
-                0u64.into()
-            },
-            plain_text: random_bytes::<300>().into(),
+        .map(|i| {
+            ApplicationData::new(
+                if i == 0 {
+                    random_integer(16u64, Some(65535u64))
+                } else {
+                    0u64
+                },
+                &random_bytes::<300>(),
+            )
         })
         .collect::<Vec<_>>()
 }

@@ -25,8 +25,25 @@ pub fn f64_approx_eq(a: f64, b: f64, epsilon: f64) -> bool {
     float_cmp::ApproxEq::approx_eq(a, b, (epsilon, 2))
 }
 
+/// Converts the given `data` into a hex string, removing the middle part of the string if it is
+/// longer than `max_chars` of hex characters.
+pub fn to_hex_shortened(data: &impl AsRef<[u8]>, max_chars: usize) -> String {
+    let data = data.as_ref();
+    if data.len() * 2 > max_chars {
+        format!(
+            "{}..{}",
+            hex::encode(&data[0..max_chars / 2]),
+            hex::encode(&data[data.len() - max_chars / 2..])
+        )
+    } else {
+        hex::encode(data)
+    }
+}
+
 pub mod prelude {
     pub use chrono::{DateTime, Utc};
 
-    pub use super::{balance::*, errors::GeneralError, f64_approx_eq, primitives::*, sma::*, traits::*};
+    pub use super::{
+        balance::*, errors::GeneralError, f64_approx_eq, primitives::*, sma::*, to_hex_shortened, traits::*,
+    };
 }

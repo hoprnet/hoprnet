@@ -2,8 +2,7 @@ use std::time::Instant;
 
 use crate::{
     errors::SessionError,
-    frames::{Frame, FrameId, Segment, SeqNum},
-    protocol::MissingSegmentsBitmap,
+    protocol::{Frame, FrameId, MissingSegmentsBitmap, Segment, SeqNum},
 };
 
 /// A helper object that reassembles segments into frames.
@@ -332,7 +331,7 @@ impl FrameMap for FrameHashMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::frames::SeqIndicator;
+    use crate::protocol::SeqIndicator;
 
     #[test]
     fn frame_builder_should_return_ordered_segments() -> anyhow::Result<()> {

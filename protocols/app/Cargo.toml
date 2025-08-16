@@ -8,18 +8,24 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
-
 [features]
-serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
+default = []
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "hopr-crypto-packet/serde",
+  "flagset/serde",
+]
 
 [dependencies]
-hex = { workspace = true }
+flagset = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 hopr-crypto-packet = { workspace = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

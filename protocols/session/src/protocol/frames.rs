@@ -5,9 +5,9 @@ use std::{
     fmt::{Debug, Display, Formatter},
 };
 
-use hopr_primitive_types::prelude::GeneralError;
+use hopr_primitive_types::prelude::{GeneralError, to_hex_shortened};
 
-use crate::{errors::SessionError, utils::to_hex_shortened};
+use crate::errors::SessionError;
 
 /// ID of a [Frame].
 pub type FrameId = u32;

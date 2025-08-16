@@ -674,10 +674,7 @@ mod tests {
             let mut from_network_to_probing_tx = iface.from_network_to_probing_tx;
             let mut from_probing_up_rx = iface.from_probing_up_rx;
 
-            let expected_data = ApplicationData {
-                application_tag: Tag::MAX.into(),
-                plain_text: b"Hello, this is a test message!".to_vec().into_boxed_slice(),
-            };
+            let expected_data = ApplicationData::new(Tag::MAX, b"Hello, this is a test message!");
 
             from_network_to_probing_tx
                 .send((HoprPseudonym::random(), expected_data.clone()))

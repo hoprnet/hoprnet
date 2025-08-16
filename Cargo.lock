@@ -4936,8 +4936,9 @@ name = "hopr-protocol-app"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "hex",
+ "flagset",
  "hopr-crypto-packet",
+ "hopr-primitive-types",
  "serde",
  "serde_bytes",
  "strum 0.27.2",

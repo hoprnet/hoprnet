@@ -8,8 +8,7 @@ use std::{
 use tracing::instrument;
 
 use crate::{
-    frames::{FrameId, Segment, SeqIndicator},
-    protocol::SessionMessage,
+    protocol::{FrameId, Segment, SeqIndicator, SessionMessage},
     utils::segment_into,
 };
 
@@ -236,7 +235,7 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
-    use crate::{frames::SeqNum, utils::segment};
+    use crate::{protocol::SeqNum, utils::segment};
 
     const MTU: usize = 1000;
     const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;

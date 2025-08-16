@@ -17,6 +17,7 @@
 /// Contains errors raised by the Start protocol.
 pub mod errors;
 
+use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
 use crate::errors::StartProtocolError;
@@ -25,8 +26,8 @@ use crate::errors::StartProtocolError;
 pub type StartChallenge = u64;
 
 /// Lists all Start protocol error reasons.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 #[repr(u8)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 pub enum StartErrorReason {
     /// Unknown error.
     Unknown = 0,
@@ -124,6 +125,11 @@ pub struct KeepAliveMessage<I> {
     pub flags: u8,
     /// Additional data (might be `flags` dependent), ignored if `0x00000000`.
     pub additional_data: u32,
+}
+
+impl<I> KeepAliveMessage<I> {
+    /// The minimum number of SURBs a [`KeepAliveMessage`] must be able to carry.
+    pub const MIN_SURBS_PER_MESSAGE: usize = HoprPacket::MAX_SURBS_IN_PACKET;
 }
 
 impl<I> From<I> for KeepAliveMessage<I> {
@@ -300,10 +306,7 @@ where
 
     fn try_from(value: StartProtocol<I, T, C>) -> Result<Self, Self::Error> {
         let (application_tag, plain_text) = value.encode()?;
-        Ok(ApplicationData {
-            application_tag,
-            plain_text,
-        })
+        Ok(ApplicationData::new_from_owned(application_tag, plain_text))
     }
 }
 
@@ -469,6 +472,25 @@ mod tests {
     }
 
     #[test]
+    fn start_protocol_message_session_initiation_message_should_allow_for_at_least_one_surb() -> anyhow::Result<()> {
+        let msg = StartProtocol::<String, String, u8>::StartSession(StartInitiation {
+            challenge: 0,
+            target: "127.0.0.1:1234".to_string(),
+            capabilities: 0xff,
+            additional_data: 0xffffffff,
+        });
+
+        let len = msg.encode()?.1.len();
+        assert!(
+            HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
+            "StartInitiation message size ({}) must allow for at least 1 SURBs in packet",
+            len,
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
         let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
@@ -476,11 +498,12 @@ mod tests {
             additional_data: 0xffffffff,
         });
         let len = msg.encode()?.1.len();
+        assert_eq!(KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE, HoprPacket::MAX_SURBS_IN_PACKET);
         assert!(
             HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
             "KeepAlive message size ({}) must allow for at least {} SURBs in packet",
             len,
-            HoprPacket::MAX_SURBS_IN_PACKET
+            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE
         );
 
         Ok(())

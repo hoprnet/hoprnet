@@ -1,6 +1,7 @@
 use std::{fmt::Formatter, ops::Range, str::FromStr};
 
 use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_primitive_types::to_hex_shortened;
 use strum::IntoEnumIterator;
 
 /// List of all reserved application tags for the protocol.
@@ -30,10 +31,11 @@ impl From<ReservedTag> for Tag {
     }
 }
 
-/// Tags are represented by 8 bytes ([`u64`]`).
+/// Tags distinguishing different application-layer protocols.
 ///
-/// [`u64`] should offer enough space to avoid collisions and tag attacks.
-// #[repr(u64)]
+/// Currently, 8 bytes represent tags (`u64`).
+///
+/// `u64` should offer enough space to avoid collisions and tag attacks.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Tag {
     Reserved(u64),
@@ -119,22 +121,64 @@ impl FromStr for Tag {
     }
 }
 
+flagset::flags! {
+   /// Individual flags passed up from the HOPR protocol layer to the Application layer.
+   ///
+   /// The upper 4 bits are reserved for signaling by the Application layer to the HOPR protocol layer
+   /// when sending data, the lower 4 bits are reserved for signaling of the HOPR protocol layer
+   /// to the Application layer when receiving data.
+    #[repr(u8)]
+    #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
+   pub enum ApplicationFlag: u8 {
+        /// The other party is in a "SURB distress" state, potentially running out of SURBs soon.
+        SurbDistress = 0b0000_0001,
+        /// The other party has run out of SURBs, and this was potentially the last message they could
+        /// send.
+        ///
+        /// Implies [`SurbDistress`].
+        OutOfSurbs = 0b0000_0011,
+   }
+}
+
+/// Additional flags passed up from the HOPR protocol layer to the application layer.
+pub type ApplicationFlags = flagset::FlagSet<ApplicationFlag>;
+
 /// Represents the received decrypted packet carrying the application-layer data.
+///
+/// This structure always owns the data.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ApplicationData {
+    /// Tag identifying the application-layer protocol.
     pub application_tag: Tag,
+    /// The actual application-layer data.
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     pub plain_text: Box<[u8]>,
+    /// Additional flags passed to/from the HOPR protocol layer and the Application layer, serving
+    /// as a means of local signaling.
+    ///
+    /// For outgoing data, these flags can be used to signal certain modes of operation by the Application layer
+    /// to the HOPR protocol.
+    /// For incoming data, the flags can be set by the HOPR protocol to signal various states to the
+    /// Applications layer.
+    ///
+    /// The flags are never serialized nor deserialized. Whether these flags are eventually
+    /// materialized over the wire is decided solely by the HOPR protocol layer underneath.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub flags: ApplicationFlags,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    _d: u8, // prevents bypassing the constructor
 }
 
 impl ApplicationData {
-    pub const PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE - Tag::SIZE;
+    pub const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE - Tag::SIZE;
 
     pub fn new<T: Into<Tag>>(application_tag: T, plain_text: &[u8]) -> Self {
         Self {
             application_tag: application_tag.into(),
             plain_text: plain_text.into(),
+            flags: ApplicationFlags::empty(),
+            _d: 0,
         }
     }
 
@@ -142,13 +186,25 @@ impl ApplicationData {
         Self {
             application_tag: tag.into(),
             plain_text,
+            flags: ApplicationFlags::empty(),
+            _d: 0,
         }
     }
 
-    #[allow(clippy::len_without_is_empty)]
+    /// Creates a new instance with the given `flags` set.
+    pub fn with_flags(mut self, flags: ApplicationFlags) -> Self {
+        self.flags = flags;
+        self
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         Self::TAG_SIZE + self.plain_text.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.plain_text.is_empty()
     }
 
     /// Returns the estimated number of SURBs the HOPR packet carrying an `ApplicationData` instance
@@ -162,13 +218,19 @@ impl std::fmt::Debug for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ApplicationData")
             .field("application_tag", &self.application_tag)
+            .field("plain_text", &to_hex_shortened(&self.plain_text, 32))
             .finish()
     }
 }
 
 impl std::fmt::Display for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}): {}", self.application_tag, hex::encode(&self.plain_text))
+        write!(
+            f,
+            "({}): {}",
+            self.application_tag,
+            to_hex_shortened(&self.plain_text, 16)
+        )
     }
 }
 
@@ -184,6 +246,8 @@ impl ApplicationData {
                         .map_err(|_e| crate::errors::PacketError::DecodingError("ApplicationData.tag".into()))?,
                 ),
                 plain_text: Box::from(&data[Self::TAG_SIZE..]),
+                flags: ApplicationFlags::empty(),
+                _d: 0,
             })
         } else {
             Err(crate::errors::PacketError::DecodingError("ApplicationData".into()))

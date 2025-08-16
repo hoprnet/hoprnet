@@ -203,11 +203,7 @@ impl<'a> TryFrom<&'a [u8]> for Message {
 
 impl From<Message> for ApplicationData {
     fn from(message: Message) -> Self {
-        let tag: Tag = ReservedTag::Ping.into();
-        ApplicationData {
-            application_tag: tag,
-            plain_text: message.to_bytes(),
-        }
+        ApplicationData::new_from_owned(ReservedTag::Ping, message.to_bytes())
     }
 }
 

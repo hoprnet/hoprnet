@@ -12,9 +12,8 @@ use tracing::Instrument;
 
 use crate::{
     errors::SessionError,
-    frames::{FrameId, Segment, SegmentId, SeqIndicator},
     processing::types::FrameInspector,
-    protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
+    protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator, SessionMessage},
     socket::{SocketState, state::SocketComponents},
     utils::{
         RetriedFrameId, RingBufferProducer, RingBufferView, next_deadline_with_backoff, searchable_ringbuffer,
@@ -609,7 +608,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        frames::SeqNum,
+        protocol::SeqNum,
         processing::types::{FrameBuilder, FrameDashMap, FrameMap},
         utils::segment,
     };

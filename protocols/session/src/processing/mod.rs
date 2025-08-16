@@ -10,7 +10,6 @@
 //! Reassembler followed by a Sequencer is commonly called frame Reconstructor.
 
 mod reassembly;
-// mod segmenter_old;
 mod segmenter;
 mod sequencer;
 /// Types necessary for frame reconstruction and segmentation.
@@ -31,7 +30,7 @@ mod tests {
     use super::*;
     use crate::{
         errors::SessionError,
-        frames::{Frame, OrderedFrame},
+        protocol::{Frame, OrderedFrame},
         utils::segment,
     };
 

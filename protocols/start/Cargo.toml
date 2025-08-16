@@ -16,6 +16,7 @@ strum = { workspace = true }
 thiserror = { workspace = true }
 
 hopr-protocol-app = { workspace = true }
+hopr-crypto-packet = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
