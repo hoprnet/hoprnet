@@ -608,8 +608,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        protocol::SeqNum,
         processing::types::{FrameBuilder, FrameDashMap, FrameMap},
+        protocol::SeqNum,
         utils::segment,
     };
 

@@ -368,6 +368,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 next_ticket,
                 &myself.caches.key_id_mapper,
                 &domain_separator,
+                None,
             )
             .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
         })
@@ -398,6 +399,7 @@ impl HoprDbProtocolOperations for HoprDb {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
+        flags: Option<u8>,
     ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -474,6 +476,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 next_ticket,
                 &myself.caches.key_id_mapper,
                 &domain_separator,
+                flags,
             )
             .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
         })
@@ -582,6 +585,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         sender: incoming.sender,
                         plain_text: incoming.plain_text,
                         ack_key,
+                        flags: incoming.flags,
                     },
                 })
             }

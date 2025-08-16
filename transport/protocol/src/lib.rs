@@ -462,6 +462,7 @@ where
                             sender,
                             plain_text,
                             ack_key,
+                            flags,
                             ..
                         } => {
                             // Send acknowledgement back
@@ -495,7 +496,7 @@ where
                                     let _ = capture_clone.try_send(captured_packet);
                                 }
 
-                                Some((sender, plain_text))
+                                Some((sender, plain_text, flags))
                         }
                         IncomingPacket::Forwarded {
                             previous_hop,
@@ -562,7 +563,8 @@ where
                     }
                 }})
                 .filter_map(|maybe_data| async move {
-                    if let Some((sender, data)) = maybe_data {
+                    // TODO: translate flags into ApplicationFlags
+                    if let Some((sender, data, _flags)) = maybe_data {
                         ApplicationData::from_bytes(data.as_ref())
                             .inspect_err(|error| tracing::error!(%error, "failed to decode application data"))
                             .ok()

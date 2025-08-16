@@ -40,6 +40,7 @@ pub trait HoprDbProtocolOperations {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
+        flags: Option<u8>,
     ) -> Result<OutgoingPacket>;
 
     /// Process the incoming packet into data
@@ -63,6 +64,7 @@ pub enum IncomingPacket {
         sender: HoprPseudonym,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
+        flags: u8,
     },
     /// Packet must be forwarded
     Forwarded {

@@ -97,18 +97,30 @@ pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(Pa
 pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>;
 
 /// Individual parts of a [`PacketMessage`]: SURBs and the actual message.
-pub type PacketParts<S, H> = (Vec<SURB<S, H>>, Box<[u8]>);
+pub struct PacketParts<S: SphinxSuite, H: SphinxHeaderSpec> {
+    pub surbs: Vec<SURB<S, H>>,
+    pub payload: Box<[u8]>,
+    pub flags: u8,
+}
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
+    /// Mask for the flags in the first byte.
+    const F_MASK: u8 = Self::N_MASK.wrapping_neg();
     /// Size of the message header.
     ///
-    /// This is currently 1 byte to indicate the number of SURBs, that precede the message.
+    /// This is currently 1 byte to indicate the number of SURBs that precede the message.
     pub const HEADER_LEN: usize = 1;
+    /// The number of SURBs in a `PacketMessage` is intentionally limited so that
+    /// the upper 4 bits remain reserved for additional flags.
+    pub const MAX_SURBS_PER_MESSAGE: usize = 31;
+    /// Mask for the number of SURBs in the first byte.
+    const N_MASK: u8 = Self::MAX_SURBS_PER_MESSAGE as u8;
 
     /// Converts this instance into [`PacketParts`].
     pub fn try_into_parts(self) -> Result<PacketParts<S, H>, SphinxError> {
         let data = self.0.into_unpadded()?;
-        let num_surbs = data[0] as usize;
+        let num_surbs = (data[0] & Self::N_MASK) as usize;
+        let flags = (data[0] & Self::F_MASK) >> Self::N_MASK.trailing_ones();
 
         if num_surbs > 0 {
             let surb_end = num_surbs * SURB::<S, H>::SIZE;
@@ -126,18 +138,30 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
                 .map(SURB::<S, H>::try_from)
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok((surbs, data.into_boxed_slice()))
+            Ok(PacketParts {
+                surbs,
+                payload: data.into_boxed_slice(),
+                flags,
+            })
         } else {
             let mut data = data.into_vec();
             data.remove(0);
-            Ok((Vec::with_capacity(0), data.into_boxed_slice()))
+            Ok(PacketParts {
+                surbs: Vec::with_capacity(0),
+                payload: data.into_boxed_slice(),
+                flags,
+            })
         }
     }
 
     /// Allocates a new instance from the given parts.
-    pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8]) -> Result<Self, SphinxError> {
-        if surbs.len() > 255 {
+    pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8], flags: u8) -> Result<Self, SphinxError> {
+        if surbs.len() > Self::MAX_SURBS_PER_MESSAGE {
             return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
+        }
+
+        if flags > Self::F_MASK >> Self::N_MASK.trailing_ones() {
+            return Err(GeneralError::ParseError("HoprPacketMessage.flags not valid".into()).into());
         }
 
         // The total size of the packet message must not exceed the maximum packet size.
@@ -146,7 +170,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
         }
 
         let mut ret = Vec::with_capacity(PaddedPayload::<P>::SIZE);
-        ret.push(surbs.len() as u8);
+        let flags_and_len = ((flags & (Self::F_MASK >> Self::N_MASK.trailing_ones())) << Self::N_MASK.trailing_ones())
+            | (surbs.len() as u8 & Self::N_MASK);
+        ret.push(flags_and_len);
         for surb in surbs.into_iter().map(|s| s.into_boxed()) {
             ret.extend_from_slice(surb.as_ref());
         }
@@ -232,9 +258,11 @@ mod tests {
     #[test]
     fn hopr_packet_message_message_only() -> anyhow::Result<()> {
         let test_msg = b"test message";
-        let (surbs, msg) = HoprPacketMessage::from_parts(vec![], test_msg)?.try_into_parts()?;
+        let PacketParts { surbs, payload, flags } =
+            HoprPacketMessage::from_parts(vec![], test_msg, 7)?.try_into_parts()?;
         assert_eq!(surbs.len(), 0);
-        assert_eq!(msg.as_ref(), test_msg);
+        assert_eq!(payload.as_ref(), test_msg);
+        assert_eq!(flags, 7);
 
         Ok(())
     }
@@ -242,14 +270,19 @@ mod tests {
     #[test]
     fn hopr_packet_message_surbs_only() -> anyhow::Result<()> {
         let surbs_1 = generate_surbs(2)?;
-        let (surbs_2, msg) = HoprPacketMessage::from_parts(surbs_1.clone(), &[])?.try_into_parts()?;
+        let PacketParts {
+            surbs: surbs_2,
+            payload,
+            flags,
+        } = HoprPacketMessage::from_parts(surbs_1.clone(), &[], 7)?.try_into_parts()?;
 
         assert_eq!(surbs_2.len(), surbs_1.len());
         for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {
             assert_eq!(surb_1.into_boxed(), surb_2.into_boxed());
         }
 
-        assert!(msg.is_empty());
+        assert!(payload.is_empty());
+        assert_eq!(flags, 7);
 
         Ok(())
     }
@@ -258,15 +291,20 @@ mod tests {
     fn hopr_packet_message_surbs_and_msg() -> anyhow::Result<()> {
         let test_msg = b"test msg";
         let surbs_1 = generate_surbs(2)?;
-        let hopr_msg = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg)?;
-        let (surbs_2, msg) = hopr_msg.try_into_parts()?;
+        let hopr_msg = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg, 7)?;
+        let PacketParts {
+            surbs: surbs_2,
+            payload,
+            flags,
+        } = hopr_msg.try_into_parts()?;
 
         assert_eq!(surbs_2.len(), surbs_1.len());
         for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {
             assert_eq!(surb_1.into_boxed(), surb_2.into_boxed());
         }
 
-        assert_eq!(msg.as_ref(), test_msg);
+        assert_eq!(payload.as_ref(), test_msg);
+        assert_eq!(flags, 7);
 
         Ok(())
     }
@@ -274,14 +312,30 @@ mod tests {
     #[test]
     fn hopr_packet_size_msg_size_limit() {
         let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE + 1];
-        let res = HoprPacketMessage::from_parts(vec![], &test_msg);
+        let res = HoprPacketMessage::from_parts(vec![], &test_msg, 0);
         assert!(res.is_err());
     }
 
     #[test]
     fn hopr_packet_message_surbs_size_limit() -> anyhow::Result<()> {
         let surbs = generate_surbs(3)?;
-        let res = HoprPacketMessage::from_parts(surbs, &[]);
+        let res = HoprPacketMessage::from_parts(surbs, &[], 0);
+        assert!(res.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hopr_packet_message_surbs_max_size_limit() -> anyhow::Result<()> {
+        let surbs = generate_surbs(16)?;
+        let res = HoprPacketMessage::from_parts(surbs, &[], 0);
+        assert!(res.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hopr_packet_message_surbs_flag_limit() -> anyhow::Result<()> {
+        let surbs = generate_surbs(3)?;
+        let res = HoprPacketMessage::from_parts(surbs, &[], 8);
         assert!(res.is_err());
         Ok(())
     }
@@ -290,7 +344,7 @@ mod tests {
     fn hopr_packet_size_msg_and_surb_size_limit() -> anyhow::Result<()> {
         let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1];
         let surbs = generate_surbs(2)?;
-        let res = HoprPacketMessage::from_parts(surbs, &test_msg);
+        let res = HoprPacketMessage::from_parts(surbs, &test_msg, 0);
         assert!(res.is_err());
         Ok(())
     }

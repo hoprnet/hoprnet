@@ -498,7 +498,10 @@ mod tests {
             additional_data: 0xffffffff,
         });
         let len = msg.encode()?.1.len();
-        assert_eq!(KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE, HoprPacket::MAX_SURBS_IN_PACKET);
+        assert_eq!(
+            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
+            HoprPacket::MAX_SURBS_IN_PACKET
+        );
         assert!(
             HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
             "KeepAlive message size ({}) must allow for at least {} SURBs in packet",
