@@ -162,7 +162,11 @@ impl PartialHoprPacket {
     ///
     /// No flags are equivalent to `0`.
     pub fn into_hopr_packet(self, msg: &[u8], flags: Option<u8>) -> Result<(HoprPacket, Vec<HoprReplyOpener>)> {
-        let msg = HoprPacketMessage::from_parts(self.surbs, msg, flags.unwrap_or_default())?;
+        let msg = HoprPacketMessage::try_from(PacketParts {
+            surbs: self.surbs,
+            payload: msg.into(),
+            flags: flags.unwrap_or_default(),
+        })?;
         Ok((
             HoprPacket::Outgoing(
                 HoprOutgoingPacket {
@@ -409,18 +413,14 @@ impl HoprPacket {
                     no_ack,
                 } => {
                     // The pre_ticket is not parsed nor verified on the final hop
-                    let PacketParts {
-                        surbs,
-                        payload: plain_text,
-                        flags,
-                    } = HoprPacketMessage::from(plain_text).try_into_parts()?;
+                    let PacketParts { surbs, payload, flags } = HoprPacketMessage::from(plain_text).try_into()?;
                     let should_acknowledge = !no_ack;
                     Ok(Self::Final(
                         HoprIncomingPacket {
                             packet_tag,
-                            ack_key: (should_acknowledge).then_some(derive_ack_key_share(&derived_secret)),
+                            ack_key: should_acknowledge.then(|| derive_ack_key_share(&derived_secret)),
                             previous_hop,
-                            plain_text,
+                            plain_text: payload.into(),
                             surbs: receiver_data.into_sequence().map(|d| d.surb_id()).zip(surbs).collect(),
                             sender: receiver_data.pseudonym(),
                             flags,
