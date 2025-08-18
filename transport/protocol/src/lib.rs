@@ -98,6 +98,7 @@ pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
+use hopr_protocol_app::v1::ApplicationFlags;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -280,6 +281,7 @@ where
                                         is_forwarded: false,
                                         data: data_clone.to_bytes().into_vec().into(),
                                         ack_challenge: v.ack_challenge.as_ref().into(),
+                                        flags: data_clone.flags.bits(),
                                         ticket: inspect_ticket_data_in_packet(&v.data).into(),
                                     }
                                     .into(),
@@ -515,6 +517,7 @@ where
                                 is_forwarded: true,
                                 data: data.as_ref().into(),
                                 ack_challenge: Default::default(),
+                                flags: 0,
                                 ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
                             }.into();
 
@@ -563,12 +566,11 @@ where
                     }
                 }})
                 .filter_map(|maybe_data| async move {
-                    // TODO: translate flags into ApplicationFlags
-                    if let Some((sender, data, _flags)) = maybe_data {
+                    if let Some((sender, data, flags)) = maybe_data {
                         ApplicationData::from_bytes(data.as_ref())
                             .inspect_err(|error| tracing::error!(%error, "failed to decode application data"))
                             .ok()
-                            .map(|data| (sender, data))
+                            .map(|data| (sender, data.with_flags(ApplicationFlags::new_truncated(flags))))
                     } else {
                         None
                     }

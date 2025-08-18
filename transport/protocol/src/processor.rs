@@ -59,7 +59,7 @@ where
                 routing,
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
-                None, // TODO: translate some flags from ApplicationData
+                Some(data.flags.bits()),
             )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
