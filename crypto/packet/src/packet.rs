@@ -13,7 +13,7 @@ use crate::{
         Result,
     },
     por::{SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay, pre_verify},
-    types::{HoprPacketMessage, HoprSenderId, HoprSurbId, PacketParts},
+    types::{HoprPacketMessage, HoprSenderId, HoprSurbId, HoprPacketParts},
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.
@@ -162,7 +162,7 @@ impl PartialHoprPacket {
     ///
     /// No flags are equivalent to `0`.
     pub fn into_hopr_packet(self, msg: &[u8], flags: Option<u8>) -> Result<(HoprPacket, Vec<HoprReplyOpener>)> {
-        let msg = HoprPacketMessage::try_from(PacketParts {
+        let msg = HoprPacketMessage::try_from(HoprPacketParts {
             surbs: self.surbs,
             payload: msg.into(),
             flags: flags.unwrap_or_default(),
@@ -327,6 +327,7 @@ impl HoprPacket {
     ///
     /// **NOTE**
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
+    #[allow(clippy::too_many_arguments)] // TODO: needs refactoring (perhaps introduce a builder pattern?)
     pub fn into_outgoing<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
         msg: &[u8],
         pseudonym: &HoprPseudonym,
@@ -413,7 +414,7 @@ impl HoprPacket {
                     no_ack,
                 } => {
                     // The pre_ticket is not parsed nor verified on the final hop
-                    let PacketParts { surbs, payload, flags } = HoprPacketMessage::from(plain_text).try_into()?;
+                    let HoprPacketParts { surbs, payload, flags } = HoprPacketMessage::from(plain_text).try_into()?;
                     let should_acknowledge = !no_ack;
                     Ok(Self::Final(
                         HoprIncomingPacket {

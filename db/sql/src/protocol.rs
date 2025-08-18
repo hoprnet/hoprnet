@@ -368,7 +368,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 next_ticket,
                 &myself.caches.key_id_mapper,
                 &domain_separator,
-                None,
+                None, // NoAck messages currently do not have flags
             )
             .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
         })

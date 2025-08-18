@@ -1,5 +1,5 @@
 use std::{borrow::Cow, marker::PhantomData, ops::Not};
-
+use std::fmt::Formatter;
 use hopr_crypto_sphinx::{
     errors::SphinxError,
     prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
@@ -10,11 +10,13 @@ use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
 
 use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 
+/// Size of the [`HoprSurbId`] in bytes.
 pub const SURB_ID_SIZE: usize = 8;
 
+/// An ID that uniquely identifies SURB for a certain pseudonym.
 pub type HoprSurbId = [u8; SURB_ID_SIZE];
 
-/// Identifier of the packet sender.
+/// Identifier of a single packet sender.
 ///
 /// This consists of two parts:
 /// - [`HoprSenderId::pseudonym`] of the sender
@@ -110,7 +112,7 @@ pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(Pa
 /// Convenience alias for HOPR specific [`PacketMessage`].
 pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>;
 
-/// Individual parts of a [`PacketMessage`]: SURBs and the actual message.
+/// Individual parts of a [`PacketMessage`]: SURBs, the actual message (payload) and additional flags for the recipient.
 pub struct PacketParts<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
     /// Contains (a potentially empty) list of SURBs.
     pub surbs: Vec<SURB<S, H>>,
@@ -119,6 +121,50 @@ pub struct PacketParts<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
     /// Additional flags from the sender to the recipient.
     pub flags: u8,
 }
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Clone for PacketParts<'_, S, H>
+where
+    H::KeyId: Clone,
+    H::SurbReceiverData: Clone {
+    fn clone(&self) -> Self {
+        Self {
+            surbs: self.surbs.clone(),
+            payload: self.payload.clone(),
+            flags: self.flags,
+        }
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> std::fmt::Debug for PacketParts<'_, S, H>
+where
+    H::KeyId: std::fmt::Debug,
+    H::SurbReceiverData: std::fmt::Debug {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PacketParts")
+            .field("surbs", &self.surbs)
+            .field("payload", &self.payload)
+            .field("flags", &self.flags)
+            .finish()
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialEq for PacketParts<'_, S, H>
+where
+    H::KeyId: PartialEq,
+    H::SurbReceiverData: PartialEq {
+    fn eq(&self, other: &Self) -> bool {
+        self.surbs == other.surbs && self.payload == other.payload && self.flags == other.flags
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Eq for PacketParts<'_, S, H>
+where
+    H::KeyId: Eq,
+    H::SurbReceiverData: Eq
+{}
+
+/// Convenience alias for HOPR specific [`PacketParts`].
+pub type HoprPacketParts<'a> = PacketParts<'a, HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
 const S_MASK: u8 = 0b0000_1111;
 
@@ -180,13 +226,13 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
 
             let mut data = data.into_vec();
 
-            let surb_data = data.drain(0..=surb_end).skip(1).collect::<Vec<_>>();
-
-            let surbs = surb_data
-                .as_slice()
+            let surbs = data[1..=surb_end]
                 .chunks_exact(SURB::<S, H>::SIZE)
                 .map(SURB::<S, H>::try_from)
                 .collect::<Result<Vec<_>, _>>()?;
+
+            // Skip buffer all the way to the end of the SURBs.
+            data.drain(0..=surb_end).for_each(drop);
 
             Ok(PacketParts {
                 surbs,
@@ -279,77 +325,51 @@ mod tests {
 
     #[test]
     fn hopr_packet_message_message_only() -> anyhow::Result<()> {
-        let test_msg = b"test message";
-        let PacketParts { surbs, payload, flags } = HoprPacketMessage::try_from(PacketParts {
+        let parts_1 = HoprPacketParts {
             surbs: vec![],
-            payload: test_msg.into(),
+            payload: b"test message".into(),
             flags: 7,
-        })?
-        .try_into()?;
-        assert_eq!(surbs.len(), 0);
-        assert_eq!(payload.as_ref(), test_msg);
-        assert_eq!(flags, 7);
+        };
+
+        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
+        assert_eq!(parts_1, parts_2);
 
         Ok(())
     }
 
     #[test]
     fn hopr_packet_message_surbs_only() -> anyhow::Result<()> {
-        let surbs_1 = generate_surbs(2)?;
-        let PacketParts {
-            surbs: surbs_2,
-            payload,
-            flags,
-        } = HoprPacketMessage::try_from(PacketParts {
-            surbs: surbs_1.clone(),
+        let parts_1 = HoprPacketParts {
+            surbs: generate_surbs(2)?,
             payload: Cow::default(),
             flags: 7,
-        })?
-        .try_into()?;
+        };
 
-        assert_eq!(surbs_2.len(), surbs_1.len());
-        for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {
-            assert_eq!(surb_1.into_boxed(), surb_2.into_boxed());
-        }
-
-        assert!(payload.is_empty());
-        assert_eq!(flags, 7);
+        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
+        assert_eq!(parts_1, parts_2);
 
         Ok(())
     }
 
     #[test]
     fn hopr_packet_message_surbs_and_msg() -> anyhow::Result<()> {
-        let test_msg = b"test msg";
-        let surbs_1 = generate_surbs(2)?;
-        let hopr_msg = HoprPacketMessage::try_from(PacketParts {
-            surbs: surbs_1.clone(),
-            payload: test_msg.into(),
+        let parts_1 = HoprPacketParts {
+            surbs: generate_surbs(2)?,
+            payload: b"test msg".into(),
             flags: 7,
-        })?;
-        let PacketParts {
-            surbs: surbs_2,
-            payload,
-            flags,
-        } = hopr_msg.try_into()?;
+        };
 
-        assert_eq!(surbs_2.len(), surbs_1.len());
-        for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {
-            assert_eq!(surb_1.into_boxed(), surb_2.into_boxed());
-        }
-
-        assert_eq!(payload.as_ref(), test_msg);
-        assert_eq!(flags, 7);
+        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
+        assert_eq!(parts_1, parts_2);
 
         Ok(())
     }
 
     #[test]
     fn hopr_packet_size_msg_size_limit() {
-        let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE + 1];
-        let res = HoprPacketMessage::try_from(PacketParts {
+        let res = HoprPacketMessage::try_from(HoprPacketParts {
             surbs: vec![],
-            payload: (&test_msg).into(),
+            payload: (&[1u8; HoprPacket::PAYLOAD_SIZE + 1]).into(),
             flags: 0,
         });
         assert!(res.is_err());
@@ -357,50 +377,44 @@ mod tests {
 
     #[test]
     fn hopr_packet_message_surbs_size_limit() -> anyhow::Result<()> {
-        let surbs = generate_surbs(3)?;
         let res = HoprPacketMessage::try_from(PacketParts {
-            surbs,
+            surbs: generate_surbs(HoprPacketMessage::MAX_SURBS_PER_MESSAGE + 1)?,
             payload: Cow::default(),
             flags: 0,
         });
         assert!(res.is_err());
-        Ok(())
-    }
 
-    #[test]
-    fn hopr_packet_message_surbs_max_size_limit() -> anyhow::Result<()> {
-        let surbs = generate_surbs(16)?;
-        let res = HoprPacketMessage::try_from(PacketParts {
-            surbs,
+        let res = HoprPacketMessage::try_from(HoprPacketParts {
+            surbs: generate_surbs(3)?,
             payload: Cow::default(),
             flags: 0,
         });
         assert!(res.is_err());
+
         Ok(())
     }
 
     #[test]
     fn hopr_packet_message_surbs_flag_limit() -> anyhow::Result<()> {
-        let surbs = generate_surbs(3)?;
         let res = HoprPacketMessage::try_from(PacketParts {
-            surbs,
+            surbs: generate_surbs(3)?,
             payload: Cow::default(),
             flags: 16,
         });
         assert!(res.is_err());
+
         Ok(())
     }
 
     #[test]
     fn hopr_packet_size_msg_and_surb_size_limit() -> anyhow::Result<()> {
-        let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1];
-        let surbs = generate_surbs(2)?;
         let res = HoprPacketMessage::try_from(PacketParts {
-            surbs,
-            payload: (&test_msg).into(),
+            surbs: generate_surbs(2)?,
+            payload: (&[1u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1]).into(),
             flags: 0,
         });
         assert!(res.is_err());
+
         Ok(())
     }
 }
