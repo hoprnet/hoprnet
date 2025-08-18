@@ -2,6 +2,7 @@
 
 #![allow(clippy::all)]
 
+#[allow(warnings)]
 #[cfg_attr(rustfmt, rustfmt_skip)]
 mod codegen;
 

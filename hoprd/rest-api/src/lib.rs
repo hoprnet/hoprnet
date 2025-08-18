@@ -108,6 +108,8 @@ pub(crate) struct InternalState {
         root::metrics,
         session::create_client,
         session::list_clients,
+        session::adjust_session,
+        session::session_config,
         session::close_client,
         tickets::aggregate_tickets_in_channel,
         tickets::redeem_all_tickets,
@@ -128,7 +130,7 @@ pub(crate) struct InternalState {
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery, node::NodeGraphResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol,
+            session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),
@@ -312,6 +314,8 @@ async fn build_api(
                 .route("/node/entry-nodes", get(node::entry_nodes))
                 .route("/node/graph", get(node::channel_graph))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
+                .route("/session/config/{id}", get(session::session_config))
+                .route("/session/config/{id}", post(session::adjust_session))
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/{protocol}", post(session::create_client))
                 .route("/session/{protocol}", get(session::list_clients))
@@ -391,6 +395,8 @@ enum ApiErrorStatus {
     InvalidQuality,
     NotReady,
     ListenHostAlreadyUsed,
+    SessionNotFound,
+    InvalidSessionId,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

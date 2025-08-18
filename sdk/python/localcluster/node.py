@@ -212,6 +212,7 @@ class Node:
                     "hopr_transport_session=debug",
                     "hopr_protocol_session=debug",
                     "hopr_network_types=debug",
+                    "hopr_protocol_session=debug",
                     "isahc=error",
                     "sea_orm=warn",
                     "sqlx=warn",

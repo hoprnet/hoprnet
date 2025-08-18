@@ -1,5 +1,6 @@
-use std::{fmt::Formatter, ops::Range};
+use std::{fmt::Formatter, ops::Range, str::FromStr};
 
+use hopr_crypto_packet::prelude::HoprPacket;
 use strum::IntoEnumIterator;
 
 /// List of all reserved application tags for the protocol.
@@ -110,6 +111,14 @@ impl std::fmt::Display for Tag {
     }
 }
 
+impl FromStr for Tag {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        u64::from_str(s).map(Tag::from)
+    }
+}
+
 /// Represents the received decrypted packet carrying the application-layer data.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -137,8 +146,15 @@ impl ApplicationData {
     }
 
     #[allow(clippy::len_without_is_empty)]
+    #[inline]
     pub fn len(&self) -> usize {
         Self::TAG_SIZE + self.plain_text.len()
+    }
+
+    /// Returns the estimated number of SURBs the HOPR packet carrying an `ApplicationData` instance
+    /// with `payload` could hold (or could have held).
+    pub fn estimate_surbs_with_msg<T: AsRef<[u8]>>(payload: &T) -> usize {
+        HoprPacket::max_surbs_with_message(payload.as_ref().len().min(Self::PAYLOAD_SIZE) + Tag::SIZE)
     }
 }
 

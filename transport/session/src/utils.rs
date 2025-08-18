@@ -1,18 +1,27 @@
-use std::{
-    marker::PhantomData,
-    pin::Pin,
-    sync::{Arc, atomic::AtomicU64},
-    task::{Context, Poll},
+use std::time::Duration;
+
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use hopr_async_runtime::AbortHandle;
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_network_types::prelude::DestinationRouting;
+use hopr_transport_packet::prelude::ApplicationData;
+use tracing::{debug, error};
+
+use crate::{
+    SessionId,
+    balancer::{RateController, RateLimitStreamExt, SurbControllerWithCorrection},
+    errors::TransportSessionError,
+    types::HoprStartProtocol,
 };
 
-/// Convenience function to copy data in both directions between a [`Session`] and arbitrary
+/// Convenience function to copy data in both directions between a [`Session`](crate::Session) and arbitrary
 /// async IO stream.
 /// This function is only available with Tokio and will panic with other runtimes.
 ///
 /// The `abort_stream` will terminate the transfer from the `stream` side, i.e.:
 /// 1. Initiates graceful shutdown of `stream`
 /// 2. Once done, initiates a graceful shutdown of `session`
-/// 3. The function terminates, returning the number of bytes transfered in both directions.
+/// 3. The function terminates, returning the number of bytes transferred in both directions.
 #[cfg(feature = "runtime-tokio")]
 pub async fn transfer_session<S>(
     session: &mut crate::Session,
@@ -51,69 +60,129 @@ where
     }
 }
 
-/// Decorates a `Sink` with a scoring function that is called for each successfully sent item,
-/// accumulating the score into an `AtomicU64`.
-///
-/// This adapter is also `Clone` if the underlying `Sink` is.
-#[pin_project::pin_project]
-pub(crate) struct ScoringSink<I, S, F> {
-    #[pin]
-    inner: S,
-    score: Arc<AtomicU64>,
-    scoring_fn: F,
-    _d: PhantomData<I>,
-}
-
-impl<I, S, F> ScoringSink<I, S, F>
+/// This function will use the given generator to generate an initial seeding key.
+/// It will check whether the given cache already contains a value for that key, and if not,
+/// calls the generator (with the previous value) to generate a new seeding key and retry.
+/// The function either finds a suitable free slot, inserting the `value` and returns the found key,
+/// or terminates with `None` when `gen` returns the initial seed again.
+pub(crate) async fn insert_into_next_slot<K, V, F>(
+    cache: &moka::future::Cache<K, V>,
+    generator: F,
+    value: V,
+) -> Option<K>
 where
-    S: futures::Sink<I>,
-    F: Fn(&I) -> u64,
+    K: Copy + std::hash::Hash + Eq + Send + Sync + 'static,
+    V: Clone + Send + Sync + 'static,
+    F: Fn(Option<K>) -> K,
 {
-    pub fn new(inner: S, score: Arc<AtomicU64>, scoring_fn: F) -> Self {
-        Self {
-            inner,
-            score,
-            scoring_fn,
-            _d: PhantomData,
+    cache.run_pending_tasks().await;
+
+    let initial = generator(None);
+    let mut next = initial;
+    loop {
+        let insertion_result = cache
+            .entry(next)
+            .and_try_compute_with(|e| {
+                if e.is_none() {
+                    futures::future::ok::<_, ()>(moka::ops::compute::Op::Put(value.clone()))
+                } else {
+                    futures::future::ok::<_, ()>(moka::ops::compute::Op::Nop)
+                }
+            })
+            .await;
+
+        // If we inserted successfully, break the loop and return the insertion key
+        if let Ok(moka::ops::compute::CompResult::Inserted(_)) = insertion_result {
+            return Some(next);
+        }
+
+        // Otherwise, generate the next key
+        next = generator(Some(next));
+
+        // If generated keys made it to full loop, return failure
+        if next == initial {
+            return None;
         }
     }
 }
 
-impl<I, S, F> futures::Sink<I> for ScoringSink<I, S, F>
+pub(crate) fn spawn_keep_alive_stream<S>(
+    session_id: SessionId,
+    sender: S,
+    routing: DestinationRouting,
+) -> (SurbControllerWithCorrection, AbortHandle)
 where
-    S: futures::Sink<I>,
-    F: Fn(&I) -> u64,
+    S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
 {
-    type Error = S::Error;
+    let elem = HoprStartProtocol::KeepAlive(session_id.into());
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_ready(cx)
-    }
+    // The stream is suspended until the caller sets a rate via the Controller
+    let controller = RateController::new(0, Duration::from_secs(1));
 
-    fn start_send(self: Pin<&mut Self>, item: I) -> Result<(), Self::Error> {
-        let this = self.project();
-        let score = (this.scoring_fn)(&item);
-        this.inner.start_send(item).inspect(|_| {
-            this.score.fetch_add(score, std::sync::atomic::Ordering::Relaxed);
-        })
-    }
+    let (ka_stream, abort_handle) =
+        futures::stream::abortable(futures::stream::repeat(elem).rate_limit_with_controller(&controller));
 
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_flush(cx)
-    }
+    let sender_clone = sender.clone();
+    let fwd_routing_clone = routing.clone();
 
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_close(cx)
-    }
+    // This task will automatically terminate once the returned abort handle is used.
+    debug!(%session_id, "spawning keep-alive stream");
+    hopr_async_runtime::prelude::spawn(
+        ka_stream
+            .map(move |msg| ApplicationData::try_from(msg).map(|m| (fwd_routing_clone.clone(), m)))
+            .map_err(TransportSessionError::from)
+            .try_for_each_concurrent(None, move |msg| {
+                let mut sender_clone = sender_clone.clone();
+                async move {
+                    sender_clone
+                        .send(msg)
+                        .await
+                        .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))
+                }
+            })
+            .then(move |res| {
+                match res {
+                    Ok(_) => debug!(%session_id, "keep-alive stream done"),
+                    Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
+                }
+                futures::future::ready(())
+            }),
+    );
+
+    // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
+    // so the correction by this factor is applied.
+    (
+        SurbControllerWithCorrection(controller, HoprPacket::MAX_SURBS_IN_PACKET as u32),
+        abort_handle,
+    )
 }
 
-impl<I, S: Clone, F: Clone> Clone for ScoringSink<I, S, F> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            score: self.score.clone(),
-            scoring_fn: self.scoring_fn.clone(),
-            _d: PhantomData,
+#[cfg(test)]
+mod tests {
+    use anyhow::anyhow;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_insert_into_next_slot() -> anyhow::Result<()> {
+        let cache = moka::future::Cache::new(10);
+
+        for i in 0..5 {
+            let v = insert_into_next_slot(&cache, |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0), "foo".to_string())
+                .await
+                .ok_or(anyhow!("should insert"))?;
+            assert_eq!(v, i);
+            assert_eq!(Some("foo".to_string()), cache.get(&i).await);
         }
+
+        assert!(
+            insert_into_next_slot(&cache, |prev| prev.map(|v| (v + 1) % 5).unwrap_or(0), "foo".to_string())
+                .await
+                .is_none(),
+            "must not find slot when full"
+        );
+
+        Ok(())
     }
 }

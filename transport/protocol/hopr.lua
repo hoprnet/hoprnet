@@ -19,12 +19,31 @@ local start_msg_types = {
     [0x03] = "KeepAlive"
 }
 
+local start_error_reasons = {
+    [0x00] = "Unknown",
+    [0x01] = "No slots available",
+    [0x02] = "Busy",
+}
+
 -- Start protocol fields
 local start_fields = {
     version = ProtoField.uint8("hopr_start.version", "Version", base.DEC),
     type = ProtoField.uint8("hopr_start.type", "Type", base.HEX, start_msg_types),
+    session_id = ProtoField.bytes("hopr_start.session_id", "Session ID"),
+    challenge = ProtoField.uint64("hopr_start.challenge", "Challenge", base.DEC),
+    length = ProtoField.uint16("hopr_start.len", "Payload length", base.DEC),
 
-    msg = ProtoField.bytes("hopr_start.message", "Bincode encoded message")
+    capabilities_nrcl = ProtoField.bool("hopr_start.init.capabilities.no_rate_control", "No rate control", 8, nil, 0x10),
+    capabilities_seg = ProtoField.bool("hopr_start.init.capabilities.segmentation", "Segmentation", 8, nil, 0x08),
+    capabilities_ack = ProtoField.bool("hopr_start.init.capabilities.retransmission_ack", "Retransmission ACK", 8, nil, 0x04),
+    capabilities_nack = ProtoField.bool("hopr_start.init.capabilities.retransmission_nack", "Retransmission NACK", 8, nil, 0x02),
+    capabilities_ndly = ProtoField.bool("hopr_start.init.capabilities.no_delay", "No delay", 8, nil, 0x01),
+    target = ProtoField.bytes("hopr_start.init.target", "Target (CBOR encoded)"),
+    init_ad_data = ProtoField.uint32("hopr_start.init.additional_data", "Additional data", base.HEX),
+
+    flags = ProtoField.uint8("hopr_start.keep_alive.flags", "Flags", base.HEX),
+    ka_additional_data = ProtoField.uint32("hopr_start.keep_alive.additional_data", "Additional data", base.HEX),
+    err_reason = ProtoField.uint8("hopr_start.error.reason", "Error reason", base.HEX, start_error_reasons)
 }
 
 hopr_start.fields = start_fields
@@ -37,19 +56,88 @@ local function dissect_hopr_start(buffer, pinfo, tree)
     subtree:add(start_fields.version, buffer(offset,1))
     local version = buffer(offset,1):uint()
 
-    if version ~= 0x01 then
+    if version ~= 0x02 then
         subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unsupported Start version " .. version )
         return offset
     end
 
     offset = offset + 1
 
-    subtree:add(start_fields.type, buffer(offset,1))
+    subtree:add(start_fields.type, buffer(offset, 1))
     local type = buffer(offset, 1):uint()
     pinfo.cols.info:append(", " .. (start_msg_types[type] or "Unknown"))
     offset = offset + 1
 
-    subtree:add(start_fields.msg, buffer(offset))
+    local len = buffer(offset, 2):uint()
+    subtree:add(start_fields.length, len)
+    offset = offset + 2
+
+    if type == 0x00 then -- Session Initiation
+        if len < 13 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "payload too short for Session Initiation ("..len.." < 13)")
+            return offset + len
+        end
+
+        local init_subtree = subtree:add("Session Initiation")
+        init_subtree:add(start_fields.challenge, buffer(offset, 8):uint64())
+        offset = offset + 8
+        init_subtree:add(start_fields.capabilities_seg, buffer(offset, 1))
+        init_subtree:add(start_fields.capabilities_ack, buffer(offset, 1))
+        init_subtree:add(start_fields.capabilities_nack, buffer(offset, 1))
+        init_subtree:add(start_fields.capabilities_ndly, buffer(offset, 1))
+        init_subtree:add(start_fields.capabilities_nrcl, buffer(offset, 1))
+        offset = offset + 1
+        init_subtree:add(start_fields.init_ad_data, buffer(offset, 4):uint())
+        offset = offset + 4
+
+        local cbor_dissector = Dissector.get("cbor")
+        if cbor_dissector ~= nil then
+            local target_tree = init_subtree:add("Target")
+            cbor_dissector:call(buffer(offset):tvb(), pinfo, target_tree)
+        else
+            init_subtree:add(start_fields.target, buffer(offset))
+        end
+        offset = offset + len - 13
+    elseif type == 0x01 then -- Session Established
+        if len < 8 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "payload too short for Session Initiation ("..len.." < 8)")
+            return offset + len
+        end
+
+        local est_subtree = subtree:add("Session Established")
+        est_subtree:add(start_fields.challenge, buffer(offset, 8):uint64())
+        offset = offset + 8
+        est_subtree:add(start_fields.session_id, buffer(offset))
+        offset = offset + len - 8
+    elseif type == 0x02 then -- Session Initiation Error
+        if len < 9 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "payload too short for Session Initiation ("..len.." < 9)")
+            return offset + len
+        end
+
+        local err_subtree = subtree:add("Session Error")
+        err_subtree:add(start_fields.challenge, buffer(offset, 8):uint64())
+        offset = offset + 8
+        err_subtree:add(start_fields.err_reason, buffer(offset):uint())
+        offset = offset + 1
+    elseif type == 0x03 then -- Keep-Alive
+        if len < 5 then
+            subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "payload too short for Session Initiation ("..len.." < 13)")
+            return offset + len
+        end
+
+        local ka_subtree = subtree:add("Keep-Alive")
+        ka_subtree:add(start_fields.flags, buffer(offset, 1):uint())
+        offset = offset + 1
+        ka_subtree:add(start_fields.ka_additional_data, buffer(offset, 4):uint())
+        offset = offset + 4
+        ka_subtree:add(start_fields.session_id, buffer(offset))
+        offset = offset + len - 5
+    else
+        subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unknown Start protocol message" )
+        offset = offset + len
+    end
+
 
     return offset
 end

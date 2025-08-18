@@ -29,6 +29,7 @@ mod m20250603_000026_logs_reset;
 mod m20250604_000027_index_initial_seed;
 mod m20250701_000028_peers_deprecate_fields;
 mod m20250709_000029_channels_add_corrupted_state;
+mod m20250808_000030_index_create_corrupted_channel;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -80,6 +81,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250603_000026_logs_reset::Migration),
             Box::new(m20250604_000027_index_initial_seed::Migration),
             Box::new(m20250709_000029_channels_add_corrupted_state::Migration),
+            Box::new(m20250808_000030_index_create_corrupted_channel::Migration),
         ]
     }
 }
@@ -110,6 +112,7 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20250603_000024_index_reset::Migration),
             Box::new(m20250604_000027_index_initial_seed::Migration),
             Box::new(m20250709_000029_channels_add_corrupted_state::Migration),
+            Box::new(m20250808_000030_index_create_corrupted_channel::Migration),
         ]
     }
 }

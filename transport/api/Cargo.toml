@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.12.1"
+version = "0.12.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition = "2021"
@@ -45,7 +45,6 @@ either = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
-pin-project = { workspace = true }
 proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true, optional = true }
 rand = { workspace = true }

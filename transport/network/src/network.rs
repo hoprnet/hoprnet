@@ -197,7 +197,12 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
-            self.refresh_metrics(&stats)
+            self.refresh_metrics(&stats);
+            tracing::info!(
+                health = %health_from_stats(&stats, self.am_i_public),
+                trigger = "peer removal",
+                "Network health updated"
+            );
         }
 
         Ok(())
@@ -260,12 +265,18 @@ where
                 },
             }
 
+            tracing::trace!(%peer, quality = entry.quality, quality_avg = hopr_primitive_types::sma::SMA::average(&entry.quality_avg), "Updating peer status in the store");
             self.db.update_network_peer(entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
                 let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
-                self.refresh_metrics(&stats)
+                self.refresh_metrics(&stats);
+                tracing::info!(
+                    health = %health_from_stats(&stats, self.am_i_public),
+                    trigger = "peer update",
+                    "Network health updated"
+                );
             }
 
             Ok(())

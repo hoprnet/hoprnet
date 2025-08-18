@@ -1,7 +1,4 @@
-use hopr_protocol_session::errors::SessionError;
 use thiserror::Error;
-
-use crate::initiation::StartErrorReason;
 
 /// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]
@@ -12,14 +9,6 @@ pub enum TransportSessionError {
     #[error("incorrect data size")]
     PayloadSize,
 
-    #[cfg(feature = "serde")]
-    #[error("serializer encoding error: {0}")]
-    SerializerEncoding(#[from] bincode::error::EncodeError),
-
-    #[cfg(feature = "serde")]
-    #[error("serializer decoding error: {0}")]
-    SerializerDecoding(#[from] bincode::error::DecodeError),
-
     #[error("invalid peer id")]
     PeerId,
 
@@ -29,20 +18,23 @@ pub enum TransportSessionError {
     #[error("no surb available for sending reply data")]
     OutOfSurbs,
 
+    #[error("unparseable session id")]
+    InvalidSessionId,
+
     #[error("the other party rejected session initiation with error: {0}")]
-    Rejected(StartErrorReason),
+    Rejected(hopr_protocol_start::StartErrorReason),
 
     #[error("received data for an unregistered session")]
     UnknownData,
-
-    #[error("session establishment protocol error: {0}")]
-    StartProtocolError(String),
 
     #[error("packet sending error: {0}")]
     PacketSendingError(String),
 
     #[error(transparent)]
-    SessionProtocolError(#[from] SessionError),
+    StartProtocolError(#[from] hopr_protocol_start::errors::StartProtocolError),
+
+    #[error(transparent)]
+    SessionProtocolError(#[from] hopr_protocol_session::errors::SessionError),
 
     #[error(transparent)]
     Manager(#[from] SessionManagerError),

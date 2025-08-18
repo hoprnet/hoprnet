@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "4.1.1"
+version = "4.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
@@ -27,9 +27,11 @@ runtime-tokio = []
 async-lock = { workspace = true }
 axum = { workspace = true, features = ["ws", "http2"] }
 axum-extra = { workspace = true, features = ["query"] }
+human-bandwidth = { workspace = true }
 base64 = { workspace = true }
 bytesize = { workspace = true }
 const_format = { workspace = true }
+dashmap = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }

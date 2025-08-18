@@ -1,5 +1,5 @@
-//! Infrastructure supporting converting a collection of [`libp2p::PeerId`] split [`libp2p_stream`] managed
-//! individual peer-to-peer [`libp2p::swarm::Stream`]s.
+//! Infrastructure supporting converting a collection of [`PeerId`] split `libp2p_stream` managed
+//! individual peer-to-peer `libp2p::swarm::Stream`s.
 
 use std::sync::Arc;
 
@@ -84,9 +84,9 @@ where
             })
             .then(move |_| {
                 // Make sure we invalidate the peer entry from the cache once the stream ends
-                let peer_cpy = peer;
+                let peer = peer;
                 async move {
-                    cache_internal.invalidate(&peer_cpy).await;
+                    cache_internal.invalidate(&peer).await;
                 }
             }),
     );
