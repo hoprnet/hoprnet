@@ -46,7 +46,6 @@ impl PartialHoprPacket {
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
     /// * `domain_separator` channels contract domain separator.
-    /// * `flags` optional flags passed to the destination.
     pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
         pseudonym: &HoprPseudonym,
         routing: PacketRouting<P>,
@@ -143,7 +142,7 @@ impl PartialHoprPacket {
                             forward_path: &[destination],
                             receiver_data: &HoprSenderId::new(pseudonym),
                             additional_data_relayer: &por_strings,
-                            no_ack: true, // Indicate this is a no acknowledgement probe packet
+                            no_ack: true, // Indicate this is a no-acknowledgement probe packet
                         },
                         mapper,
                     )?,
@@ -158,9 +157,9 @@ impl PartialHoprPacket {
     }
 
     /// Turns this partial HOPR packet into a full [`Outgoing`](HoprPacket::Outgoing) [`HoprPacket`] by
-    /// attaching the given payload `msg` and optional `flags` for the recipient.
+    /// attaching the given payload `msg` and optional packet `signals` for the recipient.
     ///
-    /// No flags are equivalent to `0`.
+    /// No `signals` are equivalent to `0`.
     pub fn into_hopr_packet(self, msg: &[u8], signals: Option<u8>) -> Result<(HoprPacket, Vec<HoprReplyOpener>)> {
         let msg = HoprPacketMessage::try_from(HoprPacketParts {
             surbs: self.surbs,
@@ -200,9 +199,9 @@ pub struct HoprIncomingPacket {
     pub sender: HoprPseudonym,
     /// List of [`SURBs`](SURB) to be used for replies sent to the packet creator.
     pub surbs: Vec<(HoprSurbId, HoprSurb)>,
-    /// Additional flags from the lower protocol layer passed from the sender.
+    /// Additional packet signals from the lower protocol layer passed from the packet sender.
     ///
-    /// Zero if no flags were specified.
+    /// Zero if no signal flags were specified.
     pub signals: u8,
 }
 
@@ -323,7 +322,7 @@ impl HoprPacket {
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
     /// * `domain_separator` channels contract domain separator.
-    /// * `flags` optional flags passed to the destination.
+    /// * `signals` optional signals passed to the packet's final destination.
     ///
     /// **NOTE**
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
