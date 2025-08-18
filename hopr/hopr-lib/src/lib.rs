@@ -422,6 +422,10 @@ impl Hopr {
                 .ok()
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
                 .unwrap_or_else(|| HoprDbConfig::default().surb_ring_buffer_size),
+            surb_distress_threshold: std::env::var("HOPR_SURB_RB_DISTRESS")
+                .ok()
+                .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
+                .unwrap_or_else(|| HoprDbConfig::default().surb_distress_threshold),
         };
         let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 

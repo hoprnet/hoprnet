@@ -22,7 +22,7 @@ where
     async fn find_surb(
         &self,
         matcher: hopr_network_types::types::SurbMatcher,
-    ) -> hopr_db_api::errors::Result<(hopr_db_api::protocol::HoprSenderId, hopr_db_api::protocol::HoprSurb)> {
+    ) -> hopr_db_api::errors::Result<hopr_db_api::protocol::FoundSurb> {
         tracing::trace!(target: "db_proxy", "Finding SURB with matcher: {:?}", matcher);
         self.db.find_surb(matcher).await
     }

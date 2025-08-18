@@ -140,7 +140,7 @@ flagset::flags! {
    }
 }
 
-/// Additional flags passed up from the HOPR protocol layer to the application layer.
+/// Additional flags passed between the HOPR protocol layer and the Application layer.
 pub type ApplicationFlags = flagset::FlagSet<ApplicationFlag>;
 
 /// Represents the received decrypted packet carrying the application-layer data.
@@ -164,6 +164,7 @@ pub struct ApplicationData {
     ///
     /// The flags are never serialized nor deserialized. Whether these flags are eventually
     /// materialized over the wire is decided solely by the HOPR protocol layer underneath.
+    /// The HOPR protocol calls such flags "packet signals".
     #[cfg_attr(feature = "serde", serde(skip))]
     pub flags: ApplicationFlags,
     #[cfg_attr(feature = "serde", serde(skip))]
@@ -192,8 +193,8 @@ impl ApplicationData {
     }
 
     /// Creates a new instance with the given `flags` set.
-    pub fn with_flags(mut self, flags: ApplicationFlags) -> Self {
-        self.flags = flags;
+    pub fn with_flags<F: Into<ApplicationFlags>>(mut self, flags: F) -> Self {
+        self.flags = flags.into();
         self
     }
 

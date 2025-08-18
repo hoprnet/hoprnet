@@ -281,7 +281,7 @@ where
                                         is_forwarded: false,
                                         data: data_clone.to_bytes().into_vec().into(),
                                         ack_challenge: v.ack_challenge.as_ref().into(),
-                                        flags: data_clone.flags.bits(),
+                                        signals: data_clone.flags.bits(),
                                         ticket: inspect_ticket_data_in_packet(&v.data).into(),
                                     }
                                     .into(),
@@ -464,7 +464,7 @@ where
                             sender,
                             plain_text,
                             ack_key,
-                            flags,
+                            signals,
                             ..
                         } => {
                             // Send acknowledgement back
@@ -498,7 +498,7 @@ where
                                     let _ = capture_clone.try_send(captured_packet);
                                 }
 
-                                Some((sender, plain_text, flags))
+                                Some((sender, plain_text, signals))
                         }
                         IncomingPacket::Forwarded {
                             previous_hop,
@@ -517,7 +517,7 @@ where
                                 is_forwarded: true,
                                 data: data.as_ref().into(),
                                 ack_challenge: Default::default(),
-                                flags: 0,
+                                signals: 0,
                                 ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
                             }.into();
 

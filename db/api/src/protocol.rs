@@ -7,7 +7,28 @@ use hopr_primitive_types::balance::HoprBalance;
 
 use crate::errors::Result;
 
-/// Trait defining all DB functionality needed by packet/acknowledgement processing pipeline.
+/// Contains a SURB found in the SURB ring buffer via [`HoprDbProtocolOperations::find_surb`].
+#[derive(Debug)]
+pub struct FoundSurb {
+    /// Complete sender ID of the SURB.
+    pub sender_id: HoprSenderId,
+    /// The SURB itself.
+    pub surb: HoprSurb,
+    /// Number of SURBs remaining in the ring buffer with the same pseudonym.
+    pub remaining: usize,
+}
+
+/// Configuration for the SURB cache.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
+pub struct SurbCacheConfig {
+    /// Size of the SURB ring buffer per pseudonym.
+    pub rb_capacity: usize,
+    /// Threshold for the number of SURBs in the ring buffer, below which it is
+    /// considered low ("SURB distress").
+    pub distress_threshold: usize,
+}
+
+/// Trait defining all DB functionality needed by a packet/acknowledgement processing pipeline.
 #[async_trait]
 pub trait HoprDbProtocolOperations {
     /// Processes the acknowledgements for the pending tickets
@@ -25,10 +46,10 @@ pub trait HoprDbProtocolOperations {
     async fn get_network_ticket_price(&self) -> Result<HoprBalance>;
 
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
-    async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)>;
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb>;
 
-    /// Returns the current maximum number of SURBs the `SurbRingBuffer` can hold.
-    fn get_surb_rb_size(&self) -> usize;
+    /// Returns the SURB cache configuration.
+    fn get_surb_config(&self) -> SurbCacheConfig;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
     async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket>;
@@ -40,7 +61,7 @@ pub trait HoprDbProtocolOperations {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-        flags: Option<u8>,
+        signals: Option<u8>,
     ) -> Result<OutgoingPacket>;
 
     /// Process the incoming packet into data
@@ -64,7 +85,7 @@ pub enum IncomingPacket {
         sender: HoprPseudonym,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
-        flags: u8,
+        signals: u8,
     },
     /// Packet must be forwarded
     Forwarded {

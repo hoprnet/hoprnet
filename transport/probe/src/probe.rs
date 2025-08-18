@@ -240,7 +240,7 @@ impl Probe {
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
-                                        match db.find_surb(pseudonym.into()).await.map(|(sender_id, surb)| ResolvedTransportRouting::Return(sender_id, surb)) {
+                                        match db.find_surb(pseudonym.into()).await.map(|found_surb| ResolvedTransportRouting::Return(found_surb.sender_id, found_surb.surb)) {
                                             Ok(path) => {
                                                 tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
                                             let message = Message::Probe(NeighborProbe::Pong(ping));
@@ -292,6 +292,7 @@ mod tests {
     use async_trait::async_trait;
     use futures::future::BoxFuture;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_db_api::prelude::FoundSurb;
     use hopr_network_types::prelude::SurbMatcher;
     use hopr_protocol_app::prelude::Tag;
 
@@ -342,16 +343,13 @@ mod tests {
 
     #[async_trait]
     impl DbOperations for Cache {
-        async fn find_surb(
-            &self,
-            _matcher: SurbMatcher,
-        ) -> hopr_db_api::errors::Result<(hopr_db_api::protocol::HoprSenderId, hopr_db_api::protocol::HoprSurb)>
-        {
+        async fn find_surb(&self, _matcher: SurbMatcher) -> hopr_db_api::errors::Result<FoundSurb> {
             // Mock implementation for testing purposes
-            Ok((
-                hopr_db_api::protocol::HoprSenderId::random(),
-                random_memory_violating_surb(),
-            ))
+            Ok(FoundSurb {
+                sender_id: hopr_db_api::protocol::HoprSenderId::random(),
+                surb: random_memory_violating_surb(),
+                remaining: 0,
+            })
         }
 
         async fn resolve_chain_key(

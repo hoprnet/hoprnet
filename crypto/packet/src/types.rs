@@ -118,8 +118,8 @@ pub struct PacketParts<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
     pub surbs: Vec<SURB<S, H>>,
     /// Contains the actual packet payload.
     pub payload: Cow<'a, [u8]>,
-    /// Additional flags from the sender to the recipient.
-    pub flags: u8,
+    /// Additional packet signals (flags) from the sender to the recipient.
+    pub signals: u8,
 }
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec> Clone for PacketParts<'_, S, H>
@@ -131,7 +131,7 @@ where
         Self {
             surbs: self.surbs.clone(),
             payload: self.payload.clone(),
-            flags: self.flags,
+            signals: self.signals,
         }
     }
 }
@@ -145,7 +145,7 @@ where
         f.debug_struct("PacketParts")
             .field("surbs", &self.surbs)
             .field("payload", &self.payload)
-            .field("flags", &self.flags)
+            .field("flags", &self.signals)
             .finish()
     }
 }
@@ -156,7 +156,7 @@ where
     H::SurbReceiverData: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.surbs == other.surbs && self.payload == other.payload && self.flags == other.flags
+        self.surbs == other.surbs && self.payload == other.payload && self.signals == other.signals
     }
 }
 
@@ -192,7 +192,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketParts<'_
             return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
         }
 
-        if value.flags > S_MASK {
+        if value.signals > S_MASK {
             return Err(GeneralError::ParseError("HoprPacketMessage.flags not valid".into()).into());
         }
 
@@ -202,7 +202,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketParts<'_
         }
 
         let mut ret = Vec::with_capacity(PaddedPayload::<P>::SIZE);
-        let flags_and_len = (value.flags << S_MASK.trailing_ones()) | (value.surbs.len() as u8 & S_MASK);
+        let flags_and_len = (value.signals << S_MASK.trailing_ones()) | (value.surbs.len() as u8 & S_MASK);
         ret.push(flags_and_len);
         for surb in value.surbs.into_iter().map(|s| s.into_boxed()) {
             ret.extend(surb);
@@ -220,7 +220,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
     fn try_from(value: PacketMessage<S, H, P>) -> Result<Self, Self::Error> {
         let data = value.0.into_unpadded()?;
         let num_surbs = (data[0] & S_MASK) as usize;
-        let flags = (data[0] & S_MASK.not()) >> S_MASK.trailing_ones();
+        let signals = (data[0] & S_MASK.not()) >> S_MASK.trailing_ones();
 
         if num_surbs > 0 {
             let surb_end = num_surbs * SURB::<S, H>::SIZE;
@@ -241,7 +241,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
             Ok(PacketParts {
                 surbs,
                 payload: Cow::Owned(data),
-                flags,
+                signals,
             })
         } else {
             let mut data = data.into_vec();
@@ -249,7 +249,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
             Ok(PacketParts {
                 surbs: Vec::with_capacity(0),
                 payload: Cow::Owned(data),
-                flags,
+                signals,
             })
         }
     }
@@ -332,7 +332,7 @@ mod tests {
         let parts_1 = HoprPacketParts {
             surbs: vec![],
             payload: b"test message".into(),
-            flags: 7,
+            signals: 7,
         };
 
         let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
@@ -346,7 +346,7 @@ mod tests {
         let parts_1 = HoprPacketParts {
             surbs: generate_surbs(2)?,
             payload: Cow::default(),
-            flags: 7,
+            signals: 7,
         };
 
         let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
@@ -360,7 +360,7 @@ mod tests {
         let parts_1 = HoprPacketParts {
             surbs: generate_surbs(2)?,
             payload: b"test msg".into(),
-            flags: 7,
+            signals: 7,
         };
 
         let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
@@ -374,7 +374,7 @@ mod tests {
         let res = HoprPacketMessage::try_from(HoprPacketParts {
             surbs: vec![],
             payload: (&[1u8; HoprPacket::PAYLOAD_SIZE + 1]).into(),
-            flags: 0,
+            signals: 0,
         });
         assert!(res.is_err());
     }
@@ -384,14 +384,14 @@ mod tests {
         let res = HoprPacketMessage::try_from(PacketParts {
             surbs: generate_surbs(HoprPacketMessage::MAX_SURBS_PER_MESSAGE + 1)?,
             payload: Cow::default(),
-            flags: 0,
+            signals: 0,
         });
         assert!(res.is_err());
 
         let res = HoprPacketMessage::try_from(HoprPacketParts {
             surbs: generate_surbs(3)?,
             payload: Cow::default(),
-            flags: 0,
+            signals: 0,
         });
         assert!(res.is_err());
 
@@ -403,7 +403,7 @@ mod tests {
         let res = HoprPacketMessage::try_from(PacketParts {
             surbs: generate_surbs(3)?,
             payload: Cow::default(),
-            flags: 16,
+            signals: 16,
         });
         assert!(res.is_err());
 
@@ -415,7 +415,7 @@ mod tests {
         let res = HoprPacketMessage::try_from(PacketParts {
             surbs: generate_surbs(2)?,
             payload: (&[1u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1]).into(),
-            flags: 0,
+            signals: 0,
         });
         assert!(res.is_err());
 
