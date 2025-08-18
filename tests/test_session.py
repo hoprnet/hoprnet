@@ -452,3 +452,46 @@ class TestSessionWithSwarm:
 
                 # TODO: Placeholder for actual test
                 await asyncio.sleep(3600)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("route", make_routes([1], barebone_nodes()))
+    async def test_session_correctly_cleared_on_closing(self, route, swarm7: dict[str, Node]):
+        config_max_sessions = (await swarm7[route[0]].api.config()).maximum_sessions
+
+        for _ in range(config_max_sessions):
+            async with HoprSession(
+                proto=Protocol.UDP,
+                src=swarm7[route[0]],
+                dest=swarm7[route[-1]],
+                fwd_path={"IntermediatePath": []},
+                return_path={"IntermediatePath": []},
+                loopback=True,
+                use_response_buffer=None,
+                capabilities=SessionCapabilitiesBody(
+                    retransmission=False, segmentation=False, no_rate_control=False),
+            ) as _:
+                assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
+
+            assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 0
+
+        entry_metrics = await swarm7[route[0]].api.metrics()
+        exit_metrics = await swarm7[route[-1]].api.metrics()
+
+        # this fails already, as it's the `session.max_parallel_sessions+1`` session
+        async with HoprSession(
+            Protocol.UDP,
+            src=swarm7[route[0]],
+            dest=swarm7[route[-1]],
+            fwd_path={"IntermediatePath": []},
+            return_path={"IntermediatePath": []},
+            loopback=True,
+            use_response_buffer=None,
+            capabilities=SessionCapabilitiesBody(
+                retransmission=False, segmentation=False, no_rate_control=False),
+        ) as _:
+            pass  
+
+        assert entry_metrics.hopr_session_num_active_sessions == 0
+
+        # exit metric is equal to `session.max_parallel_sessions`, assert thus fails.
+        assert exit_metrics.hopr_session_num_active_sessions == 0 

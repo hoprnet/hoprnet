@@ -15,5 +15,7 @@ hopr:
     strategies: []
   protocol:
     outgoing_ticket_winning_prob: 1.0
+  session:
+    maximum_sessions: 10
 session_ip_forwarding:
   use_target_allow_list: false

@@ -30,7 +30,7 @@ async def bringup(
     use_nat: bool = False,
     exposed: bool = False,
     base_port: int = BASE_PORT,
-) -> Optional[Tuple[Cluster, Anvil]]:
+) -> Tuple[Cluster, Anvil]:
     logging.info(f"Using the random seed: {SEED}")
 
     if test_mode and fully_connected:
