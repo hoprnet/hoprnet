@@ -13,7 +13,7 @@ use crate::{
         Result,
     },
     por::{SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay, pre_verify},
-    types::{HoprPacketMessage, HoprSenderId, HoprSurbId, HoprPacketParts},
+    types::{HoprPacketMessage, HoprPacketParts, HoprSenderId, HoprSurbId},
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.

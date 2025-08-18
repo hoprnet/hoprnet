@@ -50,7 +50,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                     tb,
                     &mapper,
                     &dst,
-                    None
+                    None,
                 )
                 .unwrap();
             });
@@ -240,7 +240,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
         tb,
         &mapper,
         &dst,
-        None
+        None,
     )
     .unwrap()
     {
@@ -302,7 +302,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
         tb,
         &mapper,
         &dst,
-        None
+        None,
     )
     .unwrap()
     {

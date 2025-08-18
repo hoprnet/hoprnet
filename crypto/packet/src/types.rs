@@ -1,5 +1,5 @@
-use std::{borrow::Cow, marker::PhantomData, ops::Not};
-use std::fmt::Formatter;
+use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
+
 use hopr_crypto_sphinx::{
     errors::SphinxError,
     prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
@@ -125,7 +125,8 @@ pub struct PacketParts<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
 impl<S: SphinxSuite, H: SphinxHeaderSpec> Clone for PacketParts<'_, S, H>
 where
     H::KeyId: Clone,
-    H::SurbReceiverData: Clone {
+    H::SurbReceiverData: Clone,
+{
     fn clone(&self) -> Self {
         Self {
             surbs: self.surbs.clone(),
@@ -138,7 +139,8 @@ where
 impl<S: SphinxSuite, H: SphinxHeaderSpec> std::fmt::Debug for PacketParts<'_, S, H>
 where
     H::KeyId: std::fmt::Debug,
-    H::SurbReceiverData: std::fmt::Debug {
+    H::SurbReceiverData: std::fmt::Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PacketParts")
             .field("surbs", &self.surbs)
@@ -151,7 +153,8 @@ where
 impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialEq for PacketParts<'_, S, H>
 where
     H::KeyId: PartialEq,
-    H::SurbReceiverData: PartialEq {
+    H::SurbReceiverData: PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         self.surbs == other.surbs && self.payload == other.payload && self.flags == other.flags
     }
@@ -160,8 +163,9 @@ where
 impl<S: SphinxSuite, H: SphinxHeaderSpec> Eq for PacketParts<'_, S, H>
 where
     H::KeyId: Eq,
-    H::SurbReceiverData: Eq
-{}
+    H::SurbReceiverData: Eq,
+{
+}
 
 /// Convenience alias for HOPR specific [`PacketParts`].
 pub type HoprPacketParts<'a> = PacketParts<'a, HoprSphinxSuite, HoprSphinxHeaderSpec>;
