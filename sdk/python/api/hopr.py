@@ -8,6 +8,7 @@ import nacl.bindings
 import nacl.public
 import nacl.signing  # Ensure nacl.signing is imported correctly
 import nacl.utils
+import yaml
 from api_lib import ApiLib
 from api_lib.method import Method
 from nacl.public import SealedBox  # Import SealedBox explicitly
@@ -247,8 +248,16 @@ class HoprdAPI(ApiLib):
         """
         Returns some configurations value of the node.
         """
-        response = await self.try_req(Method.GET, "/node/configuration", dict)
-        return Configuration(response["config"]) if response else response
+
+        class PlainTextLoader(yaml.SafeLoader):
+            def construct_str(self, node):
+                return self.construct_scalar(node)
+
+        PlainTextLoader.yaml_implicit_resolvers = {}
+        PlainTextLoader.add_constructor(None, PlainTextLoader.construct_str)
+
+        config = await self.try_req(Method.GET, "/node/configuration", str)
+        return Configuration(yaml.load(config, Loader=PlainTextLoader)) if config else None
 
     async def node_info(self) -> Optional[Infos]:
         """

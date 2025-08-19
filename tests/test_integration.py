@@ -9,7 +9,7 @@ from sdk.python.api import Protocol
 from sdk.python.api.balance import Balance
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
-from sdk.python.api.response_objects import Metrics
+from sdk.python.api.response_objects import Configuration, Metrics
 from sdk.python.localcluster.constants import OPEN_CHANNEL_FUNDING_VALUE_HOPR
 from sdk.python.localcluster.node import Node
 
@@ -363,5 +363,5 @@ class TestIntegrationWithSwarm:
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_configuration_endpoint(self, peer, swarm7: dict[str, Node]):
         cfg = await swarm7[peer].api.config()
-
-        cfg.contains("0.9 wxHOPR", "Configuration should contain the default wxHOPR token value")
+        assert isinstance(cfg, Configuration)
+        assert cfg.max_priority_fee_per_gas == "0.2 gwei"
