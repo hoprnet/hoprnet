@@ -12,7 +12,6 @@ import yaml
 from api_lib import ApiLib
 from api_lib.method import Method
 from nacl.public import SealedBox  # Import SealedBox explicitly
-from yaml.resolver import BaseResolver
 
 from .balance import Balance
 from .protocol import Protocol

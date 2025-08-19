@@ -9,7 +9,7 @@ from sdk.python.api import Protocol
 from sdk.python.api.balance import Balance
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
-from sdk.python.api.response_objects import Configuration, Metrics
+from sdk.python.api.response_objects import Metrics
 from sdk.python.localcluster.constants import OPEN_CHANNEL_FUNDING_VALUE_HOPR
 from sdk.python.localcluster.node import Node
 
