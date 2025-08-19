@@ -467,8 +467,7 @@ class TestSessionWithSwarm:
                 return_path={"IntermediatePath": []},
                 loopback=True,
                 use_response_buffer=None,
-                capabilities=SessionCapabilitiesBody(
-                    retransmission=False, segmentation=False, no_rate_control=False),
+                capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=False, no_rate_control=False),
             ) as _:
                 assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
 
@@ -477,21 +476,20 @@ class TestSessionWithSwarm:
         entry_metrics = await swarm7[route[0]].api.metrics()
         exit_metrics = await swarm7[route[-1]].api.metrics()
 
-        # this fails already, as it's the `session.max_parallel_sessions+1`` session
+        # this fails already, as it's the `session.maximum_sessions+1`` session
         async with HoprSession(
-            Protocol.UDP,
+            proto=Protocol.UDP,
             src=swarm7[route[0]],
             dest=swarm7[route[-1]],
             fwd_path={"IntermediatePath": []},
             return_path={"IntermediatePath": []},
             loopback=True,
             use_response_buffer=None,
-            capabilities=SessionCapabilitiesBody(
-                retransmission=False, segmentation=False, no_rate_control=False),
+            capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=False, no_rate_control=False),
         ) as _:
-            pass  
+            pass
 
         assert entry_metrics.hopr_session_num_active_sessions == 0
 
-        # exit metric is equal to `session.max_parallel_sessions`, assert thus fails.
-        assert exit_metrics.hopr_session_num_active_sessions == 0 
+        # exit metric is equal to `session.maximum_sessions`, assert thus fails.
+        assert exit_metrics.hopr_session_num_active_sessions == 0
