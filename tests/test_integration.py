@@ -360,8 +360,10 @@ class TestIntegrationWithSwarm:
         assert re.match(r"^\d+\.\d+\.\d+$", version) is not None, "Version should be in the format X.Y.Z"
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+    @pytest.mark.parametrize("peer", random.sample(default_nodes(), 1))
     async def test_hoprd_configuration_endpoint(self, peer, swarm7: dict[str, Node]):
         cfg = await swarm7[peer].api.config()
-        assert isinstance(cfg, Configuration)
-        assert cfg.max_priority_fee_per_gas == "0.2 gwei"
+
+        strategies_field = {k: v for d in cfg.strategies for k, v in d.items()}
+
+        assert strategies_field["unrealized_balance_ratio"] == "0.9"

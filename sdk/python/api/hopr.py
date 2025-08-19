@@ -12,6 +12,7 @@ import yaml
 from api_lib import ApiLib
 from api_lib.method import Method
 from nacl.public import SealedBox  # Import SealedBox explicitly
+from yaml.resolver import BaseResolver
 
 from .balance import Balance
 from .protocol import Protocol
@@ -42,6 +43,7 @@ from .response_objects import (
     TicketProbability,
     TicketStatistics,
 )
+from .yaml_parser import PlainTextLoader
 
 MESSAGE_TAG = 0x1245
 
@@ -248,16 +250,8 @@ class HoprdAPI(ApiLib):
         """
         Returns some configurations value of the node.
         """
-
-        class PlainTextLoader(yaml.SafeLoader):
-            def construct_str(self, node):
-                return self.construct_scalar(node)
-
-        PlainTextLoader.yaml_implicit_resolvers = {}
-        PlainTextLoader.add_constructor(None, PlainTextLoader.construct_str)
-
-        config = await self.try_req(Method.GET, "/node/configuration", str)
-        return Configuration(yaml.load(config, Loader=PlainTextLoader)) if config else None
+        yml_string = await self.try_req(Method.GET, "/node/configuration", str)
+        return Configuration(yaml.load(yml_string, Loader=PlainTextLoader))
 
     async def node_info(self) -> Optional[Infos]:
         """

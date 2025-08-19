@@ -94,7 +94,7 @@ class TicketStatistics(JsonResponse):
 class Configuration(JsonResponse):
     safe_address: str = APIfield("hopr/safe_module/safe_address")
     module_address: str = APIfield("hopr/safe_module/module_address")
-    max_priority_fee_per_gas: str = APIfield("hopr/chain/protocols/chains/anvil/max_priority_fee_per_gas")
+    strategies: list[dict] = APIfield("hopr/strategy/strategies")
 
 
 @APIobject
