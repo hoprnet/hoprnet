@@ -5,17 +5,21 @@ from yaml.resolver import BaseResolver
 class PlainTextLoader(yaml.SafeLoader):
     pass
 
+
 # Scalars always as strings
 def construct_str(loader, node):
     return loader.construct_scalar(node)
+
 
 # Sequences normal lists
 def construct_seq(loader, node):
     return loader.construct_sequence(node, deep=True)
 
+
 # Mappings normal dicts
 def construct_mapping(loader, node):
     return loader.construct_mapping(node, deep=True)
+
 
 # Catch-all for tags -> ignore the tag
 def ignore_tag(loader, tag_suffix, node):
