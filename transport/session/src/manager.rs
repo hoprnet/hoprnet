@@ -1944,8 +1944,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore = "This test is currently ignored because it is flaky and requires adaptation after SURB balancer \
-                changes. It fails on the 'Alice sends the terminating segment to close the Session' step."]
     #[test_log::test(tokio::test)]
     async fn session_manager_should_send_keep_alives_via_surb_balancer() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -2064,7 +2062,7 @@ mod tests {
                     SessionTarget::TcpStream(target.clone()),
                     SessionClientConfig {
                         pseudonym: alice_pseudonym.into(),
-                        capabilities: None.into(),
+                        capabilities: Capability::Segmentation.into(),
                         surb_management: Some(balancer_cfg),
                         ..Default::default()
                     },
