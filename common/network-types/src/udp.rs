@@ -512,7 +512,10 @@ impl ConnectedUdpStream {
                     }
                     let elapsed = start.elapsed();
                     if elapsed > QUEUE_DISPATCH_THRESHOLD {
-                        warn!("udp queue dispatch took too long: {elapsed:?}, consider increasing the queue size");
+                        warn!(
+                            ?elapsed,
+                            "udp queue dispatch took too long, consider increasing the queue size"
+                        );
                     }
                 }
 

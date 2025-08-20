@@ -563,11 +563,12 @@ pub(crate) struct SessionClientResponse {
     #[schema(example = 5542)]
     /// Listening port of the Session's socket.
     pub port: u16,
-    /// MTU used by the Session.
+    /// MTU used by the Session. This is the maximum size of a single write
+    /// to the socket.
     pub mtu: usize,
     /// Size of a Single Use Reply Block used by the protocol.
     ///
-    /// This is usefult for SURB balancing calculations.
+    /// This is useful for SURB balancing calculations.
     pub surb_len: usize,
     /// Lists Session IDs of all active clients.
     ///

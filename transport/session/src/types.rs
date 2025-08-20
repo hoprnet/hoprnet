@@ -385,9 +385,9 @@ impl Session {
                 ..Default::default()
             };
 
-            if cfg
+            if !cfg
                 .capabilities
-                .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
+                .is_disjoint(Capability::RetransmissionAck | Capability::RetransmissionNack)
             {
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {

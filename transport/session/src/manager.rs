@@ -109,10 +109,13 @@ struct SessionCacheBalancerFeedback(moka::future::Cache<SessionId, SessionSlot>)
 #[async_trait::async_trait]
 impl BalancerConfigFeedback for SessionCacheBalancerFeedback {
     async fn get_config(&self, id: &SessionId) -> crate::errors::Result<SurbBalancerConfig> {
+        // Intentionally using `iter().find()` instead of `get()` here,
+        // so that the popularity estimator is not hit.
         self.0
-            .get(id)
-            .await
+            .iter()
+            .find(|(sid, _)| sid.as_ref() == id)
             .ok_or(SessionManagerError::NonExistingSession)?
+            .1
             .surb_mgmt
             .ok_or(SessionManagerError::Other("missing surb balancer config".into()).into())
     }
@@ -1140,8 +1143,8 @@ where
                     reply_routing.clone(),
                     HoprSessionConfig {
                         capabilities: session_req.capabilities.into(),
-                        mtu: 0,
-                        frame_timeout: Default::default(),
+                        mtu: self.cfg.session_mtu,
+                        frame_timeout: self.cfg.max_frame_timeout,
                     },
                     (msg_sender.clone(), rx_session_data),
                     Some(closure_notifier),
