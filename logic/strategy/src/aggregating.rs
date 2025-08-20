@@ -75,7 +75,7 @@ fn default_unrealized_balance_ratio() -> Option<f64> {
     Some(0.9)
 }
 
-fn serialize_optional_f64_as_decimal<S>(x: &Option<f64>, s: S) -> Result<S::Ok, S::Error>
+fn serialize_optional_f64<S>(x: &Option<f64>, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -110,7 +110,7 @@ pub struct AggregatingStrategyConfig {
     /// Default is 0.9
     #[validate(range(min = 0_f64, max = 1.0_f64))]
     #[default(default_unrealized_balance_ratio())]
-    #[serde(serialize_with = "serialize_optional_f64_as_decimal")]
+    #[serde(serialize_with = "serialize_optional_f64")]
     pub unrealized_balance_ratio: Option<f64>,
 
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
