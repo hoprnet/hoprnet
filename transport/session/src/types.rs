@@ -309,6 +309,26 @@ pub struct IncomingSession {
     pub target: SessionTarget,
 }
 
+/// Configures the Session protocol socket over HOPR.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+pub struct HoprSessionConfig {
+    /// Capabilities of the Session protocol socket.
+    ///
+    /// Default is no capabilities.
+    #[default(Capabilities::empty())]
+    pub capabilities: Capabilities,
+    /// Expected frame size of the Session protocol socket.
+    ///
+    /// Default is 1452
+    #[default(1452)]
+    pub mtu: usize,
+    /// Maximum amount of time an incomplete frame can be kept in the buffer.
+    ///
+    /// Default is 800ms
+    #[default(Duration::from_millis(800))]
+    pub frame_timeout: Duration,
+}
+
 /// Represents the Session protocol socket over HOPR.
 ///
 /// This is essentially a HOPR-specific wrapper for [`ReliableSocket`] and [`UnreliableSocket`]
@@ -319,7 +339,7 @@ pub struct Session {
     #[pin]
     inner: Box<dyn AsyncReadWrite>,
     routing: DestinationRouting,
-    capabilities: Capabilities,
+    cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
 }
 
@@ -330,20 +350,18 @@ impl Session {
     /// from the given `hopr` interface and passing it to the appropriate [`UnreliableSocket`] or [`ReliableSocket`]
     /// based on the given `capabilities`.
     #[tracing::instrument(skip(hopr, on_close), fields(session_id = %id))]
-    pub fn new<Tx, Rx, C>(
+    pub fn new<Tx, Rx>(
         id: SessionId,
         routing: DestinationRouting,
-        capabilities: C,
+        cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationData)> + Send + Sync + Unpin + 'static,
         Rx: futures::Stream<Item = Box<[u8]>> + Send + Sync + Unpin + 'static,
-        C: Into<Capabilities> + std::fmt::Debug,
         Tx::Error: std::error::Error + Send + Sync,
     {
-        let capabilities = capabilities.into();
         let routing_clone = routing.clone();
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
@@ -358,17 +376,19 @@ impl Session {
         );
 
         // Based on the requested capabilities, see if we should use the Session protocol
-        let inner: Box<dyn AsyncReadWrite> = if capabilities.contains(Capability::Segmentation) {
-            // TODO: update config values
+        let inner: Box<dyn AsyncReadWrite> = if cfg.capabilities.contains(Capability::Segmentation) {
             let socket_cfg = SessionSocketConfig {
-                frame_size: 1500,
-                frame_timeout: Duration::from_millis(800),
+                frame_size: cfg.mtu,
+                frame_timeout: cfg.frame_timeout,
                 capacity: 16384,
-                flush_immediately: capabilities.contains(Capability::NoDelay),
+                flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
                 ..Default::default()
             };
 
-            if capabilities.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+            if cfg
+                .capabilities
+                .contains(Capability::RetransmissionAck | Capability::RetransmissionNack)
+            {
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {
                     // This is a very coarse assumption, that a single 3-hop packet
@@ -376,7 +396,7 @@ impl Session {
                     // We can no longer base this timeout on the number of hops because
                     // it is not known for SURB-based routing.
                     expected_packet_latency: Duration::from_millis(200),
-                    mode: caps_to_ack_mode(capabilities),
+                    mode: caps_to_ack_mode(cfg.capabilities),
                     backoff_base: 0.2,
                     max_incoming_frame_retries: 1,
                     max_outgoing_frame_retries: 2,
@@ -406,7 +426,7 @@ impl Session {
             id,
             inner,
             routing,
-            capabilities,
+            cfg,
             on_close,
         })
     }
@@ -421,9 +441,9 @@ impl Session {
         &self.routing
     }
 
-    /// Capabilities of this Session.
-    pub fn capabilities(&self) -> &Capabilities {
-        &self.capabilities
+    /// Configuration of this Session.
+    pub fn config(&self) -> &HoprSessionConfig {
+        &self.cfg
     }
 }
 
@@ -572,7 +592,7 @@ mod tests {
         let mut alice_session = Session::new(
             id,
             DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into()?)),
-            None,
+            Default::default(),
             (
                 alice_tx,
                 alice_rx
@@ -585,7 +605,7 @@ mod tests {
         let mut bob_session = Session::new(
             id,
             DestinationRouting::Return(id.pseudonym().into()),
-            None,
+            Default::default(),
             (
                 bob_tx,
                 bob_rx
@@ -641,7 +661,10 @@ mod tests {
         let mut alice_session = Session::new(
             id,
             DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into()?)),
-            Capability::Segmentation,
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation.into(),
+                ..Default::default()
+            },
             (
                 alice_tx,
                 alice_rx
@@ -654,7 +677,10 @@ mod tests {
         let mut bob_session = Session::new(
             id,
             DestinationRouting::Return(id.pseudonym().into()),
-            Capability::Segmentation,
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation.into(),
+                ..Default::default()
+            },
             (
                 bob_tx,
                 bob_rx

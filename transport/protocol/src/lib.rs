@@ -446,15 +446,19 @@ where
                             ..
                         } => {
                             trace!(%previous_hop, "received a valid acknowledgement");
+                            let now = std::time::Instant::now();
                             match db.handle_acknowledgement(ack).await {
                                 Ok(_) => trace!(%previous_hop, "successfully processed a known acknowledgement"),
                                 // Eventually, we do not care here if the acknowledgement does not belong to any
                                 // unacknowledged packets.
                                 Err(error) => trace!(%previous_hop, %error, "valid acknowledgement is unknown or error occurred while processing it"),
                             }
+                            let elapsed = now.elapsed();
+                            if elapsed.as_millis() > SLOW_OP_MS {
+                                warn!(%previous_hop, ?elapsed, "ack_processor.handle_acknowledgement took too long");
+                            }
 
                             // We do not acknowledge back acknowledgements.
-
                             None
                         },
                         IncomingPacket::Final {

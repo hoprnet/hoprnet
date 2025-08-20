@@ -246,6 +246,16 @@ where
                 // TODO(v3.1): Use the entire range of tags properly
                 session_tag_range: (16..65535),
                 maximum_sessions: cfg.session.maximum_sessions as usize,
+                session_mtu: std::env::var("HOPR_SESSION_MTU")
+                    .ok()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or_else(|| SessionManagerConfig::default().session_mtu)
+                    .max(ApplicationData::PAYLOAD_SIZE),
+                max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
+                    .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
+                    .max(Duration::from_millis(100)),
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,

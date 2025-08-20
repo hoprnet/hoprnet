@@ -4,6 +4,7 @@ use std::{
     future::Future,
     hash::Hash,
     net::{IpAddr, SocketAddr},
+    num::NonZeroUsize,
     str::FromStr,
     sync::Arc,
 };
@@ -1399,7 +1400,13 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
         .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-        .with_receiver_parallelism(UdpStreamParallelism::Auto);
+        .with_receiver_parallelism(
+            std::env::var("HOPRD_ENTRY_UDP_RX_PARALLELISM")
+                .ok()
+                .and_then(|s| s.parse::<NonZeroUsize>().ok())
+                .map(UdpStreamParallelism::Specific)
+                .unwrap_or(UdpStreamParallelism::Auto),
+        );
 
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
@@ -1482,7 +1489,7 @@ mod tests {
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
-            None,
+            Default::default(),
             loopback_transport(),
             None,
         )?;
@@ -1525,7 +1532,7 @@ mod tests {
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
-            None,
+            Default::default(),
             loopback_transport(),
             None,
         )?;
