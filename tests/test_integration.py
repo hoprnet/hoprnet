@@ -364,8 +364,6 @@ class TestIntegrationWithSwarm:
     async def test_hoprd_configuration_endpoint(self, peer, swarm7: dict[str, Node]):
         cfg = await swarm7[peer].api.config()
 
-        print(f"{cfg=}")
-
         strategies_field = {k: v for d in cfg.strategies for k, v in d.items()}
 
         assert strategies_field["Aggregating"]["unrealized_balance_ratio"] == 0.9
