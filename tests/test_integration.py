@@ -231,7 +231,7 @@ class TestIntegrationWithSwarm:
                     s.settimeout(5)
                     # These messages will pass through
                     for i in range(message_count):
-                        message = f"#{i}".ljust(session.mtu)
+                        message = f"#{i}".ljust(session.hopr_mtu)
                         s.sendto(message.encode(), ("127.0.0.1", session.listen_port))
 
                         # Each packet increases the unredeemed value
@@ -245,7 +245,7 @@ class TestIntegrationWithSwarm:
 
                     # This additional message is not covered
                     s.sendto(
-                        "This message is not covered".ljust(session.mtu).encode(),
+                        "This message is not covered".ljust(session.hopr_mtu).encode(),
                         ("127.0.0.1", session.listen_port),
                     )
 

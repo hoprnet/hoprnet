@@ -92,7 +92,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .with_foreign_data_mode(ForeignDataMode::Error)
                     .with_queue_size(HOPR_UDP_QUEUE_SIZE)
                     .with_receiver_parallelism(
-                        std::env::var("HOPRD_EXIT_UDP_RX_PARALLELISM")
+                        std::env::var("HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM")
                             .ok()
                             .and_then(|s| s.parse::<NonZeroUsize>().ok())
                             .map(UdpStreamParallelism::Specific)

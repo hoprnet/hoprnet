@@ -116,7 +116,7 @@ class Session(JsonResponse):
     target: str = APIfield()
     forward_path: str = APIfield("forwardPath")
     return_path: str = APIfield("returnPath")
-    mtu: int = APIfield()
+    hopr_mtu: int = APIfield("hoprMtu")
     surb_len: int = APIfield("surbLen")
     active_clients: list[str] = APIfield("activeClients")
 
