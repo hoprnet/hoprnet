@@ -422,7 +422,7 @@ async def basic_send_and_receive_packets(
         dest,
         fwd_path,
         return_path,
-        SessionCapabilitiesBody(segmentation=True, no_rate_control=True),
+        SessionCapabilitiesBody(segmentation=True, no_rate_control=True,no_delay=True),
         use_response_buffer=None,
     ) as session:
         addr = ("127.0.0.1", session.listen_port)
