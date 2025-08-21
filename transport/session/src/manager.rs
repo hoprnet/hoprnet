@@ -109,10 +109,13 @@ struct SessionCacheBalancerFeedback(moka::future::Cache<SessionId, SessionSlot>)
 #[async_trait::async_trait]
 impl BalancerConfigFeedback for SessionCacheBalancerFeedback {
     async fn get_config(&self, id: &SessionId) -> crate::errors::Result<SurbBalancerConfig> {
+        // Intentionally using `iter().find()` instead of `get()` here,
+        // so that the popularity estimator is not hit.
         self.0
-            .get(id)
-            .await
+            .iter()
+            .find(|(sid, _)| sid.as_ref() == id)
             .ok_or(SessionManagerError::NonExistingSession)?
+            .1
             .surb_mgmt
             .ok_or(SessionManagerError::Other("missing surb balancer config".into()).into())
     }
@@ -634,6 +637,7 @@ where
 
         // Send the Session initiation message
         info!(challenge, %pseudonym, %destination, "new session request");
+        let new_session_request_start = std::time::Instant::now();
         msg_sender
             .send((forward_routing.clone(), start_session_msg.try_into()?))
             .await
@@ -654,7 +658,13 @@ where
             Ok(Ok(Some(est))) => {
                 // Session has been established, construct it
                 let session_id = est.session_id;
-                debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
+                let elapsed_since_init = new_session_request_start.elapsed();
+                debug!(
+                    challenge = est.orig_challenge,
+                    ?session_id,
+                    ?elapsed_since_init,
+                    "started a new session"
+                );
 
                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
                 let notifier = self
@@ -830,6 +840,16 @@ where
                 ))
                 .await
                 .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?)
+        } else {
+            Err(SessionManagerError::NonExistingSession.into())
+        }
+    }
+
+    /// Explicitly terminates the Session with the given [`SessionId`].
+    pub async fn terminate_session(&self, id: &SessionId) -> crate::errors::Result<()> {
+        if let Some(session_data) = self.sessions.remove(id).await {
+            close_session(*id, session_data, ClosureReason::Explicit);
+            Ok(())
         } else {
             Err(SessionManagerError::NonExistingSession.into())
         }
@@ -1548,6 +1568,110 @@ mod tests {
 
         // Let the session timeout at Alice
         tokio::time::sleep(Duration::from_millis(300)).await;
+
+        assert!(matches!(
+            alice_mgr.ping_session(alice_session.id()).await,
+            Err(TransportSessionError::Manager(SessionManagerError::NonExistingSession))
+        ));
+
+        futures::stream::iter(ahs)
+            .for_each(|ah| async move { ah.abort() })
+            .await;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_manager_should_close_session_on_manual_request() -> anyhow::Result<()> {
+        let alice_pseudonym = HoprPseudonym::random();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let alice_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(Default::default());
+
+        let mut sequence = mockall::Sequence::new();
+        let mut alice_transport = MockMsgSender::new();
+        let mut bob_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message
+        let bob_mgr_clone = bob_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+            })
+            .returning(move |_, data| {
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
+            });
+
+        // Bob sends the SessionEstablished message
+        let alice_mgr_clone = alice_mgr.clone();
+        bob_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |peer, data| {
+                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+            })
+            .returning(move |_, data| {
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
+            });
+
+        let mut ahs = Vec::new();
+
+        // Start Alice
+        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
+
+        // Start Bob
+        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
+        ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
+
+        let target = SealedHost::Plain("127.0.0.1:80".parse()?);
+
+        pin_mut!(new_session_rx_bob);
+        let (alice_session, bob_session) = timeout(
+            Duration::from_secs(2),
+            futures::future::join(
+                alice_mgr.new_session(
+                    bob_peer,
+                    SessionTarget::TcpStream(target.clone()),
+                    SessionClientConfig {
+                        pseudonym: alice_pseudonym.into(),
+                        capabilities: Capability::NoRateControl | Capability::Segmentation,
+                        surb_management: None,
+                        ..Default::default()
+                    },
+                ),
+                new_session_rx_bob.next(),
+            ),
+        )
+        .await?;
+
+        let alice_session = alice_session?;
+        let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
+
+        assert_eq!(
+            *alice_session.capabilities(),
+            Capability::Segmentation | Capability::NoRateControl,
+        );
+        assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
+        assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
+
+        alice_mgr.terminate_session(alice_session.id()).await?;
 
         assert!(matches!(
             alice_mgr.ping_session(alice_session.id()).await,

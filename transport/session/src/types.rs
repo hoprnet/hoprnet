@@ -274,6 +274,8 @@ pub enum ClosureReason {
     EmptyRead,
     /// Session has been evicted from the cache due to inactivity or capacity reasons.
     Eviction,
+    /// The Session has been closed explicitly.
+    Explicit,
 }
 
 /// Helper trait to allow Box aliasing
