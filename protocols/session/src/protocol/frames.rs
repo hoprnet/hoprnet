@@ -47,7 +47,7 @@ impl Debug for Frame {
         f.debug_struct("Frame")
             .field("frame_id", &self.frame_id)
             .field("len", &self.data.len())
-            .field("data", &to_hex_shortened(&self.data, 16))
+            .field("data", &to_hex_shortened::<16>(&self.data))
             .field("is_terminating", &self.is_terminating)
             .finish()
     }
@@ -243,7 +243,7 @@ impl Debug for Segment {
             .field("frame_id", &self.frame_id)
             .field("seq_id", &self.seq_idx)
             .field("seq_flags", &self.seq_flags)
-            .field("data", &to_hex_shortened(&self.data, 16))
+            .field("data", &to_hex_shortened::<16>(&self.data))
             .finish()
     }
 }

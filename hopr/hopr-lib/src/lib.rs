@@ -418,11 +418,11 @@ impl Hopr {
             create_if_missing: cfg.db.initialize,
             force_create: cfg.db.force_initialize,
             log_slow_queries: std::time::Duration::from_millis(150),
-            surb_ring_buffer_size: std::env::var("HOPR_SURB_RB_SIZE")
+            surb_ring_buffer_size: std::env::var("HOPR_PROTOCOL_SURB_RB_SIZE")
                 .ok()
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
                 .unwrap_or_else(|| HoprDbConfig::default().surb_ring_buffer_size),
-            surb_distress_threshold: std::env::var("HOPR_SURB_RB_DISTRESS")
+            surb_distress_threshold: std::env::var("HOPR_PROTOCOL_SURB_RB_DISTRESS")
                 .ok()
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
                 .unwrap_or_else(|| HoprDbConfig::default().surb_distress_threshold),

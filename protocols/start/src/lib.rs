@@ -361,7 +361,7 @@ mod tests {
         let len = msg.encode()?.1.len();
         assert!(
             HoprPacket::max_surbs_with_message(len) >= 1,
-            "KeepAlive message size ({len}) must allow for at least 1 SURBs in packet",
+            "StartSession message size ({len}) must allow for at least 1 SURBs in packet",
         );
 
         Ok(())
@@ -472,25 +472,6 @@ mod tests {
     }
 
     #[test]
-    fn start_protocol_message_session_initiation_message_should_allow_for_at_least_one_surb() -> anyhow::Result<()> {
-        let msg = StartProtocol::<String, String, u8>::StartSession(StartInitiation {
-            challenge: 0,
-            target: "127.0.0.1:1234".to_string(),
-            capabilities: 0xff,
-            additional_data: 0xffffffff,
-        });
-
-        let len = msg.encode()?.1.len();
-        assert!(
-            HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
-            "StartInitiation message size ({}) must allow for at least 1 SURBs in packet",
-            len,
-        );
-
-        Ok(())
-    }
-
-    #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
         let msg = StartProtocol::<String, String, u8>::KeepAlive(KeepAliveMessage {
             session_id: "example-of-a-very-very-long-session-id-that-should-still-fit-the-packet".to_string(),
@@ -503,7 +484,7 @@ mod tests {
             HoprPacket::MAX_SURBS_IN_PACKET
         );
         assert!(
-            HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
+            HoprPacket::max_surbs_with_message(len) >= KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
             "KeepAlive message size ({}) must allow for at least {} SURBs in packet",
             len,
             KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE

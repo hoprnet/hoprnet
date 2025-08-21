@@ -23,7 +23,7 @@ use crate::{
 /// so the Segmenter naturally acts as a buffered writer.
 /// Any unflushed bytes written to the Segmenter will be lost when it is closed.
 ///
-/// The data are grouped into [`Frames`](frames::Frame) of the size given by the `frame_size`
+/// The data are grouped into [`Frames`](crate::protocol::Frame) of the size given by the `frame_size`
 /// parameter, segments in each such group share the same [`FrameId`].
 /// This acts as a natural buffering feature of a Segmenter.
 ///

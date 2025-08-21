@@ -219,6 +219,10 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
 
     fn try_from(value: PacketMessage<S, H, P>) -> Result<Self, Self::Error> {
         let data = value.0.into_unpadded()?;
+        if data.is_empty() {
+            return Err(GeneralError::ParseError("HoprPacketMessage.size".into()).into());
+        }
+
         let num_surbs = (data[0] & S_MASK) as usize;
         let signals = (data[0] & S_MASK.not()) >> S_MASK.trailing_ones();
 

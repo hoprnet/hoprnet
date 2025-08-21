@@ -219,7 +219,7 @@ impl std::fmt::Debug for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ApplicationData")
             .field("application_tag", &self.application_tag)
-            .field("plain_text", &to_hex_shortened(&self.plain_text, 32))
+            .field("plain_text", &to_hex_shortened::<32>(&self.plain_text))
             .finish()
     }
 }
@@ -230,7 +230,7 @@ impl std::fmt::Display for ApplicationData {
             f,
             "({}): {}",
             self.application_tag,
-            to_hex_shortened(&self.plain_text, 16)
+            to_hex_shortened::<16>(&self.plain_text)
         )
     }
 }

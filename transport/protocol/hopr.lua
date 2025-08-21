@@ -400,7 +400,7 @@ local hopr_fields = {
     is_fwd = ProtoField.bool("hopr.is_forwarded", "Is forwarded"),
     data_len = ProtoField.uint16("hopr.data_len", "Data Length"),
     raw_data = ProtoField.bytes("hopr.raw_data", "Raw packet data"),
-    dst_flags = ProtoField.uint8("hopr.raw_data", "Packet signals"),
+    dst_flags = ProtoField.uint8("hopr.packet_signals", "Packet signals"),
 
     -- Ticket fields
     ticket_channel_id = ProtoField.bytes("hopr.ticket.channel_id", "Channel ID"),

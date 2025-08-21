@@ -45,7 +45,7 @@
 //! This message is sent from the segment recipient to the segment sender to acknowledge that
 //! all segments of certain frames have been completely and correctly received by the recipient.
 //!
-//! The message consists simply of a [frame ID](super::frames::FrameId) list of the completely received
+//! The message consists simply of a [frame ID](FrameId) list of the completely received
 //! frames. There can be at most [`MAX_ACK_FRAMES`](FrameAcknowledgements::MAX_ACK_FRAMES)
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).

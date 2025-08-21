@@ -14,6 +14,7 @@ pub trait ToHex {
 }
 
 /// Represents a type that can be encoded to/decoded from a fixed-sized byte array of size `N`.
+///
 /// This requires processing and memory allocation to represent the type in binary encoding.
 ///
 /// Differences between [BytesEncodable] and [BytesRepresentable]:
