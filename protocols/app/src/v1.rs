@@ -46,7 +46,9 @@ impl Tag {
     /// Application tag range for external usage
     pub const APPLICATION_TAG_RANGE: Range<Self> =
         (Self::Application(ReservedTag::Undefined as u64 + 1))..Self::Application(Self::MAX);
-    pub const MAX: u64 = u64::MAX;
+    /// The maximum value of a tag.
+    pub const MAX: u64 = 0x1fffffffffffffff_u64;
+    /// Size of a tag in bytes.
     pub const SIZE: usize = size_of::<u64>();
 
     pub fn from_be_bytes(bytes: [u8; Self::SIZE]) -> Self {
@@ -69,7 +71,8 @@ impl Tag {
 
 impl<T: Into<u64>> From<T> for Tag {
     fn from(tag: T) -> Self {
-        let tag: u64 = tag.into();
+        // In version 1, the 3 most significant bits are always 0.
+        let tag: u64 = tag.into() & Self::MAX;
 
         if ReservedTag::range().contains(&tag) {
             Tag::Reserved(
@@ -279,6 +282,12 @@ mod tests {
         let reserved_tag = ReservedTag::Ping as u64;
 
         assert_eq!(Tag::from(reserved_tag), Tag::Reserved(reserved_tag));
+    }
+
+    #[test]
+    fn v1_tags_should_have_3_most_significant_bits_unset() {
+        let tag: Tag = u64::MAX.into();
+        assert_eq!(tag.as_u64(), Tag::MAX);
     }
 
     #[test]
