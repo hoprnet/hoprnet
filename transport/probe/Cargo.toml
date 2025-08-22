@@ -43,7 +43,7 @@ hopr-network-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
-hopr-transport-packet = { workspace = true }
+hopr-protocol-app = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]

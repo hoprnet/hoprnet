@@ -24,7 +24,7 @@ pub trait DbOperations {
     async fn find_surb(
         &self,
         matcher: hopr_network_types::types::SurbMatcher,
-    ) -> hopr_db_api::errors::Result<(hopr_db_api::protocol::HoprSenderId, hopr_db_api::protocol::HoprSurb)>;
+    ) -> hopr_db_api::errors::Result<hopr_db_api::protocol::FoundSurb>;
 
     /// Tries to resolve on-chain public key given the off-chain public key
     async fn resolve_chain_key(

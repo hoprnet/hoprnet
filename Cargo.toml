@@ -31,6 +31,7 @@ members = [
   "logic/strategy",
   "misc/metrics",
   "misc/platform",
+  "protocols/app",
   "protocols/session",
   "protocols/start",
   "transport/api",
@@ -38,7 +39,6 @@ members = [
   "transport/identity",
   "transport/mixer",
   "transport/network",
-  "transport/packet",
   "transport/p2p",
   "transport/probe",
   "transport/protocol",
@@ -240,6 +240,7 @@ hopr-path = { path = "logic/path" }
 hopr-parallelize = { path = "common/parallelize" }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
+hopr-protocol-app = { path = "protocols/app" }
 hopr-protocol-session = { path = "protocols/session" }
 hopr-protocol-start = { path = "protocols/start" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
@@ -250,7 +251,6 @@ hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
-hopr-transport-packet = { path = "transport/packet" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hopr-transport-ticket-aggregation = { path = "transport/ticket-aggregation" } # dead package waiting for reimplementation as a session protocol

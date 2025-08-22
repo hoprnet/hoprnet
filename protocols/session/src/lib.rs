@@ -33,7 +33,6 @@
 
 /// Contains errors thrown from this module.
 pub mod errors;
-mod frames;
 #[allow(dead_code)]
 mod processing;
 mod protocol;
@@ -49,7 +48,7 @@ pub use socket::{
 // Enable exports of additional Session protocol types
 #[cfg(feature = "session-types")]
 pub mod types {
-    pub use super::{frames::*, protocol::*};
+    pub use super::protocol::*;
 }
 
 /// Represents a stateless (and therefore unreliable) socket.

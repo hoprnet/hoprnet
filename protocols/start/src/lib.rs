@@ -17,7 +17,8 @@
 /// Contains errors raised by the Start protocol.
 pub mod errors;
 
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
 use crate::errors::StartProtocolError;
 
@@ -25,8 +26,8 @@ use crate::errors::StartProtocolError;
 pub type StartChallenge = u64;
 
 /// Lists all Start protocol error reasons.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 #[repr(u8)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 pub enum StartErrorReason {
     /// Unknown error.
     Unknown = 0,
@@ -124,6 +125,11 @@ pub struct KeepAliveMessage<I> {
     pub flags: u8,
     /// Additional data (might be `flags` dependent), ignored if `0x00000000`.
     pub additional_data: u32,
+}
+
+impl<I> KeepAliveMessage<I> {
+    /// The minimum number of SURBs a [`KeepAliveMessage`] must be able to carry.
+    pub const MIN_SURBS_PER_MESSAGE: usize = HoprPacket::MAX_SURBS_IN_PACKET;
 }
 
 impl<I> From<I> for KeepAliveMessage<I> {
@@ -300,10 +306,7 @@ where
 
     fn try_from(value: StartProtocol<I, T, C>) -> Result<Self, Self::Error> {
         let (application_tag, plain_text) = value.encode()?;
-        Ok(ApplicationData {
-            application_tag,
-            plain_text,
-        })
+        Ok(ApplicationData::new_from_owned(application_tag, plain_text))
     }
 }
 
@@ -323,7 +326,7 @@ where
 #[cfg(test)]
 mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
-    use hopr_transport_packet::prelude::Tag;
+    use hopr_protocol_app::prelude::Tag;
 
     use super::*;
 
@@ -358,7 +361,7 @@ mod tests {
         let len = msg.encode()?.1.len();
         assert!(
             HoprPacket::max_surbs_with_message(len) >= 1,
-            "KeepAlive message size ({len}) must allow for at least 1 SURBs in packet",
+            "StartSession message size ({len}) must allow for at least 1 SURBs in packet",
         );
 
         Ok(())
@@ -476,11 +479,15 @@ mod tests {
             additional_data: 0xffffffff,
         });
         let len = msg.encode()?.1.len();
+        assert_eq!(
+            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
+            HoprPacket::MAX_SURBS_IN_PACKET
+        );
         assert!(
-            HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
+            HoprPacket::max_surbs_with_message(len) >= KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
             "KeepAlive message size ({}) must allow for at least {} SURBs in packet",
             len,
-            HoprPacket::MAX_SURBS_IN_PACKET
+            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE
         );
 
         Ok(())

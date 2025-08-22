@@ -12,8 +12,10 @@ use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
-use hopr_protocol_start::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_protocol_start::{
+    KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
+};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -99,7 +101,9 @@ struct SessionSlot {
     routing_opts: DestinationRouting,
     abort_handles: Vec<AbortHandle>,
     // Allows reconfiguring of the SURB balancer on-the-fly
+    // Set on both Entry and Exit sides.
     surb_mgmt: Option<SurbBalancerConfig>,
+    // Set only on the Exit side.
     surb_estimator: Option<AtomicSurbFlowEstimator>,
 }
 
@@ -1241,7 +1245,10 @@ where
                     // This applies to the incoming sessions currently
                     if let Some(estimator) = session_slot.surb_estimator.as_ref() {
                         // Two SURBs per Keep-Alive message
-                        estimator.produced.fetch_add(2, std::sync::atomic::Ordering::Relaxed);
+                        estimator.produced.fetch_add(
+                            KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE as u64,
+                            std::sync::atomic::Ordering::Relaxed,
+                        );
                     }
                 } else {
                     debug!(%session_id, "received keep-alive request for an unknown session");
@@ -1937,8 +1944,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore = "This test is currently ignored because it is flaky and requires adaptation after SURB balancer \
-                changes. It fails on the 'Alice sends the terminating segment to close the Session' step."]
     #[test_log::test(tokio::test)]
     async fn session_manager_should_send_keep_alives_via_surb_balancer() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
@@ -2057,7 +2062,7 @@ mod tests {
                     SessionTarget::TcpStream(target.clone()),
                     SessionClientConfig {
                         pseudonym: alice_pseudonym.into(),
-                        capabilities: None.into(),
+                        capabilities: Capability::Segmentation.into(),
                         surb_management: Some(balancer_cfg),
                         ..Default::default()
                     },

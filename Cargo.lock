@@ -4566,7 +4566,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4932,6 +4932,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-protocol-app"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "flagset",
+ "hopr-crypto-packet",
+ "hopr-primitive-types",
+ "serde",
+ "serde_bytes",
+ "strum 0.27.2",
+ "thiserror 2.0.14",
+]
+
+[[package]]
 name = "hopr-protocol-session"
 version = "1.0.0"
 dependencies = [
@@ -4980,7 +4994,7 @@ dependencies = [
  "anyhow",
  "aquamarine",
  "hopr-crypto-packet",
- "hopr-transport-packet",
+ "hopr-protocol-app",
  "serde",
  "serde_cbor_2",
  "strum 0.27.2",
@@ -5043,11 +5057,11 @@ dependencies = [
  "hopr-network-types",
  "hopr-path",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-network",
  "hopr-transport-p2p",
- "hopr-transport-packet",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -5172,19 +5186,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-transport-packet"
-version = "3.0.1"
-dependencies = [
- "anyhow",
- "hex",
- "hopr-crypto-packet",
- "serde",
- "serde_bytes",
- "strum 0.27.2",
- "thiserror 2.0.14",
-]
-
-[[package]]
 name = "hopr-transport-probe"
 version = "0.2.0"
 dependencies = [
@@ -5203,7 +5204,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
- "hopr-transport-packet",
+ "hopr-protocol-app",
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p-identity",
@@ -5246,12 +5247,12 @@ dependencies = [
  "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-bloom",
  "hopr-transport-identity",
  "hopr-transport-mixer",
- "hopr-transport-packet",
  "hopr-transport-probe",
  "hopr-transport-session",
  "lazy_static",
@@ -5289,9 +5290,9 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
- "hopr-transport-packet",
  "lazy_static",
  "mockall",
  "moka",
