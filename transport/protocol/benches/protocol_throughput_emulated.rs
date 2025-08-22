@@ -9,7 +9,7 @@ use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::HoprBalance;
-use hopr_transport_packet::prelude::ApplicationData;
+use hopr_protocol_app::prelude::ApplicationData;
 use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
 use libp2p::PeerId;
 

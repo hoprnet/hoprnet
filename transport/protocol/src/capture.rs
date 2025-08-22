@@ -155,6 +155,7 @@ pub enum PacketBeforeTransit<'a> {
         is_forwarded: bool,
         data: Cow<'a, [u8]>,
         ack_challenge: Cow<'a, [u8]>,
+        signals: u8,
         ticket: Cow<'a, [u8]>,
     },
     OutgoingAck {
@@ -180,6 +181,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 next_hop,
                 data,
                 ack_challenge,
+                signals,
                 ticket,
                 num_surbs,
                 is_forwarded,
@@ -196,6 +198,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(ticket.as_ref());
                 out.push(num_surbs);
                 out.push(if is_forwarded { 1 } else { 0 });
+                out.push(signals);
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
                 direction = PacketDirection::Outgoing;
@@ -226,6 +229,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                         sender,
                         plain_text,
                         ack_key,
+                        signals,
                     },
                 ticket,
             } => {
@@ -241,6 +245,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(ack_key.as_ref());
                 out.push(ticket.len() as u8);
                 out.extend_from_slice(ticket.as_ref());
+                out.push(*signals);
                 out.extend_from_slice((plain_text.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(plain_text.as_ref());
             }
@@ -315,9 +320,9 @@ mod tests {
     use hopr_internal_types::prelude::{Acknowledgement, HoprPseudonym, TicketBuilder, WinningProbability};
     use hopr_network_types::types::SealedHost;
     use hopr_primitive_types::{primitives::EthereumChallenge, traits::BytesEncodable};
+    use hopr_protocol_app::prelude::ApplicationData;
     use hopr_protocol_session::types::*;
     use hopr_protocol_start::{KeepAliveMessage, StartErrorReason, StartErrorType, StartEstablished, StartInitiation};
-    use hopr_transport_packet::prelude::ApplicationData;
     use hopr_transport_probe::content::{NeighborProbe, PathTelemetry};
     use hopr_transport_session::{ByteCapabilities, Capability, SessionId, SessionTarget};
 
@@ -336,6 +341,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new(10u64, &hex!("deadbeef")).to_bytes(),
             ack_key: HalfKey::random(),
+            signals: 0,
         };
 
         let ticket = TicketBuilder::default()
@@ -374,6 +380,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
             ack_key: HalfKey::random(),
+            signals: 0,
         };
 
         let _ = pcap
@@ -400,6 +407,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
             ack_key: HalfKey::random(),
+            signals: 0,
         };
 
         let _ = pcap
@@ -421,6 +429,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
             ack_key: HalfKey::random(),
+            signals: 0,
         };
 
         let _ = pcap
@@ -445,6 +454,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
             ack_key: HalfKey::random(),
+            signals: 0,
         };
 
         let _ = pcap
@@ -511,6 +521,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
+            signals: 1,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -529,6 +540,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
+            signals: 0,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -547,6 +559,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
+            signals: 0,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -572,6 +585,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
+            signals: 0,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -595,6 +609,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
+            signals: 0,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -618,6 +633,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
+            signals: 0,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -642,6 +658,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
+            signals: 0,
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -655,6 +672,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 0,
             is_forwarded: true,
+            signals: 0,
         };
 
         let _ = pcap.send(packet.into()).await;

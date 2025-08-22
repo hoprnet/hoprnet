@@ -33,6 +33,7 @@ generic-array = { workspace = true }
 k256 = { workspace = true, features = ["arithmetic", "ecdh", "hash2curve"] }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
+subtle = { workspace = true }
 thiserror = { workspace = true }
 typenum = { workspace = true }
 
