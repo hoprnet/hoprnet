@@ -140,6 +140,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
     }
 
+    if cfg!(debug_assertions) {
+        warn!("Executable was built using the DEBUG profile.");
+    } else {
+        info!("Executable was built using the RELEASE profile.");
+    }
+
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
 

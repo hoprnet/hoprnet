@@ -13,7 +13,10 @@ on:
     types: [checks_requested]
   pull_request_target:
     types:
+      - opened
       - synchronize
+      - reopened
+      - ready_for_review
 
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.workflow}}

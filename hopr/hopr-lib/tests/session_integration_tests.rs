@@ -5,8 +5,7 @@ use hopr_internal_types::prelude::*;
 use hopr_lib::ApplicationData;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
-use hopr_transport::{Session, SessionId};
-use hopr_transport_session::{Capabilities, Capability, transfer_session};
+use hopr_transport_session::{Capabilities, Capability, HoprSessionConfig, Session, SessionId, transfer_session};
 use parameterized::parameterized;
 use tokio::{io::AsyncReadExt, net::UdpSocket};
 
@@ -21,7 +20,10 @@ async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
     let mut alice_session = Session::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        cap,
+        HoprSessionConfig {
+            capabilities: cap,
+            ..Default::default()
+        },
         (alice_tx, alice_rx.map(|(_, d)| d.plain_text)),
         None,
     )?;
@@ -29,7 +31,10 @@ async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
     let mut bob_session = Session::new(
         id,
         DestinationRouting::Return(id.pseudonym().into()),
-        cap,
+        HoprSessionConfig {
+            capabilities: cap,
+            ..Default::default()
+        },
         (bob_tx, bob_rx.map(|(_, d)| d.plain_text)),
         None,
     )?;
