@@ -189,8 +189,8 @@ hopr:
     quality_avg_window_size: 25
     # Minimum score to add a node to the routing table
     node_score_auto_path_threshold: 0.95
-    # Maximum latency for the first hop
-    max_first_hop_latency_threshold: 0.25
+    # Maximum latency for the first hop in ms
+    max_first_hop_latency_threshold: 250
     # Indicates how long (in seconds) a node is considered "ignored"
     ignore_timeframe: 120
     # Backoff exponent when probing nodes
