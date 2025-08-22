@@ -179,7 +179,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
     pub const HEADER_LEN: usize = 1;
     /// The maximum number of SURBs a packet message can hold, according to RFC-0003.
     ///
-    /// The number of SURBs in a `PacketMessage` is intentionally limited to 16, so that
+    /// The number of SURBs in a `PacketMessage` is intentionally limited to 15, so that
     /// the upper 4 bits remain reserved for additional flags.
     pub const MAX_SURBS_PER_MESSAGE: usize = S_MASK as usize;
 }
