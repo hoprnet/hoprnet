@@ -247,8 +247,7 @@ class HoprdAPI(ApiLib):
         """
         Returns some configurations value of the node.
         """
-        response = await self.try_req(Method.GET, "/node/configuration", dict)
-        return Configuration(response["config"]) if response else response
+        return await self.try_req(Method.GET, "/node/configuration", Configuration)
 
     async def node_info(self) -> Optional[Infos]:
         """

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures::{StreamExt, future::AbortRegistration, pin_mut};
 use hopr_async_runtime::AbortHandle;
-use tracing::{Instrument, debug, error, instrument, trace};
+use tracing::{Instrument, debug, error, instrument, trace, warn};
 
 use super::{
     BalancerControllerBounds, MIN_BALANCER_SAMPLING_INTERVAL, SimpleSurbFlowEstimator, SurbBalancerController,
@@ -267,7 +267,7 @@ where
                 pin_mut!(sampling_stream);
                 while sampling_stream.next().await.is_some() {
                     let Ok(mut current_cfg) = cfg_feedback.get_config(&self.session_id).await else {
-                        error!("cannot get config for session");
+                        warn!("cannot get config for session - session was possibly evicted from the cache");
                         break;
                     };
 

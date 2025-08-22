@@ -198,7 +198,7 @@ where
         {
             let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
             self.refresh_metrics(&stats);
-            tracing::info!(
+            tracing::debug!(
                 health = %health_from_stats(&stats, self.am_i_public),
                 trigger = "peer removal",
                 "Network health updated"
@@ -272,7 +272,7 @@ where
             {
                 let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
                 self.refresh_metrics(&stats);
-                tracing::info!(
+                tracing::debug!(
                     health = %health_from_stats(&stats, self.am_i_public),
                     trigger = "peer update",
                     "Network health updated"

@@ -94,6 +94,7 @@ class TicketStatistics(JsonResponse):
 class Configuration(JsonResponse):
     safe_address: str = APIfield("hopr/safe_module/safe_address")
     module_address: str = APIfield("hopr/safe_module/module_address")
+    maximum_sessions: int = APIfield("hopr/session/maximum_sessions")
 
 
 @APIobject
@@ -130,6 +131,7 @@ class SessionConfig(JsonResponse):
 @APIobject
 class Metrics(MetricResponse):
     hopr_tickets_incoming_statistics: dict = APImetric(["statistic"])
+    hopr_session_num_active_sessions: int = APImetric()
 
 
 class Channels:
