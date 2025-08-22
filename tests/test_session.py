@@ -38,7 +38,7 @@ from .utils import (
     make_routes,
 )
 
-STANDARD_MTU_SIZE = 1452
+STANDARD_MTU_SIZE = 1500
 DOWNLOAD_FILE_SIZE = 800
 
 

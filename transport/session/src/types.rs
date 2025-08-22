@@ -319,12 +319,12 @@ pub struct HoprSessionConfig {
     pub capabilities: Capabilities,
     /// Expected frame size of the Session protocol socket.
     ///
-    /// Default is 1452
-    #[default(1452)]
+    /// Default is 1500.
+    #[default(1500)]
     pub mtu: usize,
     /// Maximum amount of time an incomplete frame can be kept in the buffer.
     ///
-    /// Default is 800ms
+    /// Default is 800 ms
     #[default(Duration::from_millis(800))]
     pub frame_timeout: Duration,
 }

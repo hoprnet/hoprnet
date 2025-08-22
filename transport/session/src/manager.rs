@@ -188,8 +188,8 @@ pub struct SessionManagerConfig {
 
     /// The maximum chunk of data that can be written to the Session's input buffer.
     ///
-    /// Default is 1452.
-    #[default(1452)]
+    /// Default is 1500.
+    #[default(1500)]
     pub session_mtu: usize,
 
     /// The maximum time for an incomplete frame to stay in the Session's output buffer.
