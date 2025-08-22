@@ -181,7 +181,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
     ///
     /// The number of SURBs in a `PacketMessage` is intentionally limited to 16, so that
     /// the upper 4 bits remain reserved for additional flags.
-    pub const MAX_SURBS_PER_MESSAGE: usize = S_MASK as usize + 1;
+    pub const MAX_SURBS_PER_MESSAGE: usize = S_MASK as usize;
 }
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketParts<'_, S, H>> for PacketMessage<S, H, P> {
