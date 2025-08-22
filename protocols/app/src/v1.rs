@@ -64,7 +64,7 @@ impl Tag {
 
     pub fn as_u64(&self) -> u64 {
         match self {
-            Tag::Reserved(tag) | Tag::Application(tag) => *tag,
+            Tag::Reserved(tag) | Tag::Application(tag) => (*tag) & Self::MAX,
         }
     }
 }
@@ -92,9 +92,7 @@ impl serde::Serialize for Tag {
     where
         S: serde::Serializer,
     {
-        match self {
-            Tag::Reserved(tag) | Tag::Application(tag) => serializer.serialize_u64(*tag),
-        }
+        serializer.serialize_u64(self.as_u64())
     }
 }
 
@@ -104,9 +102,7 @@ impl<'a> serde::Deserialize<'a> for Tag {
     where
         D: serde::Deserializer<'a>,
     {
-        let value = u64::deserialize(deserializer)?;
-
-        Ok(value.into())
+        Ok(u64::deserialize(deserializer)?.into())
     }
 }
 
