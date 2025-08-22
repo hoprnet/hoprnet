@@ -39,6 +39,12 @@ class Cluster:
 
         for network_name, params in config["networks"].items():
             size = size if size else len(params["nodes"])
+
+            if size > len(params["nodes"]):
+                logging.warning(
+                    f"Requested cluster size `{size}` is larger than available `{len(params['nodes'])}` nodes. Using only {len(params['nodes'])} nodes instead."
+                )
+
             for node, index in zip(params["nodes"], range(1, size + 1)):
                 self.nodes[str(index)] = Node.fromConfig(
                     index, node, config["defaults"], network_name, use_nat, exposed, base_port
