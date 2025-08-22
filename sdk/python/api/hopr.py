@@ -8,6 +8,7 @@ import nacl.bindings
 import nacl.public
 import nacl.signing  # Ensure nacl.signing is imported correctly
 import nacl.utils
+import yaml
 from api_lib import ApiLib
 from api_lib.method import Method
 from nacl.public import SealedBox  # Import SealedBox explicitly
@@ -41,6 +42,7 @@ from .response_objects import (
     TicketProbability,
     TicketStatistics,
 )
+from .yaml_parser import PlainTextLoader
 
 MESSAGE_TAG = 0x1245
 
@@ -247,8 +249,8 @@ class HoprdAPI(ApiLib):
         """
         Returns some configurations value of the node.
         """
-        response = await self.try_req(Method.GET, "/node/configuration", dict)
-        return Configuration(response["config"]) if response else response
+        yml_string = await self.try_req(Method.GET, "/node/configuration", str)
+        return Configuration(yaml.load(yml_string, Loader=PlainTextLoader))
 
     async def node_info(self) -> Optional[Infos]:
         """

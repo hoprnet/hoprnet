@@ -43,7 +43,7 @@ use hopr_internal_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
 use hopr_transport_ticket_aggregation::TicketAggregatorTrait;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_with::serde_as;
 use tracing::{debug, error, info, warn};
 use validator::Validate;
@@ -71,8 +71,19 @@ fn just_true() -> bool {
 }
 
 #[inline]
-fn default_unrealized_balance_ratio() -> Option<f32> {
+fn default_unrealized_balance_ratio() -> Option<f64> {
     Some(0.9)
+}
+
+fn serialize_optional_f64<S>(x: &Option<f64>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Some(v) = x {
+        s.serialize_f64(*v)
+    } else {
+        s.serialize_none()
+    }
 }
 
 /// Configuration object for the `AggregatingStrategy`
@@ -97,9 +108,10 @@ pub struct AggregatingStrategyConfig {
     /// unaggregated tickets. This condition is independent of `aggregation_threshold`.
     ///
     /// Default is 0.9
-    #[validate(range(min = 0_f32, max = 1.0_f32))]
+    #[validate(range(min = 0_f64, max = 1.0_f64))]
     #[default(default_unrealized_balance_ratio())]
-    pub unrealized_balance_ratio: Option<f32>,
+    #[serde(serialize_with = "serialize_optional_f64")]
+    pub unrealized_balance_ratio: Option<f64>,
 
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
     /// to the `PendingToClose` state.
@@ -116,7 +128,7 @@ impl From<AggregatingStrategyConfig> for AggregationPrerequisites {
     fn from(value: AggregatingStrategyConfig) -> Self {
         AggregationPrerequisites {
             min_ticket_count: value.aggregation_threshold.map(|x| x as usize),
-            min_unaggregated_ratio: value.unrealized_balance_ratio.map(|x| x as f64),
+            min_unaggregated_ratio: value.unrealized_balance_ratio,
         }
     }
 }
