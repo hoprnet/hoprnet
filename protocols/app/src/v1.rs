@@ -47,6 +47,9 @@ impl Tag {
     pub const APPLICATION_TAG_RANGE: Range<Self> =
         (Self::Application(ReservedTag::Undefined as u64 + 1))..Self::Application(Self::MAX);
     /// The maximum value of a tag.
+    ///
+    /// The maximum value is determined by the fact, that the 3 most significant bits
+    /// must be set to 0 in version 1.
     pub const MAX: u64 = 0x1fffffffffffffff_u64;
     /// Size of a tag in bytes.
     pub const SIZE: usize = size_of::<u64>();
