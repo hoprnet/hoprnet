@@ -5,7 +5,7 @@ use futures::{StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUno
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_types::crypto_traits::Randomizable;
-use hopr_db_sql::HoprDbAllOperations;
+use hopr_db_sql::{HoprDbAllOperations, prelude::FoundSurb};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::{
     prelude::{ResolvedTransportRouting, RoutingOptions},
@@ -13,7 +13,7 @@ use hopr_network_types::{
 };
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
 use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
-use hopr_transport_packet::v1::ApplicationData;
+use hopr_protocol_app::v1::{ApplicationData, ApplicationFlag, ApplicationFlags};
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use tracing::trace;
 
@@ -139,7 +139,7 @@ where
         &self,
         size_hint: usize,
         routing: DestinationRouting,
-    ) -> crate::errors::Result<ResolvedTransportRouting> {
+    ) -> crate::errors::Result<(ResolvedTransportRouting, Option<usize>)> {
         match routing {
             DestinationRouting::Forward {
                 destination,
@@ -164,15 +164,22 @@ where
 
                 trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
 
-                Ok(ResolvedTransportRouting::Forward {
-                    pseudonym: pseudonym.unwrap_or_else(HoprPseudonym::random),
-                    forward_path,
-                    return_paths,
-                })
+                Ok((
+                    ResolvedTransportRouting::Forward {
+                        pseudonym: pseudonym.unwrap_or_else(HoprPseudonym::random),
+                        forward_path,
+                        return_paths,
+                    },
+                    None,
+                ))
             }
             DestinationRouting::Return(matcher) => {
-                let (sender_id, surb) = self.db.find_surb(matcher).await?;
-                Ok(ResolvedTransportRouting::Return(sender_id, surb))
+                let FoundSurb {
+                    sender_id,
+                    surb,
+                    remaining,
+                } = self.db.find_surb(matcher).await?;
+                Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }
     }
@@ -199,15 +206,26 @@ where
         .and_then(|v| v.parse().ok())
         .unwrap_or(DEFAULT_PACKET_PLANNER_CONCURRENCY);
 
+    let distress_threshold = planner.db.get_surb_config().distress_threshold;
     hopr_async_runtime::prelude::spawn(rx.for_each_concurrent(planner_concurrency, move |(routing, data)| {
         let planner = planner.clone();
         let packet_sender = packet_sender.clone();
         async move {
             match planner.resolve_routing(data.len(), routing).await {
-                Ok(resolved) => {
+                Ok((resolved, rem_surbs)) => {
+                    // Set the SURB distress/out-of-SURBs flag if applicable.
+                    // These flags are translated into HOPR protocol packet signals.
+                    let flags: ApplicationFlags = match rem_surbs {
+                        Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                            ApplicationFlag::SurbDistress.into()
+                        }
+                        Some(0) => ApplicationFlag::OutOfSurbs.into(),
+                        _ => data.flags - (ApplicationFlag::OutOfSurbs | ApplicationFlag::SurbDistress),
+                    };
+
                     // The awaiter here is intentionally dropped,
                     // since we do not intend to be notified about packet delivery to the first hop
-                    if let Err(error) = packet_sender.send_packet(data, resolved).await {
+                    if let Err(error) = packet_sender.send_packet(data.with_flags(flags), resolved).await {
                         tracing::error!(%error, "failed to enqueue packet for sending");
                     }
                 }

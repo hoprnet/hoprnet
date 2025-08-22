@@ -6,8 +6,7 @@ use bitvec::{BitArr, field::BitField, prelude::Msb0};
 
 use crate::{
     errors::SessionError,
-    frames::{FrameId, SegmentId, SeqNum},
-    protocol::SessionMessage,
+    protocol::{FrameId, SegmentId, SeqNum, SessionMessage},
 };
 
 /// Holds the Segment Retransmission Request message.

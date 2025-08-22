@@ -46,14 +46,20 @@ hopr:
     # in the given directory.
     force_initialize: false
   # Global configuration of Session management
-  # session:
-  # How many seconds it takes before Session is considered idle and is closed automatically
-  # idle_timeout: 120
-  # How many retries are made to establish an outgoing Session
-  # establish_max_retries: 3
-  # How many seconds to wait between retries to establish an outgoing Session
-  # Random jitter is always added to this value for each retry.
-  # establish_retry_timeout: 2
+  session:
+    # How many seconds it takes before Session is considered idle and is closed automatically
+    idle_timeout: 180
+    # Maximum number of outgoing or incoming Sessions allowed by the Session manager
+    maximum_sessions: 2048
+    # How many retries are made to establish an outgoing Session
+    establish_max_retries: 3
+    # How many seconds to wait between retries to establish an outgoing Session
+    # Random jitter is always added to this value for each retry.
+    establish_retry_timeout: 2
+    # Sampling interval for SURB balancer in ms
+    balancer_sampling_interval: 500
+    # Minimum runway of received SURBs in seconds
+    balancer_minimum_surb_buffer_duration: 5
   # Configuration of node's Safe
   safe_module:
     # Node's safe transaction provider
@@ -87,30 +93,6 @@ hopr:
         redeem_all_on_close: true
         # Sets the minimum value of a ticket to be able to redeem it.
         minimum_redeem_ticket_value: "0.09 wxHOPR"
-        #
-        ############################################
-        # - !Aggregating
-        # Strategy performing automatic ticket aggregation
-        # once the number of unredeemed tickets in a channel goes
-        # over the given threshold.
-        #
-        # Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
-        # in that channel when exceeded.
-        # This condition is independent of `unrealized_balance_ratio`.
-        #
-        # aggregation_threshold: 100
-        #
-        # Percentage of unrealized balance in unaggregated tickets in a channel
-        # that triggers the ticket aggregation when exceeded.
-        # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
-        # This condition is independent of `aggregation_threshold`.
-        # unrealized_balance_ratio: 0.9
-        # If set, the strategy will automatically aggregate tickets in channel that has transitioned
-        # to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
-        # or `unrealized_balance_ratio` thresholds are met on that channel.
-        # If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
-        #
-        # aggregate_on_channel_close: true
         #
         ############################################
         #
@@ -205,6 +187,10 @@ hopr:
     quality_step: 0.1
     # Size of the quality moving average window.
     quality_avg_window_size: 25
+    # Minimum score to add a node to the routing table
+    node_score_auto_path_threshold: 0.95
+    # Maximum latency for the first hop in ms
+    max_first_hop_latency_threshold: 250
     # Indicates how long (in seconds) a node is considered "ignored"
     ignore_timeframe: 120
     # Backoff exponent when probing nodes
