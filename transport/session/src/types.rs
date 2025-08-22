@@ -17,12 +17,12 @@ use hopr_primitive_types::{
     errors::GeneralError,
     prelude::{BytesRepresentable, ToHex},
 };
+use hopr_protocol_app::prelude::{ApplicationData, Tag};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
 };
 use hopr_protocol_start::StartProtocol;
-use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, instrument};
 
 use crate::{Capabilities, Capability, errors::TransportSessionError};

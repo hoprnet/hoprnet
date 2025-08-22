@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-packet"
-version = "0.11.0"
+version = "0.12.0"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"

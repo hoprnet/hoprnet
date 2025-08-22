@@ -49,6 +49,7 @@ pub struct NetworkConfig {
     #[default(node_score_auto_path_threshold())]
     pub node_score_auto_path_threshold: f64,
 
+    #[serde_as(as = "Option<serde_with::DurationMilliSeconds<u64>>")]
     #[serde(default = "max_first_hop_latency_threshold")]
     #[default(max_first_hop_latency_threshold())]
     pub max_first_hop_latency_threshold: Option<Duration>,

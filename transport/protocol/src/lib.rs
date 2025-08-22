@@ -81,9 +81,9 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
 use hopr_internal_types::{prelude::HoprPseudonym, protocol::Acknowledgement};
 use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_protocol_app::prelude::ApplicationData;
 use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
-use hopr_transport_packet::prelude::ApplicationData;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, error, trace, warn};
 
@@ -98,6 +98,7 @@ pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
+use hopr_protocol_app::v1::ApplicationFlags;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -280,6 +281,7 @@ where
                                         is_forwarded: false,
                                         data: data_clone.to_bytes().into_vec().into(),
                                         ack_challenge: v.ack_challenge.as_ref().into(),
+                                        signals: data_clone.flags.bits(),
                                         ticket: inspect_ticket_data_in_packet(&v.data).into(),
                                     }
                                     .into(),
@@ -466,6 +468,7 @@ where
                             sender,
                             plain_text,
                             ack_key,
+                            signals,
                             ..
                         } => {
                             // Send acknowledgement back
@@ -499,7 +502,7 @@ where
                                     let _ = capture_clone.try_send(captured_packet);
                                 }
 
-                                Some((sender, plain_text))
+                                Some((sender, plain_text, signals))
                         }
                         IncomingPacket::Forwarded {
                             previous_hop,
@@ -518,6 +521,7 @@ where
                                 is_forwarded: true,
                                 data: data.as_ref().into(),
                                 ack_challenge: Default::default(),
+                                signals: 0,
                                 ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
                             }.into();
 
@@ -566,11 +570,11 @@ where
                     }
                 }})
                 .filter_map(|maybe_data| async move {
-                    if let Some((sender, data)) = maybe_data {
+                    if let Some((sender, data, flags)) = maybe_data {
                         ApplicationData::from_bytes(data.as_ref())
                             .inspect_err(|error| tracing::error!(%error, "failed to decode application data"))
                             .ok()
-                            .map(|data| (sender, data))
+                            .map(|data| (sender, data.with_flags(ApplicationFlags::new_truncated(flags))))
                     } else {
                         None
                     }

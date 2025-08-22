@@ -17,9 +17,8 @@ use tracing::{Instrument, instrument};
 
 use crate::{
     errors::SessionError,
-    frames::{OrderedFrame, SeqIndicator},
     processing::{ReassemblerExt, SegmenterExt, SequencerExt, types::FrameInspector},
-    protocol::{SegmentRequest, SessionCodec, SessionMessage},
+    protocol::{OrderedFrame, SegmentRequest, SeqIndicator, SessionCodec, SessionMessage},
     socket::state::{SocketComponents, Stateless},
 };
 

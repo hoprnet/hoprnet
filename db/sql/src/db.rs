@@ -47,6 +47,9 @@ pub struct HoprDbConfig {
     #[default(10_000)]
     #[validate(range(min = MIN_SURB_RING_BUFFER_SIZE))]
     pub surb_ring_buffer_size: usize,
+    #[default(1000)]
+    #[validate(range(min = 2))]
+    pub surb_distress_threshold: usize,
 }
 
 #[cfg(feature = "sqlite")]

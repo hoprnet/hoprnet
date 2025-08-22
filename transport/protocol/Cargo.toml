@@ -48,9 +48,10 @@ hopr-metrics = { optional = true, workspace = true }
 hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-protocol-app = { workspace = true }
 hopr-transport-bloom = { workspace = true, features = ["persistent"] }
 hopr-transport-identity = { workspace = true }
-hopr-transport-packet = { workspace = true }
+
 
 [dev-dependencies]
 tokio = { workspace = true }

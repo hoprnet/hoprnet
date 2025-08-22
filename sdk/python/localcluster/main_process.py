@@ -25,6 +25,7 @@ random.seed(SEED)
 
 async def bringup(
     config: str,
+    size: Optional[int] = None,
     test_mode: bool = False,
     fully_connected: bool = False,
     use_nat: bool = False,
@@ -41,7 +42,7 @@ async def bringup(
         config = yaml.safe_load(f)
 
     cluster = Cluster(
-        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port
+        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port, size
     )
     anvil = Anvil(
         ANVIL_FOLDER.joinpath("anvil.log"),

@@ -241,6 +241,8 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_PACKET_PLANNER_CONCURRENCY` - maximum number of concurrently planned outgoing packets (default: `10`)
 - `HOPR_SESSION_MTU` - The maximum chunk of data that can be written to the Session's input buffer (default: 1500)
 - `HOPR_SESSION_FRAME_TIMEOUT_MS` - The maximum time (in milliseconds) for an incomplete frame to stay in the Session's output buffer (default: 800 ms)
+- `HOPR_PROTOCOL_SURB_RB_SIZE` - size of the SURB ring buffer (default: 10 000)
+- `HOPR_PROTOCOL_SURB_RB_DISTRESS` - threshold since number of SURBs in the ring buffer triggers a distress packet signal (default: 1000)
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
 - `HOPRD_SESSION_ENTRY_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Entry node (defaults to number of CPU cores)
 - `HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Exit node (defaults to number of CPU cores)
