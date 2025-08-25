@@ -5,6 +5,7 @@ pub mod errors;
 /// Implements [ChainKeypair](keypairs::ChainKeypair) and [OffchainKeypair](keypairs::OffchainKeypair),
 /// the important representations of chain key and packet key.
 pub mod keypairs;
+pub mod lioness;
 /// Re-exports of low-level cryptographic primitives.
 pub mod primitives;
 /// Enables randomized encryption (sealing)

@@ -1690,6 +1690,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "constant_time_eq",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -4623,7 +4624,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "aes",
  "anyhow",
