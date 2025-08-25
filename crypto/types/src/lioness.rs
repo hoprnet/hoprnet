@@ -243,6 +243,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use hex_literal::hex;
     use typenum::{U33, U1024};
 
     use super::*;
@@ -276,6 +277,28 @@ mod tests {
 
         lioness.decrypt_block((&mut data).into());
         assert_eq!(data, data_clone);
+    }
+
+    #[test]
+    fn lioness_forward_kat() {
+        let lioness = LionessBlake3ChaCha20::<U33>::new(&Default::default(), &Default::default());
+
+        let mut data = GenericArray::<u8, U33>::default();
+
+        lioness.encrypt_block((&mut data).into());
+        let ka = hex!("0ea63b3ae3b4abc59d9f6fa885e656f770d9e901525d2d9e20108d29ca07c0ceb6");
+        assert_eq!(data.as_slice(), &ka);
+    }
+
+    #[test]
+    fn lioness_inverse_kat() {
+        let lioness = LionessBlake3ChaCha20::<U33>::new(&Default::default(), &Default::default());
+
+        let mut data = GenericArray::<u8, U33>::default();
+
+        lioness.decrypt_block((&mut data).into());
+        let ka = hex!("54d7e0222501f9c5f3ff91bed711d67e07665afba6053d5cad2e50a9cbe87e6a8e");
+        assert_eq!(data.as_slice(), &ka);
     }
 
     #[test]
