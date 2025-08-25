@@ -8,6 +8,7 @@ use std::{fmt::Formatter, marker::PhantomData, ops::Sub};
 use cipher::{AlgorithmName, ArrayLength, Block, BlockSizeUser, Iv, IvSizeUser, Key, KeyIvInit, KeySizeUser, StreamCipher, generic_array::GenericArray, inout::InOut};
 use digest::{Digest, OutputSizeUser};
 use typenum::{B1, IsEqual, IsGreater, Unsigned};
+use crate::crypto_traits::PRP;
 
 /// Implementation of [Lioness wide-block cipher](https://www.cl.cam.ac.uk/archive/rja14/Papers/bear-lion.pdf) over a [`Digest`] and a [`StreamCipher`].
 ///
@@ -246,6 +247,32 @@ where
 
 /// Type-alias for Lioness wide-block cipher instantiated using Blake3 cryptographic hash function and ChaCha20 stream cipher.
 pub type LionessBlake3ChaCha20<B> = Lioness<blake3::Hasher, chacha20::ChaCha20, B>;
+
+impl<H: Digest, S: StreamCipher + KeyIvInit, B: ArrayLength<u8>> PRP for Lioness<H, S, B>
+where
+    // OutputSize of the digest must be equal to the KeySize of the stream cipher
+    H::OutputSize: IsEqual<<S as KeySizeUser>::KeySize, Output = B1>,
+    // BlockSize must be greater or equal to the KeySize of the stream cipher
+    B: IsGreater<<S as KeySizeUser>::KeySize, Output = B1> + Sub<<S as KeySizeUser>::KeySize>,
+    // The difference of BlockSize minus KeySize must be an array length
+    <B as Sub<<S as KeySizeUser>::KeySize>>::Output: ArrayLength<u8>,
+    // OutputSize must allow multiplication by U4
+    H::OutputSize: std::ops::Mul<cipher::consts::U4>,
+    // IvSize must allow multiplication by U2
+    <S as IvSizeUser>::IvSize: std::ops::Mul<cipher::consts::U2>,
+    // The product of OutputSize and U4 must be an array length
+    <H::OutputSize as std::ops::Mul<cipher::consts::U4>>::Output: ArrayLength<u8>,
+    // The product of IvSize with U2 must be an array length
+    <<S as IvSizeUser>::IvSize as std::ops::Mul<cipher::consts::U2>>::Output: ArrayLength<u8>,
+{
+    fn forward(&self, data: &mut Block<Self>) {
+        self.encrypt_block(data.into());
+    }
+
+    fn inverse(&self, data: &mut Block<Self>) {
+        self.decrypt_block(data.into());
+    }
+}
 
 #[cfg(test)]
 mod tests {
