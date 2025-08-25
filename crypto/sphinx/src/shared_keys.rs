@@ -153,7 +153,7 @@ pub trait SphinxSuite {
     type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
 
     /// Pseudo-Random Permutation used to encrypt and decrypt packet payload
-    type PRP: crypto_traits::StreamCipher + crypto_traits::KeyIvInit;
+    type PRP: crypto_traits::PRP + crypto_traits::KeyIvInit;
 
     /// Convenience function to generate shared keys from the path of public keys.
     fn new_shared_keys(
