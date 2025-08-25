@@ -19,6 +19,7 @@ use crate::crypto_traits::PRP;
 /// ## Requirements
 /// - the output size of the `Digest` must match the key size of the `StreamCipher`.
 /// - the block size `B` can be arbitrary but must be strictly greater than the key size of the `StreamCipher`.
+/// - However, for cryptographic security, `B` must be at least twice the key size of the `StreamCipher`.
 ///
 /// The key size of the Lioness cipher is 4-times the size of `StreamCipher`'s
 /// key.
