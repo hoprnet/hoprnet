@@ -167,7 +167,7 @@ impl From<AffinePoint> for CurvePoint {
         Self {
             affine,
             compressed: affine.to_encoded_point(true),
-            uncompressed: OnceLock::new(),
+            uncompressed: OnceLock::from(affine.to_encoded_point(false)),
         }
     }
 }

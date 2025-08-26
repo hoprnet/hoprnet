@@ -61,3 +61,7 @@ harness = false
 [[bench]]
 name = "por_benches"
 harness = false
+
+[[bench]]
+name = "validation_bench"
+harness = false
