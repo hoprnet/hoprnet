@@ -42,7 +42,7 @@ local start_fields = {
     init_ad_data = ProtoField.uint32("hopr_start.init.additional_data", "Additional data", base.HEX),
 
     flags = ProtoField.uint8("hopr_start.keep_alive.flags", "Flags", base.HEX),
-    ka_additional_data = ProtoField.uint32("hopr_start.keep_alive.additional_data", "Additional data", base.HEX),
+    ka_additional_data = ProtoField.uint64("hopr_start.keep_alive.additional_data", "Additional data", base.HEX),
     err_reason = ProtoField.uint8("hopr_start.error.reason", "Error reason", base.HEX, start_error_reasons)
 }
 
@@ -129,10 +129,10 @@ local function dissect_hopr_start(buffer, pinfo, tree)
         local ka_subtree = subtree:add("Keep-Alive")
         ka_subtree:add(start_fields.flags, buffer(offset, 1):uint())
         offset = offset + 1
-        ka_subtree:add(start_fields.ka_additional_data, buffer(offset, 4):uint())
-        offset = offset + 4
+        ka_subtree:add(start_fields.ka_additional_data, buffer(offset, 8):uint64())
+        offset = offset + 8
         ka_subtree:add(start_fields.session_id, buffer(offset))
-        offset = offset + len - 5
+        offset = offset + len - 9
     else
         subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unknown Start protocol message" )
         offset = offset + len
