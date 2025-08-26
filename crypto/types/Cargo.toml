@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-types"
-version = "0.2.1"
+version = "0.3.0"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
 
@@ -17,7 +17,7 @@ serde = [
 
 [dependencies]
 aes = "0.8.4"
-blake3 = "1.8.2"
+blake3 = { version = "1.8.2", features = ["traits-preview"] }
 cipher = "0.4.4"
 chacha20 = "0.9.1"
 crypto_box = { version = "0.9.1", features = ["seal"] }
@@ -46,8 +46,13 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
+
+[[bench]]
+name = "lioness_bench"
+harness = false

@@ -5,6 +5,7 @@ pub mod errors;
 /// Implements [ChainKeypair](keypairs::ChainKeypair) and [OffchainKeypair](keypairs::OffchainKeypair),
 /// the important representations of chain key and packet key.
 pub mod keypairs;
+pub mod lioness;
 /// Re-exports of low-level cryptographic primitives.
 pub mod primitives;
 /// Enables randomized encryption (sealing)
@@ -21,11 +22,19 @@ pub mod vrf;
 /// Re-exports from the generic cryptographic traits.
 pub mod crypto_traits {
     pub use cipher::{
-        BlockSizeUser, Iv, IvSizeUser, Key, KeyInit, KeyIvInit, KeySizeUser, StreamCipher, StreamCipherSeek,
+        Block, BlockSizeUser, Iv, IvSizeUser, Key, KeyInit, KeyIvInit, KeySizeUser, StreamCipher, StreamCipherSeek,
     };
     pub use digest::{Digest, FixedOutput, FixedOutputReset, Output, OutputSizeUser, Update};
     pub use hopr_crypto_random::Randomizable;
     pub use poly1305::universal_hash::UniversalHash;
+
+    /// Pseudo-random permutation (PRP)
+    pub trait PRP: BlockSizeUser {
+        /// Forward permutation
+        fn forward(&self, data: &mut Block<Self>);
+        /// Inverse permutation
+        fn inverse(&self, data: &mut Block<Self>);
+    }
 }
 
 #[doc(hidden)]

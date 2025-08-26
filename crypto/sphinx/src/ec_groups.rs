@@ -120,7 +120,7 @@ impl SphinxSuite for Secp256k1Suite {
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
     type P = hopr_crypto_types::keypairs::ChainKeypair;
-    type PRP = hopr_crypto_types::primitives::ChaCha20;
+    type PRP = hopr_crypto_types::lioness::LionessBlake3ChaCha20<typenum::U1022>;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
@@ -134,7 +134,7 @@ impl SphinxSuite for Ed25519Suite {
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
     type P = hopr_crypto_types::keypairs::OffchainKeypair;
-    type PRP = hopr_crypto_types::primitives::ChaCha20;
+    type PRP = hopr_crypto_types::lioness::LionessBlake3ChaCha20<typenum::U1022>;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
@@ -148,7 +148,7 @@ impl SphinxSuite for X25519Suite {
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
     type P = hopr_crypto_types::keypairs::OffchainKeypair;
-    type PRP = hopr_crypto_types::primitives::ChaCha20;
+    type PRP = hopr_crypto_types::lioness::LionessBlake3ChaCha20<typenum::U1022>;
 }
 
 #[cfg(test)]
