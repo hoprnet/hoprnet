@@ -1690,6 +1690,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "constant_time_eq",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -4599,7 +4600,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4623,13 +4624,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "aes",
  "anyhow",
  "blake3",
  "chacha20",
  "cipher",
+ "criterion",
  "crypto_box",
  "ctr",
  "curve25519-dalek",
