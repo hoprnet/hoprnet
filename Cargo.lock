@@ -4631,6 +4631,7 @@ dependencies = [
  "blake3",
  "chacha20",
  "cipher",
+ "criterion",
  "crypto_box",
  "ctr",
  "curve25519-dalek",
