@@ -935,7 +935,7 @@ impl AcknowledgedTicket {
         chain_keypair: &ChainKeypair,
         domain_separator: &Hash,
     ) -> crate::errors::Result<RedeemableTicket> {
-        // This function must be called by ticket recipient and not the issuer
+        // This function must be called by the ticket recipient and not the issuer
         if chain_keypair.public().to_address().eq(self.ticket.verified_issuer()) {
             return Err(errors::CoreTypesError::LoopbackTicket);
         }

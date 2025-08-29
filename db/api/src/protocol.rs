@@ -37,7 +37,7 @@ pub trait HoprDbProtocolOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()>;
+    async fn handle_acknowledgement(&self, ack: VerifiedAcknowledgement) -> Result<()>;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
     async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
@@ -93,13 +93,13 @@ pub enum IncomingPacket {
         previous_hop: OffchainPublicKey,
         next_hop: OffchainPublicKey,
         data: Box<[u8]>,
-        ack: Acknowledgement,
+        ack: VerifiedAcknowledgement,
     },
     /// The packet contains an acknowledgement of a delivered packet.
     Acknowledgement {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
-        ack: Acknowledgement,
+        ack: VerifiedAcknowledgement,
     },
 }
 
@@ -121,7 +121,7 @@ impl std::fmt::Debug for OutgoingPacket {
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum ResolvedAcknowledgement {
-    Sending(Acknowledgement),
+    Sending(VerifiedAcknowledgement),
     RelayingWin(AcknowledgedTicket),
     RelayingLoss(Hash),
 }

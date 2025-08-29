@@ -135,7 +135,9 @@ impl HoprDb {
             .unacked_tickets
             .insert(
                 fwd.outgoing.ack_challenge,
-                PendingAcknowledgement::WaitingAsRelayer(verified_incoming_ticket.into_unacknowledged(fwd.own_key)),
+                PendingAcknowledgement::WaitingAsRelayer(
+                    verified_incoming_ticket.into_unacknowledged(fwd.own_key).into(),
+                ),
             )
             .await;
 
@@ -177,17 +179,17 @@ impl HoprDb {
     }
 
     #[instrument(level = "trace", skip(self, ack), err)]
-    async fn validate_acknowledgement(
+    async fn find_ticket_to_acknowledge(
         &self,
-        ack: &Acknowledgement,
+        ack: &VerifiedAcknowledgement,
     ) -> std::result::Result<ResolvedAcknowledgement, DbSqlError> {
-        // TODO: bottleneck - must be called via spawn_fifo
-        let challenge = ack.ack_challenge()?;
+        let ack_half_key = *ack.ack_key_share();
+        let challenge = hopr_parallelize::cpu::spawn_blocking(move || ack_half_key.to_challenge()).await;
 
         let pending_ack = self.caches.unacked_tickets.remove(&challenge).await.ok_or_else(|| {
             DbSqlError::AcknowledgementValidationError(format!(
                 "received unexpected acknowledgement for half key challenge {}",
-                ack.to_hex()
+                ack.ack_key_share().to_hex()
             ))
         })?;
 
@@ -219,7 +221,7 @@ impl HoprDb {
                         // solves the challenge on the ticket. It must be done before we
                         // check that the ticket is winning, which is a lengthy operation
                         // and should not be done for bogus unacknowledged tickets
-                        let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share()?)?;
+                        let ack_ticket = unacknowledged.acknowledge(ack.ack_key_share())?;
 
                         if ack_ticket.is_winning(&myself.chain_key, &domain_separator) {
                             trace!("Found a winning ticket");
@@ -246,8 +248,8 @@ impl HoprDb {
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self, ack), err(Debug), ret)]
-    async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()> {
-        let result = self.validate_acknowledgement(&ack).await?;
+    async fn handle_acknowledgement(&self, ack: VerifiedAcknowledgement) -> Result<()> {
+        let result = self.find_ticket_to_acknowledge(&ack).await?;
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
                 // If the ticket was a win, store it
@@ -571,15 +573,17 @@ impl HoprDbProtocolOperations for HoprDb {
                             .try_into()
                             .map_err(|_| DbSqlError::DecodingError)?;
 
-                        // TODO: bottleneck - ack.validate must be called via spawn_fifo
-                        let ack = ack.validate(&incoming.previous_hop).map_err(|error| {
-                            tracing::error!(%error, "failed to validate the acknowledgement");
+                        let prev_hop = incoming.previous_hop;
+                        let ack = spawn_fifo_blocking(move || ack.verify(&prev_hop))
+                            .await
+                            .map_err(|error| {
+                                tracing::error!(%error, "failed to validate the acknowledgement");
 
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_RECEIVED_ACKS.increment(&["false"]);
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                METRIC_RECEIVED_ACKS.increment(&["false"]);
 
-                            DbSqlError::AcknowledgementValidationError(error.to_string())
-                        })?;
+                                DbSqlError::AcknowledgementValidationError(error.to_string())
+                            })?;
 
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement {
@@ -616,8 +620,10 @@ impl HoprDbProtocolOperations for HoprDb {
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        // TODO: bottleneck - ack.new must be called via spawn_fifo
-                        let ack = Acknowledgement::new(fwd.ack_key, pkt_keypair);
+                        let keypair_clone = pkt_keypair.clone();
+                        let ack =
+                            spawn_fifo_blocking(move || VerifiedAcknowledgement::new(fwd.ack_key, &keypair_clone))
+                                .await;
 
                         Ok(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,

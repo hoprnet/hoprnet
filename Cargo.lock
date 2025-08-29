@@ -5246,6 +5246,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-parallelize",
  "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",

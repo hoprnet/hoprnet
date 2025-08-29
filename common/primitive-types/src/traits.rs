@@ -56,7 +56,7 @@ pub trait BytesRepresentable<E = GeneralError>: AsRef<[u8]> + for<'a> TryFrom<&'
     /// Convenience function to copy this type's binary representation into a Box.
     #[inline]
     fn into_boxed(self) -> Box<[u8]> {
-        self.as_ref().to_vec().into_boxed_slice()
+        self.as_ref().into()
     }
 }
 

@@ -155,7 +155,7 @@ impl PartialEq for Signature {
 impl Eq for Signature {}
 
 /// Represents an EdDSA signature using the Ed25519 Edwards curve.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OffchainSignature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 

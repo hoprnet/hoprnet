@@ -4,7 +4,7 @@ use futures::{StreamExt, pin_mut};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::prelude::IncomingPacket;
-use hopr_internal_types::prelude::Acknowledgement;
+use hopr_internal_types::prelude::VerifiedAcknowledgement;
 use pcap_file::{
     DataLink,
     pcapng::{
@@ -161,7 +161,7 @@ pub enum PacketBeforeTransit<'a> {
     OutgoingAck {
         me: OffchainPublicKey,
         next_hop: OffchainPublicKey,
-        ack: Acknowledgement,
+        ack: VerifiedAcknowledgement,
         is_random: bool,
     },
     IncomingPacket {
@@ -317,7 +317,7 @@ mod tests {
         prelude::{ChainKeypair, Keypair, OffchainKeypair, SimplePseudonym},
         types::{HalfKey, Hash},
     };
-    use hopr_internal_types::prelude::{Acknowledgement, HoprPseudonym, TicketBuilder, WinningProbability};
+    use hopr_internal_types::prelude::{HoprPseudonym, TicketBuilder, VerifiedAcknowledgement, WinningProbability};
     use hopr_network_types::types::SealedHost;
     use hopr_primitive_types::{primitives::EthereumChallenge, traits::BytesEncodable};
     use hopr_protocol_app::prelude::ApplicationData;
@@ -472,7 +472,7 @@ mod tests {
         let packet = IncomingPacket::Acknowledgement {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *kp.public(),
-            ack: Acknowledgement::random(&kp),
+            ack: VerifiedAcknowledgement::random(&kp),
         };
 
         let _ = pcap
@@ -491,7 +491,7 @@ mod tests {
             previous_hop: *OffchainKeypair::random().public(),
             next_hop: *OffchainKeypair::random().public(),
             data: Box::new([0x08]),
-            ack: Acknowledgement::random(&OffchainKeypair::random()),
+            ack: VerifiedAcknowledgement::random(&OffchainKeypair::random()),
         };
 
         let _ = pcap
@@ -682,7 +682,7 @@ mod tests {
         let packet = PacketBeforeTransit::OutgoingAck {
             me,
             next_hop: *kp.public(),
-            ack: Acknowledgement::random(&kp),
+            ack: VerifiedAcknowledgement::random(&kp),
             is_random: false,
         };
 
@@ -691,7 +691,7 @@ mod tests {
         let packet = PacketBeforeTransit::OutgoingAck {
             me,
             next_hop: *kp.public(),
-            ack: Acknowledgement::random(&kp),
+            ack: VerifiedAcknowledgement::random(&kp),
             is_random: true,
         };
 
