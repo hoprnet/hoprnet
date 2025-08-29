@@ -244,7 +244,7 @@ pub(crate) fn check_ticket_win(
     computed_ticket_luck[1..].copy_from_slice(
         &Hash::create(&[
             ticket_hash.as_ref(),
-            &vrf_params.V.as_uncompressed().as_bytes()[1..], // skip prefix
+            &vrf_params.get_v_encoded_point().as_bytes()[1..], // skip prefix
             response.as_ref(),
             ticket_signature.as_ref(),
         ])
@@ -447,7 +447,7 @@ impl TicketBuilder {
     /// the given hash.
     pub fn build_verified(self, hash: Hash) -> errors::Result<VerifiedTicket> {
         if let Some(signature) = self.signature {
-            let issuer = PublicKey::from_signature_hash(hash.as_ref(), &signature)?.to_address();
+            let issuer = signature.recover_from_hash(hash.as_ref())?.to_address();
             Ok(VerifiedTicket(self.build()?, hash, issuer))
         } else {
             Err(InvalidInputData("signature is missing".into()))
@@ -616,7 +616,7 @@ impl Ticket {
         let ticket_hash = self.get_hash(domain_separator);
 
         if let Some(signature) = &self.signature {
-            match PublicKey::from_signature_hash(ticket_hash.as_ref(), signature) {
+            match signature.recover_from_hash(ticket_hash.as_ref()) {
                 Ok(pk) if pk.to_address().eq(issuer) => Ok(VerifiedTicket(self, ticket_hash, *issuer)),
                 Err(e) => {
                     error!("failed to verify ticket signature: {e}");
@@ -859,7 +859,7 @@ impl UnacknowledgedTicket {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
         debug!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
 
-        if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
+        if self.ticket.verified_ticket().challenge == response.to_challenge().to_ethereum_challenge() {
             Ok(self.ticket.into_acknowledged(response))
         } else {
             Err(CryptoError::InvalidChallenge.into())
@@ -1101,7 +1101,7 @@ pub mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
-        types::{Challenge, CurvePoint, HalfKey, Hash, Response},
+        types::{HalfKey, Hash, Response},
     };
     use hopr_primitive_types::{
         prelude::UnitaryFloatOps,
@@ -1326,16 +1326,14 @@ pub mod tests {
 
         let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())?;
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge();
 
         let dst = Hash::default();
         let ack = mock_ticket(
             &ALICE,
             &BOB.public().to_address(),
             Some(dst),
-            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
+            Some(challenge.to_ethereum_challenge()),
         )?
         .into_unacknowledged(hk1)
         .acknowledge(&hk2)?;
@@ -1356,7 +1354,7 @@ pub mod tests {
             &ALICE,
             &BOB.public().to_address(),
             Some(dst),
-            Some(response.to_challenge().into()),
+            Some(response.to_challenge().to_ethereum_challenge()),
         )?;
 
         let acked_ticket = ticket.into_acknowledged(response);

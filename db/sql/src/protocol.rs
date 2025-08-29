@@ -184,17 +184,12 @@ impl HoprDb {
         // TODO: bottleneck - must be called via spawn_fifo
         let challenge = ack.ack_challenge()?;
 
-        let pending_ack = self
-            .caches
-            .unacked_tickets
-            .remove(&challenge)
-            .await
-            .ok_or_else(|| {
-                DbSqlError::AcknowledgementValidationError(format!(
-                    "received unexpected acknowledgement for half key challenge {}",
-                    ack.to_hex()
-                ))
-            })?;
+        let pending_ack = self.caches.unacked_tickets.remove(&challenge).await.ok_or_else(|| {
+            DbSqlError::AcknowledgementValidationError(format!(
+                "received unexpected acknowledgement for half key challenge {}",
+                ack.to_hex()
+            ))
+        })?;
 
         match pending_ack {
             PendingAcknowledgement::WaitingAsSender => {
@@ -577,18 +572,20 @@ impl HoprDbProtocolOperations for HoprDb {
                             .map_err(|_| DbSqlError::DecodingError)?;
 
                         // TODO: bottleneck - ack.validate must be called via spawn_fifo
-                        let Ok(ack) = ack.validate(&incoming.previous_hop) else {
-                            tracing::error!("failed to validate the acknowledgement");
+                        let ack = ack.validate(&incoming.previous_hop).map_err(|error| {
+                            tracing::error!(%error, "failed to validate the acknowledgement");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_RECEIVED_ACKS.increment(&["false"]);
-                        };
+
+                            DbSqlError::AcknowledgementValidationError(error.to_string())
+                        })?;
 
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement {
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
-                            ack
+                            ack,
                         }
                     }
                     Some(ack_key) => IncomingPacket::Final {

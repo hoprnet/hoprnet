@@ -359,16 +359,14 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge();
 
         let ticket = TicketBuilder::default()
             .direction(&BOB.public().to_address(), &ALICE.public().to_address())
             .amount(TICKET_VALUE)
             .index(index as u64)
             .channel_epoch(4)
-            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .challenge(challenge.to_ethereum_challenge())
             .build_signed(&BOB, &Hash::default())?;
 
         Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))

@@ -224,9 +224,7 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge();
 
         Ok(TicketBuilder::default()
             .addresses(&*BOB, &*ALICE)
@@ -235,7 +233,7 @@ mod tests {
             .index_offset(idx_offset)
             .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(4)
-            .challenge(Challenge::from(cp_sum).into())
+            .challenge(challenge.to_ethereum_challenge())
             .build_signed(&BOB, &Hash::default())?
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }

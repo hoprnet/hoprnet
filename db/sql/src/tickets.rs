@@ -1370,10 +1370,7 @@ mod tests {
     ) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
-
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge();
 
         Ok(TicketBuilder::default()
             .addresses(src, dst)
@@ -1382,7 +1379,7 @@ mod tests {
             .index_offset(index_offset)
             .win_prob(win_prob.try_into()?)
             .channel_epoch(4)
-            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .challenge(challenge.to_ethereum_challenge())
             .build_signed(src, &Hash::default())?
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
@@ -3343,7 +3340,7 @@ mod tests {
         let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random())?;
         tickets[1] = TicketBuilder::from(tickets[1].ticket.clone())
             .win_prob(0.0.try_into()?)
-            .challenge(resp.to_challenge().into())
+            .challenge(resp.to_challenge().to_ethereum_challenge())
             .build_signed(&BOB, &Hash::default())?
             .into_acknowledged(resp)
             .into_transferable(&ALICE, &Hash::default())?;

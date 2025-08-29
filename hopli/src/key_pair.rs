@@ -479,7 +479,7 @@ impl IdentityFileArgs {
             // read all the identities from the directory
             Ok(read_identities(files, &pwd)?
                 .values()
-                .map(|ni| ni.chain_key.public().0.to_address())
+                .map(|ni| ni.chain_key.public().to_address())
                 .collect())
         } else {
             Ok(Vec::<Address>::new())
@@ -541,8 +541,8 @@ mod tests {
 
         let read_id = read_identity(files[0].as_path(), pwd)?;
         assert_eq!(
-            read_id.1.chain_key.public().0.to_address(),
-            created_id.chain_key.public().0.to_address()
+            read_id.1.chain_key.public().to_address(),
+            created_id.chain_key.public().to_address()
         );
         Ok(())
     }
@@ -559,14 +559,14 @@ mod tests {
         // created and the read id is identical
         let files = get_files(path, &None);
         assert_eq!(files.len(), 1, "must have one identity file");
-        let address = created_id.chain_key.public().0.to_address();
+        let address = created_id.chain_key.public().to_address();
 
         let new_pwd = "supersecured";
         let (_, returned_key) = update_identity_password(created_id, files[0].as_path(), new_pwd)?;
 
         // check the returned value
         assert_eq!(
-            returned_key.chain_key.public().0.to_address(),
+            returned_key.chain_key.public().to_address(),
             address,
             "returned keys are identical"
         );
@@ -574,7 +574,7 @@ mod tests {
         // check the read value
         let (_, read_id) = read_identity(files[0].as_path(), new_pwd)?;
         assert_eq!(
-            read_id.chain_key.public().0.to_address(),
+            read_id.chain_key.public().to_address(),
             address,
             "cannot use the new password to read files"
         );
@@ -595,8 +595,8 @@ mod tests {
         let read_id = read_identities(files, pwd)?;
         assert_eq!(read_id.len(), 1);
         assert_eq!(
-            read_id.values().next().unwrap().chain_key.public().0.to_address(),
-            created_id.chain_key.public().0.to_address()
+            read_id.values().next().unwrap().chain_key.public().to_address(),
+            created_id.chain_key.public().to_address()
         );
 
         // print the read id
@@ -709,14 +709,7 @@ mod tests {
         let val = read_identities(files, pwd)?;
         assert_eq!(val.len(), 1);
         assert_eq!(
-            val.values()
-                .next()
-                .unwrap()
-                .chain_key
-                .public()
-                .0
-                .to_address()
-                .to_string(),
+            val.values().next().unwrap().chain_key.public().to_address().to_string(),
             alice_address
         );
         Ok(())

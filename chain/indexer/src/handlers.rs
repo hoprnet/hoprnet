@@ -21,11 +21,7 @@ use hopr_chain_types::{
     ContractAddresses,
     chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent},
 };
-use hopr_crypto_types::{
-    keypairs::ChainKeypair,
-    prelude::{Hash, Keypair},
-    types::OffchainSignature,
-};
+use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{
     HoprDbAllOperations, OpenTransaction,
     api::{info::DomainSeparator, tickets::TicketSelector},
@@ -2706,7 +2702,7 @@ mod tests {
             .index_offset(1)
             .win_prob(win_prob.try_into()?)
             .channel_epoch(1)
-            .challenge(response.to_challenge().into())
+            .challenge(response.to_challenge().to_ethereum_challenge())
             .build_signed(signer, &domain_separator)?
             .into_acknowledged(response))
     }

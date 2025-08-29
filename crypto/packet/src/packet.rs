@@ -542,7 +542,7 @@ mod tests {
             "return hops must be between 1 and 3"
         );
 
-        let ticket = mock_ticket(&PEERS[1].0.public().0, forward_hops + 1, &PEERS[0].0)?;
+        let ticket = mock_ticket(&PEERS[1].0.public(), forward_hops + 1, &PEERS[0].0)?;
         let forward_path = TransportPath::new(PEERS[1..=forward_hops + 1].iter().map(|kp| *kp.1.public()))?;
 
         let return_paths = return_hops
@@ -575,7 +575,7 @@ mod tests {
         assert!((1..=4).contains(&sender_node), "sender_node must be between 1 and 4");
 
         let ticket = mock_ticket(
-            &PEERS[sender_node - 1].0.public().0,
+            &PEERS[sender_node - 1].0.public(),
             surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
             &PEERS[sender_node].0,
         )?;
@@ -619,10 +619,10 @@ mod tests {
             HoprPacket::Final(_) => Ok(packet),
             HoprPacket::Forwarded(_) => {
                 let next_hop = match (node_pos, is_reply) {
-                    (3, false) => PEERS[4].0.public().0.clone(),
-                    (_, false) => PEERS[node_pos + 1].0.public().0.clone(),
-                    (1, true) => PEERS[0].0.public().0.clone(),
-                    (_, true) => PEERS[node_pos - 1].0.public().0.clone(),
+                    (3, false) => PEERS[4].0.public().clone(),
+                    (_, false) => PEERS[node_pos + 1].0.public().clone(),
+                    (1, true) => PEERS[0].0.public().clone(),
+                    (_, true) => PEERS[node_pos - 1].0.public().clone(),
                 };
 
                 let next_ticket = mock_ticket(&next_hop, path_len, &PEERS[node_pos].0)?;
