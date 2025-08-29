@@ -138,6 +138,7 @@ where
     pub(crate) async fn resolve_routing(
         &self,
         size_hint: usize,
+        max_surbs: Option<usize>,
         routing: DestinationRouting,
     ) -> crate::errors::Result<(ResolvedTransportRouting, Option<usize>)> {
         match routing {
@@ -150,7 +151,8 @@ where
                 let forward_path = self.resolve_path(self.me, destination, forward_options).await?;
 
                 let return_paths = if let Some(return_options) = return_options {
-                    let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint);
+                    let num_possible_surbs =
+                        HoprPacket::max_surbs_with_message(size_hint).min(max_surbs.unwrap_or(usize::MAX));
                     trace!(%destination, %num_possible_surbs, data_len = size_hint, "resolving packet return paths");
 
                     (0..num_possible_surbs)
@@ -211,7 +213,16 @@ where
         let planner = planner.clone();
         let packet_sender = packet_sender.clone();
         async move {
-            match planner.resolve_routing(data.len(), routing).await {
+            // If SURB production reduce flags have been set, indicate the maximum number of SURBs to generate
+            let max_surbs = if data.flags.contains(ApplicationFlag::NoSurbs) {
+                Some(0)
+            } else if data.flags.contains(ApplicationFlag::ReduceSurbs) {
+                Some(HoprPacket::max_surbs_with_message(data.len()) / 2)
+            } else {
+                None
+            };
+
+            match planner.resolve_routing(data.len(), max_surbs, routing).await {
                 Ok((resolved, rem_surbs)) => {
                     // Set the SURB distress/out-of-SURBs flag if applicable.
                     // These flags are translated into HOPR protocol packet signals.

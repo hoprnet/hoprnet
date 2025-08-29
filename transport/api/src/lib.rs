@@ -708,7 +708,11 @@ where
         }
 
         let app_data = ApplicationData::new_from_owned(tag, msg);
-        let routing = self.path_planner.resolve_routing(app_data.len(), routing).await?.0;
+        let routing = self
+            .path_planner
+            .resolve_routing(app_data.len(), None, routing)
+            .await?
+            .0;
 
         // Here we do not use msg_sender directly,
         // since it internally follows Session-oriented logic

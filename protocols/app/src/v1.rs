@@ -132,6 +132,12 @@ flagset::flags! {
     #[repr(u8)]
     #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
    pub enum ApplicationFlag: u8 {
+        /// Tells the HOPR protocol layer that it should reduce the number of SURBs it produces.
+        ReduceSurbs = 0b0001_0000,
+        /// Tells the HOPR protocol layer that it should not produce any SURBs with this packet.
+        ///
+        /// Implies [`ReduceSurbs`]
+        NoSurbs = 0b0011_0000,
         /// The other party is in a "SURB distress" state, potentially running out of SURBs soon.
         SurbDistress = 0b0000_0001,
         /// The other party has run out of SURBs, and this was potentially the last message they could
