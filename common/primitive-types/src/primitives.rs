@@ -146,13 +146,6 @@ impl From<Address> for alloy::primitives::Address {
 /// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.
 #[derive(Clone, Copy, Eq, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct EthereumChallenge(pub Address);
-
-impl EthereumChallenge {
-    pub fn new(data: &[u8]) -> Self {
-        Self(Address::new(data))
-    }
-}
-
 impl AsRef<[u8]> for EthereumChallenge {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()

@@ -59,7 +59,7 @@ impl ProofOfRelayValues {
     /// Returns the complete challenge that is present on the ticket corresponding to the
     /// packet.
     pub fn ticket_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&self.0[1 + HalfKeyChallenge::SIZE..])
+        EthereumChallenge(Address::new(&self.0[1 + HalfKeyChallenge::SIZE..]))
     }
 }
 
@@ -152,7 +152,7 @@ impl ProofOfRelayString {
 
     /// Challenge that must be printed on the ticket for the next downstream node.
     pub fn next_ticket_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&self.0[0..EthereumChallenge::SIZE])
+        EthereumChallenge(Address::new(&self.0[0..EthereumChallenge::SIZE]))
     }
 
     /// Proof of Relay hint value for this node. In case this node is a sender

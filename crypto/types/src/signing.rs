@@ -23,9 +23,8 @@ use crate::prelude::*;
 pub struct Signature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Signature {
-    pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
-        let mut ret = Self([0u8; Self::SIZE]);
-        ret.0.copy_from_slice(raw_bytes);
+    fn new(raw_bytes: [u8; Self::SIZE], recovery: u8) -> Signature {
+        let mut ret = Self(raw_bytes);
 
         // Embed the parity recovery bit into the S value
         let parity = recovery & 0x01;
@@ -42,7 +41,7 @@ impl Signature {
         let key = SigningKey::from_bytes(private_key.into()).expect("invalid signing key");
         let (sig, rec) = signing_method(&key, data).expect("signing failed");
 
-        Self::new(&sig.to_vec(), rec.to_byte())
+        Self::new(sig.to_bytes().into(), rec.to_byte())
     }
 
     /// Signs the given message using the chain private key.
@@ -116,11 +115,13 @@ impl Signature {
         Err(CryptoError::CalculationError)
     }
 
+    /// Recovers signer public key if this signature is a valid signature of the given `msg`.
     #[inline]
     pub fn recover_from_msg(&self, msg: &[u8]) -> crate::errors::Result<PublicKey> {
         self.recover(msg, VerifyingKey::recover_from_msg)
     }
 
+    /// Recovers signer public key if this signature is a valid signature of the given `hash`.
     #[inline]
     pub fn recover_from_hash(&self, hash: &[u8]) -> crate::errors::Result<PublicKey> {
         self.recover(hash, VerifyingKey::recover_from_prehash)

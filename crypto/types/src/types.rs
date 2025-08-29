@@ -135,7 +135,8 @@ impl HalfKey {
     ///
     /// Returns an error if the instance is a zero scalar.
     pub fn to_challenge(&self) -> Result<HalfKeyChallenge> {
-        PublicKey::from_privkey(&self.0).map(|pk| HalfKeyChallenge::new(pk.as_ref()))
+        // This may return an error if the instance was deserialized (e.g., via serde) from a zero scalar
+        Ok(PublicKey::from_privkey(&self.0)?.as_ref().try_into()?)
     }
 }
 
@@ -524,7 +525,7 @@ impl PublicKey {
 
     /// Converts the public key to an Ethereum address
     pub fn to_address(&self) -> Address {
-        affine_point_to_address(&self.0)
+        affine_point_to_address(self.0.as_ref())
     }
 
     /// Serializes the public key to a binary uncompressed form.
@@ -672,6 +673,7 @@ impl Response {
     ///
     /// Error is returned when this `Response` contains an invalid value.
     pub fn to_challenge(&self) -> Result<Challenge> {
+        // This may return an error if the instance was deserialized (e.g., via serde) from a zero scalar
         PublicKey::from_privkey(&self.0).map(|pk| Challenge(pk.into()))
     }
 
@@ -710,7 +712,7 @@ impl TryFrom<&[u8]> for Response {
 }
 
 impl BytesRepresentable for Response {
-    /// Fixed size of the PoR challenge response.
+    /// Size of the PoR challenge response.
     const SIZE: usize = 32;
 }
 
