@@ -13,9 +13,7 @@ import { HoprLedger } from "./Ledger.sol";
 import { HoprMultiSig } from "./MultiSig.sol";
 import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
-uint256 constant TWENTY_FOUR_HOURS = 24 * 60 * 60; // in seconds
-
-uint256 constant INDEX_SNAPSHOT_INTERVAL = TWENTY_FOUR_HOURS;
+uint256 constant INDEX_SNAPSHOT_INTERVAL = 1 days; // in seconds
 
 abstract contract HoprChannelsEvents {
     /**
@@ -24,7 +22,7 @@ abstract contract HoprChannelsEvents {
      * Includes source and destination separately because mapping
      * (source, destination) -> channelId destroys information.
      */
-    event ChannelOpened(bytes32 indexed channelId, address indexed source, address indexed destination);
+    event ChannelOpened(bytes32 indexed channelId, address indexed source, address indexed destination, HoprChannels.Channel channel);
 
     /**
      * Emitted once balance of a channel is increased, e.g. after opening a
@@ -92,6 +90,22 @@ contract HoprChannels is
     IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
+    // maximum balance that can be staked in a channel. 1% of total supply, staking more is not sound
+    Balance public constant MAX_USED_BALANCE = Balance.wrap(10 ** 25);
+    // minimum balance that must be staked in a channel. No empty token transactions
+    Balance public constant MIN_USED_BALANCE = Balance.wrap(1);
+    // Version of the contract
+    string public constant VERSION = "2.0.0";
+
+    // ERC-777 tokensReceived hook, fundChannelMulti
+    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE =
+        abi.encodePacked(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
+    // ERC-777 tokensReceived hook, fundChannel
+    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encodePacked(address(0), address(0)).length;
+    // Token that will be used for all interactions.
+    IERC20 public immutable token;
+    // Notice period before fund from an outgoing channel can be pulled out.
+    Timestamp public immutable noticePeriodChannelClosure; // in seconds
 
     type Balance is uint96;
     type TicketIndex is uint48;
@@ -117,20 +131,6 @@ contract HoprChannels is
     error WrongToken();
     error InvalidTokenRecipient();
     error InvalidTokensReceivedUsage();
-
-    Balance public constant MAX_USED_BALANCE = Balance.wrap(10 ** 25); // 1% of total supply, staking more is not sound
-    Balance public constant MIN_USED_BALANCE = Balance.wrap(1); // no empty token transactions
-
-    // ERC-777 tokensReceived hook, fundChannelMulti
-    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE =
-        abi.encodePacked(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
-
-    // ERC-777 tokensReceived hook, fundChannel
-    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encodePacked(address(0), address(0)).length;
-
-    string public constant VERSION = "2.0.0";
-
-    bytes32 public domainSeparator; // depends on chainId
 
     /**
      * @dev Channel state machine
@@ -164,15 +164,15 @@ contract HoprChannels is
      * Aligned to 2 EVM words
      */
     struct Channel {
-        // latest balance of the channel, changes whenever a ticket gets redeemed
+        // (uint96) latest balance of the channel, changes whenever a ticket gets redeemed
         Balance balance;
-        // prevents tickets from being replayed, increased with every redeemed ticket
+        // (uint48) prevents tickets from being replayed, increased with every redeemed ticket
         TicketIndex ticketIndex;
-        // if set, timestamp once we can pull all funds from the channel
+        // (uint32) if set, timestamp once we can pull all funds from the channel
         Timestamp closureTime;
-        // prevents tickets issued for older instantions to be replayed
+        // (uint24) prevents tickets issued for older instantions to be replayed
         ChannelEpoch epoch;
-        // current state of the channel
+        // (uint8) current state of the channel
         ChannelStatus status;
     }
 
@@ -184,19 +184,19 @@ contract HoprChannels is
     struct TicketData {
         // ticket is valid in this channel
         bytes32 channelId;
-        // amount of tokens to transfer if ticket is a win
+        // (uint96) amount of tokens to transfer if ticket is a win
         Balance amount;
-        // highest channel.ticketIndex to accept when redeeming
+        // (uint48) highest channel.ticketIndex to accept when redeeming
         // ticket, used to aggregate tickets off-chain
         TicketIndex ticketIndex;
-        // delta by which channel.ticketIndex gets increased when redeeming
+        // (uint32) delta by which channel.ticketIndex gets increased when redeeming
         // the ticket, should be set to 1 if ticket is not aggregated, and >1 if
         // it is aggregated. Must never be <1.
         TicketIndexOffset indexOffset;
-        // replay protection, invalidates all tickets once payment channel
+        // (uint24) replay protection, invalidates all tickets once payment channel
         // gets closed
         ChannelEpoch epoch;
-        // encoded winning probability of the ticket
+        // (uint56) encoded winning probability of the ticket
         WinProb winProb;
     }
 
@@ -214,20 +214,10 @@ contract HoprChannels is
         uint256 porSecret;
     }
 
-    /**
-     * Stores channels, indexed by their channelId
-     */
+    // Domain separator for EIP-712 signatures
+    bytes32 public domainSeparator;
+    // Stores channels, indexed by their channelId. Storage slot 1
     mapping(bytes32 => Channel) public channels;
-
-    /**
-     * Token that will be used for all interactions.
-     */
-    IERC20 public immutable token;
-
-    /**
-     * Notice period before fund from an outgoing channel can be pulled out.
-     */
-    Timestamp public immutable noticePeriodChannelClosure; // in seconds
 
     /**
      * @dev This contracts contains ERC1820 implementation logic 'ERC777TokensRecipient' only for itself.
@@ -790,8 +780,8 @@ contract HoprChannels is
 
             channel.status = ChannelStatus.OPEN;
 
-            indexEvent(abi.encodePacked(ChannelOpened.selector, selfAddress, account));
-            emit ChannelOpened(channelId, selfAddress, account);
+            indexEvent(abi.encodePacked(ChannelOpened.selector, channelId, selfAddress, account, channel.balance, channel.ticketIndex, channel.closureTime, channel.epoch, channel.status));
+            emit ChannelOpened(channelId, selfAddress, account, channel);
         }
 
         indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));

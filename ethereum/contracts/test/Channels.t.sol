@@ -121,7 +121,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
-                abi.encode(wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.OPEN))
+                abi.encode(_wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.OPEN))
             )
         );
 
@@ -133,7 +133,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE)
+                    _wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE)
                 )
             )
         );
@@ -194,16 +194,24 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperTokenTransferFromMock(src, amount1);
 
         bytes32 channelId = keccak256(abi.encodePacked(src, dest));
+        HoprChannels.Channel memory channel = _wrapChannel(
+            amount1, 0, 0, 1, HoprChannels.ChannelStatus.OPEN
+        );
+        // DEBUG test encoding of fund Channel event
+        // assertEq(channel, abi.encodePacked(uint96(amount1), uint48(0), uint32(0), uint24(1), uint8(1)));
 
-        vm.expectEmit(true, true, false, true, address(hoprChannels));
-        emit ChannelOpened(channelId, src, dest);
+        // test emitting of ChannelOpened event
+        // DEBUG test_fundChannel(uint96,uint96,address,address,address) (runs: 256, μ: 143080, ~: 142892)
+        vm.expectEmit(true, true, true, true, address(hoprChannels));
+        emit ChannelOpened(channelId, src, dest, channel);
+        // emit ChannelOpened(channelId, src, dest, abi.encodePacked(uint96(amount1), uint48(0), uint32(0), uint24(1), uint8(1)));
 
         vm.startPrank(src);
         hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount1));
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amount1, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amount1, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
 
         vm.clearMockedCalls();
@@ -221,7 +229,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amount1 + amount2, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amount1 + amount2, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
 
         vm.clearMockedCalls();
@@ -234,15 +242,15 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperOnlySafeMock(src, safeContract);
         _helperTokenTransferFromMock(safeContract, amount1);
 
-        vm.expectEmit(true, true, false, true, address(hoprChannels));
-        emit ChannelOpened(channelId, src, dest);
+        vm.expectEmit(true, true, true, true, address(hoprChannels));
+        emit ChannelOpened(channelId, src, dest, channel);
 
         vm.startPrank(safeContract);
         hoprChannels.fundChannelSafe(src, dest, HoprChannels.Balance.wrap(amount1));
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amount1, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amount1, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
 
         vm.clearMockedCalls();
@@ -259,7 +267,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amount1 + amount2, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amount1 + amount2, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
 
         vm.clearMockedCalls();
@@ -376,7 +384,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(dest, src))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, 1, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, 1, HoprChannels.ChannelStatus.CLOSED)))
         );
 
         vm.clearMockedCalls();
@@ -394,7 +402,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(dest, src))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, 2, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, 2, HoprChannels.ChannelStatus.CLOSED)))
         );
 
         vm.clearMockedCalls();
@@ -416,7 +424,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(dest, src))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, 1, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, 1, HoprChannels.ChannelStatus.CLOSED)))
         );
 
         vm.clearMockedCalls();
@@ -510,7 +518,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(
+                    _wrapChannel(
                         amount,
                         ticketIndex,
                         HoprChannels.Timestamp.unwrap(closureTime),
@@ -535,7 +543,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(
+                    _wrapChannel(
                         amount,
                         ticketIndex,
                         HoprChannels.Timestamp.unwrap(nextClosureTime),
@@ -566,7 +574,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(
+                    _wrapChannel(
                         amount,
                         ticketIndex,
                         HoprChannels.Timestamp.unwrap(closureTime),
@@ -588,7 +596,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(
+                    _wrapChannel(
                         amount,
                         ticketIndex,
                         HoprChannels.Timestamp.unwrap(nextClosureTime),
@@ -666,7 +674,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, epoch, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, epoch, HoprChannels.ChannelStatus.CLOSED)))
         );
 
         vm.clearMockedCalls();
@@ -690,7 +698,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, epoch, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, epoch, HoprChannels.ChannelStatus.CLOSED)))
         );
 
         vm.clearMockedCalls();
@@ -1542,7 +1550,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
 
         // from != src (called by Safe)
@@ -1557,7 +1565,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
     }
 
@@ -1590,12 +1598,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(dest, src))),
-            keccak256(abi.encode(wrapChannel(amountB, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amountB, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
         );
 
         vm.clearMockedCalls();
@@ -1974,7 +1982,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
     }
 
-    function wrapChannel(
+    function _wrapChannel(
         uint256 balance,
         uint256 ticketIndex,
         uint256 closureTime,
