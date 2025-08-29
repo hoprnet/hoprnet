@@ -46,7 +46,7 @@ async fn generate_the_first_ack_ticket(
     let hk1 = HalfKey::try_from(hex!("16e1d5a405315958b7db2d70ed797d858c9e6ba979783cf5110c13e0200ab0d0").as_ref())?;
     let hk2 = HalfKey::try_from(hex!("bc580f2aad36f35419d5936cc3256e2eb4a7a5f42c934b91a94305da8c4f7e81").as_ref())?;
 
-    let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge();
+    let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
     let ack_ticket = TicketBuilder::default()
         .addresses(counterparty, &myself.chain_key)

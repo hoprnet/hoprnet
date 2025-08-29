@@ -184,7 +184,7 @@ impl HoprDb {
         ack: &VerifiedAcknowledgement,
     ) -> std::result::Result<ResolvedAcknowledgement, DbSqlError> {
         let ack_half_key = *ack.ack_key_share();
-        let challenge = hopr_parallelize::cpu::spawn_blocking(move || ack_half_key.to_challenge()).await;
+        let challenge = hopr_parallelize::cpu::spawn_blocking(move || ack_half_key.to_challenge()).await?;
 
         let pending_ack = self.caches.unacked_tickets.remove(&challenge).await.ok_or_else(|| {
             DbSqlError::AcknowledgementValidationError(format!(

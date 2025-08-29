@@ -2702,7 +2702,7 @@ mod tests {
             .index_offset(1)
             .win_prob(win_prob.try_into()?)
             .channel_epoch(1)
-            .challenge(response.to_challenge())
+            .challenge(response.to_challenge()?)
             .build_signed(signer, &domain_separator)?
             .into_acknowledged(response))
     }

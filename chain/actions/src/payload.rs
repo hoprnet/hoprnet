@@ -677,7 +677,7 @@ mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(response.to_challenge())
+            .challenge(response.to_challenge()?)
             .build_signed(&chain_key_alice, &domain_separator)?;
 
         // Bob acknowledges the ticket using the HalfKey from the Response

@@ -867,7 +867,7 @@ impl UnacknowledgedTicket {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
         debug!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
 
-        if self.ticket.verified_ticket().challenge == response.to_challenge().to_ethereum_challenge() {
+        if self.ticket.verified_ticket().challenge == response.to_challenge()?.to_ethereum_challenge() {
             Ok(self.ticket.into_acknowledged(response))
         } else {
             Err(CryptoError::InvalidChallenge.into())
@@ -1334,7 +1334,7 @@ pub mod tests {
 
         let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())?;
 
-        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge();
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         let dst = Hash::default();
         let ack = mock_ticket(
@@ -1362,7 +1362,7 @@ pub mod tests {
             &ALICE,
             &BOB.public().to_address(),
             Some(dst),
-            Some(response.to_challenge().to_ethereum_challenge()),
+            Some(response.to_challenge()?.to_ethereum_challenge()),
         )?;
 
         let acked_ticket = ticket.into_acknowledged(response);
@@ -1402,7 +1402,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(resp.to_challenge())
+            .challenge(resp.to_challenge()?)
             .build_signed(&ALICE, &Default::default())?;
 
         let unack = verified.into_unacknowledged(hk1);

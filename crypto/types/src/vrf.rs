@@ -150,7 +150,7 @@ impl VrfParameters {
         Ok(())
     }
 
-    /// Returns the encoded VRF `V` value as a compressed point in affine coordinates.
+    /// Returns the encoded VRF `V` value as an uncompressed point in affine coordinates.
     pub fn get_v_encoded_point(&self) -> k256::EncodedPoint {
         self.V.to_encoded_point(false)
     }

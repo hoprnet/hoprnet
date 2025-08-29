@@ -24,14 +24,13 @@ pub struct Signature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
 
 impl Signature {
     pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
-        assert!(recovery <= 1, "invalid recovery bit");
-
         let mut ret = Self([0u8; Self::SIZE]);
         ret.0.copy_from_slice(raw_bytes);
 
-        // Embed the recovery bit into the S value
+        // Embed the parity recovery bit into the S value
+        let parity = recovery & 0x01;
         ret.0[Self::SIZE / 2] &= 0x7f;
-        ret.0[Self::SIZE / 2] |= recovery << 7;
+        ret.0[Self::SIZE / 2] |= parity << 7;
 
         ret
     }
@@ -91,30 +90,30 @@ impl Signature {
     }
 
     /// Returns the raw signature, without the encoded public key recovery bit and
-    /// the recovery bit as a separate value.
+    /// the recovery parity bit as a separate value.
     pub fn raw_signature(&self) -> ([u8; Self::SIZE], u8) {
         let mut raw_sig = self.0;
-        let recovery: u8 = (raw_sig[Self::SIZE / 2] & 0x80 != 0).into();
+        let parity: u8 = (raw_sig[Self::SIZE / 2] & 0x80 != 0).into();
         raw_sig[Self::SIZE / 2] &= 0x7f;
-        (raw_sig, recovery)
+        (raw_sig, parity)
     }
 
     fn recover<R>(&self, msg: &[u8], recovery_method: R) -> crate::errors::Result<PublicKey>
     where
-        R: FnOnce(&[u8], &ECDSASignature, RecoveryId) -> ecdsa::signature::Result<VerifyingKey>,
+        R: Fn(&[u8], &ECDSASignature, RecoveryId) -> ecdsa::signature::Result<VerifyingKey>,
     {
-        let (sig, v) = self.raw_signature();
-
-        let recid = RecoveryId::try_from(v).map_err(|_| ParseError("Signature".into()))?;
-
+        let (sig, parity) = self.raw_signature();
         let signature = ECDSASignature::from_bytes(&sig.into()).map_err(|_| ParseError("Signature".into()))?;
 
-        let recovered_key = *recovery_method(msg, &signature, recid)
-            .map_err(|_| CryptoError::CalculationError)?
-            .as_affine();
-
-        // Verify that it is a valid public key
-        recovered_key.try_into()
+        // Try both candidates for the missing x-reduction bit (0 and 2).
+        for alt in [0u8, 2u8] {
+            if let Ok(recid) = RecoveryId::try_from(parity | alt) {
+                if let Ok(recovered_key) = recovery_method(msg, &signature, recid) {
+                    return (*recovered_key.as_affine()).try_into();
+                }
+            }
+        }
+        Err(CryptoError::CalculationError)
     }
 
     #[inline]
@@ -164,7 +163,8 @@ impl OffchainSignature {
     pub fn sign_message(msg: &[u8], signing_keypair: &OffchainKeypair) -> Self {
         // Expand the SK from the given keypair
         let expanded_sk = ed25519_dalek::hazmat::ExpandedSecretKey::from(
-            &ed25519_dalek::SecretKey::try_from(signing_keypair.secret().as_ref()).expect("invalid private key"),
+            &ed25519_dalek::SecretKey::try_from(signing_keypair.secret().as_ref())
+                .expect("cannot fail: OffchainKeypair always contains a valid secret key"),
         );
 
         // Get the verifying key from the SAME keypair, avoiding Double Public Key Signing Function Oracle Attack on
@@ -176,7 +176,8 @@ impl OffchainSignature {
 
     /// Verify this signature of the given message and [OffchainPublicKey].
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
-        let sgn = ed25519_dalek::Signature::from_slice(&self.0).expect("corrupted OffchainSignature");
+        let sgn = ed25519_dalek::Signature::from_slice(&self.0)
+            .expect("cannot fail: OffchainSignature always contains a valid signature");
         let pk = ed25519_dalek::VerifyingKey::from(public_key.edwards);
         pk.verify_strict(msg, &sgn).is_ok()
     }

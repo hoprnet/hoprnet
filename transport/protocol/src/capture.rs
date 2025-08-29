@@ -505,7 +505,7 @@ mod tests {
             )
             .await;
 
-        let hk = HalfKey::random().to_challenge();
+        let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
             me,
             next_hop: *OffchainKeypair::random().public(),
@@ -526,7 +526,7 @@ mod tests {
 
         let _ = pcap.send(packet.into()).await;
 
-        let hk = HalfKey::random().to_challenge();
+        let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
             me,
             next_hop: *OffchainKeypair::random().public(),
@@ -545,7 +545,7 @@ mod tests {
 
         let _ = pcap.send(packet.into()).await;
 
-        let hk = HalfKey::random().to_challenge();
+        let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
             me,
             next_hop: *OffchainKeypair::random().public(),
@@ -564,7 +564,7 @@ mod tests {
 
         let _ = pcap.send(packet.into()).await;
 
-        let hk = HalfKey::random().to_challenge();
+        let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
             me,
             next_hop: *OffchainKeypair::random().public(),
@@ -590,7 +590,7 @@ mod tests {
 
         let _ = pcap.send(packet.into()).await;
 
-        let hk = HalfKey::random().to_challenge();
+        let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
             me,
             next_hop: *OffchainKeypair::random().public(),
@@ -614,7 +614,7 @@ mod tests {
 
         let _ = pcap.send(packet.into()).await;
 
-        let hk = HalfKey::random().to_challenge();
+        let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
             me,
             next_hop: *OffchainKeypair::random().public(),
@@ -638,7 +638,7 @@ mod tests {
 
         let _ = pcap.send(packet.into()).await;
 
-        let hk = HalfKey::random().to_challenge();
+        let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
             me,
             next_hop: *OffchainKeypair::random().public(),
@@ -663,7 +663,7 @@ mod tests {
 
         let _ = pcap.send(packet.into()).await;
 
-        let hk = HalfKey::random().to_challenge();
+        let hk = HalfKey::random().to_challenge()?;
         let packet = PacketBeforeTransit::OutgoingPacket {
             me,
             next_hop: *OffchainKeypair::random().public(),

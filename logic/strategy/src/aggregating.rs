@@ -393,7 +393,7 @@ mod tests {
             .index_offset(index_offset)
             .win_prob(ticket_win_prob.try_into()?)
             .channel_epoch(1)
-            .challenge(response.to_challenge())
+            .challenge(response.to_challenge()?)
             .build_signed(signer, &domain_separator)?
             .into_acknowledged(response))
     }

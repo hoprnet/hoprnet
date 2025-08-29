@@ -100,7 +100,7 @@ impl Challenge {
     /// Note that this is an expensive operation that involves point decompression of the
     /// both [`HalfKeyChallenge`] and scalar multiplication of the [`HalfKey`] with the basepoint.
     pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Result<Self> {
-        Self::from_hint_and_share(own_share, &half_key.to_challenge())
+        Self::from_hint_and_share(own_share, &half_key.to_challenge()?)
     }
 }
 
@@ -132,12 +132,10 @@ impl HalfKey {
     /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
     ///
     /// Note that this is an expensive operation that involves scalar multiplication.
-    pub fn to_challenge(&self) -> HalfKeyChallenge {
-        HalfKeyChallenge::new(
-            PublicKey::from_privkey(&self.0)
-                .expect("invalid invariant: HalfKey is never an invalid private key")
-                .as_ref(),
-        )
+    ///
+    /// Returns an error if the instance is a zero scalar.
+    pub fn to_challenge(&self) -> Result<HalfKeyChallenge> {
+        PublicKey::from_privkey(&self.0).map(|pk| HalfKeyChallenge::new(pk.as_ref()))
     }
 }
 
@@ -169,7 +167,7 @@ impl BytesRepresentable for HalfKey {
 /// Represents a challenge for the half-key in Proof of Relay.
 ///
 /// Half-key challenge is equivalent to a secp256k1 curve point.
-/// Therefore, HalfKeyChallenge can be obtained from a HalfKey.
+/// Therefore, `HalfKeyChallenge` can be [obtained](HalfKey::to_challenge) from a [`HalfKey`].
 ///
 /// The value is internally stored as a compressed point encoded as a byte-array.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -671,12 +669,10 @@ impl Response {
     /// represented by this response into a secp256k1 curve point (public key).
     ///
     /// Note that this is an expensive operation involving scalar multiplication.
-    pub fn to_challenge(&self) -> Challenge {
-        Challenge(
-            PublicKey::from_privkey(&self.0)
-                .expect("invalid invariant: HalfKey is never an invalid private key")
-                .into(),
-        )
+    ///
+    /// Error is returned when this `Response` contains an invalid value.
+    pub fn to_challenge(&self) -> Result<Challenge> {
+        PublicKey::from_privkey(&self.0).map(|pk| Challenge(pk.into()))
     }
 
     /// Derives the response from two half-keys.
@@ -687,7 +683,11 @@ impl Response {
         let first = NonZeroScalar::<Secp256k1>::try_from(first.as_ref()).map_err(|_| InvalidInputValue("first"))?;
         let second = NonZeroScalar::<Secp256k1>::try_from(second.as_ref()).map_err(|_| InvalidInputValue("second"))?;
 
+        // This addition is modulo order the order of the secp256k1 prime field
         let res = first.as_ref() + second.as_ref();
+        if res.is_zero().into() {
+            return Err(InvalidInputValue("invalid half-key"));
+        }
 
         let mut ret = [0u8; Self::SIZE];
         ret.copy_from_slice(res.to_bytes().as_slice());
@@ -920,14 +920,14 @@ mod tests {
 
         let response = Response::from_half_keys(&hk1, &hk2)?;
 
-        let half_chal1 = hk1.to_challenge();
-        let half_chal2 = hk2.to_challenge();
+        let half_chal1 = hk1.to_challenge()?;
+        let half_chal2 = hk2.to_challenge()?;
 
         let challenge1 = Challenge::from_hint_and_share(&half_chal1, &half_chal2)?;
         assert_eq!(challenge1, Challenge::from_hint_and_share(&half_chal2, &half_chal1)?);
         assert_eq!(challenge1, Challenge::from_own_share_and_half_key(&half_chal1, &hk2)?);
 
-        let challenge2 = response.to_challenge();
+        let challenge2 = response.to_challenge()?;
         assert_eq!(challenge1, challenge2);
         assert_eq!(challenge1.to_ethereum_challenge(), challenge2.to_ethereum_challenge());
         Ok(())

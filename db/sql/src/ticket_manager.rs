@@ -359,7 +359,7 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge();
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         let ticket = TicketBuilder::default()
             .direction(&BOB.public().to_address(), &ALICE.public().to_address())

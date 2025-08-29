@@ -24,12 +24,9 @@ use crate::{
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
 pub(crate) fn random_group_element() -> ([u8; 32], NonIdentity<AffinePoint>) {
-    let mut scalar = k256::NonZeroScalar::from_uint(1u32.into()).unwrap();
-    let mut point = NonIdentity::new(k256::ProjectivePoint::IDENTITY);
-    while point.is_none().into() {
-        scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
-        point = NonIdentity::new(k256::ProjectivePoint::GENERATOR * scalar.as_ref());
-    }
+    // Since sep256k1 has a group of prime order, a non-zero scalar cannot result into an identity point.
+    let scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
+    let point = NonIdentity::new(k256::ProjectivePoint::GENERATOR * scalar.as_ref());
     (scalar.to_bytes().into(), point.unwrap().to_affine())
 }
 
