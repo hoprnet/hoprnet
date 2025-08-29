@@ -469,6 +469,7 @@ where
                         } => {
                             // Send acknowledgement back
                             trace!(%previous_hop, "acknowledging final packet back");
+                            // TODO: bottleneck - ack.new must be called via spawn_fifo
                             let ack = Acknowledgement::new(ack_key, &me);
 
                             #[cfg(feature = "capture")]

@@ -181,10 +181,13 @@ impl HoprDb {
         &self,
         ack: &Acknowledgement,
     ) -> std::result::Result<ResolvedAcknowledgement, DbSqlError> {
+        // TODO: bottleneck - must be called via spawn_fifo
+        let challenge = ack.ack_challenge()?;
+
         let pending_ack = self
             .caches
             .unacked_tickets
-            .remove(&ack.ack_challenge()?)
+            .remove(&challenge)
             .await
             .ok_or_else(|| {
                 DbSqlError::AcknowledgementValidationError(format!(
@@ -377,7 +380,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 next_ticket,
                 &myself.caches.key_id_mapper,
                 &domain_separator,
-                None, // NoAck messages currently do not have flags
+                None, // NoAck messages currently do not have signals
             )
             .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
         })
@@ -567,25 +570,25 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 Ok(match incoming.ack_key {
                     None => {
+                        let ack: Acknowledgement = incoming
+                            .plain_text
+                            .as_ref()
+                            .try_into()
+                            .map_err(|_| DbSqlError::DecodingError)?;
+
+                        // TODO: bottleneck - ack.validate must be called via spawn_fifo
+                        let Ok(ack) = ack.validate(&incoming.previous_hop) else {
+                            tracing::error!("failed to validate the acknowledgement");
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_RECEIVED_ACKS.increment(&["false"]);
+                        };
+
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement {
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
-                            ack: incoming
-                                .plain_text
-                                .as_ref()
-                                .try_into()
-                                .map_err(|_| DbSqlError::DecodingError)
-                                .and_then(|ack: Acknowledgement| {
-                                    ack.validate(&incoming.previous_hop)
-                                        .map_err(|e| DbSqlError::AcknowledgementValidationError(e.to_string()))
-                                })
-                                .inspect_err(|error| {
-                                    tracing::error!(%error, "failed to decode the acknowledgement");
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_RECEIVED_ACKS.increment(&["false"]);
-                                })?,
+                            ack
                         }
                     }
                     Some(ack_key) => IncomingPacket::Final {
@@ -616,12 +619,15 @@ impl HoprDbProtocolOperations for HoprDb {
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
+                        // TODO: bottleneck - ack.new must be called via spawn_fifo
+                        let ack = Acknowledgement::new(fwd.ack_key, pkt_keypair);
+
                         Ok(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
-                            ack: Acknowledgement::new(fwd.ack_key, pkt_keypair),
+                            ack,
                         })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {

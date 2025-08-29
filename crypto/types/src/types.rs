@@ -76,7 +76,7 @@ use crate::{
 pub struct CurvePoint {
     pub(crate) affine: AffinePoint,
     compressed: EncodedPoint<Secp256k1>,
-    uncompressed: OnceLock<EncodedPoint<Secp256k1>>,
+    uncompressed: EncodedPoint<Secp256k1>,
 }
 
 impl CurvePoint {
@@ -93,25 +93,32 @@ impl CurvePoint {
     }
 
     /// Creates a curve point from a non-zero scalar.
-    /// The given exponent must represent a non-zero scalar and must result into
+    ///
+    /// The given `exponent` must represent a non-zero scalar and must result into
     /// a secp256k1 identity point.
     pub fn from_exponent(exponent: &[u8]) -> Result<Self> {
         PublicKey::from_privkey(exponent).map(CurvePoint::from)
     }
 
     /// Converts the curve point to a representation suitable for calculations.
+    ///
+    /// This operation is inexpensive.
     pub fn into_projective_point(self) -> ProjectivePoint<Secp256k1> {
         self.affine.into()
     }
 
-    /// Converts the curve point into a compressed form. This is a cheap operation.
+    /// Converts the curve point into a compressed form.
+    ///
+    /// This operation is inexpensive.
     pub fn as_compressed(&self) -> &EncodedPoint<Secp256k1> {
         &self.compressed
     }
 
-    /// Converts the curve point into an uncompressed form. This is many cases an expensive operation.
+    /// Converts the curve point into an uncompressed form.
+    ///
+    /// This operation is inexpensive.
     pub fn as_uncompressed(&self) -> &EncodedPoint<Secp256k1> {
-        self.uncompressed.get_or_init(|| self.affine.to_encoded_point(false))
+        &self.uncompressed
     }
 
     /// Sums all given curve points together, creating a new curve point.
@@ -166,8 +173,9 @@ impl From<AffinePoint> for CurvePoint {
     fn from(affine: AffinePoint) -> Self {
         Self {
             affine,
+            // Both operations are inexpensive
             compressed: affine.to_encoded_point(true),
-            uncompressed: OnceLock::from(affine.to_encoded_point(false)),
+            uncompressed: affine.to_encoded_point(false),
         }
     }
 }
