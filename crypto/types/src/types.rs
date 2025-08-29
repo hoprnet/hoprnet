@@ -685,7 +685,6 @@ impl Response {
     /// Returns an error if any of the given scalars is zero.
     pub fn from_half_keys(first: &HalfKey, second: &HalfKey) -> Result<Self> {
         let first = NonZeroScalar::<Secp256k1>::try_from(first.as_ref()).map_err(|_| InvalidInputValue("first"))?;
-
         let second = NonZeroScalar::<Secp256k1>::try_from(second.as_ref()).map_err(|_| InvalidInputValue("second"))?;
 
         let res = first.as_ref() + second.as_ref();
@@ -782,13 +781,14 @@ mod tests {
     use std::str::FromStr;
 
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
     use hopr_primitive_types::prelude::*;
     use k256::AffinePoint;
     use libp2p_identity::PeerId;
 
     use crate::{
         keypairs::{Keypair, OffchainKeypair},
-        types::{HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey, Response},
+        types::{Challenge, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, PublicKey, Response},
     };
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
@@ -910,6 +910,26 @@ mod tests {
         let hkc2 = HalfKeyChallenge::try_from(hkc1.as_ref())?;
         assert_eq!(hkc1, hkc2, "failed to match deserialized half key challenge");
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_challenge_response_flow() -> anyhow::Result<()> {
+        let hk1 = HalfKey::random();
+        let hk2 = HalfKey::random();
+
+        let response = Response::from_half_keys(&hk1, &hk2)?;
+
+        let half_chal1 = hk1.to_challenge();
+        let half_chal2 = hk2.to_challenge();
+
+        let challenge1 = Challenge::from_hint_and_share(&half_chal1, &half_chal2)?;
+        assert_eq!(challenge1, Challenge::from_hint_and_share(&half_chal2, &half_chal1)?);
+        assert_eq!(challenge1, Challenge::from_own_share_and_half_key(&half_chal1, &hk2)?);
+
+        let challenge2 = response.to_challenge();
+        assert_eq!(challenge1, challenge2);
+        assert_eq!(challenge1.to_ethereum_challenge(), challenge2.to_ethereum_challenge());
         Ok(())
     }
 
