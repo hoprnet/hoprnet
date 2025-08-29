@@ -367,10 +367,18 @@ impl TicketBuilder {
         self
     }
 
-    /// Sets the [EthereumChallenge] for the Proof of Relay.
-    /// Must be set.
+    /// Sets the [`Challenge`] for the Proof of Relay, converting it to [`EthereumChallenge`] first.
+    ///
+    /// Either this method or [`Ticket::eth_challenge`] must be called.
     #[must_use]
-    pub fn challenge(mut self, challenge: EthereumChallenge) -> Self {
+    pub fn challenge(mut self, challenge: Challenge) -> Self {
+        self.challenge = Some(challenge.to_ethereum_challenge());
+        self
+    }
+
+    /// Sets the [`EthereumChallenge`] for the Proof of Relay.
+    /// Either this method or [`Ticket::challenge`] must be called.
+    pub fn eth_challenge(mut self, challenge: EthereumChallenge) -> Self {
         self.challenge = Some(challenge);
         self
     }
@@ -702,7 +710,7 @@ impl TryFrom<&[u8]> for Ticket {
                 .index_offset(u32::from_be_bytes(index_offset))
                 .channel_epoch(u32::from_be_bytes(channel_epoch))
                 .win_prob(win_prob)
-                .challenge(challenge)
+                .eth_challenge(challenge)
                 .signature(signature)
                 .build()
                 .map_err(|e| GeneralError::ParseError(format!("ticket build failed: {e}")))
@@ -1206,7 +1214,7 @@ pub mod tests {
     pub fn test_ticket_builder_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build()?;
         assert_eq!(0, ticket.index);
         assert_eq!(0.0, ticket.win_prob().as_f64());
@@ -1227,7 +1235,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
@@ -1250,7 +1258,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert_eq!(
@@ -1273,7 +1281,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
@@ -1287,7 +1295,7 @@ pub mod tests {
     pub fn test_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert!(
@@ -1316,7 +1324,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(4)
-            .challenge(challenge.unwrap_or_default())
+            .eth_challenge(challenge.unwrap_or_default())
             .build_signed(pk, &domain_separator.unwrap_or_default())?)
     }
 
@@ -1394,7 +1402,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(resp.to_challenge().to_ethereum_challenge())
+            .challenge(resp.to_challenge())
             .build_signed(&ALICE, &Default::default())?;
 
         let unack = verified.into_unacknowledged(hk1);

@@ -55,7 +55,7 @@ async fn generate_the_first_ack_ticket(
         .index_offset(1)
         .win_prob(WinningProbability::ALWAYS)
         .channel_epoch(1)
-        .challenge(challenge.to_ethereum_challenge())
+        .challenge(challenge)
         .build_signed(counterparty, &domain_separator)?
         .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?);
 

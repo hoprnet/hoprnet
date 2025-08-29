@@ -24,7 +24,7 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
         .balance(HoprBalance::new_base(100))
         .index(1)
         .index_offset(1)
-        .challenge(Default::default())
+        .eth_challenge(Default::default())
         .win_prob(WinningProbability::ALWAYS)
         .channel_epoch(1)
         .build_signed(&source, &Hash::default())

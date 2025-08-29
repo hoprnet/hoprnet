@@ -75,7 +75,7 @@ impl PartialHoprPacket {
 
                 // Update the ticket with the challenge
                 let ticket = ticket
-                    .challenge(por_values.ticket_challenge())
+                    .eth_challenge(por_values.ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
@@ -100,7 +100,7 @@ impl PartialHoprPacket {
             PacketRouting::Surb(id, surb) => {
                 // Update the ticket with the challenge
                 let ticket = ticket
-                    .challenge(surb.additional_data_receiver.proof_of_relay_values().ticket_challenge())
+                    .eth_challenge(surb.additional_data_receiver.proof_of_relay_values().ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
@@ -131,7 +131,7 @@ impl PartialHoprPacket {
 
                 // Update the ticket with the challenge
                 let ticket = ticket
-                    .challenge(por_values.ticket_challenge())
+                    .eth_challenge(por_values.ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
@@ -474,7 +474,7 @@ mod tests {
     ) -> HoprPacket {
         if let HoprPacket::Forwarded(fwd) = &mut packet {
             fwd.outgoing.ticket = next_ticket
-                .challenge(fwd.next_challenge)
+                .eth_challenge(fwd.next_challenge)
                 .build_signed(chain_keypair, domain_separator)
                 .expect("ticket should create")
                 .leak();
@@ -521,7 +521,7 @@ mod tests {
                 .index_offset(1)
                 .win_prob(WinningProbability::ALWAYS)
                 .channel_epoch(1)
-                .challenge(Default::default()))
+                .eth_challenge(Default::default()))
         } else {
             Ok(TicketBuilder::zero_hop()
                 .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address()))

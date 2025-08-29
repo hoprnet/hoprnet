@@ -171,7 +171,7 @@ impl HoprDb {
 
         // Finally, replace the ticket in the outgoing packet with a new one
         fwd.outgoing.ticket = ticket_builder
-            .challenge(fwd.next_challenge)
+            .eth_challenge(fwd.next_challenge)
             .build_signed(me, &domain_separator)?
             .leak();
 

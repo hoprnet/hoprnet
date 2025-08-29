@@ -217,7 +217,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.push(if is_random { 1 } else { 0 });
-                out.extend_from_slice(ack.as_ref());
+                out.extend_from_slice(ack.leak().as_ref());
                 direction = PacketDirection::Outgoing;
             }
             PacketBeforeTransit::IncomingPacket {
@@ -269,7 +269,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(next_hop.as_ref());
                 out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
-                out.extend_from_slice(ack.as_ref());
+                out.extend_from_slice(ack.leak().as_ref());
                 out.push(ticket.len() as u8);
                 out.extend_from_slice(ticket.as_ref());
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
@@ -293,7 +293,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(me.as_ref());
                 out.extend_from_slice(me.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
-                out.extend_from_slice(ack.as_ref());
+                out.extend_from_slice(ack.leak().as_ref());
             }
         }
 
@@ -347,7 +347,7 @@ mod tests {
         let ticket = TicketBuilder::default()
             .amount(10)
             .channel_id(Hash::create(&[b"test"]))
-            .challenge(EthereumChallenge::default())
+            .eth_challenge(EthereumChallenge::default())
             .win_prob(WinningProbability::try_from_f64(0.5)?)
             .channel_epoch(1)
             .index(10)

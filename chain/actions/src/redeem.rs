@@ -299,7 +299,7 @@ mod tests {
             .index_offset(1)
             .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(channel_epoch)
-            .challenge(challenge.to_ethereum_challenge())
+            .challenge(challenge)
             .build_signed(counterparty, &Hash::default())?
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }

@@ -366,7 +366,7 @@ mod tests {
             .amount(TICKET_VALUE)
             .index(index as u64)
             .channel_epoch(4)
-            .challenge(challenge.to_ethereum_challenge())
+            .challenge(challenge)
             .build_signed(&BOB, &Hash::default())?;
 
         Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
