@@ -79,7 +79,10 @@ use futures::{SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
-use hopr_internal_types::{prelude::HoprPseudonym, protocol::VerifiedAcknowledgement};
+use hopr_internal_types::{
+    prelude::{Acknowledgement, HoprPseudonym},
+    protocol::VerifiedAcknowledgement,
+};
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_protocol_app::prelude::ApplicationData;
 use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
@@ -95,6 +98,9 @@ const SLOW_OP_MS: u128 = 150;
 
 pub type HoprBinaryCodec = crate::codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
 pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
+
+pub const TICKET_ACK_BUFFER_SIZE: usize = 1_000_000;
+pub const NUM_CONCURRENT_ACK_PROCESSING: usize = 10;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -134,6 +140,8 @@ pub enum ProtocolProcesses {
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,
+    #[strum(to_string = "HOPR [ack] ticket acknowledgement")]
+    TicketAck,
 }
 /// Processed indexer generated events.
 #[derive(Debug, Clone)]
@@ -242,6 +250,31 @@ where
     } else {
         WrappedTagBloomFilter::new("no_tbf".into())
     };
+
+    let (ack_tx, ack_rx) =
+        futures::channel::mpsc::channel::<(Acknowledgement, OffchainPublicKey)>(TICKET_ACK_BUFFER_SIZE);
+
+    let db_clone = db.clone();
+    processes.insert(
+        ProtocolProcesses::TicketAck,
+        spawn_as_abortable!(ack_rx
+            .for_each_concurrent(NUM_CONCURRENT_ACK_PROCESSING, move |(ack, sender)| {
+                let db = db_clone.clone();
+                async move {
+                    if let Ok(verified) = hopr_parallelize::cpu::spawn_blocking(move || ack.verify(&sender)).await {
+                        trace!(%sender, "received a valid acknowledgement");
+                            match db.handle_acknowledgement(verified).await {
+                                Ok(_) => trace!(%sender, "successfully processed a known acknowledgement"),
+                                // Eventually, we do not care here if the acknowledgement does not belong to any
+                                // unacknowledged packets.
+                                Err(error) => trace!(%sender, %error, "valid acknowledgement is unknown or error occurred while processing it"),
+                            }
+                    } else {
+                        error!(%sender, "failed to verify signature on acknowledgement");
+                    }
+                }
+            }))
+    );
 
     let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
@@ -439,6 +472,7 @@ where
                     #[cfg(feature = "capture")]
                     let mut capture_clone = capture_clone.clone();
 
+                    let mut ack_tx_clone = ack_tx.clone();
                     async move {
 
                     match packet {
@@ -447,16 +481,16 @@ where
                             ack,
                             ..
                         } => {
-                            trace!(%previous_hop, "received a valid acknowledgement");
-                            match db.handle_acknowledgement(ack).await {
-                                Ok(_) => trace!(%previous_hop, "successfully processed a known acknowledgement"),
-                                // Eventually, we do not care here if the acknowledgement does not belong to any
-                                // unacknowledged packets.
-                                Err(error) => trace!(%previous_hop, %error, "valid acknowledgement is unknown or error occurred while processing it"),
+                            let now = std::time::Instant::now();
+                            if let Err(error) = ack_tx_clone.send((ack, previous_hop)).await {
+                                tracing::error!(%error, "failed dispatching received acknowledgement to the ticket ack queue");
+                            }
+                            let elapsed = now.elapsed();
+                            if elapsed.as_millis() > SLOW_OP_MS {
+                                warn!(?elapsed," ack_tx.send took too long");
                             }
 
                             // We do not acknowledge back acknowledgements.
-
                             None
                         },
                         IncomingPacket::Final {

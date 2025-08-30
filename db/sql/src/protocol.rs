@@ -567,29 +567,15 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 Ok(match incoming.ack_key {
                     None => {
-                        let ack: Acknowledgement = incoming
-                            .plain_text
-                            .as_ref()
-                            .try_into()
-                            .map_err(|_| DbSqlError::DecodingError)?;
-
-                        let prev_hop = incoming.previous_hop;
-                        let ack = spawn_fifo_blocking(move || ack.verify(&prev_hop))
-                            .await
-                            .map_err(|error| {
-                                tracing::error!(%error, "failed to validate the acknowledgement");
-
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_RECEIVED_ACKS.increment(&["false"]);
-
-                                DbSqlError::AcknowledgementValidationError(error.to_string())
-                            })?;
-
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement {
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
-                            ack,
+                            ack: incoming
+                                .plain_text
+                                .as_ref()
+                                .try_into()
+                                .map_err(|_| DbSqlError::DecodingError)?,
                         }
                     }
                     Some(ack_key) => IncomingPacket::Final {

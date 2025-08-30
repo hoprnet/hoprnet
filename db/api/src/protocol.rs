@@ -93,13 +93,14 @@ pub enum IncomingPacket {
         previous_hop: OffchainPublicKey,
         next_hop: OffchainPublicKey,
         data: Box<[u8]>,
+        /// Acknowledgement to be sent to the previous hop
         ack: VerifiedAcknowledgement,
     },
     /// The packet contains an acknowledgement of a delivered packet.
     Acknowledgement {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
-        ack: VerifiedAcknowledgement,
+        ack: Acknowledgement,
     },
 }
 
