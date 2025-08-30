@@ -606,17 +606,12 @@ impl HoprDbProtocolOperations for HoprDb {
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        let keypair_clone = pkt_keypair.clone();
-                        let ack =
-                            spawn_fifo_blocking(move || VerifiedAcknowledgement::new(fwd.ack_key, &keypair_clone))
-                                .await;
-
                         Ok(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
-                            ack,
+                            ack_key: fwd.ack_key,
                         })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
