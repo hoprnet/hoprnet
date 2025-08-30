@@ -133,6 +133,8 @@ flagset::flags! {
     #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
    pub enum ApplicationFlag: u8 {
         /// Tells the HOPR protocol layer that it should reduce the number of SURBs it produces.
+        ///
+        /// This is typically reduction by a factor of 2.
         ReduceSurbs = 0b0001_0000,
         /// Tells the HOPR protocol layer that it should not produce any SURBs with this packet.
         ///
@@ -151,7 +153,7 @@ flagset::flags! {
 /// Additional flags passed between the HOPR protocol layer and the Application layer.
 pub type ApplicationFlags = flagset::FlagSet<ApplicationFlag>;
 
-/// Represents the received decrypted packet carrying the application-layer data.
+/// Represents the to-be-sent or received decrypted packet carrying the application-layer data.
 ///
 /// This structure always owns the data.
 #[derive(Clone, PartialEq, Eq)]

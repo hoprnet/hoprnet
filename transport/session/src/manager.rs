@@ -17,7 +17,7 @@ use hopr_protocol_start::{
     KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use tracing::{debug, error, info, trace, warn};
-
+use hopr_protocol_app::v1::ApplicationFlag;
 use crate::{
     Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
@@ -683,12 +683,13 @@ where
                     // Sender responsible for keep-alive and Session data will be counting produced SURBs
                     let surb_estimator_clone = surb_estimator.clone();
                     let scoring_sender =
-                        msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationData)| {
+                        msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationData)| {
                             // Count how many SURBs we sent with each packet
                             surb_estimator_clone.produced.fetch_add(
                                 ApplicationData::estimate_surbs_with_msg(&data.plain_text) as u64,
                                 std::sync::atomic::Ordering::Relaxed,
                             );
+                            data.flags |= ApplicationFlag::ReduceSurbs;
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 

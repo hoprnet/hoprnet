@@ -138,7 +138,7 @@ where
     pub(crate) async fn resolve_routing(
         &self,
         size_hint: usize,
-        max_surbs: Option<usize>,
+        max_surbs: usize,
         routing: DestinationRouting,
     ) -> crate::errors::Result<(ResolvedTransportRouting, Option<usize>)> {
         match routing {
@@ -152,8 +152,8 @@ where
 
                 let return_paths = if let Some(return_options) = return_options {
                     let num_possible_surbs =
-                        HoprPacket::max_surbs_with_message(size_hint).min(max_surbs.unwrap_or(usize::MAX));
-                    trace!(%destination, %num_possible_surbs, data_len = size_hint, "resolving packet return paths");
+                        HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
+                    trace!(%destination, %num_possible_surbs, data_len = size_hint, max_surbs, "resolving packet return paths");
 
                     (0..num_possible_surbs)
                         .map(|_| self.resolve_path(destination, self.me, return_options.clone()))
@@ -215,11 +215,11 @@ where
         async move {
             // If SURB production reduce flags have been set, indicate the maximum number of SURBs to generate
             let max_surbs = if data.flags.contains(ApplicationFlag::NoSurbs) {
-                Some(0)
+                0
             } else if data.flags.contains(ApplicationFlag::ReduceSurbs) {
-                Some(HoprPacket::max_surbs_with_message(data.len()) / 2)
+                HoprPacket::max_surbs_with_message(data.len()) / 2
             } else {
-                None
+                usize::MAX
             };
 
             match planner.resolve_routing(data.len(), max_surbs, routing).await {
