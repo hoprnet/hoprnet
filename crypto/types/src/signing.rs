@@ -1,14 +1,119 @@
+use std::marker::PhantomData;
+
 use hopr_primitive_types::prelude::{GeneralError::ParseError, *};
-use k256::ecdsa::{
-    self, RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
-    signature::{Verifier, hazmat::PrehashVerifier},
-};
 use sha2::Sha512;
-use tracing::warn;
 
 use crate::prelude::*;
 
+const ECDSA_SIGNATURE_SIZE: usize = 64;
+
+type RawSignature = ([u8; ECDSA_SIGNATURE_SIZE], u8);
+
+/// Trait for ECDSA signing engines.
+pub trait EcdsaSigningEngine {
+    /// Sign the given `hash` with the private key from the `chain_keypair`.
+    fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Result<RawSignature, CryptoError>;
+    /// Verify the given `signature` against the `hash` and the `public_key`.
+    fn verify_hash(signature: &RawSignature, hash: &Hash, public_key: &PublicKey) -> Result<bool, CryptoError>;
+    /// Recover the signer public key from the `signature` and the `hash`.
+    fn recover_from_hash(signature: &RawSignature, hash: &Hash) -> Result<PublicKey, CryptoError>;
+}
+
+/// ECDSA signing engine based on the pure Rust [`k256`](https://docs.rs/k256/latest/k256/) crate.
+///
+/// This is usually slower than [`NativeEcdsaSigningEngine`], but pure Rust-based.
+#[cfg(feature = "rust-ecdsa")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct K256EcdsaSigningEngine;
+#[cfg(feature = "rust-ecdsa")]
+impl EcdsaSigningEngine for K256EcdsaSigningEngine {
+    #[inline]
+    fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Result<RawSignature, CryptoError> {
+        let key = k256::ecdsa::SigningKey::from_bytes(chain_keypair.secret().as_ref().into())
+            .map_err(|_| CryptoError::InvalidInputValue("chain_keypair"))?;
+        let (sig, rec) = key
+            .sign_prehash_recoverable(hash.as_ref())
+            .map_err(|_| CryptoError::CalculationError)?;
+
+        Ok((sig.to_bytes().into(), rec.to_byte()))
+    }
+
+    #[inline]
+    fn verify_hash(signature: &RawSignature, hash: &Hash, public_key: &PublicKey) -> Result<bool, CryptoError> {
+        use k256::ecdsa::signature::hazmat::PrehashVerifier;
+
+        let pub_key = k256::ecdsa::VerifyingKey::from_sec1_bytes(&public_key.to_uncompressed_bytes())
+            .map_err(|_| CryptoError::InvalidInputValue("public key"))?;
+
+        if let Ok(signature) = k256::ecdsa::Signature::try_from(signature.0.as_ref()) {
+            Ok(pub_key.verify_prehash(hash.as_ref(), &signature).is_ok())
+        } else {
+            Err(CryptoError::InvalidInputValue("signature"))
+        }
+    }
+
+    #[inline]
+    fn recover_from_hash(signature: &RawSignature, hash: &Hash) -> Result<PublicKey, CryptoError> {
+        let sig = k256::ecdsa::Signature::from_bytes(&signature.0.into())
+            .map_err(|_| CryptoError::InvalidInputValue("signature.sig"))?;
+
+        let recid = k256::ecdsa::RecoveryId::try_from(signature.1)
+            .map_err(|_| CryptoError::InvalidInputValue("signature.recid"))?;
+
+        let recovered_key = k256::ecdsa::VerifyingKey::recover_from_prehash(hash.as_ref(), &sig, recid)
+            .map_err(|_| CryptoError::SignatureVerification)?;
+
+        (*recovered_key.as_affine()).try_into()
+    }
+}
+
+/// ECDSA signing engine based on the fast [`secp256k1`](https://docs.rs/secp256k1/latest/secp256k1/) crate.
+///
+/// The crate uses bindings to the Bitcoin secp256k1 C library.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativeEcdsaSigningEngine;
+
+impl EcdsaSigningEngine for NativeEcdsaSigningEngine {
+    fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Result<RawSignature, CryptoError> {
+        let sk_arr: &generic_array::GenericArray<u8, typenum::U32> = chain_keypair.secret().into();
+        let sk = secp256k1::SecretKey::from_byte_array(sk_arr.into_array())
+            .map_err(|_| CryptoError::InvalidInputValue("chain_keypair"))?;
+
+        let sig =
+            secp256k1::global::SECP256K1.sign_ecdsa_recoverable(secp256k1::Message::from_digest(hash.into()), &sk);
+        let (recid, sig) = sig.serialize_compact();
+        Ok((sig, i32::from(recid) as u8))
+    }
+
+    fn verify_hash(signature: &RawSignature, hash: &Hash, public_key: &PublicKey) -> Result<bool, CryptoError> {
+        let pk = secp256k1::PublicKey::from_slice(&public_key.to_uncompressed_bytes())
+            .map_err(|_| CryptoError::InvalidInputValue("public key"))?;
+
+        let sig = secp256k1::ecdsa::Signature::from_compact(&signature.0)
+            .map_err(|_| CryptoError::InvalidInputValue("signature"))?;
+
+        Ok(secp256k1::global::SECP256K1
+            .verify_ecdsa(secp256k1::Message::from_digest(hash.into()), &sig, &pk)
+            .is_ok())
+    }
+
+    fn recover_from_hash(signature: &RawSignature, hash: &Hash) -> Result<PublicKey, CryptoError> {
+        let sig = secp256k1::ecdsa::RecoverableSignature::from_compact(
+            &signature.0,
+            secp256k1::ecdsa::RecoveryId::from_u8_masked(signature.1),
+        )
+        .map_err(|_| CryptoError::InvalidInputValue("signature"))?;
+
+        let pk = secp256k1::global::SECP256K1
+            .recover_ecdsa(secp256k1::Message::from_digest(hash.into()), &sig)
+            .map_err(|_| CryptoError::SignatureVerification)?;
+
+        PublicKey::try_from(pk.serialize_uncompressed().as_ref()).map_err(|_| CryptoError::CalculationError)
+    }
+}
+
 /// Represents an ECDSA signature based on the secp256k1 curve with a recoverable public key.
+/// The signature uses [Keccak256](Hash) as the hash function.
 ///
 /// This signature encodes the 2-bit recovery information into the
 /// uppermost bits from MSB of the `S` value, which are never used by this ECDSA
@@ -18,141 +123,106 @@ use crate::prelude::*;
 /// already embedded in `S`.
 ///
 /// See [EIP-2098](https://eips.ethereum.org/EIPS/eip-2098) for details.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Signature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
+pub struct ChainSignature<E>(
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; ECDSA_SIGNATURE_SIZE],
+    PhantomData<E>,
+);
 
-impl Signature {
-    fn new(raw_bytes: [u8; Self::SIZE], recovery: u8) -> Signature {
-        let mut ret = Self(raw_bytes);
+impl<E: EcdsaSigningEngine> ChainSignature<E> {
+    fn new(raw: RawSignature) -> Self {
+        let mut ret = Self(raw.0, PhantomData);
 
         // Embed the parity recovery bit into the S value
-        let parity = recovery & 0x01;
+        let parity = raw.1 & 0x01;
         ret.0[Self::SIZE / 2] &= 0x7f;
         ret.0[Self::SIZE / 2] |= parity << 7;
 
         ret
     }
 
-    fn sign<S>(data: &[u8], private_key: &[u8], signing_method: S) -> Signature
-    where
-        S: FnOnce(&SigningKey, &[u8]) -> ecdsa::signature::Result<(ECDSASignature, RecoveryId)>,
-    {
-        let key = SigningKey::from_bytes(private_key.into()).expect("invalid signing key");
-        let (sig, rec) = signing_method(&key, data).expect("signing failed");
-
-        Self::new(sig.to_bytes().into(), rec.to_byte())
-    }
-
-    /// Signs the given message using the chain private key.
-    pub fn sign_message(message: &[u8], chain_keypair: &ChainKeypair) -> Signature {
-        Self::sign(
-            message,
-            chain_keypair.secret().as_ref(),
-            |k: &SigningKey, data: &[u8]| k.sign_recoverable(data),
-        )
-    }
-
-    /// Signs the given hash using the raw private key.
-    pub fn sign_hash(hash: &[u8], chain_keypair: &ChainKeypair) -> Signature {
-        Self::sign(hash, chain_keypair.secret().as_ref(), |k: &SigningKey, data: &[u8]| {
-            k.sign_prehash_recoverable(data)
-        })
-    }
-
-    fn verify<V>(&self, message: &[u8], public_key: &[u8], verifier: V) -> bool
-    where
-        V: FnOnce(&VerifyingKey, &[u8], &ECDSASignature) -> ecdsa::signature::Result<()>,
-    {
-        let pub_key = VerifyingKey::from_sec1_bytes(public_key).expect("invalid public key");
-
-        if let Ok(signature) = ECDSASignature::try_from(self.raw_signature().0.as_ref()) {
-            verifier(&pub_key, message, &signature).is_ok()
-        } else {
-            warn!("un-parseable signature encountered");
-            false
-        }
-    }
-
-    /// Verifies this signature against the given message and a public key object
-    pub fn verify_message(&self, message: &[u8], public_key: &PublicKey) -> bool {
-        self.verify(message, &public_key.to_uncompressed_bytes(), |k, msg, sgn| {
-            k.verify(msg, sgn)
-        })
-    }
-
-    /// Verifies this signature against the given hash and a public key object
-    pub fn verify_hash(&self, hash: &[u8], public_key: &PublicKey) -> bool {
-        self.verify(hash, &public_key.to_uncompressed_bytes(), |k, msg, sgn| {
-            k.verify_prehash(msg, sgn)
-        })
-    }
-
     /// Returns the raw signature, without the encoded public key recovery bit and
     /// the recovery parity bit as a separate value.
-    pub fn raw_signature(&self) -> ([u8; Self::SIZE], u8) {
+    pub fn raw_signature(&self) -> RawSignature {
         let mut raw_sig = self.0;
         let parity: u8 = (raw_sig[Self::SIZE / 2] & 0x80 != 0).into();
         raw_sig[Self::SIZE / 2] &= 0x7f;
         (raw_sig, parity)
     }
 
-    fn recover<R>(&self, msg: &[u8], recovery_method: R) -> crate::errors::Result<PublicKey>
-    where
-        R: Fn(&[u8], &ECDSASignature, RecoveryId) -> ecdsa::signature::Result<VerifyingKey>,
-    {
-        let (sig, parity) = self.raw_signature();
-        let signature = ECDSASignature::from_bytes(&sig.into()).map_err(|_| ParseError("Signature".into()))?;
+    /// Signs the given message using the chain private key.
+    #[inline]
+    pub fn sign_message(message: &[u8], chain_keypair: &ChainKeypair) -> Self {
+        Self::sign_hash(&Hash::create(&[message]), chain_keypair)
+    }
 
-        // Try both candidates for the missing x-reduction bit (0 and 2).
-        for alt in [0u8, 2u8] {
-            if let Ok(recid) = RecoveryId::try_from(parity | alt) {
-                if let Ok(recovered_key) = recovery_method(msg, &signature, recid) {
-                    return (*recovered_key.as_affine()).try_into();
-                }
-            }
-        }
-        Err(CryptoError::CalculationError)
+    /// Signs the given hash using the raw private key.
+    #[inline]
+    pub fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Self {
+        Self::new(
+            E::sign_hash(hash, chain_keypair).expect("signing cannot fail: keypair always contains a valid secret key"),
+        )
+    }
+
+    /// Verifies this signature against the given message and a public key object
+    #[inline]
+    pub fn verify_message(&self, message: &[u8], public_key: &PublicKey) -> crate::errors::Result<bool> {
+        self.verify_hash(&Hash::create(&[message]), public_key)
+    }
+
+    /// Verifies this signature against the given hash and a public key object
+    #[inline]
+    pub fn verify_hash(&self, hash: &Hash, public_key: &PublicKey) -> crate::errors::Result<bool> {
+        E::verify_hash(&self.raw_signature(), hash, public_key)
     }
 
     /// Recovers signer public key if this signature is a valid signature of the given `msg`.
     #[inline]
     pub fn recover_from_msg(&self, msg: &[u8]) -> crate::errors::Result<PublicKey> {
-        self.recover(msg, VerifyingKey::recover_from_msg)
+        self.recover_from_hash(&Hash::create(&[msg]))
     }
 
     /// Recovers signer public key if this signature is a valid signature of the given `hash`.
     #[inline]
-    pub fn recover_from_hash(&self, hash: &[u8]) -> crate::errors::Result<PublicKey> {
-        self.recover(hash, VerifyingKey::recover_from_prehash)
+    pub fn recover_from_hash(&self, hash: &Hash) -> crate::errors::Result<PublicKey> {
+        // We saved only the parity bit in the S value, so test both x-coordinate signs.
+        let (sig, parity) = self.raw_signature();
+        for alt in [0u8, 2u8] {
+            if let Ok(pk) = E::recover_from_hash(&(sig, parity | alt), hash) {
+                return Ok(pk);
+            }
+        }
+        Err(CryptoError::CalculationError)
     }
 }
 
-impl AsRef<[u8]> for Signature {
+impl<E> AsRef<[u8]> for ChainSignature<E> {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl TryFrom<&[u8]> for Signature {
+impl<E> TryFrom<&[u8]> for ChainSignature<E> {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError("Signature".into()))?))
+        Ok(Self(
+            value.try_into().map_err(|_| ParseError("Signature".into()))?,
+            PhantomData,
+        ))
     }
 }
 
-impl BytesRepresentable for Signature {
-    const SIZE: usize = 64;
+impl<E> BytesRepresentable for ChainSignature<E> {
+    const SIZE: usize = ECDSA_SIGNATURE_SIZE;
 }
 
-impl PartialEq for Signature {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.eq(&other.0)
-    }
-}
+#[cfg(not(feature = "rust-ecdsa"))]
+pub type Signature = ChainSignature<NativeEcdsaSigningEngine>;
 
-impl Eq for Signature {}
+#[cfg(feature = "rust-ecdsa")]
+pub type Signature = ChainSignature<K256EcdsaSigningEngine>;
 
 /// Represents an EdDSA signature using the Ed25519 Edwards curve.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -160,7 +230,7 @@ impl Eq for Signature {}
 pub struct OffchainSignature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl OffchainSignature {
-    /// Sign the given message using the [OffchainKeypair].
+    /// Sign the given message using the [`OffchainKeypair`].
     pub fn sign_message(msg: &[u8], signing_keypair: &OffchainKeypair) -> Self {
         // Expand the SK from the given keypair
         let expanded_sk = ed25519_dalek::hazmat::ExpandedSecretKey::from(
@@ -246,43 +316,44 @@ mod tests {
     #[test]
     fn test_sign_and_recover() -> anyhow::Result<()> {
         let msg = hex!("eff80b9f035b1d369c6a60f362ac7c8b8c3b61b76d151d1be535145ccaa3e83e");
+        let hash = Hash::create(&[&msg]);
 
         let kp = ChainKeypair::from_secret(&PRIVATE_KEY)?;
 
         let signature1 = Signature::sign_message(&msg, &kp);
-        let signature2 = Signature::sign_hash(&msg, &kp);
+        let signature2 = Signature::sign_hash(&hash, &kp);
 
         let pub_key1 = PublicKey::from_privkey(&PRIVATE_KEY)?;
         let pub_key2 = signature1.recover_from_msg(&msg)?;
-        let pub_key3 = signature2.recover_from_hash(&msg)?;
+        let pub_key3 = signature2.recover_from_hash(&hash)?;
 
         assert_eq!(pub_key1, *kp.public());
         assert_eq!(pub_key1, pub_key2, "recovered public key does not match");
         assert_eq!(pub_key1, pub_key3, "recovered public key does not match");
 
         assert!(
-            signature1.verify_message(&msg, &pub_key1),
+            signature1.verify_message(&msg, &pub_key1)?,
             "signature 1 verification failed with pub key 1"
         );
         assert!(
-            signature1.verify_message(&msg, &pub_key2),
+            signature1.verify_message(&msg, &pub_key2)?,
             "signature 1 verification failed with pub key 2"
         );
         assert!(
-            signature1.verify_message(&msg, &pub_key3),
+            signature1.verify_message(&msg, &pub_key3)?,
             "signature 1 verification failed with pub key 3"
         );
 
         assert!(
-            signature2.verify_hash(&msg, &pub_key1),
+            signature2.verify_hash(&hash, &pub_key1)?,
             "signature 2 verification failed with pub key 1"
         );
         assert!(
-            signature2.verify_hash(&msg, &pub_key2),
+            signature2.verify_hash(&hash, &pub_key2)?,
             "signature 2 verification failed with pub key 2"
         );
         assert!(
-            signature2.verify_hash(&msg, &pub_key3),
+            signature2.verify_hash(&hash, &pub_key3)?,
             "signature 2 verification failed with pub key 3"
         );
 

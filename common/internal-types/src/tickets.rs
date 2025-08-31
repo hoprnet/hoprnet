@@ -455,7 +455,7 @@ impl TicketBuilder {
     /// the given hash.
     pub fn build_verified(self, hash: Hash) -> errors::Result<VerifiedTicket> {
         if let Some(signature) = self.signature {
-            let issuer = signature.recover_from_hash(hash.as_ref())?.to_address();
+            let issuer = signature.recover_from_hash(&hash)?.to_address();
             Ok(VerifiedTicket(self.build()?, hash, issuer))
         } else {
             Err(InvalidInputData("signature is missing".into()))
@@ -608,7 +608,7 @@ impl Ticket {
     /// If a signature was already present, it will be replaced.
     pub fn sign(mut self, signing_key: &ChainKeypair, domain_separator: &Hash) -> VerifiedTicket {
         let ticket_hash = self.get_hash(domain_separator);
-        self.signature = Some(Signature::sign_hash(ticket_hash.as_ref(), signing_key));
+        self.signature = Some(Signature::sign_hash(&ticket_hash, signing_key));
         VerifiedTicket(self, ticket_hash, signing_key.public().to_address())
     }
 
@@ -624,7 +624,7 @@ impl Ticket {
         let ticket_hash = self.get_hash(domain_separator);
 
         if let Some(signature) = &self.signature {
-            match signature.recover_from_hash(ticket_hash.as_ref()) {
+            match signature.recover_from_hash(&ticket_hash) {
                 Ok(pk) if pk.to_address().eq(issuer) => Ok(VerifiedTicket(self, ticket_hash, *issuer)),
                 Err(e) => {
                     error!("failed to verify ticket signature: {e}");
