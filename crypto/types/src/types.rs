@@ -20,7 +20,6 @@ use k256::{AffinePoint, Secp256k1, elliptic_curve::{
     point::NonIdentity,
     sec1::{FromEncodedPoint, ToEncodedPoint},
 }};
-
 use libp2p_identity::PeerId;
 use sha3::Keccak256;
 use typenum::Unsigned;
