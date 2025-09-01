@@ -4707,6 +4707,7 @@ dependencies = [
  "chrono",
  "dashmap",
  "futures",
+ "hex",
  "hex-literal",
  "hopr-async-runtime",
  "hopr-crypto-packet",

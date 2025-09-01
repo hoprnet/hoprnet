@@ -20,7 +20,6 @@ use hopr_primitive_types::{
 };
 use moka::{Expiry, future::Cache, notification::RemovalCause};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-
 use crate::errors::DbSqlError;
 
 /// Lists all singular data that can be cached and
@@ -214,12 +213,12 @@ impl Default for HoprDbCaches {
 impl HoprDbCaches {
     pub(crate) fn insert_pseudonym_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
         self.pseudonym_openers
-            .get_with(sender_id.pseudonym(), || {
+            .get_with(sender_id.pseudonym(), move || {
                 moka::sync::Cache::builder()
                     .time_to_live(Duration::from_secs(3600))
-                    .eviction_listener(|sender_id, _reply_opener, cause| {
+                    .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
                         if cause != RemovalCause::Explicit {
-                            tracing::warn!(?sender_id, ?cause, "evicting reply opener for sender id");
+                            tracing::warn!(pseudonym = %sender_id.pseudonym(), surb_id = hex::encode(id.as_slice()), ?cause, "evicting reply opener for sender id");
                         }
                     })
                     .max_capacity(100_000)

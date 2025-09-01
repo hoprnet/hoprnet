@@ -20,14 +20,16 @@ use crate::{
     },
     prelude::{HalfKey, SecretKey},
 };
+use crate::types::PublicKey;
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
 pub(crate) fn random_group_element() -> ([u8; 32], NonIdentity<AffinePoint>) {
     // Since sep256k1 has a group of prime order, a non-zero scalar cannot result into an identity point.
     let scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
-    let point = NonIdentity::new(k256::ProjectivePoint::GENERATOR * scalar.as_ref());
-    (scalar.to_bytes().into(), point.unwrap().to_affine())
+    let point = PublicKey::from_privkey(&scalar.to_bytes())
+        .expect("non-zero scalar cannot represent an invalid public key");
+    (scalar.to_bytes().into(), point.into())
 }
 
 /// Creates X25519 secret scalar (also compatible with Ed25519 scalar) from the given bytes.
@@ -59,6 +61,7 @@ pub fn k256_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<k256::Scala
 }
 
 /// Sample a random secp256k1 field element that can represent a valid secp256k1 point.
+///
 /// The implementation uses the ` hash_to_field ` function as defined in
 /// `<https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field>`
 /// The `secret` must be at least `SecretKey::LENGTH` long.

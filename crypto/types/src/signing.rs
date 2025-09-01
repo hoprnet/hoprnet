@@ -9,8 +9,8 @@ const ECDSA_SIGNATURE_SIZE: usize = 64;
 
 type RawSignature = ([u8; ECDSA_SIGNATURE_SIZE], u8);
 
-/// Trait for ECDSA signing engines.
-pub trait EcdsaSigningEngine {
+/// Trait for ECDSA signature engines.
+pub trait EcdsaEngine {
     /// Sign the given `hash` with the private key from the `chain_keypair`.
     fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Result<RawSignature, CryptoError>;
     /// Verify the given `signature` against the `hash` and the `public_key`.
@@ -26,7 +26,7 @@ pub trait EcdsaSigningEngine {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct K256EcdsaSigningEngine;
 #[cfg(feature = "rust-ecdsa")]
-impl EcdsaSigningEngine for K256EcdsaSigningEngine {
+impl EcdsaEngine for K256EcdsaSigningEngine {
     #[inline]
     fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Result<RawSignature, CryptoError> {
         let key = k256::ecdsa::SigningKey::from_bytes(chain_keypair.secret().as_ref().into())
@@ -73,7 +73,7 @@ impl EcdsaSigningEngine for K256EcdsaSigningEngine {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NativeEcdsaSigningEngine;
 
-impl EcdsaSigningEngine for NativeEcdsaSigningEngine {
+impl EcdsaEngine for NativeEcdsaSigningEngine {
     fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Result<RawSignature, CryptoError> {
         let sk_arr: &generic_array::GenericArray<u8, typenum::U32> = chain_keypair.secret().into();
         let sk = secp256k1::SecretKey::from_byte_array(sk_arr.into_array())
@@ -130,7 +130,7 @@ pub struct ChainSignature<E>(
     PhantomData<E>,
 );
 
-impl<E: EcdsaSigningEngine> ChainSignature<E> {
+impl<E: EcdsaEngine> ChainSignature<E> {
     fn new(raw: RawSignature) -> Self {
         let mut ret = Self(raw.0, PhantomData);
 

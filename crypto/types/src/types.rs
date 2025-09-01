@@ -15,14 +15,12 @@ use digest::Digest;
 use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use hopr_crypto_random::Randomizable;
 use hopr_primitive_types::{errors::GeneralError::ParseError, prelude::*};
-use k256::{
-    AffinePoint, Secp256k1,
-    elliptic_curve::{
-        self,
-        point::NonIdentity,
-        sec1::{FromEncodedPoint, ToEncodedPoint},
-    },
-};
+use k256::{AffinePoint, Secp256k1, elliptic_curve::{
+    self,
+    point::NonIdentity,
+    sec1::{FromEncodedPoint, ToEncodedPoint},
+}};
+
 use libp2p_identity::PeerId;
 use sha3::Keccak256;
 use typenum::Unsigned;
@@ -512,15 +510,27 @@ impl PublicKey {
     /// The private key must be a big-endian encoding of a non-zero scalar in the field
     /// of the `secp256k1` curve.
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {
-        // This verifies that it is indeed a non-zero scalar, and thus represents a valid public key
-        let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key)
-            .map_err(|_| GeneralError::ParseError("PublicKey".into()))?;
+        #[cfg(feature = "rust-ecdsa")]
+        {
+            // This verifies that it is indeed a non-zero scalar, and thus represents a valid public key
+            let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key)
+                .map_err(|_| GeneralError::ParseError("PublicKey".into()))?;
 
-        Ok(
             elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar)
                 .to_nonidentity()
-                .into(),
-        )
+                .into()
+        }
+
+        #[cfg(not(feature = "rust-ecdsa"))]
+        {
+            let sk = secp256k1::SecretKey::from_byte_array(private_key.try_into().map_err(|_| GeneralError::ParseError("private_key.len".into()))?)
+                .map_err(|_| GeneralError::ParseError("private_key".into()))?;
+
+            let pk = secp256k1::PublicKey::from_secret_key_global(&sk);
+            affine_point_from_bytes(&pk.serialize_uncompressed())
+                .and_then(|p| NonIdentity::new(p).into_option().ok_or(CryptoError::InvalidPublicKey))
+                .map(Self::from)
+        }
     }
 
     /// Converts the public key to an Ethereum address
