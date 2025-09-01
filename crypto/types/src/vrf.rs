@@ -1,3 +1,4 @@
+use generic_array::GenericArray;
 use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::prelude::*;
 use k256::{
@@ -201,6 +202,7 @@ impl VrfParameters {
 /// Takes a private key, the corresponding Ethereum address and a payload
 /// and creates all parameters that are required by the smart contract
 /// to prove that a ticket is a win.
+#[cfg(feature = "rust-ecdsa")]
 #[allow(non_snake_case)]
 pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     msg: T,
@@ -241,6 +243,68 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     let s = r + h * a;
 
     Ok(VrfParameters { V: V.to_affine(), h, s })
+}
+
+/// Takes a private key, the corresponding Ethereum address and a payload
+/// and creates all parameters that are required by the smart contract
+/// to prove that a ticket is a win.
+#[cfg(not(feature = "rust-ecdsa"))]
+#[allow(non_snake_case)]
+pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
+    msg: T,
+    chain_keypair: &ChainKeypair,
+    dst: &[u8],
+) -> crate::errors::Result<VrfParameters> {
+    let chain_addr = chain_keypair.public().to_address();
+    let B = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg.as_ref()], &[dst])?
+        .to_affine();
+
+    let gen_a: &GenericArray<u8, typenum::U32> = chain_keypair.secret().into();
+    let a = secp256k1::Scalar::from_be_bytes(gen_a.into_array())
+        .map_err(|_| crate::errors::CryptoError::InvalidSecretScalar)?;
+
+    let B_pk = secp256k1::PublicKey::from_byte_array_uncompressed(
+        B.to_encoded_point(false)
+            .as_bytes()
+            .try_into()
+            .map_err(|_| crate::errors::CryptoError::InvalidPublicKey)?,
+    )
+    .map_err(|_| crate::errors::CryptoError::InvalidPublicKey)?;
+
+    let V = B_pk
+        .mul_tweak(secp256k1::global::SECP256K1, &a)
+        .map_err(|_| crate::errors::CryptoError::CalculationError)?;
+
+    let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+        &[
+            &a.to_be_bytes(),
+            &V.serialize_uncompressed()[1..],
+            &random_bytes::<64>(),
+        ],
+        &[dst],
+    )?;
+
+    let r_scalar = secp256k1::Scalar::from_be_bytes(r.to_bytes().into())
+        .map_err(|_| crate::errors::CryptoError::InvalidSecretScalar)?;
+
+    let R_v = B_pk
+        .mul_tweak(secp256k1::global::SECP256K1, &r_scalar)
+        .map_err(|_| crate::errors::CryptoError::CalculationError)?;
+
+    let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+        &[
+            chain_addr.as_ref(),
+            &V.serialize_uncompressed()[1..],
+            &R_v.serialize_uncompressed()[1..],
+            msg.as_ref(),
+        ],
+        &[dst],
+    )?;
+    let s = r + h * Scalar::from(chain_keypair);
+
+    let V = affine_point_from_bytes(&V.serialize_uncompressed()).map_err(|_| CalculationError)?;
+
+    Ok(VrfParameters { V, h, s })
 }
 
 #[cfg(test)]
