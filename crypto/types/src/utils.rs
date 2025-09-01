@@ -2,10 +2,11 @@ use cipher::zeroize;
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_random::{Randomizable, random_array};
 use k256::{
-    Secp256k1,
+    AffinePoint, Secp256k1,
     elliptic_curve::{
-        Group, PrimeField,
+        PrimeField,
         hash2curve::{ExpandMsgXmd, GroupDigest},
+        point::NonIdentity,
     },
 };
 use sha3::Sha3_256;
@@ -22,14 +23,11 @@ use crate::{
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
-pub(crate) fn random_group_element() -> ([u8; 32], crate::types::CurvePoint) {
-    let mut scalar = k256::NonZeroScalar::from_uint(1u32.into()).unwrap();
-    let mut point = k256::ProjectivePoint::IDENTITY;
-    while point.is_identity().into() {
-        scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
-        point = k256::ProjectivePoint::GENERATOR * scalar.as_ref();
-    }
-    (scalar.to_bytes().into(), point.to_affine().into())
+pub(crate) fn random_group_element() -> ([u8; 32], NonIdentity<AffinePoint>) {
+    // Since sep256k1 has a group of prime order, a non-zero scalar cannot result into an identity point.
+    let scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
+    let point = NonIdentity::new(k256::ProjectivePoint::GENERATOR * scalar.as_ref());
+    (scalar.to_bytes().into(), point.unwrap().to_affine())
 }
 
 /// Creates X25519 secret scalar (also compatible with Ed25519 scalar) from the given bytes.
@@ -170,5 +168,16 @@ impl<L: ArrayLength> Randomizable for SecretValue<L> {
     /// Generates cryptographically strong random secret value.
     fn random() -> Self {
         Self(random_array())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sample_field_element() {
+        let secret = [1u8; SecretKey::LENGTH];
+        assert!(sample_secp256k1_field_element(&secret, "TEST_TAG").is_ok());
     }
 }

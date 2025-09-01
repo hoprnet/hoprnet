@@ -1,5 +1,7 @@
 //! This Rust crate contains implementation of common cryptographic types.
 
+extern crate core;
+
 /// Contains error enum implementation used across other `hopr-crypto-...` crates
 pub mod errors;
 /// Implements [ChainKeypair](keypairs::ChainKeypair) and [OffchainKeypair](keypairs::OffchainKeypair),
@@ -11,6 +13,8 @@ pub mod primitives;
 /// Enables randomized encryption (sealing)
 /// and decryption of data using [`OffchainKeypair`](keypairs::OffchainKeypair).
 pub mod seal;
+/// Separate module for signature algorithms.
+pub mod signing;
 /// Implements basic cryptography-related types based on [primitives], such as [Hash](types::Hash),
 /// [PublicKey](types::PublicKey) and [Signature](types::Signature).
 pub mod types;
@@ -42,6 +46,6 @@ pub mod prelude {
     pub use libp2p_identity::PeerId;
 
     pub use super::{
-        crypto_traits, errors::CryptoError, keypairs::*, primitives::*, seal::*, types::*, utils::*, vrf::*,
+        crypto_traits, errors::CryptoError, keypairs::*, primitives::*, seal::*, signing::*, types::*, utils::*, vrf::*,
     };
 }
