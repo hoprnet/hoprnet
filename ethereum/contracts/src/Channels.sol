@@ -22,36 +22,36 @@ abstract contract HoprChannelsEvents {
      * Includes source and destination separately because mapping
      * (source, destination) -> channelId destroys information.
      */
-    event ChannelOpened(bytes32 indexed channelId, address indexed source, address indexed destination, HoprChannels.Channel channel);
+    event ChannelOpened(bytes32 indexed channelId, address indexed source, address indexed destination, bytes32 channel);
 
     /**
      * Emitted once balance of a channel is increased, e.g. after opening a
      * channel or redeeming a ticket.
      */
-    event ChannelBalanceIncreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
+    event ChannelBalanceIncreased(bytes32 indexed channelId, bytes32 channel);
 
     /**
      * Emitted once balance of a channel is decreased, e.g. when redeeming
      * a ticket or closing a channel.
      */
-    event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
+    event ChannelBalanceDecreased(bytes32 indexed channelId, bytes32 channel);
 
     /**
      * Emitted once a party initiates the closure of an outgoing
      * channel. Includes the timestamp when the notice period is due.
      */
-    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureTime);
+    event OutgoingChannelClosureInitiated(bytes32 indexed channelId, bytes32 channel);
 
     /**
      * Emitted once a channel closure is finalized.
      */
-    event ChannelClosed(bytes32 indexed channelId);
+    event ChannelClosed(bytes32 indexed channelId, bytes32 channel);
 
     /**
      * Emitted once a ticket is redeemed. Includes latest ticketIndex
      * since this value is necessary for issuing and validating tickets.
      */
-    event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTicketIndex);
+    event TicketRedeemed(bytes32 indexed channelId, bytes32 channel);
 
     /**
      * Emitted once the domain separator is updated.
@@ -60,53 +60,19 @@ abstract contract HoprChannelsEvents {
 }
 
 /**
- *    &&&&
- *    &&&&
- *    &&&&
- *    &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
- *    &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
- *     &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
- *     &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
- *     &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
- *     %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
- *    %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
- *                                          %%%%
- *                                          %%%%
- *                                          %%%%
- *
- * Manages mixnet incentives in the hopr network.
- *
+ * @dev Essential type definitions for managing channels
+ * Separate them to ensure that channels state is stored in slot 0
+ * @notice The following imported types should be renamed:
+ * - HoprChannels.Balance -> HoprChannelsType.Balance
+ * - HoprChannels.TicketIndex -> HoprChannelsType.TicketIndex
+ * - HoprChannels.TicketIndexOffset -> HoprChannelsType.TicketIndexOffset
+ * - HoprChannels.ChannelEpoch -> HoprChannelsType.ChannelEpoch
+ * - HoprChannels.Timestamp -> HoprChannelsType.Timestamp
+ * - HoprChannels.WinProb -> HoprChannelsType.WinProb
+ * - HoprChannels.ChannelStatus -> HoprChannelsType.ChannelStatus
+ * - HoprChannels.Channel -> HoprChannelsType.Channel
  */
-contract HoprChannels is
-    IERC777Recipient,
-    ERC1820Implementer,
-    Multicall,
-    HoprLedger(INDEX_SNAPSHOT_INTERVAL),
-    HoprMultiSig,
-    HoprCrypto,
-    HoprChannelsEvents
-{
-    // required by ERC1820 spec
-    IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
-    // required by ERC777 spec
-    bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
-    // maximum balance that can be staked in a channel. 1% of total supply, staking more is not sound
-    Balance public constant MAX_USED_BALANCE = Balance.wrap(10 ** 25);
-    // minimum balance that must be staked in a channel. No empty token transactions
-    Balance public constant MIN_USED_BALANCE = Balance.wrap(1);
-    // Version of the contract
-    string public constant VERSION = "2.0.0";
-
-    // ERC-777 tokensReceived hook, fundChannelMulti
-    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE =
-        abi.encodePacked(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
-    // ERC-777 tokensReceived hook, fundChannel
-    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encodePacked(address(0), address(0)).length;
-    // Token that will be used for all interactions.
-    IERC20 public immutable token;
-    // Notice period before fund from an outgoing channel can be pulled out.
-    Timestamp public immutable noticePeriodChannelClosure; // in seconds
-
+abstract contract HoprChannelsType {
     type Balance is uint96;
     type TicketIndex is uint48;
     type TicketIndexOffset is uint32;
@@ -115,28 +81,11 @@ contract HoprChannels is
     // Using IEEE 754 double precision -> 53 significant bits
     type WinProb is uint56;
 
-    error InvalidBalance();
-    error BalanceExceedsGlobalPerChannelAllowance();
-    error SourceEqualsDestination();
-    error ZeroAddress(string reason);
-    error TokenTransferFailed();
-    error InvalidNoticePeriod();
-    error NoticePeriodNotDue();
-    error WrongChannelState(string reason);
-    error InvalidTicketSignature();
-    error InvalidVRFProof();
-    error InsufficientChannelBalance();
-    error TicketIsNotAWin();
-    error InvalidAggregatedTicketInterval();
-    error WrongToken();
-    error InvalidTokenRecipient();
-    error InvalidTokensReceivedUsage();
-
     /**
      * @dev Channel state machine
      *                                  redeemTicket()
      *                                     ┌──────┐
-     * finalizeOutgoingChannelClosure()            v      │
+     * finalizeOutgoingChannelClosure()           v      
      *  (after notice period), or  ┌──────────────────────┐
      *  closeIncomingChannel()     │                      │ initiateOutgoingChannelClosure()
      *            ┌────────────────│   Pending To Close   │<─────────────────┐
@@ -175,6 +124,97 @@ contract HoprChannels is
         // (uint8) current state of the channel
         ChannelStatus status;
     }
+
+    // Stores channels, indexed by their channelId. Storage slot 0
+    mapping(bytes32 => Channel) public channels;
+
+    /**
+     * Get the current state of a channel in a compact format
+     */
+    function channelState(bytes32 channelId) external view returns (bytes32 state) {
+        return _channelState(channelId);
+    }
+
+    /**
+     * Gets the state of a channel.
+     *
+     * @param channelId The ID of the channel to get the state for.
+     * @return state The state of the channel.
+     */
+    function _channelState(bytes32 channelId) internal view returns (bytes32 state) {
+        // Get the channel state from the storage slot
+        bytes32 slot = keccak256(abi.encode(channelId, 0));
+        assembly {
+            state := sload(slot)
+        }
+    }
+}
+
+/**
+ *    &&&&
+ *    &&&&
+ *    &&&&
+ *    &&&&  &&&&&&&&&       &&&&&&&&&&&&          &&&&&&&&&&/   &&&&.&&&&&&&&&
+ *    &&&&&&&&&   &&&&&   &&&&&&     &&&&&,     &&&&&    &&&&&  &&&&&&&&   &&&&
+ *     &&&&&&      &&&&  &&&&#         &&&&   &&&&&       &&&&& &&&&&&     &&&&&
+ *     &&&&&       &&&&/ &&&&           &&&& #&&&&        &&&&  &&&&&
+ *     &&&&         &&&& &&&&&         &&&&  &&&&        &&&&&  &&&&&
+ *     %%%%        /%%%%   %%%%%%   %%%%%%   %%%%  %%%%%%%%%    %%%%%
+ *    %%%%%        %%%%      %%%%%%%%%%%    %%%%   %%%%%%       %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *                                          %%%%
+ *
+ * Manages mixnet incentives in the hopr network.
+ *
+ */
+contract HoprChannels is
+    HoprChannelsType,
+    IERC777Recipient,
+    ERC1820Implementer,
+    Multicall,
+    HoprLedger(INDEX_SNAPSHOT_INTERVAL),
+    HoprMultiSig,
+    HoprCrypto,
+    HoprChannelsEvents
+{
+    // required by ERC1820 spec
+    IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
+    // required by ERC777 spec
+    bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
+    // maximum balance that can be staked in a channel. 1% of total supply, staking more is not sound
+    Balance public constant MAX_USED_BALANCE = Balance.wrap(10 ** 25);
+    // minimum balance that must be staked in a channel. No empty token transactions
+    Balance public constant MIN_USED_BALANCE = Balance.wrap(1);
+    // Version of the contract
+    string public constant VERSION = "2.0.0";
+
+    // ERC-777 tokensReceived hook, fundChannelMulti
+    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE =
+        abi.encodePacked(address(0), Balance.wrap(0), address(0), Balance.wrap(0)).length;
+    // ERC-777 tokensReceived hook, fundChannel
+    uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encodePacked(address(0), address(0)).length;
+    // Token that will be used for all interactions.
+    IERC20 public immutable token;
+    // Notice period before fund from an outgoing channel can be pulled out.
+    Timestamp public immutable noticePeriodChannelClosure; // in seconds
+
+    error InvalidBalance();
+    error BalanceExceedsGlobalPerChannelAllowance();
+    error SourceEqualsDestination();
+    error ZeroAddress(string reason);
+    error TokenTransferFailed();
+    error InvalidNoticePeriod();
+    error NoticePeriodNotDue();
+    error WrongChannelState(string reason);
+    error InvalidTicketSignature();
+    error InvalidVRFProof();
+    error InsufficientChannelBalance();
+    error TicketIsNotAWin();
+    error InvalidAggregatedTicketInterval();
+    error WrongToken();
+    error InvalidTokenRecipient();
+    error InvalidTokensReceivedUsage();
 
     /**
      * Represents a ticket that can be redeemed using `redeemTicket` function.
@@ -216,8 +256,6 @@ contract HoprChannels is
 
     // Domain separator for EIP-712 signatures
     bytes32 public domainSeparator;
-    // Stores channels, indexed by their channelId. Storage slot 1
-    mapping(bytes32 => Channel) public channels;
 
     /**
      * @dev This contracts contains ERC1820 implementation logic 'ERC777TokensRecipient' only for itself.
@@ -417,14 +455,14 @@ contract HoprChannels is
         indexEvent(
             abi.encodePacked(ChannelBalanceDecreased.selector, redeemable.data.channelId, spendingChannel.balance)
         );
-        emit ChannelBalanceDecreased(redeemable.data.channelId, spendingChannel.balance);
-
+        emit ChannelBalanceDecreased(redeemable.data.channelId, _channelState(redeemable.data.channelId));
+        // DEBUG: TODO: FIXME: if this memory is needed
         bytes32 outgoingChannelId = _getChannelId(selfAddress, source);
         Channel storage earningChannel = channels[outgoingChannelId];
 
         // Informs about new ticketIndex
         indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, spendingChannel.ticketIndex));
-        emit TicketRedeemed(redeemable.data.channelId, spendingChannel.ticketIndex);
+        emit TicketRedeemed(redeemable.data.channelId, _channelState(redeemable.data.channelId));
 
         if (earningChannel.status == ChannelStatus.CLOSED) {
             // The other channel does not exist, so we need to transfer funds directly
@@ -437,7 +475,7 @@ contract HoprChannels is
             earningChannel.balance =
                 Balance.wrap(Balance.unwrap(earningChannel.balance) + Balance.unwrap(redeemable.data.amount));
             indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, outgoingChannelId, earningChannel.balance));
-            emit ChannelBalanceIncreased(outgoingChannelId, earningChannel.balance);
+            emit ChannelBalanceIncreased(outgoingChannelId, _channelState(outgoingChannelId));
         }
     }
 
@@ -485,7 +523,7 @@ contract HoprChannels is
 
         // Inform others at which time the notice period is due
         indexEvent(abi.encodePacked(OutgoingChannelClosureInitiated.selector, channelId, channel.closureTime));
-        emit OutgoingChannelClosureInitiated(channelId, channel.closureTime);
+        emit OutgoingChannelClosureInitiated(channelId, _channelState(channelId));
     }
 
     /**
@@ -536,7 +574,7 @@ contract HoprChannels is
         // channel.epoch must be kept
 
         indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
-        emit ChannelClosed(channelId);
+        emit ChannelClosed(channelId, _channelState(channelId));
 
         if (balance > 0) {
             if (token.transfer(source, balance) != true) {
@@ -594,7 +632,7 @@ contract HoprChannels is
         // channel.epoch must be kept
 
         indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
-        emit ChannelClosed(channelId);
+        emit ChannelClosed(channelId, _channelState(channelId));
 
         if (balance > 0) {
             if (token.transfer(msg.sender, balance) != true) {
@@ -781,11 +819,11 @@ contract HoprChannels is
             channel.status = ChannelStatus.OPEN;
 
             indexEvent(abi.encodePacked(ChannelOpened.selector, channelId, selfAddress, account, channel.balance, channel.ticketIndex, channel.closureTime, channel.epoch, channel.status));
-            emit ChannelOpened(channelId, selfAddress, account, channel);
+            emit ChannelOpened(channelId, selfAddress, account, _channelState(channelId));
         }
 
         indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
-        emit ChannelBalanceIncreased(channelId, channel.balance);
+        emit ChannelBalanceIncreased(channelId, _channelState(channelId));
     }
 
     // utility functions, no state changes involved

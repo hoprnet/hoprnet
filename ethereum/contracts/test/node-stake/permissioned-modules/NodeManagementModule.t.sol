@@ -3,6 +3,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 
+import { HoprChannels, HoprChannelsType } from "../../../src/Channels.sol";
 import "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
 import "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
 import "../../utils/CapabilityLibrary.sol";
@@ -1157,11 +1158,11 @@ contract HoprNodeManagementModuleTest is
 
         HoprChannels.TicketData memory dummyTicketData = HoprChannels.TicketData(
             bytes32(hex"11"),
-            HoprChannels.Balance.wrap(1),
-            HoprChannels.TicketIndex.wrap(1),
-            HoprChannels.TicketIndexOffset.wrap(1),
-            HoprChannels.ChannelEpoch.wrap(1),
-            HoprChannels.WinProb.wrap(1)
+            HoprChannelsType.Balance.wrap(1),
+            HoprChannelsType.TicketIndex.wrap(1),
+            HoprChannelsType.TicketIndexOffset.wrap(1),
+            HoprChannelsType.ChannelEpoch.wrap(1),
+            HoprChannelsType.WinProb.wrap(1)
         );
         HoprChannels.CompactSignature memory dummyCompactSignature =
             HoprCrypto.CompactSignature(bytes32(hex"22"), bytes32(hex"33"));
@@ -1177,7 +1178,7 @@ contract HoprNodeManagementModuleTest is
         data[5] =
             abi.encodeWithSelector(HoprChannels.finalizeOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
         data[6] = abi.encodeWithSelector(
-            HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannels.Balance.wrap(66)
+            HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannelsType.Balance.wrap(66)
         );
         // data[7] nothing
         // data[8] nothing
