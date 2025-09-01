@@ -100,7 +100,7 @@ pub enum IncomingPacket {
     Acknowledgement {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
-        ack: Acknowledgement,
+        ack: VerifiedAcknowledgement,
     },
 }
 

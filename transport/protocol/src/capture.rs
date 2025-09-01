@@ -293,7 +293,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(me.as_ref());
                 out.extend_from_slice(me.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
-                out.extend_from_slice(ack.as_ref());
+                out.extend_from_slice(ack.leak().as_ref());
             }
         }
 
@@ -472,7 +472,7 @@ mod tests {
         let packet = IncomingPacket::Acknowledgement {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *kp.public(),
-            ack: VerifiedAcknowledgement::random(&kp).leak(),
+            ack: VerifiedAcknowledgement::random(&kp),
         };
 
         let _ = pcap
