@@ -12,7 +12,7 @@ use curve25519_dalek::{
     montgomery::MontgomeryPoint,
 };
 use digest::Digest;
-use elliptic_curve::{NonZeroScalar, ProjectivePoint};
+use elliptic_curve::NonZeroScalar;
 use hopr_crypto_random::Randomizable;
 use hopr_primitive_types::{errors::GeneralError::ParseError, prelude::*};
 use k256::{
@@ -84,14 +84,32 @@ impl Challenge {
     /// Note that this is an expensive operation that involves point decompression of the
     /// both [`HalfKeyChallenges`](HalfKeyChallenge).
     pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
-        let own_share: ProjectivePoint<Secp256k1> = affine_point_from_bytes(own_share.as_ref())?.into();
+        #[cfg(not(feature = "rust-ecdsa"))]
+        {
+            let own_share = secp256k1::PublicKey::from_byte_array_compressed(own_share.0)
+                .map_err(|_| ParseError("invalid half-key challenge".into()))?;
 
-        let hint: ProjectivePoint<Secp256k1> = affine_point_from_bytes(hint.as_ref())?.into();
+            let hint = secp256k1::PublicKey::from_byte_array_compressed(hint.0)
+                .map_err(|_| ParseError("invalid half-key challenge".into()))?;
 
-        NonIdentity::new((own_share + hint).to_affine())
-            .into_option()
-            .ok_or(CalculationError)
-            .map(Self)
+            let res = own_share.combine(&hint).map_err(|_| CalculationError)?;
+
+            affine_point_from_bytes(&res.serialize_uncompressed())
+                .and_then(|p| NonIdentity::new(p).into_option().ok_or(CryptoError::InvalidPublicKey))
+                .map(Self)
+        }
+
+        #[cfg(feature = "rust-ecdsa")]
+        {
+            let own_share: k256::ProjectivePoint = affine_point_from_bytes(own_share.as_ref())?.into();
+
+            let hint: k256::ProjectivePoint = affine_point_from_bytes(hint.as_ref())?.into();
+
+            NonIdentity::new((own_share + hint).to_affine())
+                .into_option()
+                .ok_or(CalculationError)
+                .map(Self)
+        }
     }
 
     /// Gets the PoR challenge by converting the given HalfKey into a secp256k1 point and
@@ -518,9 +536,11 @@ impl PublicKey {
             let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key)
                 .map_err(|_| GeneralError::ParseError("PublicKey".into()))?;
 
-            elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar)
-                .to_nonidentity()
-                .into()
+            Ok(
+                elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar)
+                    .to_nonidentity()
+                    .into(),
+            )
         }
 
         #[cfg(not(feature = "rust-ecdsa"))]
