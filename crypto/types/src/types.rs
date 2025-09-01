@@ -15,11 +15,14 @@ use digest::Digest;
 use elliptic_curve::{NonZeroScalar, ProjectivePoint};
 use hopr_crypto_random::Randomizable;
 use hopr_primitive_types::{errors::GeneralError::ParseError, prelude::*};
-use k256::{AffinePoint, Secp256k1, elliptic_curve::{
-    self,
-    point::NonIdentity,
-    sec1::{FromEncodedPoint, ToEncodedPoint},
-}};
+use k256::{
+    AffinePoint, Secp256k1,
+    elliptic_curve::{
+        self,
+        point::NonIdentity,
+        sec1::{FromEncodedPoint, ToEncodedPoint},
+    },
+};
 use libp2p_identity::PeerId;
 use sha3::Keccak256;
 use typenum::Unsigned;
@@ -522,8 +525,12 @@ impl PublicKey {
 
         #[cfg(not(feature = "rust-ecdsa"))]
         {
-            let sk = secp256k1::SecretKey::from_byte_array(private_key.try_into().map_err(|_| GeneralError::ParseError("private_key.len".into()))?)
-                .map_err(|_| GeneralError::ParseError("private_key".into()))?;
+            let sk = secp256k1::SecretKey::from_byte_array(
+                private_key
+                    .try_into()
+                    .map_err(|_| GeneralError::ParseError("private_key.len".into()))?,
+            )
+            .map_err(|_| GeneralError::ParseError("private_key".into()))?;
 
             let pk = secp256k1::PublicKey::from_secret_key_global(&sk);
             affine_point_from_bytes(&pk.serialize_uncompressed())

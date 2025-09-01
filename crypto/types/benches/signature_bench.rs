@@ -1,9 +1,8 @@
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_types::{
-    prelude::{ChainKeypair, Keypair, Signature},
+    prelude::{ChainKeypair, Keypair, OffchainKeypair, OffchainSignature, Signature},
     types::Hash,
 };
-use hopr_crypto_types::prelude::{OffchainKeypair, OffchainSignature};
 
 const SAMPLE_SIZE: usize = 100_000;
 
@@ -43,16 +42,14 @@ pub fn offchain_signature_bench(c: &mut Criterion) {
     group.bench_function("offchain_signature_sign_hash", |b| {
         let ck = OffchainKeypair::random();
         let msg = Hash::create(&[b"test"]).as_ref().to_vec();
-        b.iter(|| {
-            OffchainSignature::sign_message(&msg, &ck)
-        })
+        b.iter(|| OffchainSignature::sign_message(&msg, &ck))
     });
 
     group.bench_function("offchain_signature_verify_hash", |b| {
         let ck = OffchainKeypair::random();
         let msg = Hash::create(&[b"test"]).as_ref().to_vec();
         let sig = OffchainSignature::sign_message(&msg, &ck);
-        b.iter(|| sig.verify_message(&msg, ck.public()) )
+        b.iter(|| sig.verify_message(&msg, ck.public()))
     });
 }
 

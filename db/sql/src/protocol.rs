@@ -170,12 +170,11 @@ impl HoprDb {
         };
 
         // Finally, replace the ticket in the outgoing packet with a new one
-        let ticket_builder = ticket_builder
-            .eth_challenge(fwd.next_challenge);
+        let ticket_builder = ticket_builder.eth_challenge(fwd.next_challenge);
         let me_clone = me.clone();
-        fwd.outgoing.ticket = spawn_fifo_blocking(move || {
-                ticket_builder.build_signed(&me_clone, &domain_separator)
-        }).await?.leak();
+        fwd.outgoing.ticket = spawn_fifo_blocking(move || ticket_builder.build_signed(&me_clone, &domain_separator))
+            .await?
+            .leak();
 
         Ok(fwd)
     }
@@ -381,7 +380,9 @@ impl HoprDbProtocolOperations for HoprDb {
                 &domain_separator,
                 None, // NoAck messages currently do not have signals
             )
-            .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a no-ack packet: {e}")))
+            .map_err(|e| {
+                DbSqlError::LogicalError(format!("failed to construct chain components for a no-ack packet: {e}"))
+            })
         })
         .await?;
 

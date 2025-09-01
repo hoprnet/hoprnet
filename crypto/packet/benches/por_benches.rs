@@ -21,17 +21,21 @@ pub fn proof_of_relay_bench(c: &mut Criterion) {
 
     for hop in [0, 1, 2, 3].iter() {
         group.throughput(Throughput::Elements(1));
-        group.bench_with_input(BenchmarkId::from_parameter(format!("por_create_{hop}_hop")), hop, |b, &hop| {
-            let secrets = HoprSphinxSuite::new_shared_keys(
-                &(0..=hop)
-                    .map(|_| *OffchainKeypair::random().public())
-                    .collect::<Vec<_>>(),
-            )
-            .unwrap()
-            .secrets;
+        group.bench_with_input(
+            BenchmarkId::from_parameter(format!("por_create_{hop}_hop")),
+            hop,
+            |b, &hop| {
+                let secrets = HoprSphinxSuite::new_shared_keys(
+                    &(0..=hop)
+                        .map(|_| *OffchainKeypair::random().public())
+                        .collect::<Vec<_>>(),
+                )
+                .unwrap()
+                .secrets;
 
-            b.iter(|| generate_proof_of_relay(&secrets).expect("failed to generate proof of relay"));
-        });
+                b.iter(|| generate_proof_of_relay(&secrets).expect("failed to generate proof of relay"));
+            },
+        );
     }
     let secrets = (0..3).map(|_| SharedSecret::random()).collect::<Vec<_>>();
     let (pors, porv) = generate_proof_of_relay(&secrets).unwrap();

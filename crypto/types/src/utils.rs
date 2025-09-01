@@ -19,16 +19,16 @@ use crate::{
         CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize},
     },
     prelude::{HalfKey, SecretKey},
+    types::PublicKey,
 };
-use crate::types::PublicKey;
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
 pub(crate) fn random_group_element() -> ([u8; 32], NonIdentity<AffinePoint>) {
     // Since sep256k1 has a group of prime order, a non-zero scalar cannot result into an identity point.
     let scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
-    let point = PublicKey::from_privkey(&scalar.to_bytes())
-        .expect("non-zero scalar cannot represent an invalid public key");
+    let point =
+        PublicKey::from_privkey(&scalar.to_bytes()).expect("non-zero scalar cannot represent an invalid public key");
     (scalar.to_bytes().into(), point.into())
 }
 
