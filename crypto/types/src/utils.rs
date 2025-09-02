@@ -42,7 +42,7 @@ pub fn x25519_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<curve2551
         clamped.copy_from_slice(&bytes[..32]);
         clamped[00] &= 0b1111_1000; // clear the 3 LSB bits (= multiply by Curve25519's co-factor)
         clamped[31] &= 0b0111_1111; // clear the 256-th bit
-        clamped[31] |= 0b0100_0000; // make it 255-bit number
+        clamped[31] |= 0b0100_0000; // make it a 255-bit number
 
         Ok(curve25519_dalek::scalar::Scalar::from_bytes_mod_order(clamped))
     } else {
@@ -139,6 +139,12 @@ impl<L: ArrayLength> AsMut<[u8]> for SecretValue<L> {
 impl<L: ArrayLength> From<SecretValue<L>> for Box<[u8]> {
     fn from(value: SecretValue<L>) -> Self {
         value.as_ref().into()
+    }
+}
+
+impl From<SecretValue<typenum::U32>> for [u8; 32] {
+    fn from(value: SecretValue<typenum::U32>) -> Self {
+        value.0.into_array()
     }
 }
 

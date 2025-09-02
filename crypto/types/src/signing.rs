@@ -22,12 +22,9 @@ pub trait EcdsaEngine {
 /// ECDSA signing engine based on the pure Rust [`k256`](https://docs.rs/k256/latest/k256/) crate.
 ///
 /// This is usually slower than [`NativeEcdsaSigningEngine`], but pure Rust-based.
-#[cfg(feature = "rust-ecdsa")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct K256EcdsaSigningEngine;
-#[cfg(feature = "rust-ecdsa")]
 impl EcdsaEngine for K256EcdsaSigningEngine {
-    #[inline]
     fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Result<RawSignature, CryptoError> {
         let key = k256::ecdsa::SigningKey::from_bytes(chain_keypair.secret().as_ref().into())
             .map_err(|_| CryptoError::InvalidInputValue("chain_keypair"))?;
@@ -38,7 +35,6 @@ impl EcdsaEngine for K256EcdsaSigningEngine {
         Ok((sig.to_bytes().into(), rec.to_byte()))
     }
 
-    #[inline]
     fn verify_hash(signature: &RawSignature, hash: &Hash, public_key: &PublicKey) -> Result<bool, CryptoError> {
         use k256::ecdsa::signature::hazmat::PrehashVerifier;
 
@@ -52,7 +48,6 @@ impl EcdsaEngine for K256EcdsaSigningEngine {
         }
     }
 
-    #[inline]
     fn recover_from_hash(signature: &RawSignature, hash: &Hash) -> Result<PublicKey, CryptoError> {
         let sig = k256::ecdsa::Signature::from_bytes(&signature.0.into())
             .map_err(|_| CryptoError::InvalidInputValue("signature.sig"))?;
@@ -75,8 +70,7 @@ pub struct NativeEcdsaSigningEngine;
 
 impl EcdsaEngine for NativeEcdsaSigningEngine {
     fn sign_hash(hash: &Hash, chain_keypair: &ChainKeypair) -> Result<RawSignature, CryptoError> {
-        let sk_arr: &generic_array::GenericArray<u8, typenum::U32> = chain_keypair.secret().into();
-        let sk = secp256k1::SecretKey::from_byte_array(sk_arr.into_array())
+        let sk = secp256k1::SecretKey::from_byte_array(chain_keypair.secret().clone().into())
             .map_err(|_| CryptoError::InvalidInputValue("chain_keypair"))?;
 
         let sig =
@@ -309,6 +303,22 @@ mod tests {
 
         let deserialized = Signature::try_from(sgn.as_ref())?;
         assert_eq!(sgn, deserialized, "signatures don't match");
+
+        Ok(())
+    }
+
+    #[test]
+    fn signature_engines_must_be_compatible() -> anyhow::Result<()> {
+        let msg = b"test12345";
+        let ck = ChainKeypair::random();
+        let sgn_1 = ChainSignature::<NativeEcdsaSigningEngine>::sign_message(msg, &ck);
+        let sgn_2 = ChainSignature::<K256EcdsaSigningEngine>::sign_message(msg, &ck);
+
+        let sgn_1_k256 = ChainSignature::<K256EcdsaSigningEngine>::try_from(sgn_1.as_ref())?;
+        let sgn_2_native = ChainSignature::<NativeEcdsaSigningEngine>::try_from(sgn_2.as_ref())?;
+
+        assert!(sgn_1_k256.verify_message(msg, ck.public())?);
+        assert!(sgn_2_native.verify_message(msg, ck.public())?);
 
         Ok(())
     }

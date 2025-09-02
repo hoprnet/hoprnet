@@ -1,4 +1,3 @@
-use generic_array::GenericArray;
 use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::prelude::*;
 use k256::{
@@ -22,7 +21,7 @@ use crate::{
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
 #[allow(non_snake_case)]
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub V: AffinePoint,
@@ -36,7 +35,7 @@ impl serde::Serialize for VrfParameters {
     where
         S: serde::Serializer,
     {
-        let v: [u8; Self::SIZE] = self.clone().into();
+        let v: [u8; Self::SIZE] = (*self).into();
         serializer.serialize_bytes(v.as_ref())
     }
 }
@@ -176,7 +175,7 @@ impl VrfParameters {
         creator: &Address,
         msg: &[u8; T],
         dst: &[u8],
-    ) -> crate::errors::Result<k256::EncodedPoint> {
+    ) -> Result<k256::EncodedPoint> {
         Ok((self.get_encoded_payload(creator, msg, dst)? * self.s)
             .to_affine()
             .to_encoded_point(false))
@@ -193,7 +192,7 @@ impl VrfParameters {
         creator: &Address,
         msg: &[u8; T],
         dst: &[u8],
-    ) -> crate::errors::Result<k256::ProjectivePoint> {
+    ) -> Result<k256::ProjectivePoint> {
         Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[creator.as_ref(), msg], &[dst])
             .or(Err(CalculationError))
     }
@@ -213,10 +212,6 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     let B = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg.as_ref()], &[dst])?;
 
     let a: Scalar = chain_keypair.into();
-
-    if a.is_zero().into() {
-        return Err(crate::errors::CryptoError::InvalidSecretScalar);
-    }
 
     let V = B * a;
 
@@ -254,13 +249,12 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     msg: T,
     chain_keypair: &ChainKeypair,
     dst: &[u8],
-) -> crate::errors::Result<VrfParameters> {
+) -> Result<VrfParameters> {
     let chain_addr = chain_keypair.public().to_address();
     let B = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg.as_ref()], &[dst])?
         .to_affine();
 
-    let gen_a: &GenericArray<u8, typenum::U32> = chain_keypair.secret().into();
-    let a = secp256k1::Scalar::from_be_bytes(gen_a.into_array())
+    let a = secp256k1::Scalar::from_be_bytes(chain_keypair.secret().clone().into())
         .map_err(|_| crate::errors::CryptoError::InvalidSecretScalar)?;
 
     let B_pk = secp256k1::PublicKey::from_byte_array_uncompressed(
@@ -273,7 +267,7 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
 
     let V = B_pk
         .mul_tweak(secp256k1::global::SECP256K1, &a)
-        .map_err(|_| crate::errors::CryptoError::CalculationError)?;
+        .map_err(|_| CalculationError)?;
 
     let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
         &[
@@ -289,7 +283,7 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
 
     let R_v = B_pk
         .mul_tweak(secp256k1::global::SECP256K1, &r_scalar)
-        .map_err(|_| crate::errors::CryptoError::CalculationError)?;
+        .map_err(|_| CalculationError)?;
 
     let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
         &[
