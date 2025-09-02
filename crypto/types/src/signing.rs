@@ -178,7 +178,6 @@ impl<E: EcdsaEngine> ChainSignature<E> {
     }
 
     /// Recovers signer public key if this signature is a valid signature of the given `hash`.
-    #[inline]
     pub fn recover_from_hash(&self, hash: &Hash) -> crate::errors::Result<PublicKey> {
         // We saved only the parity bit in the S value, so test both x-coordinate signs.
         let (sig, parity) = self.raw_signature();
@@ -246,6 +245,23 @@ impl OffchainSignature {
         let pk = ed25519_dalek::VerifyingKey::from(public_key.edwards);
         pk.verify_strict(msg, &sgn).is_ok()
     }
+
+    /// Performs optimized signature verification of multiple signed messages and public keys.
+    pub fn verify_batch<'a, I: IntoIterator<Item = ((&'a [u8], OffchainSignature), OffchainPublicKey)>>(
+        entries: I,
+    ) -> bool {
+        let (signed_msgs, pub_keys): (Vec<(&[u8], OffchainSignature)>, Vec<ed25519_dalek::VerifyingKey>) = entries
+            .into_iter()
+            .map(|(a, b)| (a, ed25519_dalek::VerifyingKey::from(b.edwards)))
+            .unzip();
+
+        let (msgs, signatures): (Vec<&[u8]>, Vec<ed25519_dalek::Signature>) = signed_msgs
+            .into_iter()
+            .map(|(a, b)| (a, ed25519_dalek::Signature::from_bytes(&b.0)))
+            .unzip();
+
+        ed25519_dalek::verify_batch(&msgs, &signatures, &pub_keys).is_ok()
+    }
 }
 
 impl AsRef<[u8]> for OffchainSignature {
@@ -296,7 +312,7 @@ mod tests {
     const PRIVATE_KEY: [u8; 32] = hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8");
 
     #[test]
-    fn test_signature_serialize() -> anyhow::Result<()> {
+    fn chain_signature_serialize() -> anyhow::Result<()> {
         let msg = b"test000000";
         let kp = ChainKeypair::from_secret(&PRIVATE_KEY)?;
         let sgn = Signature::sign_message(msg, &kp);
@@ -308,7 +324,7 @@ mod tests {
     }
 
     #[test]
-    fn signature_engines_must_be_compatible() -> anyhow::Result<()> {
+    fn chain_signature_engines_must_be_compatible() -> anyhow::Result<()> {
         let msg = b"test12345";
         let ck = ChainKeypair::random();
         let sgn_1 = ChainSignature::<NativeEcdsaSigningEngine>::sign_message(msg, &ck);
@@ -324,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_and_recover() -> anyhow::Result<()> {
+    fn chain_signature_sign_and_recover() -> anyhow::Result<()> {
         let msg = hex!("eff80b9f035b1d369c6a60f362ac7c8b8c3b61b76d151d1be535145ccaa3e83e");
         let hash = Hash::create(&[&msg]);
 
@@ -371,35 +387,7 @@ mod tests {
     }
 
     #[test]
-    fn test_offchain_signature_signing() -> anyhow::Result<()> {
-        let msg = b"test12345";
-        let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY)?;
-
-        let key = ed25519_dalek::SecretKey::try_from(PRIVATE_KEY)?;
-        let kp = ed25519_dalek::SigningKey::from_bytes(&key);
-        let pk = ed25519_dalek::VerifyingKey::from(&kp);
-
-        let sgn = kp.sign(msg);
-        assert!(pk.verify_strict(msg, &sgn).is_ok(), "blomp");
-
-        let sgn_1 = OffchainSignature::sign_message(msg, &keypair);
-        let sgn_2 = OffchainSignature::try_from(sgn_1.as_ref())?;
-
-        assert!(
-            sgn_1.verify_message(msg, keypair.public()),
-            "cannot verify message via sig 1"
-        );
-        assert!(
-            sgn_2.verify_message(msg, keypair.public()),
-            "cannot verify message via sig 2"
-        );
-        assert_eq!(sgn_1, sgn_2, "signatures must be equal");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_offchain_signature() -> anyhow::Result<()> {
+    fn offchain_signature_signing() -> anyhow::Result<()> {
         let msg = b"test12345";
         let keypair = OffchainKeypair::from_secret(&PRIVATE_KEY)?;
 
@@ -427,6 +415,24 @@ mod tests {
         let sig = OffchainSignature::sign_message("my test msg".as_bytes(), &keypair);
         assert!(sig.verify_message("my test msg".as_bytes(), keypair.public()));
 
+        Ok(())
+    }
+
+    #[test]
+    fn offchain_signature_batch_verify() -> anyhow::Result<()> {
+        let msgs = (0..100)
+            .map(|i| format!("test_msg_{i}").as_bytes().to_vec())
+            .collect::<Vec<_>>();
+
+        let tuples = (0..100)
+            .map(|i| {
+                let kp = OffchainKeypair::random();
+                let sig = OffchainSignature::sign_message(&msgs[i], &kp);
+                ((msgs[i].as_slice(), sig), *kp.public())
+            })
+            .collect::<Vec<_>>();
+
+        assert!(OffchainSignature::verify_batch(tuples));
         Ok(())
     }
 }

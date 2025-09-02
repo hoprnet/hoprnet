@@ -37,6 +37,7 @@ pub fn chain_signature_bench(c: &mut Criterion) {
 pub fn offchain_signature_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("offchain_signature_bench");
     group.sample_size(SAMPLE_SIZE);
+    group.measurement_time(std::time::Duration::from_secs(20));
     group.throughput(Throughput::Elements(1));
 
     group.bench_function("offchain_signature_sign_hash", |b| {
@@ -50,6 +51,22 @@ pub fn offchain_signature_bench(c: &mut Criterion) {
         let msg = Hash::create(&[b"test"]).as_ref().to_vec();
         let sig = OffchainSignature::sign_message(&msg, &ck);
         b.iter(|| sig.verify_message(&msg, ck.public()))
+    });
+
+    group.bench_function("offchain_signature_verify_batch", |b| {
+        let msgs = (0..100)
+            .map(|i| format!("test_msg_{i}").as_bytes().to_vec())
+            .collect::<Vec<_>>();
+
+        let tuples = (0..100)
+            .map(|i| {
+                let kp = OffchainKeypair::random();
+                let sig = OffchainSignature::sign_message(&msgs[i], &kp);
+                ((msgs[i].as_slice(), sig), *kp.public())
+            })
+            .collect::<Vec<_>>();
+
+        b.iter(|| OffchainSignature::verify_batch(tuples.clone()))
     });
 }
 
