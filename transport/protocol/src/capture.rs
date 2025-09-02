@@ -341,7 +341,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new(10u64, &hex!("deadbeef")).to_bytes(),
             ack_key: HalfKey::random(),
-            signals: 0,
+            info: Default::default(),
         };
 
         let ticket = TicketBuilder::default()
@@ -380,7 +380,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
             ack_key: HalfKey::random(),
-            signals: 0,
+            info: Default::default(),
         };
 
         let _ = pcap
@@ -407,7 +407,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
             ack_key: HalfKey::random(),
-            signals: 0,
+            info: Default::default(),
         };
 
         let _ = pcap
@@ -429,7 +429,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
             ack_key: HalfKey::random(),
-            signals: 0,
+            info: Default::default(),
         };
 
         let _ = pcap
@@ -454,7 +454,7 @@ mod tests {
             sender: SimplePseudonym::random(),
             plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
             ack_key: HalfKey::random(),
-            signals: 0,
+            info: Default::default(),
         };
 
         let _ = pcap
@@ -472,7 +472,7 @@ mod tests {
         let packet = IncomingPacket::Acknowledgement {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *kp.public(),
-            ack: VerifiedAcknowledgement::random(&kp),
+            ack: VerifiedAcknowledgement::random(&kp).leak(),
         };
 
         let _ = pcap
