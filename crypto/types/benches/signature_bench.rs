@@ -1,10 +1,10 @@
-use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_types::{
     prelude::{ChainKeypair, Keypair, OffchainKeypair, OffchainSignature, Signature},
     types::Hash,
 };
 
-const SAMPLE_SIZE: usize = 100_000;
+const SAMPLE_SIZE: usize = 10_000;
 
 pub fn chain_signature_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("chain_signature_bench");
@@ -53,12 +53,20 @@ pub fn offchain_signature_bench(c: &mut Criterion) {
         b.iter(|| sig.verify_message(&msg, ck.public()))
     });
 
+    group.finish();
+
+    const BATCH_SIZE: usize = 100;
+    let mut group = c.benchmark_group("offchain_signature_batch_verify_bench");
+    group.sample_size(SAMPLE_SIZE);
+    group.measurement_time(std::time::Duration::from_secs(20));
+    group.throughput(Throughput::Elements(BATCH_SIZE as u64));
+
     group.bench_function("offchain_signature_verify_batch", |b| {
-        let msgs = (0..100)
+        let msgs = (0..BATCH_SIZE)
             .map(|i| format!("test_msg_{i}").as_bytes().to_vec())
             .collect::<Vec<_>>();
 
-        let tuples = (0..100)
+        let tuples = (0..BATCH_SIZE)
             .map(|i| {
                 let kp = OffchainKeypair::random();
                 let sig = OffchainSignature::sign_message(&msgs[i], &kp);
@@ -66,7 +74,11 @@ pub fn offchain_signature_bench(c: &mut Criterion) {
             })
             .collect::<Vec<_>>();
 
-        b.iter(|| OffchainSignature::verify_batch(tuples.clone()))
+        b.iter_batched(
+            || tuples.clone(),
+            |tuples| OffchainSignature::verify_batch(tuples),
+            BatchSize::SmallInput,
+        );
     });
 }
 

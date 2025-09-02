@@ -1,5 +1,5 @@
 use bimap::BiHashMap;
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};
@@ -194,9 +194,11 @@ pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
             )
             .unwrap();
 
-            b.iter(|| {
-                precomputed.clone().into_hopr_packet(&msg, None).unwrap();
-            });
+            b.iter_batched(
+                || precomputed.clone(),
+                |p| p.into_hopr_packet(&msg, None).unwrap(),
+                BatchSize::SmallInput,
+            );
         });
     }
     group.finish();
