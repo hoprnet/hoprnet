@@ -6,10 +6,11 @@ use typenum::{U1022, Unsigned};
 const SAMPLE_SIZE: usize = 100_000;
 type BlockSize = U1022;
 
-pub fn lioness_encrypt_bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("lioness_encrypt_bench");
+pub fn lioness_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("lioness_bench");
     group.sample_size(SAMPLE_SIZE);
     group.throughput(Throughput::Bytes(BlockSize::USIZE as u64));
+
     group.bench_function("lioness_encrypt", |b| {
         let (k, iv) =
             hopr_crypto_types::lioness::LionessBlake3ChaCha20::<BlockSize>::generate_key_iv(hopr_crypto_random::rng());
@@ -20,12 +21,7 @@ pub fn lioness_encrypt_bench(c: &mut Criterion) {
             lioness.encrypt_block((&mut data).into());
         })
     });
-}
 
-pub fn lioness_decrypt_bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("lioness_decrypt_bench");
-    group.sample_size(SAMPLE_SIZE);
-    group.throughput(Throughput::Bytes(BlockSize::USIZE as u64));
     group.bench_function("lioness_decrypt", |b| {
         let (k, iv) =
             hopr_crypto_types::lioness::LionessBlake3ChaCha20::<BlockSize>::generate_key_iv(hopr_crypto_random::rng());
@@ -38,5 +34,5 @@ pub fn lioness_decrypt_bench(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, lioness_encrypt_bench, lioness_decrypt_bench);
+criterion_group!(benches, lioness_bench);
 criterion_main!(benches);
