@@ -9,8 +9,15 @@
 , solcDefault
 , hoprd
 , hopli
+, extraPackages ? []
 }:
 
-import ../ciTestShell.nix {
-  inherit pkgs config crane solcDefault hoprd hopli;
+import ./test.nix {
+  inherit pkgs config crane solcDefault;
+  
+  # Include pre-built binaries for testing
+  extraPackages = [
+    hoprd
+    hopli
+  ] ++ extraPackages;
 }

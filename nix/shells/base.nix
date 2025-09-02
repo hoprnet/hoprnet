@@ -1,3 +1,8 @@
+# base.nix - Base shell configuration utilities
+#
+# Core shell building functions used by all other shell environments.
+# Provides the mkShell function with Rust toolchain and basic packages.
+
 { }:
 
 {
@@ -19,7 +24,7 @@ let
     if useRustNightly then
       pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
     else
-      (pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml).override {
+      (pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ../../rust-toolchain.toml).override {
         targets = [ cargoTarget ];
       };
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;

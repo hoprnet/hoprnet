@@ -18,7 +18,30 @@
   description = "HOPR Network - Privacy-preserving messaging protocol monorepo";
 
   # External dependencies - kept in main flake for Nix flake requirements
-  # See nix/inputs.nix for documentation on each input
+  #
+  # INPUTS REFERENCE:
+  #
+  # Core Nix ecosystem dependencies:
+  # - flake-utils: Provides utility functions for working with flakes across multiple systems
+  # - flake-parts: Modular flake framework for better organization
+  # - nixpkgs: The main Nix package repository (using release 25.05 for stability)
+  #
+  # Rust toolchain and build system:
+  # - rust-overlay: Provides up-to-date Rust toolchains with cross-compilation support
+  # - crane: Incremental Rust build system for Nix with excellent caching
+  #
+  # Ethereum/Solidity development tools:
+  # - foundry: Ethereum development framework (pinned to specific version for reproducibility)
+  # - solc: Solidity compiler packages for various versions
+  #
+  # Development tools and quality assurance:
+  # - pre-commit: Git hooks for code quality enforcement
+  # - treefmt-nix: Universal code formatter integration for Nix
+  # - flake-root: Utilities for finding flake root directory
+  #
+  # Input optimization strategy:
+  # All inputs follow nixpkgs where possible to reduce closure size and improve caching.
+  # This is achieved through the "follows" directive below.
   inputs = {
     # Core Nix ecosystem dependencies
     flake-utils.url = "github:numtide/flake-utils";
@@ -146,66 +169,13 @@
             # Additional standalone packages
             
             # Smoke tests for integration testing
-            smoke-tests = pkgs.stdenv.mkDerivation {
-              pname = "hoprd-smoke-tests";
-              version = hoprdCrateInfo.version;
-              src = fs.toSource {
-                root = ./.;
-                fileset = fs.unions [
-                  (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
-                  ./tests
-                  ./scripts
-                  ./sdk/python
-                  ./ethereum/contracts/foundry.in.toml
-                  ./ethereum/contracts/remappings.txt
-                ];
-              };
-              buildInputs = with pkgs; [
-                uv
-                foundry-bin
-                solcDefault
-                python313
-                hopliPackages.hopli-dev
-                hoprdPackages.hoprd-dev
-              ];
-              buildPhase = ''
-                uv sync --frozen
-                unset SOURCE_DATE_EPOCH
-              '';
-              checkPhase = ''
-                uv run --frozen -m pytest tests/
-              '';
-              doCheck = true;
+            smoke-tests = pkgs.callPackage ./nix/packages/smoke-tests.nix {
+              inherit fs hoprdCrateInfo hoprdPackages hopliPackages solcDefault;
             };
             
             # Pre-commit hooks check
-            pre-commit-check = pre-commit.lib.${system}.run {
-              src = ./.;
-              hooks = {
-                treefmt.enable = false;
-                treefmt.package = config.treefmt.build.wrapper;
-                check-executables-have-shebangs.enable = true;
-                check-shebang-scripts-are-executable.enable = true;
-                check-case-conflicts.enable = true;
-                check-symlinks.enable = true;
-                check-merge-conflicts.enable = true;
-                check-added-large-files.enable = true;
-                commitizen.enable = true;
-                immutable-files = {
-                  enable = false;
-                  name = "Immutable files - the files should not change";
-                  entry = "bash .github/scripts/immutable-files-check.sh";
-                  files = "";
-                  language = "system";
-                };
-              };
-              tools = pkgs;
-              excludes = [
-                "vendor/"
-                "ethereum/contracts/"
-                "ethereum/bindings/src/codegen"
-                ".gcloudignore"
-              ];
+            pre-commit-check = pkgs.callPackage ./nix/packages/pre-commit-check.nix {
+              inherit pre-commit system config;
             };
             
             
