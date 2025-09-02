@@ -256,7 +256,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                         previous_hop,
                         next_hop,
                         data,
-                        ack,
+                        ack_key,
                     },
                 ticket,
                 ..
@@ -269,7 +269,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(next_hop.as_ref());
                 out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
-                out.extend_from_slice(ack.leak().as_ref());
+                out.extend_from_slice(ack_key.as_ref());
                 out.push(ticket.len() as u8);
                 out.extend_from_slice(ticket.as_ref());
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
@@ -293,7 +293,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(me.as_ref());
                 out.extend_from_slice(me.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
-                out.extend_from_slice(ack.leak().as_ref());
+                out.extend_from_slice(ack.as_ref());
             }
         }
 
@@ -491,7 +491,7 @@ mod tests {
             previous_hop: *OffchainKeypair::random().public(),
             next_hop: *OffchainKeypair::random().public(),
             data: Box::new([0x08]),
-            ack: VerifiedAcknowledgement::random(&OffchainKeypair::random()),
+            ack_key: HalfKey::random(),
         };
 
         let _ = pcap

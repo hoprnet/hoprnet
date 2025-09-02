@@ -21,7 +21,7 @@ use crate::{
 /// The VRF is thereby needed because it generates on-demand deterministic
 /// entropy that can only be derived by the ticket redeemer.
 #[allow(non_snake_case)]
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub V: AffinePoint,
@@ -35,7 +35,7 @@ impl serde::Serialize for VrfParameters {
     where
         S: serde::Serializer,
     {
-        let v: [u8; Self::SIZE] = self.clone().into();
+        let v: [u8; Self::SIZE] = (*self).into();
         serializer.serialize_bytes(v.as_ref())
     }
 }
@@ -175,7 +175,7 @@ impl VrfParameters {
         creator: &Address,
         msg: &[u8; T],
         dst: &[u8],
-    ) -> crate::errors::Result<k256::EncodedPoint> {
+    ) -> Result<k256::EncodedPoint> {
         Ok((self.get_encoded_payload(creator, msg, dst)? * self.s)
             .to_affine()
             .to_encoded_point(false))
@@ -192,7 +192,7 @@ impl VrfParameters {
         creator: &Address,
         msg: &[u8; T],
         dst: &[u8],
-    ) -> crate::errors::Result<k256::ProjectivePoint> {
+    ) -> Result<k256::ProjectivePoint> {
         Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[creator.as_ref(), msg], &[dst])
             .or(Err(CalculationError))
     }
@@ -201,6 +201,7 @@ impl VrfParameters {
 /// Takes a private key, the corresponding Ethereum address and a payload
 /// and creates all parameters that are required by the smart contract
 /// to prove that a ticket is a win.
+#[cfg(feature = "rust-ecdsa")]
 #[allow(non_snake_case)]
 pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     msg: T,
@@ -211,10 +212,6 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     let B = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg.as_ref()], &[dst])?;
 
     let a: Scalar = chain_keypair.into();
-
-    if a.is_zero().into() {
-        return Err(crate::errors::CryptoError::InvalidSecretScalar);
-    }
 
     let V = B * a;
 
@@ -241,6 +238,67 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
     let s = r + h * a;
 
     Ok(VrfParameters { V: V.to_affine(), h, s })
+}
+
+/// Takes a private key, the corresponding Ethereum address and a payload
+/// and creates all parameters that are required by the smart contract
+/// to prove that a ticket is a win.
+#[cfg(not(feature = "rust-ecdsa"))]
+#[allow(non_snake_case)]
+pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
+    msg: T,
+    chain_keypair: &ChainKeypair,
+    dst: &[u8],
+) -> Result<VrfParameters> {
+    let chain_addr = chain_keypair.public().to_address();
+    let B = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(&[chain_addr.as_ref(), msg.as_ref()], &[dst])?
+        .to_affine();
+
+    let a = secp256k1::Scalar::from_be_bytes(chain_keypair.secret().clone().into())
+        .map_err(|_| crate::errors::CryptoError::InvalidSecretScalar)?;
+
+    let B_pk = secp256k1::PublicKey::from_byte_array_uncompressed(
+        B.to_encoded_point(false)
+            .as_bytes()
+            .try_into()
+            .map_err(|_| crate::errors::CryptoError::InvalidPublicKey)?,
+    )
+    .map_err(|_| crate::errors::CryptoError::InvalidPublicKey)?;
+
+    let V = B_pk
+        .mul_tweak(secp256k1::global::SECP256K1, &a)
+        .map_err(|_| CalculationError)?;
+
+    let r = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+        &[
+            &a.to_be_bytes(),
+            &V.serialize_uncompressed()[1..],
+            &random_bytes::<64>(),
+        ],
+        &[dst],
+    )?;
+
+    let r_scalar = secp256k1::Scalar::from_be_bytes(r.to_bytes().into())
+        .map_err(|_| crate::errors::CryptoError::InvalidSecretScalar)?;
+
+    let R_v = B_pk
+        .mul_tweak(secp256k1::global::SECP256K1, &r_scalar)
+        .map_err(|_| CalculationError)?;
+
+    let h = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+        &[
+            chain_addr.as_ref(),
+            &V.serialize_uncompressed()[1..],
+            &R_v.serialize_uncompressed()[1..],
+            msg.as_ref(),
+        ],
+        &[dst],
+    )?;
+    let s = r + h * Scalar::from(chain_keypair);
+
+    let V = affine_point_from_bytes(&V.serialize_uncompressed()).map_err(|_| CalculationError)?;
+
+    Ok(VrfParameters { V, h, s })
 }
 
 #[cfg(test)]
