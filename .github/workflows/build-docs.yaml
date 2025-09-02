@@ -64,7 +64,7 @@ jobs:
           USER: runner
 
       - name: Build docs
-        run: nix build -L .#docs
+        run: nix build -L .#hoprd-docs
 
       - name: Increase git buffer size
         if: inputs.publish
