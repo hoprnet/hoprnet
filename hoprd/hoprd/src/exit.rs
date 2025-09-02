@@ -52,9 +52,8 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
         match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
                 let kp = self.keypair.clone();
-                let udp_target = hopr_async_runtime::prelude::spawn_blocking(move || udp_target.unseal(&kp))
+                let udp_target = hopr_parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp))
                     .await
-                    .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
@@ -137,9 +136,8 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
                 let kp = self.keypair.clone();
-                let tcp_target = hopr_async_runtime::prelude::spawn_blocking(move || tcp_target.unseal(&kp))
+                let tcp_target = hopr_parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp))
                     .await
-                    .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(?session_id, %tcp_target, "creating a connection to the TCP server");
