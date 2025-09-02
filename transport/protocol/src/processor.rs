@@ -10,7 +10,7 @@ use hopr_db_api::{
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::{prelude::ApplicationData, v1::TransientPacketInfo};
 use hopr_transport_identity::PeerId;
 use tracing::error;
 
@@ -59,7 +59,10 @@ where
                 routing,
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
-                Some(data.flags.bits()),
+                match data.info {
+                    TransientPacketInfo::Outgoing { flags, .. } => Some(flags.bits()),
+                    _ => None,
+                },
             )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;

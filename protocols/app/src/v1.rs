@@ -124,26 +124,20 @@ impl FromStr for Tag {
 }
 
 flagset::flags! {
-   /// Individual flags passed up from the HOPR protocol layer to the Application layer.
+   /// Individual flags passed up between the HOPR protocol layer to the Application layer.
    ///
-   /// The upper 4 bits are reserved for signaling by the Application layer to the HOPR protocol layer
-   /// when sending data, the lower 4 bits are reserved for signaling of the HOPR protocol layer
-   /// to the Application layer when receiving data.
-    #[repr(u8)]
-    #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
+   /// These flags may be eventually materialized over the wire and passed to the packet receiver.
+   #[repr(u8)]
+   #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
    pub enum ApplicationFlag: u8 {
-        /// Tells the HOPR protocol layer that it should reduce the number of SURBs it produces.
-        ///
-        /// This is typically reduction by a factor of 2.
-        ReduceSurbs = 0b0001_0000,
-        /// Tells the HOPR protocol layer that it should not produce any SURBs with this packet.
-        ///
-        /// Implies [`ReduceSurbs`]
-        NoSurbs = 0b0011_0000,
         /// The other party is in a "SURB distress" state, potentially running out of SURBs soon.
+        ///
+        /// Has no effect on packets that take the "forward path".
         SurbDistress = 0b0000_0001,
         /// The other party has run out of SURBs, and this was potentially the last message they could
         /// send.
+        ///
+        /// Has no effect on packets that take the "forward path".
         ///
         /// Implies [`SurbDistress`].
         OutOfSurbs = 0b0000_0011,
@@ -152,6 +146,54 @@ flagset::flags! {
 
 /// Additional flags passed between the HOPR protocol layer and the Application layer.
 pub type ApplicationFlags = flagset::FlagSet<ApplicationFlag>;
+
+/// Holds packet transient information when [`ApplicationData`] is passed between the HOPR protocol layer and the
+/// Application layer.
+///
+/// This may include:
+/// - [`ApplicationFlags`] that materialize over the wire (via "packet signals")
+/// - maximum number of SURBs the HOPR protocol layer should include in the free space (for outgoing packets only)
+/// - the number of SURBs the HOPR protocol extracted from an incoming packet (for incoming packets only)
+///
+/// The important fact is that all the info carried by this structure can be transient.
+/// Only the HOPR protocol layer gets to decide whether some portions of this information may be passed
+/// as additional data inside the HOPR packet to the recipient.
+/// When that happens, the HOPR protocol layer also takes care of properly populating this structure
+/// as the packet arrives to the destination.
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub enum TransientPacketInfo {
+    /// Transient information for an incoming packet.
+    Incoming {
+        /// The number of SURBs the HOPR packet was carrying along with the [`ApplicationData`] instance.
+        num_surbs: usize,
+        /// Additional flags passed from the HOPR protocol layer to the Application layer, serving
+        /// as a means of local signaling.
+        ///
+        /// For incoming data, the flags can be set by the HOPR protocol to signal various states to the
+        /// Applications layer.
+        ///
+        /// These flags can carry also "packet signals" which are thee materialized outgoing flags
+        /// when the packet was sent from the other side.
+        flags: ApplicationFlags,
+    },
+    /// Transient information for an outgoing packet.
+    Outgoing {
+        /// The maximum number of SURBs the HOPR packet should be carrying when sent.
+        max_surbs_in_packet: usize,
+        /// Additional flags passed to the HOPR protocol layer from the Application layer, serving
+        /// as a means of local signaling.
+        ///
+        /// For outgoing data, these flags can be used to signal certain modes of operation by the Application layer
+        /// to the HOPR protocol.
+        ///
+        /// Whether these flags are eventually materialized over the wire is decided solely by the HOPR protocol layer
+        /// underneath. The HOPR protocol calls such flags "packet signals".
+        flags: ApplicationFlags,
+    },
+    /// No transient packet information.
+    #[default]
+    Missing,
+}
 
 /// Represents the to-be-sent or received decrypted packet carrying the application-layer data.
 ///
@@ -164,21 +206,16 @@ pub struct ApplicationData {
     /// The actual application-layer data.
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     pub plain_text: Box<[u8]>,
-    /// Additional flags passed to/from the HOPR protocol layer and the Application layer, serving
-    /// as a means of local signaling.
+    /// Contains various transient information about the packet.
     ///
-    /// For outgoing data, these flags can be used to signal certain modes of operation by the Application layer
-    /// to the HOPR protocol.
-    /// For incoming data, the flags can be set by the HOPR protocol to signal various states to the
-    /// Applications layer.
+    /// This data is never serialized or deserialized to/from wire-data directly.
+    /// Instead, they are managed by the HOPR protocol layer.
     ///
-    /// The flags are never serialized nor deserialized. Whether these flags are eventually
-    /// materialized over the wire is decided solely by the HOPR protocol layer underneath.
-    /// The HOPR protocol calls such flags "packet signals".
+    /// If not [`TransientPacketInfo::Missing`], the instance determines the directionality of this instance.
+    ///
+    /// See [`TransientPacketInfo`] for details.
     #[cfg_attr(feature = "serde", serde(skip))]
-    pub flags: ApplicationFlags,
-    #[cfg_attr(feature = "serde", serde(skip))]
-    _d: u8, // prevents bypassing the constructor
+    pub info: TransientPacketInfo,
 }
 
 impl ApplicationData {
@@ -188,8 +225,7 @@ impl ApplicationData {
         Self {
             application_tag: application_tag.into(),
             plain_text: plain_text.into(),
-            flags: ApplicationFlags::empty(),
-            _d: 0,
+            info: Default::default(),
         }
     }
 
@@ -197,15 +233,8 @@ impl ApplicationData {
         Self {
             application_tag: tag.into(),
             plain_text,
-            flags: ApplicationFlags::empty(),
-            _d: 0,
+            info: Default::default(),
         }
-    }
-
-    /// Creates a new instance with the given `flags` set.
-    pub fn with_flags<F: Into<ApplicationFlags>>(mut self, flags: F) -> Self {
-        self.flags = flags.into();
-        self
     }
 
     #[inline]
@@ -218,18 +247,35 @@ impl ApplicationData {
         self.plain_text.is_empty()
     }
 
-    /// Returns the estimated number of SURBs the HOPR packet carrying an `ApplicationData` instance
-    /// with `payload` could hold (or could have held).
-    pub fn estimate_surbs_with_msg<T: AsRef<[u8]>>(payload: &T) -> usize {
-        HoprPacket::max_surbs_with_message(payload.as_ref().len().min(Self::PAYLOAD_SIZE) + Tag::SIZE)
+    /// Returns the estimated number of SURBs the HOPR packet carrying this `ApplicationData`.
+    pub fn estimate_surbs_with_msg(&self) -> usize {
+        let max_possible =
+            HoprPacket::max_surbs_with_message(self.plain_text.len().min(Self::PAYLOAD_SIZE) + Tag::SIZE);
+        match self.info {
+            TransientPacketInfo::Incoming { num_surbs, .. } => num_surbs,
+            TransientPacketInfo::Outgoing {
+                max_surbs_in_packet, ..
+            } => max_possible.min(max_surbs_in_packet),
+            TransientPacketInfo::Missing => max_possible,
+        }
     }
 }
+
+// impl PartialEq for ApplicationData {
+// fn eq(&self, other: &Self) -> bool {
+// TransientPacketInfo is intentionally not compared
+// self.application_tag == other.application_tag && self.plain_text == other.plain_text
+// }
+// }
+//
+// impl Eq for ApplicationData {}
 
 impl std::fmt::Debug for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ApplicationData")
             .field("application_tag", &self.application_tag)
             .field("plain_text", &to_hex_shortened::<32>(&self.plain_text))
+            .field("info", &self.info)
             .finish()
     }
 }
@@ -257,8 +303,7 @@ impl ApplicationData {
                         .map_err(|_e| crate::errors::PacketError::DecodingError("ApplicationData.tag".into()))?,
                 ),
                 plain_text: Box::from(&data[Self::TAG_SIZE..]),
-                flags: ApplicationFlags::empty(),
-                _d: 0,
+                info: Default::default(),
             })
         } else {
             Err(crate::errors::PacketError::DecodingError("ApplicationData".into()))

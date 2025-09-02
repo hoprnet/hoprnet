@@ -1457,13 +1457,13 @@ mod tests {
 
     fn loopback_transport() -> (
         UnboundedSender<(DestinationRouting, ApplicationData)>,
-        UnboundedReceiver<Box<[u8]>>,
+        UnboundedReceiver<ApplicationData>,
     ) {
         let (input_tx, input_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
-        let (output_tx, output_rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+        let (output_tx, output_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
         tokio::task::spawn(
             input_rx
-                .map(|(_, data)| Ok(data.plain_text))
+                .map(|(_, data)| Ok(data))
                 .forward(output_tx)
                 .map(|e| tracing::debug!(?e, "loopback transport completed")),
         );

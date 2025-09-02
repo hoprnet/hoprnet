@@ -339,7 +339,7 @@ impl Session {
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationData)> + Send + Sync + Unpin + 'static,
-        Rx: futures::Stream<Item = Box<[u8]>> + Send + Sync + Unpin + 'static,
+        Rx: futures::Stream<Item = ApplicationData> + Send + Sync + Unpin + 'static,
         C: Into<Capabilities> + std::fmt::Debug,
         Tx::Error: std::error::Error + Send + Sync,
     {
@@ -354,7 +354,9 @@ impl Session {
                     ))
                 },
             )),
-            hopr.1.map(Ok::<_, std::io::Error>).into_async_read(),
+            hopr.1
+                .map(|data| Ok::<_, std::io::Error>(data.plain_text))
+                .into_async_read(),
         );
 
         // Based on the requested capabilities, see if we should use the Session protocol
@@ -576,7 +578,7 @@ mod tests {
             (
                 alice_tx,
                 alice_rx
-                    .map(|(_, data)| data.plain_text)
+                    .map(|(_, data)| data)
                     .inspect(|d| debug!("alice rcvd: {}", d.len())),
             ),
             None,
@@ -589,7 +591,7 @@ mod tests {
             (
                 bob_tx,
                 bob_rx
-                    .map(|(_, data)| data.plain_text)
+                    .map(|(_, data)| data)
                     .inspect(|d| debug!("bob rcvd: {}", d.len())),
             ),
             None,
@@ -645,7 +647,7 @@ mod tests {
             (
                 alice_tx,
                 alice_rx
-                    .map(|(_, data)| data.plain_text)
+                    .map(|(_, data)| data)
                     .inspect(|d| debug!("alice rcvd: {}", d.len())),
             ),
             None,
@@ -658,7 +660,7 @@ mod tests {
             (
                 bob_tx,
                 bob_rx
-                    .map(|(_, data)| data.plain_text)
+                    .map(|(_, data)| data)
                     .inspect(|d| debug!("bob rcvd: {}", d.len())),
             ),
             None,

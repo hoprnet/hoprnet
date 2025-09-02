@@ -5,7 +5,7 @@ use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_db_api::{
     errors::Result,
-    prelude::{DbError, SurbCacheConfig},
+    prelude::{AuxiliaryPacketInfo, DbError, SurbCacheConfig},
     protocol::{FoundSurb, HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
     resolver::HoprDbResolverOperations,
 };
@@ -551,10 +551,14 @@ impl HoprDbProtocolOperations for HoprDb {
 
         match packet {
             HoprPacket::Final(incoming) => {
+                // Extract additional information from the packet that will be passed upwards
+                let info = AuxiliaryPacketInfo {
+                    packet_signals: incoming.signals,
+                    num_surbs: incoming.surbs.len(),
+                };
+
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
-                    let num_surbs = incoming.surbs.len();
-
                     self.caches
                         .surbs_per_pseudonym
                         .entry_by_ref(&incoming.sender)
@@ -565,7 +569,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         .value()
                         .push(incoming.surbs)?;
 
-                    trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
+                    trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, "stored incoming surbs for pseudonym");
                 }
 
                 Ok(match incoming.ack_key {
@@ -587,7 +591,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         sender: incoming.sender,
                         plain_text: incoming.plain_text,
                         ack_key,
-                        signals: incoming.signals,
+                        info,
                     },
                 })
             }

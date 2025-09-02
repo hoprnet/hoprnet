@@ -12,12 +12,15 @@ use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
-use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_protocol_app::{
+    prelude::{ApplicationData, ReservedTag, Tag},
+    v1::TransientPacketInfo,
+};
 use hopr_protocol_start::{
     KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
 use tracing::{debug, error, info, trace, warn};
-use hopr_protocol_app::v1::ApplicationFlag;
+
 use crate::{
     Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     balancer::{
@@ -97,7 +100,7 @@ type SessionInitiationCache =
 struct SessionSlot {
     // Sender needs to be put in Arc, so that no clones are made by `moka`.
     // This makes sure that the entire channel closes once the one and only sender is closed.
-    session_tx: Arc<UnboundedSender<Box<[u8]>>>,
+    session_tx: Arc<UnboundedSender<ApplicationData>>,
     routing_opts: DestinationRouting,
     abort_handles: Vec<AbortHandle>,
     // Allows reconfiguring of the SURB balancer on-the-fly
@@ -660,7 +663,7 @@ where
                 let session_id = est.session_id;
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
-                let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+                let (tx, rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
                 let notifier = self
                     .session_notifiers
                     .get()
@@ -682,22 +685,39 @@ where
 
                     // Sender responsible for keep-alive and Session data will be counting produced SURBs
                     let surb_estimator_clone = surb_estimator.clone();
-                    let scoring_sender =
-                        msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationData)| {
+                    let full_surb_scoring_sender =
+                        msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationData)| {
                             // Count how many SURBs we sent with each packet
                             surb_estimator_clone.produced.fetch_add(
-                                ApplicationData::estimate_surbs_with_msg(&data.plain_text) as u64,
+                                data.estimate_surbs_with_msg() as u64,
                                 std::sync::atomic::Ordering::Relaxed,
                             );
-                            data.flags |= ApplicationFlag::ReduceSurbs;
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
+
+                    // For standard Session data we first reduce the number of SURBs we want to produce,
+                    // unless requested to always max them out
+                    let max_out_organic_surbs = balancer_config.always_max_out_surbs;
+                    let reduced_surb_scoring_sender = full_surb_scoring_sender.clone().with(
+                        move |(routing, mut data): (DestinationRouting, ApplicationData)| {
+                            if !max_out_organic_surbs {
+                                if let TransientPacketInfo::Outgoing {
+                                    max_surbs_in_packet, ..
+                                } = &mut data.info
+                                {
+                                    // TODO: make this dynamic to honor the balancer target
+                                    *max_surbs_in_packet = 1;
+                                }
+                            }
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        },
+                    );
 
                     let mut abort_handles = Vec::new();
 
                     // Spawn the SURB-bearing keep alive stream
                     let (ka_controller, ka_abort_handle) =
-                        utils::spawn_keep_alive_stream(session_id, scoring_sender.clone(), forward_routing.clone());
+                        utils::spawn_keep_alive_stream(session_id, full_surb_scoring_sender, forward_routing.clone());
                     abort_handles.push(ka_abort_handle);
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
@@ -759,7 +779,7 @@ where
                         forward_routing,
                         cfg.capabilities,
                         (
-                            scoring_sender,
+                            reduced_surb_scoring_sender,
                             rx.inspect(move |_| {
                                 // Received packets = SURB consumption estimate
                                 surb_estimator
@@ -917,7 +937,7 @@ where
 
                 Ok(session_data
                     .session_tx
-                    .unbounded_send(data.plain_text)
+                    .unbounded_send(data)
                     .map(|_| DispatchResult::Processed)
                     .map_err(|e| SessionManagerError::Other(e.to_string()))?)
             } else {
@@ -950,7 +970,7 @@ where
         // Reply routing uses SURBs only with the pseudonym of this Session's ID
         let reply_routing = DestinationRouting::Return(pseudonym.into());
 
-        let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+        let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationData>();
 
         // Search for a free Session ID slot
         self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated
@@ -1037,7 +1057,7 @@ where
                         rx_session_data.inspect(move |data| {
                             // Count the number of SURBs delivered with each incoming packet
                             surb_estimator_clone.produced.fetch_add(
-                                ApplicationData::estimate_surbs_with_msg(data) as u64,
+                                data.estimate_surbs_with_msg() as u64,
                                 std::sync::atomic::Ordering::Relaxed,
                             );
                         }),
@@ -1060,6 +1080,7 @@ where
                     // No SURB decay at the Exit, since we know almost exactly how many SURBs
                     // were received
                     surb_decay: None,
+                    always_max_out_surbs: false, // Applies to outgoing Sessions only
                 };
 
                 // Assign the SURB balancer and abort handles to the already allocated Session slot

@@ -13,7 +13,7 @@ use crate::{
         Result,
     },
     por::{SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay, pre_verify},
-    types::{HoprPacketMessage, HoprPacketParts, HoprSenderId, HoprSurbId},
+    types::{HoprPacketMessage, HoprPacketParts, HoprSenderId, HoprSurbId, S_MASK},
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.
@@ -164,7 +164,7 @@ impl PartialHoprPacket {
         let msg = HoprPacketMessage::try_from(HoprPacketParts {
             surbs: self.surbs,
             payload: msg.into(),
-            signals: signals.unwrap_or_default(),
+            signals: signals.unwrap_or_default() & S_MASK, // Coerce the signals to bits 0-3.
         })?;
         Ok((
             HoprPacket::Outgoing(

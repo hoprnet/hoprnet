@@ -229,7 +229,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                         sender,
                         plain_text,
                         ack_key,
-                        signals,
+                        info,
                     },
                 ticket,
             } => {
@@ -245,7 +245,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(ack_key.as_ref());
                 out.push(ticket.len() as u8);
                 out.extend_from_slice(ticket.as_ref());
-                out.push(*signals);
+                out.push(info.packet_signals);
                 out.extend_from_slice((plain_text.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(plain_text.as_ref());
             }

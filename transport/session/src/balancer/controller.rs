@@ -74,9 +74,9 @@ pub struct SurbBalancerConfig {
     pub target_surb_buffer_size: u64,
     /// Maximum outflow of SURBs.
     ///
-    /// - In the context of the local SURB buffer, this is the maximum egress Session traffic.
+    /// - In the context of the local SURB buffer, this is the maximum egress Session traffic (= SURB consumption).
     /// - In the context of the remote SURB buffer, this is the maximum egress of keep-alive messages to the
-    ///   counterparty.
+    ///   counterparty (= artificial SURB production).
     ///
     /// The default is 5000 (which is 2500 packets/second currently)
     #[default(5_000)]
@@ -90,6 +90,19 @@ pub struct SurbBalancerConfig {
     /// The default is `(60, 0.05)` (5% of the target buffer size is discarded every 60 seconds).
     #[default(_code = "Some((Duration::from_secs(60), 0.05))")]
     pub surb_decay: Option<(Duration, f64)>,
+
+    /// If set, the maximum number of possible SURBs will always be sent with Session data packets (if they fit).
+    ///
+    /// This does not affect `KeepAlive` messages used with SURB balancing, as they will always
+    /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
+    /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
+    ///
+    /// Set this only when the underlying traffic is highly asymmetric.
+    /// Has no effect on the local SURB balancer (incoming sessions).
+    ///
+    /// Default is `false`.
+    #[default(false)]
+    pub always_max_out_surbs: bool,
 }
 
 /// Runs a continuous process that attempts to [evaluate](SurbFlowEstimator) and

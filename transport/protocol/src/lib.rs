@@ -107,7 +107,7 @@ pub const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
-use hopr_protocol_app::v1::ApplicationFlags;
+use hopr_protocol_app::v1::{ApplicationFlags, TransientPacketInfo};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -385,7 +385,10 @@ where
                                         is_forwarded: false,
                                         data: data_clone.to_bytes().into_vec().into(),
                                         ack_challenge: v.ack_challenge.as_ref().into(),
-                                        signals: data_clone.flags.bits(),
+                                        signals: match data_clone.info {
+                                            TransientPacketInfo::Outgoing { flags, .. } => flags.bits(),
+                                            _ => 0,
+                                        },
                                         ticket: inspect_ticket_data_in_packet(&v.data).into(),
                                     }
                                     .into(),
@@ -543,7 +546,7 @@ where
                             sender,
                             plain_text,
                             ack_key,
-                            signals,
+                            info,
                             ..
                         } => {
                             // Send acknowledgement back
@@ -563,7 +566,7 @@ where
                                 METRIC_PACKET_COUNT.increment(&["received"]);
                             }
 
-                            Some((sender, plain_text, signals))
+                            Some((sender, plain_text, info))
                         }
                         IncomingPacket::Forwarded {
                             previous_hop,
@@ -617,11 +620,18 @@ where
                     }
                 }})
                 .filter_map(|maybe_data| async move {
-                    if let Some((sender, data, flags)) = maybe_data {
+                    if let Some((sender, data, aux_info)) = maybe_data {
                         ApplicationData::from_bytes(data.as_ref())
                             .inspect_err(|error| tracing::error!(%error, "failed to decode application data"))
                             .ok()
-                            .map(|data| (sender, data.with_flags(ApplicationFlags::new_truncated(flags))))
+                            .map(|mut data| {
+                                // Populate the transient packet info from the received packet
+                                data.info = TransientPacketInfo::Incoming {
+                                    num_surbs: aux_info.num_surbs,
+                                    flags: ApplicationFlags::new_truncated(aux_info.packet_signals)
+                                };
+                                (sender, data)
+                            })
                     } else {
                         None
                     }

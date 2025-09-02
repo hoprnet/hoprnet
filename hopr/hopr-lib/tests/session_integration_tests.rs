@@ -22,7 +22,7 @@ async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
         cap,
-        (alice_tx, alice_rx.map(|(_, d)| d.plain_text)),
+        (alice_tx, alice_rx.map(|(_, d)| d)),
         None,
     )?;
 
@@ -30,7 +30,7 @@ async fn udp_session_bridging(cap: Capabilities) -> anyhow::Result<()> {
         id,
         DestinationRouting::Return(id.pseudonym().into()),
         cap,
-        (bob_tx, bob_rx.map(|(_, d)| d.plain_text)),
+        (bob_tx, bob_rx.map(|(_, d)| d)),
         None,
     )?;
 

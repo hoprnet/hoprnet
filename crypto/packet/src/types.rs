@@ -170,7 +170,7 @@ where
 /// Convenience alias for HOPR specific [`PacketParts`].
 pub type HoprPacketParts<'a> = PacketParts<'a, HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
-const S_MASK: u8 = 0b0000_1111;
+pub(crate) const S_MASK: u8 = 0b0000_1111;
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
     /// Size of the message header.

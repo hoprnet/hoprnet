@@ -17,7 +17,10 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
 use hopr_primitive_types::prelude::*;
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::{
+    prelude::ApplicationData,
+    v1::{ApplicationFlags, TransientPacketInfo},
+};
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
     DEFAULT_PRICE_PER_PACKET,
@@ -334,14 +337,20 @@ pub async fn resolve_mock_path(
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
     (0..size)
         .map(|i| {
-            ApplicationData::new(
+            let mut data = ApplicationData::new(
                 if i == 0 {
                     random_integer(16u64, Some(65535u64))
                 } else {
                     0u64
                 },
                 &random_bytes::<300>(),
-            )
+            );
+            // Needs to be set to match correctly against the received data
+            data.info = TransientPacketInfo::Incoming {
+                num_surbs: 0,
+                flags: ApplicationFlags::empty(),
+            };
+            data
         })
         .collect::<Vec<_>>()
 }

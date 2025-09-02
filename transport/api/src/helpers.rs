@@ -13,7 +13,7 @@ use hopr_network_types::{
 };
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
 use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
-use hopr_protocol_app::v1::{ApplicationData, ApplicationFlag, ApplicationFlags};
+use hopr_protocol_app::v1::{ApplicationData, ApplicationFlag, TransientPacketInfo};
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use tracing::trace;
 
@@ -151,8 +151,7 @@ where
                 let forward_path = self.resolve_path(self.me, destination, forward_options).await?;
 
                 let return_paths = if let Some(return_options) = return_options {
-                    let num_possible_surbs =
-                        HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
+                    let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
                     trace!(%destination, %num_possible_surbs, data_len = size_hint, max_surbs, "resolving packet return paths");
 
                     (0..num_possible_surbs)
@@ -209,34 +208,35 @@ where
         .unwrap_or(DEFAULT_PACKET_PLANNER_CONCURRENCY);
 
     let distress_threshold = planner.db.get_surb_config().distress_threshold;
-    hopr_async_runtime::prelude::spawn(rx.for_each_concurrent(planner_concurrency, move |(routing, data)| {
+    hopr_async_runtime::prelude::spawn(rx.for_each_concurrent(planner_concurrency, move |(routing, mut data)| {
         let planner = planner.clone();
         let packet_sender = packet_sender.clone();
         async move {
-            // If SURB production reduce flags have been set, indicate the maximum number of SURBs to generate
-            let max_surbs = if data.flags.contains(ApplicationFlag::NoSurbs) {
-                0
-            } else if data.flags.contains(ApplicationFlag::ReduceSurbs) {
-                HoprPacket::max_surbs_with_message(data.len()) / 2
-            } else {
-                usize::MAX
+            let max_possible_surbs = HoprPacket::max_surbs_with_message(data.len());
+            let max_surbs = match data.info {
+                // If the maximum number of SURBs has been set in the transient info, reduce the production
+                TransientPacketInfo::Outgoing {
+                    max_surbs_in_packet, ..
+                } => max_surbs_in_packet.min(max_possible_surbs),
+                _ => max_possible_surbs,
             };
 
             match planner.resolve_routing(data.len(), max_surbs, routing).await {
                 Ok((resolved, rem_surbs)) => {
                     // Set the SURB distress/out-of-SURBs flag if applicable.
                     // These flags are translated into HOPR protocol packet signals.
-                    let flags: ApplicationFlags = match rem_surbs {
-                        Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                            ApplicationFlag::SurbDistress.into()
-                        }
-                        Some(0) => ApplicationFlag::OutOfSurbs.into(),
-                        _ => data.flags - (ApplicationFlag::OutOfSurbs | ApplicationFlag::SurbDistress),
-                    };
-
+                    if let TransientPacketInfo::Outgoing { flags, .. } = &mut data.info {
+                        *flags = match rem_surbs {
+                            Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                                *flags | ApplicationFlag::SurbDistress
+                            }
+                            Some(0) => *flags | ApplicationFlag::OutOfSurbs,
+                            _ => *flags - (ApplicationFlag::OutOfSurbs | ApplicationFlag::SurbDistress),
+                        };
+                    }
                     // The awaiter here is intentionally dropped,
                     // since we do not intend to be notified about packet delivery to the first hop
-                    if let Err(error) = packet_sender.send_packet(data.with_flags(flags), resolved).await {
+                    if let Err(error) = packet_sender.send_packet(data, resolved).await {
                         tracing::error!(%error, "failed to enqueue packet for sending");
                     }
                 }

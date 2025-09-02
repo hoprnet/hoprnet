@@ -710,7 +710,7 @@ where
         let app_data = ApplicationData::new_from_owned(tag, msg);
         let routing = self
             .path_planner
-            .resolve_routing(app_data.len(), None, routing)
+            .resolve_routing(app_data.len(), usize::MAX, routing)
             .await?
             .0;
 

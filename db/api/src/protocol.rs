@@ -76,6 +76,17 @@ pub trait HoprDbProtocolOperations {
     ) -> Result<IncomingPacket>;
 }
 
+/// Contains some miscellaneous information about a received packet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct AuxiliaryPacketInfo {
+    /// Packet signals that the packet carried.
+    ///
+    /// Zero if no signal flags were specified.
+    pub packet_signals: u8,
+    /// Number of SURBs that the packet carried.
+    pub num_surbs: usize,
+}
+
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum IncomingPacket {
     /// Packet is intended for us
@@ -85,7 +96,7 @@ pub enum IncomingPacket {
         sender: HoprPseudonym,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
-        signals: u8,
+        info: AuxiliaryPacketInfo,
     },
     /// Packet must be forwarded
     Forwarded {
