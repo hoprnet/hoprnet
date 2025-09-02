@@ -697,7 +697,7 @@ where
 
                     // For standard Session data we first reduce the number of SURBs we want to produce,
                     // unless requested to always max them out
-                    let max_out_organic_surbs = balancer_config.always_max_out_surbs;
+                    let max_out_organic_surbs = cfg.always_max_out_surbs;
                     let reduced_surb_scoring_sender = full_surb_scoring_sender.clone().with(
                         move |(routing, mut data): (DestinationRouting, ApplicationData)| {
                             if !max_out_organic_surbs {
@@ -782,6 +782,7 @@ where
                             reduced_surb_scoring_sender,
                             rx.inspect(move |_| {
                                 // Received packets = SURB consumption estimate
+                                // The received packets always consume a single SURB.
                                 surb_estimator
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -804,11 +805,27 @@ where
                     )
                     .await?;
 
+                    // For standard Session data we first reduce the number of SURBs we want to produce,
+                    // unless requested to always max them out
+                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let reduced_surb_sender =
+                        msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationData)| {
+                            if !max_out_organic_surbs {
+                                if let TransientPacketInfo::Outgoing {
+                                    max_surbs_in_packet, ..
+                                } = &mut data.info
+                                {
+                                    *max_surbs_in_packet = 1;
+                                }
+                            }
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        });
+
                     Session::new(
                         session_id,
                         forward_routing,
                         cfg.capabilities,
-                        (msg_sender, rx),
+                        (reduced_surb_sender, rx),
                         Some(notifier),
                     )
                 }
@@ -1080,7 +1097,6 @@ where
                     // No SURB decay at the Exit, since we know almost exactly how many SURBs
                     // were received
                     surb_decay: None,
-                    always_max_out_surbs: false, // Applies to outgoing Sessions only
                 };
 
                 // Assign the SURB balancer and abort handles to the already allocated Session slot

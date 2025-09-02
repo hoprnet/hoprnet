@@ -90,19 +90,6 @@ pub struct SurbBalancerConfig {
     /// The default is `(60, 0.05)` (5% of the target buffer size is discarded every 60 seconds).
     #[default(_code = "Some((Duration::from_secs(60), 0.05))")]
     pub surb_decay: Option<(Duration, f64)>,
-
-    /// If set, the maximum number of possible SURBs will always be sent with Session data packets (if they fit).
-    ///
-    /// This does not affect `KeepAlive` messages used with SURB balancing, as they will always
-    /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
-    /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
-    ///
-    /// Set this only when the underlying traffic is highly asymmetric.
-    /// Has no effect on the local SURB balancer (incoming sessions).
-    ///
-    /// Default is `false`.
-    #[default(false)]
-    pub always_max_out_surbs: bool,
 }
 
 /// Runs a continuous process that attempts to [evaluate](SurbFlowEstimator) and
@@ -246,7 +233,6 @@ where
 
     /// Spawns a new task that performs updates of the given [`SurbBalancer`] at the given `sampling_interval`.
     ///
-    /// If `surb_decay` is given, SURBs are removed at each window as the given percentage of the target buffer.
     /// If `cfg_feedback` is given, [`SurbBalancerConfig`] can be queried for updates and also updated
     /// if the underlying [`SurbBalancerController`] also does target updates.
     ///

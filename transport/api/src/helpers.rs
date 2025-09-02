@@ -191,6 +191,8 @@ where
 //   a) `MsgSender` to be a `Sink`
 //   b) Dropping the `Clone` requirement on `Sink` that is given into `SessionManager`
 // However the DestinationRouting resolution concurrency (from for_each_concurrent) would be lost.
+// Therefore, this will likely make sense when the path planner is behind some sort of a mutex,
+// where concurrent resolution would not make sense.
 pub(crate) fn run_packet_planner<T, S>(
     planner: PathPlanner<T, S>,
     packet_sender: MsgSender<Sender<SendMsgInput>>,
@@ -224,15 +226,21 @@ where
             match planner.resolve_routing(data.len(), max_surbs, routing).await {
                 Ok((resolved, rem_surbs)) => {
                     // Set the SURB distress/out-of-SURBs flag if applicable.
-                    // These flags are translated into HOPR protocol packet signals.
+                    // These flags are translated into HOPR protocol packet signals and are
+                    // applicable only on the return path.
                     if let TransientPacketInfo::Outgoing { flags, .. } = &mut data.info {
-                        *flags = match rem_surbs {
-                            Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                                *flags | ApplicationFlag::SurbDistress
-                            }
-                            Some(0) => *flags | ApplicationFlag::OutOfSurbs,
-                            _ => *flags - (ApplicationFlag::OutOfSurbs | ApplicationFlag::SurbDistress),
-                        };
+                        if resolved.is_return() {
+                            *flags = match rem_surbs {
+                                Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                                    *flags | ApplicationFlag::SurbDistress
+                                }
+                                Some(0) => *flags | ApplicationFlag::OutOfSurbs,
+                                _ => *flags - (ApplicationFlag::OutOfSurbs | ApplicationFlag::SurbDistress),
+                            };
+                        } else {
+                            // Unset these flags as they make no sense on the forward path.
+                            *flags -= ApplicationFlag::SurbDistress | ApplicationFlag::OutOfSurbs;
+                        }
                     }
                     // The awaiter here is intentionally dropped,
                     // since we do not intend to be notified about packet delivery to the first hop
