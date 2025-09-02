@@ -73,9 +73,8 @@ impl HoprDbPeersOperations for HoprDb {
         quality_window: u32,
     ) -> Result<()> {
         let peer = *peer;
-        let ocp = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+        let ocp = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
             .await
-            .map_err(|_| crate::errors::DbSqlError::DecodingError)?
             .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
 
         let new_peer = hopr_db_entity::network_peer::ActiveModel {
@@ -109,9 +108,8 @@ impl HoprDbPeersOperations for HoprDb {
     )]
     async fn remove_network_peer(&self, peer: &PeerId) -> Result<()> {
         let peer = *peer;
-        let ocp = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+        let ocp = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
             .await
-            .map_err(|_| crate::errors::DbSqlError::DecodingError)?
             .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
 
         let res = hopr_db_entity::network_peer::Entity::delete_many()
@@ -189,9 +187,8 @@ impl HoprDbPeersOperations for HoprDb {
     )]
     async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         let peer = *peer;
-        let ocp = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+        let ocp = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
             .await
-            .map_err(|_| crate::errors::DbSqlError::DecodingError)?
             .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
         let row = hopr_db_entity::network_peer::Entity::find()
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(ocp.as_ref())))

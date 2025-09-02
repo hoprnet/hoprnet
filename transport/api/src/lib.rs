@@ -338,10 +338,8 @@ where
                                         .collect::<Vec<_>>();
 
                                     if ! mas.is_empty() {
-                                        if let Ok(pk) = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-                                            .await
-                                            .map_err(|e| GeneralError::NonSpecificError(e.to_string()))
-                                            .and_then(|r| r) {
+                                        if let Ok(pk) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                            .await {
                                             if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk)).await {
                                                 let key: Result<Address, _> = key.try_into();
 
