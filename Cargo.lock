@@ -1043,16 +1043,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-attributes"
-version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3203e79f4dd9bdda415ed03cf14dae5a2bf775c683a00f94e9cd1faf0f596e5"
-dependencies = [
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "async-channel"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1222,7 +1212,6 @@ version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "730294c1c08c2e0f85759590518f6333f0d5a0a766a27d519c1b244c3dfd8a24"
 dependencies = [
- "async-attributes",
  "async-channel 1.9.0",
  "async-global-executor",
  "async-io 2.5.0",
@@ -1690,6 +1679,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "constant_time_eq",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -4379,9 +4369,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-async-runtime"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
- "async-std",
  "futures",
  "tokio",
 ]
@@ -4566,7 +4555,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.11.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4599,7 +4588,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.7.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4623,13 +4612,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.2.1"
+version = "0.4.0"
 dependencies = [
  "aes",
  "anyhow",
  "blake3",
  "chacha20",
  "cipher",
+ "criterion",
  "crypto_box",
  "ctr",
  "curve25519-dalek",
@@ -4658,7 +4648,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.9.1"
+version = "0.10.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4707,7 +4697,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -4752,7 +4742,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4932,6 +4922,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-protocol-app"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "flagset",
+ "hopr-crypto-packet",
+ "hopr-primitive-types",
+ "serde",
+ "serde_bytes",
+ "strum 0.27.2",
+ "thiserror 2.0.14",
+]
+
+[[package]]
 name = "hopr-protocol-session"
 version = "1.0.0"
 dependencies = [
@@ -4980,7 +4984,7 @@ dependencies = [
  "anyhow",
  "aquamarine",
  "hopr-crypto-packet",
- "hopr-transport-packet",
+ "hopr-protocol-app",
  "serde",
  "serde_cbor_2",
  "strum 0.27.2",
@@ -4989,7 +4993,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.14.1"
+version = "0.14.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5043,11 +5047,11 @@ dependencies = [
  "hopr-network-types",
  "hopr-path",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-network",
  "hopr-transport-p2p",
- "hopr-transport-packet",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -5172,19 +5176,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-transport-packet"
-version = "3.0.1"
-dependencies = [
- "anyhow",
- "hex",
- "hopr-crypto-packet",
- "serde",
- "serde_bytes",
- "strum 0.27.2",
- "thiserror 2.0.14",
-]
-
-[[package]]
 name = "hopr-transport-probe"
 version = "0.2.0"
 dependencies = [
@@ -5203,7 +5194,7 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
- "hopr-transport-packet",
+ "hopr-protocol-app",
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p-identity",
@@ -5224,7 +5215,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5243,15 +5234,16 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-parallelize",
  "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-bloom",
  "hopr-transport-identity",
  "hopr-transport-mixer",
- "hopr-transport-packet",
  "hopr-transport-probe",
  "hopr-transport-session",
  "lazy_static",
@@ -5289,9 +5281,9 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "hopr-protocol-session",
  "hopr-protocol-start",
- "hopr-transport-packet",
  "lazy_static",
  "mockall",
  "moka",

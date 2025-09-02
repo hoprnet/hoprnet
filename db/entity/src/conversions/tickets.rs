@@ -24,7 +24,7 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
                     .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?,
             )
             .channel_epoch(U256::from_be_bytes(&value.channel_epoch).as_u32())
-            .challenge(response.to_challenge().to_ethereum_challenge())
+            .challenge(response.to_challenge()?)
             .signature(
                 value
                     .signature

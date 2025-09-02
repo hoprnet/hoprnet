@@ -56,6 +56,7 @@ use hopr_path::{
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
 use hopr_primitive_types::prelude::*;
+pub use hopr_protocol_app::prelude::{ApplicationData, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_mixer::MixerConfig;
@@ -64,7 +65,6 @@ use hopr_transport_p2p::{
     HoprSwarm,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
-pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
     DbProxy, Probe,
     ping::{PingConfig, Pinger},
@@ -251,7 +251,7 @@ where
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: Duration::from_secs(5),
-                maximum_surb_buffer_size: db.get_surb_rb_size(),
+                maximum_surb_buffer_size: db.get_surb_config().rb_capacity,
                 // Allow a 10% increase of the target SURB buffer on incoming Sessions
                 // if the SURB buffer level has surpassed it by at least 10% in the last 2 minutes.
                 growable_target_surb_buffer: Some((Duration::from_secs(120), 0.10)),
@@ -708,7 +708,7 @@ where
         }
 
         let app_data = ApplicationData::new_from_owned(tag, msg);
-        let routing = self.path_planner.resolve_routing(app_data.len(), routing).await?;
+        let routing = self.path_planner.resolve_routing(app_data.len(), routing).await?.0;
 
         // Here we do not use msg_sender directly,
         // since it internally follows Session-oriented logic

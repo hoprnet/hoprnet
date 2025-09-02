@@ -1,13 +1,13 @@
 //! This crate defines the Start sub-protocol used for HOPR Session initiation and management.
 //!
 //! The Start protocol is used to establish Session as described in HOPR
-//! [`RFC-0007`](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0007-session-protocol).
+//! [`RFC-0012`](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0012-session-start-protocol).
 //! and is implemented via the [`StartProtocol`] enum.
 //!
 //! The protocol is defined via generic arguments `I` (for Session ID), `T` (for Session Target)
 //! and `C` (for Session capabilities).
 //!
-//! Per `RFC-0007`, the types `I` and `T` are serialized/deserialized to the CBOR binary format
+//! Per `RFC-0012`, the types `I` and `T` are serialized/deserialized to the CBOR binary format
 //! (see [`RFC7049`](https://datatracker.ietf.org/doc/html/rfc7049)) and therefore must implement
 //! `serde::Serialize + serde::Deserialize`.
 //! The capability type `C` must be expressible as a single unsigned byte.
@@ -17,7 +17,8 @@
 /// Contains errors raised by the Start protocol.
 pub mod errors;
 
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
 
 use crate::errors::StartProtocolError;
 
@@ -25,8 +26,8 @@ use crate::errors::StartProtocolError;
 pub type StartChallenge = u64;
 
 /// Lists all Start protocol error reasons.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 #[repr(u8)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 pub enum StartErrorReason {
     /// Unknown error.
     Unknown = 0,
@@ -123,7 +124,12 @@ pub struct KeepAliveMessage<I> {
     /// Reserved for future use, always zero currently.
     pub flags: u8,
     /// Additional data (might be `flags` dependent), ignored if `0x00000000`.
-    pub additional_data: u32,
+    pub additional_data: u64,
+}
+
+impl<I> KeepAliveMessage<I> {
+    /// The minimum number of SURBs a [`KeepAliveMessage`] must be able to carry.
+    pub const MIN_SURBS_PER_MESSAGE: usize = HoprPacket::MAX_SURBS_IN_PACKET;
 }
 
 impl<I> From<I> for KeepAliveMessage<I> {
@@ -277,12 +283,12 @@ where
 
                     StartProtocol::KeepAlive(KeepAliveMessage {
                         flags: data[data_offset],
-                        additional_data: u32::from_be_bytes(
-                            data[data_offset + 1..data_offset + 1 + size_of::<u32>()]
+                        additional_data: u64::from_be_bytes(
+                            data[data_offset + 1..data_offset + 1 + size_of::<u64>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("ka.additional_data".into()))?,
                         ),
-                        session_id: serde_cbor_2::from_slice(&data[data_offset + 1 + size_of::<u32>()..])?,
+                        session_id: serde_cbor_2::from_slice(&data[data_offset + 1 + size_of::<u64>()..])?,
                     })
                 }
             },
@@ -300,10 +306,7 @@ where
 
     fn try_from(value: StartProtocol<I, T, C>) -> Result<Self, Self::Error> {
         let (application_tag, plain_text) = value.encode()?;
-        Ok(ApplicationData {
-            application_tag,
-            plain_text,
-        })
+        Ok(ApplicationData::new_from_owned(application_tag, plain_text))
     }
 }
 
@@ -323,7 +326,7 @@ where
 #[cfg(test)]
 mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
-    use hopr_transport_packet::prelude::Tag;
+    use hopr_protocol_app::prelude::Tag;
 
     use super::*;
 
@@ -358,7 +361,7 @@ mod tests {
         let len = msg.encode()?.1.len();
         assert!(
             HoprPacket::max_surbs_with_message(len) >= 1,
-            "KeepAlive message size ({len}) must allow for at least 1 SURBs in packet",
+            "StartSession message size ({len}) must allow for at least 1 SURBs in packet",
         );
 
         Ok(())
@@ -476,11 +479,15 @@ mod tests {
             additional_data: 0xffffffff,
         });
         let len = msg.encode()?.1.len();
+        assert_eq!(
+            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
+            HoprPacket::MAX_SURBS_IN_PACKET
+        );
         assert!(
-            HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
+            HoprPacket::max_surbs_with_message(len) >= KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE,
             "KeepAlive message size ({}) must allow for at least {} SURBs in packet",
             len,
-            HoprPacket::MAX_SURBS_IN_PACKET
+            KeepAliveMessage::<String>::MIN_SURBS_PER_MESSAGE
         );
 
         Ok(())

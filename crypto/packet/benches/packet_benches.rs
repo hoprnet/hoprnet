@@ -50,6 +50,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                     tb,
                     &mapper,
                     &dst,
+                    None,
                 )
                 .unwrap();
             });
@@ -194,7 +195,7 @@ pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
             .unwrap();
 
             b.iter(|| {
-                precomputed.clone().into_hopr_packet(&msg).unwrap();
+                precomputed.clone().into_hopr_packet(&msg, None).unwrap();
             });
         });
     }
@@ -239,6 +240,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
         tb,
         &mapper,
         &dst,
+        None,
     )
     .unwrap()
     {
@@ -300,6 +302,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
         tb,
         &mapper,
         &dst,
+        None,
     )
     .unwrap()
     {

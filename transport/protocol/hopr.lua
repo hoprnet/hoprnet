@@ -42,7 +42,7 @@ local start_fields = {
     init_ad_data = ProtoField.uint32("hopr_start.init.additional_data", "Additional data", base.HEX),
 
     flags = ProtoField.uint8("hopr_start.keep_alive.flags", "Flags", base.HEX),
-    ka_additional_data = ProtoField.uint32("hopr_start.keep_alive.additional_data", "Additional data", base.HEX),
+    ka_additional_data = ProtoField.uint64("hopr_start.keep_alive.additional_data", "Additional data", base.HEX),
     err_reason = ProtoField.uint8("hopr_start.error.reason", "Error reason", base.HEX, start_error_reasons)
 }
 
@@ -129,10 +129,10 @@ local function dissect_hopr_start(buffer, pinfo, tree)
         local ka_subtree = subtree:add("Keep-Alive")
         ka_subtree:add(start_fields.flags, buffer(offset, 1):uint())
         offset = offset + 1
-        ka_subtree:add(start_fields.ka_additional_data, buffer(offset, 4):uint())
-        offset = offset + 4
+        ka_subtree:add(start_fields.ka_additional_data, buffer(offset, 8):uint64())
+        offset = offset + 8
         ka_subtree:add(start_fields.session_id, buffer(offset))
-        offset = offset + len - 5
+        offset = offset + len - 9
     else
         subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Unknown Start protocol message" )
         offset = offset + len
@@ -400,6 +400,7 @@ local hopr_fields = {
     is_fwd = ProtoField.bool("hopr.is_forwarded", "Is forwarded"),
     data_len = ProtoField.uint16("hopr.data_len", "Data Length"),
     raw_data = ProtoField.bytes("hopr.raw_data", "Raw packet data"),
+    dst_flags = ProtoField.uint8("hopr.packet_signals", "Packet signals"),
 
     -- Ticket fields
     ticket_channel_id = ProtoField.bytes("hopr.ticket.channel_id", "Channel ID"),
@@ -416,7 +417,6 @@ local hopr_fields = {
     sender_pseudonym = ProtoField.bytes("hopr.sender_pseudonym", "Sender Pseudonym"),
 
     ack_key = ProtoField.bytes("hopr.ack.key", "ACK Key"),
-    ack_sig = ProtoField.bytes("hopr.ack.signature", "Signature"),
     challenge = ProtoField.bytes("hopr.challenge", "Challenge"),
 
     -- ApplicationData
@@ -610,7 +610,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
     offset = offset + 1
 
     -- Process based on packet type
-    if pkt_type == 0 then -- FinalPacket
+    if pkt_type == 0 then -- IncomingPacket
         if length < 1 + 16 + 32 + 32 + 10 + 32 + 2 + 8 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for FinalPacket")
             return
@@ -647,6 +647,9 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         offset = dissect_ticket(buffer, final_tree, offset)
 
+        final_tree:add(hopr_fields.dst_flags, buffer(offset, 1):uint())
+        offset = offset + 1
+
         local data_len_field = buffer(offset, 2)
         local data_len = data_len_field:uint()
         final_tree:add(hopr_fields.data_len, data_len_field)
@@ -655,7 +658,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         offset = dissect_appdata(buffer, final_tree, offset, data_len, pinfo)
 
     elseif pkt_type == 1 then -- ForwardedPacket
-        if length < 1 + 16 + 32 + 32 + 96 then
+        if length < 1 + 16 + 32 + 32 + 32 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for ForwardedPacket")
             return
         end
@@ -686,8 +689,6 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         local ack_subtree = fwd_tree:add("Acknowledgement Data")
         ack_subtree:add(hopr_fields.ack_key, buffer(offset, 32))
         offset = offset + 32
-        ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
-        offset = offset + 64
 
         offset = dissect_ticket(buffer, fwd_tree, offset)
     elseif pkt_type == 2 then -- OutgoingPacket
@@ -733,6 +734,9 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         end
         out_tree:add(hopr_fields.is_fwd, is_fwd)
 
+        out_tree:add(hopr_fields.dst_flags, buffer(offset, 1):uint())
+        offset = offset + 1
+
         local data_len_field = buffer(offset, 2)
         local data_len = data_len_field:uint()
         out_tree:add(hopr_fields.data_len, data_len_field)
@@ -746,7 +750,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         end
 
     elseif pkt_type == 3 then -- AcknowledgementIn
-        if length < 1 + 16 + 32 + 32 + 96 then
+        if length < 1 + 16 + 32 + 32 + 32 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for AckIn")
             return
         end
@@ -777,8 +781,6 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         local ack_subtree = ack_in_tree:add("Acknowledgement Data")
         ack_subtree:add(hopr_fields.ack_key, buffer(offset, 32))
         offset = offset + 32
-        ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
-        offset = offset + 64
 
     elseif pkt_type == 4 then -- AcknowledgementOut
             if length < 1 + 32 + 1 + 96 then

@@ -307,6 +307,7 @@
             # lldb
             rust-bin.stable.latest.minimal
             valgrind
+            gnutar # Use to extract the pcap file from the docker container
           ];
 
           dockerHoprdEntrypoint = pkgs.writeShellScriptBin "docker-entrypoint.sh" ''

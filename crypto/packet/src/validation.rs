@@ -116,7 +116,7 @@ mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&SENDER_PRIV_KEY, &Hash::default())?
             .leak())
     }

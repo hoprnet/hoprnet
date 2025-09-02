@@ -2,9 +2,8 @@ use futures::channel::mpsc::UnboundedSender;
 
 use crate::{
     errors::SessionError,
-    frames::{FrameId, Segment, SegmentId, SeqIndicator},
     processing::types::FrameInspector,
-    protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
+    protocol::{FrameAcknowledgements, FrameId, Segment, SegmentId, SegmentRequest, SeqIndicator, SessionMessage},
 };
 
 /// Components the [`SessionSocket`] exposes to a [`SocketState`].

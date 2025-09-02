@@ -13,11 +13,11 @@ use tracing::instrument;
 
 use crate::{
     errors::SessionError,
-    frames::{Frame, FrameId, Segment},
     processing::types::{
         FrameBuilder, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry,
         FrameMapVacantEntry,
     },
+    protocol::{Frame, FrameId, Segment},
 };
 
 #[cfg(all(not(test), feature = "prometheus"))]

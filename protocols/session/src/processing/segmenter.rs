@@ -8,8 +8,7 @@ use std::{
 use tracing::instrument;
 
 use crate::{
-    frames::{FrameId, Segment, SeqIndicator},
-    protocol::SessionMessage,
+    protocol::{FrameId, Segment, SeqIndicator, SessionMessage},
     utils::segment_into,
 };
 
@@ -24,7 +23,7 @@ use crate::{
 /// so the Segmenter naturally acts as a buffered writer.
 /// Any unflushed bytes written to the Segmenter will be lost when it is closed.
 ///
-/// The data are grouped into [`Frames`](frames::Frame) of the size given by the `frame_size`
+/// The data are grouped into [`Frames`](crate::protocol::Frame) of the size given by the `frame_size`
 /// parameter, segments in each such group share the same [`FrameId`].
 /// This acts as a natural buffering feature of a Segmenter.
 ///
@@ -236,7 +235,7 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
-    use crate::{frames::SeqNum, utils::segment};
+    use crate::{protocol::SeqNum, utils::segment};
 
     const MTU: usize = 1000;
     const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;

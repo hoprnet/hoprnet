@@ -45,18 +45,20 @@
 //! This message is sent from the segment recipient to the segment sender to acknowledge that
 //! all segments of certain frames have been completely and correctly received by the recipient.
 //!
-//! The message consists simply of a [frame ID](super::frames::FrameId) list of the completely received
+//! The message consists simply of a [frame ID](FrameId) list of the completely received
 //! frames. There can be at most [`MAX_ACK_FRAMES`](FrameAcknowledgements::MAX_ACK_FRAMES)
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
 
+mod frames;
 mod messages;
 
 use asynchronous_codec::{Decoder, Encoder};
 use bytes::{Buf, BufMut, BytesMut};
+pub use frames::{Frame, FrameId, OrderedFrame, Segment, SegmentId, SeqIndicator, SeqNum};
 pub use messages::{FrameAcknowledgements, MissingSegmentsBitmap, SegmentRequest};
 
-use crate::{errors::SessionError, frames::Segment};
+use crate::errors::SessionError;
 
 /// Contains all messages of the Session sub-protocol.
 ///
@@ -215,7 +217,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        frames::{FrameId, SegmentId},
+        protocol::{FrameId, SegmentId},
         utils::segment,
     };
 
