@@ -570,29 +570,15 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 Ok(match incoming.ack_key {
                     None => {
-                        let ack: Acknowledgement = incoming
-                            .plain_text
-                            .as_ref()
-                            .try_into()
-                            .map_err(|_| DbSqlError::DecodingError)?;
-
-                        let prev_hop = incoming.previous_hop;
-                        let ack = spawn_fifo_blocking(move || ack.verify(&prev_hop))
-                            .await
-                            .map_err(|error| {
-                                tracing::error!(%error, "failed to validate the acknowledgement");
-
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_RECEIVED_ACKS.increment(&["false"]);
-
-                                DbSqlError::AcknowledgementValidationError(error.to_string())
-                            })?;
-
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement {
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
-                            ack,
+                            ack: incoming
+                                .plain_text
+                                .as_ref()
+                                .try_into()
+                                .map_err(|_| DbSqlError::DecodingError)?,
                         }
                     }
                     Some(ack_key) => IncomingPacket::Final {
@@ -623,17 +609,12 @@ impl HoprDbProtocolOperations for HoprDb {
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        let keypair_clone = pkt_keypair.clone();
-                        let ack =
-                            spawn_fifo_blocking(move || VerifiedAcknowledgement::new(fwd.ack_key, &keypair_clone))
-                                .await;
-
                         Ok(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
-                            ack,
+                            ack_key: fwd.ack_key,
                         })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
