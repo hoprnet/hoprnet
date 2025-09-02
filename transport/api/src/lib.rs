@@ -293,7 +293,11 @@ where
                         match event {
                             PeerDiscovery::Allow(peer_id) => {
                                 debug!(peer = %peer_id, "Processing peer discovery event: Allow");
-                                if let Ok(pk) = OffchainPublicKey::try_from(peer_id) {
+
+                                if let Ok(pk) = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer_id))
+                                    .await
+                                    .map_err(|e| GeneralError::NonSpecificError(e.to_string()))
+                                    .and_then(|pk| pk) {
                                     if !network.has(&peer_id).await {
                                         let mas = db
                                             .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk))
@@ -334,7 +338,10 @@ where
                                         .collect::<Vec<_>>();
 
                                     if ! mas.is_empty() {
-                                        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
+                                        if let Ok(pk) = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                            .await
+                                            .map_err(|e| GeneralError::NonSpecificError(e.to_string()))
+                                            .and_then(|r| r) {
                                             if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk)).await {
                                                 let key: Result<Address, _> = key.try_into();
 
@@ -796,7 +803,11 @@ where
                 Box::pin(async move {
                     match address_like_noref {
                         either::Left(peer) => {
-                            let pk = OffchainPublicKey::try_from(peer)?;
+                            let pk = hopr_async_runtime::prelude::spawn_blocking(move || {
+                                OffchainPublicKey::from_peerid(&peer)
+                            })
+                            .await
+                            .map_err(|e| hopr_db_sql::api::errors::DbError::General(e.to_string()))??;
                             if let Some(address) = db_clone.translate_key(Some(tx), pk).await? {
                                 db_clone.is_allowed_in_network_registry(Some(tx), &address).await
                             } else {

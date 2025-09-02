@@ -40,6 +40,7 @@ pub type Result<T> = core::result::Result<T, TicketAggregationError>;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
+use hopr_primitive_types::errors::GeneralError;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -304,7 +305,11 @@ where
                 let processed = match event {
                     TicketAggregationToProcess::ToProcess(destination, acked_tickets, response) => {
                         let opk: std::result::Result<OffchainPublicKey, hopr_primitive_types::errors::GeneralError> =
-                            destination.try_into();
+                            hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&destination))
+                                .await
+                                .map_err(|e| GeneralError::NonSpecificError(e.to_string()))
+                                .and_then(|r| r);
+
                         match opk {
                             Ok(opk) => {
                                 let count = acked_tickets.len();

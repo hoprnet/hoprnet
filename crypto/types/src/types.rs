@@ -403,33 +403,33 @@ impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
     }
 }
 
-impl TryFrom<&PeerId> for OffchainPublicKey {
-    type Error = GeneralError;
-
-    fn try_from(value: &PeerId) -> std::result::Result<Self, Self::Error> {
-        let mh = value.as_ref();
-        if mh.code() == 0 {
-            libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
-                .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
-                .and_then(|pk| {
-                    pk.try_into_ed25519()
-                        .map(|p| p.to_bytes())
-                        .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
-                })
-                .and_then(Self::try_from)
-        } else {
-            Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
-        }
-    }
-}
-
-impl TryFrom<PeerId> for OffchainPublicKey {
-    type Error = GeneralError;
-
-    fn try_from(value: PeerId) -> std::result::Result<Self, Self::Error> {
-        Self::try_from(&value)
-    }
-}
+// impl TryFrom<&PeerId> for OffchainPublicKey {
+// type Error = GeneralError;
+//
+// fn try_from(value: &PeerId) -> std::result::Result<Self, Self::Error> {
+// let mh = value.as_ref();
+// if mh.code() == 0 {
+// libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
+// .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
+// .and_then(|pk| {
+// pk.try_into_ed25519()
+// .map(|p| p.to_bytes())
+// .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
+// })
+// .and_then(Self::try_from)
+// } else {
+// Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
+// }
+// }
+// }
+//
+// impl TryFrom<PeerId> for OffchainPublicKey {
+// type Error = GeneralError;
+//
+// fn try_from(value: PeerId) -> std::result::Result<Self, Self::Error> {
+// Self::try_from(&value)
+// }
+// }
 
 impl From<OffchainPublicKey> for PeerId {
     fn from(value: OffchainPublicKey) -> Self {
@@ -465,6 +465,25 @@ impl OffchainPublicKey {
     /// Outputs the public key as PeerId represented as Base58 string.
     pub fn to_peerid_str(&self) -> String {
         PeerId::from(self).to_base58()
+    }
+
+    /// Tries to convert an Ed25519 `PeerId` to `OffchainPublicKey`.
+    ///
+    /// This is a CPU-intensive operation and should be used with care.
+    pub fn from_peerid(peerid: &PeerId) -> std::result::Result<Self, GeneralError> {
+        let mh = peerid.as_ref();
+        if mh.code() == 0 {
+            libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
+                .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
+                .and_then(|pk| {
+                    pk.try_into_ed25519()
+                        .map(|p| p.to_bytes())
+                        .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
+                })
+                .and_then(Self::try_from)
+        } else {
+            Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
+        }
     }
 }
 
@@ -909,15 +928,15 @@ mod tests {
     #[test]
     fn test_offchain_public_key_peerid() -> anyhow::Result<()> {
         let valid_peerid = PeerId::from_str("12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs")?;
-        let valid = OffchainPublicKey::try_from(valid_peerid)?;
+        let valid = OffchainPublicKey::from_peerid(&valid_peerid)?;
         assert_eq!(valid_peerid, valid.into(), "must work with ed25519 peer ids");
 
         let invalid_peerid = PeerId::from_str("16Uiu2HAmPHGyJ7y1Rj3kJ64HxJQgM9rASaeT2bWfXF9EiX3Pbp3K")?;
-        let invalid = OffchainPublicKey::try_from(invalid_peerid);
+        let invalid = OffchainPublicKey::from_peerid(&invalid_peerid);
         assert!(invalid.is_err(), "must not work with secp256k1 peer ids");
 
         let invalid_peerid_2 = PeerId::from_str("QmWvEwidPYBbLHfcZN6ATHdm4NPM4KbUx72LZnZRoRNKEN")?;
-        let invalid_2 = OffchainPublicKey::try_from(invalid_peerid_2);
+        let invalid_2 = OffchainPublicKey::from_peerid(&invalid_peerid_2);
         assert!(invalid_2.is_err(), "must not work with rsa peer ids");
 
         Ok(())

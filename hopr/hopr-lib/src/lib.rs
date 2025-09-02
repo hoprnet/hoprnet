@@ -1202,7 +1202,12 @@ impl Hopr {
 
     /// List all multiaddresses announced on-chain for the given node.
     pub async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        let key = match OffchainPublicKey::try_from(peer) {
+        let peer = *peer;
+        let key = match hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+            .await
+            .map_err(|e| GeneralError::NonSpecificError(e.to_string()))
+            .and_then(|r| r)
+        {
             Ok(k) => k,
             Err(e) => {
                 error!(%peer, error = %e, "failed to convert peer id to off-chain key");
@@ -1526,7 +1531,10 @@ impl Hopr {
     }
 
     pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> errors::Result<Option<Address>> {
-        let pk = hopr_transport::OffchainPublicKey::try_from(peer_id)?;
+        let peer_id = *peer_id;
+        let pk = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer_id))
+            .await
+            .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))??;
         Ok(self.db.resolve_chain_key(&pk).await?)
     }
 

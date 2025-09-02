@@ -7,6 +7,7 @@ use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 use hopr_path::channel_graph::ChannelGraph;
+use hopr_primitive_types::prelude::GeneralError;
 use hopr_transport_network::{
     HoprDbPeersOperations,
     network::{Network, UpdateFailure},
@@ -110,7 +111,12 @@ where
         };
 
         // Update the channel graph
-        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
+        let peer = *peer;
+        if let Ok(pk) = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+            .await
+            .map_err(|e| GeneralError::NonSpecificError(e.to_string()))
+            .and_then(|r| r)
+        {
             let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
             if let Ok(Some(chain_key)) = maybe_chain_key {
                 let mut g = self.channel_graph.write_arc().await;
@@ -123,7 +129,7 @@ where
             error!("encountered invalid peer id");
         }
 
-        if let Err(error) = self.network.update(peer, result).await {
+        if let Err(error) = self.network.update(&peer, result).await {
             error!(%error, "Encountered error on on updating the collected ping data")
         }
     }

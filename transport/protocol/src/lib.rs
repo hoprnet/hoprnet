@@ -433,8 +433,18 @@ where
                     );
 
                     async move {
+                        // TODO: this CPU intensive operation can be cached!
+                        let peer_key = match hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&peer)).await {
+                            Ok(peer) => peer,
+                            Err(error) => {
+                                // There absolutely nothing we can do when the peer id is unparseable (e.g., non-ed25519 based)
+                                error!(%peer, %error, "dropping packet - cannot convert peer id");
+                                return None;
+                            }
+                        };
+
                         let now = std::time::Instant::now();
-                        let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
+                        let res = msg_processor.recv(peer_key, data).await.map_err(move |e| (peer, e));
                         let elapsed = now.elapsed();
                         if elapsed.as_millis() > SLOW_OP_MS {
                             warn!(%peer, ?elapsed, "msg_processor.recv took too long");
@@ -450,17 +460,9 @@ where
 
                             error!(%peer, %error, "failed to process the received message");
 
-                            let peer: OffchainPublicKey = match peer.try_into() {
-                                Ok(p) => p,
-                                Err(error) => {
-                                    warn!(%peer, %error, "Dropping packet - cannot convert peer id");
-                                    return None;
-                                }
-                            };
-
                             // Send random signed acknowledgement to give feedback to the sender
                             let now = std::time::Instant::now();
-                            if let Err(error) = ack_out_tx.send((None, peer)).await {
+                            if let Err(error) = ack_out_tx.send((None, peer_key)).await {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             }
                             let elapsed = now.elapsed();

@@ -182,7 +182,9 @@ impl Probe {
                     async move {
                         let result = cache_peer_routing
                             .try_get_with(peer, async move {
-                                let cp_ofk = OffchainPublicKey::try_from(peer)
+                                // TODO: This is a CPU intensive operation, convert the probing mechanism to use OffchainPublicKey instead of PeerIDs!
+                                let cp_ofk = hopr_async_runtime::prelude::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                    .await?
                                     .context(format!("failed to convert {peer} to offchain public key"))?;
                                 let cp_address = db
                                     .resolve_chain_key(&cp_ofk)
