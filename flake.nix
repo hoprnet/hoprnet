@@ -1,8 +1,7 @@
 # flake.nix - HOPR monorepo Nix flake configuration
 #
 # This is the main entry point for the Nix flake. It combines modular components
-# from the nix/ directory to provide a complete build and development environment
-# for the HOPR network software.
+# from the nix/ directory to provide a complete build and development environment.
 #
 # Structure:
 # - nix/inputs.nix: External dependency definitions
