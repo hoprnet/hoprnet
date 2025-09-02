@@ -73,7 +73,7 @@ pub mod timer;
 #[cfg(feature = "capture")]
 mod capture;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use futures::{SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
@@ -415,6 +415,12 @@ where
     #[cfg(feature = "capture")]
     let capture_clone = capture.clone();
 
+    // Create a cache for a CPU-intensive conversion PeerId -> OffchainPublicKey
+    let peer_id_cache: moka::future::Cache<PeerId, OffchainPublicKey> = moka::future::Cache::builder()
+        .time_to_idle(Duration::from_secs(600))
+        .max_capacity(100_000)
+        .build();
+
     processes.insert(
         ProtocolProcesses::MsgIn,
         spawn_as_abortable!(async move {
@@ -423,6 +429,7 @@ where
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
                     let mut ack_out_tx = ack_out_tx_clone_1.clone();
+                    let peer_id_key_cache = peer_id_cache.clone();
 
                     trace!(%peer, "protocol message in");
 
@@ -433,8 +440,10 @@ where
                     );
 
                     async move {
-                        // TODO: this CPU intensive operation can be cached!
-                        let peer_key = match hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&peer)).await {
+                        // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
+                        let peer_key = match peer_id_key_cache
+                                .try_get_with_by_ref(&peer, hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&peer)))
+                                .await {
                             Ok(peer) => peer,
                             Err(error) => {
                                 // There absolutely nothing we can do when the peer id is unparseable (e.g., non-ed25519 based)

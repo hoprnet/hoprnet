@@ -403,34 +403,6 @@ impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
     }
 }
 
-// impl TryFrom<&PeerId> for OffchainPublicKey {
-// type Error = GeneralError;
-//
-// fn try_from(value: &PeerId) -> std::result::Result<Self, Self::Error> {
-// let mh = value.as_ref();
-// if mh.code() == 0 {
-// libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
-// .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
-// .and_then(|pk| {
-// pk.try_into_ed25519()
-// .map(|p| p.to_bytes())
-// .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
-// })
-// .and_then(Self::try_from)
-// } else {
-// Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
-// }
-// }
-// }
-//
-// impl TryFrom<PeerId> for OffchainPublicKey {
-// type Error = GeneralError;
-//
-// fn try_from(value: PeerId) -> std::result::Result<Self, Self::Error> {
-// Self::try_from(&value)
-// }
-// }
-
 impl From<OffchainPublicKey> for PeerId {
     fn from(value: OffchainPublicKey) -> Self {
         let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.compressed.as_bytes()).unwrap();
@@ -469,7 +441,7 @@ impl OffchainPublicKey {
 
     /// Tries to convert an Ed25519 `PeerId` to `OffchainPublicKey`.
     ///
-    /// This is a CPU-intensive operation and should be used with care.
+    /// This is a CPU-intensive operation.
     pub fn from_peerid(peerid: &PeerId) -> std::result::Result<Self, GeneralError> {
         let mh = peerid.as_ref();
         if mh.code() == 0 {
