@@ -3,22 +3,23 @@
 # Defines formatters for all file types in the monorepo.
 # Used by treefmt-nix for consistent code formatting across the project.
 
-{ config
-, pkgs
-, solcDefault
+{
+  config,
+  pkgs,
+  solcDefault,
 }:
 
 {
   # Project root detection file
   inherit (config.flake-root) projectRootFile;
-  
+
   # Global exclusions - files and directories to never format
   settings.global.excludes = [
     # Binary and lock files
     "**/*.id"
     "**/.cargo-ok"
     "**/.gitignore"
-    
+
     # Configuration files that shouldn't be formatted
     ".actrc"
     ".dockerignore"
@@ -28,27 +29,27 @@
     ".yamlfmt"
     "LICENSE"
     "Makefile"
-    
+
     # Generated code - don't format to avoid churn
     "db/entity/src/codegen/*"
     "ethereum/bindings/src/codegen/*"
-    
+
     # External configuration
     "deploy/compose/grafana/config.monitoring"
     "deploy/nfpm/nfpm.yaml"
     ".github/workflows/build-binaries.yaml"
-    
+
     # Documentation and test data
     "docs/*"
     "hopr/hopr-lib/tests/snapshots/*"
-    
+
     # Build artifacts
     "ethereum/contracts/broadcast/*"
     "target/*"
-    
+
     # Vendor code
     "vendor/*"
-    
+
     # Other specific files
     "ethereum/contracts/contracts-addresses.json"
     "ethereum/contracts/remappings.txt"
@@ -59,7 +60,7 @@
     "nix/setup-hook-darwin.sh"
     "tests/pytest.ini"
   ];
-  
+
   # Shell script formatting
   programs.shfmt.enable = true;
   settings.formatter.shfmt.includes = [
@@ -68,7 +69,7 @@
     "deploy/compose/.env-secrets.sample"
     "ethereum/contracts/.env.example"
   ];
-  
+
   # YAML formatting
   programs.yamlfmt.enable = true;
   settings.formatter.yamlfmt.includes = [
@@ -82,7 +83,7 @@
     formatter.scan_folded_as_literal = true;
     formatter.include_document_start = true;
   };
-  
+
   # Markdown and JSON formatting with Prettier
   programs.prettier.enable = true;
   settings.formatter.prettier.includes = [
@@ -95,22 +96,22 @@
     "*.yml"
     "*.yaml"
   ];
-  
+
   # Rust formatting with nightly for unstable features
   programs.rustfmt.enable = true;
   settings.formatter.rustfmt = {
     command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
   };
-  
+
   # Nix formatting using official Nixpkgs style
   programs.nixfmt.enable = true;
-  
+
   # TOML formatting
   programs.taplo.enable = true;
-  
+
   # Python formatting with Ruff
   programs.ruff-format.enable = true;
-  
+
   # Solidity formatting with Forge
   settings.formatter.solc = {
     command = "sh";

@@ -3,9 +3,10 @@
 # Defines Docker images for the HOPRD daemon with different profiles.
 # Images are built as layered containers for efficient caching and smaller sizes.
 
-{ pkgs
-, dockerBuilder
-, packages
+{
+  pkgs,
+  dockerBuilder,
+  packages,
 }:
 
 let
@@ -48,21 +49,27 @@ let
 
   # Profile-specific dependencies for debugging and profiling
   profileDeps = with pkgs; [
-    gdb              # GNU debugger for debugging
-    rust-bin.stable.latest.minimal  # Minimal Rust toolchain for analysis
-    valgrind         # Memory debugging and profiling
-    gnutar           # For extracting pcap files from container
+    gdb # GNU debugger for debugging
+    rust-bin.stable.latest.minimal # Minimal Rust toolchain for analysis
+    valgrind # Memory debugging and profiling
+    gnutar # For extracting pcap files from container
   ];
 
   # Base Docker image configuration for HOPRD
-  mkHoprdDocker = { package, extraDeps ? [], nameSuffix ? "" }:
+  mkHoprdDocker =
+    {
+      package,
+      extraDeps ? [ ],
+      nameSuffix ? "",
+    }:
     dockerBuilder {
       inherit pkgs;
       name = "hoprd${nameSuffix}";
       extraContents = [
         (mkDockerEntrypoint)
         package
-      ] ++ extraDeps;
+      ]
+      ++ extraDeps;
       Entrypoint = [ "/bin/docker-entrypoint.sh" ];
       Cmd = [ "hoprd" ];
     };

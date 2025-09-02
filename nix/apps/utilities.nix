@@ -2,9 +2,10 @@
 #
 # Provides various utility scripts for development, testing, and maintenance.
 
-{ pkgs
-, system
-, flake-utils
+{
+  pkgs,
+  system,
+  flake-utils,
 }:
 
 {
@@ -60,11 +61,11 @@
   update-github-labels = flake-utils.lib.mkApp {
     drv = pkgs.writeShellScriptBin "update-github-labels" ''
       set -eu
-      
+
       # Remove existing crate entries to handle removed crates
       yq 'with_entries(select(.key != "crate:*"))' \
         .github/labeler.yml > labeler.yml.new
-      
+
       # Add new crate entries for all known crates
       for f in `find . -mindepth 2 -name "Cargo.toml" -type f -printf '%P\n'`; do
         env \
@@ -73,7 +74,7 @@
           yq -n '.[strenv(name)][0]."changed-files"[0]."any-glob-to-any-file" = env(dir)' \
           >> labeler.yml.new
       done
-      
+
       mv labeler.yml.new .github/labeler.yml
     '';
   };

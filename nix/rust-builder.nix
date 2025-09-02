@@ -1,21 +1,27 @@
+# rust-builder.nix - Cross-compilation Rust builder factory
+#
+# Creates Rust build environments for cross-compilation to different platforms.
+# Configures toolchains, linkers, and platform-specific settings for building
+# Rust applications that can run on various architectures and operating systems.
+
 {
-  crane,
-  crossSystem ? localSystem,
-  foundry,
-  isCross ? false,
-  isStatic ? false,
-  localSystem,
-  nixpkgs,
-  rust-overlay,
-  solc,
-  useRustNightly ? false,
+  crane, # Crane build system for Rust
+  crossSystem ? localSystem, # Target system for cross-compilation
+  foundry, # Ethereum development framework
+  isCross ? false, # Whether this is a cross-compilation build
+  isStatic ? false, # Whether to create statically linked binaries
+  localSystem, # Host system where compilation occurs
+  nixpkgs, # Nixpkgs package set
+  rust-overlay, # Rust toolchain overlay
+  solc, # Solidity compiler
+  useRustNightly ? false, # Whether to use nightly Rust toolchain
 }@args:
 let
   crossSystem0 = crossSystem;
 in
 let
-  # the foundry overlay uses the hostPlatform, so we need to use a
-  # localSystem-only pkgs to get the correct architecture
+  # The foundry overlay uses the hostPlatform, so we need to use a
+  # localSystem-only pkgs to get the correct architecture for native tools
   pkgsLocal = import nixpkgs {
     localSystem = args.localSystem;
     overlays = [

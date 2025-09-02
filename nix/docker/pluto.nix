@@ -3,10 +3,11 @@
 # Creates a Docker image for running a complete local HOPR development environment.
 # Includes Anvil, multiple HOPRD nodes, and all necessary tooling for integration testing.
 
-{ pkgs
-, sources
-, packages
-, solcDefault
+{
+  pkgs,
+  sources,
+  packages,
+  solcDefault,
 }:
 
 pkgs.dockerTools.buildLayeredImage {
@@ -14,38 +15,38 @@ pkgs.dockerTools.buildLayeredImage {
   tag = "latest";
   # Note: Using "now" breaks reproducibility but makes usage easier
   created = "now";
-  
+
   # Include comprehensive development environment
   contents = with pkgs; [
     # Core utilities
-    coreutils              # Basic Unix utilities
-    curl                   # HTTP client
-    findutils              # File searching
-    gnumake                # Build automation
-    jq                     # JSON processing
-    lsof                   # Network diagnostics
-    openssl                # Cryptographic library
-    runtimeShellPackage    # Shell interpreter
-    time                   # Command timing
-    tini                   # Container init system
-    which                  # Command locator
-    
+    coreutils # Basic Unix utilities
+    curl # HTTP client
+    findutils # File searching
+    gnumake # Build automation
+    jq # JSON processing
+    lsof # Network diagnostics
+    openssl # Cryptographic library
+    runtimeShellPackage # Shell interpreter
+    time # Command timing
+    tini # Container init system
+    which # Command locator
+
     # Development tools
-    foundry-bin            # Ethereum development framework
-    solcDefault            # Solidity compiler
-    python313              # Python runtime
-    uv                     # Fast Python package manager
-    
+    foundry-bin # Ethereum development framework
+    solcDefault # Solidity compiler
+    python313 # Python runtime
+    uv # Fast Python package manager
+
     # HOPR components
-    packages.hoprd         # HOPR daemon
-    packages.hopli         # HOPR CLI tool
-    
+    packages.hoprd # HOPR daemon
+    packages.hopli # HOPR CLI tool
+
     # Source files
-    sources.pluto          # Pluto cluster configuration
+    sources.pluto # Pluto cluster configuration
   ];
-  
+
   enableFakechroot = true;
-  
+
   # Pre-build setup commands run during image creation
   fakeRootCommands = ''
     #!${pkgs.runtimeShell}
@@ -81,13 +82,13 @@ pkgs.dockerTools.buildLayeredImage {
     mkdir -p /tmp/hopr-localcluster
     mkdir -p /tmp/hopr-localcluster/anvil
   '';
-  
+
   config = {
     # Set library path for OpenSSL
     Env = [
       "LD_LIBRARY_PATH=${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH"
     ];
-    
+
     # Run the local cluster script through tini
     Cmd = [
       "/bin/tini"
@@ -95,12 +96,12 @@ pkgs.dockerTools.buildLayeredImage {
       "bash"
       "/scripts/run-local-cluster.sh"
     ];
-    
+
     # Expose ports for various services
     ExposedPorts = {
-      "8545/tcp" = { };          # Anvil Ethereum node
-      "3003-3018/tcp" = { };      # HOPRD REST API ports
-      "10001-10101/tcp" = { };    # HOPRD P2P ports
+      "8545/tcp" = { }; # Anvil Ethereum node
+      "3003-3018/tcp" = { }; # HOPRD REST API ports
+      "10001-10101/tcp" = { }; # HOPRD P2P ports
     };
   };
 }

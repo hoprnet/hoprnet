@@ -3,19 +3,20 @@
 # Provides an environment configured for running tests and quality checks.
 # Forms the base for other shell environments.
 
-{ pkgs
-, config
-, crane
-, solcDefault
-, shellHook ? ""
-, shellPackages ? []
-, useRustNightly ? false
-, extraPackages ? []
+{
+  pkgs,
+  config,
+  crane,
+  solcDefault,
+  shellHook ? "",
+  shellPackages ? [ ],
+  useRustNightly ? false,
+  extraPackages ? [ ],
 }:
 
 let
   mkShell = import ./base.nix { };
-  
+
   # Foundry setup hook for contract testing
   finalShellHook = ''
     if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
@@ -36,24 +37,29 @@ let
     autoPatchelf ./.venv
   ''
   + shellHook;
-  
+
   # Base packages for testing environment
   basePackages = with pkgs; [
-    uv                    # Python package manager
-    python313             # Python runtime for tests
-    solcDefault           # Solidity compiler
-    foundry-bin           # Ethereum development framework
-    
+    uv # Python package manager
+    python313 # Python runtime for tests
+    solcDefault # Solidity compiler
+    foundry-bin # Ethereum development framework
+
     # Documentation and formatting tools
-    html-tidy             # HTML validation
-    pandoc                # Universal document converter
+    html-tidy # HTML validation
+    pandoc # Universal document converter
   ];
-  
+
   # Combine all packages
   allShellPackages = basePackages ++ shellPackages ++ extraPackages;
 in
 mkShell {
-  inherit pkgs config crane useRustNightly;
+  inherit
+    pkgs
+    config
+    crane
+    useRustNightly
+    ;
   shellPackages = allShellPackages;
   shellHook = finalShellHook;
 }

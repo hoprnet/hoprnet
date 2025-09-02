@@ -3,9 +3,10 @@
 # Creates a Docker image for running a local Ethereum development node using Anvil.
 # This is used for local testing and development of HOPR smart contracts.
 
-{ pkgs
-, sources
-, solcDefault
+{
+  pkgs,
+  sources,
+  solcDefault,
 }:
 
 pkgs.dockerTools.buildLayeredImage {
@@ -13,26 +14,26 @@ pkgs.dockerTools.buildLayeredImage {
   tag = "latest";
   # Note: Using "now" breaks reproducibility but makes usage easier
   created = "now";
-  
+
   # Include all necessary tools and dependencies
   contents = with pkgs; [
-    sources.anvil          # Anvil source files
-    coreutils              # Basic Unix utilities
-    curl                   # HTTP client for API calls
-    findutils              # File searching utilities
-    foundry-bin            # Foundry toolkit (includes Anvil)
-    gnumake                # Build automation
-    jq                     # JSON processor
-    lsof                   # Network diagnostics
-    runtimeShellPackage    # Shell interpreter
-    solcDefault            # Solidity compiler
-    time                   # Command timing
-    tini                   # Minimal init system for containers
-    which                  # Command locator
+    sources.anvil # Anvil source files
+    coreutils # Basic Unix utilities
+    curl # HTTP client for API calls
+    findutils # File searching utilities
+    foundry-bin # Foundry toolkit (includes Anvil)
+    gnumake # Build automation
+    jq # JSON processor
+    lsof # Network diagnostics
+    runtimeShellPackage # Shell interpreter
+    solcDefault # Solidity compiler
+    time # Command timing
+    tini # Minimal init system for containers
+    which # Command locator
   ];
-  
+
   enableFakechroot = true;
-  
+
   # Pre-build setup commands run during image creation
   fakeRootCommands = ''
     #!${pkgs.runtimeShell}
@@ -63,7 +64,7 @@ pkgs.dockerTools.buildLayeredImage {
     # Pre-compile contracts to speed up container startup
     ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
   '';
-  
+
   config = {
     # Use tini as init to properly handle signals and reap zombies
     Cmd = [
@@ -72,7 +73,7 @@ pkgs.dockerTools.buildLayeredImage {
       "bash"
       "/scripts/run-local-anvil.sh"
     ];
-    
+
     # Expose the standard Ethereum JSON-RPC port
     ExposedPorts = {
       "8545/tcp" = { };
