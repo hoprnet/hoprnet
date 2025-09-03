@@ -110,8 +110,10 @@ where
         };
 
         // Update the channel graph
-        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
-            let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
+        let peer = *peer;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await {
+            let maybe_chain_key = self.resolver.resolve_chain_key(&pubkey).await;
             if let Ok(Some(chain_key)) = maybe_chain_key {
                 let mut g = self.channel_graph.write_arc().await;
                 g.update_node_score(&chain_key, result.into());
@@ -123,7 +125,7 @@ where
             error!("encountered invalid peer id");
         }
 
-        if let Err(error) = self.network.update(peer, result).await {
+        if let Err(error) = self.network.update(&peer, result).await {
             error!(%error, "Encountered error on on updating the collected ping data")
         }
     }
