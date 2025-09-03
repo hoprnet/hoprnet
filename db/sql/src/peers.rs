@@ -73,12 +73,13 @@ impl HoprDbPeersOperations for HoprDb {
         quality_window: u32,
     ) -> Result<()> {
         let peer = *peer;
-        let ocp = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
             .await
             .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
 
         let new_peer = hopr_db_entity::network_peer::ActiveModel {
-            packet_key: sea_orm::ActiveValue::Set(Vec::from(ocp.as_ref())),
+            packet_key: sea_orm::ActiveValue::Set(Vec::from(pubkey.as_ref())),
             multi_addresses: sea_orm::ActiveValue::Set(
                 mas.into_iter().map(|m| m.to_string()).collect::<Vec<String>>().into(),
             ),
@@ -108,12 +109,13 @@ impl HoprDbPeersOperations for HoprDb {
     )]
     async fn remove_network_peer(&self, peer: &PeerId) -> Result<()> {
         let peer = *peer;
-        let ocp = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
             .await
             .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
 
         let res = hopr_db_entity::network_peer::Entity::delete_many()
-            .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(ocp.as_ref())))
+            .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(pubkey.as_ref())))
             .exec(&self.peers_db)
             .await
             .map_err(DbSqlError::from)?;
@@ -187,11 +189,12 @@ impl HoprDbPeersOperations for HoprDb {
     )]
     async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         let peer = *peer;
-        let ocp = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
             .await
             .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
         let row = hopr_db_entity::network_peer::Entity::find()
-            .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(ocp.as_ref())))
+            .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(pubkey.as_ref())))
             .one(&self.peers_db)
             .await
             .map_err(DbSqlError::from)?;

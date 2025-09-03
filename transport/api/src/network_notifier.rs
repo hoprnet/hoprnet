@@ -111,8 +111,9 @@ where
 
         // Update the channel graph
         let peer = *peer;
-        if let Ok(pk) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await {
-            let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await {
+            let maybe_chain_key = self.resolver.resolve_chain_key(&pubkey).await;
             if let Ok(Some(chain_key)) = maybe_chain_key {
                 let mut g = self.channel_graph.write_arc().await;
                 g.update_node_score(&chain_key, result.into());

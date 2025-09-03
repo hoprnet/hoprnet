@@ -441,7 +441,8 @@ impl OffchainPublicKey {
 
     /// Tries to convert an Ed25519 `PeerId` to `OffchainPublicKey`.
     ///
-    /// This is a CPU-intensive operation.
+    /// This is a CPU-intensive operation, as it performs Ed25519 point decompression
+    /// and mapping to the Curve255919 point representation.
     pub fn from_peerid(peerid: &PeerId) -> std::result::Result<Self, GeneralError> {
         let mh = peerid.as_ref();
         if mh.code() == 0 {
