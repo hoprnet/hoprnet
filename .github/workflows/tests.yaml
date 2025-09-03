@@ -41,7 +41,7 @@ jobs:
           persist-credentials: false
 
       - name: Run unit tests
-        run: nix build -L .#hopr-test
+        run: nix build -L .#hoprd-test
 
   tests-unit-nightly:
     name: Unit Tests Nightly

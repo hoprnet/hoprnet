@@ -1,13 +1,22 @@
+# docker-builder.nix - Docker image builder utility
+#
+# Creates layered Docker images with optimized caching and minimal size.
+# Provides a consistent base for all HOPR container images.
+
 {
-  Cmd ? [ ],
-  Entrypoint,
-  env ? [ ],
-  extraContents ? [ ],
-  name,
-  pkgs,
+  Cmd ? [ ], # Default command to run in container
+  Entrypoint, # Container entrypoint script or binary
+  env ? [ ], # Environment variables for the container
+  extraContents ? [ ], # Additional packages to include in image
+  name, # Name of the Docker image
+  pkgs, # Nixpkgs package set
 }:
 let
+  # Library path for essential system libraries
   libPath = pkgs.lib.makeLibraryPath [ pkgs.openssl ];
+
+  # Base packages included in all Docker images
+  # These provide essential runtime dependencies
   contents =
     with pkgs;
     [
