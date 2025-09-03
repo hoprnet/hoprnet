@@ -93,9 +93,10 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             //    aggregate_on_channel_close: true,
             //}),
             AutoRedeeming(AutoRedeemingStrategyConfig {
-                redeem_only_aggregated: true,
+                redeem_only_aggregated: false,
                 redeem_all_on_close: true,
                 minimum_redeem_ticket_value: HoprBalance::from_str("0.09 wxHOPR").unwrap(),
+                redeem_on_winning: false,
             }),
         ],
     }
