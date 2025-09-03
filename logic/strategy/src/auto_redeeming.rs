@@ -69,6 +69,19 @@ pub struct AutoRedeemingStrategyConfig {
     #[serde_as(as = "DisplayFromStr")]
     #[default(min_redeem_hopr())]
     pub minimum_redeem_ticket_value: HoprBalance,
+
+    /// If set, the strategy will redeem each incoming winning ticket.
+    /// Otherwise, it will try to redeem tickets in all channels periodically.
+    ///
+    /// Set this to `true` when winning tickets are not happening too often (e.g., when winning
+    /// is low < 1%).
+    /// Set this to `false` when winning tickets are happening very often (e.g., when winning probability
+    /// is above > 1%).
+    ///
+    /// Default is `true`
+    #[serde(default = "just_true")]
+    #[default = true]
+    pub redeem_on_winning: bool
 }
 
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
@@ -108,9 +121,32 @@ where
     A: TicketRedeemActions + Send + Sync,
     Db: HoprDbTicketOperations + Send + Sync,
 {
+    async fn on_tick(&self) -> crate::errors::Result<()> {
+        if !self.cfg.redeem_on_winning {
+            debug!("trying to redeem all tickets in all channels");
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_COUNT_AUTO_REDEEMS.increment();
+
+            let count = self.hopr_chain_actions
+                .redeem_all_tickets(Some(self.cfg.minimum_redeem_ticket_value), self.cfg.redeem_only_aggregated)
+                .await?
+                .len();
+            if count > 0 {
+                info!(count, "strategy issued ticket redemptions");
+            } else {
+                debug!(count, "strategy issued no ticket redemptions");
+            }
+
+            Ok(())
+        } else {
+            Err(CriteriaNotSatisfied)
+        }
+    }
+
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        if (!self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated())
-            && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value)
+        if self.cfg.redeem_on_winning && ((!self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated())
+            && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value))
         {
             info!(%ack, "redeeming");
 
@@ -242,15 +278,17 @@ mod tests {
         TicketRedeemAct { }
         #[async_trait]
         impl TicketRedeemActions for TicketRedeemAct {
-            async fn redeem_all_tickets(&self, only_aggregated: bool) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
+            async fn redeem_all_tickets(&self, min_value: Option<HoprBalance>, only_aggregated: bool) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_with_counterparty(
                 &self,
                 counterparty: &Address,
+                min_value: Option<HoprBalance>,
                 only_aggregated: bool,
             ) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_in_channel(
                 &self,
                 channel: &ChannelEntry,
+                min_value: Option<HoprBalance>,
                 only_aggregated: bool,
             ) -> hopr_chain_actions::errors::Result<Vec<PendingAction >>;
             async fn redeem_tickets(&self, selector: TicketSelector) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
