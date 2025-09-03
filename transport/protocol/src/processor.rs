@@ -11,7 +11,6 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::{prelude::ApplicationData, v1::TransientPacketInfo};
-use hopr_transport_identity::PeerId;
 use tracing::error;
 
 lazy_static::lazy_static! {
