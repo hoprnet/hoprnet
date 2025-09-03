@@ -47,7 +47,7 @@ class Cluster:
 
             for node, index in zip(params["nodes"], range(1, size + 1)):
                 self.nodes[str(index)] = Node.fromConfig(
-                    index, node, config["defaults"], network_name, use_nat, exposed, base_port
+                    index, node, config["defaults"], network_name, use_nat, exposed, base_port, len(params["nodes"])
                 )
 
     def clean_up(self):
