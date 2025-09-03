@@ -4694,7 +4694,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -4874,6 +4874,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-parallelize",
  "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
@@ -5127,6 +5128,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-parallelize",
  "hopr-path",
  "hopr-primitive-types",
  "hopr-protocol-app",
@@ -5274,6 +5276,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-parallelize",
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-protocol-app",
@@ -5401,6 +5404,7 @@ dependencies = [
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-parallelize",
  "hopr-primitive-types",
  "hopr-transport-identity",
  "hopr-transport-mixer",
@@ -5431,6 +5435,7 @@ dependencies = [
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-parallelize",
  "hopr-platform",
  "hoprd-api",
  "hoprd-keypair",

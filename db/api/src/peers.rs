@@ -113,7 +113,7 @@ pub struct PeerStatus {
 impl PeerStatus {
     pub fn new(id: PeerId, origin: PeerOrigin, backoff: f64, quality_window: u32) -> PeerStatus {
         PeerStatus {
-            id: (OffchainPublicKey::try_from(&id).expect("invalid peer id given"), id),
+            id: (OffchainPublicKey::from_peerid(&id).expect("invalid peer id given"), id),
             origin,
             heartbeats_sent: 0,
             heartbeats_succeeded: 0,
