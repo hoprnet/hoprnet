@@ -28,7 +28,6 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
-hex = { workspace = true }
 hashbrown = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
 pin-project = { workspace = true }
