@@ -10,8 +10,7 @@ use hopr_db_api::{
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
-use hopr_transport_identity::PeerId;
-use hopr_transport_packet::prelude::ApplicationData;
+use hopr_protocol_app::prelude::ApplicationData;
 use tracing::error;
 
 lazy_static::lazy_static! {
@@ -30,7 +29,7 @@ pub trait PacketWrapping {
 pub trait PacketUnwrapping {
     type Packet;
 
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet>;
+    async fn recv(&self, peer: OffchainPublicKey, data: Box<[u8]>) -> Result<Self::Packet>;
 }
 
 /// Implements protocol acknowledgement logic for msg packets
@@ -59,6 +58,7 @@ where
                 routing,
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
+                Some(data.flags.bits()),
             )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
@@ -75,10 +75,7 @@ where
     type Packet = IncomingPacket;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet> {
-        let previous_hop = OffchainPublicKey::try_from(peer)
-            .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
-
+    async fn recv(&self, previous_hop: OffchainPublicKey, data: Box<[u8]>) -> Result<Self::Packet> {
         let packet = self
             .db
             .from_recv(

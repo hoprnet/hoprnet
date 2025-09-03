@@ -25,6 +25,7 @@ use std::{
     fmt::{Display, Formatter},
     ops::Deref,
     path::PathBuf,
+    str::FromStr,
     sync::{Arc, atomic::Ordering},
     time::Duration,
 };
@@ -78,9 +79,9 @@ use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::{
     ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU, ServiceId,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU, SURB_SIZE, ServiceId,
     Session as HoprSession, SessionCapabilities, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
-    SessionTarget, SurbBalancerConfig, Tag, TicketStatistics,
+    SessionManagerError, SessionTarget, SurbBalancerConfig, Tag, TicketStatistics, TransportSessionError,
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
@@ -93,7 +94,6 @@ use tracing::{debug, error, info, trace, warn};
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_platform::time::native::current_time,
-    std::str::FromStr,
 };
 
 use crate::{
@@ -418,6 +418,14 @@ impl Hopr {
             create_if_missing: cfg.db.initialize,
             force_create: cfg.db.force_initialize,
             log_slow_queries: std::time::Duration::from_millis(150),
+            surb_ring_buffer_size: std::env::var("HOPR_PROTOCOL_SURB_RB_SIZE")
+                .ok()
+                .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
+                .unwrap_or_else(|| HoprDbConfig::default().surb_ring_buffer_size),
+            surb_distress_threshold: std::env::var("HOPR_PROTOCOL_SURB_RB_DISTRESS")
+                .ok()
+                .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
+                .unwrap_or_else(|| HoprDbConfig::default().surb_distress_threshold),
         };
         let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 
@@ -1097,7 +1105,7 @@ impl Hopr {
     }
 
     /// Create a client session connection returning a session object that implements
-    /// [`AsyncRead`] and [`AsyncWrite`] and can bu used as a read/write binary session.
+    /// [`futures::io::AsyncRead`] and [`futures::io::AsyncWrite`] and can bu used as a read/write binary session.
     #[cfg(feature = "session-client")]
     pub async fn connect_to(
         &self,
@@ -1130,6 +1138,25 @@ impl Hopr {
     pub async fn keep_alive_session(&self, id: &HoprSessionId) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.probe_session(id).await?)
+    }
+
+    #[cfg(feature = "session-client")]
+    pub async fn get_session_surb_balancer_config(
+        &self,
+        id: &HoprSessionId,
+    ) -> errors::Result<Option<SurbBalancerConfig>> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
+    }
+
+    #[cfg(feature = "session-client")]
+    pub async fn update_session_surb_balancer_config(
+        &self,
+        id: &HoprSessionId,
+        cfg: SurbBalancerConfig,
+    ) -> errors::Result<()> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+        Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }
 
     /// Send a message to another peer in the network
@@ -1175,7 +1202,9 @@ impl Hopr {
 
     /// List all multiaddresses announced on-chain for the given node.
     pub async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Vec<Multiaddr> {
-        let key = match OffchainPublicKey::try_from(peer) {
+        let peer = *peer;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = match hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await {
             Ok(k) => k,
             Err(e) => {
                 error!(%peer, error = %e, "failed to convert peer id to off-chain key");
@@ -1183,7 +1212,7 @@ impl Hopr {
             }
         };
 
-        match self.db.get_account(None, key).await {
+        match self.db.get_account(None, pubkey).await {
             Ok(Some(entry)) => Vec::from_iter(entry.get_multiaddr()),
             Ok(None) => {
                 error!(%peer, "no information");
@@ -1499,8 +1528,12 @@ impl Hopr {
     }
 
     pub async fn peerid_to_chain_key(&self, peer_id: &PeerId) -> errors::Result<Option<Address>> {
-        let pk = hopr_transport::OffchainPublicKey::try_from(peer_id)?;
-        Ok(self.db.resolve_chain_key(&pk).await?)
+        let peer_id = *peer_id;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer_id))
+            .await
+            .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
+        Ok(self.db.resolve_chain_key(&pubkey).await?)
     }
 
     pub async fn chain_key_to_peerid(&self, address: &Address) -> errors::Result<Option<PeerId>> {

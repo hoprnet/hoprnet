@@ -2,8 +2,7 @@
 //! into a unified [`crate::HoprTransport`] object with the goal of isolating the transport layer
 //! and defining a fully specified transport API.
 //!
-//! It also implements the Session negotiation via Start sub-protocol.
-//! See the [`hopr_transport_session::initiation`] module for details on Start sub-protocol.
+//! See also the `hopr_protocol_start` crate for details on Start sub-protocol which initiates a Session.
 //!
 //! As such, the transport layer components should be only those that are directly necessary to:
 //!
@@ -27,6 +26,7 @@ pub mod proxy;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, OnceLock},
+    time::Duration,
 };
 
 use async_lock::RwLock;
@@ -56,6 +56,7 @@ use hopr_path::{
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
 use hopr_primitive_types::prelude::*;
+pub use hopr_protocol_app::prelude::{ApplicationData, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_mixer::MixerConfig;
@@ -64,7 +65,6 @@ use hopr_transport_p2p::{
     HoprSwarm,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
-pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
     DbProxy, Probe,
     ping::{PingConfig, Pinger},
@@ -78,8 +78,9 @@ use hopr_transport_protocol::{
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_MTU, ServiceId,
-    Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, errors::TransportSessionError,
+    Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_MTU, SURB_SIZE,
+    ServiceId, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use hopr_transport_ticket_aggregation::{
@@ -239,17 +240,23 @@ where
                 ),
                 channel_graph.clone(),
             ),
-            db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(SessionManagerConfig {
                 // TODO(v3.1): Use the entire range of tags properly
                 session_tag_range: (16..65535),
-                maximum_sessions: 16,
+                maximum_sessions: cfg.session.maximum_sessions as usize,
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+                initial_return_session_egress_rate: 10,
+                minimum_surb_buffer_duration: Duration::from_secs(5),
+                maximum_surb_buffer_size: db.get_surb_config().rb_capacity,
+                // Allow a 10% increase of the target SURB buffer on incoming Sessions
+                // if the SURB buffer level has surpassed it by at least 10% in the last 2 minutes.
+                growable_target_surb_buffer: Some((Duration::from_secs(120), 0.10)),
             }),
+            db,
             cfg,
         }
     }
@@ -286,10 +293,13 @@ where
                         match event {
                             PeerDiscovery::Allow(peer_id) => {
                                 debug!(peer = %peer_id, "Processing peer discovery event: Allow");
-                                if let Ok(pk) = OffchainPublicKey::try_from(peer_id) {
+
+                                // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer_id))
+                                    .await {
                                     if !network.has(&peer_id).await {
                                         let mas = db
-                                            .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk))
+                                            .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pubkey))
                                             .await
                                             .map(|entry| {
                                                 entry
@@ -327,8 +337,10 @@ where
                                         .collect::<Vec<_>>();
 
                                     if ! mas.is_empty() {
-                                        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
-                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk)).await {
+                                        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                        if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                            .await {
+                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pubkey)).await {
                                                 let key: Result<Address, _> = key.try_into();
 
                                                 if let Ok(key) = key {
@@ -672,6 +684,18 @@ where
         Ok(self.smgr.ping_session(id).await?)
     }
 
+    pub async fn session_surb_balancing_cfg(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
+        Ok(self.smgr.get_surb_balancer_config(id).await?)
+    }
+
+    pub async fn update_session_surb_balancing_cfg(
+        &self,
+        id: &SessionId,
+        cfg: SurbBalancerConfig,
+    ) -> errors::Result<()> {
+        Ok(self.smgr.update_surb_balancer_config(id, cfg).await?)
+    }
+
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
     pub async fn send_message(&self, msg: Box<[u8]>, routing: DestinationRouting, tag: Tag) -> errors::Result<()> {
         if let Tag::Reserved(reserved_tag) = tag {
@@ -689,7 +713,7 @@ where
         }
 
         let app_data = ApplicationData::new_from_owned(tag, msg);
-        let routing = self.path_planner.resolve_routing(app_data.len(), routing).await?;
+        let routing = self.path_planner.resolve_routing(app_data.len(), routing).await?.0;
 
         // Here we do not use msg_sender directly,
         // since it internally follows Session-oriented logic
@@ -777,8 +801,12 @@ where
                 Box::pin(async move {
                     match address_like_noref {
                         either::Left(peer) => {
-                            let pk = OffchainPublicKey::try_from(peer)?;
-                            if let Some(address) = db_clone.translate_key(Some(tx), pk).await? {
+                            // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                            let pubkey =
+                                hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                    .await
+                                    .map_err(|e| hopr_db_sql::api::errors::DbError::General(e.to_string()))?;
+                            if let Some(address) = db_clone.translate_key(Some(tx), pubkey).await? {
                                 db_clone.is_allowed_in_network_registry(Some(tx), &address).await
                             } else {
                                 Err(hopr_db_sql::errors::DbSqlError::LogicalError(

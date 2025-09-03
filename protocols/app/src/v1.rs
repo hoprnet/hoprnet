@@ -1,5 +1,7 @@
-use std::{fmt::Formatter, ops::Range};
+use std::{fmt::Formatter, ops::Range, str::FromStr};
 
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_primitive_types::to_hex_shortened;
 use strum::IntoEnumIterator;
 
 /// List of all reserved application tags for the protocol.
@@ -29,10 +31,11 @@ impl From<ReservedTag> for Tag {
     }
 }
 
-/// Tags are represented by 8 bytes ([`u64`]`).
+/// Tags distinguishing different application-layer protocols.
 ///
-/// [`u64`] should offer enough space to avoid collisions and tag attacks.
-// #[repr(u64)]
+/// Currently, 8 bytes represent tags (`u64`).
+///
+/// `u64` should offer enough space to avoid collisions and tag attacks.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Tag {
     Reserved(u64),
@@ -43,7 +46,12 @@ impl Tag {
     /// Application tag range for external usage
     pub const APPLICATION_TAG_RANGE: Range<Self> =
         (Self::Application(ReservedTag::Undefined as u64 + 1))..Self::Application(Self::MAX);
-    pub const MAX: u64 = u64::MAX;
+    /// The maximum value of a tag.
+    ///
+    /// The maximum value is determined by the fact that the 3 most significant bits
+    /// must be set to 0 in version 1.
+    pub const MAX: u64 = 0x1fffffffffffffff_u64;
+    /// Size of a tag in bytes.
     pub const SIZE: usize = size_of::<u64>();
 
     pub fn from_be_bytes(bytes: [u8; Self::SIZE]) -> Self {
@@ -59,14 +67,15 @@ impl Tag {
 
     pub fn as_u64(&self) -> u64 {
         match self {
-            Tag::Reserved(tag) | Tag::Application(tag) => *tag,
+            Tag::Reserved(tag) | Tag::Application(tag) => (*tag) & Self::MAX,
         }
     }
 }
 
 impl<T: Into<u64>> From<T> for Tag {
     fn from(tag: T) -> Self {
-        let tag: u64 = tag.into();
+        // In version 1, the 3 most significant bits are always 0.
+        let tag: u64 = tag.into() & Self::MAX;
 
         if ReservedTag::range().contains(&tag) {
             Tag::Reserved(
@@ -86,9 +95,7 @@ impl serde::Serialize for Tag {
     where
         S: serde::Serializer,
     {
-        match self {
-            Tag::Reserved(tag) | Tag::Application(tag) => serializer.serialize_u64(*tag),
-        }
+        serializer.serialize_u64(self.as_u64())
     }
 }
 
@@ -98,9 +105,7 @@ impl<'a> serde::Deserialize<'a> for Tag {
     where
         D: serde::Deserializer<'a>,
     {
-        let value = u64::deserialize(deserializer)?;
-
-        Ok(value.into())
+        Ok(u64::deserialize(deserializer)?.into())
     }
 }
 
@@ -110,22 +115,73 @@ impl std::fmt::Display for Tag {
     }
 }
 
+impl FromStr for Tag {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        u64::from_str(s).map(Tag::from)
+    }
+}
+
+flagset::flags! {
+   /// Individual flags passed up from the HOPR protocol layer to the Application layer.
+   ///
+   /// The upper 4 bits are reserved for signaling by the Application layer to the HOPR protocol layer
+   /// when sending data, the lower 4 bits are reserved for signaling of the HOPR protocol layer
+   /// to the Application layer when receiving data.
+    #[repr(u8)]
+    #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
+   pub enum ApplicationFlag: u8 {
+        /// The other party is in a "SURB distress" state, potentially running out of SURBs soon.
+        SurbDistress = 0b0000_0001,
+        /// The other party has run out of SURBs, and this was potentially the last message they could
+        /// send.
+        ///
+        /// Implies [`SurbDistress`].
+        OutOfSurbs = 0b0000_0011,
+   }
+}
+
+/// Additional flags passed between the HOPR protocol layer and the Application layer.
+pub type ApplicationFlags = flagset::FlagSet<ApplicationFlag>;
+
 /// Represents the received decrypted packet carrying the application-layer data.
+///
+/// This structure always owns the data.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ApplicationData {
+    /// Tag identifying the application-layer protocol.
     pub application_tag: Tag,
+    /// The actual application-layer data.
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     pub plain_text: Box<[u8]>,
+    /// Additional flags passed to/from the HOPR protocol layer and the Application layer, serving
+    /// as a means of local signaling.
+    ///
+    /// For outgoing data, these flags can be used to signal certain modes of operation by the Application layer
+    /// to the HOPR protocol.
+    /// For incoming data, the flags can be set by the HOPR protocol to signal various states to the
+    /// Applications layer.
+    ///
+    /// The flags are never serialized nor deserialized. Whether these flags are eventually
+    /// materialized over the wire is decided solely by the HOPR protocol layer underneath.
+    /// The HOPR protocol calls such flags "packet signals".
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub flags: ApplicationFlags,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    _d: u8, // prevents bypassing the constructor
 }
 
 impl ApplicationData {
-    pub const PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE - Tag::SIZE;
+    pub const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE - Tag::SIZE;
 
     pub fn new<T: Into<Tag>>(application_tag: T, plain_text: &[u8]) -> Self {
         Self {
             application_tag: application_tag.into(),
             plain_text: plain_text.into(),
+            flags: ApplicationFlags::empty(),
+            _d: 0,
         }
     }
 
@@ -133,12 +189,31 @@ impl ApplicationData {
         Self {
             application_tag: tag.into(),
             plain_text,
+            flags: ApplicationFlags::empty(),
+            _d: 0,
         }
     }
 
-    #[allow(clippy::len_without_is_empty)]
+    /// Creates a new instance with the given `flags` set.
+    pub fn with_flags<F: Into<ApplicationFlags>>(mut self, flags: F) -> Self {
+        self.flags = flags.into();
+        self
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         Self::TAG_SIZE + self.plain_text.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.plain_text.is_empty()
+    }
+
+    /// Returns the estimated number of SURBs the HOPR packet carrying an `ApplicationData` instance
+    /// with `payload` could hold (or could have held).
+    pub fn estimate_surbs_with_msg<T: AsRef<[u8]>>(payload: &T) -> usize {
+        HoprPacket::max_surbs_with_message(payload.as_ref().len().min(Self::PAYLOAD_SIZE) + Tag::SIZE)
     }
 }
 
@@ -146,13 +221,19 @@ impl std::fmt::Debug for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ApplicationData")
             .field("application_tag", &self.application_tag)
+            .field("plain_text", &to_hex_shortened::<32>(&self.plain_text))
             .finish()
     }
 }
 
 impl std::fmt::Display for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}): {}", self.application_tag, hex::encode(&self.plain_text))
+        write!(
+            f,
+            "({}): {}",
+            self.application_tag,
+            to_hex_shortened::<16>(&self.plain_text)
+        )
     }
 }
 
@@ -168,6 +249,8 @@ impl ApplicationData {
                         .map_err(|_e| crate::errors::PacketError::DecodingError("ApplicationData.tag".into()))?,
                 ),
                 plain_text: Box::from(&data[Self::TAG_SIZE..]),
+                flags: ApplicationFlags::empty(),
+                _d: 0,
             })
         } else {
             Err(crate::errors::PacketError::DecodingError("ApplicationData".into()))
@@ -198,6 +281,12 @@ mod tests {
         let reserved_tag = ReservedTag::Ping as u64;
 
         assert_eq!(Tag::from(reserved_tag), Tag::Reserved(reserved_tag));
+    }
+
+    #[test]
+    fn v1_tags_should_have_3_most_significant_bits_unset() {
+        let tag: Tag = u64::MAX.into();
+        assert_eq!(tag.as_u64(), Tag::MAX);
     }
 
     #[test]

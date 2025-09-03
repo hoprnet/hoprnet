@@ -22,6 +22,7 @@ use sqlx::{
     sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
 };
 use tracing::{debug, log::LevelFilter};
+use validator::Validate;
 
 use crate::{
     HoprDbAllOperations,
@@ -33,7 +34,9 @@ use crate::{
 
 pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
-#[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
+pub const MIN_SURB_RING_BUFFER_SIZE: usize = 1024;
+
+#[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 pub struct HoprDbConfig {
     #[default(true)]
     pub create_if_missing: bool,
@@ -41,6 +44,12 @@ pub struct HoprDbConfig {
     pub force_create: bool,
     #[default(Duration::from_secs(5))]
     pub log_slow_queries: Duration,
+    #[default(10_000)]
+    #[validate(range(min = MIN_SURB_RING_BUFFER_SIZE))]
+    pub surb_ring_buffer_size: usize,
+    #[default(1000)]
+    #[validate(range(min = 2))]
+    pub surb_distress_threshold: usize,
 }
 
 #[cfg(feature = "sqlite")]
@@ -84,9 +93,10 @@ pub struct HoprDb {
     pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
     pub(crate) ticket_manager: Arc<TicketManager>,
+    pub(crate) cfg: HoprDbConfig,
 }
 
-/// Filename for the blockchain indexing database.
+/// Filename for the blockchain-indexing database.
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
 /// Filename for the network peers database.
 pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
@@ -103,6 +113,9 @@ impl HoprDb {
             lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
             lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
         }
+
+        cfg.validate()
+            .map_err(|e| DbSqlError::Construction(format!("failed configuration validation: {e}")))?;
 
         fs::create_dir_all(directory)
             .map_err(|_e| DbSqlError::Construction(format!("cannot create main database directory {directory:?}")))?;
@@ -169,7 +182,7 @@ impl HoprDb {
         .await?;
 
         #[cfg(feature = "sqlite")]
-        Self::new_sqlx_sqlite(chain_key, index, index_ro, peers, tickets, logs).await
+        Self::new_sqlx_sqlite(chain_key, index, index_ro, peers, tickets, logs, cfg).await
     }
 
     #[cfg(feature = "sqlite")]
@@ -191,6 +204,7 @@ impl HoprDb {
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| DbSqlError::Construction(e.to_string()))?,
+            Default::default(),
         )
         .await
     }
@@ -203,6 +217,7 @@ impl HoprDb {
         peers_db_pool: SqlitePool,
         tickets_db_pool: SqlitePool,
         logs_db_pool: SqlitePool,
+        cfg: HoprDbConfig,
     ) -> Result<Self> {
         let index_db_rw = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db_pool);
         let index_db_ro = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db_ro_pool);
@@ -293,10 +308,11 @@ impl HoprDb {
             tickets_db,
             peers_db,
             logs_db,
+            cfg,
         })
     }
 
-    /// Starts ticket processing by the [TicketManager] with an optional new ticket notifier.
+    /// Starts ticket processing by the `TicketManager` with an optional new ticket notifier.
     /// Without calling this method, tickets will not be persisted into the DB.
     ///
     /// If the notifier is given, it will receive notifications once new ticket has been

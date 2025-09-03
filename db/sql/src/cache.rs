@@ -18,7 +18,7 @@ use hopr_primitive_types::{
     balance::HoprBalance,
     prelude::{Address, KeyIdent, U256},
 };
-use moka::{Expiry, future::Cache};
+use moka::{Expiry, future::Cache, notification::RemovalCause};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::errors::DbSqlError;
@@ -67,8 +67,21 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
+/// Represents a single SURB along with its ID popped from the [`SurbRingBuffer`].
+#[derive(Debug, Clone)]
+pub struct PoppedSurb<S> {
+    /// Complete SURB sender ID.
+    pub id: HoprSurbId,
+    /// The popped SURB.
+    pub surb: S,
+    /// Number of SURBs left in the RB after the pop.
+    pub remaining: usize,
+}
+
 /// Ring buffer containing SURBs along with their IDs.
-/// All these SURBs usually belong to the same pseudonym.
+///
+/// All these SURBs usually belong to the same pseudonym and are therefore identified
+/// only by the [`HoprSurbId`].
 #[derive(Clone, Debug)]
 pub(crate) struct SurbRingBuffer<S>(Arc<Mutex<AllocRingBuffer<(HoprSurbId, S)>>>);
 
@@ -85,31 +98,47 @@ impl<S> SurbRingBuffer<S> {
     }
 
     /// Push all SURBs with their IDs into the RB.
-    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> Result<(), DbError> {
-        self.0
-            .lock()
-            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
-            .extend(surbs);
-        Ok(())
-    }
-
-    /// Pop the latest SURB and its IDs from the RB.
-    pub fn pop_one(&self) -> Result<(HoprSurbId, S), DbError> {
-        self.0
-            .lock()
-            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
-            .dequeue()
-            .ok_or(DbError::NoSurbAvailable("no more surbs".into()))
-    }
-
-    /// Check if the next SURB has the given ID and pop it from the RB.
-    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, S), DbError> {
+    ///
+    /// Returns the total number of elements in the RB after the push.
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> Result<usize, DbError> {
         let mut rb = self
             .0
             .lock()
             .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
+
+        rb.extend(surbs);
+        Ok(rb.len())
+    }
+
+    /// Pop the latest SURB and its IDs from the RB.
+    pub fn pop_one(&self) -> Result<PoppedSurb<S>, DbError> {
+        let mut rb = self
+            .0
+            .lock()
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
+
+        let (id, surb) = rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))?;
+        Ok(PoppedSurb {
+            id,
+            surb,
+            remaining: rb.len(),
+        })
+    }
+
+    /// Check if the next SURB has the given ID and pop it from the RB.
+    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<PoppedSurb<S>, DbError> {
+        let mut rb = self
+            .0
+            .lock()
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
+
         if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
-            rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))
+            let (id, surb) = rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))?;
+            Ok(PoppedSurb {
+                id,
+                surb,
+                remaining: rb.len(),
+            })
         } else {
             Err(DbError::NoSurbAvailable("surb does not match the given id".into()))
         }
@@ -161,8 +190,9 @@ impl Default for HoprDbCaches {
             // if not used.
             pseudonym_openers: moka::sync::Cache::builder()
                 .time_to_idle(Duration::from_secs(600))
+                .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::trace!(?sender_id, ?cause, "evicting reply opener for pseudonym");
+                    tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
                 })
                 .max_capacity(10_000)
                 .build(),
@@ -170,8 +200,9 @@ impl Default for HoprDbCaches {
             // For each Pseudonym, there's an RB of SURBs and their IDs.
             surbs_per_pseudonym: Cache::builder()
                 .time_to_idle(Duration::from_secs(600))
+                .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
-                    tracing::trace!(%pseudonym, ?cause, "evicting surb for pseudonym");
+                    tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
                 })
                 .max_capacity(10_000)
                 .build(),
@@ -183,13 +214,15 @@ impl Default for HoprDbCaches {
 impl HoprDbCaches {
     pub(crate) fn insert_pseudonym_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
         self.pseudonym_openers
-            .get_with(sender_id.pseudonym(), || {
+            .get_with(sender_id.pseudonym(), move || {
                 moka::sync::Cache::builder()
                     .time_to_live(Duration::from_secs(3600))
-                    .eviction_listener(|sender_id, _reply_opener, cause| {
-                        tracing::trace!(?sender_id, ?cause, "evicting reply opener for sender id");
+                    .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
+                        if cause != RemovalCause::Explicit {
+                            tracing::warn!(pseudonym = %sender_id.pseudonym(), surb_id = hex::encode(id.as_slice()), ?cause, "evicting reply opener for sender id");
+                        }
                     })
-                    .max_capacity(10_000)
+                    .max_capacity(100_000)
                     .build()
             })
             .insert(sender_id.surb_id(), opener);
@@ -306,9 +339,18 @@ mod tests {
         rb.push([([3u8; 8], 0)])?;
         rb.push([([4u8; 8], 0)])?;
 
-        assert_eq!([2u8; 8], rb.pop_one()?.0);
-        assert_eq!([3u8; 8], rb.pop_one()?.0);
-        assert_eq!([4u8; 8], rb.pop_one()?.0);
+        let popped = rb.pop_one()?;
+        assert_eq!([2u8; 8], popped.id);
+        assert_eq!(2, popped.remaining);
+
+        let popped = rb.pop_one()?;
+        assert_eq!([3u8; 8], popped.id);
+        assert_eq!(1, popped.remaining);
+
+        let popped = rb.pop_one()?;
+        assert_eq!([4u8; 8], popped.id);
+        assert_eq!(0, popped.remaining);
+
         assert!(rb.pop_one().is_err());
 
         Ok(())
@@ -318,16 +360,25 @@ mod tests {
     fn surb_ring_buffer_must_be_fifo() -> anyhow::Result<()> {
         let rb = SurbRingBuffer::new(5);
 
-        rb.push([([1u8; 8], 0)])?;
-        rb.push([([2u8; 8], 0)])?;
+        let len = rb.push([([1u8; 8], 0)])?;
+        assert_eq!(1, len);
 
-        assert_eq!([1u8; 8], rb.pop_one()?.0);
-        assert_eq!([2u8; 8], rb.pop_one()?.0);
+        let len = rb.push([([2u8; 8], 0)])?;
+        assert_eq!(2, len);
 
-        rb.push([([1u8; 8], 0), ([2u8; 8], 0)])?;
+        let popped = rb.pop_one()?;
+        assert_eq!([1u8; 8], popped.id);
+        assert_eq!(1, popped.remaining);
 
-        assert_eq!([1u8; 8], rb.pop_one()?.0);
-        assert_eq!([2u8; 8], rb.pop_one()?.0);
+        let popped = rb.pop_one()?;
+        assert_eq!([2u8; 8], popped.id);
+        assert_eq!(0, popped.remaining);
+
+        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)])?;
+        assert_eq!(2, len);
+
+        assert_eq!([1u8; 8], rb.pop_one()?.id);
+        assert_eq!([2u8; 8], rb.pop_one()?.id);
 
         Ok(())
     }
@@ -339,7 +390,7 @@ mod tests {
         rb.push([([1u8; 8], 0)])?;
 
         assert!(rb.pop_one_if_has_id(&[2u8; 8]).is_err());
-        assert_eq!([1u8; 8], rb.pop_one_if_has_id(&[1u8; 8])?.0);
+        assert_eq!([1u8; 8], rb.pop_one_if_has_id(&[1u8; 8])?.id);
 
         Ok(())
     }

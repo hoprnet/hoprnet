@@ -4,7 +4,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use hopr_crypto_types::{crypto_traits::StreamCipher, prelude::*};
+use hopr_crypto_types::{crypto_traits::PRP, prelude::*};
 use hopr_primitive_types::prelude::*;
 use typenum::Unsigned;
 
@@ -239,8 +239,12 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
     /// Transform this partial packet into an actual [`MetaPacket`] using the given payload.
     pub fn into_meta_packet<const P: usize>(self, mut payload: PaddedPayload<P>) -> MetaPacket<S, H, P> {
         for iv_key in self.prp_inits {
-            let mut prp = iv_key.into_init::<S::PRP>();
-            prp.apply_keystream(&mut payload);
+            let prp = iv_key.into_init::<S::PRP>();
+            // The following won't panic, because PaddedPayload<P> is guaranteed to be S::PRP::BlockSize bytes-long
+            // However, it would be nicer to make PaddedPayload take P as a typenum parameter
+            // and enforce this invariant at compile time.
+            let block = crypto_traits::Block::<S::PRP>::from_mut_slice(&mut payload);
+            prp.forward(block);
         }
 
         MetaPacket::new_from_parts(self.alpha, self.routing_info, &payload)
@@ -392,6 +396,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     }
 
     /// Returns the payload subslice from the packet data.
+    ///
+    /// This data is guaranteed to be `PaddedPayload::<P>::SIZE` bytes-long, which currently
+    /// is `P + 1` bytes.
     fn payload_mut(&mut self) -> &mut [u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + RoutingInfo::<H>::SIZE;
         &mut self.packet[base..base + PaddedPayload::<P>::SIZE]
@@ -420,8 +427,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
 
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
-        let mut prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-        prp.apply_keystream(decrypted);
+        let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
+        prp.inverse(decrypted.into());
 
         Ok(match fwd_header {
             ForwardedHeader::Relayed {
@@ -457,14 +464,14 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     // Encrypt the packet payload using the derived shared secrets
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_secrets.into_iter().rev() {
-                        let mut prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
-                        prp.apply_keystream(decrypted);
+                        let prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
+                        prp.forward(decrypted.into());
                     }
 
                     // Invert the initial encryption using the sender key
-                    let mut prp =
+                    let prp =
                         S::new_reply_prp_init(&local_surb.sender_key, receiver_data.as_ref())?.into_init::<S::PRP>();
-                    prp.apply_keystream(decrypted);
+                    prp.inverse(decrypted.into());
                 }
 
                 // Remove all the data before the actual decrypted payload
@@ -539,7 +546,7 @@ pub(crate) mod tests {
         const MAX_HOPS: NonZeroUsize = NonZeroUsize::new(4).unwrap();
     }
 
-    const PAYLOAD_SIZE: usize = 799;
+    const PAYLOAD_SIZE: usize = 1021;
 
     #[test]
     fn test_padding() -> anyhow::Result<()> {

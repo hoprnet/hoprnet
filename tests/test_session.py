@@ -258,7 +258,7 @@ class TestSessionWithSwarm:
                 # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
                 await asyncio.sleep(1.0)
 
-                # Session uses Response buffer
+                # Session uses Response buffer and Exit egress rate control
                 async with HoprSession(
                     Protocol.TCP,
                     src=swarm7[route[0]],
@@ -308,9 +308,41 @@ class TestSessionWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))
+    async def test_session_parameter_reconfiguration(self, route, swarm7: dict[str, Node]):
+        async with HoprSession(
+            Protocol.UDP,
+            src=swarm7[route[0]],
+            dest=swarm7[route[-1]],
+            fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+            return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
+            use_response_buffer="1002 kB",  # currently set to be the exact multiple of the MTU
+            capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=False),
+        ) as session:
+            assert len(session.active_clients) == 1
+            session_id = session.active_clients[0]
+
+            entry = await swarm7[route[0]].api.session_list_clients(Protocol.UDP)
+            assert len(entry) == 1
+            assert len(entry[0].active_clients) == 1
+            assert entry[0].active_clients[0] == session_id
+
+            cfg = await swarm7[route[0]].api.session_get_config(session_id)
+            assert cfg is not None
+            assert cfg.response_buffer == "978.5 KiB"  # correction from kB to KiB
+
+            cfg.response_buffer = "2004 kB"
+            await swarm7[route[0]].api.session_set_config(session_id, cfg)
+
+            cfg = await swarm7[route[0]].api.session_get_config(session_id)
+            assert cfg is not None
+            assert cfg.response_buffer == "1.9 MiB"  # correction from kB to MiB
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))
     async def test_session_communication_with_udp_loopback_service(self, route, swarm7: dict[str, Node]):
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
 
+        # Session uses NO Response buffer and NO Exit egress rate control
         async with HoprSession(
             Protocol.UDP,
             src=swarm7[route[0]],
@@ -319,6 +351,7 @@ class TestSessionWithSwarm:
             return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
             loopback=True,
             use_response_buffer=None,
+            capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=False, no_rate_control=True),
         ) as session:
             assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
 
@@ -367,7 +400,7 @@ class TestSessionWithSwarm:
             # Generate random text content to be served
             expected = "".join(random.choices(string.ascii_letters + string.digits, k=DOWNLOAD_FILE_SIZE))
 
-            # Session uses Response buffer
+            # Session uses Response buffer and Exit egress rate control
             with run_https_server(expected) as dst_sock_port:
                 async with HoprSession(
                     Protocol.TCP,
@@ -401,6 +434,7 @@ class TestSessionWithSwarm:
         async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route], packet_count * ticket_price, packet_count * ticket_price
         ):
+            # Session uses Response buffer and Exit egress rate control
             logging.info(f"Opening session for route '{route}'")
             async with HoprSession(
                 Protocol.UDP,

@@ -1,0 +1,34 @@
+[package]
+name = "hopr-protocol-app"
+version = "1.0.0"
+edition = "2024"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Contains implementation of Application layer for HOPR protocol as specified in RFC-0014"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[features]
+default = []
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "hopr-crypto-packet/serde",
+  "flagset/serde",
+]
+
+[dependencies]
+flagset = { workspace = true }
+strum = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
+thiserror = { workspace = true }
+
+hopr-crypto-packet = { workspace = true }
+hopr-primitive-types = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]

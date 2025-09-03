@@ -1,8 +1,9 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     fmt::Formatter,
     future::Future,
-    net::IpAddr,
+    hash::Hash,
+    net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::Arc,
 };
@@ -18,14 +19,16 @@ use axum::{
 };
 use axum_extra::extract::Query;
 use base64::Engine;
+use dashmap::DashMap;
 use futures::{
     AsyncReadExt, AsyncWriteExt, FutureExt, SinkExt, StreamExt, TryStreamExt,
     future::{AbortHandle, AbortRegistration},
 };
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, Hopr, HoprSession, SESSION_MTU, ServiceId, SessionCapabilities, SessionClientConfig, SessionTarget,
-    SurbBalancerConfig, errors::HoprLibError, transfer_session,
+    Address, Hopr, HoprSession, HoprSessionId, HoprTransportError, SESSION_MTU, SURB_SIZE, ServiceId,
+    SessionCapabilities, SessionClientConfig, SessionManagerError, SessionTarget, SurbBalancerConfig,
+    TransportSessionError, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
@@ -56,6 +59,11 @@ lazy_static::lazy_static! {
         &["type"]
     ).unwrap();
 }
+
+// Imported for some IDEs to not treat the `json!` macro inside the `schema` macro as an error
+#[allow(unused_imports)]
+use serde_json::json;
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[schema(
@@ -140,6 +148,8 @@ pub struct StoredSessionEntry {
     pub return_path: RoutingOptions,
     /// The abort handle for the Session processing.
     pub abort_handle: AbortHandle,
+
+    clients: Arc<DashMap<HoprSessionId, (SocketAddr, AbortHandle)>>,
 }
 
 #[repr(u8)]
@@ -165,6 +175,8 @@ pub enum SessionCapability {
     RetransmissionAckOnly,
     /// Disable packet buffering
     NoDelay,
+    /// Disable SURB-based egress rate control at the Exit.
+    NoRateControl,
 }
 
 impl From<SessionCapability> for hopr_lib::SessionCapabilities {
@@ -176,6 +188,7 @@ impl From<SessionCapability> for hopr_lib::SessionCapabilities {
             }
             SessionCapability::RetransmissionAckOnly => hopr_lib::SessionCapability::RetransmissionAck.into(),
             SessionCapability::NoDelay => hopr_lib::SessionCapability::NoDelay.into(),
+            SessionCapability::NoRateControl => hopr_lib::SessionCapability::NoRateControl.into(),
         }
     }
 }
@@ -404,7 +417,9 @@ impl RoutingOptions {
         "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"],
         "responseBuffer": "2 MB",
+        "maxSurbUpstream": "2000 kb/s",
         "sessionPool": 0,
+        "maxClientSessions": 2
     }))]
 #[serde(rename_all = "camelCase")]
 /// Request body for creating a new client session.
@@ -441,6 +456,17 @@ pub(crate) struct SessionClientRequest {
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = String)]
     pub response_buffer: Option<bytesize::ByteSize>,
+    /// The maximum throughput at which artificial SURBs might be generated and sent
+    /// to the recipient of the Session.
+    ///
+    /// On Sessions that rarely send data but receive a lot (= Exit node has high SURB consumption),
+    /// this should roughly match the maximum retrieval throughput.
+    ///
+    /// All syntaxes like "2 MBps", "1.2Mbps", "300 kb/s", "1.23 Mb/s" are supported.
+    #[serde(default)]
+    #[serde(with = "human_bandwidth::option")]
+    #[schema(value_type = String)]
+    pub max_surb_upstream: Option<human_bandwidth::re::bandwidth::Bandwidth>,
     /// How many Sessions to pool for clients.
     ///
     /// If no sessions are pooled, they will be opened ad-hoc when a client connects.
@@ -448,6 +474,16 @@ pub(crate) struct SessionClientRequest {
     ///
     /// Currently, the maximum value is 5.
     pub session_pool: Option<usize>,
+    /// The maximum number of client sessions that the listener can spawn.
+    ///
+    /// This currently applies only to the TCP sessions, as UDP sessions cannot
+    /// handle multiple clients (and spawn therefore always only a single session).
+    ///
+    /// If this value is smaller than the value specified in `session_pool`, it will
+    /// be set to that value.
+    ///
+    /// The default value is 5.
+    pub max_client_sessions: Option<usize>,
 }
 
 impl SessionClientRequest {
@@ -477,17 +513,11 @@ impl SessionClientRequest {
                         // Only Segmentation capability for UDP per default
                         _ => SessionCapability::Segmentation.into(),
                     }),
-                surb_management: match self.response_buffer {
-                    // Buffer worth at least 2 reply packets
-                    Some(buffer_size) if buffer_size.as_u64() >= 2 * SESSION_MTU as u64 => Some(SurbBalancerConfig {
-                        target_surb_buffer_size: buffer_size.as_u64() / SESSION_MTU as u64,
-                        ..Default::default()
-                    }),
-                    // No SURBs are set up and maintained, useful for high-send low-reply sessions
-                    Some(_) => None,
-                    // Use defaults otherwise
-                    None => Some(SurbBalancerConfig::default()),
-                },
+                surb_management: SessionConfig {
+                    response_buffer: self.response_buffer,
+                    max_surb_upstream: self.max_surb_upstream,
+                }
+                .into(),
                 ..Default::default()
             },
         ))
@@ -504,7 +534,9 @@ impl SessionClientRequest {
         "protocol": "tcp",
         "ip": "127.0.0.1",
         "port": 5542,
-        "mtu": 987
+        "mtu": 1020,
+        "surb_len": 400,
+        "active_clients": []
     }))]
 #[serde(rename_all = "camelCase")]
 /// Response body for creating a new client session.
@@ -532,6 +564,15 @@ pub(crate) struct SessionClientResponse {
     pub port: u16,
     /// MTU used by the Session.
     pub mtu: usize,
+    /// Size of a Single Use Reply Block used by the protocol.
+    ///
+    /// This is usefult for SURB balancing calculations.
+    pub surb_len: usize,
+    /// Lists Session IDs of all active clients.
+    ///
+    /// Can contain multiple entries on TCP sessions, but currently
+    /// always only a single entry on UDP sessions.
+    pub active_clients: Vec<String>,
 }
 
 /// This function first tries to parse `requested` as the `ip:port` host pair.
@@ -672,7 +713,7 @@ async fn create_tcp_client_binding(
     bind_host: std::net::SocketAddr,
     state: Arc<InternalState>,
     args: SessionClientRequest,
-) -> Result<std::net::SocketAddr, (StatusCode, ApiErrorStatus)> {
+) -> Result<(std::net::SocketAddr, Option<HoprSessionId>), (StatusCode, ApiErrorStatus)> {
     let target_spec = args.target.clone();
     let (dst, target, data) = args
         .clone()
@@ -698,20 +739,21 @@ async fn create_tcp_client_binding(
     let hopr = state.hopr.clone();
 
     // Create a session pool if requested
-    let mut session_pool = SessionPool::new(
-        args.session_pool.unwrap_or(0),
-        dst,
-        target.clone(),
-        data.clone(),
-        hopr.clone(),
-    )
-    .await?;
+    let session_pool_size = args.session_pool.unwrap_or(0);
+    let mut session_pool = SessionPool::new(session_pool_size, dst, target.clone(), data.clone(), hopr.clone()).await?;
+
+    let active_sessions = Arc::new(DashMap::new());
+    let mut max_clients = args.max_client_sessions.unwrap_or(5).max(1);
+
+    if max_clients < session_pool_size {
+        max_clients = session_pool_size;
+    }
 
     // Create an abort handler for the listener
     let (abort_handle, abort_reg) = AbortHandle::new_pair();
+    let active_sessions_clone = active_sessions.clone();
     hopr_async_runtime::prelude::spawn(async move {
-        let active_sessions = Arc::new(std::sync::Mutex::new(HashMap::new()));
-        let active_sessions_clone = active_sessions.clone();
+        let active_sessions_clone_2 = active_sessions_clone.clone();
 
         futures::stream::Abortable::new(tokio_stream::wrappers::TcpListenerStream::new(tcp_listener), abort_reg)
             .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
@@ -719,14 +761,27 @@ async fn create_tcp_client_binding(
                 let data = data.clone();
                 let target = target.clone();
                 let hopr = hopr.clone();
-                let active_sessions = active_sessions_clone.clone();
+                let active_sessions = active_sessions_clone_2.clone();
 
                 // Try to pop from the pool only if a client was accepted
                 let maybe_pooled_session = accepted_client.is_ok().then(|| session_pool.pop()).flatten();
                 async move {
                     match accepted_client {
-                        Ok((sock_addr, stream)) => {
+                        Ok((sock_addr, mut stream)) => {
                             debug!(?sock_addr, "incoming TCP connection");
+
+                            // Check that we are still within the quota,
+                            // otherwise shutdown the new client immediately
+                            if active_sessions.len() >= max_clients {
+                                error!(?bind_host, "no more client slots available at listener");
+                                use tokio::io::AsyncWriteExt;
+                                if let Err(error) = stream.shutdown().await {
+                                    error!(%error, ?sock_addr, "failed to shutdown TCP connection");
+                                }
+                                return;
+                            }
+
+                            // See if we still have some session pooled
                             let session = match maybe_pooled_session {
                                 Some(s) => {
                                     debug!(session_id = %s.id(), "using pooled session");
@@ -748,9 +803,7 @@ async fn create_tcp_client_binding(
                             debug!(?sock_addr, %session_id, "new session for incoming TCP connection");
 
                             let (abort_handle, abort_reg) = AbortHandle::new_pair();
-                            if let Ok(mut active_sessions) = active_sessions.lock() {
-                                active_sessions.insert(session_id, abort_handle);
-                            }
+                            active_sessions.insert(session_id, (sock_addr, abort_handle));
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
@@ -758,13 +811,11 @@ async fn create_tcp_client_binding(
                             hopr_async_runtime::prelude::spawn(
                                 // The stream either terminates naturally (by the client closing the TCP connection)
                                 // or is terminated via the abort handle.
-                                bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).map(
+                                bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE, Some(abort_reg)).then(
                                     move |_| async move {
                                         // Regardless how the session ended, remove the abort handle
                                         // from the map
-                                        if let Ok(mut active_sessions) = active_sessions.lock() {
-                                            active_sessions.remove(&session_id);
-                                        }
+                                        active_sessions.remove(&session_id);
 
                                         debug!(%session_id, "tcp session has ended");
 
@@ -781,12 +832,11 @@ async fn create_tcp_client_binding(
             .await;
 
         // Once the listener is done, abort all active sessions created by the listener
-        if let Ok(active_sessions) = active_sessions.lock() {
-            active_sessions.iter().for_each(|(session_id, handle)| {
-                debug!(%session_id, "aborting opened TCP session after listener has been closed");
-                handle.abort()
-            });
-        };
+        active_sessions_clone.iter().for_each(|entry| {
+            let (sock_addr, handle) = entry.value();
+            debug!(session_id = %entry.key(), ?sock_addr, "aborting opened TCP session after listener has been closed");
+            handle.abort()
+        });
     });
 
     state.open_listeners.write_arc().await.insert(
@@ -796,17 +846,18 @@ async fn create_tcp_client_binding(
             target: target_spec.clone(),
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
+            clients: active_sessions,
             abort_handle,
         },
     );
-    Ok(bound_host)
+    Ok((bound_host, None))
 }
 
 async fn create_udp_client_binding(
     bind_host: std::net::SocketAddr,
     state: Arc<InternalState>,
     args: SessionClientRequest,
-) -> Result<std::net::SocketAddr, (StatusCode, ApiErrorStatus)> {
+) -> Result<(std::net::SocketAddr, Option<HoprSessionId>), (StatusCode, ApiErrorStatus)> {
     let target_spec = args.target.clone();
     let (dst, target, data) = args
         .clone()
@@ -852,6 +903,10 @@ async fn create_udp_client_binding(
     //
     // This is needed because the `udp_socket` cannot terminate by itself.
     let (abort_handle, abort_reg) = AbortHandle::new_pair();
+    let clients = Arc::new(DashMap::new());
+    // TODO: add multiple client support to UDP sessions (#7370)
+    let session_id = *session.id();
+    clients.insert(session_id, (bind_host, abort_handle.clone()));
     hopr_async_runtime::prelude::spawn(async move {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
@@ -873,9 +928,10 @@ async fn create_udp_client_binding(
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
             abort_handle,
+            clients,
         },
     );
-    Ok(bound_host)
+    Ok((bound_host, Some(session_id)))
 }
 
 /// Creates a new client session returning the given session listening host and port over TCP or UDP.
@@ -925,20 +981,15 @@ pub(crate) async fn create_client(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let bind_host: std::net::SocketAddr = build_binding_host(args.listen_host.as_deref(), state.default_listen_host);
 
-    if bind_host.port() > 0
-        && state
-            .open_listeners
-            .read_arc()
-            .await
-            .contains_key(&ListenerId(protocol.into(), bind_host))
-    {
+    let listener_id = ListenerId(protocol.into(), bind_host);
+    if bind_host.port() > 0 && state.open_listeners.read_arc().await.contains_key(&listener_id) {
         return Err((StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed));
     }
 
     debug!("binding {protocol} session listening socket to {bind_host}");
-    let bound_host = match protocol {
-        IpProtocol::TCP => create_tcp_client_binding(bind_host, state, args.clone()).await?,
-        IpProtocol::UDP => create_udp_client_binding(bind_host, state, args.clone()).await?,
+    let (bound_host, udp_session_id) = match protocol {
+        IpProtocol::TCP => create_tcp_client_binding(bind_host, state.clone(), args.clone()).await?,
+        IpProtocol::UDP => create_udp_client_binding(bind_host, state.clone(), args.clone()).await?,
     };
 
     Ok::<_, (StatusCode, ApiErrorStatus)>(
@@ -953,6 +1004,8 @@ pub(crate) async fn create_client(
                 forward_path: args.forward_path.clone(),
                 return_path: args.return_path.clone(),
                 mtu: SESSION_MTU,
+                surb_len: SURB_SIZE,
+                active_clients: udp_session_id.into_iter().map(|s| s.to_string()).collect(),
             }),
         )
             .into_response(),
@@ -977,7 +1030,9 @@ pub(crate) async fn create_client(
                 "protocol": "tcp",
                 "ip": "127.0.0.1",
                 "port": 5542,
-                "mtu": 987
+                "surbLen": 400,
+                "mtu": 1020,
+                "activeClients": []
             }
         ])),
         (status = 400, description = "Invalid IP protocol.", body = ApiError),
@@ -1009,10 +1064,167 @@ pub(crate) async fn list_clients(
             return_path: entry.return_path.clone(),
             destination: entry.destination,
             mtu: SESSION_MTU,
+            surb_len: SURB_SIZE,
+            active_clients: entry.clients.iter().map(|e| e.key().to_string()).collect(),
         })
         .collect::<Vec<_>>();
 
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(response)).into_response())
+}
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "responseBuffer": "2 MB",
+        "maxSurbUpstream": "2 Mbps"
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionConfig {
+    /// The amount of response data the Session counterparty can deliver back to us,
+    /// without us sending any SURBs to them.
+    ///
+    /// In other words, this size is recalculated to a number of SURBs delivered
+    /// to the counterparty upfront and then maintained.
+    /// The maintenance is dynamic, based on the number of responses we receive.
+    ///
+    /// All syntaxes like "2 MB", "128 kiB", "3MiB" are supported. The value must be
+    /// at least the size of 2 Session packet payloads.
+    #[serde(default)]
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = String)]
+    pub response_buffer: Option<bytesize::ByteSize>,
+    /// The maximum throughput at which artificial SURBs might be generated and sent
+    /// to the recipient of the Session.
+    ///
+    /// On Sessions that rarely send data but receive a lot (= Exit node has high SURB consumption),
+    /// this should roughly match the maximum retrieval throughput.
+    ///
+    /// All syntaxes like "2 MBps", "1.2Mbps", "300 kb/s", "1.23 Mb/s" are supported.
+    #[serde(default)]
+    #[serde(with = "human_bandwidth::option")]
+    #[schema(value_type = String)]
+    pub max_surb_upstream: Option<human_bandwidth::re::bandwidth::Bandwidth>,
+}
+
+impl From<SessionConfig> for Option<SurbBalancerConfig> {
+    fn from(value: SessionConfig) -> Self {
+        match value.response_buffer {
+            // Buffer worth at least 2 reply packets
+            Some(buffer_size) if buffer_size.as_u64() >= 2 * SESSION_MTU as u64 => Some(SurbBalancerConfig {
+                target_surb_buffer_size: buffer_size.as_u64() / SESSION_MTU as u64,
+                max_surbs_per_sec: value
+                    .max_surb_upstream
+                    .map(|b| (b.as_bps() as usize / (8 * SURB_SIZE)) as u64)
+                    .unwrap_or_else(|| SurbBalancerConfig::default().max_surbs_per_sec),
+                ..Default::default()
+            }),
+            // No additional SURBs are set up and maintained, useful for high-send low-reply sessions
+            Some(_) => None,
+            // Use defaults otherwise
+            None => Some(SurbBalancerConfig::default()),
+        }
+    }
+}
+
+impl From<SurbBalancerConfig> for SessionConfig {
+    fn from(value: SurbBalancerConfig) -> Self {
+        Self {
+            response_buffer: Some(bytesize::ByteSize::b(
+                value.target_surb_buffer_size * SESSION_MTU as u64,
+            )),
+            max_surb_upstream: Some(human_bandwidth::re::bandwidth::Bandwidth::from_bps(
+                value.max_surbs_per_sec * (8 * SURB_SIZE) as u64,
+            )),
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = const_format::formatcp!("{BASE_PATH}/session/config/{{id}}"),
+    description = "Updates configuration of an existing active session.",
+    params(
+        ("id" = String, Path, description = "Session ID", example = "0x5112D584a1C72Fc25017:487"),
+    ),
+    request_body(
+            content = SessionConfig,
+            description = "Allows updating of several parameters of an existing active session.",
+            content_type = "application/json"),
+    responses(
+            (status = 204, description = "Successfully updated the configuration"),
+            (status = 400, description = "Invalid configuration.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Given session ID does not refer to an existing Session", body = ApiError),
+            (status = 406, description = "Session cannot be reconfigured.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Session"
+)]
+pub(crate) async fn adjust_session(
+    State(state): State<Arc<InternalState>>,
+    Path(session_id): Path<String>,
+    Json(args): Json<SessionConfig>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let session_id = HoprSessionId::from_str(&session_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
+
+    if let Some(cfg) = Option::<SurbBalancerConfig>::from(args) {
+        match state.hopr.update_session_surb_balancer_config(&session_id, cfg).await {
+            Ok(_) => Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response()),
+            Err(HoprLibError::TransportError(HoprTransportError::Session(TransportSessionError::Manager(
+                SessionManagerError::NonExistingSession,
+            )))) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
+            Err(e) => Err((
+                StatusCode::NOT_ACCEPTABLE,
+                ApiErrorStatus::UnknownFailure(e.to_string()),
+            )),
+        }
+    } else {
+        Err::<_, (StatusCode, ApiErrorStatus)>((StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/session/config/{{id}}"),
+    description = "Gets configuration of an existing active session.",
+    params(
+        ("id" = String, Path, description = "Session ID", example = "0x5112D584a1C72Fc25017:487"),
+    ),
+    responses(
+            (status = 200, description = "Retrieved session configuration.", body = SessionConfig),
+            (status = 400, description = "Invalid session ID.", body = ApiError),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 404, description = "Given session ID does not refer to an existing Session", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError),
+    ),
+    security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+    ),
+    tag = "Session"
+)]
+pub(crate) async fn session_config(
+    State(state): State<Arc<InternalState>>,
+    Path(session_id): Path<String>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let session_id = HoprSessionId::from_str(&session_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
+
+    match state.hopr.get_session_surb_balancer_config(&session_id).await {
+        Ok(Some(cfg)) => {
+            Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::OK, Json(SessionConfig::from(cfg))).into_response())
+        }
+        Ok(None) => Err((StatusCode::NOT_FOUND, ApiErrorStatus::SessionNotFound)),
+        Err(e) => Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ApiErrorStatus::UnknownFailure(e.to_string()),
+        )),
+    }
 }
 
 #[derive(

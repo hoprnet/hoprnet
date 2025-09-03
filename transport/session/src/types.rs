@@ -2,6 +2,7 @@ use std::{
     fmt::{Debug, Display, Formatter},
     hash::{Hash, Hasher},
     pin::Pin,
+    str::FromStr,
     task::{Context, Poll},
     time::Duration,
 };
@@ -12,15 +13,60 @@ use hopr_network_types::{
     prelude::{DestinationRouting, SealedHost},
     utils::{AsyncWriteSink, DuplexIO},
 };
-use hopr_primitive_types::prelude::BytesRepresentable;
+use hopr_primitive_types::{
+    errors::GeneralError,
+    prelude::{BytesRepresentable, ToHex},
+};
+use hopr_protocol_app::prelude::{ApplicationData, Tag};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
 };
-use hopr_transport_packet::prelude::{ApplicationData, Tag};
+use hopr_protocol_start::StartProtocol;
 use tracing::{debug, instrument};
 
 use crate::{Capabilities, Capability, errors::TransportSessionError};
+
+/// Wrapper for [`Capabilities`] that makes conversion to/from `u8` possible.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ByteCapabilities(pub Capabilities);
+
+impl TryFrom<u8> for ByteCapabilities {
+    type Error = GeneralError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Capabilities::new(value)
+            .map(Self)
+            .map_err(|_| GeneralError::ParseError("capabilities".into()))
+    }
+}
+
+impl From<ByteCapabilities> for u8 {
+    fn from(value: ByteCapabilities) -> Self {
+        *value.0.as_ref()
+    }
+}
+
+impl From<ByteCapabilities> for Capabilities {
+    fn from(value: ByteCapabilities) -> Self {
+        value.0
+    }
+}
+
+impl From<Capabilities> for ByteCapabilities {
+    fn from(value: Capabilities) -> Self {
+        Self(value)
+    }
+}
+
+impl AsRef<Capabilities> for ByteCapabilities {
+    fn as_ref(&self) -> &Capabilities {
+        &self.0
+    }
+}
+
+/// Start protocol instantiation for HOPR.
+pub type HoprStartProtocol = StartProtocol<SessionId, SessionTarget, ByteCapabilities>;
 
 /// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
 ///
@@ -58,9 +104,11 @@ pub struct SessionId {
 }
 
 impl SessionId {
+    const DELIMITER: char = ':';
+
     pub fn new<T: Into<Tag>>(tag: T, pseudonym: HoprPseudonym) -> Self {
         let tag = tag.into();
-        let mut cached = format!("{pseudonym}:{tag}");
+        let mut cached = format!("{pseudonym}{}{tag}", Self::DELIMITER);
         cached.truncate(MAX_SESSION_ID_STR_LEN);
 
         Self {
@@ -83,7 +131,21 @@ impl SessionId {
     }
 }
 
-#[cfg(feature = "serde")]
+impl FromStr for SessionId {
+    type Err = TransportSessionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.split_once(Self::DELIMITER)
+            .ok_or(TransportSessionError::InvalidSessionId)
+            .and_then(
+                |(pseudonym, tag)| match (HoprPseudonym::from_hex(pseudonym), Tag::from_str(tag)) {
+                    (Ok(p), Ok(t)) => Ok(Self::new(t, p)),
+                    _ => Err(TransportSessionError::InvalidSessionId),
+                },
+            )
+    }
+}
+
 impl serde::Serialize for SessionId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -97,7 +159,6 @@ impl serde::Serialize for SessionId {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for SessionId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -228,8 +289,7 @@ pub type ServiceId = u32;
 
 /// Defines what should happen with the data at the recipient where the
 /// data from the established session are supposed to be forwarded to some `target`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SessionTarget {
     /// Target is running over UDP with the given IP address and port.
     UdpStream(SealedHost),
@@ -304,6 +364,7 @@ impl Session {
                 frame_size: 1500,
                 frame_timeout: Duration::from_millis(800),
                 capacity: 16384,
+                flush_immediately: capabilities.contains(Capability::NoDelay),
                 ..Default::default()
             };
 
@@ -321,8 +382,6 @@ impl Session {
                     max_outgoing_frame_retries: 2,
                     ..Default::default()
                 };
-
-                // TODO: The NoDelay capability is currently unused
 
                 debug!(?socket_cfg, ?ack_cfg, "opening new stateful session socket");
 
@@ -461,6 +520,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_session_id_to_str_from_str() -> anyhow::Result<()> {
+        let id = SessionId::new(1234_u64, HoprPseudonym::random());
+        assert_eq!(id.as_str(), id.to_string());
+        assert_eq!(id, SessionId::from_str(id.as_str())?);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_max_decimal_digits_for_n_bytes() {
         assert_eq!(3, max_decimal_digits_for_n_bytes(size_of::<u8>()));
         assert_eq!(5, max_decimal_digits_for_n_bytes(size_of::<u16>()));
@@ -474,19 +542,14 @@ mod tests {
         assert!(id.len() <= MAX_SESSION_ID_STR_LEN);
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn session_id_should_serialize_and_deserialize_correctly() -> anyhow::Result<()> {
-        const SESSION_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
-            .with_little_endian()
-            .with_variable_int_encoding();
-
         let pseudonym = HoprPseudonym::random();
         let tag: Tag = 1234u64.into();
 
         let session_id_1 = SessionId::new(tag, pseudonym);
-        let data = bincode::serde::encode_to_vec(session_id_1, SESSION_BINCODE_CONFIGURATION)?;
-        let session_id_2: SessionId = bincode::serde::decode_from_slice(&data, SESSION_BINCODE_CONFIGURATION)?.0;
+        let data = serde_cbor_2::to_vec(&session_id_1)?;
+        let session_id_2: SessionId = serde_cbor_2::from_slice(&data)?;
 
         assert_eq!(tag, session_id_2.tag());
         assert_eq!(pseudonym, *session_id_2.pseudonym());

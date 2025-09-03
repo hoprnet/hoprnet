@@ -9,7 +9,7 @@ use hopr_internal_types::protocol::HoprPseudonym;
 use hopr_network_types::types::{ResolvedTransportRouting, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag};
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag};
 use hopr_transport_protocol::processor::{PacketError, PacketSendFinalizer};
 use libp2p_identity::PeerId;
 
@@ -182,16 +182,19 @@ impl Probe {
                     async move {
                         let result = cache_peer_routing
                             .try_get_with(peer, async move {
-                                let cp_ofk = OffchainPublicKey::try_from(peer)
+                                // TODO: This is a CPU intensive operation, convert the probing mechanism to use OffchainPublicKey instead of PeerIDs!
+                                // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                    .await
                                     .context(format!("failed to convert {peer} to offchain public key"))?;
                                 let cp_address = db
-                                    .resolve_chain_key(&cp_ofk)
+                                    .resolve_chain_key(&pubkey)
                                     .await?
                                     .ok_or_else(|| anyhow::anyhow!("Failed to resolve chain key for peer: {peer}"))?;
 
                                 Ok::<ResolvedTransportRouting, anyhow::Error>(ResolvedTransportRouting::Forward {
                                     pseudonym: HoprPseudonym::random(),
-                                    forward_path: ValidatedPath::direct(cp_ofk, cp_address),
+                                    forward_path: ValidatedPath::direct(pubkey, cp_address),
                                     return_paths: vec![ValidatedPath::direct(me.0, me.1)],
                                 })
                             })
@@ -240,7 +243,7 @@ impl Probe {
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
-                                        match db.find_surb(pseudonym.into()).await.map(|(sender_id, surb)| ResolvedTransportRouting::Return(sender_id, surb)) {
+                                        match db.find_surb(pseudonym.into()).await.map(|found_surb| ResolvedTransportRouting::Return(found_surb.sender_id, found_surb.surb)) {
                                             Ok(path) => {
                                                 tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
                                             let message = Message::Probe(NeighborProbe::Pong(ping));
@@ -292,8 +295,9 @@ mod tests {
     use async_trait::async_trait;
     use futures::future::BoxFuture;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_db_api::prelude::FoundSurb;
     use hopr_network_types::prelude::SurbMatcher;
-    use hopr_transport_packet::prelude::Tag;
+    use hopr_protocol_app::prelude::Tag;
 
     use super::*;
 
@@ -342,16 +346,13 @@ mod tests {
 
     #[async_trait]
     impl DbOperations for Cache {
-        async fn find_surb(
-            &self,
-            _matcher: SurbMatcher,
-        ) -> hopr_db_api::errors::Result<(hopr_db_api::protocol::HoprSenderId, hopr_db_api::protocol::HoprSurb)>
-        {
+        async fn find_surb(&self, _matcher: SurbMatcher) -> hopr_db_api::errors::Result<FoundSurb> {
             // Mock implementation for testing purposes
-            Ok((
-                hopr_db_api::protocol::HoprSenderId::random(),
-                random_memory_violating_surb(),
-            ))
+            Ok(FoundSurb {
+                sender_id: hopr_db_api::protocol::HoprSenderId::random(),
+                surb: random_memory_violating_surb(),
+                remaining: 0,
+            })
         }
 
         async fn resolve_chain_key(
@@ -674,10 +675,7 @@ mod tests {
             let mut from_network_to_probing_tx = iface.from_network_to_probing_tx;
             let mut from_probing_up_rx = iface.from_probing_up_rx;
 
-            let expected_data = ApplicationData {
-                application_tag: Tag::MAX.into(),
-                plain_text: b"Hello, this is a test message!".to_vec().into_boxed_slice(),
-            };
+            let expected_data = ApplicationData::new(Tag::MAX, b"Hello, this is a test message!");
 
             from_network_to_probing_tx
                 .send((HoprPseudonym::random(), expected_data.clone()))

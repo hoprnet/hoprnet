@@ -9,7 +9,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum DbSqlError {
-    #[error("failed to construct the database, {0}")]
+    #[error("failed to construct the database: {0}")]
     Construction(String),
 
     #[error("log status not found")]

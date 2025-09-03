@@ -14,21 +14,8 @@ use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::{
     errors::SessionError,
-    frames::{FrameId, Segment, SeqIndicator, SeqNum},
+    protocol::{FrameId, Segment, SeqIndicator, SeqNum},
 };
-
-pub(crate) fn to_hex_shortened(data: &impl AsRef<[u8]>, max_chars: usize) -> String {
-    let data = data.as_ref();
-    if data.len() * 2 > max_chars {
-        format!(
-            "{}..{}",
-            hex::encode(&data[0..max_chars / 2]),
-            hex::encode(&data[data.len() - max_chars / 2..])
-        )
-    } else {
-        hex::encode(data)
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct RingBufferProducer<T>(futures::channel::mpsc::Sender<T>);

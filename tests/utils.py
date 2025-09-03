@@ -366,6 +366,18 @@ class HoprSession:
             s.close()
 
     @property
+    def surb_len(self):
+        if self._session is None:
+            raise Exception("Session is not open")
+        return self._session.surb_len
+
+    @property
+    def active_clients(self):
+        if self._session is None:
+            raise Exception("Session is not open")
+        return self._session.active_clients
+
+    @property
     def mtu(self):
         if self._session is None:
             raise Exception("Session is not open")
@@ -410,7 +422,7 @@ async def basic_send_and_receive_packets(
         dest,
         fwd_path,
         return_path,
-        SessionCapabilitiesBody(no_delay=True, segmentation=True),
+        SessionCapabilitiesBody(segmentation=True, no_rate_control=True),
         use_response_buffer=None,
     ) as session:
         addr = ("127.0.0.1", session.listen_port)
