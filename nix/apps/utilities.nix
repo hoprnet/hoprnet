@@ -19,8 +19,8 @@
       if [ -z "$check" ]; then
         # Run all checks by listing them from flake output
         nix flake show --json 2>/dev/null | \
-          jq -r '.checks."${system}" | to_entries | .[].key' | \
-          xargs -I '{}' nix build ".#checks.${system}.{}"
+          jq -r '.checks."${system}" | to_entries | .[].key | @sh' | \
+          xargs -I '{}' sh -c 'nix build ".#checks.${system}.$1"' -- {}
       else
         # Run specific check
         nix build ".#checks.${system}.$check"
