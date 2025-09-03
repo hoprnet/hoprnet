@@ -12,7 +12,7 @@ class Snapshot:
         self.cluster = cluster
 
     def create(self):
-        logging.info(f"Taking snapshot (anvil port: {self.anvil_port}")
+        logging.info("Taking snapshot")
 
         # delete old snapshot
         shutil.rmtree(self.sdir, ignore_errors=True)
