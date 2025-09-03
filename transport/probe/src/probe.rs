@@ -182,16 +182,19 @@ impl Probe {
                     async move {
                         let result = cache_peer_routing
                             .try_get_with(peer, async move {
-                                let cp_ofk = OffchainPublicKey::try_from(peer)
+                                // TODO: This is a CPU intensive operation, convert the probing mechanism to use OffchainPublicKey instead of PeerIDs!
+                                // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                    .await
                                     .context(format!("failed to convert {peer} to offchain public key"))?;
                                 let cp_address = db
-                                    .resolve_chain_key(&cp_ofk)
+                                    .resolve_chain_key(&pubkey)
                                     .await?
                                     .ok_or_else(|| anyhow::anyhow!("Failed to resolve chain key for peer: {peer}"))?;
 
                                 Ok::<ResolvedTransportRouting, anyhow::Error>(ResolvedTransportRouting::Forward {
                                     pseudonym: HoprPseudonym::random(),
-                                    forward_path: ValidatedPath::direct(cp_ofk, cp_address),
+                                    forward_path: ValidatedPath::direct(pubkey, cp_address),
                                     return_paths: vec![ValidatedPath::direct(me.0, me.1)],
                                 })
                             })

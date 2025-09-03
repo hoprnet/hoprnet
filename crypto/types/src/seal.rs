@@ -6,7 +6,7 @@ use crate::{errors::CryptoError, keypairs::OffchainKeypair, types::OffchainPubli
 /// only the recipient with the given `peer_id` can [decrypt it](unseal_data).
 pub fn seal_data(data: &[u8], peer_id: PeerId) -> crate::errors::Result<Box<[u8]>> {
     let recipient_pk: crypto_box::PublicKey =
-        curve25519_dalek::MontgomeryPoint::from(&OffchainPublicKey::try_from(peer_id)?).into();
+        curve25519_dalek::MontgomeryPoint::from(&OffchainPublicKey::from_peerid(&peer_id)?).into();
 
     recipient_pk
         .seal(&mut hopr_crypto_random::rng(), data)

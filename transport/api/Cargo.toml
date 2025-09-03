@@ -71,6 +71,7 @@ hopr-protocol-app = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
+hopr-parallelize = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }

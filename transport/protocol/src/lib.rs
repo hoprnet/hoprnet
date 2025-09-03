@@ -73,7 +73,7 @@ pub mod timer;
 #[cfg(feature = "capture")]
 mod capture;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use futures::{SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
@@ -415,6 +415,12 @@ where
     #[cfg(feature = "capture")]
     let capture_clone = capture.clone();
 
+    // Create a cache for a CPU-intensive conversion PeerId -> OffchainPublicKey
+    let peer_id_cache: moka::future::Cache<PeerId, OffchainPublicKey> = moka::future::Cache::builder()
+        .time_to_idle(Duration::from_secs(600))
+        .max_capacity(100_000)
+        .build();
+
     processes.insert(
         ProtocolProcesses::MsgIn,
         spawn_as_abortable!(async move {
@@ -423,6 +429,7 @@ where
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
                     let mut ack_out_tx = ack_out_tx_clone_1.clone();
+                    let peer_id_key_cache = peer_id_cache.clone();
 
                     trace!(%peer, "protocol message in");
 
@@ -433,8 +440,20 @@ where
                     );
 
                     async move {
+                        // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
+                        let peer_key = match peer_id_key_cache
+                                .try_get_with_by_ref(&peer, hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&peer)))
+                                .await {
+                            Ok(peer) => peer,
+                            Err(error) => {
+                                // There absolutely nothing we can do when the peer id is unparseable (e.g., non-ed25519 based)
+                                error!(%peer, %error, "dropping packet - cannot convert peer id");
+                                return None;
+                            }
+                        };
+
                         let now = std::time::Instant::now();
-                        let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
+                        let res = msg_processor.recv(peer_key, data).await.map_err(move |e| (peer, e));
                         let elapsed = now.elapsed();
                         if elapsed.as_millis() > SLOW_OP_MS {
                             warn!(%peer, ?elapsed, "msg_processor.recv took too long");
@@ -450,17 +469,9 @@ where
 
                             error!(%peer, %error, "failed to process the received message");
 
-                            let peer: OffchainPublicKey = match peer.try_into() {
-                                Ok(p) => p,
-                                Err(error) => {
-                                    warn!(%peer, %error, "Dropping packet - cannot convert peer id");
-                                    return None;
-                                }
-                            };
-
                             // Send random signed acknowledgement to give feedback to the sender
                             let now = std::time::Instant::now();
-                            if let Err(error) = ack_out_tx.send((None, peer)).await {
+                            if let Err(error) = ack_out_tx.send((None, peer_key)).await {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             }
                             let elapsed = now.elapsed();

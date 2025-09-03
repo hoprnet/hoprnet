@@ -303,9 +303,12 @@ where
             async move {
                 let processed = match event {
                     TicketAggregationToProcess::ToProcess(destination, acked_tickets, response) => {
-                        let opk: std::result::Result<OffchainPublicKey, hopr_primitive_types::errors::GeneralError> =
-                            destination.try_into();
-                        match opk {
+                        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                        let pubkey: std::result::Result<OffchainPublicKey, hopr_primitive_types::errors::GeneralError> =
+                            hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&destination))
+                                .await;
+
+                        match pubkey {
                             Ok(opk) => {
                                 let count = acked_tickets.len();
                                 match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
