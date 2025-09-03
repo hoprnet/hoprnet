@@ -288,9 +288,7 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
 
@@ -301,7 +299,7 @@ mod tests {
             .index_offset(1)
             .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(channel_epoch)
-            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .challenge(challenge)
             .build_signed(counterparty, &Hash::default())?
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
