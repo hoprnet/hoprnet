@@ -69,14 +69,14 @@ pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem each incoming winning ticket.
     /// Otherwise, it will try to redeem tickets in all channels periodically.
     ///
-    /// Set this to `false` when winning tickets are not happening too often (e.g., when winning probability
+    /// Set this to `true` when winning tickets are not happening too often (e.g., when winning probability
     /// is below 1%).
-    /// Set this to `true` when winning tickets are happening very often (e.g., when winning probability
+    /// Set this to `false` when winning tickets are happening very often (e.g., when winning probability
     /// is above 1%).
     ///
-    /// Default is `false`
-    #[serde(default)]
-    #[default = false]
+    /// Default is `true`
+    #[serde(defaul = "just_true")]
+    #[default = true]
     pub redeem_on_winning: bool,
 }
 
