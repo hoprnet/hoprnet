@@ -45,10 +45,20 @@
     checkPhase = ''
       echo "Checking if generated bindings introduced changes..."
 
-      # If reference directory exists, bindings are outdated
-      if [ -d "ethereum/bindings/src/reference" ]; then
-        echo "Generated bindings are outdated."
-        echo "Please run the binding generation and commit the changes."
+      # Create backup of current committed bindings
+      cp -r ethereum/bindings/src/codegen ethereum/bindings/src/codegen.backup
+
+      # Regenerate bindings
+      just generate-bindings
+
+      # Compare the regenerated bindings against the committed version
+      if ! diff -ru ethereum/bindings/src/codegen.backup ethereum/bindings/src/codegen; then
+        echo ""
+        echo "ERROR: Generated bindings differ from committed bindings."
+        echo "Please regenerate bindings and commit the changes:"
+        echo "  just generate-bindings"
+        echo "  git add ethereum/bindings/src/codegen"
+        echo "  git commit -m 'feat(bindings): Update generated bindings'"
         exit 1
       fi
 

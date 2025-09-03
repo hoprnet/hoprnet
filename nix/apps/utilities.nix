@@ -12,8 +12,8 @@
   # Run all or specific checks for the project
   # Without arguments: runs all checks
   # With argument: runs specific check by name
-  run-check = flake-utils.lib.mkApp {
-    drv = pkgs.writeShellScriptBin "run-check" ''
+  check = flake-utils.lib.mkApp {
+    drv = pkgs.writeShellScriptBin "check" ''
       set -e
       check=$1
       if [ -z "$check" ]; then
@@ -29,7 +29,7 @@
   };
 
   # Run cargo audit for security vulnerability checking
-  run-audit = flake-utils.lib.mkApp {
+  audit = flake-utils.lib.mkApp {
     drv = pkgs.writeShellApplication {
       name = "audit";
       runtimeInputs = with pkgs; [
@@ -48,7 +48,7 @@
     drv = pkgs.writeShellApplication {
       name = "find-port";
       text = ''
-        ${pkgs.python3}/bin/python ./tests/find_port.py \
+        ${pkgs.python3}/bin/python ${./../../tests/find_port.py} \
           --min-port 3000 \
           --max-port 4000 \
           --skip 30

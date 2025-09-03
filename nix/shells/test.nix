@@ -19,12 +19,22 @@ let
 
   # Foundry setup hook for contract testing
   finalShellHook = ''
-    if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
-      echo "solc = \"${solcDefault}/bin/solc\""
+    # Atomic creation of foundry.toml to avoid TOCTOU race
+    if [ ! -e ethereum/contracts/foundry.toml ]; then
       echo "Generating foundry.toml file!"
-      sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-        ethereum/contracts/foundry.in.toml >| \
-        ethereum/contracts/foundry.toml
+      temp_file=$(mktemp ethereum/contracts/foundry.toml.XXXXXX) || exit 1
+      
+      # Generate content to temporary file with cleanup on failure
+      if sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+           ethereum/contracts/foundry.in.toml > "$temp_file"; then
+        # Atomic move into place
+        mv "$temp_file" ethereum/contracts/foundry.toml
+        echo "solc = \"${solcDefault}/bin/solc\""
+      else
+        # Clean up temp file on failure
+        rm -f "$temp_file"
+        exit 1
+      fi
     else
       echo "foundry.toml file already exists!"
     fi

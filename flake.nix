@@ -116,7 +116,10 @@
             foundry.overlay
             solc.overlay
           ];
-          pkgs = import nixpkgs { inherit localSystem overlays; };
+          pkgs = import nixpkgs {
+            system = localSystem;
+            inherit overlays;
+          };
 
           # Platform information
           buildPlatform = pkgs.stdenv.buildPlatform;
@@ -356,9 +359,12 @@
             hopr-pluto-docker-build-and-upload = dockerUploadLib.mkDockerUploadApp plutoDocker;
 
             # Utility scripts
-            inherit (utilities) update-github-labels find-port-ci;
-            check = utilities.run-check;
-            audit = utilities.run-audit;
+            inherit (utilities)
+              update-github-labels
+              find-port-ci
+              audit
+              check
+              ;
           };
 
           # Export packages

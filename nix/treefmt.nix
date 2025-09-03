@@ -129,10 +129,14 @@
           echo "foundry.toml file already exists!"
         fi
 
-        # Format each file with forge fmt
+        # Format each file with forge fmt, abort on first failure
         for file in "$@"; do
-          ${pkgs.foundry-bin}/bin/forge fmt $file \
-            --root ./ethereum/contracts;
+          ${pkgs.foundry-bin}/bin/forge fmt "$file" \
+            --root ./ethereum/contracts
+          if [ $? -ne 0 ]; then
+            echo "forge fmt failed for file: $file" >&2
+            exit $?
+          fi
         done
       ''
       "--"

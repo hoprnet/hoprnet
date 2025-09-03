@@ -26,6 +26,9 @@ pkgs.stdenv.mkDerivation {
       ./../../tests
       ./../../scripts
       ./../../sdk/python
+      # Python project configuration and lock files for offline uv builds
+      ./../../pyproject.toml
+      ./../../uv.lock
       # Contract configuration
       ./../../ethereum/contracts/foundry.in.toml
       ./../../ethereum/contracts/remappings.txt
@@ -44,13 +47,15 @@ pkgs.stdenv.mkDerivation {
 
   # Build phase - prepare the testing environment
   buildPhase = ''
+    cd tests
     uv sync --frozen
     unset SOURCE_DATE_EPOCH
   '';
 
   # Check phase - run the actual smoke tests
   checkPhase = ''
-    uv run --frozen -m pytest tests/
+    cd tests
+    uv run --frozen -m pytest
   '';
 
   # Install phase - not needed for tests, just create output
