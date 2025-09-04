@@ -906,7 +906,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function test_redeemTicket(
+    function testFuzz_redeemTicket(
         uint256 privKeyA,
         uint256 privKeyB,
         address safeContract,
