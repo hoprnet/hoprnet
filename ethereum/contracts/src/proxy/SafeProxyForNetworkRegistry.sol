@@ -25,6 +25,7 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
     uint128 public snapshotBlockNumber;
 
     error SameValue();
+    error ZeroAddress(string reason);
 
     event ThresholdUpdated(uint256 indexed threshold);
     event SnapshotUpdated(uint128 indexed blockNumber);
@@ -38,6 +39,18 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
         address _token,
         address _nodeSafeRegistry
     ) {
+        if (_owner == address(0)) {
+            revert ZeroAddress({ reason: "_owner must not be empty" });
+        }
+        if (_manager == address(0)) {
+            revert ZeroAddress({ reason: "_manager must not be empty" });
+        }
+        if (_token == address(0)) {
+            revert ZeroAddress({ reason: "_token must not be empty" });
+        }
+        if (_nodeSafeRegistry == address(0)) {
+            revert ZeroAddress({ reason: "_nodeSafeRegistry must not be empty" });
+        }
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(MANAGER_ROLE, _owner);
         _grantRole(MANAGER_ROLE, _manager);

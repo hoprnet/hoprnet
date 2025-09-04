@@ -6,6 +6,8 @@ import "openzeppelin-contracts-4.9.2/utils/Multicall.sol";
 import { HoprMultiSig } from "./MultiSig.sol";
 import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
+error ZeroAddress(string reason);
+
 abstract contract HoprAnnouncementsEvents {
     event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
 
@@ -45,6 +47,9 @@ abstract contract HoprAnnouncementsEvents {
  */
 contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
     constructor(HoprNodeSafeRegistry safeRegistry) {
+        if (address(safeRegistry) == address(0)) {
+            revert ZeroAddress({ reason: "safeRegistry must not be empty" });
+        }
         setNodeSafeRegistry(safeRegistry);
     }
 

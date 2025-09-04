@@ -268,7 +268,13 @@ contract HoprChannels is
             revert InvalidNoticePeriod();
         }
 
-        require(_token != address(0), "token must not be empty");
+        if (_token == address(0)) {
+            revert ZeroAddress({ reason: "_token must not be empty" });
+        }
+
+        if (address(_safeRegistry) == address(0)) {
+            revert ZeroAddress({ reason: "_safeRegistry must not be empty" });
+        }
 
         setNodeSafeRegistry(_safeRegistry);
 

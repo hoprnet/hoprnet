@@ -69,12 +69,16 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     error SameStakingThreshold();
     error NftRanksMismatch();
     error MaxRegistrationsMismatch();
+    error ZeroAddress(string reason);
 
     /**
      * @dev Set stake contract address, transfer ownership, and set the maximum registrations per
      * special NFT to the default value: upperbound of of uint256.
      */
     constructor(address _stakeContract, address _newOwner, uint256 _minStake) {
+        if (_stakeContract == address(0)) {
+            revert ZeroAddress({ reason: "_stakeContract must not be empty" });
+        }
         _updateStakeContract(_stakeContract);
         _transferOwnership(_newOwner);
         stakeThreshold = _minStake;

@@ -38,6 +38,8 @@ contract HoprTicketPriceOracle is Ownable, HoprTicketPriceOracleEvents {
     error TicketPriceMustNotBeZero();
     // when new ticket price is equal to old ticket price
     error TicketPriceMustNotBeSame();
+    // when address is zero
+    error ZeroAddress(string reason);
 
     /**
      * @param _newOwner Address of the new owner.
