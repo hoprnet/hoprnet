@@ -182,9 +182,9 @@ contract HoprChannels is
     IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
-    // maximum balance that can be staked in a channel. 1% of total supply, staking more is not sound
+    // maximum balance that can be added in a channel. 1% of total supply, adding more is not sound
     Balance public constant MAX_USED_BALANCE = Balance.wrap(10 ** 25);
-    // minimum balance that must be staked in a channel. No empty token transactions
+    // minimum balance that must be added in a channel. No empty token transactions
     Balance public constant MIN_USED_BALANCE = Balance.wrap(1);
     // Version of the contract
     string public constant VERSION = "2.0.0";
@@ -397,6 +397,8 @@ contract HoprChannels is
      * - pseudorandomness of keccak256 function
      *
      * @dev This method makes use of several methods to reduce stack height.
+     * @notice redeemting tickets may result in token transfers, which can happen even
+     * when the channel state is PENDING_TO_CLOSE
      *
      * @param selfAddress account address of the ticket redeemer
      * @param redeemable ticket, signature of ticket issuer, porSecret
@@ -462,7 +464,6 @@ contract HoprChannels is
             abi.encodePacked(ChannelBalanceDecreased.selector, redeemable.data.channelId,  _channelState(redeemable.data.channelId))
         );
         emit ChannelBalanceDecreased(redeemable.data.channelId, _channelState(redeemable.data.channelId));
-        // DEBUG: TODO: FIXME: if this memory is needed
         bytes32 outgoingChannelId = _getChannelId(selfAddress, source);
         Channel storage earningChannel = channels[outgoingChannelId];
 
@@ -793,7 +794,8 @@ contract HoprChannels is
 
     /**
      * @dev Internal function to fund an outgoing channel from selfAddress to account with amount token
-     * @notice only balance above zero can execute
+     * @notice only balance above zero can execute.
+     * Channels cannot be actively funded at PENDING_TO_CLOSE state.
      *
      * @param selfAddress source address
      * @param account destination address
