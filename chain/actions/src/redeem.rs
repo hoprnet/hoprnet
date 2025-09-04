@@ -87,7 +87,7 @@ impl<Db> TicketRedeemActions for ChainActions<Db>
 where
     Db: HoprDbChannelOperations + HoprDbTicketOperations + HoprDbInfoOperations + Clone + Send + Sync + std::fmt::Debug,
 {
-    #[tracing::instrument(level = "debug", skip(self, min_value, only_aggregated))]
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_all_tickets(&self, min_value: HoprBalance, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self
             .db
@@ -122,7 +122,7 @@ where
         Ok(receivers)
     }
 
-    #[tracing::instrument(level = "debug", skip(self, min_value, only_aggregated))]
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets_with_counterparty(
         &self,
         counterparty: &Address,
@@ -141,7 +141,7 @@ where
         }
     }
 
-    #[tracing::instrument(level = "debug", skip(self, min_value, only_aggregated))]
+    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets_in_channel(
         &self,
         channel: &ChannelEntry,
