@@ -201,6 +201,9 @@ impl HoprSwarm {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatServer(event)) => {
                         warn!(?event, "Autonat server event");
                     }
+                    SwarmEvent::Behaviour(_) => {
+                        warn!(?event, "Unknown behaviour event");
+                    }
                     SwarmEvent::ConnectionEstablished {
                         peer_id,
                         connection_id,

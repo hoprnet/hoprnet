@@ -93,8 +93,8 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
 pub struct HoprNetworkBehavior {
     discovery: behavior::discovery::Behaviour,
     streams: libp2p_stream::Behaviour,
-    pub autonat_client: autonat::v2::client::Behaviour,
-    pub autonat_server: autonat::v2::server::Behaviour,
+    autonat_client: autonat::v2::client::Behaviour,
+    autonat_server: autonat::v2::server::Behaviour,
 }
 
 impl Debug for HoprNetworkBehavior {
