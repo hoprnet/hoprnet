@@ -453,7 +453,7 @@ where
         let mut transport_layer =
             HoprSwarm::new((&self.me).into(), discovery_updates, self.my_multiaddresses.clone()).await;
 
-        let autonat_port = self.my_multiaddresses.get(0).and_then(|addr| {
+        let autonat_port = self.my_multiaddresses.first().and_then(|addr| {
             let protocols: Vec<_> = addr.iter().collect();
             for p in protocols.iter().rev() {
                 match p {
