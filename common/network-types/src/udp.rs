@@ -53,7 +53,7 @@ lazy_static::lazy_static! {
 /// multiple sockets with `SO_REUSEADDR` and spin parallel tasks that will coordinate data and
 /// transmission retrieval using these sockets. This is driven by RX/TX MPMC queues, which are
 /// per-default unbounded (see [queue size](UdpStreamBuilder::with_queue_size) for details).
-#[pin_project::pin_project]
+#[pin_project::pin_project(PinnedDrop)]
 pub struct ConnectedUdpStream {
     socket_handles: Vec<tokio::task::JoinHandle<()>>,
     #[pin]
@@ -660,6 +660,15 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
                 "udp stream is closed",
             )))
         }
+    }
+}
+
+#[pin_project::pinned_drop]
+impl PinnedDrop for ConnectedUdpStream {
+    fn drop(self: Pin<&mut Self>) {
+        self.project().socket_handles.iter().for_each(|handle| {
+            handle.abort();
+        })
     }
 }
 
