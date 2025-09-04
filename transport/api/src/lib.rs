@@ -453,22 +453,19 @@ where
         let mut transport_layer =
             HoprSwarm::new((&self.me).into(), discovery_updates, self.my_multiaddresses.clone()).await;
 
-        let autonat_port = self.my_multiaddresses.first().and_then(|addr| {
-            let protocols: Vec<_> = addr.iter().collect();
-            for p in protocols.iter().rev() {
-                match p {
-                    Protocol::Tcp(port) | Protocol::Udp(port) | Protocol::Sctp(port) => return Some(*port),
-                    _ => {}
-                }
-            }
-            None
-        });
+        // let autonat_port = self.my_multiaddresses.first().and_then(|addr| {
+        //     let protocols: Vec<_> = addr.iter().collect();
+        //     for p in protocols.iter().rev() {
+        //         match p {
+        //             Protocol::Tcp(port) | Protocol::Udp(port) | Protocol::Sctp(port) => return Some(*port),
+        //             _ => {}
+        //         }
+        //     }
+        //     None
+        // });
 
-        if let Some(port) = autonat_port {
-            info!(port, "Running NAT server on the first multi-address port");
-            transport_layer.run_nat_server(port);
-        } else {
-            warn!("No port found in the multi-addresses, not running a NAT server");
+        if let Some(addr) = self.my_multiaddresses.first() {
+            transport_layer.run_nat_server(addr.clone());
         }
 
         if addresses.is_empty() {
