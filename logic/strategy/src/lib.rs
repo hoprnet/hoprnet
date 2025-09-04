@@ -96,7 +96,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
                 redeem_only_aggregated: false,
                 redeem_all_on_close: true,
                 minimum_redeem_ticket_value: HoprBalance::from_str("0.09 wxHOPR").unwrap(),
-                redeem_on_winning: false,
+                redeem_on_winning: true,
             }),
         ],
     }
