@@ -88,7 +88,7 @@ hopr:
         # a winning acknowledged ticket
         #
         # If set, the strategy will redeem only aggregated tickets.
-        redeem_only_aggregated: true
+        redeem_only_aggregated: false
         # If set, all tickets will be redeemed on channel closure.
         redeem_all_on_close: true
         # Sets the minimum value of a ticket to be able to redeem it.
