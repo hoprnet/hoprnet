@@ -58,7 +58,7 @@ use hopr_path::{
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
-pub use hopr_transport_identity::{Multiaddr, PeerId};
+pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network, PeerOrigin, PeerStatus};
 use hopr_transport_p2p::{
@@ -453,8 +453,22 @@ where
         let mut transport_layer =
             HoprSwarm::new((&self.me).into(), discovery_updates, self.my_multiaddresses.clone()).await;
 
-        if let Some(port) = self.cfg.protocol.autonat_port {
+        let autonat_port = self.my_multiaddresses.get(0).and_then(|addr| {
+            let protocols: Vec<_> = addr.iter().collect();
+            for p in protocols.iter().rev() {
+                match p {
+                    Protocol::Tcp(port) | Protocol::Udp(port) | Protocol::Sctp(port) => return Some(*port),
+                    _ => {}
+                }
+            }
+            None
+        });
+
+        if let Some(port) = autonat_port {
+            info!(port, "Running NAT server on the first multi-address port");
             transport_layer.run_nat_server(port);
+        } else {
+            warn!("No port found in the multi-addresses, not running a NAT server");
         }
 
         if addresses.is_empty() {

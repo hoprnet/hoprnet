@@ -209,11 +209,9 @@ hopr:
     prefer_local_addresses: false
   # Configuration of various HOPR sub-protocols.
   protocol:
-    # Outgoing ticket winning probability.
-    # Should not be lower than the minimum ticket winning probability set on-chain
-    # outgoing_ticket_winning_prob: 1.0
-    # port used for nat server functionality
-    autonat_port:
+  # Outgoing ticket winning probability.
+  # Should not be lower than the minimum ticket winning probability set on-chain
+  # outgoing_ticket_winning_prob: 1.0
   # Blockchain-specific configuration
   chain:
     # Indicates whether a node should announce itself on-chain

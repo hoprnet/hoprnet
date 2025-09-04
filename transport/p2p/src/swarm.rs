@@ -348,7 +348,6 @@ impl HoprSwarm {
                 warn!(%addr, %e, "Failed to dial NAT server address");
             } else {
                 info!(%addr, "Dialed NAT server address");
-                break;
             }
         }
     }

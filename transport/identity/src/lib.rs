@@ -6,4 +6,4 @@ pub mod errors;
 pub mod multiaddrs;
 
 pub use libp2p_identity::{Keypair, PeerId};
-pub use multiaddr::Multiaddr;
+pub use multiaddr::{Multiaddr, Protocol};
