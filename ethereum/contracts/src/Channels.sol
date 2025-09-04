@@ -324,6 +324,7 @@ contract HoprChannels is
 
         if (newDomainSeparator != domainSeparator) {
             domainSeparator = newDomainSeparator;
+            indexEvent(abi.encodePacked(DomainSeparatorUpdated.selector, domainSeparator));
             emit DomainSeparatorUpdated(domainSeparator);
         }
     }
@@ -421,8 +422,7 @@ contract HoprChannels is
         // channel.
         uint48 baseIndex = TicketIndex.unwrap(redeemable.data.ticketIndex);
         uint32 baseIndexOffset = TicketIndexOffset.unwrap(redeemable.data.indexOffset);
-        uint48 currentIndex = TicketIndex.unwrap(spendingChannel.ticketIndex);
-        if (baseIndexOffset < 1 || baseIndex < currentIndex) {
+        if (baseIndexOffset < 1 || baseIndex < TicketIndex.unwrap(spendingChannel.ticketIndex)) {
             revert InvalidAggregatedTicketInterval();
         }
 
@@ -453,7 +453,7 @@ contract HoprChannels is
         spendingChannel.balance =
             Balance.wrap(Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount));
         indexEvent(
-            abi.encodePacked(ChannelBalanceDecreased.selector, redeemable.data.channelId, spendingChannel.balance)
+            abi.encodePacked(ChannelBalanceDecreased.selector, redeemable.data.channelId,  _channelState(redeemable.data.channelId))
         );
         emit ChannelBalanceDecreased(redeemable.data.channelId, _channelState(redeemable.data.channelId));
         // DEBUG: TODO: FIXME: if this memory is needed
@@ -461,7 +461,7 @@ contract HoprChannels is
         Channel storage earningChannel = channels[outgoingChannelId];
 
         // Informs about new ticketIndex
-        indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, spendingChannel.ticketIndex));
+        indexEvent(abi.encodePacked(TicketRedeemed.selector, redeemable.data.channelId, _channelState(redeemable.data.channelId)));
         emit TicketRedeemed(redeemable.data.channelId, _channelState(redeemable.data.channelId));
 
         if (earningChannel.status == ChannelStatus.CLOSED) {
@@ -474,7 +474,7 @@ contract HoprChannels is
             // to overflows since total supply < type(uin96).max
             earningChannel.balance =
                 Balance.wrap(Balance.unwrap(earningChannel.balance) + Balance.unwrap(redeemable.data.amount));
-            indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, outgoingChannelId, earningChannel.balance));
+            indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, outgoingChannelId, _channelState(outgoingChannelId)));
             emit ChannelBalanceIncreased(outgoingChannelId, _channelState(outgoingChannelId));
         }
     }
@@ -522,7 +522,7 @@ contract HoprChannels is
         channel.status = ChannelStatus.PENDING_TO_CLOSE;
 
         // Inform others at which time the notice period is due
-        indexEvent(abi.encodePacked(OutgoingChannelClosureInitiated.selector, channelId, channel.closureTime));
+        indexEvent(abi.encodePacked(OutgoingChannelClosureInitiated.selector, channelId, _channelState(channelId)));
         emit OutgoingChannelClosureInitiated(channelId, _channelState(channelId));
     }
 
@@ -573,7 +573,7 @@ contract HoprChannels is
 
         // channel.epoch must be kept
 
-        indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
+        indexEvent(abi.encodePacked(ChannelClosed.selector, channelId, _channelState(channelId)));
         emit ChannelClosed(channelId, _channelState(channelId));
 
         if (balance > 0) {
@@ -631,7 +631,7 @@ contract HoprChannels is
 
         // channel.epoch must be kept
 
-        indexEvent(abi.encodePacked(ChannelClosed.selector, channelId));
+        indexEvent(abi.encodePacked(ChannelClosed.selector, channelId, _channelState(channelId)));
         emit ChannelClosed(channelId, _channelState(channelId));
 
         if (balance > 0) {
@@ -818,11 +818,11 @@ contract HoprChannels is
 
             channel.status = ChannelStatus.OPEN;
 
-            indexEvent(abi.encodePacked(ChannelOpened.selector, channelId, selfAddress, account, channel.balance, channel.ticketIndex, channel.closureTime, channel.epoch, channel.status));
+            indexEvent(abi.encodePacked(ChannelOpened.selector, channelId, selfAddress, account, _channelState(channelId)));
             emit ChannelOpened(channelId, selfAddress, account, _channelState(channelId));
         }
 
-        indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));
+        indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, _channelState(channelId)));
         emit ChannelBalanceIncreased(channelId, _channelState(channelId));
     }
 

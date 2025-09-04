@@ -2,7 +2,6 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import { HoprNodeSafeRegistry, HoprNodeSafeRegistryEvents } from "../../src/node-stake/NodeSafeRegistry.sol";
-import { PrecompileUtils } from "../utils/Precompiles.sol";
 import { ECDSA } from "openzeppelin-contracts-4.9.2/utils/cryptography/ECDSA.sol";
 import { Address } from "openzeppelin-contracts-4.9.2/utils/Address.sol";
 import { Test } from "forge-std/Test.sol";
