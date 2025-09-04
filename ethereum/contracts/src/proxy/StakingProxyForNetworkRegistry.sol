@@ -93,6 +93,11 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
      * @param account staker address that has a hopr nodes running
      */
     function maxAllowedRegistrations(address account) external view returns (uint256) {
+        // if threshold is 0, no one is eligible for self-registration
+        if (stakeThreshold == 0) {
+            return 0;
+        }
+
         uint256 allowedRegistration;
         // if the account owns a special NFT, requirement is fulfilled
         for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {

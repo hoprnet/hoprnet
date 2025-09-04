@@ -81,6 +81,10 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
      * @param safeAddress node address
      */
     function maxAllowedRegistrations(address safeAddress) external view returns (uint256) {
+        // if threshold is 0, no one is eligible for self-registration
+        if (stakeThreshold == 0) {
+            return 0;
+        }
         return token.balanceOfAt(safeAddress, snapshotBlockNumber) / stakeThreshold;
     }
 

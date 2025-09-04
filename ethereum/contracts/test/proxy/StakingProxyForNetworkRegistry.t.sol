@@ -396,6 +396,18 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
     }
 
     /**
+     * @dev allowance should be zerowhen threshold is 0.
+     * @notice This essentially disables "selfRegister" a node
+     */
+
+    function test_SetThresholdToZero(address stakingAccount) public {
+        vm.prank(owner);
+        hoprStakingProxyForNetworkRegistry.ownerUpdateThreshold(0);
+        assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(stakingAccount), 0);
+        vm.clearMockedCalls();
+    }
+
+    /**
      * @dev Owner fail to remove special NFTs in batch due to mismatched length
      */
     function testRevert_OwnerBatchRemoveSpecialNFTs() public {
