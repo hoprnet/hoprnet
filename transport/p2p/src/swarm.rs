@@ -315,10 +315,14 @@ impl HoprSwarm {
         }
     }
 
-    pub fn run_nat_server(&mut self, address: Multiaddr) {
-        info!(%address, "Starting NAT server");
+    pub fn run_nat_server(&mut self, port: u16) {
+        info!(listen_on = port, "Starting NAT server");
 
-        match self.swarm.listen_on(address) {
+        match self.swarm.listen_on(
+            Multiaddr::empty()
+                .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+                .with(Protocol::Tcp(port)),
+        ) {
             Ok(_) => {
                 info!("NAT server started");
             }
