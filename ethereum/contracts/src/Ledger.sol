@@ -26,6 +26,9 @@ abstract contract HoprLedgerEvents {
  * Indexes data trustlessly to allow a fast-sync for nodes in the network.
  */
 abstract contract HoprLedger is HoprLedgerEvents {
+    // Prevents from initializing the contract with a zero interval
+    error ZeroInterval();
+
     string public constant LEDGER_VERSION = "1.0.0";
 
     uint256 public immutable snapshotInterval;
@@ -51,6 +54,9 @@ abstract contract HoprLedger is HoprLedgerEvents {
      * @param _snapshotInterval time in seconds to create a new snapshot
      */
     constructor(uint256 _snapshotInterval) {
+        if (_snapshotInterval == 0) {
+            revert ZeroInterval();
+        }
         snapshotInterval = _snapshotInterval;
 
         // take first 28 bytes
