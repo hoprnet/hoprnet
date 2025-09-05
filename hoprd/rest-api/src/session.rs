@@ -1449,21 +1449,26 @@ mod tests {
     };
     use futures_time::future::FutureExt as TimeFutureExt;
     use hopr_crypto_types::crypto_traits::Randomizable;
-    use hopr_lib::{ApplicationData, HoprPseudonym};
+    use hopr_lib::{ApplicationData, ApplicationDataIn, ApplicationDataOut, HoprPseudonym};
     use hopr_network_types::prelude::DestinationRouting;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
 
     fn loopback_transport() -> (
-        UnboundedSender<(DestinationRouting, ApplicationData)>,
-        UnboundedReceiver<ApplicationData>,
+        UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+        UnboundedReceiver<ApplicationDataIn>,
     ) {
-        let (input_tx, input_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
-        let (output_tx, output_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
+        let (input_tx, input_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let (output_tx, output_rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
         tokio::task::spawn(
             input_rx
-                .map(|(_, data)| Ok(data))
+                .map(|(_, data)| {
+                    Ok(ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    })
+                })
                 .forward(output_tx)
                 .map(|e| tracing::debug!(?e, "loopback transport completed")),
         );

@@ -56,7 +56,7 @@ use hopr_path::{
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
 use hopr_primitive_types::prelude::*;
-pub use hopr_protocol_app::prelude::{ApplicationData, Tag};
+pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_mixer::MixerConfig;
@@ -195,7 +195,7 @@ where
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<Sender<(DestinationRouting, ApplicationData)>>,
+    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>>,
 }
 
 impl<T> HoprTransport<T>
@@ -272,7 +272,7 @@ where
         &self,
         me_onchain: &ChainKeypair,
         tbf_path: String,
-        on_incoming_data: UnboundedSender<ApplicationData>,
+        on_incoming_data: UnboundedSender<ApplicationDataIn>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
         on_incoming_session: UnboundedSender<IncomingSession>,
     ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>> {
@@ -397,7 +397,7 @@ where
         let tkt_agg_writer = ticket_agg_proc.writer();
 
         let (external_msg_send, external_msg_rx) =
-            mpsc::channel::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>(
+            mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>(
                 MAXIMUM_MSG_OUTGOING_BUFFER_SIZE,
             );
 
@@ -525,7 +525,7 @@ where
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationData)>();
+        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationDataIn)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -546,7 +546,7 @@ where
         }
 
         // -- network probing
-        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationData)>();
+        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let (manual_ping_tx, manual_ping_rx) = unbounded::<(PeerId, PingQueryReplier)>();
 
@@ -712,10 +712,10 @@ where
             )));
         }
 
-        let app_data = ApplicationData::new_from_owned(tag, msg);
+        let app_data = ApplicationData::new(tag, msg.into_vec())?;
         let routing = self
             .path_planner
-            .resolve_routing(app_data.len(), usize::MAX, routing)
+            .resolve_routing(app_data.total_len(), usize::MAX, routing)
             .await?
             .0;
 
@@ -726,7 +726,7 @@ where
         })?;
 
         sender
-            .send_packet(app_data, routing)
+            .send_packet(ApplicationDataOut::with_no_packet_info(app_data), routing)
             .await
             .map_err(|e| HoprTransportError::Api(format!("send msg failed to enqueue msg: {e}")))?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)

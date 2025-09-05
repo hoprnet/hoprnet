@@ -411,7 +411,7 @@ impl HoprDbProtocolOperations for HoprDb {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-        signals: Option<u8>,
+        signals: PacketSignals,
     ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {

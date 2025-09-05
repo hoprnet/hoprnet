@@ -1,8 +1,10 @@
-use std::{fmt::Formatter, ops::Range, str::FromStr};
+use std::{borrow::Cow, fmt::Formatter, ops::Range, str::FromStr};
 
-use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_packet::prelude::{HoprPacket, PacketSignals};
 use hopr_primitive_types::to_hex_shortened;
 use strum::IntoEnumIterator;
+
+use crate::errors::ApplicationLayerError;
 
 /// List of all reserved application tags for the protocol.
 #[repr(u64)]
@@ -123,81 +125,99 @@ impl FromStr for Tag {
     }
 }
 
-flagset::flags! {
-   /// Individual flags passed up between the HOPR protocol layer to the Application layer.
-   ///
-   /// These flags may be eventually materialized over the wire and passed to the packet receiver.
-   #[repr(u8)]
-   #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
-   pub enum ApplicationFlag: u8 {
-        /// The other party is in a "SURB distress" state, potentially running out of SURBs soon.
-        ///
-        /// Has no effect on packets that take the "forward path".
-        SurbDistress = 0b0000_0001,
-        /// The other party has run out of SURBs, and this was potentially the last message they could
-        /// send.
-        ///
-        /// Has no effect on packets that take the "forward path".
-        ///
-        /// Implies [`SurbDistress`].
-        OutOfSurbs = 0b0000_0011,
-   }
-}
-
-/// Additional flags passed between the HOPR protocol layer and the Application layer.
-pub type ApplicationFlags = flagset::FlagSet<ApplicationFlag>;
-
-/// Holds packet transient information when [`ApplicationData`] is passed between the HOPR protocol layer and the
+/// Holds packet transient information when [`ApplicationData`] is passed from the HOPR protocol layer to the
 /// Application layer.
 ///
-/// This may include:
-/// - [`ApplicationFlags`] that materialize over the wire (via "packet signals")
-/// - maximum number of SURBs the HOPR protocol layer should include in the free space (for outgoing packets only)
-/// - the number of SURBs the HOPR protocol extracted from an incoming packet (for incoming packets only)
+/// The HOPR protocol layer typically takes care of properly populating this structure
+/// as the packet arrives.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+pub struct IncomingPacketInfo {
+    /// Packet signals that were passed by the sender.
+    pub signals_from_sender: PacketSignals,
+    /// The number of SURBs the HOPR packet was carrying along with the [`ApplicationData`] instance.
+    pub num_saved_surbs: usize,
+}
+
+/// Holds packet transient information when [`ApplicationData`] is passed to the HOPR protocol layer from the
+/// Application layer.
 ///
-/// The important fact is that all the info carried by this structure can be transient.
-/// Only the HOPR protocol layer gets to decide whether some portions of this information may be passed
-/// as additional data inside the HOPR packet to the recipient.
-/// When that happens, the HOPR protocol layer also takes care of properly populating this structure
-/// as the packet arrives to the destination.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub enum TransientPacketInfo {
-    /// Transient information for an incoming packet.
-    Incoming {
-        /// The number of SURBs the HOPR packet was carrying along with the [`ApplicationData`] instance.
-        num_surbs: usize,
-        /// Additional flags passed from the HOPR protocol layer to the Application layer, serving
-        /// as a means of local signaling.
-        ///
-        /// For incoming data, the flags can be set by the HOPR protocol to signal various states to the
-        /// Applications layer.
-        ///
-        /// These flags can carry also "packet signals" which are thee materialized outgoing flags
-        /// when the packet was sent from the other side.
-        flags: ApplicationFlags,
-    },
-    /// Transient information for an outgoing packet.
-    Outgoing {
-        /// The maximum number of SURBs the HOPR packet should be carrying when sent.
-        max_surbs_in_packet: usize,
-        /// Additional flags passed to the HOPR protocol layer from the Application layer, serving
-        /// as a means of local signaling.
-        ///
-        /// For outgoing data, these flags can be used to signal certain modes of operation by the Application layer
-        /// to the HOPR protocol.
-        ///
-        /// Whether these flags are eventually materialized over the wire is decided solely by the HOPR protocol layer
-        /// underneath. The HOPR protocol calls such flags "packet signals".
-        flags: ApplicationFlags,
-    },
-    /// No transient packet information.
-    #[default]
-    Missing,
+/// The information passed to the HOPR protocol only serves as a suggestion, and the HOPR protocol
+/// may choose to ignore it, based on its configuration.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct OutgoingPacketInfo {
+    /// Packet signals that should be passed to the recipient.
+    pub signals_to_destination: PacketSignals,
+    /// The maximum number of SURBs the HOPR packet should be carrying when sent.
+    pub max_surbs_in_packet: usize,
+}
+
+impl Default for OutgoingPacketInfo {
+    fn default() -> Self {
+        Self {
+            signals_to_destination: PacketSignals::empty(),
+            max_surbs_in_packet: usize::MAX,
+        }
+    }
+}
+
+/// Wrapper for incoming [`ApplicationData`] with optional [`IncomingPacketInfo`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ApplicationDataIn {
+    /// The actual application-layer data.
+    pub data: ApplicationData,
+    /// Additional transient information about the incoming packet.
+    ///
+    /// This information is always populated by the HOPR packet layer.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub packet_info: IncomingPacketInfo,
+}
+
+impl ApplicationDataIn {
+    /// Returns how many SURBs were carried with this packet.
+    pub fn num_surbs_with_msg(&self) -> usize {
+        self.packet_info
+            .num_saved_surbs
+            .min(HoprPacket::max_surbs_with_message(self.data.total_len()))
+    }
+}
+
+/// Wrapper for outgoing [`ApplicationData`] with optional [`IncomingPacketInfo`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ApplicationDataOut {
+    /// The actual application-layer data.
+    pub data: ApplicationData,
+    /// Additional transient information about the outgoing packet.
+    ///
+    /// This field is optional and acts mainly as a suggestion to the HOPR packet layer,
+    /// as it may choose to completely ignore it, based on its configuration.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub packet_info: Option<OutgoingPacketInfo>,
+}
+
+impl ApplicationDataOut {
+    /// Creates a new instance with `packet_info` set to `None`.
+    pub fn with_no_packet_info(data: ApplicationData) -> Self {
+        Self {
+            data,
+            packet_info: None,
+        }
+    }
+
+    /// Returns the upper bound of how many SURBs that will be carried with this packet.
+    pub fn estimate_surbs_with_msg(&self) -> usize {
+        let max_possible = HoprPacket::max_surbs_with_message(self.data.total_len());
+        self.packet_info
+            .map(|info| info.max_surbs_in_packet.min(max_possible))
+            .unwrap_or(max_possible)
+    }
 }
 
 /// Represents the to-be-sent or received decrypted packet carrying the application-layer data.
 ///
-/// This structure always owns the data.
+/// This type is already HOPR specific, as it enforces the maximum payload size to be at most
+/// [`HoprPacket::PAYLOAD_SIZE`] bytes-long. This structure always owns the data.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ApplicationData {
@@ -206,76 +226,58 @@ pub struct ApplicationData {
     /// The actual application-layer data.
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     pub plain_text: Box<[u8]>,
-    /// Contains various transient information about the packet.
-    ///
-    /// This data is never serialized or deserialized to/from wire-data directly.
-    /// Instead, they are managed by the HOPR protocol layer.
-    ///
-    /// If not [`TransientPacketInfo::Missing`], the instance determines the directionality of this instance.
-    ///
-    /// See [`TransientPacketInfo`] for details.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    pub info: TransientPacketInfo,
 }
 
 impl ApplicationData {
+    /// The payload size is the [`HoprPacket::PAYLOAD_SIZE`] minus the [`Tag::SIZE`].
     pub const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE - Tag::SIZE;
 
-    pub fn new<T: Into<Tag>>(application_tag: T, plain_text: &[u8]) -> Self {
-        Self {
-            application_tag: application_tag.into(),
-            plain_text: plain_text.into(),
-            info: Default::default(),
+    /// Creates a new instance with the given tag and application layer data.
+    ///
+    /// Fails if the `plain_text` is larger than [`ApplicationData::PAYLOAD_SIZE`].
+    pub fn new<'a, T: Into<Tag>, D: Into<Cow<'a, [u8]>>>(
+        application_tag: T,
+        plain_text: D,
+    ) -> crate::errors::Result<Self> {
+        let data = plain_text.into();
+        if data.len() <= Self::PAYLOAD_SIZE {
+            Ok(Self {
+                application_tag: application_tag.into(),
+                plain_text: data.into(),
+            })
+        } else {
+            Err(ApplicationLayerError::PayloadTooLarge)
         }
     }
 
-    pub fn new_from_owned<T: Into<Tag>>(tag: T, plain_text: Box<[u8]>) -> Self {
-        Self {
-            application_tag: tag.into(),
-            plain_text,
-            info: Default::default(),
-        }
+    /// Length of the payload plus the [`Tag`].
+    ///
+    /// Can never be zero due to the `Tag`.
+    #[inline]
+    pub fn total_len(&self) -> usize {
+        Tag::SIZE + self.plain_text.len()
     }
 
+    /// Indicates if the payload is empty.
     #[inline]
-    pub fn len(&self) -> usize {
-        Self::TAG_SIZE + self.plain_text.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_payload_empty(&self) -> bool {
         self.plain_text.is_empty()
     }
 
-    /// Returns the estimated number of SURBs the HOPR packet carrying this `ApplicationData`.
-    pub fn estimate_surbs_with_msg(&self) -> usize {
-        let max_possible =
-            HoprPacket::max_surbs_with_message(self.plain_text.len().min(Self::PAYLOAD_SIZE) + Tag::SIZE);
-        match self.info {
-            TransientPacketInfo::Incoming { num_surbs, .. } => num_surbs,
-            TransientPacketInfo::Outgoing {
-                max_surbs_in_packet, ..
-            } => max_possible.min(max_surbs_in_packet),
-            TransientPacketInfo::Missing => max_possible,
-        }
+    /// Serializes the structure into binary representation.
+    pub fn to_bytes(&self) -> Box<[u8]> {
+        let mut buf = Vec::with_capacity(Tag::SIZE + self.plain_text.len());
+        buf.extend_from_slice(&self.application_tag.to_be_bytes());
+        buf.extend_from_slice(&self.plain_text);
+        buf.into_boxed_slice()
     }
 }
-
-// impl PartialEq for ApplicationData {
-// fn eq(&self, other: &Self) -> bool {
-// TransientPacketInfo is intentionally not compared
-// self.application_tag == other.application_tag && self.plain_text == other.plain_text
-// }
-// }
-//
-// impl Eq for ApplicationData {}
 
 impl std::fmt::Debug for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ApplicationData")
             .field("application_tag", &self.application_tag)
             .field("plain_text", &to_hex_shortened::<32>(&self.plain_text))
-            .field("info", &self.info)
             .finish()
     }
 }
@@ -291,30 +293,22 @@ impl std::fmt::Display for ApplicationData {
     }
 }
 
-impl ApplicationData {
-    const TAG_SIZE: usize = Tag::SIZE;
+impl TryFrom<&[u8]> for ApplicationData {
+    type Error = ApplicationLayerError;
 
-    pub fn from_bytes(data: &[u8]) -> crate::errors::Result<Self> {
-        if data.len() >= Self::TAG_SIZE {
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() >= Tag::SIZE && value.len() <= HoprPacket::PAYLOAD_SIZE {
             Ok(Self {
                 application_tag: Tag::from_be_bytes(
-                    data[0..Self::TAG_SIZE]
+                    value[0..Tag::SIZE]
                         .try_into()
-                        .map_err(|_e| crate::errors::PacketError::DecodingError("ApplicationData.tag".into()))?,
+                        .map_err(|_e| ApplicationLayerError::DecodingError("ApplicationData.tag".into()))?,
                 ),
-                plain_text: Box::from(&data[Self::TAG_SIZE..]),
-                info: Default::default(),
+                plain_text: Box::from(&value[Tag::SIZE..]),
             })
         } else {
-            Err(crate::errors::PacketError::DecodingError("ApplicationData".into()))
+            Err(ApplicationLayerError::DecodingError("ApplicationData.size".into()))
         }
-    }
-
-    pub fn to_bytes(&self) -> Box<[u8]> {
-        let mut buf = Vec::with_capacity(Self::TAG_SIZE + self.plain_text.len());
-        buf.extend_from_slice(&self.application_tag.to_be_bytes());
-        buf.extend_from_slice(&self.plain_text);
-        buf.into_boxed_slice()
     }
 }
 
@@ -354,9 +348,9 @@ mod tests {
 
     #[test]
     fn v1_format_is_binary_stable() -> anyhow::Result<()> {
-        let original = ApplicationData::new(10u64, &[0_u8, 1_u8]);
-        let reserialized = ApplicationData::from_bytes(&original.to_bytes())?;
-        let reserialized = ApplicationData::from_bytes(&reserialized.to_bytes())?;
+        let original = ApplicationData::new(10u64, &[0_u8, 1_u8])?;
+        let reserialized = ApplicationData::try_from(original.to_bytes().as_ref())?;
+        let reserialized = ApplicationData::try_from(reserialized.to_bytes().as_ref())?;
 
         assert_eq!(original, reserialized);
 
@@ -365,18 +359,30 @@ mod tests {
 
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
-        let ad_1 = ApplicationData::new(10u64, &[0_u8, 1_u8]);
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
+        let ad_1 = ApplicationData::new(10u64, &[0_u8, 1_u8])?;
+        let ad_2 = ApplicationData::try_from(ad_1.to_bytes().as_ref())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(0u64, &[]);
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
+        let ad_1 = ApplicationData::new(0u64, &[])?;
+        let ad_2 = ApplicationData::try_from(ad_1.to_bytes().as_ref())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(10u64, &[0_u8, 1_u8]);
-        let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
+        let ad_1 = ApplicationData::new(10u64, &[0_u8, 1_u8])?;
+        let ad_2 = ApplicationData::try_from(ad_1.to_bytes().as_ref())?;
         assert_eq!(ad_1, ad_2);
+
+        let ad_1 = ApplicationData::new(10u64, &[0_u8; ApplicationData::PAYLOAD_SIZE])?;
+        let ad_2 = ApplicationData::try_from(ad_1.to_bytes().as_ref())?;
+        assert_eq!(ad_1, ad_2);
+
+        assert!(ApplicationData::try_from([0_u8; Tag::SIZE - 1].as_ref()).is_err());
+        assert!(ApplicationData::try_from([0_u8; ApplicationData::PAYLOAD_SIZE + Tag::SIZE + 1].as_ref()).is_err());
 
         Ok(())
+    }
+
+    #[test]
+    fn application_data_should_not_allow_payload_larger_than_hopr_packet_payload_size() {
+        assert!(ApplicationData::new(10u64, [0_u8; HoprPacket::PAYLOAD_SIZE + 1].as_ref()).is_err());
     }
 }

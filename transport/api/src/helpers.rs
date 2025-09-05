@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_lock::RwLock;
 use futures::{StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
-use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_packet::prelude::{HoprPacket, PacketSignal};
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_db_sql::{HoprDbAllOperations, prelude::FoundSurb};
 use hopr_internal_types::prelude::*;
@@ -13,7 +13,7 @@ use hopr_network_types::{
 };
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
 use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
-use hopr_protocol_app::v1::{ApplicationData, ApplicationFlag, TransientPacketInfo};
+use hopr_protocol_app::prelude::ApplicationDataOut;
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use tracing::trace;
 
@@ -151,6 +151,7 @@ where
                 let forward_path = self.resolve_path(self.me, destination, forward_options).await?;
 
                 let return_paths = if let Some(return_options) = return_options {
+                    // Safeguard for the correct number of SURBs
                     let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
                     trace!(%destination, %num_possible_surbs, data_len = size_hint, max_surbs, "resolving packet return paths");
 
@@ -196,13 +197,13 @@ where
 pub(crate) fn run_packet_planner<T, S>(
     planner: PathPlanner<T, S>,
     packet_sender: MsgSender<Sender<SendMsgInput>>,
-) -> Sender<(DestinationRouting, ApplicationData)>
+) -> Sender<(DestinationRouting, ApplicationDataOut)>
 where
     T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
     S: PathSelector + Clone + Send + Sync + 'static,
 {
     let (tx, rx) =
-        futures::channel::mpsc::channel::<(DestinationRouting, ApplicationData)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
     let planner_concurrency = std::env::var("HOPR_PACKET_PLANNER_CONCURRENCY")
         .ok()
@@ -214,32 +215,28 @@ where
         let planner = planner.clone();
         let packet_sender = packet_sender.clone();
         async move {
-            let max_possible_surbs = HoprPacket::max_surbs_with_message(data.len());
-            let max_surbs = match data.info {
-                // If the maximum number of SURBs has been set in the transient info, reduce the production
-                TransientPacketInfo::Outgoing {
-                    max_surbs_in_packet, ..
-                } => max_surbs_in_packet.min(max_possible_surbs),
-                _ => max_possible_surbs,
-            };
+            let max_surbs = data.estimate_surbs_with_msg();
 
-            match planner.resolve_routing(data.len(), max_surbs, routing).await {
+            match planner.resolve_routing(data.data.total_len(), max_surbs, routing).await {
                 Ok((resolved, rem_surbs)) => {
                     // Set the SURB distress/out-of-SURBs flag if applicable.
                     // These flags are translated into HOPR protocol packet signals and are
                     // applicable only on the return path.
-                    if let TransientPacketInfo::Outgoing { flags, .. } = &mut data.info {
+                    if let Some(info) = &mut data.packet_info {
                         if resolved.is_return() {
-                            *flags = match rem_surbs {
+                            info.signals_to_destination = match rem_surbs {
                                 Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                                    *flags | ApplicationFlag::SurbDistress
+                                    info.signals_to_destination | PacketSignal::SurbDistress
                                 }
-                                Some(0) => *flags | ApplicationFlag::OutOfSurbs,
-                                _ => *flags - (ApplicationFlag::OutOfSurbs | ApplicationFlag::SurbDistress),
+                                Some(0) => info.signals_to_destination | PacketSignal::OutOfSurbs,
+                                _ => {
+                                    info.signals_to_destination
+                                        - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress)
+                                }
                             };
                         } else {
                             // Unset these flags as they make no sense on the forward path.
-                            *flags -= ApplicationFlag::SurbDistress | ApplicationFlag::OutOfSurbs;
+                            info.signals_to_destination -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
                         }
                     }
                     // The awaiter here is intentionally dropped,

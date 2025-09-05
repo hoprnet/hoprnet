@@ -17,7 +17,7 @@ use hopr_primitive_types::{
     errors::GeneralError,
     prelude::{BytesRepresentable, ToHex},
 };
-use hopr_protocol_app::prelude::{ApplicationData, Tag};
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_protocol_session::{
     AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig, ReliableSocket, SessionSocketConfig,
     UnreliableSocket,
@@ -329,6 +329,8 @@ impl Session {
     /// It builds an [`futures::io::AsyncRead`] + [`futures::io::AsyncWrite`] transport
     /// from the given `hopr` interface and passing it to the appropriate [`UnreliableSocket`] or [`ReliableSocket`]
     /// based on the given `capabilities`.
+    ///
+    /// The `on_close` closure can be optionally called when the Session has been closed via `poll_close`.
     #[tracing::instrument(skip(hopr, on_close), fields(session_id = %id))]
     pub fn new<Tx, Rx, C>(
         id: SessionId,
@@ -338,24 +340,31 @@ impl Session {
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     ) -> Result<Self, TransportSessionError>
     where
-        Tx: futures::Sink<(DestinationRouting, ApplicationData)> + Send + Sync + Unpin + 'static,
-        Rx: futures::Stream<Item = ApplicationData> + Send + Sync + Unpin + 'static,
+        Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Sync + Unpin + 'static,
+        Rx: futures::Stream<Item = ApplicationDataIn> + Send + Sync + Unpin + 'static,
         C: Into<Capabilities> + std::fmt::Debug,
         Tx::Error: std::error::Error + Send + Sync,
     {
         let capabilities = capabilities.into();
         let routing_clone = routing.clone();
+
+        // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
         let transport = DuplexIO(
             AsyncWriteSink::<{ ApplicationData::PAYLOAD_SIZE }, _>(hopr.0.sink_map_err(std::io::Error::other).with(
-                move |buf| {
-                    futures::future::ok::<_, std::io::Error>((
-                        routing_clone.clone(),
-                        ApplicationData::new_from_owned(id.tag(), buf),
-                    ))
+                move |buf: Box<[u8]>| {
+                    // The Session protocol does not set any packet info on outgoing packets.
+                    // However, the SessionManager on top usually overrides this.
+                    futures::future::ready(
+                        ApplicationData::new(id.tag(), buf.into_vec())
+                            .map(|data| (routing_clone.clone(), ApplicationDataOut::with_no_packet_info(data)))
+                            .map_err(std::io::Error::other),
+                    )
                 },
             )),
+            // The Session protocol ignores the packet info on incoming packets.
+            // It is typically SessionManager's job to interpret those.
             hopr.1
-                .map(|data| Ok::<_, std::io::Error>(data.plain_text))
+                .map(|data| Ok::<_, std::io::Error>(data.data.plain_text))
                 .into_async_read(),
         );
 
@@ -370,7 +379,7 @@ impl Session {
                 ..Default::default()
             };
 
-            if capabilities.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+            if !capabilities.is_disjoint(Capability::RetransmissionAck | Capability::RetransmissionNack) {
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {
                     // This is a very coarse assumption, that a single 3-hop packet
@@ -568,8 +577,8 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
-        let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+        let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
         let mut alice_session = Session::new(
             id,
@@ -578,8 +587,11 @@ mod tests {
             (
                 alice_tx,
                 alice_rx
-                    .map(|(_, data)| data)
-                    .inspect(|d| debug!("alice rcvd: {}", d.len())),
+                    .map(|(_, data)| ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    })
+                    .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
             None,
         )?;
@@ -591,8 +603,11 @@ mod tests {
             (
                 bob_tx,
                 bob_rx
-                    .map(|(_, data)| data)
-                    .inspect(|d| debug!("bob rcvd: {}", d.len())),
+                    .map(|(_, data)| ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    })
+                    .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
             None,
         )?;
@@ -637,8 +652,8 @@ mod tests {
         let id = SessionId::new(1234_u64, HoprPseudonym::random());
         const DATA_LEN: usize = 5000;
 
-        let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
-        let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+        let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+        let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
         let mut alice_session = Session::new(
             id,
@@ -647,8 +662,11 @@ mod tests {
             (
                 alice_tx,
                 alice_rx
-                    .map(|(_, data)| data)
-                    .inspect(|d| debug!("alice rcvd: {}", d.len())),
+                    .map(|(_, data)| ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    })
+                    .inspect(|d| debug!("alice rcvd: {}", d.data.total_len())),
             ),
             None,
         )?;
@@ -660,8 +678,11 @@ mod tests {
             (
                 bob_tx,
                 bob_rx
-                    .map(|(_, data)| data)
-                    .inspect(|d| debug!("bob rcvd: {}", d.len())),
+                    .map(|(_, data)| ApplicationDataIn {
+                        data: data.data,
+                        packet_info: Default::default(),
+                    })
+                    .inspect(|d| debug!("bob rcvd: {}", d.data.total_len())),
             ),
             None,
         )?;

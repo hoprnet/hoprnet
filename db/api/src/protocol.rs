@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use hopr_crypto_packet::prelude::PacketSignals;
 pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -61,7 +62,7 @@ pub trait HoprDbProtocolOperations {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-        signals: Option<u8>,
+        signals: PacketSignals,
     ) -> Result<OutgoingPacket>;
 
     /// Process the incoming packet into data
@@ -82,7 +83,7 @@ pub struct AuxiliaryPacketInfo {
     /// Packet signals that the packet carried.
     ///
     /// Zero if no signal flags were specified.
-    pub packet_signals: u8,
+    pub packet_signals: PacketSignals,
     /// Number of SURBs that the packet carried.
     pub num_surbs: usize,
 }

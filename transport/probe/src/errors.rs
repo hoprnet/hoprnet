@@ -17,6 +17,8 @@ pub enum ProbeError {
 
     #[error("error sending probe: {0}")]
     SendError(String),
+    #[error(transparent)]
+    ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
 }
 
 pub type Result<T> = core::result::Result<T, ProbeError>;

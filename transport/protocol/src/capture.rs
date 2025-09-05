@@ -2,6 +2,7 @@ use std::{borrow::Cow, fs::File};
 
 use futures::{StreamExt, pin_mut};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
+use hopr_crypto_packet::prelude::{PacketSignal, PacketSignals};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::prelude::IncomingPacket;
 use hopr_internal_types::prelude::VerifiedAcknowledgement;
@@ -155,7 +156,7 @@ pub enum PacketBeforeTransit<'a> {
         is_forwarded: bool,
         data: Cow<'a, [u8]>,
         ack_challenge: Cow<'a, [u8]>,
-        signals: u8,
+        signals: PacketSignals,
         ticket: Cow<'a, [u8]>,
     },
     OutgoingAck {
@@ -198,7 +199,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(ticket.as_ref());
                 out.push(num_surbs);
                 out.push(if is_forwarded { 1 } else { 0 });
-                out.push(signals);
+                out.push(signals.bits());
                 out.extend_from_slice((data.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(data.as_ref());
                 direction = PacketDirection::Outgoing;
@@ -245,7 +246,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(ack_key.as_ref());
                 out.push(ticket.len() as u8);
                 out.extend_from_slice(ticket.as_ref());
-                out.push(info.packet_signals);
+                out.push(info.packet_signals.bits());
                 out.extend_from_slice((plain_text.len() as u16).to_be_bytes().as_ref());
                 out.extend_from_slice(plain_text.as_ref());
             }
@@ -521,7 +522,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
-            signals: 1,
+            signals: PacketSignal::OutOfSurbs.into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -540,7 +541,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
-            signals: 0,
+            signals: None.into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -559,7 +560,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
-            signals: 0,
+            signals: None.into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -585,7 +586,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
-            signals: 0,
+            signals: None.into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -609,7 +610,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
-            signals: 0,
+            signals: None.into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -633,7 +634,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
-            signals: 0,
+            signals: None.into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -658,7 +659,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 2,
             is_forwarded: false,
-            signals: 0,
+            signals: None.into(),
         };
 
         let _ = pcap.send(packet.into()).await;
@@ -672,7 +673,7 @@ mod tests {
             ticket: ticket.to_vec().into(),
             num_surbs: 0,
             is_forwarded: true,
-            signals: 0,
+            signals: None.into(),
         };
 
         let _ = pcap.send(packet.into()).await;
