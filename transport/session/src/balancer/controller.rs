@@ -266,6 +266,8 @@ where
             async move {
                 pin_mut!(sampling_stream);
                 while sampling_stream.next().await.is_some() {
+                    // This call should not update the popularity estimator of the cache,
+                    // so that it is still allowed to expire.
                     let Ok(mut current_cfg) = cfg_feedback.get_config(&self.session_id).await else {
                         error!("cannot get config for session");
                         break;
