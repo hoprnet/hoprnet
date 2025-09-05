@@ -379,7 +379,11 @@ impl Session {
                 ..Default::default()
             };
 
-            if !capabilities.is_disjoint(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+            // Need to test the capabilities separately, because any Retransmission capability
+            // implies Segmentation, and therefore `is_disjoint` would fail
+            if capabilities.contains(Capability::RetransmissionAck)
+                || capabilities.contains(Capability::RetransmissionNack)
+            {
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {
                     // This is a very coarse assumption, that a single 3-hop packet
