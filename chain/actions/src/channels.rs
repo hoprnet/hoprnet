@@ -214,7 +214,7 @@ where
                         if redeem_before_close && direction == ChannelDirection::Incoming {
                             // TODO: trigger aggregation
                             // Do not await the redemption, just submit it to the queue
-                            let redeemed = self.redeem_tickets_in_channel(&channel, false).await?.len();
+                            let redeemed = self.redeem_tickets_in_channel(&channel, 0.into(), false).await?.len();
                             info!(count = redeemed, %channel, "redeemed tickets before channel closing");
                         }
 

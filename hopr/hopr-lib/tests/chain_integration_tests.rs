@@ -625,7 +625,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let confirmations = futures::future::try_join_all(
         bob_node
             .actions
-            .redeem_tickets_with_counterparty(&alice_chain_key.public().to_address(), false)
+            .redeem_tickets_with_counterparty(&alice_chain_key.public().to_address(), 0.into(), false)
             .await
             .expect("should submit redeem action"),
     )
