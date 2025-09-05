@@ -249,7 +249,7 @@ mod tests {
 
         let mut segments = segment(hex!("deadbeefcafebabe"), SEG_SIZE, 10)?;
 
-        const MTU: usize = SEG_SIZE + Segment::HEADER_SIZE + 2;
+        const MTU: usize = SEG_SIZE + SessionMessage::<0>::SEGMENT_OVERHEAD;
 
         let msg_1 = SessionMessage::<MTU>::Segment(segments.pop().unwrap());
         let data = Vec::from(msg_1.clone());
