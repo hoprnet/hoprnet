@@ -78,10 +78,11 @@ use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::{
-    ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU, SURB_SIZE, ServiceId,
-    Session as HoprSession, SessionCapabilities, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
-    SessionManagerError, SessionTarget, SurbBalancerConfig, Tag, TicketStatistics, TransportSessionError,
+    ApplicationData, ApplicationDataIn, ApplicationDataOut, HalfKeyChallenge, Health,
+    IncomingSession as HoprIncomingSession, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair, PeerId,
+    PingQueryReplier, ProbeError, SESSION_MTU, SURB_SIZE, ServiceId, Session as HoprSession, SessionCapabilities,
+    SessionCapability, SessionClientConfig, SessionId as HoprSessionId, SessionManagerError, SessionTarget,
+    SurbBalancerConfig, Tag, TicketStatistics, TransportSessionError,
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
@@ -331,13 +332,13 @@ where
 ///
 /// Provides a read and write stream for Hopr socket recognized data formats.
 pub struct HoprSocket {
-    rx: UnboundedReceiver<ApplicationData>,
-    tx: UnboundedSender<ApplicationData>,
+    rx: UnboundedReceiver<ApplicationDataIn>,
+    tx: UnboundedSender<ApplicationDataIn>,
 }
 
 impl Default for HoprSocket {
     fn default() -> Self {
-        let (tx, rx) = unbounded::<ApplicationData>();
+        let (tx, rx) = unbounded::<ApplicationDataIn>();
         Self { rx, tx }
     }
 }
@@ -347,11 +348,11 @@ impl HoprSocket {
         Self::default()
     }
 
-    pub fn reader(self) -> UnboundedReceiver<ApplicationData> {
+    pub fn reader(self) -> UnboundedReceiver<ApplicationDataIn> {
         self.rx
     }
 
-    pub fn writer(&self) -> UnboundedSender<ApplicationData> {
+    pub fn writer(&self) -> UnboundedSender<ApplicationDataIn> {
         self.tx.clone()
     }
 }

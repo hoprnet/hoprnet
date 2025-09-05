@@ -38,7 +38,7 @@ pub mod prelude {
         packet::{
             HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
         },
-        types::{HoprSenderId, HoprSurbId},
+        types::{HoprSenderId, HoprSurbId, PacketSignal, PacketSignals},
         validation::validate_unacknowledged_ticket,
     };
 }

@@ -98,7 +98,7 @@ impl<const C: usize> SessionMessage<C> {
     /// Current version of the protocol.
     pub const VERSION: u8 = 1;
 
-    /// Returns the minimum size of a [SessionMessage].
+    /// Returns the minimum size of a [`SessionMessage`].
     pub fn minimum_message_size() -> usize {
         // Make this a "const fn" once "min" is const fn too
         Self::HEADER_SIZE

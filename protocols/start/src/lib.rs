@@ -306,7 +306,7 @@ where
 
     fn try_from(value: StartProtocol<I, T, C>) -> Result<Self, Self::Error> {
         let (application_tag, plain_text) = value.encode()?;
-        Ok(ApplicationData::new_from_owned(application_tag, plain_text))
+        Ok(ApplicationData::new(application_tag, plain_text.into_vec())?)
     }
 }
 

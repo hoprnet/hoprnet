@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use hopr_crypto_packet::prelude::PacketSignals;
 pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -61,7 +62,7 @@ pub trait HoprDbProtocolOperations {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-        signals: Option<u8>,
+        signals: PacketSignals,
     ) -> Result<OutgoingPacket>;
 
     /// Process the incoming packet into data
@@ -76,6 +77,17 @@ pub trait HoprDbProtocolOperations {
     ) -> Result<IncomingPacket>;
 }
 
+/// Contains some miscellaneous information about a received packet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct AuxiliaryPacketInfo {
+    /// Packet signals that the packet carried.
+    ///
+    /// Zero if no signal flags were specified.
+    pub packet_signals: PacketSignals,
+    /// Number of SURBs that the packet carried.
+    pub num_surbs: usize,
+}
+
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum IncomingPacket {
     /// Packet is intended for us
@@ -85,7 +97,7 @@ pub enum IncomingPacket {
         sender: HoprPseudonym,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
-        signals: u8,
+        info: AuxiliaryPacketInfo,
     },
     /// Packet must be forwarded
     Forwarded {

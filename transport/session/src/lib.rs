@@ -79,6 +79,17 @@ pub struct SessionClientConfig {
     /// Enable automatic SURB management for the Session.
     #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
+    /// If set, the maximum number of possible SURBs will always be sent with Session data packets (if they fit).
+    ///
+    /// This does not affect `KeepAlive` messages used with SURB balancing, as they will always
+    /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
+    /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
+    ///
+    /// Set this to `true` only when the underlying traffic is highly asymmetric.
+    ///
+    /// Default is `false`.
+    #[default(false)]
+    pub always_max_out_surbs: bool,
 }
 
 #[cfg(test)]

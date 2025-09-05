@@ -4,7 +4,7 @@ use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use hopr_async_runtime::AbortHandle;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::prelude::DestinationRouting;
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use tracing::{debug, error};
 
 use crate::{
@@ -112,7 +112,7 @@ pub(crate) fn spawn_keep_alive_stream<S>(
     routing: DestinationRouting,
 ) -> (SurbControllerWithCorrection, AbortHandle)
 where
-    S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
     let elem = HoprStartProtocol::KeepAlive(session_id.into());
@@ -130,7 +130,10 @@ where
     debug!(%session_id, "spawning keep-alive stream");
     hopr_async_runtime::prelude::spawn(
         ka_stream
-            .map(move |msg| ApplicationData::try_from(msg).map(|m| (fwd_routing_clone.clone(), m)))
+            .map(move |msg| {
+                ApplicationData::try_from(msg)
+                    .map(|data| (fwd_routing_clone.clone(), ApplicationDataOut::with_no_packet_info(data)))
+            })
             .map_err(TransportSessionError::from)
             .try_for_each_concurrent(None, move |msg| {
                 let mut sender_clone = sender_clone.clone();

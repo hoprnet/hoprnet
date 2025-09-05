@@ -15,6 +15,8 @@ pub enum StartProtocolError {
     ParseError(String),
     #[error("cbor error: {0}")]
     CborError(#[from] serde_cbor_2::Error),
+    #[error(transparent)]
+    ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
 }
 
 pub type Result<T> = std::result::Result<T, StartProtocolError>;
