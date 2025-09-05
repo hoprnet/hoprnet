@@ -13,7 +13,7 @@ use hopr_network_types::{
 };
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
 use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
-use hopr_protocol_app::prelude::ApplicationDataOut;
+use hopr_protocol_app::{prelude::ApplicationDataOut, v1::OutgoingPacketInfo};
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use tracing::trace;
 
@@ -222,23 +222,27 @@ where
                     // Set the SURB distress/out-of-SURBs flag if applicable.
                     // These flags are translated into HOPR protocol packet signals and are
                     // applicable only on the return path.
-                    if let Some(info) = &mut data.packet_info {
-                        if resolved.is_return() {
-                            info.signals_to_destination = match rem_surbs {
-                                Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                                    info.signals_to_destination | PacketSignal::SurbDistress
-                                }
-                                Some(0) => info.signals_to_destination | PacketSignal::OutOfSurbs,
-                                _ => {
-                                    info.signals_to_destination
-                                        - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress)
-                                }
-                            };
-                        } else {
-                            // Unset these flags as they make no sense on the forward path.
-                            info.signals_to_destination -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
-                        }
+                    let mut signals_to_dst = data
+                        .packet_info
+                        .as_ref()
+                        .map(|info| info.signals_to_destination)
+                        .unwrap_or_default();
+
+                    if resolved.is_return() {
+                        signals_to_dst = match rem_surbs {
+                            Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                                signals_to_dst | PacketSignal::SurbDistress
+                            }
+                            Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
+                            _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
+                        };
+                    } else {
+                        // Unset these flags as they make no sense on the forward path.
+                        signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
                     }
+
+                    data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
+
                     // The awaiter here is intentionally dropped,
                     // since we do not intend to be notified about packet delivery to the first hop
                     if let Err(error) = packet_sender.send_packet(data, resolved).await {

@@ -58,6 +58,7 @@ hopr-protocol-start = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+criterion = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
