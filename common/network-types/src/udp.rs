@@ -666,6 +666,7 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
 #[pin_project::pinned_drop]
 impl PinnedDrop for ConnectedUdpStream {
     fn drop(self: Pin<&mut Self>) {
+        debug!(binding = ?self.bound_to,"dropping ConnectedUdpStream");
         self.project().socket_handles.iter().for_each(|handle| {
             handle.abort();
         })
