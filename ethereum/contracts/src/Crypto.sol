@@ -679,6 +679,9 @@ abstract contract HoprCrypto {
                 let b0Payload := mload(0x40)
 
                 // payload[0..KECCAK256_BLOCKSIZE] = 0
+                for { let i := 0 } lt(i, KECCAK256_BLOCKSIZE) { i := add(i, 0x20) } {
+                    mstore(add(b0Payload, i), 0)
+                }
 
                 let b0PayloadO := KECCAK256_BLOCKSIZE // leave first block empty
                 let msg_o := 0x20 // skip length prefix
@@ -783,6 +786,9 @@ abstract contract HoprCrypto {
                 let b0Payload := mload(0x40)
 
                 // payload[0..KECCAK256_BLOCKSIZE] = 0
+                for { let i := 0 } lt(i, KECCAK256_BLOCKSIZE) { i := add(i, 0x20) } {
+                    mstore(add(b0Payload, i), 0)
+                }
 
                 let b0PayloadO := KECCAK256_BLOCKSIZE // leave first block empty
                 let msg_o := 0x20 // skip length prefix

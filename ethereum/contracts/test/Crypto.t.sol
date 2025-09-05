@@ -291,6 +291,71 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         expand_message_xmd_keccak256_single(message, abi.encodePacked(superLongDST));
     }
 
+    /**
+     * @dev test the expand_message_xmd_keccak256 function
+     */
+    function testFuzz_expandMessageXmdKeccak256(uint256 firstIndex, uint256 secondIndex) public {
+        firstIndex = bound(firstIndex, 0, 4);
+        secondIndex = bound(secondIndex, 0, 4);
+
+        bytes memory dst = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
+        // Test vectors taken from
+        // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
+
+        bytes[5] memory testStrings = [
+            bytes(""),
+            bytes("abc"),
+            bytes("abcdef0123456789"),
+            bytes(
+                "q128_qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+            ),
+            bytes(
+                "a512_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+        ];
+
+
+        (bytes32 maybe_out_first_b1, bytes32 maybe_out_first_b2, bytes32 maybe_out_first_b3) = expand_message_xmd_keccak256(testStrings[firstIndex], dst);
+         expand_message_xmd_keccak256(testStrings[secondIndex], dst);
+        (bytes32 maybe_out_second_b1, bytes32 maybe_out_second_b2, bytes32 maybe_out_second_b3) = expand_message_xmd_keccak256(testStrings[firstIndex], dst);
+
+        assertEq(maybe_out_first_b1, maybe_out_second_b1, "b1 mismatch between run #1 and run #2");
+        assertEq(maybe_out_first_b2, maybe_out_second_b2, "b2 mismatch between run #1 and run #2");
+        assertEq(maybe_out_first_b3, maybe_out_second_b3, "b3 mismatch between run #1 and run #2");
+    }
+
+    /**
+     * @dev test the expand_message_xmd_keccak256 function
+     */
+    function testFuzz_expandMessageXmdKeccak256Single(uint256 firstIndex, uint256 secondIndex) public {
+        firstIndex = bound(firstIndex, 0, 4);
+        secondIndex = bound(secondIndex, 0, 4);
+
+        bytes memory dst = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
+        // Test vectors taken from
+        // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
+
+        bytes[5] memory testStrings = [
+            bytes(""),
+            bytes("abc"),
+            bytes("abcdef0123456789"),
+            bytes(
+                "q128_qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+            ),
+            bytes(
+                "a512_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+        ];
+
+
+        (bytes32 maybe_out_first_b1, bytes32 maybe_out_first_b2) = expand_message_xmd_keccak256_single(testStrings[firstIndex], dst);
+        expand_message_xmd_keccak256_single(testStrings[secondIndex], dst);
+        (bytes32 maybe_out_second_b1, bytes32 maybe_out_second_b2) = expand_message_xmd_keccak256_single(testStrings[firstIndex], dst);
+
+        assertEq(maybe_out_first_b1, maybe_out_second_b1, "b1 mismatch between run #1 and run #2");
+        assertEq(maybe_out_first_b2, maybe_out_second_b2, "b2 mismatch between run #1 and run #2");
+    }
+
     function testHashToCurve() public {
         bytes memory dst = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
 
