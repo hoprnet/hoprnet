@@ -132,7 +132,7 @@ pub enum HoprNetworkBehaviorEvent {
     TicketAggregation(
         libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
-    Identify(libp2p_identify::Event),
+    Identify(Box<libp2p_identify::Event>),
     Autonat(autonat::Event),
 }
 
@@ -161,7 +161,7 @@ impl From<libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::r
 
 impl From<libp2p_identify::Event> for HoprNetworkBehaviorEvent {
     fn from(event: libp2p_identify::Event) -> Self {
-        Self::Identify(event)
+        Self::Identify(Box::new(event))
     }
 }
 impl From<autonat::Event> for HoprNetworkBehaviorEvent {
