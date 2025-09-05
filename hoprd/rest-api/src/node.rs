@@ -16,6 +16,14 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum NatStatus {
+    // Public,
+    // Private,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "version": "2.1.0",
     }))]
@@ -471,7 +479,7 @@ pub(crate) struct NodeInfoResponse {
     #[schema(example = true)]
     is_indexer_corrupted: bool,
     #[schema(example = "public")]
-    nat_status: Option<String>,
+    nat_status: Option<NatStatus>,
 }
 
 /// Get information about this HOPR Node.
@@ -503,7 +511,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     };
 
     let is_eligible = hopr.is_allowed_to_access_network(either::Right(me_address)).await?;
-    let nat_status = "public"; // TODO: get status from behavior
+    let nat_status = NatStatus::Unknown; // TODO: get status from behavior
 
     // If one channel or more are corrupted, we consider the indexer as corrupted.
     let is_indexer_corrupted = hopr
@@ -533,7 +541,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 indexer_last_log_block: indexer_state_info.latest_log_block_number,
                 indexer_last_log_checksum: indexer_state_info.latest_log_checksum,
                 is_indexer_corrupted,
-                nat_status: Some(nat_status.to_string()),
+                nat_status: Some(nat_status),
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())

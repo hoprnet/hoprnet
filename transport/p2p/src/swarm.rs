@@ -184,9 +184,15 @@ impl HoprSwarm {
                         }
                     }
                     SwarmEvent::Behaviour(
-                        HoprNetworkBehaviorEvent::Autonat(autonat::Event::StatusChanged { old, new })
+                        HoprNetworkBehaviorEvent::Autonat(event)
                     ) => {
-                            info!(?old, ?new, "AutoNAT status changed");
+                            match event {
+                                autonat::Event::StatusChanged { old, new } => {
+                                    info!(?old, ?new, "AutoNAT status changed");
+                                }
+                                autonat::Event::InboundProbe { .. } => {}
+                                autonat::Event::OutboundProbe { .. } => {}
+                            }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Identify(_event)) => {}
                     SwarmEvent::ConnectionEstablished {

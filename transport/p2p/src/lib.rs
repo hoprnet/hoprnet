@@ -33,7 +33,7 @@ pub mod swarm;
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
-use std::{fmt::Debug, time::Duration};
+use std::fmt::Debug;
 
 pub use behavior::discovery::Event as DiscoveryEvent;
 use futures::{AsyncRead, AsyncWrite, Stream};
