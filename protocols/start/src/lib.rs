@@ -1,13 +1,13 @@
 //! This crate defines the Start sub-protocol used for HOPR Session initiation and management.
 //!
 //! The Start protocol is used to establish Session as described in HOPR
-//! [`RFC-0007`](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0007-session-protocol).
+//! [`RFC-0012`](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0012-session-start-protocol).
 //! and is implemented via the [`StartProtocol`] enum.
 //!
 //! The protocol is defined via generic arguments `I` (for Session ID), `T` (for Session Target)
 //! and `C` (for Session capabilities).
 //!
-//! Per `RFC-0007`, the types `I` and `T` are serialized/deserialized to the CBOR binary format
+//! Per `RFC-0012`, the types `I` and `T` are serialized/deserialized to the CBOR binary format
 //! (see [`RFC7049`](https://datatracker.ietf.org/doc/html/rfc7049)) and therefore must implement
 //! `serde::Serialize + serde::Deserialize`.
 //! The capability type `C` must be expressible as a single unsigned byte.
@@ -124,7 +124,7 @@ pub struct KeepAliveMessage<I> {
     /// Reserved for future use, always zero currently.
     pub flags: u8,
     /// Additional data (might be `flags` dependent), ignored if `0x00000000`.
-    pub additional_data: u32,
+    pub additional_data: u64,
 }
 
 impl<I> KeepAliveMessage<I> {
@@ -283,12 +283,12 @@ where
 
                     StartProtocol::KeepAlive(KeepAliveMessage {
                         flags: data[data_offset],
-                        additional_data: u32::from_be_bytes(
-                            data[data_offset + 1..data_offset + 1 + size_of::<u32>()]
+                        additional_data: u64::from_be_bytes(
+                            data[data_offset + 1..data_offset + 1 + size_of::<u64>()]
                                 .try_into()
                                 .map_err(|_| StartProtocolError::ParseError("ka.additional_data".into()))?,
                         ),
-                        session_id: serde_cbor_2::from_slice(&data[data_offset + 1 + size_of::<u32>()..])?,
+                        session_id: serde_cbor_2::from_slice(&data[data_offset + 1 + size_of::<u64>()..])?,
                     })
                 }
             },

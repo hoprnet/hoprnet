@@ -2,10 +2,11 @@ use cipher::zeroize;
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_random::{Randomizable, random_array};
 use k256::{
-    Secp256k1,
+    AffinePoint, Secp256k1,
     elliptic_curve::{
-        Group, PrimeField,
+        PrimeField,
         hash2curve::{ExpandMsgXmd, GroupDigest},
+        point::NonIdentity,
     },
 };
 use sha3::Sha3_256;
@@ -18,18 +19,17 @@ use crate::{
         CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize},
     },
     prelude::{HalfKey, SecretKey},
+    types::PublicKey,
 };
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
-pub(crate) fn random_group_element() -> ([u8; 32], crate::types::CurvePoint) {
-    let mut scalar = k256::NonZeroScalar::from_uint(1u32.into()).unwrap();
-    let mut point = k256::ProjectivePoint::IDENTITY;
-    while point.is_identity().into() {
-        scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
-        point = k256::ProjectivePoint::GENERATOR * scalar.as_ref();
-    }
-    (scalar.to_bytes().into(), point.to_affine().into())
+pub(crate) fn random_group_element() -> ([u8; 32], NonIdentity<AffinePoint>) {
+    // Since sep256k1 has a group of prime order, a non-zero scalar cannot result into an identity point.
+    let scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
+    let point =
+        PublicKey::from_privkey(&scalar.to_bytes()).expect("non-zero scalar cannot represent an invalid public key");
+    (scalar.to_bytes().into(), point.into())
 }
 
 /// Creates X25519 secret scalar (also compatible with Ed25519 scalar) from the given bytes.
@@ -42,7 +42,7 @@ pub fn x25519_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<curve2551
         clamped.copy_from_slice(&bytes[..32]);
         clamped[00] &= 0b1111_1000; // clear the 3 LSB bits (= multiply by Curve25519's co-factor)
         clamped[31] &= 0b0111_1111; // clear the 256-th bit
-        clamped[31] |= 0b0100_0000; // make it 255-bit number
+        clamped[31] |= 0b0100_0000; // make it a 255-bit number
 
         Ok(curve25519_dalek::scalar::Scalar::from_bytes_mod_order(clamped))
     } else {
@@ -61,6 +61,7 @@ pub fn k256_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<k256::Scala
 }
 
 /// Sample a random secp256k1 field element that can represent a valid secp256k1 point.
+///
 /// The implementation uses the ` hash_to_field ` function as defined in
 /// `<https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field>`
 /// The `secret` must be at least `SecretKey::LENGTH` long.
@@ -141,6 +142,12 @@ impl<L: ArrayLength> From<SecretValue<L>> for Box<[u8]> {
     }
 }
 
+impl From<SecretValue<typenum::U32>> for [u8; 32] {
+    fn from(value: SecretValue<typenum::U32>) -> Self {
+        value.0.into_array()
+    }
+}
+
 #[cfg(feature = "serde")]
 impl<L: ArrayLength> serde::Serialize for SecretValue<L> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -170,5 +177,16 @@ impl<L: ArrayLength> Randomizable for SecretValue<L> {
     /// Generates cryptographically strong random secret value.
     fn random() -> Self {
         Self(random_array())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sample_field_element() {
+        let secret = [1u8; SecretKey::LENGTH];
+        assert!(sample_secp256k1_field_element(&secret, "TEST_TAG").is_ok());
     }
 }

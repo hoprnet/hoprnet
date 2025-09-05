@@ -244,7 +244,7 @@ pub(crate) fn check_ticket_win(
     computed_ticket_luck[1..].copy_from_slice(
         &Hash::create(&[
             ticket_hash.as_ref(),
-            &vrf_params.V.as_uncompressed().as_bytes()[1..], // skip prefix
+            &vrf_params.get_v_encoded_point().as_bytes()[1..], // skip prefix
             response.as_ref(),
             ticket_signature.as_ref(),
         ])
@@ -367,10 +367,18 @@ impl TicketBuilder {
         self
     }
 
-    /// Sets the [EthereumChallenge] for the Proof of Relay.
-    /// Must be set.
+    /// Sets the [`Challenge`] for the Proof of Relay, converting it to [`EthereumChallenge`] first.
+    ///
+    /// Either this method or [`Ticket::eth_challenge`] must be called.
     #[must_use]
-    pub fn challenge(mut self, challenge: EthereumChallenge) -> Self {
+    pub fn challenge(mut self, challenge: Challenge) -> Self {
+        self.challenge = Some(challenge.to_ethereum_challenge());
+        self
+    }
+
+    /// Sets the [`EthereumChallenge`] for the Proof of Relay.
+    /// Either this method or [`Ticket::challenge`] must be called.
+    pub fn eth_challenge(mut self, challenge: EthereumChallenge) -> Self {
         self.challenge = Some(challenge);
         self
     }
@@ -447,7 +455,7 @@ impl TicketBuilder {
     /// the given hash.
     pub fn build_verified(self, hash: Hash) -> errors::Result<VerifiedTicket> {
         if let Some(signature) = self.signature {
-            let issuer = PublicKey::from_signature_hash(hash.as_ref(), &signature)?.to_address();
+            let issuer = signature.recover_from_hash(&hash)?.to_address();
             Ok(VerifiedTicket(self.build()?, hash, issuer))
         } else {
             Err(InvalidInputData("signature is missing".into()))
@@ -600,7 +608,7 @@ impl Ticket {
     /// If a signature was already present, it will be replaced.
     pub fn sign(mut self, signing_key: &ChainKeypair, domain_separator: &Hash) -> VerifiedTicket {
         let ticket_hash = self.get_hash(domain_separator);
-        self.signature = Some(Signature::sign_hash(ticket_hash.as_ref(), signing_key));
+        self.signature = Some(Signature::sign_hash(&ticket_hash, signing_key));
         VerifiedTicket(self, ticket_hash, signing_key.public().to_address())
     }
 
@@ -616,7 +624,7 @@ impl Ticket {
         let ticket_hash = self.get_hash(domain_separator);
 
         if let Some(signature) = &self.signature {
-            match PublicKey::from_signature_hash(ticket_hash.as_ref(), signature) {
+            match signature.recover_from_hash(&ticket_hash) {
                 Ok(pk) if pk.to_address().eq(issuer) => Ok(VerifiedTicket(self, ticket_hash, *issuer)),
                 Err(e) => {
                     error!("failed to verify ticket signature: {e}");
@@ -702,7 +710,7 @@ impl TryFrom<&[u8]> for Ticket {
                 .index_offset(u32::from_be_bytes(index_offset))
                 .channel_epoch(u32::from_be_bytes(channel_epoch))
                 .win_prob(win_prob)
-                .challenge(challenge)
+                .eth_challenge(challenge)
                 .signature(signature)
                 .build()
                 .map_err(|e| GeneralError::ParseError(format!("ticket build failed: {e}")))
@@ -859,7 +867,7 @@ impl UnacknowledgedTicket {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
         debug!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
 
-        if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
+        if self.ticket.verified_ticket().challenge == response.to_challenge()?.to_ethereum_challenge() {
             Ok(self.ticket.into_acknowledged(response))
         } else {
             Err(CryptoError::InvalidChallenge.into())
@@ -935,7 +943,7 @@ impl AcknowledgedTicket {
         chain_keypair: &ChainKeypair,
         domain_separator: &Hash,
     ) -> crate::errors::Result<RedeemableTicket> {
-        // This function must be called by ticket recipient and not the issuer
+        // This function must be called by the ticket recipient and not the issuer
         if chain_keypair.public().to_address().eq(self.ticket.verified_issuer()) {
             return Err(errors::CoreTypesError::LoopbackTicket);
         }
@@ -1101,7 +1109,7 @@ pub mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
-        types::{Challenge, CurvePoint, HalfKey, Hash, Response},
+        types::{HalfKey, Hash, Response},
     };
     use hopr_primitive_types::{
         prelude::UnitaryFloatOps,
@@ -1206,7 +1214,7 @@ pub mod tests {
     pub fn test_ticket_builder_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build()?;
         assert_eq!(0, ticket.index);
         assert_eq!(0.0, ticket.win_prob().as_f64());
@@ -1227,7 +1235,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
@@ -1250,7 +1258,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert_eq!(
@@ -1273,7 +1281,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert_ne!(initial_ticket.verified_hash().as_ref(), [0u8; Hash::SIZE]);
@@ -1287,7 +1295,7 @@ pub mod tests {
     pub fn test_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
         assert!(
@@ -1316,7 +1324,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(4)
-            .challenge(challenge.unwrap_or_default())
+            .eth_challenge(challenge.unwrap_or_default())
             .build_signed(pk, &domain_separator.unwrap_or_default())?)
     }
 
@@ -1326,16 +1334,14 @@ pub mod tests {
 
         let hk2 = HalfKey::try_from(hex!("4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b").as_ref())?;
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         let dst = Hash::default();
         let ack = mock_ticket(
             &ALICE,
             &BOB.public().to_address(),
             Some(dst),
-            Some(Challenge::from(cp_sum).to_ethereum_challenge()),
+            Some(challenge.to_ethereum_challenge()),
         )?
         .into_unacknowledged(hk1)
         .acknowledge(&hk2)?;
@@ -1356,7 +1362,7 @@ pub mod tests {
             &ALICE,
             &BOB.public().to_address(),
             Some(dst),
-            Some(response.to_challenge().into()),
+            Some(response.to_challenge()?.to_ethereum_challenge()),
         )?;
 
         let acked_ticket = ticket.into_acknowledged(response);
@@ -1396,7 +1402,7 @@ pub mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(resp.to_challenge().to_ethereum_challenge())
+            .challenge(resp.to_challenge()?)
             .build_signed(&ALICE, &Default::default())?;
 
         let unack = verified.into_unacknowledged(hk1);

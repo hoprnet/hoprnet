@@ -207,8 +207,8 @@ pub struct SessionManagerConfig {
     /// The actual timeout is adjusted according to the number of hops for that Session:
     /// `t = initiation_time_out_base * (num_forward_hops + num_return_hops + 2)`
     ///
-    /// Default is 5 seconds.
-    #[default(Duration::from_secs(5))]
+    /// Default is 500 milliseconds.
+    #[default(Duration::from_millis(500))]
     pub initiation_timeout_base: Duration,
 
     /// Timeout for Session to be closed due to inactivity.

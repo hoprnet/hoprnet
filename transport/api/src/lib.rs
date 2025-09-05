@@ -303,10 +303,13 @@ where
                         match event {
                             PeerDiscovery::Allow(peer_id) => {
                                 debug!(peer = %peer_id, "Processing peer discovery event: Allow");
-                                if let Ok(pk) = OffchainPublicKey::try_from(peer_id) {
+
+                                // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer_id))
+                                    .await {
                                     if !network.has(&peer_id).await {
                                         let mas = db
-                                            .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk))
+                                            .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pubkey))
                                             .await
                                             .map(|entry| {
                                                 entry
@@ -344,8 +347,10 @@ where
                                         .collect::<Vec<_>>();
 
                                     if ! mas.is_empty() {
-                                        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
-                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk)).await {
+                                        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                        if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                            .await {
+                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pubkey)).await {
                                                 let key: Result<Address, _> = key.try_into();
 
                                                 if let Ok(key) = key {
@@ -806,8 +811,12 @@ where
                 Box::pin(async move {
                     match address_like_noref {
                         either::Left(peer) => {
-                            let pk = OffchainPublicKey::try_from(peer)?;
-                            if let Some(address) = db_clone.translate_key(Some(tx), pk).await? {
+                            // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                            let pubkey =
+                                hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                    .await
+                                    .map_err(|e| hopr_db_sql::api::errors::DbError::General(e.to_string()))?;
+                            if let Some(address) = db_clone.translate_key(Some(tx), pubkey).await? {
                                 db_clone.is_allowed_in_network_registry(Some(tx), &address).await
                             } else {
                                 Err(hopr_db_sql::errors::DbSqlError::LogicalError(

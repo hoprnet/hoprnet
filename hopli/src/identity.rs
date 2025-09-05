@@ -231,7 +231,8 @@ impl Cmd for IdentitySubcommands {
                     let pk = PeerId::from_str(&peer_or_key.peer_or_key)
                         .map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key.clone()))
                         .and_then(|p| {
-                            OffchainPublicKey::try_from(p).map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key))
+                            OffchainPublicKey::from_peerid(&p)
+                                .map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key))
                         })?;
                     println!("{}", pk.to_hex());
                     Ok(())
