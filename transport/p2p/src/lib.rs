@@ -33,7 +33,7 @@ pub mod swarm;
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
 pub use behavior::discovery::Event as DiscoveryEvent;
 use futures::{AsyncRead, AsyncWrite, Stream};
@@ -111,7 +111,13 @@ impl HoprNetworkBehavior {
                 "/hopr/identify/1.0.0".to_string(),
                 me.clone(),
             )),
-            autonat: autonat::Behaviour::new(me.into(), autonat::Config::default()),
+            autonat: autonat::Behaviour::new(
+                me.into(),
+                autonat::Config {
+                    only_global_ips: false,
+                    ..Default::default()
+                },
+            ),
         }
     }
 }
