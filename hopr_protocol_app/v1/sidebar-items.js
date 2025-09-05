@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ApplicationFlag","ReservedTag","Tag"],"struct":["ApplicationData","ReservedTagIter"],"type":["ApplicationFlags"]};
