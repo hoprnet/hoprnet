@@ -115,6 +115,8 @@ impl<const C: usize> SessionMessage<C> {
 
 impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     fn from(message: SessionMessage<C>) -> Self {
+        debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
+
         let mut result = BytesMut::new();
         SessionCodec::<C>
             .encode(message, &mut result)
@@ -142,6 +144,8 @@ impl<const C: usize> Encoder for SessionCodec<C> {
     type Item<'a> = SessionMessage<C>;
 
     fn encode(&mut self, item: Self::Item<'_>, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
+
         let disc = SessionMessageDiscriminants::from(&item) as u8;
 
         let msg = match item {
@@ -166,6 +170,8 @@ impl<const C: usize> Decoder for SessionCodec<C> {
     type Item = SessionMessage<C>;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
+
         tracing::trace!(msg_len = src.len(), "decoding message");
         if src.len() < SessionMessage::<C>::minimum_message_size() {
             return Ok(None);
