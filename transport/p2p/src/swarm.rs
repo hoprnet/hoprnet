@@ -183,23 +183,10 @@ impl HoprSwarm {
                             tracing::error!("Failed to send discovery event from the transport layer");
                         }
                     }
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatClient(autonat::v2::client::Event {
-                        server,
-                        tested_addr,
-                        bytes_sent,
-                        result,
-                    })) => {
-                        match result {
-                            Ok(_) => {
-                                info!(%server, %tested_addr, %bytes_sent, "Autonat client event: test success");
-                            }
-                            Err(error) => {
-                                warn!(%server, %tested_addr, %bytes_sent, %error, "Autonat client event: test failed");
-                            }
-                        }
-                    }
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatServer(event)) => {
-                        info!(?event, "Autonat server event");
+                    SwarmEvent::Behaviour(
+                        HoprNetworkBehaviorEvent::Autonat(autonat::Event::StatusChanged { old, new })
+                    ) => {
+                            info!(?old, ?new, "AutoNAT status changed");
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Identify(_event)) => {}
                     SwarmEvent::ConnectionEstablished {

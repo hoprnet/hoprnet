@@ -24,7 +24,7 @@ pub mod network_notifier;
 pub mod proxy;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{Arc, OnceLock},
     time::Duration,
 };

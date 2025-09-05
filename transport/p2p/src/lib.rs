@@ -41,7 +41,6 @@ use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{StreamProtocol, autonat, identity::PublicKey, swarm::NetworkBehaviour};
-use rand::rngs::OsRng;
 
 // Control object for the streams over the HOPR protocols
 #[derive(Clone)]
@@ -91,8 +90,7 @@ pub struct HoprNetworkBehavior {
     discovery: behavior::discovery::Behaviour,
     streams: libp2p_stream::Behaviour,
     identify: libp2p_identify::Behaviour,
-    autonat_client: autonat::v2::client::Behaviour,
-    autonat_server: autonat::v2::server::Behaviour,
+    autonat: autonat::Behaviour,
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -111,10 +109,9 @@ impl HoprNetworkBehavior {
             discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events),
             identify: libp2p_identify::Behaviour::new(libp2p_identify::Config::new(
                 "/hopr/identify/1.0.0".to_string(),
-                me,
+                me.clone(),
             )),
-            autonat_client: autonat::v2::client::Behaviour::new(OsRng, autonat::v2::client::Config::default()),
-            autonat_server: autonat::v2::server::Behaviour::new(OsRng),
+            autonat: autonat::Behaviour::new(me.into(), autonat::Config::default()),
         }
     }
 }
@@ -130,8 +127,7 @@ pub enum HoprNetworkBehaviorEvent {
         libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
     Identify(libp2p_identify::Event),
-    AutonatClient(autonat::v2::client::Event),
-    AutonatServer(autonat::v2::server::Event),
+    Autonat(autonat::Event),
 }
 
 // Unexpected libp2p_stream event
@@ -162,16 +158,9 @@ impl From<libp2p_identify::Event> for HoprNetworkBehaviorEvent {
         Self::Identify(event)
     }
 }
-
-impl From<autonat::v2::client::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: autonat::v2::client::Event) -> Self {
-        Self::AutonatClient(event)
-    }
-}
-
-impl From<autonat::v2::server::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: autonat::v2::server::Event) -> Self {
-        Self::AutonatServer(event)
+impl From<autonat::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: autonat::Event) -> Self {
+        Self::Autonat(event)
     }
 }
 

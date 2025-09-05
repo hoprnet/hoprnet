@@ -113,7 +113,6 @@ pub(crate) struct HeartbeatInfo {
     "quality": 0.7,
     "backoff": 0.5,
     "isNew": true,
-    "reportedVersion": "2.1.0"
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerInfo {
@@ -172,7 +171,6 @@ pub(crate) struct AnnouncedPeer {
         "quality": 0.7,
         "backoff": 0.5,
         "isNew": true,
-        "reportedVersion": "2.1.0"
     }],
     "announced": [{
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
@@ -193,7 +191,6 @@ pub(crate) struct NodePeersResponse {
         "quality": 0.7,
         "backoff": 0.5,
         "isNew": true,
-        "reportedVersion": "2.1.0"
     }]))]
     connected: Vec<PeerInfo>,
     #[schema(example = json!([{
@@ -420,6 +417,7 @@ pub(super) async fn channel_graph(
         "indexerLastLogBlock": 123450,
         "indexerLastLogChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
         "isIndexerCorrupted": false,
+        "natStatus": "public"
     }))]
 #[serde(rename_all = "camelCase")]
 /// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses
@@ -472,6 +470,8 @@ pub(crate) struct NodeInfoResponse {
     indexer_last_log_checksum: Hash,
     #[schema(example = true)]
     is_indexer_corrupted: bool,
+    #[schema(example = "public")]
+    nat_status: Option<String>,
 }
 
 /// Get information about this HOPR Node.
@@ -480,7 +480,7 @@ pub(crate) struct NodeInfoResponse {
         path = const_format::formatcp!("{BASE_PATH}/node/info"),
         description = "Get information about this HOPR Node",
         responses(
-            (status = 200, description = "Fetched node version", body = NodeInfoResponse),
+            (status = 200, description = "Fetched node informations", body = NodeInfoResponse),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -503,6 +503,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     };
 
     let is_eligible = hopr.is_allowed_to_access_network(either::Right(me_address)).await?;
+    let nat_status = "public"; // TODO: get status from behavior
 
     // If one channel or more are corrupted, we consider the indexer as corrupted.
     let is_indexer_corrupted = hopr
@@ -532,6 +533,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 indexer_last_log_block: indexer_state_info.latest_log_block_number,
                 indexer_last_log_checksum: indexer_state_info.latest_log_checksum,
                 is_indexer_corrupted,
+                nat_status: Some(nat_status.to_string()),
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())
