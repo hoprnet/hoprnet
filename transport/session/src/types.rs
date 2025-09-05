@@ -385,9 +385,10 @@ impl Session {
                 ..Default::default()
             };
 
-            if !cfg
-                .capabilities
-                .is_disjoint(Capability::RetransmissionAck | Capability::RetransmissionNack)
+            // Need to test the capabilities separately, because any Retransmission capability
+            // implies Segmentation, and therefore `is_disjoint` would fail
+            if cfg.capabilities.contains(Capability::RetransmissionAck)
+                || cfg.capabilities.contains(Capability::RetransmissionNack)
             {
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {
