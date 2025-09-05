@@ -368,7 +368,7 @@ impl Session {
                 ..Default::default()
             };
 
-            if capabilities.contains(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+            if !capabilities.is_disjoint(Capability::RetransmissionAck | Capability::RetransmissionNack) {
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {
                     // This is a very coarse assumption, that a single 3-hop packet

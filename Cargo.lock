@@ -5042,6 +5042,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "lazy_static",
  "mockall",
  "parameterized",

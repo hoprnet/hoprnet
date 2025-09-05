@@ -63,6 +63,7 @@ hopr-network-types = { workspace = true, features = [
   "capture",
   "runtime-tokio",
 ] }
+hopr-protocol-app = { workspace = true }
 
 [[example]]
 name = "session-socket"

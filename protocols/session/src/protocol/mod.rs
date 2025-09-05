@@ -90,7 +90,7 @@ impl<const C: usize> SessionMessage<C> {
     /// and two bytes for the message length.
     pub const HEADER_SIZE: usize = 1 + size_of::<SessionMessageDiscriminants>() + size_of::<u16>();
     /// Maximum size of the message in v1.
-    pub const MAX_MESSAGE_LENGTH: usize = 2047;
+    pub const MAX_MESSAGE_LENGTH: usize = C.saturating_sub(Self::HEADER_SIZE);
     /// Size of the overhead that's added to the raw payload of each [`Segment`].
     ///
     /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
@@ -213,6 +213,7 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
+    use hopr_protocol_app::prelude::ApplicationData;
     use rand::{Rng, thread_rng};
 
     use super::*;
@@ -224,10 +225,16 @@ mod tests {
     #[test]
     fn ensure_session_protocol_version_1_values() {
         // All of these values are independent of C, so we can set C = 0
-        assert_eq!(1, SessionMessage::<0>::VERSION);
-        assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
-        assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
-        assert_eq!(2047, SessionMessage::<0>::MAX_MESSAGE_LENGTH);
+        assert_eq!(1, SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::VERSION);
+        assert_eq!(4, SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::HEADER_SIZE);
+        assert_eq!(
+            10,
+            SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::SEGMENT_OVERHEAD
+        );
+        assert_eq!(
+            1008,
+            SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MESSAGE_LENGTH
+        );
     }
 
     #[test]
