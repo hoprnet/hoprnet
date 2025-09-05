@@ -87,7 +87,6 @@ use hopr_transport_ticket_aggregation::{
     AwaitingAggregator, TicketAggregationActions, TicketAggregationError, TicketAggregationInteraction,
     TicketAggregatorTrait,
 };
-use rand::seq::SliceRandom;
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, info, trace, warn};
@@ -372,12 +371,10 @@ where
 
         info!("Loading initial peers from the storage");
 
-        let mut addresses: HashSet<Multiaddr> = HashSet::new();
         let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
             if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
-                addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
                     .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
@@ -450,35 +447,8 @@ where
             (tx, rx)
         };
 
-        let mut transport_layer =
+        let transport_layer =
             HoprSwarm::new((&self.me).into(), discovery_updates, self.my_multiaddresses.clone()).await;
-
-        let autonat_port = self.my_multiaddresses.first().and_then(|addr| {
-            let protocols: Vec<_> = addr.iter().collect();
-            for p in protocols.iter().rev() {
-                match p {
-                    Protocol::Tcp(port) | Protocol::Udp(port) | Protocol::Sctp(port) => return Some(*port),
-                    _ => {}
-                }
-            }
-            None
-        });
-
-        if let Some(port) = autonat_port {
-            info!(port, "Running NAT server on the first multi-address port");
-            transport_layer.run_nat_server(port);
-        } else {
-            warn!("No port found in the multi-addresses, not running a NAT server");
-        }
-
-        if addresses.is_empty() {
-            warn!("No addresses found in the database, not dialing any NAT servers");
-        } else {
-            info!(num_addresses = addresses.len(), "Found addresses from the database");
-            let mut randomized_addresses: Vec<_> = addresses.into_iter().collect();
-            randomized_addresses.shuffle(&mut rand::thread_rng());
-            transport_layer.dial_nat_server(randomized_addresses);
-        }
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);

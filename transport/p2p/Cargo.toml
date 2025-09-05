@@ -35,6 +35,7 @@ libp2p = { workspace = true, features = [
   "yamux",
 ] }
 libp2p-stream = { workspace = true }
+libp2p-identify = { workspace = true }
 rand = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

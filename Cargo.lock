@@ -5250,6 +5250,7 @@ dependencies = [
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p",
+ "libp2p-identify",
  "libp2p-stream",
  "more-asserts",
  "rand 0.8.5",
@@ -6351,6 +6352,27 @@ dependencies = [
  "libp2p-identity",
  "parking_lot",
  "smallvec",
+ "tracing",
+]
+
+[[package]]
+name = "libp2p-identify"
+version = "0.47.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ab792a8b68fdef443a62155b01970c81c3aadab5e659621b063ef252a8e65e8"
+dependencies = [
+ "asynchronous-codec",
+ "either",
+ "futures",
+ "futures-bounded",
+ "futures-timer",
+ "libp2p-core",
+ "libp2p-identity",
+ "libp2p-swarm",
+ "quick-protobuf",
+ "quick-protobuf-codec",
+ "smallvec",
+ "thiserror 2.0.16",
  "tracing",
 ]
 
