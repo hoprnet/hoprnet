@@ -225,7 +225,7 @@ hopr-chain-types = { path = "chain/types", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
 hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [
-  "x25519",
+  "x25519", "ed25519"
 ] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
 hopr-db-api = { path = "db/api" }

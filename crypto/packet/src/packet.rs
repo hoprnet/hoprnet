@@ -15,6 +15,7 @@ use crate::{
     por::{SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay, pre_verify},
     types::{HoprPacketMessage, HoprPacketParts, HoprSenderId, HoprSurbId},
 };
+use crate::por::{ProofOfRelayString, ProofOfRelayValues};
 
 /// Represents an outgoing packet that has been only partially instantiated.
 ///
@@ -33,6 +34,19 @@ pub struct PartialHoprPacket {
     ticket: Ticket,
     next_hop: OffchainPublicKey,
     ack_challenge: HalfKeyChallenge,
+}
+
+/// Shared key data for a path.
+struct PathKeyData<P: NonEmptyPath<OffchainPublicKey>> {
+    pub path: P,
+    pub shared_keys: SharedKeys<<HoprSphinxSuite as SphinxSuite>::E, <HoprSphinxSuite as SphinxSuite>::G>,
+    pub por_strings: Vec<ProofOfRelayString>,
+    pub por_values: ProofOfRelayValues,
+}
+
+fn generate_key_data<I: IntoIterator<Item = P>, P: NonEmptyPath<OffchainPublicKey>>(paths: I) -> Vec<PathKeyData> {
+    // TODO: ensure ordering of output paths
+    vec![]
 }
 
 impl PartialHoprPacket {
@@ -59,9 +73,11 @@ impl PartialHoprPacket {
                 forward_path,
                 return_paths,
             } => {
-                // Create shared secrets and PoR challenge chain
-                let shared_keys = HoprSphinxSuite::new_shared_keys(&forward_path)?;
-                let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
+                // Create shared secrets and PoR challenge chain for forward and return paths
+                let mut key_data = generate_key_data(std::iter::once(forward_path).chain(return_paths));
+
+                let PathKeyData { path: forward_path, shared_keys, por_strings, por_values } = key_data.remove(0);
+
                 let receiver_data = HoprSenderId::new(pseudonym);
 
                 // Create SURBs if some return paths were specified

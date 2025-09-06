@@ -4652,6 +4652,7 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "parameterized",
+ "rayon",
  "serde",
  "serde_bytes",
  "strum 0.27.2",
