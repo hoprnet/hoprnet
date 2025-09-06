@@ -1,5 +1,4 @@
-use curve25519_dalek::EdwardsPoint;
-use curve25519_dalek::traits::IsIdentity;
+use curve25519_dalek::{EdwardsPoint, traits::IsIdentity};
 use hopr_crypto_types::errors::Result;
 #[cfg(feature = "secp256k1")]
 use {

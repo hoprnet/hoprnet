@@ -246,6 +246,8 @@ impl FromStr for HalfKeyChallenge {
     }
 }
 
+pub use blake3::Hasher as Blake3;
+
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
 #[derive(Clone, Copy, Eq, PartialEq, Default, PartialOrd, Ord, std::hash::Hash)]

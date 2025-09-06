@@ -23,7 +23,7 @@ serde = [
 
 [dependencies]
 hex = { workspace = true }
-rayon = { workspace = true, optional = true}
+rayon = { workspace = true, optional = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
