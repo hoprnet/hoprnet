@@ -9,7 +9,7 @@ use hopr_primitive_types::prelude::{Address, BytesEncodable, KeyIdent};
 
 const SAMPLE_SIZE: usize = 100_000;
 
-pub fn packet_sending_bench(c: &mut Criterion) {
+pub fn packet_sending_no_precompute_bench(c: &mut Criterion) {
     assert!(
         !hopr_crypto_random::is_rng_fixed(),
         "RNG must not be fixed for bench tests"
@@ -28,8 +28,9 @@ pub fn packet_sending_bench(c: &mut Criterion) {
     let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
     let dst = Hash::default();
 
-    let mut group = c.benchmark_group("packet_sending");
+    let mut group = c.benchmark_group("packet_sending_no_precompute");
     group.sample_size(SAMPLE_SIZE);
+    group.measurement_time(std::time::Duration::from_secs(30));
 
     for hop in [0, 1, 2, 3].iter() {
         group.throughput(Throughput::BytesDecimal(msg.len() as u64));
@@ -341,7 +342,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    packet_sending_bench,
+    packet_sending_no_precompute_bench,
     packet_precompute_1rp_bench,
     packet_precompute_2rp_bench,
     packet_sending_precomputed_bench,

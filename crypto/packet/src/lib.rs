@@ -46,7 +46,7 @@ pub mod prelude {
 pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
 
 /// Currently used public key cipher suite for Sphinx.
-pub type HoprSphinxSuite = X25519Suite;
+pub type HoprSphinxSuite = Ed25519Suite;
 
 /// Current Sphinx header specification for the HOPR protocol.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

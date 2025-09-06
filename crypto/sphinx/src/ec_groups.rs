@@ -1,3 +1,4 @@
+use curve25519_dalek::EdwardsPoint;
 use curve25519_dalek::traits::IsIdentity;
 use hopr_crypto_types::errors::Result;
 #[cfg(feature = "secp256k1")]
@@ -56,7 +57,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgo
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
-        scalar * curve25519_dalek::constants::X25519_BASEPOINT
+        EdwardsPoint::mul_base(scalar).to_montgomery()
     }
 
     fn is_valid(&self) -> bool {
@@ -79,11 +80,11 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edward
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
-        scalar * curve25519_dalek::constants::ED25519_BASEPOINT_POINT
+        EdwardsPoint::mul_base(scalar)
     }
 
     fn is_valid(&self) -> bool {
-        self.is_torsion_free() && !self.is_identity()
+        self.is_torsion_free() && !self.is_identity() && !self.is_small_order()
     }
 }
 

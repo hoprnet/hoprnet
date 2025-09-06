@@ -280,3 +280,8 @@ lto = "fat"
 panic = "abort"
 strip = true
 opt-level = 3
+
+[profile.bench]
+debug = 2
+split-debuginfo = "off"
+strip = false
