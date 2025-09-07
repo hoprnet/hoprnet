@@ -15,6 +15,7 @@ use curve25519_dalek::{
 };
 use digest::Digest;
 use elliptic_curve::NonZeroScalar;
+use generic_array::GenericArray;
 use hopr_crypto_random::Randomizable;
 use hopr_primitive_types::{errors::GeneralError::ParseError, prelude::*};
 use k256::{
@@ -252,12 +253,12 @@ const HASH_BASE_SIZE: usize = 32;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HashBase<H>(
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; HASH_BASE_SIZE],
-    PhantomData<H>,
+    #[cfg_attr(feature = "serde", serde(skip))] PhantomData<H>,
 );
 
 impl<H> Clone for HashBase<H> {
     fn clone(&self) -> Self {
-        Self(self.0, PhantomData)
+        *self
     }
 }
 
@@ -425,7 +426,7 @@ impl PartialEq for OffchainPublicKey {
 
 impl AsRef<[u8]> for OffchainPublicKey {
     fn as_ref(&self) -> &[u8] {
-        self.compressed.as_bytes()
+        &self.compressed.0
     }
 }
 
@@ -461,7 +462,8 @@ impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
 
 impl From<OffchainPublicKey> for PeerId {
     fn from(value: OffchainPublicKey) -> Self {
-        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.compressed.as_bytes()).unwrap();
+        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.compressed.as_bytes())
+            .expect("offchain public key is always a valid ed25519 public key");
         PeerId::from_public_key(&k.into())
     }
 }
@@ -522,32 +524,15 @@ impl From<&OffchainPublicKey> for EdwardsPoint {
     }
 }
 
+impl<'a> From<&'a OffchainPublicKey> for &'a GenericArray<u8, typenum::U32> {
+    fn from(value: &'a OffchainPublicKey) -> &'a GenericArray<u8, typenum::U32> {
+        GenericArray::from_slice(&value.compressed.0)
+    }
+}
+
 impl From<&OffchainPublicKey> for MontgomeryPoint {
     fn from(value: &OffchainPublicKey) -> Self {
         value.montgomery
-    }
-}
-
-/// Compact representation of [`OffchainPublicKey`] suitable for use in enums.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CompactOffchainPublicKey(CompressedEdwardsY);
-
-impl From<OffchainPublicKey> for CompactOffchainPublicKey {
-    fn from(value: OffchainPublicKey) -> Self {
-        Self(value.compressed)
-    }
-}
-
-impl CompactOffchainPublicKey {
-    /// Performs an **expensive** operation of converting back to the [`OffchainPublicKey`].
-    pub fn into_offchain_public_key(self) -> OffchainPublicKey {
-        let decompressed = self.0.decompress().expect("decompression must not fail");
-        OffchainPublicKey {
-            compressed: self.0,
-            edwards: decompressed,
-            montgomery: decompressed.to_montgomery(),
-        }
     }
 }
 
@@ -728,6 +713,12 @@ impl TryFrom<AffinePoint> for PublicKey {
 impl From<&PublicKey> for k256::ProjectivePoint {
     fn from(value: &PublicKey) -> Self {
         (*value.0.as_ref()).into()
+    }
+}
+
+impl<'a> From<&'a PublicKey> for &'a GenericArray<u8, typenum::U33> {
+    fn from(value: &'a PublicKey) -> &'a GenericArray<u8, typenum::U33> {
+        GenericArray::from_slice(&value.1)
     }
 }
 

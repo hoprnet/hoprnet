@@ -407,20 +407,21 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
 
     /// Attempts to remove the layer of encryption in this packet by using the given `node_keypair`.
     /// This will transform this packet into the [`ForwardedMetaPacket`].
-    pub fn into_forwarded<K, F>(
+    pub fn into_forwarded<'a, K, F>(
         mut self,
-        node_keypair: &S::P,
+        node_keypair: &'a S::P,
         key_mapper: &K,
         mut reply_openers: F,
     ) -> Result<ForwardedMetaPacket<S, H, P>, SphinxError>
     where
         K: KeyIdMapper<S, H>,
         F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
+        &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
             Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),
             &(node_keypair.into()),
-            &(node_keypair.public().into()),
+            node_keypair.public().into(),
         )?;
 
         // Forward the packet header
@@ -636,6 +637,7 @@ pub(crate) mod tests {
     where
         S: SphinxSuite,
         <S::P as Keypair>::Public: Eq + Hash,
+        for<'a> &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let mapper = keypairs
@@ -694,6 +696,8 @@ pub(crate) mod tests {
     where
         S: SphinxSuite,
         <S::P as Keypair>::Public: Eq + Hash,
+        for<'a> &'a Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>:
+            From<&'a <<S as SphinxSuite>::P as Keypair>::Public>,
     {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let mapper = keypairs

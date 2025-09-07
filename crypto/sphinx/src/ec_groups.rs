@@ -27,14 +27,8 @@ impl Scalar for curve25519_dalek::scalar::Scalar {
 #[cfg(feature = "secp256k1")]
 impl Scalar for k256::Scalar {
     fn random() -> Self {
-        // Beware this is not constant time
-        let mut bytes = k256::FieldBytes::default();
-        loop {
-            hopr_crypto_random::random_fill(&mut bytes);
-            if let Ok(scalar) = Self::from_bytes(&bytes) {
-                return scalar;
-            }
-        }
+        // Beware, this is not constant-time
+        k256::Scalar::generate_vartime(&mut hopr_crypto_random::rng())
     }
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -114,7 +108,7 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
     }
 
     fn is_valid(&self) -> bool {
-        self.is_identity().unwrap_u8() == 0
+        !bool::from(self.is_identity())
     }
 }
 

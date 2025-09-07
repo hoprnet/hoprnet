@@ -108,7 +108,7 @@ impl PartialHoprPacket {
                 let mut key_data = PathKeyData::iter_from_paths(
                     std::iter::once(forward_path.hops())
                         .chain(return_paths.iter().map(|p| p.hops()))
-                        .collect()
+                        .collect(),
                 )?;
 
                 let PathKeyData {
