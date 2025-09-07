@@ -65,7 +65,7 @@ pub struct CliArgs {
     )]
     pub identity: Option<String>,
 
-    // Identity details
+    // Data directory
     #[arg(
         long,
         env = "HOPRD_DATA",
