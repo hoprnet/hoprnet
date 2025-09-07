@@ -1,4 +1,3 @@
-use curve25519_dalek::{EdwardsPoint, traits::IsIdentity};
 use hopr_crypto_types::errors::Result;
 #[cfg(feature = "secp256k1")]
 use {
@@ -44,7 +43,7 @@ impl Scalar for k256::Scalar {
 }
 
 #[cfg(feature = "x25519")]
-impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgomery::MontgomeryPoint {
+impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::MontgomeryPoint {
     type AlphaLen = typenum::U32;
 
     fn to_alpha(&self) -> Alpha<typenum::U32> {
@@ -52,20 +51,21 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::montgo
     }
 
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
-        Ok(curve25519_dalek::montgomery::MontgomeryPoint(alpha.into()))
+        Ok(curve25519_dalek::MontgomeryPoint(alpha.into()))
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
-        EdwardsPoint::mul_base(scalar).to_montgomery()
+        curve25519_dalek::EdwardsPoint::mul_base(scalar).to_montgomery()
     }
 
     fn is_valid(&self) -> bool {
+        use curve25519_dalek::traits::IsIdentity;
         !self.is_identity()
     }
 }
 
 #[cfg(feature = "ed25519")]
-impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edwards::EdwardsPoint {
+impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::EdwardsPoint {
     type AlphaLen = typenum::U32;
 
     fn to_alpha(&self) -> Alpha<typenum::U32> {
@@ -79,10 +79,11 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edward
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
-        EdwardsPoint::mul_base(scalar)
+        curve25519_dalek::EdwardsPoint::mul_base(scalar)
     }
 
     fn is_valid(&self) -> bool {
+        use curve25519_dalek::traits::IsIdentity;
         self.is_torsion_free() && !self.is_identity() && !self.is_small_order()
     }
 }

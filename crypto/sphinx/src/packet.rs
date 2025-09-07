@@ -19,6 +19,7 @@ use crate::{
 /// Holds data that are padded up to `P + 1`.
 ///
 /// Data in this instance is guaranteed to be always `P + 1` bytes-long.
+// TODO: make P a typenum argument
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PaddedPayload<const P: usize>(Box<[u8]>);
 
