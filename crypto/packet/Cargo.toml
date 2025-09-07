@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["rayon"]
 rayon = ["dep:rayon"]
 serde = [
   "dep:serde",
