@@ -94,9 +94,7 @@ async def swarm7(request, base_port):
             params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port
         )
 
-        if cluster_and_anvil is None:
-            pytest.fail("Failed to bring up the cluster")
-            return
+        assert cluster_and_anvil is not None, "Failed to bring up the cluster"
 
         cluster, anvil = cluster_and_anvil
         yield cluster.nodes
