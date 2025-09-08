@@ -13,7 +13,7 @@ use crate::{
         Result,
     },
     por::{SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay, pre_verify},
-    types::{HoprPacketMessage, HoprSenderId, HoprSurbId},
+    types::{HoprPacketMessage, HoprPacketParts, HoprSenderId, HoprSurbId, PacketSignals},
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.
@@ -75,7 +75,7 @@ impl PartialHoprPacket {
 
                 // Update the ticket with the challenge
                 let ticket = ticket
-                    .challenge(por_values.ticket_challenge())
+                    .eth_challenge(por_values.ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
@@ -100,7 +100,7 @@ impl PartialHoprPacket {
             PacketRouting::Surb(id, surb) => {
                 // Update the ticket with the challenge
                 let ticket = ticket
-                    .challenge(surb.additional_data_receiver.proof_of_relay_values().ticket_challenge())
+                    .eth_challenge(surb.additional_data_receiver.proof_of_relay_values().ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
@@ -131,7 +131,7 @@ impl PartialHoprPacket {
 
                 // Update the ticket with the challenge
                 let ticket = ticket
-                    .challenge(por_values.ticket_challenge())
+                    .eth_challenge(por_values.ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
@@ -142,7 +142,7 @@ impl PartialHoprPacket {
                             forward_path: &[destination],
                             receiver_data: &HoprSenderId::new(pseudonym),
                             additional_data_relayer: &por_strings,
-                            no_ack: true, // Indicate this is a no acknowledgement probe packet
+                            no_ack: true, // Indicate this is a no-acknowledgement probe packet
                         },
                         mapper,
                     )?,
@@ -157,9 +157,19 @@ impl PartialHoprPacket {
     }
 
     /// Turns this partial HOPR packet into a full [`Outgoing`](HoprPacket::Outgoing) [`HoprPacket`] by
-    /// attaching the given payload.
-    pub fn into_hopr_packet(self, msg: &[u8]) -> Result<(HoprPacket, Vec<HoprReplyOpener>)> {
-        let msg = HoprPacketMessage::from_parts(self.surbs, msg)?;
+    /// attaching the given payload `msg` and optional packet `signals` for the recipient.
+    ///
+    /// No `signals` are equivalent to `0`.
+    pub fn into_hopr_packet<S: Into<PacketSignals>>(
+        self,
+        msg: &[u8],
+        signals: S,
+    ) -> Result<(HoprPacket, Vec<HoprReplyOpener>)> {
+        let msg = HoprPacketMessage::try_from(HoprPacketParts {
+            surbs: self.surbs,
+            payload: msg.into(),
+            signals: signals.into(),
+        })?;
         Ok((
             HoprPacket::Outgoing(
                 HoprOutgoingPacket {
@@ -193,6 +203,10 @@ pub struct HoprIncomingPacket {
     pub sender: HoprPseudonym,
     /// List of [`SURBs`](SURB) to be used for replies sent to the packet creator.
     pub surbs: Vec<(HoprSurbId, HoprSurb)>,
+    /// Additional packet signals from the lower protocol layer passed from the packet sender.
+    ///
+    /// Zero if no signal flags were specified.
+    pub signals: PacketSignals,
 }
 
 /// Represents a packet destined for another node.
@@ -312,10 +326,16 @@ impl HoprPacket {
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
     /// * `domain_separator` channels contract domain separator.
+    /// * `signals` optional signals passed to the packet's final destination.
     ///
     /// **NOTE**
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
-    pub fn into_outgoing<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
+    #[allow(clippy::too_many_arguments)] // TODO: needs refactoring (perhaps introduce a builder pattern?)
+    pub fn into_outgoing<
+        M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+        P: NonEmptyPath<OffchainPublicKey>,
+        S: Into<PacketSignals>,
+    >(
         msg: &[u8],
         pseudonym: &HoprPseudonym,
         routing: PacketRouting<P>,
@@ -323,9 +343,10 @@ impl HoprPacket {
         ticket: TicketBuilder,
         mapper: &M,
         domain_separator: &Hash,
+        signals: S,
     ) -> Result<(Self, Vec<HoprReplyOpener>)> {
         PartialHoprPacket::new(pseudonym, routing, chain_keypair, ticket, mapper, domain_separator)?
-            .into_hopr_packet(msg)
+            .into_hopr_packet(msg, signals)
     }
 
     /// Calculates how many SURBs can be fitted into a packet that
@@ -400,16 +421,21 @@ impl HoprPacket {
                     no_ack,
                 } => {
                     // The pre_ticket is not parsed nor verified on the final hop
-                    let (surbs, plain_text) = HoprPacketMessage::from(plain_text).try_into_parts()?;
+                    let HoprPacketParts {
+                        surbs,
+                        payload,
+                        signals,
+                    } = HoprPacketMessage::from(plain_text).try_into()?;
                     let should_acknowledge = !no_ack;
                     Ok(Self::Final(
                         HoprIncomingPacket {
                             packet_tag,
-                            ack_key: (should_acknowledge).then_some(derive_ack_key_share(&derived_secret)),
+                            ack_key: should_acknowledge.then(|| derive_ack_key_share(&derived_secret)),
                             previous_hop,
-                            plain_text,
+                            plain_text: payload.into(),
                             surbs: receiver_data.into_sequence().map(|d| d.surb_id()).zip(surbs).collect(),
                             sender: receiver_data.pseudonym(),
+                            signals,
                         }
                         .into(),
                     ))
@@ -431,6 +457,7 @@ mod tests {
     use parameterized::parameterized;
 
     use super::*;
+    use crate::types::PacketSignal;
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [
@@ -456,7 +483,7 @@ mod tests {
     ) -> HoprPacket {
         if let HoprPacket::Forwarded(fwd) = &mut packet {
             fwd.outgoing.ticket = next_ticket
-                .challenge(fwd.next_challenge)
+                .eth_challenge(fwd.next_challenge)
                 .build_signed(chain_keypair, domain_separator)
                 .expect("ticket should create")
                 .leak();
@@ -503,12 +530,14 @@ mod tests {
                 .index_offset(1)
                 .win_prob(WinningProbability::ALWAYS)
                 .channel_epoch(1)
-                .challenge(Default::default()))
+                .eth_challenge(Default::default()))
         } else {
             Ok(TicketBuilder::zero_hop()
                 .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address()))
         }
     }
+
+    const FLAGS: PacketSignal = PacketSignal::OutOfSurbs;
 
     fn create_packet(
         forward_hops: usize,
@@ -522,7 +551,7 @@ mod tests {
             "return hops must be between 1 and 3"
         );
 
-        let ticket = mock_ticket(&PEERS[1].0.public().0, forward_hops + 1, &PEERS[0].0)?;
+        let ticket = mock_ticket(&PEERS[1].0.public(), forward_hops + 1, &PEERS[0].0)?;
         let forward_path = TransportPath::new(PEERS[1..=forward_hops + 1].iter().map(|kp| *kp.1.public()))?;
 
         let return_paths = return_hops
@@ -541,6 +570,7 @@ mod tests {
             ticket,
             &*MAPPER,
             &Hash::default(),
+            FLAGS,
         )?)
     }
 
@@ -554,7 +584,7 @@ mod tests {
         assert!((1..=4).contains(&sender_node), "sender_node must be between 1 and 4");
 
         let ticket = mock_ticket(
-            &PEERS[sender_node - 1].0.public().0,
+            &PEERS[sender_node - 1].0.public(),
             surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
             &PEERS[sender_node].0,
         )?;
@@ -567,6 +597,7 @@ mod tests {
             ticket,
             &*MAPPER,
             &Hash::default(),
+            FLAGS,
         )?
         .0)
     }
@@ -597,10 +628,10 @@ mod tests {
             HoprPacket::Final(_) => Ok(packet),
             HoprPacket::Forwarded(_) => {
                 let next_hop = match (node_pos, is_reply) {
-                    (3, false) => PEERS[4].0.public().0.clone(),
-                    (_, false) => PEERS[node_pos + 1].0.public().0.clone(),
-                    (1, true) => PEERS[0].0.public().0.clone(),
-                    (_, true) => PEERS[node_pos - 1].0.public().0.clone(),
+                    (3, false) => PEERS[4].0.public().clone(),
+                    (_, false) => PEERS[node_pos + 1].0.public().clone(),
+                    (1, true) => PEERS[0].0.public().clone(),
+                    (_, true) => PEERS[node_pos - 1].0.public().clone(),
                 };
 
                 let next_ticket = mock_ticket(&next_hop, path_len, &PEERS[node_pos].0)?;
@@ -636,6 +667,7 @@ mod tests {
                 HoprPacket::Final(packet) => {
                     assert_eq!(hop - 1, hops, "final packet must be at the last hop");
                     assert!(packet.ack_key.is_some(), "must not be a no-ack packet");
+                    assert_eq!(PacketSignals::from(FLAGS), packet.signals);
                     actual_plain_text = packet.plain_text.clone();
                 }
                 HoprPacket::Forwarded(fwd) => {
@@ -674,6 +706,7 @@ mod tests {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
                     assert_eq!(pseudonym, packet.sender, "invalid sender");
                     assert!(packet.ack_key.is_some(), "must not be a no-ack packet");
+                    assert_eq!(PacketSignals::from(FLAGS), packet.signals);
                     received_plain_text = packet.plain_text.clone();
                     received_surbs.extend(packet.surbs.clone());
                 }
@@ -729,6 +762,7 @@ mod tests {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
                     assert_eq!(pseudonym, incoming.sender, "invalid sender");
                     assert!(incoming.ack_key.is_some(), "must not be a no-ack packet");
+                    assert_eq!(PacketSignals::from(FLAGS), incoming.signals);
                     received_fwd_plain_text = incoming.plain_text.clone();
                     received_surbs.extend(incoming.surbs.clone());
                 }
@@ -786,6 +820,7 @@ mod tests {
                     assert_eq!(pseudonym, incoming.sender, "invalid sender");
                     assert!(incoming.ack_key.is_some(), "must not be a no-ack packet");
                     assert!(incoming.surbs.is_empty(), "must not receive surbs on reply");
+                    assert_eq!(PacketSignals::from(FLAGS), incoming.signals);
                     received_re_plain_text = incoming.plain_text.clone();
                 }
                 HoprPacket::Forwarded(fwd) => {
@@ -832,6 +867,7 @@ mod tests {
                     assert!(incoming.ack_key.is_some(), "must not be a no-ack packet");
                     assert_eq!(2, incoming.surbs.len(), "invalid number of received surbs per packet");
                     assert_eq!(pseudonym, incoming.sender, "invalid sender");
+                    assert_eq!(PacketSignals::from(FLAGS), incoming.signals);
                     received_surbs.extend(incoming.surbs.clone());
                 }
                 HoprPacket::Forwarded(fwd) => {
@@ -892,6 +928,7 @@ mod tests {
                             incoming.surbs.is_empty(),
                             "must not receive surbs on reply for reply {i}"
                         );
+                        assert_eq!(PacketSignals::from(FLAGS), incoming.signals);
                         received_re_plain_text = incoming.plain_text.clone();
                     }
                     HoprPacket::Forwarded(fwd) => {

@@ -22,7 +22,7 @@ pub use utils::transfer_session;
 
 /// Number of bytes that can be sent in a single Session protocol payload.
 pub const SESSION_MTU: usize =
-    hopr_protocol_session::session_socket_mtu::<{ hopr_transport_packet::v1::ApplicationData::PAYLOAD_SIZE }>();
+    hopr_protocol_session::session_socket_mtu::<{ hopr_protocol_app::v1::ApplicationData::PAYLOAD_SIZE }>();
 
 /// Size of the HOPR SURB in bytes.
 ///
@@ -32,7 +32,7 @@ pub const SURB_SIZE: usize = hopr_crypto_packet::HoprSurb::SIZE;
 flagset::flags! {
     /// Individual capabilities of a Session.
     #[repr(u8)]
-    #[derive(strum::EnumString, strum::Display, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
+    #[derive(PartialOrd, Ord, strum::EnumString, strum::Display, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
     pub enum Capability : u8 {
         /// Frame segmentation.
         Segmentation = 0b0000_1000,
@@ -79,6 +79,17 @@ pub struct SessionClientConfig {
     /// Enable automatic SURB management for the Session.
     #[default(Some(SurbBalancerConfig::default()))]
     pub surb_management: Option<SurbBalancerConfig>,
+    /// If set, the maximum number of possible SURBs will always be sent with Session data packets (if they fit).
+    ///
+    /// This does not affect `KeepAlive` messages used with SURB balancing, as they will always
+    /// carry the maximum number of SURBs possible. Setting this to `true` will put additional CPU
+    /// pressure on the local node as it will generate the maximum number of SURBs for each data packet.
+    ///
+    /// Set this to `true` only when the underlying traffic is highly asymmetric.
+    ///
+    /// Default is `false`.
+    #[default(false)]
+    pub always_max_out_surbs: bool,
 }
 
 #[cfg(test)]
@@ -86,11 +97,11 @@ mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::HoprPseudonym;
+    use hopr_protocol_app::v1::ApplicationData;
     use hopr_protocol_session::session_socket_mtu;
     use hopr_protocol_start::{
         KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
     };
-    use hopr_transport_packet::v1::ApplicationData;
 
     use super::*;
     use crate::types::HoprStartProtocol;
@@ -155,6 +166,27 @@ mod tests {
     }
 
     #[test]
+    fn hopr_start_protocol_message_session_initiation_message_should_allow_for_at_least_one_surb() -> anyhow::Result<()>
+    {
+        let msg = HoprStartProtocol::StartSession(StartInitiation {
+            challenge: StartChallenge::MAX,
+            target: SessionTarget::TcpStream(SealedHost::Plain(
+                "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
+            )),
+            capabilities: Capabilities::full().into(),
+            additional_data: 0xffffffff,
+        });
+        let len = msg.encode()?.1.len();
+        assert!(
+            HoprPacket::max_surbs_with_message(len) >= 1,
+            "Hopr StartSession message size ({}) must allow for at least 1 SURB in packet",
+            len
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn hopr_start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
         let msg = HoprStartProtocol::KeepAlive(KeepAliveMessage {
             session_id: SessionId::new(u64::MAX, HoprPseudonym::random()),
@@ -162,6 +194,10 @@ mod tests {
             additional_data: 0xffffffff,
         });
         let len = msg.encode()?.1.len();
+        assert_eq!(
+            KeepAliveMessage::<SessionId>::MIN_SURBS_PER_MESSAGE,
+            HoprPacket::MAX_SURBS_IN_PACKET
+        );
         assert!(
             HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
             "Hopr KeepAlive message size ({}) must allow for at least {} SURBs in packet",

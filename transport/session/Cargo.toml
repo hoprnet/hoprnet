@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -51,12 +51,14 @@ hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
 hopr-primitive-types = { workspace = true }
+hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde"] }
 hopr-protocol-start = { workspace = true }
-hopr-transport-packet = { workspace = true }
+
 
 [dev-dependencies]
 anyhow = { workspace = true }
+criterion = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",

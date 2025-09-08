@@ -109,7 +109,7 @@ impl std::fmt::Display for HoprKeys {
                 "packet_key: {}, chain_key: {} (Ethereum address: {})\nUUID: {}",
                 self.packet_key.public().to_peerid_str(),
                 self.chain_key.public().to_hex(),
-                self.chain_key.public().0.to_address(),
+                self.chain_key.public().to_address(),
                 self.id
             )
             .as_str(),
@@ -523,7 +523,7 @@ mod tests {
 
         assert!(needs_migration);
         assert_eq!(
-            deserialized.chain_key.public().0.to_address().to_string(),
+            deserialized.chain_key.public().to_address().to_string(),
             "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
         );
 
@@ -551,7 +551,7 @@ mod tests {
 
         assert!(!needs_migration);
         assert_eq!(
-            deserialized.chain_key.public().0.to_address().to_string(),
+            deserialized.chain_key.public().to_address().to_string(),
             "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
         );
 

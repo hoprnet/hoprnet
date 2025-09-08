@@ -42,6 +42,9 @@ pub enum HoprTransportError {
     #[error("Network monitoring error: {0}")]
     NetworkError(#[from] NetworkingError),
 
+    #[error(transparent)]
+    ApplicationLayerError(#[from] hopr_protocol_app::errors::ApplicationLayerError),
+
     #[error("Ticket aggregation error: {0}")]
     TicketAggregationError(#[from] hopr_transport_ticket_aggregation::TicketAggregationError),
 }

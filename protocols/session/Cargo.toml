@@ -28,7 +28,6 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
-hex = { workspace = true }
 hashbrown = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
 pin-project = { workspace = true }
@@ -64,6 +63,7 @@ hopr-network-types = { workspace = true, features = [
   "capture",
   "runtime-tokio",
 ] }
+hopr-protocol-app = { workspace = true }
 
 [[example]]
 name = "session-socket"

@@ -46,9 +46,7 @@ async fn generate_the_first_ack_ticket(
     let hk1 = HalfKey::try_from(hex!("16e1d5a405315958b7db2d70ed797d858c9e6ba979783cf5110c13e0200ab0d0").as_ref())?;
     let hk2 = HalfKey::try_from(hex!("bc580f2aad36f35419d5936cc3256e2eb4a7a5f42c934b91a94305da8c4f7e81").as_ref())?;
 
-    let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-    let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-    let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+    let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
     let ack_ticket = TicketBuilder::default()
         .addresses(counterparty, &myself.chain_key)
@@ -57,7 +55,7 @@ async fn generate_the_first_ack_ticket(
         .index_offset(1)
         .win_prob(WinningProbability::ALWAYS)
         .channel_epoch(1)
-        .challenge(Challenge::from(cp_sum).into())
+        .challenge(challenge)
         .build_signed(counterparty, &domain_separator)?
         .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?);
 
@@ -627,7 +625,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let confirmations = futures::future::try_join_all(
         bob_node
             .actions
-            .redeem_tickets_with_counterparty(&alice_chain_key.public().to_address(), false)
+            .redeem_tickets_with_counterparty(&alice_chain_key.public().to_address(), 0.into(), false)
             .await
             .expect("should submit redeem action"),
     )

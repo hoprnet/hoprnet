@@ -13,11 +13,11 @@ use tracing::instrument;
 
 use crate::{
     errors::SessionError,
-    frames::{Frame, FrameId, Segment},
     processing::types::{
         FrameBuilder, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry,
         FrameMapVacantEntry,
     },
+    protocol::{Frame, FrameId, Segment},
 };
 
 #[cfg(all(not(test), feature = "prometheus"))]
@@ -467,11 +467,33 @@ mod tests {
         }
         reassembled.sort_by(result_comparator);
 
-        assert!(matches!(reassembled[0], Err(SessionError::FrameDiscarded(1))));
-        assert!(matches!(reassembled[1], Err(SessionError::FrameDiscarded(2))));
-        assert!(matches!(reassembled[2], Err(SessionError::FrameDiscarded(3))));
-        assert!(matches!(&reassembled[3], Ok(f) if f == &expected[3].clone()));
-        assert!(matches!(&reassembled[4], Ok(f) if f == &expected[4].clone()));
+        assert!(
+            matches!(reassembled[0], Err(SessionError::FrameDiscarded(1))),
+            "{:?} must be discarded ID 1",
+            reassembled[0]
+        );
+        assert!(
+            matches!(reassembled[1], Err(SessionError::FrameDiscarded(2))),
+            "{:?} must be discarded ID 2",
+            reassembled[1]
+        );
+        assert!(
+            matches!(reassembled[2], Err(SessionError::FrameDiscarded(3))),
+            "{:?} must be discarded ID 3",
+            reassembled[2]
+        );
+        assert!(
+            matches!(&reassembled[3], Ok(f) if f == &expected[3].clone()),
+            "{:?} (idx 3) must be {:?}",
+            reassembled[3],
+            expected[3]
+        );
+        assert!(
+            matches!(&reassembled[4], Ok(f) if f == &expected[4].clone()),
+            "{:?} (idx 3) must be {:?}",
+            reassembled[4],
+            expected[4]
+        );
 
         r_sink.close().await?;
         assert_eq!(None, r_stream.try_next().await?);

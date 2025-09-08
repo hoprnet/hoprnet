@@ -56,6 +56,7 @@ use hopr_path::{
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
 use hopr_primitive_types::prelude::*;
+pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_mixer::MixerConfig;
@@ -64,7 +65,6 @@ use hopr_transport_p2p::{
     HoprSwarm,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
-pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
     DbProxy, Probe,
     ping::{PingConfig, Pinger},
@@ -195,7 +195,7 @@ where
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<Sender<(DestinationRouting, ApplicationData)>>,
+    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>>,
 }
 
 impl<T> HoprTransport<T>
@@ -251,7 +251,7 @@ where
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: Duration::from_secs(5),
-                maximum_surb_buffer_size: db.get_surb_rb_size(),
+                maximum_surb_buffer_size: db.get_surb_config().rb_capacity,
                 // Allow a 10% increase of the target SURB buffer on incoming Sessions
                 // if the SURB buffer level has surpassed it by at least 10% in the last 2 minutes.
                 growable_target_surb_buffer: Some((Duration::from_secs(120), 0.10)),
@@ -272,7 +272,7 @@ where
         &self,
         me_onchain: &ChainKeypair,
         tbf_path: String,
-        on_incoming_data: UnboundedSender<ApplicationData>,
+        on_incoming_data: UnboundedSender<ApplicationDataIn>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
         on_incoming_session: UnboundedSender<IncomingSession>,
     ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>> {
@@ -293,10 +293,13 @@ where
                         match event {
                             PeerDiscovery::Allow(peer_id) => {
                                 debug!(peer = %peer_id, "Processing peer discovery event: Allow");
-                                if let Ok(pk) = OffchainPublicKey::try_from(peer_id) {
+
+                                // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer_id))
+                                    .await {
                                     if !network.has(&peer_id).await {
                                         let mas = db
-                                            .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk))
+                                            .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pubkey))
                                             .await
                                             .map(|entry| {
                                                 entry
@@ -334,8 +337,10 @@ where
                                         .collect::<Vec<_>>();
 
                                     if ! mas.is_empty() {
-                                        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
-                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pk)).await {
+                                        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                        if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                            .await {
+                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pubkey)).await {
                                                 let key: Result<Address, _> = key.try_into();
 
                                                 if let Ok(key) = key {
@@ -392,7 +397,7 @@ where
         let tkt_agg_writer = ticket_agg_proc.writer();
 
         let (external_msg_send, external_msg_rx) =
-            mpsc::channel::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>(
+            mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>(
                 MAXIMUM_MSG_OUTGOING_BUFFER_SIZE,
             );
 
@@ -520,7 +525,7 @@ where
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationData)>();
+        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationDataIn)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -541,7 +546,7 @@ where
         }
 
         // -- network probing
-        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationData)>();
+        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let (manual_ping_tx, manual_ping_rx) = unbounded::<(PeerId, PingQueryReplier)>();
 
@@ -707,8 +712,12 @@ where
             )));
         }
 
-        let app_data = ApplicationData::new_from_owned(tag, msg);
-        let routing = self.path_planner.resolve_routing(app_data.len(), routing).await?;
+        let app_data = ApplicationData::new(tag, msg.into_vec())?;
+        let routing = self
+            .path_planner
+            .resolve_routing(app_data.total_len(), usize::MAX, routing)
+            .await?
+            .0;
 
         // Here we do not use msg_sender directly,
         // since it internally follows Session-oriented logic
@@ -717,7 +726,7 @@ where
         })?;
 
         sender
-            .send_packet(app_data, routing)
+            .send_packet(ApplicationDataOut::with_no_packet_info(app_data), routing)
             .await
             .map_err(|e| HoprTransportError::Api(format!("send msg failed to enqueue msg: {e}")))?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
@@ -796,8 +805,12 @@ where
                 Box::pin(async move {
                     match address_like_noref {
                         either::Left(peer) => {
-                            let pk = OffchainPublicKey::try_from(peer)?;
-                            if let Some(address) = db_clone.translate_key(Some(tx), pk).await? {
+                            // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                            let pubkey =
+                                hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                    .await
+                                    .map_err(|e| hopr_db_sql::api::errors::DbError::General(e.to_string()))?;
+                            if let Some(address) = db_clone.translate_key(Some(tx), pubkey).await? {
                                 db_clone.is_allowed_in_network_registry(Some(tx), &address).await
                             } else {
                                 Err(hopr_db_sql::errors::DbSqlError::LogicalError(

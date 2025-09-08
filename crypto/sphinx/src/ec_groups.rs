@@ -1,7 +1,15 @@
 use curve25519_dalek::traits::IsIdentity;
-#[cfg(feature = "secp256k1")]
-use elliptic_curve::{Group, ops::MulByGenerator};
 use hopr_crypto_types::errors::Result;
+#[cfg(feature = "secp256k1")]
+use {
+    elliptic_curve::{
+        Group,
+        ops::MulByGenerator,
+        sec1::{FromEncodedPoint, ToEncodedPoint},
+    },
+    hopr_crypto_types::prelude::CryptoError,
+    k256::{AffinePoint, EncodedPoint},
+};
 
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 
@@ -85,19 +93,19 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
 
     fn to_alpha(&self) -> Alpha<typenum::U33> {
         let mut ret = Alpha::<typenum::U33>::default();
-        ret.copy_from_slice(
-            hopr_crypto_types::types::CurvePoint::from(self.to_affine())
-                .as_compressed()
-                .as_ref(),
-        );
+        ret.copy_from_slice(self.to_affine().to_encoded_point(true).as_ref());
         ret
     }
 
     fn from_alpha(alpha: Alpha<typenum::U33>) -> Result<Self> {
-        let v: &[u8] = alpha.as_ref();
-        hopr_crypto_types::types::CurvePoint::try_from(v)
-            .map(|c| c.into_projective_point())
-            .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue("alpha"))
+        EncodedPoint::from_bytes(&alpha)
+            .map_err(|_| CryptoError::InvalidInputValue("alpha"))
+            .and_then(|ep| {
+                AffinePoint::from_encoded_point(&ep)
+                    .into_option()
+                    .ok_or(CryptoError::InvalidInputValue("alpha"))
+            })
+            .map(k256::ProjectivePoint::from)
     }
 
     fn generate(scalar: &k256::Scalar) -> Self {
@@ -120,7 +128,7 @@ impl SphinxSuite for Secp256k1Suite {
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
     type P = hopr_crypto_types::keypairs::ChainKeypair;
-    type PRP = hopr_crypto_types::primitives::ChaCha20;
+    type PRP = hopr_crypto_types::lioness::LionessBlake3ChaCha20<typenum::U1022>;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
@@ -134,7 +142,7 @@ impl SphinxSuite for Ed25519Suite {
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
     type P = hopr_crypto_types::keypairs::OffchainKeypair;
-    type PRP = hopr_crypto_types::primitives::ChaCha20;
+    type PRP = hopr_crypto_types::lioness::LionessBlake3ChaCha20<typenum::U1022>;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
@@ -148,7 +156,7 @@ impl SphinxSuite for X25519Suite {
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
     type P = hopr_crypto_types::keypairs::OffchainKeypair;
-    type PRP = hopr_crypto_types::primitives::ChaCha20;
+    type PRP = hopr_crypto_types::lioness::LionessBlake3ChaCha20<typenum::U1022>;
 }
 
 #[cfg(test)]

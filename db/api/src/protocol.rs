@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use hopr_crypto_packet::prelude::PacketSignals;
 pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -7,7 +8,28 @@ use hopr_primitive_types::balance::HoprBalance;
 
 use crate::errors::Result;
 
-/// Trait defining all DB functionality needed by packet/acknowledgement processing pipeline.
+/// Contains a SURB found in the SURB ring buffer via [`HoprDbProtocolOperations::find_surb`].
+#[derive(Debug)]
+pub struct FoundSurb {
+    /// Complete sender ID of the SURB.
+    pub sender_id: HoprSenderId,
+    /// The SURB itself.
+    pub surb: HoprSurb,
+    /// Number of SURBs remaining in the ring buffer with the same pseudonym.
+    pub remaining: usize,
+}
+
+/// Configuration for the SURB cache.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd)]
+pub struct SurbCacheConfig {
+    /// Size of the SURB ring buffer per pseudonym.
+    pub rb_capacity: usize,
+    /// Threshold for the number of SURBs in the ring buffer, below which it is
+    /// considered low ("SURB distress").
+    pub distress_threshold: usize,
+}
+
+/// Trait defining all DB functionality needed by a packet/acknowledgement processing pipeline.
 #[async_trait]
 pub trait HoprDbProtocolOperations {
     /// Processes the acknowledgements for the pending tickets
@@ -16,7 +38,7 @@ pub trait HoprDbProtocolOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()>;
+    async fn handle_acknowledgement(&self, ack: VerifiedAcknowledgement) -> Result<()>;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
     async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
@@ -25,10 +47,10 @@ pub trait HoprDbProtocolOperations {
     async fn get_network_ticket_price(&self) -> Result<HoprBalance>;
 
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
-    async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)>;
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb>;
 
-    /// Returns the current maximum number of SURBs the `SurbRingBuffer` can hold.
-    fn get_surb_rb_size(&self) -> usize;
+    /// Returns the SURB cache configuration.
+    fn get_surb_config(&self) -> SurbCacheConfig;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
     async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket>;
@@ -40,6 +62,7 @@ pub trait HoprDbProtocolOperations {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
+        signals: PacketSignals,
     ) -> Result<OutgoingPacket>;
 
     /// Process the incoming packet into data
@@ -54,6 +77,17 @@ pub trait HoprDbProtocolOperations {
     ) -> Result<IncomingPacket>;
 }
 
+/// Contains some miscellaneous information about a received packet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct AuxiliaryPacketInfo {
+    /// Packet signals that the packet carried.
+    ///
+    /// Zero if no signal flags were specified.
+    pub packet_signals: PacketSignals,
+    /// Number of SURBs that the packet carried.
+    pub num_surbs: usize,
+}
+
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum IncomingPacket {
     /// Packet is intended for us
@@ -63,6 +97,7 @@ pub enum IncomingPacket {
         sender: HoprPseudonym,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
+        info: AuxiliaryPacketInfo,
     },
     /// Packet must be forwarded
     Forwarded {
@@ -70,7 +105,8 @@ pub enum IncomingPacket {
         previous_hop: OffchainPublicKey,
         next_hop: OffchainPublicKey,
         data: Box<[u8]>,
-        ack: Acknowledgement,
+        /// Acknowledgement payload to be sent to the previous hop
+        ack_key: HalfKey,
     },
     /// The packet contains an acknowledgement of a delivered packet.
     Acknowledgement {
@@ -98,7 +134,7 @@ impl std::fmt::Debug for OutgoingPacket {
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum ResolvedAcknowledgement {
-    Sending(Acknowledgement),
+    Sending(VerifiedAcknowledgement),
     RelayingWin(AcknowledgedTicket),
     RelayingLoss(Hash),
 }

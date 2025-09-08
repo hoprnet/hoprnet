@@ -1,5 +1,7 @@
 use hopr_primitive_types::prelude::GeneralError;
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
+
+use crate::errors::ProbeError;
 
 /// Serializable and deserializable enum for the probe message content
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumDiscriminants)]
@@ -201,13 +203,11 @@ impl<'a> TryFrom<&'a [u8]> for Message {
     }
 }
 
-impl From<Message> for ApplicationData {
-    fn from(message: Message) -> Self {
-        let tag: Tag = ReservedTag::Ping.into();
-        ApplicationData {
-            application_tag: tag,
-            plain_text: message.to_bytes(),
-        }
+impl TryFrom<Message> for ApplicationData {
+    type Error = ProbeError;
+
+    fn try_from(message: Message) -> Result<Self, Self::Error> {
+        Ok(ApplicationData::new(ReservedTag::Ping, message.to_bytes().into_vec())?)
     }
 }
 
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn check_that_at_least_one_surb_can_fit_into_the_payload_for_direct_probing() -> anyhow::Result<()> {
         let ping = NeighborProbe::random_nonce();
-        let as_data: ApplicationData = Message::Probe(ping).into();
+        let as_data: ApplicationData = Message::Probe(ping).try_into()?;
 
         assert_lt!(
             as_data.plain_text.len(),
@@ -301,7 +301,7 @@ mod tests {
             path: [1; 10],
             timestamp: current_time().as_unix_timestamp().as_millis(),
         };
-        let as_data: ApplicationData = Message::Telemetry(telemetry).into();
+        let as_data: ApplicationData = Message::Telemetry(telemetry).try_into()?;
 
         assert_lt!(
             as_data.plain_text.len(),

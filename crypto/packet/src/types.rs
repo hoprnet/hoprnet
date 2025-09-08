@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{borrow::Cow, fmt::Formatter, marker::PhantomData, ops::Not};
 
 use hopr_crypto_sphinx::{
     errors::SphinxError,
@@ -10,11 +10,38 @@ use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
 
 use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 
+flagset::flags! {
+   /// Individual packet signals passed up between the packet sender and destination.
+   #[repr(u8)]
+   #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
+   pub enum PacketSignal: u8 {
+        /// The other party is in a "SURB distress" state, potentially running out of SURBs soon.
+        ///
+        /// Has no effect on packets that take the "forward path".
+        SurbDistress = 0b0000_0001,
+        /// The other party has run out of SURBs, and this was potentially the last message they could
+        /// send.
+        ///
+        /// Has no effect on packets that take the "forward path".
+        ///
+        /// Implies [`SurbDistress`].
+        OutOfSurbs = 0b0000_0011,
+   }
+}
+
+/// Packet signal states that can be passed between the packet sender and destination.
+///
+/// These signals can be typically propagated up to the application layer to take an appropriate
+/// action to the signaled states.
+pub type PacketSignals = flagset::FlagSet<PacketSignal>;
+
+/// Size of the [`HoprSurbId`] in bytes.
 pub const SURB_ID_SIZE: usize = 8;
 
+/// An ID that uniquely identifies SURB for a certain pseudonym.
 pub type HoprSurbId = [u8; SURB_ID_SIZE];
 
-/// Identifier of the packet sender.
+/// Identifier of a single packet sender.
 ///
 /// This consists of two parts:
 /// - [`HoprSenderId::pseudonym`] of the sender
@@ -51,6 +78,20 @@ impl HoprSenderId {
             .expect("must have valid nonce")
     }
 
+    /// Creates a pseudorandom sequence of IDs.
+    ///
+    /// Each item has the same [`pseudonym`](HoprSenderId::pseudonym)
+    /// but different [`surb_id`](HoprSenderId::surb_id).
+    ///
+    /// The `surb_id` of the `n`-th item (n > 1) is computed as `Keccak256(n || I_prev)`
+    /// where `I_prev` is the whole `n-1`-th ID, the `n` is represented as big-endian and
+    /// `||` denotes byte-array concatenation.
+    /// The first item (n = 1) is always `self`.
+    ///
+    /// The entropy of the whole pseudorandom sequence is completely given by `self` (the first
+    /// item in the sequence). It follows that the next element of the sequence can be computed
+    /// by just knowing any preceding element; therefore, the sequence is fully predictable
+    /// once an element is known.
     pub fn into_sequence(self) -> impl Iterator<Item = Self> {
         std::iter::successors(Some((1u32, self)), |&(i, prev)| {
             let hash = Hash::create(&[&i.to_be_bytes(), prev.as_ref()]);
@@ -96,19 +137,122 @@ pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(Pa
 /// Convenience alias for HOPR specific [`PacketMessage`].
 pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>;
 
-/// Individual parts of a [`PacketMessage`]: SURBs and the actual message.
-pub type PacketParts<S, H> = (Vec<SURB<S, H>>, Box<[u8]>);
+/// Individual parts of a [`PacketMessage`]: SURBs, the actual message (payload) and additional signals for the
+/// recipient.
+pub struct PacketParts<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
+    /// Contains (a potentially empty) list of SURBs.
+    pub surbs: Vec<SURB<S, H>>,
+    /// Contains the actual packet payload.
+    pub payload: Cow<'a, [u8]>,
+    /// Additional packet signals from the sender to the recipient.
+    pub signals: PacketSignals,
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Clone for PacketParts<'_, S, H>
+where
+    H::KeyId: Clone,
+    H::SurbReceiverData: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            surbs: self.surbs.clone(),
+            payload: self.payload.clone(),
+            signals: self.signals,
+        }
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> std::fmt::Debug for PacketParts<'_, S, H>
+where
+    H::KeyId: std::fmt::Debug,
+    H::SurbReceiverData: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PacketParts")
+            .field("surbs", &self.surbs)
+            .field("payload", &self.payload)
+            .field("signals", &self.signals)
+            .finish()
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialEq for PacketParts<'_, S, H>
+where
+    H::KeyId: PartialEq,
+    H::SurbReceiverData: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.surbs == other.surbs && self.payload == other.payload && self.signals == other.signals
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Eq for PacketParts<'_, S, H>
+where
+    H::KeyId: Eq,
+    H::SurbReceiverData: Eq,
+{
+}
+
+/// Convenience alias for HOPR specific [`PacketParts`].
+pub type HoprPacketParts<'a> = PacketParts<'a, HoprSphinxSuite, HoprSphinxHeaderSpec>;
+
+// Coerces PacketSignals to only lower 4 bits.
+pub(crate) const S_MASK: u8 = 0b0000_1111;
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
     /// Size of the message header.
     ///
-    /// This is currently 1 byte to indicate the number of SURBs, that precede the message.
+    /// This is currently 1 byte to indicate the number of SURBs that precede the message.
     pub const HEADER_LEN: usize = 1;
+    /// The maximum number of SURBs a packet message can hold, according to RFC-0003.
+    ///
+    /// The number of SURBs in a `PacketMessage` is intentionally limited to 15, so that
+    /// the upper 4 bits remain reserved for additional flags.
+    pub const MAX_SURBS_PER_MESSAGE: usize = S_MASK as usize;
+}
 
-    /// Converts this instance into [`PacketParts`].
-    pub fn try_into_parts(self) -> Result<PacketParts<S, H>, SphinxError> {
-        let data = self.0.into_unpadded()?;
-        let num_surbs = data[0] as usize;
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketParts<'_, S, H>> for PacketMessage<S, H, P> {
+    type Error = SphinxError;
+
+    fn try_from(value: PacketParts<S, H>) -> Result<Self, Self::Error> {
+        if value.surbs.len() > Self::MAX_SURBS_PER_MESSAGE {
+            return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
+        }
+
+        if value.signals.bits() > S_MASK {
+            return Err(GeneralError::ParseError("HoprPacketMessage.flags not valid".into()).into());
+        }
+
+        // The total size of the packet message must not exceed the maximum packet size.
+        if Self::HEADER_LEN + value.surbs.len() * SURB::<S, H>::SIZE + value.payload.len() > P {
+            return Err(GeneralError::ParseError("HoprPacketMessage.size not valid".into()).into());
+        }
+
+        let mut ret = Vec::with_capacity(PaddedPayload::<P>::SIZE);
+        let flags_and_len = (value.signals.bits() << S_MASK.trailing_ones()) | (value.surbs.len() as u8 & S_MASK);
+        ret.push(flags_and_len);
+        for surb in value.surbs.into_iter().map(|s| s.into_boxed()) {
+            ret.extend(surb);
+        }
+        ret.extend_from_slice(value.payload.as_ref());
+
+        // Save one reallocation by using the vector that we just created
+        Ok(Self(PaddedPayload::new_from_vec(ret)?, PhantomData))
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<S, H, P>> for PacketParts<'_, S, H> {
+    type Error = SphinxError;
+
+    fn try_from(value: PacketMessage<S, H, P>) -> Result<Self, Self::Error> {
+        let data = value.0.into_unpadded()?;
+        if data.is_empty() {
+            return Err(GeneralError::ParseError("HoprPacketMessage.size".into()).into());
+        }
+
+        let num_surbs = (data[0] & S_MASK) as usize;
+        let signals = PacketSignals::new((data[0] & S_MASK.not()) >> S_MASK.trailing_ones())
+            .map_err(|_| GeneralError::ParseError("HoprPacketMessage.signals".into()))?;
 
         if num_surbs > 0 {
             let surb_end = num_surbs * SURB::<S, H>::SIZE;
@@ -118,42 +262,28 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
 
             let mut data = data.into_vec();
 
-            let surb_data = data.drain(0..=surb_end).skip(1).collect::<Vec<_>>();
-
-            let surbs = surb_data
-                .as_slice()
+            let surbs = data[1..=surb_end]
                 .chunks_exact(SURB::<S, H>::SIZE)
                 .map(SURB::<S, H>::try_from)
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok((surbs, data.into_boxed_slice()))
+            // Skip buffer all the way to the end of the SURBs.
+            data.drain(0..=surb_end).for_each(drop);
+
+            Ok(PacketParts {
+                surbs,
+                payload: Cow::Owned(data),
+                signals,
+            })
         } else {
             let mut data = data.into_vec();
             data.remove(0);
-            Ok((Vec::with_capacity(0), data.into_boxed_slice()))
+            Ok(PacketParts {
+                surbs: Vec::with_capacity(0),
+                payload: Cow::Owned(data),
+                signals,
+            })
         }
-    }
-
-    /// Allocates a new instance from the given parts.
-    pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8]) -> Result<Self, SphinxError> {
-        if surbs.len() > 255 {
-            return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
-        }
-
-        // The total size of the packet message must not exceed the maximum packet size.
-        if Self::HEADER_LEN + surbs.len() * SURB::<S, H>::SIZE + payload.len() > P {
-            return Err(GeneralError::ParseError("HoprPacketMessage.size not valid".into()).into());
-        }
-
-        let mut ret = Vec::with_capacity(PaddedPayload::<P>::SIZE);
-        ret.push(surbs.len() as u8);
-        for surb in surbs.into_iter().map(|s| s.into_boxed()) {
-            ret.extend_from_slice(surb.as_ref());
-        }
-        ret.extend_from_slice(payload);
-
-        // Save one reallocation by using the vector that we just created
-        Ok(Self(PaddedPayload::new_from_vec(ret)?, PhantomData))
     }
 }
 
@@ -231,67 +361,96 @@ mod tests {
 
     #[test]
     fn hopr_packet_message_message_only() -> anyhow::Result<()> {
-        let test_msg = b"test message";
-        let (surbs, msg) = HoprPacketMessage::from_parts(vec![], test_msg)?.try_into_parts()?;
-        assert_eq!(surbs.len(), 0);
-        assert_eq!(msg.as_ref(), test_msg);
+        let parts_1 = HoprPacketParts {
+            surbs: vec![],
+            payload: b"test message".into(),
+            signals: PacketSignal::OutOfSurbs.into(),
+        };
+
+        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
+        assert_eq!(parts_1, parts_2);
 
         Ok(())
     }
 
     #[test]
     fn hopr_packet_message_surbs_only() -> anyhow::Result<()> {
-        let surbs_1 = generate_surbs(2)?;
-        let (surbs_2, msg) = HoprPacketMessage::from_parts(surbs_1.clone(), &[])?.try_into_parts()?;
+        let parts_1 = HoprPacketParts {
+            surbs: generate_surbs(2)?,
+            payload: Cow::default(),
+            signals: PacketSignal::OutOfSurbs.into(),
+        };
 
-        assert_eq!(surbs_2.len(), surbs_1.len());
-        for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {
-            assert_eq!(surb_1.into_boxed(), surb_2.into_boxed());
-        }
-
-        assert!(msg.is_empty());
+        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
+        assert_eq!(parts_1, parts_2);
 
         Ok(())
     }
 
     #[test]
     fn hopr_packet_message_surbs_and_msg() -> anyhow::Result<()> {
-        let test_msg = b"test msg";
-        let surbs_1 = generate_surbs(2)?;
-        let hopr_msg = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg)?;
-        let (surbs_2, msg) = hopr_msg.try_into_parts()?;
+        let parts_1 = HoprPacketParts {
+            surbs: generate_surbs(2)?,
+            payload: b"test msg".into(),
+            signals: PacketSignal::OutOfSurbs.into(),
+        };
 
-        assert_eq!(surbs_2.len(), surbs_1.len());
-        for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {
-            assert_eq!(surb_1.into_boxed(), surb_2.into_boxed());
-        }
-
-        assert_eq!(msg.as_ref(), test_msg);
+        let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
+        assert_eq!(parts_1, parts_2);
 
         Ok(())
     }
 
     #[test]
     fn hopr_packet_size_msg_size_limit() {
-        let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE + 1];
-        let res = HoprPacketMessage::from_parts(vec![], &test_msg);
+        let res = HoprPacketMessage::try_from(HoprPacketParts {
+            surbs: vec![],
+            payload: (&[1u8; HoprPacket::PAYLOAD_SIZE + 1]).into(),
+            signals: None.into(),
+        });
         assert!(res.is_err());
     }
 
     #[test]
     fn hopr_packet_message_surbs_size_limit() -> anyhow::Result<()> {
-        let surbs = generate_surbs(3)?;
-        let res = HoprPacketMessage::from_parts(surbs, &[]);
+        let res = HoprPacketMessage::try_from(PacketParts {
+            surbs: generate_surbs(HoprPacketMessage::MAX_SURBS_PER_MESSAGE + 1)?,
+            payload: Cow::default(),
+            signals: None.into(),
+        });
         assert!(res.is_err());
+
+        let res = HoprPacketMessage::try_from(HoprPacketParts {
+            surbs: generate_surbs(3)?,
+            payload: Cow::default(),
+            signals: None.into(),
+        });
+        assert!(res.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn hopr_packet_message_surbs_flag_limit() -> anyhow::Result<()> {
+        let res = HoprPacketMessage::try_from(PacketParts {
+            surbs: generate_surbs(3)?,
+            payload: Cow::default(),
+            signals: unsafe { PacketSignals::new_unchecked(16) },
+        });
+        assert!(res.is_err());
+
         Ok(())
     }
 
     #[test]
     fn hopr_packet_size_msg_and_surb_size_limit() -> anyhow::Result<()> {
-        let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1];
-        let surbs = generate_surbs(2)?;
-        let res = HoprPacketMessage::from_parts(surbs, &test_msg);
+        let res = HoprPacketMessage::try_from(PacketParts {
+            surbs: generate_surbs(2)?,
+            payload: (&[1u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1]).into(),
+            signals: None.into(),
+        });
         assert!(res.is_err());
+
         Ok(())
     }
 }

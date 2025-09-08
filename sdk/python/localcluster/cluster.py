@@ -3,6 +3,7 @@ import os
 import shutil
 from pathlib import Path
 from subprocess import run
+from typing import Optional
 
 from . import utils
 from .constants import (
@@ -21,21 +22,33 @@ GLOBAL_TIMEOUT = 60
 
 class Cluster:
     def __init__(
-        self, config: dict, anvil_config: Path, protocol_config: Path, use_nat: bool, exposed: bool, base_port: int
+        self,
+        config: dict,
+        anvil_config: Path,
+        protocol_config: Path,
+        use_nat: bool,
+        exposed: bool,
+        base_port: int,
+        size: Optional[int],
     ):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
         self.use_nat = use_nat
         self.base_port = base_port
         self.nodes: dict[str, Node] = {}
-        index = 1
 
         for network_name, params in config["networks"].items():
-            for node in params["nodes"]:
+            size = size if size else len(params["nodes"])
+
+            if size > len(params["nodes"]):
+                logging.warning(
+                    f"Requested cluster size `{size}` is larger than available `{len(params['nodes'])}` nodes. Using only {len(params['nodes'])} nodes instead."
+                )
+
+            for node, index in zip(params["nodes"], range(1, size + 1)):
                 self.nodes[str(index)] = Node.fromConfig(
                     index, node, config["defaults"], network_name, use_nat, exposed, base_port
                 )
-                index += 1
 
     def clean_up(self):
         logging.info(f"Tearing down the {self.size} nodes cluster")
