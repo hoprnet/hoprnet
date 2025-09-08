@@ -1468,21 +1468,26 @@ impl Hopr {
         Ok(self.hopr_chain_api.get_channel_closure_notice_period().await?)
     }
 
-    pub async fn redeem_all_tickets(&self, only_aggregated: bool) -> errors::Result<()> {
+    pub async fn redeem_all_tickets<B: Into<HoprBalance>>(
+        &self,
+        min_value: B,
+        only_aggregated: bool,
+    ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         // We do not await the on-chain confirmation
         self.hopr_chain_api
             .actions_ref()
-            .redeem_all_tickets(only_aggregated)
+            .redeem_all_tickets(min_value.into(), only_aggregated)
             .await?;
 
         Ok(())
     }
 
-    pub async fn redeem_tickets_with_counterparty(
+    pub async fn redeem_tickets_with_counterparty<B: Into<HoprBalance>>(
         &self,
         counterparty: &Address,
+        min_value: B,
         only_aggregated: bool,
     ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
@@ -1491,13 +1496,18 @@ impl Hopr {
         let _ = self
             .hopr_chain_api
             .actions_ref()
-            .redeem_tickets_with_counterparty(counterparty, only_aggregated)
+            .redeem_tickets_with_counterparty(counterparty, min_value.into(), only_aggregated)
             .await?;
 
         Ok(())
     }
 
-    pub async fn redeem_tickets_in_channel(&self, channel_id: &Hash, only_aggregated: bool) -> errors::Result<usize> {
+    pub async fn redeem_tickets_in_channel<B: Into<HoprBalance>>(
+        &self,
+        channel_id: &Hash,
+        min_value: B,
+        only_aggregated: bool,
+    ) -> errors::Result<usize> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let channel = self.db.get_channel_by_id(None, channel_id).await?;
@@ -1509,7 +1519,7 @@ impl Hopr {
                 redeem_count = self
                     .hopr_chain_api
                     .actions_ref()
-                    .redeem_tickets_in_channel(&channel, only_aggregated)
+                    .redeem_tickets_in_channel(&channel, min_value.into(), only_aggregated)
                     .await?
                     .len();
             }
