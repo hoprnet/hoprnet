@@ -330,7 +330,7 @@ class TestIntegrationWithSwarm:
         await assert_channel_statuses(swarm7[src].api)
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.choice(barebone_nodes()))
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_native_withdraw(self, peer, swarm7: dict[str, Node]):
         before_balance = (await swarm7[peer].api.balances()).native
         assert before_balance > Balance.zero("xDai")
@@ -342,7 +342,7 @@ class TestIntegrationWithSwarm:
         await asyncio.wait_for(check_native_balance_below(swarm7[peer], before_balance - amount), 60.0)
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.choice(barebone_nodes()))
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_ticket_price_is_default(self, peer, swarm7: dict[str, Node]):
         price = await swarm7[peer].api.ticket_price()
 
@@ -350,7 +350,7 @@ class TestIntegrationWithSwarm:
         assert price.value > Balance.zero("wxHOPR")
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.choice(barebone_nodes()))
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_api_version(self, peer, swarm7: dict[str, Node]):
         version = await swarm7[peer].api.api_version()
 

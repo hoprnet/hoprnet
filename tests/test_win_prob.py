@@ -54,7 +54,7 @@ def set_minimum_winning_probability_in_network(private_key: str, win_prob: Decim
 @pytest.mark.usefixtures("swarm7_reset")
 class TestWinProbWithSwarm:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.choice(barebone_nodes()))
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_min_incoming_ticket_win_prob_is_default(
         self, peer, swarm7: dict[str, Node], base_port: int
     ):
