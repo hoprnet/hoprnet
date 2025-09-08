@@ -9,6 +9,11 @@ use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
 use hopr_transport_session::{Capabilities, Capability, Session, SessionId};
 use rand::{Rng, thread_rng};
 
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub async fn alice_send_data(
     data: &[u8],
     caps: impl Into<Capabilities> + std::fmt::Debug,

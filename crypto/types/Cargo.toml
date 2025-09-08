@@ -30,6 +30,7 @@ generic-array = { workspace = true, features = ["zeroize"] }
 hex = { workspace = true }
 k256 = { workspace = true, features = ["arithmetic", "ecdh", "hash2curve"] }
 libp2p-identity = { workspace = true }
+mimalloc = { workspace = true }
 poly1305 = { version = "0.8.0" }
 primitive-types = { workspace = true }
 secp256k1 = { version = "0.31.1", default-features = false, features = [
