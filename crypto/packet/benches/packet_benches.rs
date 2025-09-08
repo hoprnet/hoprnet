@@ -61,17 +61,13 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                         let return_paths = (0..surb_count)
                             .map(|_| forward_path.clone().invert().unwrap())
                             .collect::<Vec<_>>();
+                        let addrs = (
+                            sender_chain.public().to_address(),
+                            destination_chain.public().to_address(),
+                        );
                         let mut payload = vec![0; HoprPacket::max_message_with_surbs(surb_count)];
                         hopr_crypto_random::random_fill(&mut payload);
-                        (
-                            (
-                                sender_chain.public().to_address(),
-                                destination_chain.public().to_address(),
-                            ),
-                            forward_path,
-                            return_paths,
-                            payload,
-                        )
+                        (addrs, forward_path, return_paths, payload)
                     },
                     |((sender_addr, destination_addr), forward_path, return_paths, payload)| {
                         // The number of hops for ticket creation does not matter for benchmark purposes
@@ -164,14 +160,11 @@ pub fn packet_precompute_bench(c: &mut Criterion) {
                         let return_paths = (0..surb_count)
                             .map(|_| forward_path.clone().invert().unwrap())
                             .collect::<Vec<_>>();
-                        (
-                            (
-                                sender_chain.public().to_address(),
-                                destination_chain.public().to_address(),
-                            ),
-                            forward_path,
-                            return_paths,
-                        )
+                        let addrs = (
+                            sender_chain.public().to_address(),
+                            destination_chain.public().to_address(),
+                        );
+                        (addrs, forward_path, return_paths)
                     },
                     |((sender_addr, destination_addr), forward_path, return_paths)| {
                         // The number of hops for ticket creation does not matter for benchmark purposes
