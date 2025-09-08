@@ -5,16 +5,16 @@ use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::{DestinationRouting, RoutingOptions};
 use hopr_primitive_types::prelude::Address;
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
 use hopr_transport_session::{Capabilities, Capability, Session, SessionId};
 use rand::{Rng, thread_rng};
 
 pub async fn alice_send_data(
     data: &[u8],
     caps: impl Into<Capabilities> + std::fmt::Debug,
-) -> impl futures::Stream<Item = Box<[u8]>> + Send {
-    let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
-    let (_bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+) -> impl futures::Stream<Item = ApplicationDataIn> + Send {
+    let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
+    let (_bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
     let dst: Address = (&ChainKeypair::random()).into();
     let id = SessionId::new(1234_u64, HoprPseudonym::random());
@@ -23,7 +23,13 @@ pub async fn alice_send_data(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into().unwrap())),
         caps,
-        (alice_tx, alice_rx.map(|(_, data)| data.plain_text)),
+        (
+            alice_tx,
+            alice_rx.map(|(_, data)| ApplicationDataIn {
+                data: data.data,
+                packet_info: Default::default(),
+            }),
+        ),
         None,
     )
     .unwrap();
@@ -32,18 +38,24 @@ pub async fn alice_send_data(
     alice_session.flush().await.unwrap();
     alice_session.close().await.unwrap();
 
-    bob_rx.map(|(_, data)| data.plain_text)
+    bob_rx.map(|(_, data)| ApplicationDataIn {
+        data: data.data,
+        packet_info: Default::default(),
+    })
 }
 
-pub async fn bob_receive_data(data: Vec<Box<[u8]>>, caps: impl Into<Capabilities> + std::fmt::Debug) -> Vec<u8> {
-    let (bob_tx, _alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationData)>();
+pub async fn bob_receive_data(
+    data: Vec<ApplicationDataIn>,
+    caps: impl Into<Capabilities> + std::fmt::Debug,
+) -> Vec<u8> {
+    let (bob_tx, _alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
     let id = SessionId::new(1234_u64, HoprPseudonym::random());
 
     let mut bob_session = Session::new(
         id,
         DestinationRouting::Return(id.pseudonym().into()),
         caps,
-        (bob_tx, futures::stream::iter(data)),
+        (bob_tx, futures::stream::iter(data).map(|data| data)),
         None,
     )
     .unwrap();

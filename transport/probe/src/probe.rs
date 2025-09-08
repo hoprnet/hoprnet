@@ -9,7 +9,7 @@ use hopr_internal_types::protocol::HoprPseudonym;
 use hopr_network_types::types::{ResolvedTransportRouting, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
-use hopr_protocol_app::prelude::{ApplicationData, ReservedTag};
+use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
 use hopr_transport_protocol::processor::{PacketError, PacketSendFinalizer};
 use libp2p_identity::PeerId;
 
@@ -47,7 +47,11 @@ struct Sender<T> {
 
 impl<T> Sender<T>
 where
-    T: futures::Sink<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)> + Clone + Send + Sync + 'static,
+    T: futures::Sink<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
 {
     #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
     async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
@@ -57,7 +61,11 @@ where
         pin_mut!(push_to_network);
         if push_to_network
             .as_mut()
-            .send((message.into(), path, packet_sent_tx.into()))
+            .send((
+                ApplicationDataOut::with_no_packet_info(message.try_into()?),
+                path,
+                packet_sent_tx.into(),
+            ))
             .await
             .is_ok()
         {
@@ -97,17 +105,17 @@ impl Probe {
         move_up: Up,      // forward up non-probing messages from the network
     ) -> HashMap<HoprProbeProcess, hopr_async_runtime::AbortHandle>
     where
-        T: futures::Sink<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
+        T: futures::Sink<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>
             + Clone
             + Send
             + Sync
             + 'static,
         T::Error: Send,
-        U: futures::Stream<Item = (HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
+        U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
         W: PeerDiscoveryFetch + ProbeStatusUpdate + Clone + Send + Sync + 'static,
         C: DbOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
-        Up: futures::Sink<(HoprPseudonym, ApplicationData)> + Clone + Send + Sync + 'static,
+        Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
         let interval_between_rounds = self.cfg.interval;
@@ -223,7 +231,7 @@ impl Probe {
         // -- Process probes --
         processes.insert(
             HoprProbeProcess::Process,
-            hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, data)| {
+            hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, in_data)| {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
                 let db = db_rx.clone();
@@ -232,8 +240,8 @@ impl Probe {
 
                 async move {
                     // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occurring on random tags
-                    if data.application_tag == ReservedTag::Ping.into() {
-                        let message: anyhow::Result<Message> = data.try_into().map_err(|e| anyhow::anyhow!("failed to convert data into message: {e}"));
+                    if in_data.data.application_tag == ReservedTag::Ping.into() {
+                        let message: anyhow::Result<Message> = in_data.data.try_into().map_err(|e| anyhow::anyhow!("failed to convert data into message: {e}"));
 
                         match message {
                             Ok(message) => {
@@ -272,11 +280,11 @@ impl Probe {
                                 }
                             },
                             Err(error) => tracing::error!(%pseudonym, %error, "cannot deserialize message"),
-                    }
+                        }
                     } else {
                         // If the message is not a probing message, forward it up
                         pin_mut!(move_up);
-                        if move_up.send((pseudonym, data.clone())).await.is_err() {
+                        if move_up.send((pseudonym, in_data)).await.is_err() {
                             tracing::error!(%pseudonym, error = "receiver error", "failed to send message up");
                         }
                     }
@@ -297,7 +305,7 @@ mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_db_api::prelude::FoundSurb;
     use hopr_network_types::prelude::SurbMatcher;
-    use hopr_protocol_app::prelude::Tag;
+    use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
     use super::*;
 
@@ -375,10 +383,10 @@ mod tests {
     }
 
     struct TestInterface {
-        from_probing_up_rx: futures::channel::mpsc::Receiver<(HoprPseudonym, ApplicationData)>,
+        from_probing_up_rx: futures::channel::mpsc::Receiver<(HoprPseudonym, ApplicationDataIn)>,
         from_probing_to_network_rx:
-            futures::channel::mpsc::Receiver<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>,
-        from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationData)>,
+            futures::channel::mpsc::Receiver<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>,
+        from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
         manual_probe_tx: futures::channel::mpsc::Sender<(PeerId, PingQueryReplier)>,
     }
 
@@ -392,13 +400,13 @@ mod tests {
         let probe = Probe::new((*OFFCHAIN_KEYPAIR.public(), ONCHAIN_KEYPAIR.public().to_address()), cfg);
 
         let (from_probing_up_tx, from_probing_up_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationData)>(100);
+            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
 
         let (from_probing_to_network_tx, from_probing_to_network_rx) =
-            futures::channel::mpsc::channel::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>(100);
+            futures::channel::mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>(100);
 
         let (from_network_to_probing_tx, from_network_to_probing_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationData)>(100);
+            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
 
         let (manual_probe_tx, manual_probe_rx) = futures::channel::mpsc::channel::<(PeerId, PingQueryReplier)>(100);
 
@@ -433,21 +441,21 @@ mod tests {
     fn concurrent_channel(
         delay: Option<std::time::Duration>,
         pass_rate: f64,
-        from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationData)>,
-    ) -> impl Fn((ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)) -> BoxFuture<'static, ()> {
+        from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
+    ) -> impl Fn((ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)) -> BoxFuture<'static, ()> {
         debug_assert!(
             (NO_PROBE_PASSES..=ALL_PROBES_PASS).contains(&pass_rate),
             "Pass rate must be between {NO_PROBE_PASSES} and {ALL_PROBES_PASS}"
         );
 
-        move |(data, path, finalizer): (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)| -> BoxFuture<'static, ()> {
+        move |(data_out, path, finalizer): (ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)| -> BoxFuture<'static, ()> {
             let mut from_network_to_probing_tx = from_network_to_probing_tx.clone();
 
             Box::pin(async move {
                 if let ResolvedTransportRouting::Forward { pseudonym, .. } = path {
                     finalizer.finalize(Ok(()));
 
-                    let message: Message = data.try_into().expect("failed to convert data into message");
+                    let message: Message = data_out.data.try_into().expect("failed to convert data into message");
                     if let Message::Probe(NeighborProbe::Ping(ping)) = message {
                         let pong_message = Message::Probe(NeighborProbe::Pong(ping));
 
@@ -458,7 +466,7 @@ mod tests {
 
                         if rand::Rng::gen_range(&mut rand::thread_rng(), NO_PROBE_PASSES..=ALL_PROBES_PASS) < pass_rate {
                             from_network_to_probing_tx
-                                .send((pseudonym, pong_message.try_into().expect("failed to convert pong message into data")))
+                                .send((pseudonym, ApplicationDataIn { data: pong_message.try_into().expect("failed to convert pong message into data"), packet_info: Default::default()}))
                                 .await.expect("failed to send pong message");
                         }
                     }
@@ -675,10 +683,16 @@ mod tests {
             let mut from_network_to_probing_tx = iface.from_network_to_probing_tx;
             let mut from_probing_up_rx = iface.from_probing_up_rx;
 
-            let expected_data = ApplicationData::new(Tag::MAX, b"Hello, this is a test message!");
+            let expected_data = ApplicationData::new(Tag::MAX, b"Hello, this is a test message!")?;
 
             from_network_to_probing_tx
-                .send((HoprPseudonym::random(), expected_data.clone()))
+                .send((
+                    HoprPseudonym::random(),
+                    ApplicationDataIn {
+                        data: expected_data.clone(),
+                        packet_info: Default::default(),
+                    },
+                ))
                 .await?;
 
             let actual = tokio::time::timeout(cfg.timeout, from_probing_up_rx.next())
@@ -686,7 +700,7 @@ mod tests {
                 .ok_or_else(|| anyhow::anyhow!("Did not return any data in time"))?
                 .1;
 
-            assert_eq!(actual, expected_data);
+            assert_eq!(actual.data, expected_data);
 
             Ok(())
         })

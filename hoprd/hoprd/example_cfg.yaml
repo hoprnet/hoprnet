@@ -88,11 +88,16 @@ hopr:
         # a winning acknowledged ticket
         #
         # If set, the strategy will redeem only aggregated tickets.
-        redeem_only_aggregated: true
+        redeem_only_aggregated: false
         # If set, all tickets will be redeemed on channel closure.
         redeem_all_on_close: true
         # Sets the minimum value of a ticket to be able to redeem it.
         minimum_redeem_ticket_value: "0.09 wxHOPR"
+        # If set, the strategy will redeem each incoming winning ticket.
+        # Otherwise, it will try to redeem tickets in all channels periodically.
+        # Set this to `true` when winning tickets are not happening too often (e.g., when winning probability is below 1%).
+        # Set this to `false` when winning tickets are happening very often (e.g., when winning probability is above 1%).
+        redeem_on_winning: true
         #
         ############################################
         #
