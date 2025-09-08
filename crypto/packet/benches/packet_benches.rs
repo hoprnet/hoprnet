@@ -2,7 +2,7 @@ use bimap::BiHashMap;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_random::Randomizable;
-use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};
+use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey, PeerId};
 use hopr_internal_types::prelude::*;
 use hopr_path::{Path, TransportPath};
 use hopr_primitive_types::prelude::{Address, BytesEncodable, KeyIdent};
@@ -19,6 +19,13 @@ const PACKET_BENCHMARK: [(usize, usize); 7] = [
     (3, 1), // 3-hop 1 SURB = common GnosisVPN use-case
     (3, 2), // 3-hop 2 SURBs = GnosisVPN use-case with asymmetric traffic (non-TCP)
 ];
+
+lazy_static::lazy_static! {
+    static ref CHAIN_KEYS: [ChainKeypair; 5] = (0..5).map(|_| ChainKeypair::random()).collect::<Vec<_>>().try_into().unwrap();
+    static ref CHAIN_ADDRS: [Address; 5] = CHAIN_KEYS.iter().map(|k| k.public().to_address()).collect::<Vec<_>>().try_into().unwrap();
+    static ref OFFCHAIN_KEYS: [OffchainKeypair; 5] = (0..5).map(|_| OffchainKeypair::random()).collect::<Vec<_>>().try_into().unwrap();
+    static ref PEER_IDS: [PeerId; 5] = OFFCHAIN_KEYS.iter().map(|k| PeerId::from(k.public())).collect::<Vec<_>>().try_into().unwrap();
+}
 
 pub fn packet_sending_bench(c: &mut Criterion) {
     assert!(
