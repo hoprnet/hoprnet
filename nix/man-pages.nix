@@ -1,20 +1,29 @@
+# man-pages.nix - Manual page generation
+#
+# Generates manual pages (man pages) for HOPR binaries using help2man.
+# Creates documentation from the --help output of the compiled binaries.
+
 {
   pkgs,
-  hoprd,
-  hopli,
+  hoprd, # HOPRD daemon binary package
+  hopli, # HOPLI CLI tool binary package
 }:
 
 let
+  # Create a manual page derivation from a binary
+  # Extracts help information and formats it as a standard man page
   mkManPage =
     {
-      pname,
-      binary,
-      description,
+      pname, # Package name for the manual page
+      binary, # Binary executable to generate documentation from
+      description, # Brief description of the tool
     }:
     pkgs.stdenv.mkDerivation {
       name = "${pname}-man";
 
+      # Tools needed for generating manual pages
       nativeBuildInputs = [ pkgs.help2man ];
+      # Ensure OpenSSL libraries are available for binary execution
       LD_LIBRARY_PATH = "${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH";
 
       buildCommand = ''

@@ -1,22 +1,28 @@
+# rust-package.nix - Rust package builder with cross-compilation support
+#
+# Creates Rust packages with support for cross-compilation, static linking,
+# documentation generation, and platform-specific optimizations.
+# Used by HOPRD and HOPLI package definitions.
+
 {
-  buildDocs ? false,
-  CARGO_PROFILE ? "release",
-  cargoExtraArgs ? "",
-  cargoToml,
-  craneLib,
-  depsSrc,
-  foundryBin,
-  html-tidy,
-  isCross ? false,
-  isStatic ? false,
-  lib,
-  libiconv,
-  makeSetupHook,
-  mold,
-  llvmPackages,
-  pandoc,
-  pkg-config,
-  pkgs,
+  buildDocs ? false, # Whether to build documentation
+  CARGO_PROFILE ? "release", # Cargo build profile (release/dev/etc)
+  cargoExtraArgs ? "", # Additional arguments for cargo build
+  cargoToml, # Path to the Cargo.toml file
+  craneLib, # Crane library for Rust builds
+  depsSrc, # Source tree with only dependencies
+  foundryBin, # Ethereum foundry binary tools
+  html-tidy, # HTML validation tool
+  isCross ? false, # Whether this is cross-compilation
+  isStatic ? false, # Whether to create static binaries
+  lib, # Nixpkgs lib utilities
+  libiconv, # Character encoding library
+  makeSetupHook, # Nix setup hook creator
+  mold, # Fast linker for Rust
+  llvmPackages, # LLVM toolchain packages
+  pandoc, # Universal document converter
+  pkg-config, # Package configuration tool
+  pkgs, # Nixpkgs package set
   postInstall ? null,
   rev,
   runClippy ? false,
