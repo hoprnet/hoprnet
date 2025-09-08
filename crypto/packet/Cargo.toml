@@ -17,12 +17,14 @@ rayon = ["dep:rayon"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
+  "flagset/serde",
   "hopr-crypto-sphinx/serde",
   "hopr-path/serde",
 ]
 
 [dependencies]
 hex = { workspace = true }
+flagset = { workspace = true }
 rayon = { workspace = true, optional = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }

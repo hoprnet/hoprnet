@@ -10,6 +10,31 @@ use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
 
 use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 
+flagset::flags! {
+   /// Individual packet signals passed up between the packet sender and destination.
+   #[repr(u8)]
+   #[derive(PartialOrd, Ord, strum::EnumString, strum::Display)]
+   pub enum PacketSignal: u8 {
+        /// The other party is in a "SURB distress" state, potentially running out of SURBs soon.
+        ///
+        /// Has no effect on packets that take the "forward path".
+        SurbDistress = 0b0000_0001,
+        /// The other party has run out of SURBs, and this was potentially the last message they could
+        /// send.
+        ///
+        /// Has no effect on packets that take the "forward path".
+        ///
+        /// Implies [`SurbDistress`].
+        OutOfSurbs = 0b0000_0011,
+   }
+}
+
+/// Packet signal states that can be passed between the packet sender and destination.
+///
+/// These signals can be typically propagated up to the application layer to take an appropriate
+/// action to the signaled states.
+pub type PacketSignals = flagset::FlagSet<PacketSignal>;
+
 /// Size of the [`HoprSurbId`] in bytes.
 pub const SURB_ID_SIZE: usize = 8;
 
@@ -112,14 +137,15 @@ pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(Pa
 /// Convenience alias for HOPR specific [`PacketMessage`].
 pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>;
 
-/// Individual parts of a [`PacketMessage`]: SURBs, the actual message (payload) and additional flags for the recipient.
+/// Individual parts of a [`PacketMessage`]: SURBs, the actual message (payload) and additional signals for the
+/// recipient.
 pub struct PacketParts<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
     /// Contains (a potentially empty) list of SURBs.
     pub surbs: Vec<SURB<S, H>>,
     /// Contains the actual packet payload.
     pub payload: Cow<'a, [u8]>,
-    /// Additional packet signals (flags) from the sender to the recipient.
-    pub signals: u8,
+    /// Additional packet signals from the sender to the recipient.
+    pub signals: PacketSignals,
 }
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec> Clone for PacketParts<'_, S, H>
@@ -145,7 +171,7 @@ where
         f.debug_struct("PacketParts")
             .field("surbs", &self.surbs)
             .field("payload", &self.payload)
-            .field("flags", &self.signals)
+            .field("signals", &self.signals)
             .finish()
     }
 }
@@ -170,7 +196,8 @@ where
 /// Convenience alias for HOPR specific [`PacketParts`].
 pub type HoprPacketParts<'a> = PacketParts<'a, HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
-const S_MASK: u8 = 0b0000_1111;
+// Coerces PacketSignals to only lower 4 bits.
+pub(crate) const S_MASK: u8 = 0b0000_1111;
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
     /// Size of the message header.
@@ -192,7 +219,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketParts<'_
             return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
         }
 
-        if value.signals > S_MASK {
+        if value.signals.bits() > S_MASK {
             return Err(GeneralError::ParseError("HoprPacketMessage.flags not valid".into()).into());
         }
 
@@ -202,7 +229,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketParts<'_
         }
 
         let mut ret = Vec::with_capacity(PaddedPayload::<P>::SIZE);
-        let flags_and_len = (value.signals << S_MASK.trailing_ones()) | (value.surbs.len() as u8 & S_MASK);
+        let flags_and_len = (value.signals.bits() << S_MASK.trailing_ones()) | (value.surbs.len() as u8 & S_MASK);
         ret.push(flags_and_len);
         for surb in value.surbs.into_iter().map(|s| s.into_boxed()) {
             ret.extend(surb);
@@ -224,7 +251,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<PacketMessage<
         }
 
         let num_surbs = (data[0] & S_MASK) as usize;
-        let signals = (data[0] & S_MASK.not()) >> S_MASK.trailing_ones();
+        let signals = PacketSignals::new((data[0] & S_MASK.not()) >> S_MASK.trailing_ones())
+            .map_err(|_| GeneralError::ParseError("HoprPacketMessage.signals".into()))?;
 
         if num_surbs > 0 {
             let surb_end = num_surbs * SURB::<S, H>::SIZE;
@@ -336,7 +364,7 @@ mod tests {
         let parts_1 = HoprPacketParts {
             surbs: vec![],
             payload: b"test message".into(),
-            signals: 7,
+            signals: PacketSignal::OutOfSurbs.into(),
         };
 
         let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
@@ -350,7 +378,7 @@ mod tests {
         let parts_1 = HoprPacketParts {
             surbs: generate_surbs(2)?,
             payload: Cow::default(),
-            signals: 7,
+            signals: PacketSignal::OutOfSurbs.into(),
         };
 
         let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
@@ -364,7 +392,7 @@ mod tests {
         let parts_1 = HoprPacketParts {
             surbs: generate_surbs(2)?,
             payload: b"test msg".into(),
-            signals: 7,
+            signals: PacketSignal::OutOfSurbs.into(),
         };
 
         let parts_2: HoprPacketParts = HoprPacketMessage::try_from(parts_1.clone())?.try_into()?;
@@ -378,7 +406,7 @@ mod tests {
         let res = HoprPacketMessage::try_from(HoprPacketParts {
             surbs: vec![],
             payload: (&[1u8; HoprPacket::PAYLOAD_SIZE + 1]).into(),
-            signals: 0,
+            signals: None.into(),
         });
         assert!(res.is_err());
     }
@@ -388,14 +416,14 @@ mod tests {
         let res = HoprPacketMessage::try_from(PacketParts {
             surbs: generate_surbs(HoprPacketMessage::MAX_SURBS_PER_MESSAGE + 1)?,
             payload: Cow::default(),
-            signals: 0,
+            signals: None.into(),
         });
         assert!(res.is_err());
 
         let res = HoprPacketMessage::try_from(HoprPacketParts {
             surbs: generate_surbs(3)?,
             payload: Cow::default(),
-            signals: 0,
+            signals: None.into(),
         });
         assert!(res.is_err());
 
@@ -407,7 +435,7 @@ mod tests {
         let res = HoprPacketMessage::try_from(PacketParts {
             surbs: generate_surbs(3)?,
             payload: Cow::default(),
-            signals: 16,
+            signals: unsafe { PacketSignals::new_unchecked(16) },
         });
         assert!(res.is_err());
 
@@ -419,7 +447,7 @@ mod tests {
         let res = HoprPacketMessage::try_from(PacketParts {
             surbs: generate_surbs(2)?,
             payload: (&[1u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1]).into(),
-            signals: 0,
+            signals: None.into(),
         });
         assert!(res.is_err());
 
