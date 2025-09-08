@@ -115,7 +115,9 @@ impl<const C: usize> SessionMessage<C> {
 
 impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     fn from(message: SessionMessage<C>) -> Self {
-        debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
+        debug_assert!(
+            C > SessionMessage::<C>::HEADER_SIZE && SessionMessage::<C>::MAX_MESSAGE_LENGTH <= u16::MAX as usize
+        );
 
         let mut result = BytesMut::new();
         SessionCodec::<C>
@@ -144,7 +146,9 @@ impl<const C: usize> Encoder for SessionCodec<C> {
     type Item<'a> = SessionMessage<C>;
 
     fn encode(&mut self, item: Self::Item<'_>, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
+        debug_assert!(
+            C > SessionMessage::<C>::HEADER_SIZE && SessionMessage::<C>::MAX_MESSAGE_LENGTH <= u16::MAX as usize
+        );
 
         let disc = SessionMessageDiscriminants::from(&item) as u8;
 
@@ -153,6 +157,10 @@ impl<const C: usize> Encoder for SessionCodec<C> {
             SessionMessage::Request(r) => Vec::from(r),
             SessionMessage::Acknowledge(a) => Vec::from(a),
         };
+
+        if msg.len() > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
+            return Err(SessionError::IncorrectMessageLength);
+        }
 
         let msg_len = msg.len() as u16;
         dst.put_u8(SessionMessage::<C>::VERSION);
