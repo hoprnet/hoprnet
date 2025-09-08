@@ -9,51 +9,7 @@ import "./utils/BoostUtilsLib.sol";
 import "../src/utils/TargetUtils.sol";
 import { HoprNetworkRegistry } from "../src/NetworkRegistry.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
-
-abstract contract Enum {
-    enum Operation {
-        Call,
-        DelegateCall
-    }
-}
-
-abstract contract ISafe {
-    function getTransactionHash(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        uint256 _nonce
-    )
-        public
-        view
-        virtual
-        returns (bytes32);
-
-    function execTransaction(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes memory signatures
-    )
-        public
-        payable
-        virtual
-        returns (bool success);
-
-    function nonce() public virtual returns (uint256);
-}
+import { Enum, ISafe } from "../src/utils/ISafe.sol";
 
 abstract contract IFactory {
     function clone(

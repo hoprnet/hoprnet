@@ -52,11 +52,11 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         vm.startBroadcast(deployerPrivateKey);
 
         // 3. Deploy
-        // 3.1 HoprNodeStakeFactory
-        _deployHoprNodeStakeFactory();
-
-        // 3.2 HoprNodeManagementModule singleton
+        // 3.1 HoprNodeManagementModule singleton
         _deployHoprNodeManagementModule();
+
+        // 3.2 HoprNodeStakeFactory
+        _deployHoprNodeStakeFactory(deployerAddress);
 
         // 3.3 HoprNodeSafeRegistry
         _deployHoprHoprNodeSafeRegistry();
@@ -109,20 +109,6 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     }
 
     /**
-     * @dev deploy node safe factory
-     */
-    function _deployHoprNodeStakeFactory() internal {
-        if (
-            currentEnvironmentType == EnvironmentType.LOCAL
-                || !isValidAddress(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress)
-        ) {
-            // deploy HoprNodeStakeFactory contract
-            currentNetworkDetail.addresses.nodeStakeV2FactoryAddress =
-                deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory");
-        }
-    }
-
-    /**
      * @dev Deploy node management module
      */
     function _deployHoprNodeManagementModule() internal {
@@ -133,6 +119,22 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             // deploy HoprNodeManagementModule contract
             currentNetworkDetail.addresses.moduleImplementationAddress =
                 deployCode("NodeManagementModule.sol:HoprNodeManagementModule");
+        }
+    }
+
+    /**
+     * @dev deploy node safe factory
+     */
+    function _deployHoprNodeStakeFactory(address deployerAddress) internal {
+        if (
+            currentEnvironmentType == EnvironmentType.LOCAL
+                || !isValidAddress(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress)
+        ) {
+            // deploy HoprNodeStakeFactory contract
+            currentNetworkDetail.addresses.nodeStakeV2FactoryAddress =
+                deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory", abi.encode(
+                    currentNetworkDetail.addresses.moduleImplementationAddress, deployerAddress
+                ));
         }
     }
 

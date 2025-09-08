@@ -8,8 +8,10 @@ import { HoprCapabilityPermissions } from "../../src/node-stake/permissioned-mod
 import { HoprNodeStakeFactory, HoprNodeStakeFactoryEvents } from "../../src/node-stake/NodeStakeFactory.sol";
 import { Safe } from "safe-contracts-1.4.1/Safe.sol";
 import { SafeSuiteLibV141 } from "../../src/utils/SafeSuiteLibV141.sol";
+import { Enum, ISafe } from "../../src/utils/ISafe.sol";
 import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
 import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
+
 
 contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
     using ClonesUpgradeable for address;
@@ -35,7 +37,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         caller = vm.addr(101); // make make address(101) a caller
         admin = vm.addr(102); // make make address(102) an admin
         moduleSingleton = new HoprNodeManagementModule();
-        factory = new HoprNodeStakeFactory();
+        factory = new HoprNodeStakeFactory(address(moduleSingleton), admin);
     }
 
     /**
@@ -70,10 +72,29 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         vm.prank(caller);
         vm.expectRevert(HoprNodeStakeFactory.TooFewOwners.selector);
         (module, safe) = factory.clone(
-            address(moduleSingleton),
-            admins,
             nonce,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            admins
+        );
+        vm.clearMockedCalls();
+    }
+
+    function testRevert_CloneSafeAndModuleWithStakeFactoryAsOwner() public {
+        address channels = 0x0101010101010101010101010101010101010101;
+        address token = 0x1010101010101010101010101010101010101010;
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+
+        uint256 nonce = 0;
+        address[] memory admins = new address[](2);
+        admins[0] = vm.addr(103); // add another admin
+        admins[1] = address(factory); // add factory address as an admin
+
+        vm.prank(caller);
+        vm.expectRevert(HoprNodeStakeFactory.InvalidOwner.selector);
+        (module, safe) = factory.clone(
+            nonce,
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            admins
         );
         vm.clearMockedCalls();
     }
@@ -87,41 +108,103 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
 
         uint256 nonce = 0;
-        address expectedModuleAddress =
-            factory.predictDeterministicAddress(address(moduleSingleton), keccak256(abi.encodePacked(caller, nonce)));
-
-        vm.startPrank(caller);
-        vm.expectEmit(true, true, false, false, address(factory));
-        emit NewHoprNodeStakeModule(address(moduleSingleton), expectedModuleAddress);
         address[] memory admins = new address[](10);
         for (uint256 i = 0; i < admins.length; i++) {
             admins[i] = vm.addr(200 + i);
         }
+        address expectedModuleAddress =
+            factory.predictModuleAddress(keccak256(abi.encodePacked(caller, nonce)));
+        address expectedSafeAddress = factory.predictSafeAddress(admins, nonce);
+
+        vm.startPrank(caller);
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress);
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit NewHoprNodeStakeSafe(expectedSafeAddress);
+
         (module, safe) = factory.clone(
-            address(moduleSingleton),
-            admins,
             nonce,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            admins
         );
 
-        // Safe should have module enabled
-        assertTrue(Safe(safe).isModuleEnabled(module));
-        // Safe should have 1 threshold and admin as the only owner
-        assertEq(Safe(safe).getThreshold(), 1, "Wrong threshold");
-        address[] memory owners = Safe(safe).getOwners();
-        assertEq(owners.length, admins.length, "Wrong number of owners");
-        for (uint256 j = 0; j < admins.length; j++) {
-            assertTrue(Safe(safe).isOwner(admins[j]));
+        _ensureSafeAndModuleAreWired(module, payable(safe), admins);
+
+        vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev Clone multiple safes and modules to ensure the nonce and salt works
+     *      and the deployed addresses are unique
+     */
+    function test_CloneMultipleSafesAndModules() public {
+        address channels = 0x0101010101010101010101010101010101010101;
+        address token = 0x1010101010101010101010101010101010101010;
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+
+        // Deploy first safe and module, with 3 admins
+        uint256 nonce0 = 0;
+        address[] memory admins0 = new address[](3);
+        for (uint256 i = 0; i < admins0.length; i++) {
+            admins0[i] = vm.addr(300 + i);
         }
-        assertFalse(Safe(safe).isOwner(address(factory)));
-        // module owner should be safe
-        assertEq(HoprNodeManagementModule(module).owner(), safe, "Wrong module owner");
-        // module multisend should beSafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS
-        assertEq(
-            HoprNodeManagementModule(module).multisend(),
-            SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS,
-            "Wrong module owner"
+        (address module0, address payable safe0) = factory.clone(
+            nonce0,
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            admins0
         );
+        _ensureSafeAndModuleAreWired(module0, payable(safe0), admins0);
+
+        // Deploy second safe and module, with 3 admins
+        uint256 nonce1 = 1;
+        address[] memory admins1 = new address[](1);
+        admins1[0] = vm.addr(400);
+        (address module1, address payable safe1) = factory.clone(
+            nonce1,
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            admins1
+        );
+        _ensureSafeAndModuleAreWired(module1, payable(safe1), admins1);
+
+        // Test with multisend to create two safe-module pairs, from the second safe that's just deployed
+        vm.startPrank(admins1[0]);
+        uint256 nonce3 = 0;
+        address[] memory admins3 = new address[](3);
+        for (uint256 i = 0; i < admins3.length; i++) {
+            admins3[i] = vm.addr(500 + i);
+        }
+        uint256 nonce4 = 1;
+        address[] memory admins4 = new address[](2);
+        for (uint256 i = 0; i < admins4.length; i++) {
+            admins4[i] = vm.addr(600 + i);
+        }
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeWithSelector(HoprNodeStakeFactory.clone.selector, nonce3, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"), admins3); // approve on token
+        data[1] = abi.encodeWithSelector(HoprNodeStakeFactory.clone.selector, nonce4, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"), admins4); // approve on token
+        uint256[] memory dataLengths = new uint256[](2);
+        dataLengths[0] = data[0].length;
+        dataLengths[1] = data[1].length;
+
+        // safe1 uses multisend to deploy another safe and module
+        bytes memory safeTxData = _helperBuildMultiSendTxForSafeModuleClone(address(factory), dataLengths, data);
+        address expectedModuleAddress3 =
+            factory.predictModuleAddress(keccak256(abi.encodePacked(address(safe1), nonce3)));
+        address expectedSafeAddress3 = factory.predictSafeAddress(admins3, nonce3);
+        address expectedModuleAddress4 =
+            factory.predictModuleAddress(keccak256(abi.encodePacked(address(safe1), nonce4)));
+        address expectedSafeAddress4 = factory.predictSafeAddress(admins4, nonce4);
+
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress3);
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit NewHoprNodeStakeSafe(expectedSafeAddress3);
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress4);
+        vm.expectEmit(true, true, false, false, address(factory));
+        emit NewHoprNodeStakeSafe(expectedSafeAddress4);
+        // The first two Safe txns were used during the deployment of safe1
+        _helperSafeTxnToMultiSend(ISafe(safe1), 400, 2, safeTxData);
 
         vm.stopPrank();
         vm.clearMockedCalls();
@@ -240,5 +323,80 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         // must revert
         assertFalse(secondResult);
         vm.clearMockedCalls();
+    }
+
+    /**
+     * @dev internal function to ensure the safe and module are properly wired after cloning
+     */
+    function _ensureSafeAndModuleAreWired(address moduleAddr, address payable safeAddr, address[] memory admins) internal {
+        // Safe should have module enabled
+        assertTrue(Safe(safeAddr).isModuleEnabled(moduleAddr));
+        // Safe should have 1 threshold
+        assertEq(Safe(safeAddr).getThreshold(), 1, "Wrong threshold");
+        // Safe should have admin as the only owner
+        address[] memory owners = Safe(safeAddr).getOwners();
+        assertEq(owners.length, admins.length, "Wrong number of owners");
+        for (uint256 j = 0; j < admins.length; j++) {
+            assertTrue(Safe(safeAddr).isOwner(admins[j]));
+        }
+        assertFalse(Safe(safeAddr).isOwner(address(factory)));
+        // module owner should be safe
+        assertEq(HoprNodeManagementModule(moduleAddr).owner(), safeAddr, "Wrong module owner");
+        // module multisend should beSafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS
+        assertEq(
+            HoprNodeManagementModule(moduleAddr).multisend(),
+            SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS,
+            "Wrong module owner"
+        );
+    }
+
+    /**
+     * @dev internal function to help build the multiSend transaction data  
+     */
+    function _helperBuildMultiSendTxForSafeModuleClone(
+        address factoryAddress,
+        uint256[] memory dataLengths,
+        bytes[] memory data
+    )
+        private
+        pure
+        returns (bytes memory)
+    {
+        bytes memory encodePacked;
+        for (uint256 i = 0; i < dataLengths.length; i++) {
+            encodePacked = abi.encodePacked(
+                encodePacked,
+                uint8(0), // txOperations[i] is CALL
+                factoryAddress, // txTos[i],
+                uint256(0), // txValues[i],
+                dataLengths[i],
+                data[i]
+            );
+        }
+        return abi.encodeWithSignature("multiSend(bytes)", encodePacked);
+    }
+
+        /**
+     * @dev when caller is owner of safe instance, prepare a signature and execute the transaction
+     */
+    function _helperSafeTxnToMultiSend(ISafe safeInstance, uint256 senderPrivateKey, uint256 nonce, bytes memory data) private {
+        address sender = vm.addr(senderPrivateKey);
+        bytes32 dataHash =
+            safeInstance.getTransactionHash(SafeSuiteLibV141.SAFE_MultiSend_ADDRESS, 0, data, Enum.Operation.DelegateCall, 0, 0, 0, address(0), sender, nonce);
+
+        // sign dataHash
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPrivateKey, dataHash);
+        safeInstance.execTransaction(
+            SafeSuiteLibV141.SAFE_MultiSend_ADDRESS,
+            0,
+            data,
+            Enum.Operation.DelegateCall,
+            0,
+            0,
+            0,
+            address(0),
+            payable(sender),
+            abi.encodePacked(r, s, v)
+        );
     }
 }
