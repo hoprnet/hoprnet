@@ -17,6 +17,7 @@ let
       findutils
       iana-etc
       nettools
+      gnugrep
     ]
     ++ extraContents;
   Env = [

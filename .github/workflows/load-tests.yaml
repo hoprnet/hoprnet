@@ -87,12 +87,12 @@ on:
         type: number
         default: 1048576
         required: true
-        description: 'Download throughput in bytes per second'
+        description: 'Download throughput in bytes per second (0 means disabled scenario)'
       upload_throughput:
         type: number
         default: 524288
         required: true
-        description: 'Upload throughput in bytes per second'
+        description: 'Upload throughput in bytes per second (0 means disabled scenario)'
 
 concurrency:
   group: load-tests
@@ -116,6 +116,7 @@ jobs:
             echo "The workflow is triggered by other pipeline"
             {
               echo "TESTID=${{ inputs.test_id }}"
+              echo "K6_EXECUTION_NAME=${{ inputs.test_id }}"
               echo "K6_CLUSTER_NODES=${{ inputs.cluster_nodes }}"
               echo "K6_TOPOLOGY_NAME=${{ inputs.topology }}"
               echo "K6_WORKLOAD_NAME=${{ inputs.workload }}"
@@ -129,6 +130,7 @@ jobs:
             echo "The workflow is triggered manually"
             {
               echo "TESTID=${{ github.event.inputs.test_id }}"
+              echo "K6_EXECUTION_NAME=${{ github.event.inputs.test_id }}"
               echo "K6_CLUSTER_NODES=${{ github.event.inputs.cluster_nodes }}"
               echo "K6_TOPOLOGY_NAME=${{ github.event.inputs.topology }}"
               echo "K6_WORKLOAD_NAME=${{ github.event.inputs.workload }}"
@@ -139,13 +141,21 @@ jobs:
               echo "K6_UPLOAD_THROUGHPUT=${{ github.event.inputs.upload_throughput }}"
             } >> $GITHUB_ENV
           fi
+          if [[ "${{ inputs.download_throughput }}" -eq 0 ]]; then
+            echo "Download throughput is disabled"
+            echo "K6_SKIP_SCENARIO_DOWNLOAD=true" >> $GITHUB_ENV
+          fi
+          if [[ "${{ inputs.upload_throughput }}" -eq 0 ]]; then
+            echo "Upload throughput is disabled"
+            echo "K6_SKIP_SCENARIO_UPLOAD=true" >> $GITHUB_ENV
+          fi
 
       - name: Checkout hoprd-test repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
           repository: hoprnet/hoprd-test
-          ref: main # Use different branch if needed to test a new development
+          ref: ${{ vars.K6_REPOSITORY_BRANCH_NAME || 'main' }}
 
       - name: Setup GCP
         id: gcp
