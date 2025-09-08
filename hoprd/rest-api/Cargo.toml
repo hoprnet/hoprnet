@@ -70,7 +70,7 @@ hopr-platform = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-oas3 = "0.17.0"
+oas3 = "0.19.0"
 test-log = { workspace = true }
 
 hopr-transport-session = { workspace = true }

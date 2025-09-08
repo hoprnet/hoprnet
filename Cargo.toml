@@ -47,7 +47,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.27", default-features = false, features = [
+alloy = { version = "=1.0.30", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -90,7 +90,7 @@ dashmap = "6.1.0"
 env_logger = "0.11.8"
 either = "1.15.0"
 flagset = "0.4.7"
-flate2 = "1.1"
+flate2 = "1.1.2"
 flume = "0.11.1"
 float-cmp = "0.10.0"
 futures = "0.3.31"
