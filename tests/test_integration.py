@@ -287,7 +287,7 @@ class TestIntegrationWithSwarm:
         self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
     ):
         route = [src, mid, dest]
-        assert len(route) == len(set(route))  # checks that all element of route are unique. Should never fail
+        assert len(route) == len(set(route))  # checks that all elements of route are unique. Should never fail
 
         ticket_count = int(TICKET_AGGREGATION_THRESHOLD)
 
