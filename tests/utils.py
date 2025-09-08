@@ -98,7 +98,7 @@ async def check_outgoing_channel_closed(src: Node, channel_id: str):
 
 async def check_rejected_tickets_value(src: Node, value: Balance):
     while (current := (await src.api.get_tickets_statistics()).rejected_value) < value:
-        logging.info(f"Rejected tickets value: {current}, wanted min: {value}")
+        logging.debug(f"Rejected tickets value: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 

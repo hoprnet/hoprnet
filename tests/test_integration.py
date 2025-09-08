@@ -276,23 +276,21 @@ class TestIntegrationWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
     @pytest.mark.parametrize(
-        "route",
-        [
-            [
-                random.sample(barebone_nodes(), 1)[0],
-                random.sample(default_nodes(), 1)[0],
-                random.sample(barebone_nodes(), 1)[0],
-            ]
-            for _ in range(PARAMETERIZED_SAMPLE_SIZE)
-        ],
+        "src, dest",
+        [random.sample(barebone_nodes(), 2) for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
+    )
+    @pytest.mark.parametrize(
+        "mid",
+        [random.choice(default_nodes()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming(
-        self, route, swarm7: dict[str, Node]
+        self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
     ):
+        route = [src, mid, dest]
+        assert len(route) == len(set(route))  # checks that all element of route are unique. Should never fail
+
         ticket_count = int(TICKET_AGGREGATION_THRESHOLD)
-        src = route[0]
-        mid = route[1]
-        dest = route[-1]
+
         ticket_price = await get_ticket_price(swarm7[src])
         aggregated_ticket_price = TICKET_AGGREGATION_THRESHOLD * ticket_price
 
