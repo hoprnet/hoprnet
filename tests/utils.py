@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import logging
 import random
 import re
@@ -24,13 +25,29 @@ RESERVED_TAG_UPPER_BOUND = 1023
 APPLICATION_TAG_THRESHOLD_FOR_SESSIONS = RESERVED_TAG_UPPER_BOUND + 1
 
 
-def shuffled(coll):
-    random.shuffle(coll)
-    return coll
-
-
 def make_routes(routes_with_hops: list[int], nodes: list[Node]):
-    return [shuffled(nodes)[: (hop + 2)] for hop in routes_with_hops]
+    return [random.sample(nodes, hop + 2) for hop in routes_with_hops]
+
+
+def random_distinct_pairs_from(values: list, count: int):
+    return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
+
+
+def random_non_looping_routes_from(*source_lists: tuple[list[str], int]):
+    # Each entry in source_lists is a tuple (list_of_node_addresses, count_to_pick_from_that_list)
+    # The function picks nodes from each list, ensuring no node is picked more than once
+
+    route = []
+    for source_list, count in source_lists:
+        candidates = set(source_list) - set(route)
+        if not candidates:
+            return None
+        route.extend(random.sample(list(candidates), count))
+
+    assert len(route) == len(set(route))
+    assert len(route) == sum(count for _, count in source_lists)
+
+    return route
 
 
 @asynccontextmanager

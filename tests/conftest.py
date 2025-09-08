@@ -1,8 +1,6 @@
 import asyncio
-import itertools
 import logging
 import os
-import random
 import re
 from subprocess import PIPE, STDOUT, CalledProcessError, Popen
 
@@ -73,10 +71,6 @@ def nodes_with_lower_outgoing_win_prob():
     return ["6"]
 
 
-def random_distinct_pairs_from(values: list, count: int):
-    return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
-
-
 @pytest.fixture(scope="session")
 async def base_port(request):
     base_port_env = os.environ.get("HOPR_SMOKETEST_BASE_PORT")
@@ -96,10 +90,15 @@ async def base_port(request):
 async def swarm7(request, base_port):
     params_path = PWD.joinpath("sdk/python/localcluster.test.params.yml")
     try:
-        cluster, anvil = await localcluster.bringup(
+        cluster_and_anvil = await localcluster.bringup(
             params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port
         )
 
+        if cluster_and_anvil is None:
+            pytest.fail("Failed to bring up the cluster")
+            return
+
+        cluster, anvil = cluster_and_anvil
         yield cluster.nodes
 
         cluster.clean_up()

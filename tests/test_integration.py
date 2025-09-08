@@ -13,7 +13,7 @@ from sdk.python.api.response_objects import Metrics
 from sdk.python.localcluster.constants import OPEN_CHANNEL_FUNDING_VALUE_HOPR
 from sdk.python.localcluster.node import Node
 
-from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
+from .conftest import barebone_nodes, default_nodes
 from .utils import (
     PARAMETERIZED_SAMPLE_SIZE,
     TICKET_AGGREGATION_THRESHOLD,
@@ -28,7 +28,8 @@ from .utils import (
     create_bidirectional_channels_for_route,
     create_channel,
     get_ticket_price,
-    shuffled,
+    random_distinct_pairs_from,
+    random_non_looping_routes_from,
 )
 
 
@@ -126,7 +127,7 @@ class TestIntegrationWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+        "src,dest", [random_non_looping_routes_from((barebone_nodes(), 2)) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
     async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
         self, src: str, dest: str, swarm7: dict[str, Node]
@@ -164,7 +165,8 @@ class TestIntegrationWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+        "src, mid, dest",
+        [random_non_looping_routes_from((barebone_nodes(), 3)) for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_reset_ticket_statistics_from_metrics(self, src: str, mid: str, dest: str, swarm7: dict[str, Node]):
         def count_metrics(metrics: Metrics):
@@ -193,7 +195,8 @@ class TestIntegrationWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+        "src,mid,dest",
+        [random_non_looping_routes_from((barebone_nodes(), 3)) for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_hoprd_should_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
@@ -276,19 +279,15 @@ class TestIntegrationWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
     @pytest.mark.parametrize(
-        "src, dest",
-        [random.sample(barebone_nodes(), 2) for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-    )
-    @pytest.mark.parametrize(
-        "mid",
-        [random.choice(default_nodes()) for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
+        "src, mid, dest",
+        [
+            random_non_looping_routes_from((barebone_nodes(), 1), (default_nodes(), 1), (barebone_nodes(), 1))
+            for _ in range(PARAMETERIZED_SAMPLE_SIZE)
+        ],
     )
     async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming(
         self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
     ):
-        route = [src, mid, dest]
-        assert len(route) == len(set(route))  # checks that all elements of route are unique. Should never fail
-
         ticket_count = int(TICKET_AGGREGATION_THRESHOLD)
 
         ticket_price = await get_ticket_price(swarm7[src])
@@ -331,7 +330,7 @@ class TestIntegrationWithSwarm:
         await assert_channel_statuses(swarm7[src].api)
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+    @pytest.mark.parametrize("peer", random.choice(barebone_nodes()))
     async def test_hoprd_check_native_withdraw(self, peer, swarm7: dict[str, Node]):
         before_balance = (await swarm7[peer].api.balances()).native
         assert before_balance > Balance.zero("xDai")
@@ -343,7 +342,7 @@ class TestIntegrationWithSwarm:
         await asyncio.wait_for(check_native_balance_below(swarm7[peer], before_balance - amount), 60.0)
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+    @pytest.mark.parametrize("peer", random.choice(barebone_nodes()))
     async def test_hoprd_check_ticket_price_is_default(self, peer, swarm7: dict[str, Node]):
         price = await swarm7[peer].api.ticket_price()
 
@@ -351,6 +350,12 @@ class TestIntegrationWithSwarm:
         assert price.value > Balance.zero("wxHOPR")
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("peer", random.choice(barebone_nodes()))
+    async def test_hoprd_check_api_version(self, peer, swarm7: dict[str, Node]):
+        version = await swarm7[peer].api.api_version()
+
+        assert re.match(r"^\d+\.\d+\.\d+$", version) is not None, "Version should be in the format X.Y.Z"
+
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_api_version(self, peer, swarm7: dict[str, Node]):
         version = await swarm7[peer].api.api_version()
