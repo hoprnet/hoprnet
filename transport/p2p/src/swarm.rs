@@ -25,6 +25,10 @@ lazy_static::lazy_static! {
         "hopr_transport_p2p_opened_connection_count",
         "Number of currently open connections"
     ).unwrap();
+    static ref METRIC_TRANSPORT_NAT_STATUS: SimpleGauge = SimpleGauge::new(
+        "hopr_transport_p2p_nat_status",
+        "Current NAT status as reported by libp2p autonat. 0=Unknown, 1=Public, 2=Private"
+    ).unwrap();
 }
 
 /// Build objects comprising the p2p network.
@@ -189,6 +193,15 @@ impl HoprSwarm {
                             match event {
                                 autonat::Event::StatusChanged { old, new } => {
                                     info!(?old, ?new, "AutoNAT status changed");
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    {
+                                        let value = match new {
+                                            autonat::NatStatus::Unknown => 0.0,
+                                            autonat::NatStatus::Public(_) => 1.0,
+                                            autonat::NatStatus::Private => 2.0,
+                                        };
+                                        METRIC_TRANSPORT_NAT_STATUS.set(value);
+                                    }
                                 }
                                 autonat::Event::InboundProbe { .. } => {}
                                 autonat::Event::OutboundProbe { .. } => {}

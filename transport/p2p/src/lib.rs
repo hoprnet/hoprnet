@@ -111,13 +111,7 @@ impl HoprNetworkBehavior {
                 "/hopr/identify/1.0.0".to_string(),
                 me.clone(),
             )),
-            autonat: autonat::Behaviour::new(
-                me.into(),
-                autonat::Config {
-                    only_global_ips: false,
-                    ..Default::default()
-                },
-            ),
+            autonat: autonat::Behaviour::new(me.into(), autonat::Config::default()),
         }
     }
 }
