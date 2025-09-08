@@ -2798,7 +2798,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4468,7 +4468,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-actions"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4637,11 +4637,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.12.1"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "bimap",
  "criterion",
+ "flagset",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -4730,7 +4731,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4779,7 +4780,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.17.1"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5042,6 +5043,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "lazy_static",
  "mockall",
  "parameterized",
@@ -5076,7 +5078,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.14.2"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5112,7 +5114,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.12.2"
+version = "0.13.0"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5300,7 +5302,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5350,11 +5352,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "arrayvec",
  "async-trait",
+ "criterion",
  "flagset",
  "futures",
  "futures-time",
@@ -8594,7 +8597,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
