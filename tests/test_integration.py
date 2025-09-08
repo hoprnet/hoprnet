@@ -355,9 +355,3 @@ class TestIntegrationWithSwarm:
         version = await swarm7[peer].api.api_version()
 
         assert re.match(r"^\d+\.\d+\.\d+$", version) is not None, "Version should be in the format X.Y.Z"
-
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_check_api_version(self, peer, swarm7: dict[str, Node]):
-        version = await swarm7[peer].api.api_version()
-
-        assert re.match(r"^\d+\.\d+\.\d+$", version) is not None, "Version should be in the format X.Y.Z"
