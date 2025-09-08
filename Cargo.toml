@@ -283,6 +283,7 @@ panic = "abort"
 strip = true
 opt-level = 3
 
+# uses extended debug symbols for profiling but does not harm benchmarking performance
 [profile.bench]
 debug = 2
 split-debuginfo = "off"

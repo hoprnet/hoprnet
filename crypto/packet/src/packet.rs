@@ -122,6 +122,8 @@ impl PartialHoprPacket {
                 let receiver_data = HoprSenderId::new(pseudonym);
 
                 // Create SURBs if some return paths were specified
+                // Possibly makes little sense to parallelize this iterator via rayon,
+                // as in most cases the number of return paths is 1.
                 let (surbs, openers): (Vec<_>, Vec<_>) = key_data
                     .zip(return_paths)
                     .zip(receiver_data.into_sequence())

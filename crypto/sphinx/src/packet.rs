@@ -598,6 +598,8 @@ pub(crate) mod tests {
     where
         S: SphinxSuite + PartialEq,
         <S::P as Keypair>::Public: Eq + Hash,
+        for<'a> &'a Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>:
+            From<&'a <<S as SphinxSuite>::P as Keypair>::Public>,
     {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let mapper = keypairs
