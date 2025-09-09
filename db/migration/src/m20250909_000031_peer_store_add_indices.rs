@@ -3,9 +3,8 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
-const IDX_NAME_IGNORED_UNTIL: &str = "idx_ignored_until";
+const IDX_NAME_IGNORED: &str = "idx_ignored";
 const IDX_NAME_QUALITY: &str = "idx_quality";
-
 const IDX_NAME_LAST_SEEN: &str = "idx_last_seen";
 
 #[async_trait::async_trait]
@@ -17,7 +16,7 @@ impl MigrationTrait for Migration {
             .create_index(
                 Index::create()
                     .if_not_exists()
-                    .name(IDX_NAME_IGNORED_UNTIL)
+                    .name(IDX_NAME_IGNORED)
                     .table(NetworkPeer::Table)
                     .col((NetworkPeer::Ignored, IndexOrder::Asc))
                     .to_owned(),
