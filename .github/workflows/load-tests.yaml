@@ -75,7 +75,7 @@ on:
         description: 'Test duration in minutes'
       echo_service_replicas:
         type: number
-        default: 1
+        default: 3
         required: true
         description: 'Echo service replicas'
       payload_size:
@@ -85,7 +85,7 @@ on:
         description: 'Payload size in bytes'
       download_throughput:
         type: number
-        default: 1048576
+        default: 524288
         required: true
         description: 'Download throughput in bytes per second (0 means disabled scenario)'
       upload_throughput:
@@ -144,10 +144,12 @@ jobs:
           if [[ "${{ inputs.download_throughput }}" -eq 0 ]]; then
             echo "Download throughput is disabled"
             echo "K6_SKIP_SCENARIO_DOWNLOAD=true" >> $GITHUB_ENV
+            echo "K6_DOWNLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
           fi
           if [[ "${{ inputs.upload_throughput }}" -eq 0 ]]; then
             echo "Upload throughput is disabled"
             echo "K6_SKIP_SCENARIO_UPLOAD=true" >> $GITHUB_ENV
+            echo "K6_UPLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
           fi
 
       - name: Checkout hoprd-test repository
