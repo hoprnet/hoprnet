@@ -140,6 +140,11 @@ let
       }
     else if runClippy then
       sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
+    else if runBench then
+      sharedArgsBase
+      // {
+        LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
+      }
     else
       sharedArgsBase;
 

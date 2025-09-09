@@ -120,6 +120,7 @@ libp2p-identity = { version = "0.2.12", features = [
   "rand",
 ] }
 libp2p-stream = { version = "0.4.0-alpha" }
+mimalloc = "0.1.48"
 mockall = "0.13.1"
 mockito = "1.7.0"
 moka = { version = "0.12.10", features = ["future"] }

@@ -5,6 +5,11 @@ use hopr_crypto_types::{
     vrf::derive_vrf_parameters,
 };
 
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 const SAMPLE_SIZE: usize = 100_000;
 
 pub fn vrf_bench(c: &mut Criterion) {

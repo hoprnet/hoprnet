@@ -5,6 +5,11 @@ use hopr_network_types::utils::DuplexIO;
 use hopr_protocol_session::{SessionSocketConfig, UnreliableSocket};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 const MTU: usize = HoprPacket::PAYLOAD_SIZE;
 
 pub async fn alice_send_data<S: AsyncRead + AsyncWrite + Send + Unpin + 'static>(data: &[u8], alice: S) {
