@@ -21,7 +21,7 @@ use sqlx::{
     pool::PoolOptions,
     sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
 };
-use tracing::{debug, log::LevelFilter};
+use tracing::{debug, info, log::LevelFilter};
 use validator::Validate;
 
 use crate::{
@@ -120,6 +120,7 @@ impl HoprDb {
         fs::create_dir_all(directory)
             .map_err(|_e| DbSqlError::Construction(format!("cannot create main database directory {directory:?}")))?;
 
+        info!("Opening database at {:?}", directory);
         let index = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
@@ -131,7 +132,7 @@ impl HoprDb {
         )
         .await?;
 
-        #[cfg(feature = "sqlite")]
+        info!("Creating index RW DB connection pool");
         let index_ro = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
@@ -143,11 +144,13 @@ impl HoprDb {
         )
         .await?;
 
+        info!("Creating index RO DB connection pool");
         let peers_options = PoolOptions::new()
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
             .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
             .max_lifetime(Some(Duration::from_secs(30 * 60))); // This is the default
 
+        info!("Creating peers DB connection pool");
         let peers = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
@@ -159,6 +162,7 @@ impl HoprDb {
         )
         .await?;
 
+        info!("Creating tickets DB connection pool");
         let tickets = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
@@ -170,6 +174,7 @@ impl HoprDb {
         )
         .await?;
 
+        info!("Creating logs DB connection pool");
         let logs = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),

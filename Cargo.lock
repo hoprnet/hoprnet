@@ -4864,6 +4864,7 @@ dependencies = [
  "backon",
  "const_format",
  "either",
+ "env_logger",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
