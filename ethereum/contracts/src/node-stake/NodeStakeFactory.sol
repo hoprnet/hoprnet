@@ -148,7 +148,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
         // Add Safe and multisend to the module, then transfer ownership to the module
         bytes memory moduleInitializer = abi.encodeWithSignature(
             "initialize(bytes)",
-            abi.encode(address(safeProxy), SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS, defaultTarget)
+            abi.encode(address(safeProxy), SafeSuiteLibV141.SAFE_MultiSend_ADDRESS, defaultTarget)
         );
         moduleProxy.functionCall(moduleInitializer);
 
