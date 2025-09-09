@@ -246,7 +246,7 @@ where
                 // TODO(v3.1): Use the entire range of tags properly
                 session_tag_range: (16..65535),
                 maximum_sessions: cfg.session.maximum_sessions as usize,
-                frame_mtu: std::env::var("HOPR_SESSION_MTU")
+                frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
                     .ok()
                     .and_then(|s| s.parse::<usize>().ok())
                     .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
