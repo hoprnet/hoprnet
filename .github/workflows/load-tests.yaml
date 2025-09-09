@@ -40,6 +40,7 @@ on:
         type: string
         required: true
         description: 'Test name'
+        default: 'my-load-test'
       cluster_nodes:
         type: choice
         options:
@@ -80,7 +81,7 @@ on:
         description: 'Echo service replicas'
       payload_size:
         type: number
-        default: 10485760
+        default: 1048576
         required: true
         description: 'Payload size in bytes'
       download_throughput:
@@ -90,7 +91,7 @@ on:
         description: 'Download throughput in bytes per second (0 means disabled scenario)'
       upload_throughput:
         type: number
-        default: 524288
+        default: 0
         required: true
         description: 'Upload throughput in bytes per second (0 means disabled scenario)'
 
