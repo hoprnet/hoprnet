@@ -12,6 +12,11 @@ import { Enum, ISafe } from "../../src/utils/ISafe.sol";
 import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
 import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 
+contract MaliciousModuleMock {
+    function initialize(bytes calldata) public {
+        return;
+    }
+}
 
 contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
     using ClonesUpgradeable for address;
@@ -322,6 +327,33 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         (bool secondResult,) = moduleProxy.call(moduleReinitializer);
         // must revert
         assertFalse(secondResult);
+        vm.clearMockedCalls();
+    }
+
+    function testRevert_SafeSetupReuseNonce() public {
+        address channels = 0x0101010101010101010101010101010101010101;
+        address token = 0x1010101010101010101010101010101010101010;
+        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        
+        uint256 nonce = 0;
+        address[] memory admins = new address[](10);
+        for (uint256 i = 0; i < admins.length; i++) {
+            admins[i] = vm.addr(200 + i);
+        }
+
+        vm.startPrank(admins[0]);
+        factory.clone(
+            nonce,
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            admins
+        );
+
+        vm.expectRevert(bytes("ERC1167: create2 failed"));
+        factory.clone(
+            nonce,
+            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            admins
+        );
         vm.clearMockedCalls();
     }
 
