@@ -4,6 +4,7 @@ use std::{
     future::Future,
     hash::Hash,
     net::{IpAddr, SocketAddr},
+    num::NonZeroUsize,
     str::FromStr,
     sync::Arc,
 };
@@ -534,8 +535,8 @@ impl SessionClientRequest {
         "protocol": "tcp",
         "ip": "127.0.0.1",
         "port": 5542,
-        "mtu": 1020,
-        "surb_len": 400,
+        "hopr_mtu": 1002,
+        "surb_len": 398,
         "active_clients": []
     }))]
 #[serde(rename_all = "camelCase")]
@@ -562,11 +563,11 @@ pub(crate) struct SessionClientResponse {
     #[schema(example = 5542)]
     /// Listening port of the Session's socket.
     pub port: u16,
-    /// MTU used by the Session.
-    pub mtu: usize,
+    /// MTU used by the underlying HOPR transport.
+    pub hopr_mtu: usize,
     /// Size of a Single Use Reply Block used by the protocol.
     ///
-    /// This is usefult for SURB balancing calculations.
+    /// This is useful for SURB balancing calculations.
     pub surb_len: usize,
     /// Lists Session IDs of all active clients.
     ///
@@ -1003,7 +1004,7 @@ pub(crate) async fn create_client(
                 destination: args.destination,
                 forward_path: args.forward_path.clone(),
                 return_path: args.return_path.clone(),
-                mtu: SESSION_MTU,
+                hopr_mtu: SESSION_MTU,
                 surb_len: SURB_SIZE,
                 active_clients: udp_session_id.into_iter().map(|s| s.to_string()).collect(),
             }),
@@ -1063,7 +1064,7 @@ pub(crate) async fn list_clients(
             forward_path: entry.forward_path.clone(),
             return_path: entry.return_path.clone(),
             destination: entry.destination,
-            mtu: SESSION_MTU,
+            hopr_mtu: SESSION_MTU,
             surb_len: SURB_SIZE,
             active_clients: entry.clients.iter().map(|e| e.key().to_string()).collect(),
         })
@@ -1399,7 +1400,13 @@ async fn udp_bind_to<A: std::net::ToSocketAddrs>(
         .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
         .with_foreign_data_mode(ForeignDataMode::Discard) // discard data from UDP clients other than the first one served
         .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-        .with_receiver_parallelism(UdpStreamParallelism::Auto);
+        .with_receiver_parallelism(
+            std::env::var("HOPRD_SESSION_ENTRY_UDP_RX_PARALLELISM")
+                .ok()
+                .and_then(|s| s.parse::<NonZeroUsize>().ok())
+                .map(UdpStreamParallelism::Specific)
+                .unwrap_or(UdpStreamParallelism::Auto),
+        );
 
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
@@ -1487,7 +1494,7 @@ mod tests {
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
-            None,
+            Default::default(),
             loopback_transport(),
             None,
         )?;
@@ -1530,7 +1537,7 @@ mod tests {
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
-            None,
+            Default::default(),
             loopback_transport(),
             None,
         )?;

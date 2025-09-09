@@ -265,7 +265,7 @@ fn caps_to_ack_mode(caps: Capabilities) -> AcknowledgementMode {
     }
 }
 
-/// Indicates the closure reason of a [`Session`].
+/// Indicates the closure reason of a [`HoprSession`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display)]
 pub enum ClosureReason {
     /// Write-half of the Session has been closed.
@@ -299,14 +299,34 @@ pub enum SessionTarget {
     ExitNode(ServiceId),
 }
 
-/// Wrapper for incoming [`Session`] along with other information
+/// Wrapper for incoming [`HoprSession`] along with other information
 /// extracted from the Start protocol during the session establishment.
 #[derive(Debug)]
 pub struct IncomingSession {
     /// Actual incoming session.
-    pub session: Session,
+    pub session: HoprSession,
     /// Desired [target](SessionTarget) of the data received over the session.
     pub target: SessionTarget,
+}
+
+/// Configures the Session protocol socket over HOPR.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+pub struct HoprSessionConfig {
+    /// Capabilities of the Session protocol socket.
+    ///
+    /// Default is no capabilities.
+    #[default(Capabilities::empty())]
+    pub capabilities: Capabilities,
+    /// Expected frame size of the Session protocol socket.
+    ///
+    /// Default is 1500.
+    #[default(1500)]
+    pub frame_mtu: usize,
+    /// Maximum amount of time an incomplete frame can be kept in the buffer.
+    ///
+    /// Default is 800 ms
+    #[default(Duration::from_millis(800))]
+    pub frame_timeout: Duration,
 }
 
 /// Represents the Session protocol socket over HOPR.
@@ -314,16 +334,16 @@ pub struct IncomingSession {
 /// This is essentially a HOPR-specific wrapper for [`ReliableSocket`] and [`UnreliableSocket`]
 /// Session protocol sockets.
 #[pin_project::pin_project]
-pub struct Session {
+pub struct HoprSession {
     id: SessionId,
     #[pin]
     inner: Box<dyn AsyncReadWrite>,
     routing: DestinationRouting,
-    capabilities: Capabilities,
+    cfg: HoprSessionConfig,
     on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
 }
 
-impl Session {
+impl HoprSession {
     /// Creates a new HOPR Session.
     ///
     /// It builds an [`futures::io::AsyncRead`] + [`futures::io::AsyncWrite`] transport
@@ -332,20 +352,18 @@ impl Session {
     ///
     /// The `on_close` closure can be optionally called when the Session has been closed via `poll_close`.
     #[tracing::instrument(skip(hopr, on_close), fields(session_id = %id))]
-    pub fn new<Tx, Rx, C>(
+    pub fn new<Tx, Rx>(
         id: SessionId,
         routing: DestinationRouting,
-        capabilities: C,
+        cfg: HoprSessionConfig,
         hopr: (Tx, Rx),
         on_close: Option<Box<dyn FnOnce(SessionId, ClosureReason) + Send + Sync>>,
     ) -> Result<Self, TransportSessionError>
     where
         Tx: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Send + Sync + Unpin + 'static,
         Rx: futures::Stream<Item = ApplicationDataIn> + Send + Sync + Unpin + 'static,
-        C: Into<Capabilities> + std::fmt::Debug,
         Tx::Error: std::error::Error + Send + Sync,
     {
-        let capabilities = capabilities.into();
         let routing_clone = routing.clone();
 
         // Wrap the HOPR transport so that it appears as regular transport to the SessionSocket
@@ -369,20 +387,19 @@ impl Session {
         );
 
         // Based on the requested capabilities, see if we should use the Session protocol
-        let inner: Box<dyn AsyncReadWrite> = if capabilities.contains(Capability::Segmentation) {
-            // TODO: update config values
+        let inner: Box<dyn AsyncReadWrite> = if cfg.capabilities.contains(Capability::Segmentation) {
             let socket_cfg = SessionSocketConfig {
-                frame_size: 1500,
-                frame_timeout: Duration::from_millis(800),
+                frame_size: cfg.frame_mtu,
+                frame_timeout: cfg.frame_timeout,
                 capacity: 16384,
-                flush_immediately: capabilities.contains(Capability::NoDelay),
+                flush_immediately: cfg.capabilities.contains(Capability::NoDelay),
                 ..Default::default()
             };
 
             // Need to test the capabilities separately, because any Retransmission capability
             // implies Segmentation, and therefore `is_disjoint` would fail
-            if capabilities.contains(Capability::RetransmissionAck)
-                || capabilities.contains(Capability::RetransmissionNack)
+            if cfg.capabilities.contains(Capability::RetransmissionAck)
+                || cfg.capabilities.contains(Capability::RetransmissionNack)
             {
                 // TODO: update config values
                 let ack_cfg = AcknowledgementStateConfig {
@@ -391,7 +408,7 @@ impl Session {
                     // We can no longer base this timeout on the number of hops because
                     // it is not known for SURB-based routing.
                     expected_packet_latency: Duration::from_millis(200),
-                    mode: caps_to_ack_mode(capabilities),
+                    mode: caps_to_ack_mode(cfg.capabilities),
                     backoff_base: 0.2,
                     max_incoming_frame_retries: 1,
                     max_outgoing_frame_retries: 2,
@@ -421,7 +438,7 @@ impl Session {
             id,
             inner,
             routing,
-            capabilities,
+            cfg,
             on_close,
         })
     }
@@ -436,13 +453,13 @@ impl Session {
         &self.routing
     }
 
-    /// Capabilities of this Session.
-    pub fn capabilities(&self) -> &Capabilities {
-        &self.capabilities
+    /// Configuration of this Session.
+    pub fn config(&self) -> &HoprSessionConfig {
+        &self.cfg
     }
 }
 
-impl std::fmt::Debug for Session {
+impl std::fmt::Debug for HoprSession {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session")
             .field("id", &self.id)
@@ -451,7 +468,7 @@ impl std::fmt::Debug for Session {
     }
 }
 
-impl futures::AsyncRead for Session {
+impl futures::AsyncRead for HoprSession {
     #[instrument(name = "Session::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         let this = self.project();
@@ -468,7 +485,7 @@ impl futures::AsyncRead for Session {
     }
 }
 
-impl futures::AsyncWrite for Session {
+impl futures::AsyncWrite for HoprSession {
     #[instrument(name = "Session::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = %self.id), ret)]
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         self.project().inner.poll_write(cx, buf)
@@ -495,7 +512,7 @@ impl futures::AsyncWrite for Session {
 }
 
 #[cfg(feature = "runtime-tokio")]
-impl tokio::io::AsyncRead for Session {
+impl tokio::io::AsyncRead for HoprSession {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -509,7 +526,7 @@ impl tokio::io::AsyncRead for Session {
 }
 
 #[cfg(feature = "runtime-tokio")]
-impl tokio::io::AsyncWrite for Session {
+impl tokio::io::AsyncWrite for HoprSession {
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
         futures::AsyncWrite::poll_write(self.as_mut(), cx, buf)
     }
@@ -584,10 +601,10 @@ mod tests {
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
-        let mut alice_session = Session::new(
+        let mut alice_session = HoprSession::new(
             id,
             DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into()?)),
-            None,
+            Default::default(),
             (
                 alice_tx,
                 alice_rx
@@ -600,10 +617,10 @@ mod tests {
             None,
         )?;
 
-        let mut bob_session = Session::new(
+        let mut bob_session = HoprSession::new(
             id,
             DestinationRouting::Return(id.pseudonym().into()),
-            None,
+            Default::default(),
             (
                 bob_tx,
                 bob_rx
@@ -659,10 +676,13 @@ mod tests {
         let (alice_tx, bob_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
         let (bob_tx, alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
 
-        let mut alice_session = Session::new(
+        let mut alice_session = HoprSession::new(
             id,
             DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into()?)),
-            Capability::Segmentation,
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation.into(),
+                ..Default::default()
+            },
             (
                 alice_tx,
                 alice_rx
@@ -675,10 +695,13 @@ mod tests {
             None,
         )?;
 
-        let mut bob_session = Session::new(
+        let mut bob_session = HoprSession::new(
             id,
             DestinationRouting::Return(id.pseudonym().into()),
-            Capability::Segmentation,
+            HoprSessionConfig {
+                capabilities: Capability::Segmentation.into(),
+                ..Default::default()
+            },
             (
                 bob_tx,
                 bob_rx

@@ -1,4 +1,4 @@
-//! [`Session`] object providing the session functionality over the HOPR transport
+//! [`HoprSession`] object providing the session functionality over the HOPR transport
 //!
 //! The session proxies the user interactions with the transport to hide the
 //! advanced interactions and functionality.
@@ -16,11 +16,15 @@ mod utils;
 pub use balancer::{MIN_BALANCER_SAMPLING_INTERVAL, SurbBalancerConfig};
 pub use hopr_network_types::types::*;
 pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, SessionManagerConfig};
-pub use types::{ByteCapabilities, IncomingSession, ServiceId, Session, SessionId, SessionTarget};
+pub use types::{
+    ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
+};
 #[cfg(feature = "runtime-tokio")]
 pub use utils::transfer_session;
 
 /// Number of bytes that can be sent in a single Session protocol payload.
+///
+/// In other words, this is the effective payload capacity of a single Session segment.
 pub const SESSION_MTU: usize =
     hopr_protocol_session::session_socket_mtu::<{ hopr_protocol_app::v1::ApplicationData::PAYLOAD_SIZE }>();
 

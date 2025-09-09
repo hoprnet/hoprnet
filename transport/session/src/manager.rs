@@ -19,7 +19,8 @@ use hopr_protocol_start::{
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
+    SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerConfigFeedback, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
@@ -27,7 +28,7 @@ use crate::{
         simple::SimpleBalancerController,
     },
     errors::{SessionManagerError, TransportSessionError},
-    types::{ByteCapabilities, ClosureReason, HoprStartProtocol},
+    types::{ByteCapabilities, ClosureReason, HoprSessionConfig, HoprStartProtocol},
     utils,
     utils::insert_into_next_slot,
 };
@@ -87,6 +88,9 @@ pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
 /// Maximum time to wait for counterparty to receive the target number of SURBs.
 const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Minimum timeout until an unfinished frame is discarded.
+const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
+
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
@@ -113,10 +117,13 @@ struct SessionCacheBalancerFeedback(moka::future::Cache<SessionId, SessionSlot>)
 #[async_trait::async_trait]
 impl BalancerConfigFeedback for SessionCacheBalancerFeedback {
     async fn get_config(&self, id: &SessionId) -> crate::errors::Result<SurbBalancerConfig> {
+        // Intentionally using `iter().find()` instead of `get()` here,
+        // so that the popularity estimator is not hit.
         self.0
-            .get(id)
-            .await
+            .iter()
+            .find(|(sid, _)| sid.as_ref() == id)
             .ok_or(SessionManagerError::NonExistingSession)?
+            .1
             .surb_mgmt
             .ok_or(SessionManagerError::Other("missing surb balancer config".into()).into())
     }
@@ -186,6 +193,18 @@ pub struct SessionManagerConfig {
     /// Default is 128, minimum is 1; maximum is given by the `session_tag_range`.
     #[default(128)]
     pub maximum_sessions: usize,
+
+    /// The maximum chunk of data that can be written to the Session's input buffer.
+    ///
+    /// Default is 1500.
+    #[default(1500)]
+    pub frame_mtu: usize,
+
+    /// The maximum time for an incomplete frame to stay in the Session's output buffer.
+    ///
+    /// Default is 800 ms.
+    #[default(Duration::from_millis(800))]
+    pub max_frame_timeout: Duration,
 
     /// The base timeout for initiation of Session initiation.
     ///
@@ -262,7 +281,7 @@ pub struct SessionManagerConfig {
 ///
 /// Since the `SessionManager` operates over the HOPR protocol,
 /// the message transport `S` is required.
-/// Such transport must also be `Clone`, since it will be cloned into all the created [`Session`] objects.
+/// Such transport must also be `Clone`, since it will be cloned into all the created [`HoprSession`] objects.
 ///
 /// ## SURB balancing
 /// The manager also can take care of automatic [SURB balancing](SurbBalancerConfig) per Session.
@@ -433,6 +452,10 @@ where
             .maximum_sessions
             .clamp(1, (cfg.session_tag_range.end - cfg.session_tag_range.start) as usize);
 
+        // Ensure the Frame MTU is at least the size of the Session segment MTU payload
+        cfg.frame_mtu = cfg.frame_mtu.max(SESSION_MTU);
+        cfg.max_frame_timeout = cfg.max_frame_timeout.max(MIN_FRAME_TIMEOUT);
+
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
@@ -582,7 +605,7 @@ where
         destination: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-    ) -> crate::errors::Result<Session> {
+    ) -> crate::errors::Result<HoprSession> {
         self.sessions.run_pending_tasks().await;
         if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
@@ -777,10 +800,14 @@ where
                         }
                     }
 
-                    Session::new(
+                    HoprSession::new(
                         session_id,
                         forward_routing,
-                        cfg.capabilities,
+                        HoprSessionConfig {
+                            capabilities: cfg.capabilities,
+                            frame_mtu: self.cfg.frame_mtu,
+                            frame_timeout: self.cfg.max_frame_timeout,
+                        },
                         (
                             reduced_surb_scoring_sender,
                             rx.inspect(move |_| {
@@ -824,10 +851,14 @@ where
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
-                    Session::new(
+                    HoprSession::new(
                         session_id,
                         forward_routing,
-                        cfg.capabilities,
+                        HoprSessionConfig {
+                            capabilities: cfg.capabilities,
+                            frame_mtu: self.cfg.frame_mtu,
+                            frame_timeout: self.cfg.max_frame_timeout,
+                        },
                         (reduced_surb_sender, rx),
                         Some(notifier),
                     )
@@ -1060,10 +1091,14 @@ where
                 };
 
                 let surb_estimator_clone = surb_estimator.clone();
-                let session = Session::new(
+                let session = HoprSession::new(
                     session_id,
                     reply_routing.clone(),
-                    session_req.capabilities,
+                    HoprSessionConfig {
+                        capabilities: session_req.capabilities.into(),
+                        frame_mtu: self.cfg.frame_mtu,
+                        frame_timeout: self.cfg.max_frame_timeout,
+                    },
                     (
                         // Sent packets = SURB consumption estimate
                         msg_sender
@@ -1159,10 +1194,14 @@ where
 
                 session
             } else {
-                Session::new(
+                HoprSession::new(
                     session_id,
                     reply_routing.clone(),
-                    session_req.capabilities,
+                    HoprSessionConfig {
+                        capabilities: session_req.capabilities.into(),
+                        frame_mtu: self.cfg.frame_mtu,
+                        frame_timeout: self.cfg.max_frame_timeout,
+                    },
                     (msg_sender.clone(), rx_session_data),
                     Some(closure_notifier),
                 )?
@@ -1495,10 +1534,13 @@ mod tests {
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
         assert_eq!(
-            *alice_session.capabilities(),
+            alice_session.config().capabilities,
             Capability::Segmentation | Capability::NoRateControl
         );
-        assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
+        assert_eq!(
+            alice_session.config().capabilities,
+            bob_session.session.config().capabilities
+        );
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
         assert_eq!(vec![*alice_session.id()], alice_mgr.active_sessions().await);
@@ -1641,10 +1683,13 @@ mod tests {
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
         assert_eq!(
-            *alice_session.capabilities(),
+            alice_session.config().capabilities,
             Capability::Segmentation | Capability::NoRateControl,
         );
-        assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
+        assert_eq!(
+            alice_session.config().capabilities,
+            bob_session.session.config().capabilities
+        );
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
         // Let the session timeout at Alice
