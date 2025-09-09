@@ -14,7 +14,7 @@ abstract contract HoprNodeSafeRegistryEvents {
     /**
      * Emitted once a safe and node pair gets deregistered
      */
-    event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    event DeregisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
     /**
      * Emitted once the domain separator is updated.
      */
@@ -184,7 +184,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
 
         // Update the state and emit the event
         _nodeToSafe[nodeAddr].safeAddress = address(0);
-        emit DergisteredNodeSafe(msg.sender, nodeAddr);
+        emit DeregisteredNodeSafe(msg.sender, nodeAddr);
     }
 
     /**

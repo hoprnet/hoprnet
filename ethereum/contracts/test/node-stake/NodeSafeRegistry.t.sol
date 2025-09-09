@@ -293,7 +293,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
 
         vm.prank(safeAddress);
         vm.expectEmit(true, true, false, false, address(nodeSafeRegistry));
-        emit DergisteredNodeSafe(safeAddress, nodeAddress);
+        emit DeregisteredNodeSafe(safeAddress, nodeAddress);
         nodeSafeRegistry.deregisterNodeBySafe(nodeAddress);
         vm.clearMockedCalls();
     }
