@@ -46,7 +46,8 @@ on:
         options:
           - core-rotsee
           - core-dufour
-          - uhttp
+          - ctdapp-rotsee
+          - demo-rotsee
           - team
         required: true
         description: 'Cluster of nodes to test'
@@ -86,7 +87,7 @@ on:
         description: 'Payload size in bytes'
       download_throughput:
         type: number
-        default: 524288
+        default: 1048576
         required: true
         description: 'Download throughput in bytes per second (0 means disabled scenario)'
       upload_throughput:
