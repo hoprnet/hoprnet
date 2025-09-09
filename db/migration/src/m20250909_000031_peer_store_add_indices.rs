@@ -56,7 +56,7 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_index(Index::drop().name(IDX_NAME_IGNORED_UNTIL).to_owned())
+            .drop_index(Index::drop().name(IDX_NAME_IGNORED).to_owned())
             .await
     }
 }
