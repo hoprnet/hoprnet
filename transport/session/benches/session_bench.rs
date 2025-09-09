@@ -6,7 +6,7 @@ use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::{DestinationRouting, RoutingOptions};
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-use hopr_transport_session::{Capabilities, Capability, Session, SessionId};
+use hopr_transport_session::{Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId};
 use rand::{Rng, thread_rng};
 
 // Avoid musl's default allocator due to degraded performance
@@ -24,10 +24,13 @@ pub async fn alice_send_data(
     let dst: Address = (&ChainKeypair::random()).into();
     let id = SessionId::new(1234_u64, HoprPseudonym::random());
 
-    let mut alice_session = Session::new(
+    let mut alice_session = HoprSession::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into().unwrap())),
-        caps,
+        HoprSessionConfig {
+            capabilities: caps.into(),
+            ..Default::default()
+        },
         (
             alice_tx,
             alice_rx.map(|(_, data)| ApplicationDataIn {
@@ -56,10 +59,13 @@ pub async fn bob_receive_data(
     let (bob_tx, _alice_rx) = futures::channel::mpsc::unbounded::<(DestinationRouting, ApplicationDataOut)>();
     let id = SessionId::new(1234_u64, HoprPseudonym::random());
 
-    let mut bob_session = Session::new(
+    let mut bob_session = HoprSession::new(
         id,
         DestinationRouting::Return(id.pseudonym().into()),
-        caps,
+        HoprSessionConfig {
+            capabilities: caps.into(),
+            ..Default::default()
+        },
         (bob_tx, futures::stream::iter(data).map(|data| data)),
         None,
     )

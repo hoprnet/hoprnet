@@ -544,6 +544,10 @@ where
                             if elapsed.as_millis() > SLOW_OP_MS {
                                 warn!(?elapsed," ack_tx.send took too long");
                             }
+                            let elapsed = now.elapsed();
+                            if elapsed.as_millis() > SLOW_OP_MS {
+                                warn!(%previous_hop, ?elapsed, "ack_processor.handle_acknowledgement took too long");
+                            }
 
                             // We do not acknowledge back acknowledgements.
                             None

@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, num::NonZeroUsize};
 
 use hopr_lib::{HoprOffchainKeypair, ServiceId, errors::HoprLibError, transfer_session};
 use hopr_network_types::{prelude::ForeignDataMode, udp::UdpStreamParallelism};
@@ -92,7 +92,13 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
                     .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-                    .with_receiver_parallelism(UdpStreamParallelism::Auto)
+                    .with_receiver_parallelism(
+                        std::env::var("HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM")
+                            .ok()
+                            .and_then(|s| s.parse::<NonZeroUsize>().ok())
+                            .map(UdpStreamParallelism::Specific)
+                            .unwrap_or(UdpStreamParallelism::Auto),
+                    )
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
                         HoprLibError::GeneralError(format!(
