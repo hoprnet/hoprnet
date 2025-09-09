@@ -589,6 +589,37 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 - `OTEL_SERVICE_NAME` - the identifier used to assign traces from this instance to (e.g. `my_hoprd_instance`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` - URL of an endpoint accepting the OpenTelemetry format (e.g. http://jaeger:4317/)
 
+### Profiling Criterion benchmarks via `flamegraph`
+
+#### Prerequisites
+
+- `perf` installed on the host system
+- flamegraph (install via e.g. `cargo install flamegraph`)
+
+#### Profiling the benchmarking binaries
+
+1. Perform a build of your chosen benchmark with `--no-rosegment` linker flag:
+
+   ```
+   RUSTFLAGS="-Clink-arg=-fuse-ld=lld -Clink-arg=-Wl,--no-rosegment" cargo bench --no-run -p hopr-crypto-packet
+   ```
+
+   Use `mold` instead of `lld` if needed.
+
+2. Find the built benchmarking binary and check if it contains debug symbols:
+
+   ```
+   readelf -S target/release/deps/packet_benches-ce70d68371e6d19a | grep debug
+   ```
+
+   The output of the above command should contain AT LEAST: `.debug_line`, `.debug_info` and `.debug_loc`
+
+3. Run `flamegraph` on the benchmarking binary of a selected benchmark with a fixed profile time (e.g.: 30 seconds):
+   ```
+   flamegraph -- ./target/release/deps/packet_benches-ce70d68371e6d19a --bench --exact packet_sending_no_precomputation/0_hop_0_surbs --profile-time 30
+   ```
+4. The `flamegraph.svg` will be generated in the project root directory and can be opened in a browser.
+
 ### HOPR packet capture
 
 Using the environment variable `HOPR_CAPTURE_PACKETS` allows capturing customized HOPR packet format to a PCAP file or to a `udpdump` host.

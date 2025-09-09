@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-packet"
-version = "0.12.1"
+version = "1.0.0"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -12,16 +12,20 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["rayon"]
+rayon = ["dep:rayon"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
+  "flagset/serde",
   "hopr-crypto-sphinx/serde",
   "hopr-path/serde",
 ]
 
 [dependencies]
 hex = { workspace = true }
+flagset = { workspace = true }
+rayon = { workspace = true, optional = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
@@ -37,7 +41,7 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-bimap = "0.6.3"
+bimap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }

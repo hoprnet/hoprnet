@@ -12,7 +12,7 @@ use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
-use hopr_protocol_app::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_protocol_app::prelude::*;
 use hopr_protocol_start::{
     KeepAliveMessage, StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation,
 };
@@ -97,7 +97,7 @@ type SessionInitiationCache =
 struct SessionSlot {
     // Sender needs to be put in Arc, so that no clones are made by `moka`.
     // This makes sure that the entire channel closes once the one and only sender is closed.
-    session_tx: Arc<UnboundedSender<Box<[u8]>>>,
+    session_tx: Arc<UnboundedSender<ApplicationDataIn>>,
     routing_opts: DestinationRouting,
     abort_handles: Vec<AbortHandle>,
     // Allows reconfiguring of the SURB balancer on-the-fly
@@ -156,7 +156,7 @@ pub enum DispatchResult {
     /// Session or Start protocol message has been processed successfully.
     Processed,
     /// The message was not related to Start or Session protocol.
-    Unrelated(ApplicationData),
+    Unrelated(ApplicationDataIn),
 }
 
 /// Incoming session notifier and session closure notifier
@@ -428,7 +428,7 @@ impl<S> Clone for SessionManager<S> {
 
 impl<S> SessionManager<S>
 where
-    S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
     /// Creates a new instance given the [`config`](SessionManagerConfig).
@@ -654,7 +654,10 @@ where
         // Send the Session initiation message
         info!(challenge, %pseudonym, %destination, "new session request");
         msg_sender
-            .send((forward_routing.clone(), start_session_msg.try_into()?))
+            .send((
+                forward_routing.clone(),
+                ApplicationDataOut::with_no_packet_info(start_session_msg.try_into()?),
+            ))
             .await
             .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?;
 
@@ -675,7 +678,7 @@ where
                 let session_id = est.session_id;
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
-                let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+                let (tx, rx) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
                 let notifier = self
                     .session_notifiers
                     .get()
@@ -697,21 +700,42 @@ where
 
                     // Sender responsible for keep-alive and Session data will be counting produced SURBs
                     let surb_estimator_clone = surb_estimator.clone();
-                    let scoring_sender =
-                        msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationData)| {
+                    let full_surb_scoring_sender =
+                        msg_sender.with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                             // Count how many SURBs we sent with each packet
                             surb_estimator_clone.produced.fetch_add(
-                                ApplicationData::estimate_surbs_with_msg(&data.plain_text) as u64,
+                                data.estimate_surbs_with_msg() as u64,
                                 std::sync::atomic::Ordering::Relaxed,
                             );
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
+                    // For standard Session data we first reduce the number of SURBs we want to produce,
+                    // unless requested to always max them out
+                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let reduced_surb_scoring_sender = full_surb_scoring_sender.clone().with(
+                        // NOTE: this is put in-front of the `full_surb_scoring_sender`,
+                        // so that its estimate of SURBs gets automatically updated based on
+                        // the `max_surbs_in_packets` set here.
+                        move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                            if !max_out_organic_surbs {
+                                // TODO: make this dynamic to honor the balancer target (#7439)
+                                data.packet_info
+                                    .get_or_insert_with(|| OutgoingPacketInfo {
+                                        max_surbs_in_packet: 1,
+                                        ..Default::default()
+                                    })
+                                    .max_surbs_in_packet = 1;
+                            }
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        },
+                    );
+
                     let mut abort_handles = Vec::new();
 
                     // Spawn the SURB-bearing keep alive stream
                     let (ka_controller, ka_abort_handle) =
-                        utils::spawn_keep_alive_stream(session_id, scoring_sender.clone(), forward_routing.clone());
+                        utils::spawn_keep_alive_stream(session_id, full_surb_scoring_sender, forward_routing.clone());
                     abort_handles.push(ka_abort_handle);
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
@@ -777,9 +801,10 @@ where
                             frame_timeout: self.cfg.max_frame_timeout,
                         },
                         (
-                            scoring_sender,
+                            reduced_surb_scoring_sender,
                             rx.inspect(move |_| {
                                 // Received packets = SURB consumption estimate
+                                // The received packets always consume a single SURB.
                                 surb_estimator
                                     .consumed
                                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -802,6 +827,22 @@ where
                     )
                     .await?;
 
+                    // For standard Session data we first reduce the number of SURBs we want to produce,
+                    // unless requested to always max them out
+                    let max_out_organic_surbs = cfg.always_max_out_surbs;
+                    let reduced_surb_sender =
+                        msg_sender.with(move |(routing, mut data): (DestinationRouting, ApplicationDataOut)| {
+                            if !max_out_organic_surbs {
+                                data.packet_info
+                                    .get_or_insert_with(|| OutgoingPacketInfo {
+                                        max_surbs_in_packet: 1,
+                                        ..Default::default()
+                                    })
+                                    .max_surbs_in_packet = 1;
+                            }
+                            futures::future::ok::<_, S::Error>((routing, data))
+                        });
+
                     Session::new(
                         session_id,
                         forward_routing,
@@ -810,7 +851,7 @@ where
                             mtu: self.cfg.session_mtu,
                             frame_timeout: self.cfg.max_frame_timeout,
                         },
-                        (msg_sender, rx),
+                        (reduced_surb_sender, rx),
                         Some(notifier),
                     )
                 }
@@ -853,7 +894,7 @@ where
                 .ok_or(SessionManagerError::NotStarted)?
                 .send((
                     session_data.routing_opts.clone(),
-                    HoprStartProtocol::KeepAlive((*id).into()).try_into()?,
+                    ApplicationDataOut::with_no_packet_info(HoprStartProtocol::KeepAlive((*id).into()).try_into()?),
                 ))
                 .await
                 .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?)
@@ -922,24 +963,28 @@ where
     pub async fn dispatch_message(
         &self,
         pseudonym: HoprPseudonym,
-        data: ApplicationData,
+        in_data: ApplicationDataIn,
     ) -> crate::errors::Result<DispatchResult> {
-        if data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
+        if in_data.data.application_tag == HoprStartProtocol::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we handle it
-            trace!(tag = %data.application_tag, "dispatching Start protocol message");
+            trace!("dispatching Start protocol message");
             return self
-                .handle_start_protocol_message(pseudonym, data)
+                .handle_start_protocol_message(pseudonym, in_data)
                 .await
                 .map(|_| DispatchResult::Processed);
-        } else if self.cfg.session_tag_range.contains(&data.application_tag.as_u64()) {
-            let session_id = SessionId::new(data.application_tag, pseudonym);
+        } else if self
+            .cfg
+            .session_tag_range
+            .contains(&in_data.data.application_tag.as_u64())
+        {
+            let session_id = SessionId::new(in_data.data.application_tag, pseudonym);
 
             return if let Some(session_data) = self.sessions.get(&session_id).await {
                 trace!(?session_id, "received data for a registered session");
 
                 Ok(session_data
                     .session_tx
-                    .unbounded_send(data.plain_text)
+                    .unbounded_send(in_data)
                     .map(|_| DispatchResult::Processed)
                     .map_err(|e| SessionManagerError::Other(e.to_string()))?)
             } else {
@@ -948,8 +993,8 @@ where
             };
         }
 
-        trace!(%data.application_tag, "received data not associated with session protocol or any existing session");
-        Ok(DispatchResult::Unrelated(data))
+        trace!(tag = %in_data.data.application_tag, "received data not associated with session protocol or any existing session");
+        Ok(DispatchResult::Unrelated(in_data))
     }
 
     async fn handle_incoming_session_initiation(
@@ -972,7 +1017,7 @@ where
         // Reply routing uses SURBs only with the pseudonym of this Session's ID
         let reply_routing = DestinationRouting::Return(pseudonym.into());
 
-        let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+        let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<ApplicationDataIn>();
 
         // Search for a free Session ID slot
         self.sessions.run_pending_tasks().await; // Needed so that entry_count is updated
@@ -1050,7 +1095,7 @@ where
                         // Sent packets = SURB consumption estimate
                         msg_sender
                             .clone()
-                            .with(move |(routing, data): (DestinationRouting, ApplicationData)| {
+                            .with(move |(routing, data): (DestinationRouting, ApplicationDataOut)| {
                                 // Each outgoing packet consumes one SURB
                                 surb_estimator_clone
                                     .consumed
@@ -1062,10 +1107,9 @@ where
                         // Received packets = SURB retrieval estimate
                         rx_session_data.inspect(move |data| {
                             // Count the number of SURBs delivered with each incoming packet
-                            surb_estimator_clone.produced.fetch_add(
-                                ApplicationData::estimate_surbs_with_msg(data) as u64,
-                                std::sync::atomic::Ordering::Relaxed,
-                            );
+                            surb_estimator_clone
+                                .produced
+                                .fetch_add(data.num_surbs_with_msg() as u64, std::sync::atomic::Ordering::Relaxed);
                         }),
                     ),
                     Some(closure_notifier),
@@ -1175,9 +1219,12 @@ where
                 session_id,
             });
 
-            msg_sender.send((reply_routing, data.try_into()?)).await.map_err(|e| {
-                SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
-            })?;
+            msg_sender
+                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .await
+                .map_err(|e| {
+                    SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
+                })?;
 
             info!(%session_id, "new session established");
 
@@ -1196,9 +1243,12 @@ where
                 reason,
             });
 
-            msg_sender.send((reply_routing, data.try_into()?)).await.map_err(|e| {
-                SessionManagerError::Other(format!("failed to send session establishment error message: {e}"))
-            })?;
+            msg_sender
+                .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .await
+                .map_err(|e| {
+                    SessionManagerError::Other(format!("failed to send session establishment error message: {e}"))
+                })?;
 
             trace!(%pseudonym, "session establishment failure message sent");
 
@@ -1212,9 +1262,9 @@ where
     async fn handle_start_protocol_message(
         &self,
         pseudonym: HoprPseudonym,
-        data: ApplicationData,
+        data: ApplicationDataIn,
     ) -> crate::errors::Result<()> {
-        match HoprStartProtocol::try_from(data)? {
+        match HoprStartProtocol::try_from(data.data)? {
             HoprStartProtocol::StartSession(session_req) => {
                 self.handle_incoming_session_initiation(pseudonym, session_req).await?;
             }
@@ -1306,18 +1356,22 @@ mod tests {
 
     #[async_trait::async_trait]
     trait SendMsg {
-        async fn send_message(&self, routing: DestinationRouting, data: ApplicationData) -> crate::errors::Result<()>;
+        async fn send_message(
+            &self,
+            routing: DestinationRouting,
+            data: ApplicationDataOut,
+        ) -> crate::errors::Result<()>;
     }
 
     mockall::mock! {
         MsgSender {}
         impl SendMsg for MsgSender {
-            fn send_message<'a, 'b>(&'a self, routing: DestinationRouting, data: ApplicationData)
+            fn send_message<'a, 'b>(&'a self, routing: DestinationRouting, data: ApplicationDataOut)
             -> BoxFuture<'b, crate::errors::Result<()>> where 'a: 'b, Self: Sync + 'b;
         }
     }
 
-    fn mock_packet_planning(sender: MockMsgSender) -> UnboundedSender<(DestinationRouting, ApplicationData)> {
+    fn mock_packet_planning(sender: MockMsgSender) -> UnboundedSender<(DestinationRouting, ApplicationDataOut)> {
         let (tx, rx) = futures::channel::mpsc::unbounded();
         tokio::task::spawn(async move {
             pin_mut!(rx);
@@ -1331,8 +1385,8 @@ mod tests {
         tx
     }
 
-    fn msg_type(data: &ApplicationData, expected: StartProtocolDiscriminants) -> bool {
-        HoprStartProtocol::decode(data.application_tag, &data.plain_text)
+    fn msg_type(data: &ApplicationDataOut, expected: StartProtocolDiscriminants) -> bool {
+        HoprStartProtocol::decode(data.data.application_tag, &data.data.plain_text)
             .map(|d| StartProtocolDiscriminants::from(d) == expected)
             .unwrap_or(false)
     }
@@ -1357,14 +1411,22 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                info!("alice sends {}", data.application_tag);
+                info!("alice sends {}", data.data.application_tag);
                 msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1376,7 +1438,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
-                info!("bob sends {}", data.application_tag);
+                info!("bob sends {}", data.data.application_tag);
                 msg_type(data, StartProtocolDiscriminants::SessionEstablished)
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
@@ -1384,7 +1446,15 @@ mod tests {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
                 Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    alice_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1397,7 +1467,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
-                    data.plain_text.as_ref(),
+                    data.data.plain_text.as_ref(),
                 )
                 .expect("must be a session message")
                 .try_as_segment()
@@ -1408,7 +1478,15 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1522,7 +1600,15 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1541,7 +1627,15 @@ mod tests {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
                 Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    alice_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1616,7 +1710,7 @@ mod tests {
         };
 
         let alice_mgr =
-            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationData)>>::new(Default::default());
+            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         alice_mgr
@@ -1701,7 +1795,15 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1719,7 +1821,15 @@ mod tests {
             .returning(move |_, data| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
                 Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    alice_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1801,7 +1911,15 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1819,7 +1937,15 @@ mod tests {
             .returning(move |_, data| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
                 Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    alice_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1878,7 +2004,15 @@ mod tests {
                 // But the message is again processed by Alice due to Loopback
                 let alice_mgr_clone = alice_mgr_clone.clone();
                 Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    alice_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -1897,7 +2031,15 @@ mod tests {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
                 Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    alice_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -2007,7 +2149,15 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -2025,7 +2175,15 @@ mod tests {
             .returning(move |_, data| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
                 Box::pin(async move {
-                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    alice_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -2043,7 +2201,15 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });
@@ -2056,7 +2222,7 @@ mod tests {
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 hopr_protocol_session::types::SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(
-                    data.plain_text.as_ref(),
+                    data.data.plain_text.as_ref(),
                 )
                 .ok()
                 .and_then(|m| m.try_as_segment())
@@ -2067,7 +2233,15 @@ mod tests {
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
                 Box::pin(async move {
-                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    bob_mgr_clone
+                        .dispatch_message(
+                            alice_pseudonym,
+                            ApplicationDataIn {
+                                data: data.data,
+                                packet_info: Default::default(),
+                            },
+                        )
+                        .await?;
                     Ok(())
                 })
             });

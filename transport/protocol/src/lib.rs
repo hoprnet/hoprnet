@@ -84,7 +84,7 @@ use hopr_internal_types::{
     protocol::VerifiedAcknowledgement,
 };
 use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
 use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -107,7 +107,6 @@ pub const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
-use hopr_protocol_app::v1::ApplicationFlags;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -169,7 +168,7 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
-/// overlayed on top of the `wire_msg` Stream or Sink.
+/// overlay on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
     packet_cfg: processor::PacketInteractionConfig,
@@ -180,8 +179,8 @@ pub async fn run_msg_ack_protocol<Db>(
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
     ),
     api: (
-        impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
-        impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
+        impl futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
+        impl futures::Stream<Item = (ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>
         + Send
         + Sync
         + 'static,
@@ -383,9 +382,9 @@ where
                                         next_hop: v.next_hop,
                                         num_surbs,
                                         is_forwarded: false,
-                                        data: data_clone.to_bytes().into_vec().into(),
+                                        data: data_clone.data.to_bytes().into_vec().into(),
                                         ack_challenge: v.ack_challenge.as_ref().into(),
-                                        signals: data_clone.flags.bits(),
+                                        signals: data_clone.packet_info.unwrap_or_default().signals_to_destination,
                                         ticket: inspect_ticket_data_in_packet(&v.data).into(),
                                     }
                                     .into(),
@@ -558,7 +557,7 @@ where
                             sender,
                             plain_text,
                             ack_key,
-                            signals,
+                            info,
                             ..
                         } => {
                             // Send acknowledgement back
@@ -578,7 +577,7 @@ where
                                 METRIC_PACKET_COUNT.increment(&["received"]);
                             }
 
-                            Some((sender, plain_text, signals))
+                            Some((sender, plain_text, info))
                         }
                         IncomingPacket::Forwarded {
                             previous_hop,
@@ -589,6 +588,7 @@ where
                         } => {
                             // First, relay the packet to the next hop
                             trace!(%previous_hop, %next_hop, "forwarding packet to the next hop");
+
                             #[cfg(feature = "capture")]
                             let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingPacket {
                                 me: me_pub,
@@ -597,7 +597,7 @@ where
                                 is_forwarded: true,
                                 data: data.as_ref().into(),
                                 ack_challenge: Default::default(),
-                                signals: 0,
+                                signals: None.into(),
                                 ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
                             }.into();
 
@@ -631,16 +631,20 @@ where
                         }
                     }
                 }})
-                .filter_map(|maybe_data| async move {
-                    if let Some((sender, data, flags)) = maybe_data {
-                        ApplicationData::from_bytes(data.as_ref())
-                            .inspect_err(|error| tracing::error!(%error, "failed to decode application data"))
+                .filter_map(|maybe_data| futures::future::ready(
+                    // Create the ApplicationDataIn data structure for incoming data
+                    maybe_data
+                        .and_then(|(sender, data, aux_info)| ApplicationData::try_from(data.as_ref())
+                            .inspect_err(|error| tracing::error!(%sender, %error, "failed to decode application data"))
                             .ok()
-                            .map(|data| (sender, data.with_flags(ApplicationFlags::new_truncated(flags))))
-                    } else {
-                        None
-                    }
-                })
+                            .map(|data| (sender, ApplicationDataIn {
+                                data,
+                                packet_info: IncomingPacketInfo {
+                                    signals_from_sender: aux_info.packet_signals,
+                                    num_saved_surbs: aux_info.num_surbs,
+                                }
+                            })))
+                ))
                 .map(Ok)
                 .forward(api.0)
                 .instrument(tracing::trace_span!("msg protocol processing - incoming"))

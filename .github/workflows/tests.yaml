@@ -37,7 +37,7 @@ jobs:
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -61,7 +61,7 @@ jobs:
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -69,7 +69,7 @@ jobs:
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@140bb5113ffb6b65a7e9b937a81fa96cf5064462 # v2.1.11
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         if: ${{ !env.ACT }}
         with:
           token_format: "access_token"
@@ -92,7 +92,7 @@ jobs:
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -100,7 +100,7 @@ jobs:
 
       - name: Set up Google Cloud Credentials
         id: auth
-        uses: google-github-actions/auth@140bb5113ffb6b65a7e9b937a81fa96cf5064462 # v2.1.11
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         if: ${{ !env.ACT }}
         with:
           token_format: "access_token"
@@ -130,7 +130,7 @@ jobs:
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -165,7 +165,7 @@ jobs:
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
@@ -205,7 +205,7 @@ jobs:
           HOPR_SMOKETEST_BASE_PORT: ${{ steps.find_base_port.outputs.base-port }}
 
       - name: Upload snapshot
-        uses: google-github-actions/upload-cloud-storage@7c73f5d6eae167341002e9c946f7479a609c588e # v2.2.3
+        uses: google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a # v3.0.0
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
           path: ${{ steps.find_base_port.outputs.snapshot-dir }}

@@ -4468,7 +4468,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-actions"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4637,11 +4637,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.12.1"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "bimap",
  "criterion",
+ "flagset",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -4652,6 +4653,7 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "parameterized",
+ "rayon",
  "serde",
  "serde_bytes",
  "strum 0.27.2",
@@ -4670,7 +4672,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4694,7 +4696,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -4730,7 +4732,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4779,7 +4781,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.17.1"
+version = "0.18.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5042,6 +5044,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-primitive-types",
+ "hopr-protocol-app",
  "lazy_static",
  "mockall",
  "parameterized",
@@ -5076,7 +5079,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.14.2"
+version = "0.15.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5112,7 +5115,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.12.2"
+version = "0.13.0"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5300,7 +5303,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5350,11 +5353,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "arrayvec",
  "async-trait",
+ "criterion",
  "flagset",
  "futures",
  "futures-time",
