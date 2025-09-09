@@ -6,7 +6,7 @@ use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::{DestinationRouting, RoutingOptions};
 use hopr_primitive_types::prelude::Address;
 use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
-use hopr_transport_session::{Capabilities, Capability, Session, SessionId};
+use hopr_transport_session::{Capabilities, Capability, HoprSessionConfig, Session, SessionId};
 use rand::{Rng, thread_rng};
 
 pub async fn alice_send_data(
@@ -22,7 +22,10 @@ pub async fn alice_send_data(
     let mut alice_session = Session::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0.try_into().unwrap())),
-        caps,
+        HoprSessionConfig {
+            capabilities: caps.into(),
+            ..Default::default()
+        },
         (
             alice_tx,
             alice_rx.map(|(_, data)| ApplicationDataIn {
@@ -54,7 +57,10 @@ pub async fn bob_receive_data(
     let mut bob_session = Session::new(
         id,
         DestinationRouting::Return(id.pseudonym().into()),
-        caps,
+        HoprSessionConfig {
+            capabilities: caps.into(),
+            ..Default::default()
+        },
         (bob_tx, futures::stream::iter(data).map(|data| data)),
         None,
     )
