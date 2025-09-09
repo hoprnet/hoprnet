@@ -77,6 +77,7 @@ pub fn session_raw_benchmark(c: &mut Criterion) {
     const KB: usize = 1024;
 
     group.sample_size(100000);
+    group.measurement_time(std::time::Duration::from_secs(30));
 
     for size in [16 * KB, 64 * KB, 128 * KB, 1024 * KB].iter() {
         let mut alice_data = vec![0u8; *size];
@@ -105,6 +106,7 @@ pub fn session_segmentation_benchmark(c: &mut Criterion) {
     const KB: usize = 1024;
 
     group.sample_size(100000);
+    group.measurement_time(std::time::Duration::from_secs(30));
 
     for size in [16 * KB, 64 * KB, 128 * KB, 1024 * KB].iter() {
         let mut alice_data = vec![0u8; *size];
