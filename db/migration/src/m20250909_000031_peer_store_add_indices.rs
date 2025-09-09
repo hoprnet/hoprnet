@@ -30,7 +30,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .name(IDX_NAME_LAST_SEEN)
                     .table(NetworkPeer::Table)
-                    .col((NetworkPeer::LastSeen, IndexOrder::Desc))
+                    .col((NetworkPeer::LastSeen, IndexOrder::Asc))
                     .to_owned(),
             )
             .await?;
