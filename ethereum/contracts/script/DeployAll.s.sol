@@ -77,7 +77,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // Only deploy NetworkRegistryProxy contract when no deployed one is detected.
         // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in
         // development/staging/production
-        _deployNRProxy(deployerAddress);
+        _deployNetworkRegistryProxy(deployerAddress);
 
         // 3.7. NetworkRegistry Contract
         // Only deploy NetworkRegistrycontract when no deployed one is detected.
@@ -208,7 +208,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * @dev deploy network registry proxy.
      * In development, dummy is used
      */
-    function _deployNRProxy(address deployerAddress) internal {
+    function _deployNetworkRegistryProxy(address deployerAddress) internal {
         bool shouldDeployStakingProxy = false;
 
         if (currentEnvironmentType == EnvironmentType.LOCAL && vm.envBool("USE_STAKING_PROXY")) {

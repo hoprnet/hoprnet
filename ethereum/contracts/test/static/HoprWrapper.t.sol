@@ -71,7 +71,8 @@ contract HoprWrapperTest is Test, ERC1820RegistryFixtureTest {
         // unwrap some wxHOPR tokens to xHOPR
         vm.expectEmit(true, false, false, true, address(hoprWrapper));
         emit Unwrapped(holder, amount);
-        wxHoprToken.transfer(address(hoprWrapper), amount);
+        bool success = wxHoprToken.transfer(address(hoprWrapper), amount);
+        assertTrue(success);
 
         // balance of user address is correct
         assertEq(xHoprToken.balanceOf(address(hoprWrapper)), 70 - amount);
@@ -92,7 +93,8 @@ contract HoprWrapperTest is Test, ERC1820RegistryFixtureTest {
         vm.prank(holder);
         vm.expectEmit(true, false, false, true, address(hoprWrapper));
         emit Wrapped(holder, amount);
-        xHoprToken.transfer(address(hoprWrapper), amount);
+        bool success = xHoprToken.transfer(address(hoprWrapper), amount);
+        assertTrue(success);
         // tokens are transferred
         assertEq(xHoprToken.balanceOf(holder), INTIAL_BALANCE - amount);
         assertEq(xHoprToken.balanceOf(address(hoprWrapper)), amount);
@@ -108,7 +110,8 @@ contract HoprWrapperTest is Test, ERC1820RegistryFixtureTest {
     function test_RecoverTokens(uint256 amount) public {
         amount = bound(amount, 1, INTIAL_BALANCE - 1);
         vm.prank(holder);
-        xHoprToken.transfer(address(hoprWrapper), amount);
+        bool success = xHoprToken.transfer(address(hoprWrapper), amount);
+        assertTrue(success);
         assertEq(hoprWrapper.xHoprAmount(), amount);
         // mock the xHOPR balance of hoprWrapper to INTIAL_BALANCE
         uint256 balanceSlot =

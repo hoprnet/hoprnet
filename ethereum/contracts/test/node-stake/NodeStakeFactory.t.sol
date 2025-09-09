@@ -69,7 +69,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     function testRevert_CloneSafeAndModuleWithFewOwner() public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
 
         uint256 nonce = 0;
         address[] memory admins = new address[](0);
@@ -87,7 +87,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     function testRevert_CloneSafeAndModuleWithStakeFactoryAsOwner() public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
 
         uint256 nonce = 0;
         address[] memory admins = new address[](2);
@@ -110,7 +110,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     function test_CloneSafeAndModule() public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
 
         uint256 nonce = 0;
         address[] memory admins = new address[](10);
@@ -146,7 +146,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     function test_CloneMultipleSafesAndModules() public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
 
         // Deploy first safe and module, with 3 admins
         uint256 nonce0 = 0;
@@ -218,7 +218,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     function testFuzz_InitializeModuleProxy(uint256 nonce, address safeAddr, address multisendAddr) public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.assume(safeAddr != address(0));
         vm.assume(multisendAddr != address(0));
         vm.assume(multisendAddr != safeAddr);
@@ -305,7 +305,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
 
         // 1. Deploy node management module
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
@@ -333,7 +333,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     function testRevert_SafeSetupReuseNonce() public {
         address channels = 0x0101010101010101010101010101010101010101;
         address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         
         uint256 nonce = 0;
         address[] memory admins = new address[](10);
@@ -360,7 +360,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     /**
      * @dev internal function to ensure the safe and module are properly wired after cloning
      */
-    function _ensureSafeAndModuleAreWired(address moduleAddr, address payable safeAddr, address[] memory admins) internal {
+    function _ensureSafeAndModuleAreWired(address moduleAddr, address payable safeAddr, address[] memory admins) internal view {
         // Safe should have module enabled
         assertTrue(Safe(safeAddr).isModuleEnabled(moduleAddr));
         // Safe should have 1 threshold

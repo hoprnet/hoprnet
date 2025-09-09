@@ -196,7 +196,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         bytes32 channelId = keccak256(abi.encodePacked(src, dest));
         assertEq(hoprChannels._getChannelId(src, dest), channelId);
 
-        bytes32 channelState = hoprChannels.channelState(channelId);
         vm.expectEmit(true, true, true, true, address(hoprChannels));
         emit ChannelOpened(channelId, src, dest, _unwrapChannel(HoprChannelsType.Channel(
             HoprChannelsType.Balance.wrap(uint96(amount1)),

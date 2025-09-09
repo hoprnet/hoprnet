@@ -723,6 +723,7 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
      * @dev account[0] staes 1000 lock tokens to the stake contract
      * account[0] redeems boost nft of id 0 and 4
      */
+    /// forge-lint: disable-next-line(mixed-case-function)
     function _helperAccountsStakeTokensAndNFTs() internal {
         _helperMintBoosts();
 
@@ -762,6 +763,7 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
      * account[0] redeems boost nft of id 0 and 4
      * owner provides 1'000'000 ether rewards
      */
+    /// forge-lint: disable-next-line(mixed-case-function)
     function _helperAccountsStakeTokensNFTsProvideRewards() internal {
         _helperAccountsStakeTokensAndNFTs();
         uint256 availableRewardSlot = stdstore.target(address(hoprStakeBase)).sig("availableReward()").find();

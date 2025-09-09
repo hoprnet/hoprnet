@@ -72,7 +72,8 @@ contract ERC777SnapshotTest is Test, ERC1820RegistryFixtureTest {
         // transfer 20 tokens every 10 blocks
         for (uint128 i = 0; i < 10; i++) {
             vm.roll(currentBlockNumber + 10 * i);
-            erc777SnapshotMock.transfer(DEFAULT_RECIPIENT, 20);
+            bool success = erc777SnapshotMock.transfer(DEFAULT_RECIPIENT, 20);
+            assertTrue(success);
         }
 
         for (uint128 j = 0; j < 10; j++) {
@@ -135,7 +136,8 @@ contract ERC777SnapshotTest is Test, ERC1820RegistryFixtureTest {
         // with balance changes after the snapshot
         vm.roll(6);
         vm.prank(INITIAL_HOLDER);
-        erc777SnapshotMock.transfer(DEFAULT_RECIPIENT, 1 ether);
+        bool success = erc777SnapshotMock.transfer(DEFAULT_RECIPIENT, 1 ether);
+        assertTrue(success);
         vm.roll(7);
         erc777SnapshotMock.mint(DEFAULT_RECIPIENT, 5 ether, hex"00", hex"00");
         vm.roll(8);

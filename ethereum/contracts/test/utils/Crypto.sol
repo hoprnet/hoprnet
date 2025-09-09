@@ -99,6 +99,7 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         r_out = r;
     }
 
+    /// forge-lint: disable-next-line(mixed-case-function)
     function getVRFParameters(
         uint256 privKey,
         bytes memory dst,

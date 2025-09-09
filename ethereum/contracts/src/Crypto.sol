@@ -459,6 +459,7 @@ abstract contract HoprCrypto {
      *
      * @param u the field element to map to a secp256k1 curve point
      */
+    /// forge-lint: disable-next-line(mixed-case-function)
     function mapToCurveSimpleSWU(uint256 u) internal view returns (uint256 rx, uint256 ry) {
         // solhint-disable-next-line no-inline-assembly
         assembly {
@@ -580,6 +581,7 @@ abstract contract HoprCrypto {
      * @param message the message to hash
      * @param dst domain separation tag, used to make protocol instantiations unique
      */
+    /// forge-lint: disable-next-line(mixed-case-function)
     function hash_to_field(bytes memory message, bytes memory dst) internal view returns (uint256 u0, uint256 u1) {
         (bytes32 b1, bytes32 b2, bytes32 b3) = expand_message_xmd_keccak256(message, dst);
 
@@ -661,6 +663,7 @@ abstract contract HoprCrypto {
      * @param message the message to hash
      * @param dst domain separation tag, used to make protocol instantiations unique
      */
+    /// forge-lint: disable-next-line(mixed-case-function)
     function expand_message_xmd_keccak256(
         bytes memory message,
         bytes memory dst
@@ -768,6 +771,7 @@ abstract contract HoprCrypto {
      * @param message the message to hash
      * @param dst domain separation tag, used to make protocol instantiations unique
      */
+    /// forge-lint: disable-next-line(mixed-case-function)
     function expand_message_xmd_keccak256_single(
         bytes memory message,
         bytes memory dst

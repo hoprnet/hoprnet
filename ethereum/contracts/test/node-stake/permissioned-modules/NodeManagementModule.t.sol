@@ -83,7 +83,7 @@ contract HoprNodeManagementModuleTest is
     function test_CanInitializeProxy() public {
         address _channels = 0x0101010101010101010101010101010101010101;
         address _token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(_channels, abi.encodeWithSignature("token()"), abi.encode(_token));
+        vm.mockCall(_channels, abi.encodeWithSignature("TOKEN()"), abi.encode(_token));
         emit SetMultisendAddress(multiaddr);
         moduleProxy.initialize(
             abi.encode(
@@ -104,7 +104,7 @@ contract HoprNodeManagementModuleTest is
     //     vm.mockCall(
     //         _channels,
     //         abi.encodeWithSignature(
-    //             'token()'
+    //             'TOKEN()'
     //         ),
     //         abi.encode(_token)
     //     );
@@ -480,7 +480,7 @@ contract HoprNodeManagementModuleTest is
         vm.assume(channelAddress != tokenAddress);
 
         vm.startPrank(owner);
-        vm.mockCall(channelAddress, abi.encodeWithSignature("token()"), abi.encode(tokenAddress));
+        vm.mockCall(channelAddress, abi.encodeWithSignature("TOKEN()"), abi.encode(tokenAddress));
 
         // token target overwritten mask
         // <         160 bits for address         >    <>              <func>
@@ -850,7 +850,7 @@ contract HoprNodeManagementModuleTest is
             channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.BLOCK_ALL, defaultFunctionPermission
         ); // clerance: FUNCTION default ALLOW_ALL
         stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
@@ -882,7 +882,7 @@ contract HoprNodeManagementModuleTest is
             channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         ); // clerance: FUNCTION default ALLOW_ALL
         stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
@@ -920,7 +920,7 @@ contract HoprNodeManagementModuleTest is
             defaultFunctionPermission
         ); // clerance: FUNCTION default ALLOW_ALL
         stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
 
         address owner = moduleProxy.owner();
@@ -952,7 +952,7 @@ contract HoprNodeManagementModuleTest is
             channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         ); // clerance: FUNCTION default ALLOW_ALL
         stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(
             safe,
             abi.encodeWithSelector(IAvatar.execTransactionFromModuleReturnData.selector),
@@ -1320,7 +1320,7 @@ contract HoprNodeManagementModuleTest is
         uint256 randomIndex
     )
         private
-        view
+        pure
         returns (address[] memory, address)
     {
         if (addrs.length == 0) {
@@ -1390,7 +1390,7 @@ contract HoprNodeManagementModuleTest is
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
 
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         vm.deal(safe, 1 ether);
         assertEq(safe.balance, 1 ether);

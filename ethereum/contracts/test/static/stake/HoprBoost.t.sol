@@ -106,10 +106,10 @@ contract HoprBoostTest is Test {
      */
     function test_SetBaseURI() public {
         _helperMintTokens();
-        assertEq(hoprBoost.tokenURI(0), _helperBuildURI("", types[0], ranks[0]));
+        assertEq(hoprBoost.tokenURI(0), _helperBuildUri("", types[0], ranks[0]));
         vm.prank(admin);
         hoprBoost.updateBaseURI(newBaseURI);
-        assertEq(hoprBoost.tokenURI(0), _helperBuildURI(newBaseURI, types[0], ranks[0]));
+        assertEq(hoprBoost.tokenURI(0), _helperBuildUri(newBaseURI, types[0], ranks[0]));
     }
 
     /**
@@ -216,7 +216,7 @@ contract HoprBoostTest is Test {
         hoprBoost.mint(accounts[0], types[0], ranks[0], numerators[0], DEFAULT_DDL);
     }
 
-    function _helperBuildURI(
+    function _helperBuildUri(
         string memory _base,
         string memory _type,
         string memory _rank

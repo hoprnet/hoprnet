@@ -10,6 +10,7 @@ interface IHoprNodeManagementModule {
      * @return The version string.
      */
     // solhint-disable-next-line func-name-mixedcase
+    /// forge-lint: disable-next-line(mixed-case-function)
     function VERSION() external view returns (string memory);
 
     /**

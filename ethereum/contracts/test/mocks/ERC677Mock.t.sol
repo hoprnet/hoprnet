@@ -38,7 +38,8 @@ contract ERC677MockTest is Test {
 
         vm.prank(msgSender);
         vm.expectRevert();
-        erc677Mock.transferFrom(sender, address(erc677Mock), 0);
+        bool success = erc677Mock.transferFrom(sender, address(erc677Mock), 0);
+        assertFalse(success);
         vm.clearMockedCalls();
     }
 
@@ -57,7 +58,8 @@ contract ERC677MockTest is Test {
 
         vm.prank(msgSender);
         vm.expectRevert();
-        erc677Mock.transfer(address(erc677Mock), 0);
+        bool success = erc677Mock.transfer(address(erc677Mock), 0);
+        assertFalse(success);
         vm.clearMockedCalls();
     }
 }
