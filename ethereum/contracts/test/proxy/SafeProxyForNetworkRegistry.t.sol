@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import "../../src/proxy/SafeProxyForNetworkRegistry.sol";
-import "forge-std/Test.sol";
+import { HoprSafeProxyForNetworkRegistry, IHoprNetworkRegistryRequirement } from "../../src/proxy/SafeProxyForNetworkRegistry.sol";
+import { Test } from "forge-std/Test.sol";
 
 contract HoprSafeProxyForNetworkRegistryTest is Test {
     HoprSafeProxyForNetworkRegistry public hoprSafeProxyForNetworkRegistry;

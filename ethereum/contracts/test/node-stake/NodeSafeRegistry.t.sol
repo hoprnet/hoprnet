@@ -23,7 +23,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     address public safe;
     MyNodeSafeRegistry public nodeSafeRegistry;
     address private constant SENTINEL_MODULES = address(0x1);
-    uint256 private constant pageSize = 100;
+    uint256 private constant PAGE_SIZE = 100;
 
     function setUp() public {
         safe = vm.addr(101); // make address(101) a caller
@@ -371,8 +371,8 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
 
         vm.mockCall(
             safeAddress,
-            abi.encodeWithSignature("getModulesPaginated(address,uint256)", SENTINEL_MODULES, pageSize),
-            abi.encode(modules, SENTINEL_MODULES)
+            abi.encodeWithSignature("getModulesPaginated(address,uint256)", SENTINEL_MODULES, PAGE_SIZE),
+            abi.encode(modules, isModuleSet ? SENTINEL_MODULES : address(0x0))
         );
 
         vm.mockCall(modules[0], abi.encodeWithSignature("isNode(address)", nodeAddress), abi.encode(isNodeIncluded));
@@ -388,6 +388,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         uint256 nonce
     )
         private
+        view
         returns (address, bytes memory)
     {
         HoprNodeSafeRegistry.NodeSafeNonce memory nodeSafeNonce = HoprNodeSafeRegistry.NodeSafeNonce({

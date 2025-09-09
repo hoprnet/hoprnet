@@ -6,12 +6,11 @@ import { HoprAnnouncements } from "../src/Announcements.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 
 // Dummy since there is no verification happening on-chain
-bytes32 constant ed25519_sig_0 = 0x000000000000000000000000000000000000000000000000000000000ed25519;
-bytes32 constant ed25519_sig_1 = 0x100000000000000000000000000000000000000000000000000000000ed25519;
+bytes32 constant ED25519_SIG_0 = 0x000000000000000000000000000000000000000000000000000000000ed25519;
+bytes32 constant ED25519_SIG_1 = 0x100000000000000000000000000000000000000000000000000000000ed25519;
+bytes32 constant ED25519_PUB_KEY = 0x3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c;
 
-string constant multiaddress = "/ip6/2604:1380:2000:7a00::1/udp/4001/quic";
-
-bytes32 constant ed25519_pub_key = 0x3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c;
+string constant MULTIADDRESS = "/ip6/2604:1380:2000:7a00::1/udp/4001/quic";
 
 contract AnnouncementsTest is Test {
     HoprNodeSafeRegistry safeRegistry;
@@ -30,10 +29,10 @@ contract AnnouncementsTest is Test {
         );
 
         vm.expectEmit(true, false, false, false, address(announcements));
-        emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, caller);
+        emit KeyBinding(ED25519_SIG_0, ED25519_SIG_1, ED25519_PUB_KEY, caller);
 
         vm.prank(caller);
-        announcements.bindKeys(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+        announcements.bindKeys(ED25519_SIG_0, ED25519_SIG_1, ED25519_PUB_KEY);
 
         vm.clearMockedCalls();
     }
@@ -46,10 +45,10 @@ contract AnnouncementsTest is Test {
         );
 
         vm.expectEmit(true, false, false, false, address(announcements));
-        emit AddressAnnouncement(caller, multiaddress);
+        emit AddressAnnouncement(caller, MULTIADDRESS);
 
         vm.prank(caller);
-        announcements.announce(multiaddress);
+        announcements.announce(MULTIADDRESS);
 
         vm.clearMockedCalls();
     }
@@ -76,16 +75,16 @@ contract AnnouncementsTest is Test {
         );
 
         vm.expectEmit(true, false, false, false, address(announcements));
-        emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, caller);
+        emit KeyBinding(ED25519_SIG_0, ED25519_SIG_1, ED25519_PUB_KEY, caller);
 
         vm.expectEmit(true, false, false, false, address(announcements));
-        emit AddressAnnouncement(caller, multiaddress);
+        emit AddressAnnouncement(caller, MULTIADDRESS);
 
         bytes[] memory calls = new bytes[](2);
 
-        calls[0] = abi.encodeCall(announcements.bindKeys, (ed25519_sig_0, ed25519_sig_1, ed25519_pub_key));
+        calls[0] = abi.encodeCall(announcements.bindKeys, (ED25519_SIG_0, ED25519_SIG_1, ED25519_PUB_KEY));
 
-        calls[1] = abi.encodeCall(announcements.announce, (multiaddress));
+        calls[1] = abi.encodeCall(announcements.announce, (MULTIADDRESS));
 
         vm.prank(caller);
         announcements.multicall(calls);
@@ -99,13 +98,13 @@ contract AnnouncementsTest is Test {
         );
 
         vm.expectEmit(true, false, false, false, address(announcements));
-        emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, caller);
+        emit KeyBinding(ED25519_SIG_0, ED25519_SIG_1, ED25519_PUB_KEY, caller);
 
         vm.expectEmit(true, false, false, false, address(announcements));
-        emit AddressAnnouncement(caller, multiaddress);
+        emit AddressAnnouncement(caller, MULTIADDRESS);
 
         vm.prank(caller);
-        announcements.bindKeysAnnounce(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, multiaddress);
+        announcements.bindKeysAnnounce(ED25519_SIG_0, ED25519_SIG_1, ED25519_PUB_KEY, MULTIADDRESS);
 
         vm.clearMockedCalls();
     }

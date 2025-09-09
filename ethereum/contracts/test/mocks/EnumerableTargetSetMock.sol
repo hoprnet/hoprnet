@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import "../../src/utils/EnumerableTargetSet.sol";
+import { EnumerableTargetSet, TargetSet, Target } from "../../src/utils/EnumerableTargetSet.sol";
 
 /**
  * @dev Mock contract to test internal library of EnumerableTargetSet

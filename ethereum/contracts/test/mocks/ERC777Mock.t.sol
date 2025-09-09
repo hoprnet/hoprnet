@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
-import "../../src/static/stake/mocks/ERC777Mock.sol";
-import "../utils/ERC1820Registry.sol";
+import { ERC777Mock } from "../../src/static/stake/mocks/ERC777Mock.sol";
+import { ERC1820RegistryFixtureTest } from "../utils/ERC1820Registry.sol";
 import { Test } from "forge-std/Test.sol";
 
 /**

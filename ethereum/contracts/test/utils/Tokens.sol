@@ -3,9 +3,9 @@ pragma solidity >=0.6.0 <0.9.0;
 
 import { Test } from "forge-std/Test.sol";
 
-import "../../src/static/HoprToken.sol";
-import "./ERC1820Registry.sol";
-import "./Accounts.sol";
+import { HoprToken } from "../../src/static/HoprToken.sol";
+import { ERC1820RegistryFixtureTest } from "./ERC1820Registry.sol";
+import { AccountsFixtureTest } from "./Accounts.sol";
 
 contract HoprTokenFixtureTest is Test, ERC1820RegistryFixtureTest, AccountsFixtureTest {
     HoprToken public hoprToken;

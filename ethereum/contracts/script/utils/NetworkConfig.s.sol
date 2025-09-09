@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/Script.sol";
+import { Script, stdJson } from "forge-std/Script.sol";
 
 /**
  * Get environment_type from the environment variable `FOUNDRY_PROFILE`
@@ -72,7 +72,7 @@ contract NetworkConfig is Script {
         currentEnvironmentType = parseEnvironmentTypeFromString(profile);
     }
 
-    function readNetwork(string memory networkName) internal returns (NetworkDetail memory networkDetail) {
+    function readNetwork(string memory networkName) internal view returns (NetworkDetail memory networkDetail) {
         string memory json = vm.readFile(pathToDeploymentFile);
         bytes memory networkDetailPath = abi.encodePacked(".networks.", networkName);
 
@@ -95,7 +95,6 @@ contract NetworkConfig is Script {
     function writeNetwork(string memory networkName, NetworkDetail memory networkDetail) internal {
         // write parsedNewEnvDetail to corresponding key
         string memory configKey = string(abi.encodePacked(".networks.", networkName));
-        string memory configKeyAddresses = string(abi.encodePacked(".networks.", networkName, ".addresses"));
 
         // the keys must be unique because they are stored in shared memory
         string memory obj = string(abi.encodePacked("obj-", networkName));

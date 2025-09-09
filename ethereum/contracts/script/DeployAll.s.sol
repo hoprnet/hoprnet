@@ -4,10 +4,10 @@ pragma abicoder v2;
 
 import { Script } from "forge-std/Script.sol";
 
-import "../test/utils/ERC1820Registry.sol";
-import "../test/utils/PermittableToken.sol";
-import "./utils/NetworkConfig.s.sol";
-import "./utils/BoostUtilsLib.sol";
+import { ERC1820RegistryFixtureTest } from "../test/utils/ERC1820Registry.sol";
+import { PermittableTokenFixtureTest } from "../test/utils/PermittableToken.sol";
+import { NetworkConfig } from "./utils/NetworkConfig.s.sol";
+import { BoostUtilsLib } from "./utils/BoostUtilsLib.sol";
 import { WinProb } from "src/WinningProbabilityOracle.sol";
 
 /**

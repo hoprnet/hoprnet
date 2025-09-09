@@ -6,6 +6,7 @@ pragma solidity >=0.8.0 <0.9.0;
  * deployed contract addresses on Gnosis Chain from
  * https://github.com/safe-global/safe-deployments/tree/51efc59d05ddf725478d6472fc67989dfb031b4d/src/assets/v1.4.1
  */
+/// forge-lint: disable-next-item(screaming-snake-case-const)
 library SafeSuiteLibV141 {
     address internal constant SAFE_SimulateTxAccessor_ADDRESS = 0x3d4BA2E0884aa488718476ca2FB8Efc291A46199;
     address internal constant SAFE_SafeProxyFactory_ADDRESS = 0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67;

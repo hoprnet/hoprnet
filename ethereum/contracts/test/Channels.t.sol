@@ -71,7 +71,7 @@ contract MyHoprChannels is HoprChannels {
 }
 
 contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, HoprChannelsEvents, HoprLedgerEvents {
-    HoprChannelsType.Timestamp constant closureNoticePeriod = HoprChannelsType.Timestamp.wrap(15);
+    HoprChannelsType.Timestamp constant CLOSURE_NOTICE_PERIOD = HoprChannelsType.Timestamp.wrap(15);
 
     bytes32 constant PROOF_OF_RELAY_SECRET_0 = keccak256(abi.encodePacked("PROOF_OF_RELAY_SECRET_0"));
     HoprChannelsType.WinProb constant WIN_PROB_100 = HoprChannelsType.WinProb.wrap(type(uint56).max);
@@ -94,7 +94,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         hoprToken = new ERC777("HOPR", "HOPR", new address[](0));
 
         hoprNodeSafeRegistry = new HoprNodeSafeRegistry();
-        hoprChannels = new MyHoprChannels(address(hoprToken), closureNoticePeriod, hoprNodeSafeRegistry);
+        hoprChannels = new MyHoprChannels(address(hoprToken), CLOSURE_NOTICE_PERIOD, hoprNodeSafeRegistry);
 
         MIN_USED_BALANCE = HoprChannelsType.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1;
         MAX_USED_BALANCE = HoprChannelsType.Balance.unwrap(hoprChannels.MAX_USED_BALANCE());
@@ -112,7 +112,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
     {
         assertEq(
             HoprChannelsType.Timestamp.unwrap(hoprChannels.NOTICE_PERIOD_CHANNEL_CLOSURE()),
-            HoprChannelsType.Timestamp.unwrap(closureNoticePeriod)
+            HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD)
         );
         assertEq(address(hoprChannels.TOKEN()), address(hoprToken));
 
@@ -559,12 +559,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(src != dest && safeContract != src && safeContract != dest);
 
         HoprChannelsType.Timestamp closureTime =
-            HoprChannelsType.Timestamp.wrap(uint32(block.timestamp) + HoprChannelsType.Timestamp.unwrap(closureNoticePeriod));
+            HoprChannelsType.Timestamp.wrap(uint32(block.timestamp) + HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD));
         nextTimestamp = uint32(
             bound(
                 nextTimestamp,
                 uint32(block.timestamp),
-                uint32(type(uint32).max - HoprChannelsType.Timestamp.unwrap(closureNoticePeriod))
+                uint32(type(uint32).max - HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD))
             )
         );
 
@@ -615,7 +615,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         hoprChannels.initiateOutgoingChannelClosure(dest);
 
         HoprChannelsType.Timestamp nextClosureTime =
-            HoprChannelsType.Timestamp.wrap(uint32(block.timestamp) + HoprChannelsType.Timestamp.unwrap(closureNoticePeriod));
+            HoprChannelsType.Timestamp.wrap(uint32(block.timestamp) + HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD));
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
@@ -739,7 +739,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             bound(
                 closureTime,
                 block.timestamp,
-                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(closureNoticePeriod) - 1
+                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) - 1
             )
         );
         vm.assume(src != address(0) && safeContract != address(0));
@@ -752,7 +752,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             src, dest, amount, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
-        vm.warp(closureTime + HoprChannelsType.Timestamp.unwrap(closureNoticePeriod) + 1);
+        vm.warp(closureTime + HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) + 1);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelClosed(
@@ -785,7 +785,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             src, dest, amount, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
-        vm.warp(closureTime + HoprChannelsType.Timestamp.unwrap(closureNoticePeriod) + 1);
+        vm.warp(closureTime + HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) + 1);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelClosed(
@@ -849,7 +849,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             bound(
                 closureTime,
                 block.timestamp + 1,
-                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(closureNoticePeriod) - 1
+                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) - 1
             )
         );
         vm.assume(src != dest);
@@ -883,7 +883,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             bound(
                 closureTime,
                 block.timestamp + 1,
-                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(closureNoticePeriod) - 1
+                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) - 1
             )
         );
         vm.assume(src != dest);

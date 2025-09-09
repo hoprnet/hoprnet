@@ -93,7 +93,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     // start and end point for linked list of modules
     address private constant SENTINEL_MODULES = address(0x1);
     // page size of querying modules
-    uint256 private constant pageSize = 100;
+    uint256 private constant PAGE_SIZE = 100;
 
     /**
      * @dev Constructor function to initialize the contract state.

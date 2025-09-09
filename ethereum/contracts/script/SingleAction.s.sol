@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
-
-import "./utils/NetworkConfig.s.sol";
-import "./utils/BoostUtilsLib.sol";
-import "../src/utils/TargetUtils.sol";
+import { Test, stdStorage, stdJson, StdStorage } from "forge-std/Test.sol";
+import { NetworkConfig } from "./utils/NetworkConfig.s.sol";
+import { BoostUtilsLib } from "./utils/BoostUtilsLib.sol";
+import { Clearance, CapabilityPermission, Target, TargetType, TargetUtils, TargetPermission } from "../src/utils/TargetUtils.sol";
 import { HoprNetworkRegistry } from "../src/NetworkRegistry.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 import { Enum, ISafe } from "../src/utils/ISafe.sol";

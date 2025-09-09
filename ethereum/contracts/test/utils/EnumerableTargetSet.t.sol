@@ -2,9 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
-
-import "../mocks/EnumerableTargetSetMock.sol";
-import "../../src/utils/TargetUtils.sol";
+import { EnumerableTargetSet, EnumerableTargetSetMock } from "../mocks/EnumerableTargetSetMock.sol";
+import { Target, TargetUtils } from "../../src/utils/TargetUtils.sol";
 
 contract EnumerableTargetSetTest is Test {
     using stdStorage for StdStorage;
