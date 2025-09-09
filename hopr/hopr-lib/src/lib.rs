@@ -78,11 +78,11 @@ use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::{
-    ApplicationData, ApplicationDataIn, ApplicationDataOut, HalfKeyChallenge, Health,
+    ApplicationData, ApplicationDataIn, ApplicationDataOut, HalfKeyChallenge, Health, HoprSession,
     IncomingSession as HoprIncomingSession, Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair, PeerId,
-    PingQueryReplier, ProbeError, SESSION_MTU, SURB_SIZE, ServiceId, Session as HoprSession, SessionCapabilities,
-    SessionCapability, SessionClientConfig, SessionId as HoprSessionId, SessionManagerError, SessionTarget,
-    SurbBalancerConfig, Tag, TicketStatistics, TransportSessionError,
+    PingQueryReplier, ProbeError, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionCapability,
+    SessionClientConfig, SessionId as HoprSessionId, SessionManagerError, SessionTarget, SurbBalancerConfig, Tag,
+    TicketStatistics, TransportSessionError,
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };

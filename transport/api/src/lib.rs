@@ -78,8 +78,8 @@ use hopr_transport_protocol::{
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_MTU, SURB_SIZE,
-    ServiceId, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
+    SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
@@ -246,10 +246,10 @@ where
                 // TODO(v3.1): Use the entire range of tags properly
                 session_tag_range: (16..65535),
                 maximum_sessions: cfg.session.maximum_sessions as usize,
-                session_mtu: std::env::var("HOPR_SESSION_MTU")
+                frame_mtu: std::env::var("HOPR_SESSION_MTU")
                     .ok()
                     .and_then(|s| s.parse::<usize>().ok())
-                    .unwrap_or_else(|| SessionManagerConfig::default().session_mtu)
+                    .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
                     .max(ApplicationData::PAYLOAD_SIZE),
                 max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
                     .ok()
@@ -685,7 +685,7 @@ where
         destination: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-    ) -> errors::Result<Session> {
+    ) -> errors::Result<HoprSession> {
         Ok(self.smgr.new_session(destination, target, cfg).await?)
     }
 

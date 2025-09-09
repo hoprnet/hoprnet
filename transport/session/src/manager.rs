@@ -19,7 +19,8 @@ use hopr_protocol_start::{
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    Capability, IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    Capability, HoprSession, IncomingSession, SESSION_MTU, SessionClientConfig, SessionId, SessionTarget,
+    SurbBalancerConfig,
     balancer::{
         AtomicSurbFlowEstimator, BalancerConfigFeedback, RateController, RateLimitSinkExt, SurbBalancer,
         SurbControllerWithCorrection,
@@ -86,6 +87,9 @@ pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
 
 /// Maximum time to wait for counterparty to receive the target number of SURBs.
 const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Minimum timeout until an unfinished frame is discarded.
+const MIN_FRAME_TIMEOUT: Duration = Duration::from_millis(10);
 
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
@@ -194,11 +198,11 @@ pub struct SessionManagerConfig {
     ///
     /// Default is 1500.
     #[default(1500)]
-    pub session_mtu: usize,
+    pub frame_mtu: usize,
 
     /// The maximum time for an incomplete frame to stay in the Session's output buffer.
     ///
-    /// Default is 800ms.
+    /// Default is 800 ms.
     #[default(Duration::from_millis(800))]
     pub max_frame_timeout: Duration,
 
@@ -277,7 +281,7 @@ pub struct SessionManagerConfig {
 ///
 /// Since the `SessionManager` operates over the HOPR protocol,
 /// the message transport `S` is required.
-/// Such transport must also be `Clone`, since it will be cloned into all the created [`Session`] objects.
+/// Such transport must also be `Clone`, since it will be cloned into all the created [`HoprSession`] objects.
 ///
 /// ## SURB balancing
 /// The manager also can take care of automatic [SURB balancing](SurbBalancerConfig) per Session.
@@ -448,6 +452,10 @@ where
             .maximum_sessions
             .clamp(1, (cfg.session_tag_range.end - cfg.session_tag_range.start) as usize);
 
+        // Ensure the Frame MTU is at least the size of the Session segment MTU payload
+        cfg.frame_mtu = cfg.frame_mtu.max(SESSION_MTU);
+        cfg.max_frame_timeout = cfg.max_frame_timeout.max(MIN_FRAME_TIMEOUT);
+
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_ACTIVE_SESSIONS.set(0.0);
 
@@ -597,7 +605,7 @@ where
         destination: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-    ) -> crate::errors::Result<Session> {
+    ) -> crate::errors::Result<HoprSession> {
         self.sessions.run_pending_tasks().await;
         if self.cfg.maximum_sessions <= self.sessions.entry_count() as usize {
             return Err(SessionManagerError::TooManySessions.into());
@@ -792,12 +800,12 @@ where
                         }
                     }
 
-                    Session::new(
+                    HoprSession::new(
                         session_id,
                         forward_routing,
                         HoprSessionConfig {
                             capabilities: cfg.capabilities,
-                            mtu: self.cfg.session_mtu,
+                            frame_mtu: self.cfg.frame_mtu,
                             frame_timeout: self.cfg.max_frame_timeout,
                         },
                         (
@@ -843,12 +851,12 @@ where
                             futures::future::ok::<_, S::Error>((routing, data))
                         });
 
-                    Session::new(
+                    HoprSession::new(
                         session_id,
                         forward_routing,
                         HoprSessionConfig {
                             capabilities: cfg.capabilities,
-                            mtu: self.cfg.session_mtu,
+                            frame_mtu: self.cfg.frame_mtu,
                             frame_timeout: self.cfg.max_frame_timeout,
                         },
                         (reduced_surb_sender, rx),
@@ -1083,12 +1091,12 @@ where
                 };
 
                 let surb_estimator_clone = surb_estimator.clone();
-                let session = Session::new(
+                let session = HoprSession::new(
                     session_id,
                     reply_routing.clone(),
                     HoprSessionConfig {
                         capabilities: session_req.capabilities.into(),
-                        mtu: self.cfg.session_mtu,
+                        frame_mtu: self.cfg.frame_mtu,
                         frame_timeout: self.cfg.max_frame_timeout,
                     },
                     (
@@ -1186,12 +1194,12 @@ where
 
                 session
             } else {
-                Session::new(
+                HoprSession::new(
                     session_id,
                     reply_routing.clone(),
                     HoprSessionConfig {
                         capabilities: session_req.capabilities.into(),
-                        mtu: self.cfg.session_mtu,
+                        frame_mtu: self.cfg.frame_mtu,
                         frame_timeout: self.cfg.max_frame_timeout,
                     },
                     (msg_sender.clone(), rx_session_data),
