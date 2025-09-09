@@ -4,7 +4,7 @@ use hopr_crypto_sphinx::{
     errors::SphinxError,
     prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
 };
-use hopr_crypto_types::prelude::HashAlt;
+use hopr_crypto_types::prelude::HashFast;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
 
@@ -94,7 +94,7 @@ impl HoprSenderId {
     /// once an element is known.
     pub fn into_sequence(self) -> impl Iterator<Item = Self> {
         std::iter::successors(Some((1u32, self)), |&(i, prev)| {
-            let hash = HashAlt::create(&[&i.to_be_bytes(), prev.as_ref()]);
+            let hash = HashFast::create(&[&i.to_be_bytes(), prev.as_ref()]);
             Some((
                 i + 1,
                 Self::from_pseudonym_and_id(&prev.pseudonym(), hash.as_ref()[0..SURB_ID_SIZE].try_into().unwrap()),

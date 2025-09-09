@@ -60,6 +60,10 @@ lazy_static = { workspace = true }
 ignored = ["serde_bytes"]
 
 [[bench]]
+name = "hash_bench"
+harness = false
+
+[[bench]]
 name = "lioness_bench"
 harness = false
 

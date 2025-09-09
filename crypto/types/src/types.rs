@@ -391,10 +391,11 @@ impl<H> From<primitive_types::H256> for HashBase<H> {
 /// This implementation instantiates the hash via Keccak256 digest.
 pub type Hash = HashBase<sha3::Keccak256>;
 
-/// Represents an alternative 256-bit hash value.
+/// Represents an alternative 256-bit hash value computed via a faster hashing algorithm.
 ///
-/// This implementation instantiates the hash via Blake3 digest.
-pub type HashAlt = HashBase<blake3::Hasher>;
+/// This implementation instantiates the hash via Blake3 digest, which is usually 8-9x faster
+/// than Keccak256.
+pub type HashFast = HashBase<blake3::Hasher>;
 
 /// Represents an Ed25519 public key.
 #[derive(Clone, Copy, Eq)]
@@ -402,7 +403,6 @@ pub type HashAlt = HashBase<blake3::Hasher>;
 pub struct OffchainPublicKey {
     compressed: CompressedEdwardsY,
     pub(crate) edwards: EdwardsPoint,
-    montgomery: MontgomeryPoint,
 }
 
 impl std::fmt::Debug for OffchainPublicKey {
@@ -438,11 +438,7 @@ impl TryFrom<&[u8]> for OffchainPublicKey {
         let edwards = compressed
             .decompress()
             .ok_or(ParseError("OffchainPublicKey.decompress".into()))?;
-        Ok(Self {
-            compressed,
-            edwards,
-            montgomery: edwards.to_montgomery(),
-        })
+        Ok(Self { compressed, edwards })
     }
 }
 
@@ -505,15 +501,15 @@ impl OffchainPublicKey {
         let mh = peerid.as_ref();
         if mh.code() == 0 {
             libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
-                .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
+                .map_err(|_| ParseError("invalid ed25519 peer id".into()))
                 .and_then(|pk| {
                     pk.try_into_ed25519()
                         .map(|p| p.to_bytes())
-                        .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
+                        .map_err(|_| ParseError("invalid ed25519 peer id".into()))
                 })
                 .and_then(Self::try_from)
         } else {
-            Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
+            Err(ParseError("invalid ed25519 peer id".into()))
         }
     }
 }
@@ -532,7 +528,9 @@ impl<'a> From<&'a OffchainPublicKey> for &'a GenericArray<u8, typenum::U32> {
 
 impl From<&OffchainPublicKey> for MontgomeryPoint {
     fn from(value: &OffchainPublicKey) -> Self {
-        value.montgomery
+        // The Curve25519 computations are mostly not used, so we can do the conversion
+        // here without caching.
+        value.edwards.to_montgomery()
     }
 }
 
