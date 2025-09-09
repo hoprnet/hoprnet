@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import { Test } from "forge-std/Test.sol";
-import { HoprAnnouncements, HoprAnnouncementsEvents } from "../src/Announcements.sol";
+import { HoprAnnouncements } from "../src/Announcements.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 
 // Dummy since there is no verification happening on-chain

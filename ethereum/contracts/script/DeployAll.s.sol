@@ -347,9 +347,12 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         }
         // grant manager roles to more accounts
         for (uint256 i = 0; i < PRODUCT_TEAM_MANAGER_ADDRESSES.length; i++) {
-            contractAddress.call(
+            (bool successGrantManagerRole,) = contractAddress.call(
                 abi.encodeWithSignature("grantRole(bytes32,address)", MANAGER_ROLE, PRODUCT_TEAM_MANAGER_ADDRESSES[i])
             );
+            if (!successGrantManagerRole) {
+                emit log_string("Cannot grant MANAGER_ROLE role on ");
+            }
         }
         if (!successGrantDefaultAdminRole) {
             emit log_string("Cannot grant MANAGER_ROLE role on ");

@@ -2,7 +2,6 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import { Test } from "forge-std/Test.sol";
-import { Ownable2Step } from "openzeppelin-contracts-4.9.2/access/Ownable2Step.sol";
 import {
     WinProb,
     HoprWinningProbabilityOracle,

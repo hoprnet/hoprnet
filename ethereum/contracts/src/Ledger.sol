@@ -31,7 +31,7 @@ abstract contract HoprLedger is HoprLedgerEvents {
 
     string public constant LEDGER_VERSION = "1.0.0";
 
-    uint256 public immutable snapshotInterval;
+    uint256 public immutable SNAPSHOT_INTERVAL;
 
     /**
      * Stores the last indexer state
@@ -57,7 +57,7 @@ abstract contract HoprLedger is HoprLedgerEvents {
         if (_snapshotInterval == 0) {
             revert ZeroInterval();
         }
-        snapshotInterval = _snapshotInterval;
+        SNAPSHOT_INTERVAL = _snapshotInterval;
 
         // take first 28 bytes
         latestRoot.rootHash = bytes28(keccak256(abi.encodePacked(address(this))));
@@ -93,7 +93,7 @@ abstract contract HoprLedger is HoprLedgerEvents {
 
     function indexEvent(bytes memory payload) internal {
         bool createSnapshot = false;
-        if (block.timestamp > latestRoot.timestamp + snapshotInterval) {
+        if (block.timestamp > latestRoot.timestamp + SNAPSHOT_INTERVAL) {
             createSnapshot = true;
         }
 

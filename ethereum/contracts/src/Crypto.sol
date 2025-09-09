@@ -856,6 +856,7 @@ abstract contract HoprCrypto {
     /**
      * Bundles values to verify the validity of the VRF
      */
+    /// forge-lint: disable-next-item(pascal-case-struct)
     struct VRFParameters {
         // the main deterministic pseudo-random values
         uint256 vx;
@@ -877,6 +878,7 @@ abstract contract HoprCrypto {
      * Bundles payload used to create a VRF-generated deterministic
      * pseudo-random value.
      */
+    /// forge-lint: disable-next-item(pascal-case-struct)
     struct VRFPayload {
         // the main message, e.g. ticket Hash
         bytes32 message;

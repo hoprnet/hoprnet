@@ -2,8 +2,6 @@
 pragma solidity ^0.8;
 
 import { ECDSA } from "openzeppelin-contracts-4.9.2/utils/cryptography/ECDSA.sol";
-import { IAvatar } from "../interfaces/IAvatar.sol";
-import { IHoprNodeManagementModule } from "../interfaces/INodeManagementModule.sol";
 import { Address } from "openzeppelin-contracts-4.9.2/utils/Address.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {

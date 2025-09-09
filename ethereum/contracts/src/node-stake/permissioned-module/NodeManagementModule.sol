@@ -378,7 +378,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     function _addChannelsAndTokenTarget(Target defaultTarget) private {
         // get channels andtokens contract
         address hoprChannelsAddress = defaultTarget.getTargetAddress();
-        address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
+        address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).TOKEN());
 
         // add default scope for Channels TargetType, with the build target for hoprChannels address
         HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget.forceWriteTargetAddress(hoprChannelsAddress));

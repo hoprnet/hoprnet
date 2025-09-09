@@ -10,7 +10,7 @@ import { Address } from "openzeppelin-contracts-4.9.2/utils/Address.sol";
 
 // proxy contract to manipulate storage
 contract MyNodeSafeRegistry is HoprNodeSafeRegistry {
-    constructor() HoprNodeSafeRegistry() { }
+    constructor() {}
 
     // Only for testing
     function _storeSafeAddress(address nodeAddress, address safeAddress) public {

@@ -3,15 +3,14 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 
-import { HoprChannels, HoprChannelsType } from "../../../src/Channels.sol";
-import "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
-import "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
-import "../../utils/CapabilityLibrary.sol";
-import "../../../src/utils/SafeSuiteLibV141.sol";
-import "../../utils/SafeSingleton.sol";
-import "../../../src/interfaces/IAvatar.sol";
-import "../../../src/Crypto.sol";
-import "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
+import { HoprChannels, HoprChannelsType, IERC20 } from "../../../src/Channels.sol";
+import { HoprNodeManagementModule, Enum } from "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
+import { GranularPermission, CapabilityPermission, TargetPermission, TargetUtils, Target, HoprCapabilityPermissions, Clearance, TargetType } from "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
+import { CapabilityPermissionsLibFixtureTest } from "../../utils/CapabilityLibrary.sol";
+import { SafeSingletonFixtureTest } from "../../utils/SafeSingleton.sol";
+import { IAvatar } from "../../../src/interfaces/IAvatar.sol";
+import { HoprCrypto } from "../../../src/Crypto.sol";
+import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 import { SimplifiedModuleEvents } from "../../../src/node-stake/permissioned-module/SimplifiedModule.sol";
 
 /**
