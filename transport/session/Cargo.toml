@@ -32,6 +32,7 @@ flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
+mimalloc = { workspace = true }
 moka = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
@@ -54,7 +55,6 @@ hopr-primitive-types = { workspace = true }
 hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde"] }
 hopr-protocol-start = { workspace = true }
-
 
 [dev-dependencies]
 anyhow = { workspace = true }

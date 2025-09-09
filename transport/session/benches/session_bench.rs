@@ -9,6 +9,11 @@ use hopr_protocol_app::{prelude::ApplicationDataOut, v1::ApplicationDataIn};
 use hopr_transport_session::{Capabilities, Capability, Session, SessionId};
 use rand::{Rng, thread_rng};
 
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 pub async fn alice_send_data(
     data: &[u8],
     caps: impl Into<Capabilities> + std::fmt::Debug,
@@ -72,6 +77,7 @@ pub fn session_raw_benchmark(c: &mut Criterion) {
     const KB: usize = 1024;
 
     group.sample_size(100000);
+    group.measurement_time(std::time::Duration::from_secs(30));
 
     for size in [16 * KB, 64 * KB, 128 * KB, 1024 * KB].iter() {
         let mut alice_data = vec![0u8; *size];
@@ -100,6 +106,7 @@ pub fn session_segmentation_benchmark(c: &mut Criterion) {
     const KB: usize = 1024;
 
     group.sample_size(100000);
+    group.measurement_time(std::time::Duration::from_secs(30));
 
     for size in [16 * KB, 64 * KB, 128 * KB, 1024 * KB].iter() {
         let mut alice_data = vec![0u8; *size];

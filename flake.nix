@@ -268,9 +268,26 @@
               rust-builder-local.callPackage ./nix/rust-package.nix (
                 hoprdBuildArgs // { CARGO_PROFILE = "candidate"; }
               );
-          hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { runBench = true; }
-          );
+          # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
+          hoprd-bench =
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
+              rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
+              rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
+              rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runBench = true; });
 
           hopliBuildArgs = {
             inherit src depsSrc rev;

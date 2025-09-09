@@ -25,6 +25,7 @@ serde = [
 [dependencies]
 hex = { workspace = true }
 flagset = { workspace = true }
+mimalloc = { workspace = true }
 rayon = { workspace = true, optional = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
@@ -45,6 +46,7 @@ bimap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
+mimalloc = { workspace = true }
 parameterized = { workspace = true }
 tokio = { workspace = true }
 
