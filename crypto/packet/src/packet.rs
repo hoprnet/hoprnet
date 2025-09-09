@@ -5,6 +5,8 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_path::{NonEmptyPath, TransportPath};
 use hopr_primitive_types::prelude::*;
+#[cfg(feature = "rayon")]
+use rayon::prelude::*;
 
 use crate::{
     HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
@@ -12,7 +14,10 @@ use crate::{
         PacketError::{PacketConstructionError, PacketDecodingError},
         Result,
     },
-    por::{SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay, pre_verify},
+    por::{
+        ProofOfRelayString, ProofOfRelayValues, SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay,
+        pre_verify,
+    },
     types::{HoprPacketMessage, HoprPacketParts, HoprSenderId, HoprSurbId, PacketSignals},
 };
 
@@ -35,6 +40,46 @@ pub struct PartialHoprPacket {
     ack_challenge: HalfKeyChallenge,
 }
 
+/// Shared key data for a path.
+///
+/// This contains the derived shared secrets and Proof of Relay data for a path.
+struct PathKeyData {
+    /// Shared secrets for the path.
+    pub shared_keys: SharedKeys<<HoprSphinxSuite as SphinxSuite>::E, <HoprSphinxSuite as SphinxSuite>::G>,
+    /// Proof of Relay data for each hop on the path.
+    pub por_strings: Vec<ProofOfRelayString>,
+    /// Proof of Relay values for the first ticket on the path.
+    pub por_values: ProofOfRelayValues,
+}
+
+impl PathKeyData {
+    fn new(path: &[OffchainPublicKey]) -> Result<Self> {
+        let shared_keys = HoprSphinxSuite::new_shared_keys(path)?;
+        let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
+        Ok(Self {
+            shared_keys,
+            por_strings,
+            por_values,
+        })
+    }
+
+    /// Computes `PathKeyData` for the given paths.
+    ///
+    /// Uses parallel processing if the `rayon` feature is enabled.
+    fn iter_from_paths(paths: Vec<&[OffchainPublicKey]>) -> Result<impl Iterator<Item = Self>> {
+        #[cfg(not(feature = "rayon"))]
+        let paths = paths.into_iter();
+
+        #[cfg(feature = "rayon")]
+        let paths = paths.into_par_iter();
+
+        paths
+            .map(Self::new)
+            .collect::<Result<Vec<_>>>()
+            .map(|paths| paths.into_iter())
+    }
+}
+
 impl PartialHoprPacket {
     /// Instantiates a new partial HOPR packet.
     ///
@@ -46,7 +91,7 @@ impl PartialHoprPacket {
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
     /// * `domain_separator` channels contract domain separator.
-    pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
+    pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey> + Send>(
         pseudonym: &HoprPseudonym,
         routing: PacketRouting<P>,
         chain_keypair: &ChainKeypair,
@@ -59,16 +104,30 @@ impl PartialHoprPacket {
                 forward_path,
                 return_paths,
             } => {
-                // Create shared secrets and PoR challenge chain
-                let shared_keys = HoprSphinxSuite::new_shared_keys(&forward_path)?;
-                let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
+                // Create shared secrets and PoR challenge chain for forward and return paths
+                let mut key_data = PathKeyData::iter_from_paths(
+                    std::iter::once(forward_path.hops())
+                        .chain(return_paths.iter().map(|p| p.hops()))
+                        .collect(),
+                )?;
+
+                let PathKeyData {
+                    shared_keys,
+                    por_strings,
+                    por_values,
+                } = key_data
+                    .next()
+                    .ok_or_else(|| PacketConstructionError("empty path".into()))?;
+
                 let receiver_data = HoprSenderId::new(pseudonym);
 
                 // Create SURBs if some return paths were specified
-                let (surbs, openers): (Vec<_>, Vec<_>) = return_paths
-                    .iter()
+                // Possibly makes little sense to parallelize this iterator via rayon,
+                // as in most cases the number of return paths is 1.
+                let (surbs, openers): (Vec<_>, Vec<_>) = key_data
+                    .zip(return_paths)
                     .zip(receiver_data.into_sequence())
-                    .map(|(rp, data)| create_surb_for_path(rp, data, mapper))
+                    .map(|((key_data, rp), data)| create_surb_for_path((rp, key_data), data, mapper))
                     .collect::<Result<Vec<_>>>()?
                     .into_iter()
                     .unzip();
@@ -126,8 +185,12 @@ impl PartialHoprPacket {
             }
             PacketRouting::NoAck(destination) => {
                 // Create shared secrets and PoR challenge chain
-                let shared_keys = HoprSphinxSuite::new_shared_keys(&[destination])?;
-                let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
+                let PathKeyData {
+                    shared_keys,
+                    por_strings,
+                    por_values,
+                    ..
+                } = PathKeyData::new(&[destination])?;
 
                 // Update the ticket with the challenge
                 let ticket = ticket
@@ -281,12 +344,18 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
 }
 
 fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
-    return_path: &P,
+    return_path: (P, PathKeyData),
     recv_data: HoprSenderId,
     mapper: &M,
 ) -> Result<(HoprSurb, HoprReplyOpener)> {
-    let shared_keys = HoprSphinxSuite::new_shared_keys(return_path)?;
-    let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
+    let (
+        return_path,
+        PathKeyData {
+            shared_keys,
+            por_strings,
+            por_values,
+        },
+    ) = return_path;
 
     Ok(create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
         shared_keys,
@@ -333,7 +402,7 @@ impl HoprPacket {
     #[allow(clippy::too_many_arguments)] // TODO: needs refactoring (perhaps introduce a builder pattern?)
     pub fn into_outgoing<
         M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
-        P: NonEmptyPath<OffchainPublicKey>,
+        P: NonEmptyPath<OffchainPublicKey> + Send,
         S: Into<PacketSignals>,
     >(
         msg: &[u8],

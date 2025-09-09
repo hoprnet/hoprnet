@@ -2798,7 +2798,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4638,7 +4638,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.13.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4655,6 +4655,7 @@ dependencies = [
  "lazy_static",
  "mimalloc",
  "parameterized",
+ "rayon",
  "serde",
  "serde_bytes",
  "strum 0.27.2",
@@ -4673,7 +4674,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -4697,7 +4698,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -8622,7 +8623,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]

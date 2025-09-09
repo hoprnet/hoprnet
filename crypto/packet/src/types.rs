@@ -4,7 +4,7 @@ use hopr_crypto_sphinx::{
     errors::SphinxError,
     prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
 };
-use hopr_crypto_types::prelude::Hash;
+use hopr_crypto_types::prelude::HashFast;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
 
@@ -83,7 +83,7 @@ impl HoprSenderId {
     /// Each item has the same [`pseudonym`](HoprSenderId::pseudonym)
     /// but different [`surb_id`](HoprSenderId::surb_id).
     ///
-    /// The `surb_id` of the `n`-th item (n > 1) is computed as `Keccak256(n || I_prev)`
+    /// The `surb_id` of the `n`-th item (n > 1) is computed as `Blake3(n || I_prev)`
     /// where `I_prev` is the whole `n-1`-th ID, the `n` is represented as big-endian and
     /// `||` denotes byte-array concatenation.
     /// The first item (n = 1) is always `self`.
@@ -94,7 +94,7 @@ impl HoprSenderId {
     /// once an element is known.
     pub fn into_sequence(self) -> impl Iterator<Item = Self> {
         std::iter::successors(Some((1u32, self)), |&(i, prev)| {
-            let hash = Hash::create(&[&i.to_be_bytes(), prev.as_ref()]);
+            let hash = HashFast::create(&[&i.to_be_bytes(), prev.as_ref()]);
             Some((
                 i + 1,
                 Self::from_pseudonym_and_id(&prev.pseudonym(), hash.as_ref()[0..SURB_ID_SIZE].try_into().unwrap()),
