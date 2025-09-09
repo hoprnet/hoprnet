@@ -345,8 +345,8 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         // module multisend should beSafeSuiteLib.SAFE_MultiSendCallOnly_ADDRESS
         assertEq(
             HoprNodeManagementModule(moduleAddr).multisend(),
-            SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS,
-            "Wrong module owner"
+            SafeSuiteLibV141.SAFE_MultiSend_ADDRESS,
+            "Wrong SafeMultiSend contract"
         );
     }
 
