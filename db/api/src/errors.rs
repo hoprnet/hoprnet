@@ -35,7 +35,7 @@ pub enum DbError {
     LogicalError(String),
 
     // Solves the issue when the message producer can send arbitrary data that cannot be decoded
-    // but would then be acknowledged, leading to potentially assymetrical work on the receiver
+    // but would then be acknowledged, leading to potentially asymmetrical work on the receiver
     #[error("adversarial behavior detected: {0}")]
     PossibleAdversaryError(String),
 }
