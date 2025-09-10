@@ -70,3 +70,29 @@ number_underscore = "thousands"
 quote_style = "double"
 tab_width = 4
 wrap_comments = true
+
+[lint]
+ignore = [
+  # Ignore all the static contracts, as they are archived and won't be changed anymore
+  "src/static/stake/HoprBoost.sol",
+  "src/static/stake/IHoprBoost.sol",
+  "src/static/stake/HoprStake.sol",
+  "src/static/stake/HoprStake2.sol",
+  "src/static/stake/HoprStakeBase.sol",
+  "src/static/stake/HoprWhitehat.sol",
+  "src/static/stake/HoprStakeSeason3.sol",
+  "src/static/stake/HoprStakeSeason4.sol",
+  "src/static/stake/HoprStakeSeason5.sol",
+  "src/static/stake/HoprStakeSeason6.sol",
+  "src/static/stake/HoprStakeSeason7.sol",
+  "src/static/stake/HoprStakeSeason8.sol",
+  "src/static/openzeppelin-contracts/ERC777.sol",
+  "src/static/ERC777/ERC777Snapshot.sol",
+  "src/static/HoprForwarder.sol",
+  "src/static/HoprWrapper.sol",
+  "src/static/HoprToken.sol",
+  "src/static/HoprDistributor.sol",
+  "src/static/HoprWrapperProxy.sol",
+  "src/static/stake/mocks/ERC777Mock.sol",
+  "src/static/stake/mocks/ERC677Mock.sol",
+]

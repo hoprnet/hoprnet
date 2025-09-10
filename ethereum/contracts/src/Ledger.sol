@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.30;
 
+import { EfficientHashLib } from "solady-0.1.24/utils/EfficientHashLib.sol";
+
 abstract contract HoprLedgerEvents {
     /**
      * Emitted once the ledger domain separator is updated.
@@ -75,15 +77,13 @@ abstract contract HoprLedger is HoprLedgerEvents {
      * An event is emitted when the domain separator is updated
      */
     function updateLedgerDomainSeparator() public {
-        // following encoding guidelines of EIP712
-        bytes32 newLedgerDomainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("HoprLedger")),
-                keccak256(bytes(LEDGER_VERSION)),
-                block.chainid,
-                address(this)
-            )
+        // following encoding guidelines of EIP712, with assembly for gas optimization
+        bytes32 newLedgerDomainSeparator = EfficientHashLib.hash(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes("HoprLedger")),
+            keccak256(bytes(LEDGER_VERSION)),
+            bytes32(block.chainid),
+            bytes32(uint256(uint160(address(this))))
         );
         if (newLedgerDomainSeparator != ledgerDomainSeparator) {
             ledgerDomainSeparator = newLedgerDomainSeparator;

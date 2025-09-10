@@ -145,6 +145,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
             }
         }
         // Generate a unique salt using the sender's address and the provided nonce
+        /// forge-lint: disable-next-line(asm-keccak256)
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
 
         // 1. Deploy node management module proxy
@@ -270,6 +271,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
             0,
             address(0)
         );
+        // forge-lint: disable-start(asm-keccak256)
         bytes32 salt = keccak256(abi.encodePacked(keccak256(initializer), nonce));
         bytes32 predictedHash = keccak256(
             abi.encodePacked(
@@ -284,6 +286,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
                 )
             )
         );
+        // forge-lint: disable-end(asm-keccak256)
         return address(uint160(uint256(predictedHash)));
     }
 }

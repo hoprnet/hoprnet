@@ -13,7 +13,7 @@ import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
 import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 
 contract MaliciousModuleMock {
-    function initialize(bytes calldata) public {
+    function initialize(bytes calldata) public pure {
         return;
     }
 }

@@ -7,6 +7,7 @@ import { ERC1820Implementer } from "openzeppelin-contracts-4.9.2/utils/introspec
 import { IERC20 } from "openzeppelin-contracts-4.9.2/token/ERC20/IERC20.sol";
 import { IERC777Recipient } from "openzeppelin-contracts-4.9.2/token/ERC777/IERC777Recipient.sol";
 import { ECDSA } from "openzeppelin-contracts-4.9.2/utils/cryptography/ECDSA.sol";
+import { EfficientHashLib } from "solady-0.1.24/utils/EfficientHashLib.sol";
 
 import { HoprCrypto } from "./Crypto.sol";
 import { HoprLedger } from "./Ledger.sol";
@@ -143,9 +144,10 @@ abstract contract HoprChannelsType {
      */
     function _channelState(bytes32 channelId) internal view returns (bytes32 state) {
         // Get the channel state from the storage slot
-        bytes32 slot = keccak256(abi.encode(channelId, 0));
         assembly {
-            state := sload(slot)
+            mstore(0x00, channelId)
+            mstore(0x20, 0) // storage slot of channels mapping
+            state := sload(keccak256(0x00, 0x40))   // load storage from the key
         }
     }
 }
@@ -318,14 +320,12 @@ contract HoprChannels is
      */
     function updateDomainSeparator() public {
         // following encoding guidelines of EIP712
-        bytes32 newDomainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("HoprChannels")),
-                keccak256(bytes(VERSION)),
-                block.chainid,
-                address(this)
-            )
+        bytes32 newDomainSeparator = EfficientHashLib.hash(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes("HoprChannels")),
+            keccak256(bytes(VERSION)),
+            bytes32(block.chainid),
+            bytes32(uint256(uint160(address(this))))
         );
 
         if (newDomainSeparator != domainSeparator) {
@@ -844,6 +844,7 @@ contract HoprChannels is
      * @return the channel id
      */
     function _getChannelId(address source, address destination) public pure returns (bytes32) {
+        /// forge-lint: disable-next-line(asm-keccak256)
         return keccak256(abi.encodePacked(source, destination));
     }
 
@@ -883,13 +884,13 @@ contract HoprChannels is
             | (uint256(ChannelEpoch.unwrap(redeemable.data.epoch)) << 56) | uint256(WinProb.unwrap(redeemable.data.winProb));
 
         // Deviates from EIP712 due to computed property and non-standard struct property encoding
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                this.redeemTicket.selector,
-                keccak256(abi.encodePacked(redeemable.data.channelId, secondPart, challenge))
-            )
+        // with efficient hashing.
+        bytes32 hashStruct = EfficientHashLib.hash(
+            bytes32(this.redeemTicket.selector),
+            keccak256(abi.encodePacked(redeemable.data.channelId, secondPart, challenge))
         );
 
+        // forge-lint: disable-next-line(asm-keccak256)
         return keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
     }
 

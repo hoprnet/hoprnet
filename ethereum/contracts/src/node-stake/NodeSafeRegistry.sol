@@ -3,6 +3,7 @@ pragma solidity ^0.8;
 
 import { ECDSA } from "openzeppelin-contracts-4.9.2/utils/cryptography/ECDSA.sol";
 import { Address } from "openzeppelin-contracts-4.9.2/utils/Address.sol";
+import { EfficientHashLib } from "solady-0.1.24/utils/EfficientHashLib.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {
     /**
@@ -148,13 +149,16 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         // check adminKeyAddress has added HOPR tokens to the staking contract.
 
         // Compute the hash of the struct according to EIP712 guidelines
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                NODE_SAFE_TYPEHASH, safeAddress, nodeChainKeyAddress, _nodeToSafe[nodeChainKeyAddress].nodeSigNonce
-            )
+        // using assembly for gas optimization (-95 gas)
+        bytes32 hashStruct = EfficientHashLib.hash(
+            uint256(NODE_SAFE_TYPEHASH),
+            uint256(uint160(safeAddress)),
+            uint256(uint160(nodeChainKeyAddress)),
+            uint256(_nodeToSafe[nodeChainKeyAddress].nodeSigNonce)
         );
 
         // Build the typed digest for signature verification
+        /// forge-lint: disable-next-line(asm-keccak256)
         bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
 
         // Verify that the signature is from nodeChainKeyAddress
@@ -200,16 +204,15 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
      * An event is emitted when the domain separator is updated
      */
     function updateDomainSeparator() public {
-        // following encoding guidelines of EIP712
-        bytes32 newDomainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("NodeSafeRegistry")),
-                keccak256(bytes(VERSION)),
-                block.chainid,
-                address(this)
-            )
+        // following encoding guidelines of EIP712, using assembly for gas optimization (-60 gas)
+        bytes32 newDomainSeparator = EfficientHashLib.hash(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes("NodeSafeRegistry")),
+            keccak256(bytes(VERSION)),
+            bytes32(block.chainid),
+            bytes32(uint256(uint160(address(this))))
         );
+
         if (newDomainSeparator != domainSeparator) {
             domainSeparator = newDomainSeparator;
             emit DomainSeparatorUpdated(domainSeparator);

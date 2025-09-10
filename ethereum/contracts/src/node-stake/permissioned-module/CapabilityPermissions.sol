@@ -655,6 +655,7 @@ library HoprCapabilityPermissions {
     // ======================================================
 
     function getChannelId(address source, address destination) internal pure returns (bytes32) {
+        // forge-lint: disable-next-line(asm-keccak256)
         return keccak256(abi.encodePacked(source, destination));
     }
 
