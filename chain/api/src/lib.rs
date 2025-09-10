@@ -42,7 +42,8 @@ use hopr_internal_types::{
 };
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
-use hopr_db_sql::prelude::ChainOrPacketKey;
+use hopr_db_sql::api::errors::DbError;
+use hopr_db_sql::prelude::{ChainOrPacketKey, HoprDbResolverOperations};
 use crate::errors::{HoprChainError, Result};
 
 pub type DefaultHttpRequestor = hopr_chain_rpc::transport::ReqwestClient;
@@ -432,5 +433,29 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn get_minimum_ticket_price(&self) -> errors::Result<HoprBalance> {
         Ok(self.rpc_operations.get_minimum_network_ticket_price().await?)
+    }
+}
+
+impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> HoprDbResolverOperations for HoprChain<T> {
+    async fn resolve_packet_key(&self, onchain_key: &Address) -> hopr_db_sql::api::errors::Result<Option<OffchainPublicKey>> {
+        // TODO: (dbmig) resolve via get_account and cache
+        Ok(self
+            .db
+            .translate_key(None, *onchain_key)
+            .await?
+            .map(|k| k.try_into())
+            .transpose()
+            .map_err(|_e| DbError::LogicalError("failed to transpose the translated key".into()))?)
+    }
+
+    async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> hopr_db_sql::api::errors::Result<Option<Address>> {
+        // TOOD: (dbmig) resolve via get_account and cache
+        Ok(self
+            .db
+            .translate_key(None, *offchain_key)
+            .await?
+            .map(|k| k.try_into())
+            .transpose()
+            .map_err(|_e| DbError::LogicalError("failed to transpose the translated key".into()))?)
     }
 }

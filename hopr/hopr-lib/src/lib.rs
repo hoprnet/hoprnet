@@ -866,7 +866,7 @@ impl Hopr {
 
             while let Some(peer) = peer_stream.next().await {
                 // TODO: (dbmig) will become Node's DB instead
-                if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
+                if let Some(key) = self.hopr_chain_api.resolve_chain_key(&peer.id.0).await? {
                     // For nodes that had a good quality, we assign a perfect score
                     cg.update_node_score(&key, NodeScoreUpdate::Initialize(peer.last_seen_latency, 1.0));
                 } else {
@@ -1261,8 +1261,7 @@ impl Hopr {
 
     // DB ============
     pub fn peer_resolver(&self) -> &impl HoprDbResolverOperations {
-        // TODO: (dbmig) will become Node's DB instead
-        &self.db
+        &self.hopr_chain_api
     }
 
     // Chain =========
@@ -1510,14 +1509,12 @@ impl Hopr {
             .await
             .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
 
-        // TODO: (dbmig) will become Node's DB instead
-        Ok(self.db.resolve_chain_key(&pubkey).await?)
+        Ok(self.hopr_chain_api.resolve_chain_key(&pubkey).await?)
     }
 
     pub async fn chain_key_to_peerid(&self, address: &Address) -> errors::Result<Option<PeerId>> {
-        // TODO: (dbmig) will become Node's DB instead
         Ok(self
-            .db
+            .hopr_chain_api
             .resolve_packet_key(address)
             .await
             .map(|pk| pk.map(|v| v.into()))?)
