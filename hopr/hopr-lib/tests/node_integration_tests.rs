@@ -1,6 +1,5 @@
 mod common;
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use alloy::primitives::U256;
@@ -16,10 +15,8 @@ const SNAPSHOT_BASE: &str = "tests/snapshots/node_snapshot_base";
 #[ignore]
 // #[tracing_test::traced_test]
 #[cfg(feature = "runtime-tokio")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn hopr_node_integration_test() -> anyhow::Result<()> {
-    // use hopr_db_api::info;
-
     use hopr_lib::config::SafeModule;
     use tracing::{debug, info};
 
@@ -40,26 +37,21 @@ async fn hopr_node_integration_test() -> anyhow::Result<()> {
 
     let alice_chain_key = chain_env.node_chain_keys[0].clone();
     let bob_chain_key = chain_env.node_chain_keys[1].clone();
-    info!(
-        "Using chain keys: \nAlice: {}\nBob: {}",
-        alice_chain_key.public(),
-        bob_chain_key.public()
-    );
 
     let _alice_node_safe = onboard_node(&chain_env, &alice_chain_key, U256::from(10_u32), U256::from(10_000_u32)).await;
     let _bob_node_safe = onboard_node(&chain_env, &bob_chain_key, U256::from(10_u32), U256::from(10_000_u32)).await;
 
-    // Instantiate Hopr for both nodes
-    let _alice = Arc::new(Hopr::new(
+    // Instantiate two Hopr instances
+    let _alice = Hopr::new(
         HoprLibConfig {
             host: hopr_lib::config::HostConfig {
-                address: hopr_lib::config::HostType::IPv4("127.0.0.1".into()),
+                address: hopr_lib::config::HostType::default(),
                 port: 3001,
             },
             db: hopr_lib::config::Db {
                 data: "/tmp/hopr-tests/alice".into(),
                 initialize: true,
-                force_initialize: false,
+                force_initialize: true,
             },
             safe_module: SafeModule {
                 safe_transaction_service_provider: "".into(),
@@ -70,11 +62,12 @@ async fn hopr_node_integration_test() -> anyhow::Result<()> {
         },
         &OffchainKeypair::random(),
         &alice_chain_key,
-    )?);
+    );
+
     let _bob = Arc::new(Hopr::new(
         HoprLibConfig {
             host: hopr_lib::config::HostConfig {
-                address: hopr_lib::config::HostType::IPv4("127.0.0.1".into()),
+                address: hopr_lib::config::HostType::default(),
                 port: 3002,
             },
             db: hopr_lib::config::Db {
