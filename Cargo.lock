@@ -4774,7 +4774,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-migration"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "hopr-internal-types",
  "hopr-primitive-types",
@@ -5123,7 +5123,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5217,7 +5217,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-network"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "futures",
