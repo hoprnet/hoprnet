@@ -538,7 +538,12 @@ impl HoprDbProtocolOperations for HoprDb {
             HoprPacket::from_incoming(&data, &offchain_keypair, sender, &myself.caches.key_id_mapper, |p| {
                 myself.caches.extract_pseudonym_opener(p)
             })
-            .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
+            .map_err(|error| match error {
+                errors::PacketError::PacketDecodingError(_) | errors::PacketError::SphinxError(_) => {
+                    DbSqlError::PossibleAdversaryError(format!("possibly adversarial behavior: {error}"))
+                }
+                _ => DbSqlError::LogicalError(format!("failed to construct an incoming packet: {error}")),
+            })
         })
         .await?;
         if start.elapsed().as_millis() > SLOW_OP_MS {
