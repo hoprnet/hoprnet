@@ -213,16 +213,13 @@ class HoprdAPI(ApiLib):
 
     async def peers(
         self,
-        quality: float = 0.1,
         status: str = "connected",
     ) -> list[ConnectedPeer]:
         """
         Returns a list of peers.
         :return: peers: list
         """
-        params = GetPeersBody(quality)
-
-        if r := await self.try_req(Method.GET, f"/node/peers?{params.as_header_string}"):
+        if r := await self.try_req(Method.GET, f"/node/peers"):
             return [ConnectedPeer(peer) for peer in r.get(status, [])]
         else:
             return []

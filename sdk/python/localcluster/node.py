@@ -270,7 +270,7 @@ class Node:
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
             # filter out peers that are not well-connected yet
-            connected_peers = [p.address for p in peers_info if p.quality >= 0.25]
+            connected_peers = [p.address for p in peers_info if p.quality >= 0.1]
             connected_peers.sort()
             logging.debug(f"Peers connected on {self.id}: {connected_peers}")
 
