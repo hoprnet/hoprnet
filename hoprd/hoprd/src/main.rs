@@ -17,6 +17,11 @@ use {
     opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
 };
 
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
@@ -138,6 +143,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
         warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
+    }
+
+    if cfg!(debug_assertions) {
+        warn!("Executable was built using the DEBUG profile.");
+    } else {
+        info!("Executable was built using the RELEASE profile.");
     }
 
     let args = <CliArgs as clap::Parser>::parse();

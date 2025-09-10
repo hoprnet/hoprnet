@@ -73,7 +73,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
     fn new(inner: S, incomplete_frames: M, max_age: Duration, capacity: usize) -> Self {
         Self {
             inner,
-            timer: futures_time::task::sleep(max_age.into()),
+            timer: futures_time::task::sleep(max_age.max(Duration::from_millis(1)).into()),
             incomplete_frames,
             expired_frames: Vec::with_capacity(capacity),
             last_expiration: None,

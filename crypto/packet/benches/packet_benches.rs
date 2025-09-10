@@ -10,6 +10,11 @@ use hopr_internal_types::prelude::*;
 use hopr_path::{Path, TransportPath};
 use hopr_primitive_types::prelude::{BytesEncodable, KeyIdent};
 
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 const SAMPLE_SIZE: usize = 100_000;
 
 /// Pairs of (hops, surb_count) to benchmark.

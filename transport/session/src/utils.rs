@@ -14,7 +14,7 @@ use crate::{
     types::HoprStartProtocol,
 };
 
-/// Convenience function to copy data in both directions between a [`Session`](crate::Session) and arbitrary
+/// Convenience function to copy data in both directions between a [`Session`](crate::HoprSession) and arbitrary
 /// async IO stream.
 /// This function is only available with Tokio and will panic with other runtimes.
 ///
@@ -24,7 +24,7 @@ use crate::{
 /// 3. The function terminates, returning the number of bytes transferred in both directions.
 #[cfg(feature = "runtime-tokio")]
 pub async fn transfer_session<S>(
-    session: &mut crate::Session,
+    session: &mut crate::HoprSession,
     stream: &mut S,
     max_buffer: usize,
     abort_stream: Option<futures::future::AbortRegistration>,
@@ -146,7 +146,12 @@ where
             })
             .then(move |res| {
                 match res {
-                    Ok(_) => debug!(%session_id, "keep-alive stream done"),
+                    Ok(_) => tracing::info!(
+                        component = "session",
+                        %session_id,
+                        task = "transport event notifier",
+                        "long-running background task finished"
+                    ),
                     Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
                 }
                 futures::future::ready(())

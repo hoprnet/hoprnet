@@ -268,9 +268,26 @@
               rust-builder-local.callPackage ./nix/rust-package.nix (
                 hoprdBuildArgs // { CARGO_PROFILE = "candidate"; }
               );
-          hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { runBench = true; }
-          );
+          # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
+          hoprd-bench =
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
+              rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
+              rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
+              rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runBench = true; });
 
           hopliBuildArgs = {
             inherit src depsSrc rev;
@@ -495,32 +512,36 @@
               (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
             ];
           };
-          hopr-pluto = pkgs.dockerTools.buildLayeredImage {
+          plutoDeps = with pkgs; [
+            curl
+            foundry-bin
+            gnumake
+            hoprd
+            hopli
+            plutoSrc
+            python313
+            runtimeShellPackage
+            solcDefault
+            lsof
+            tini
+            uv
+            which
+          ];
+          pluto-docker = import ./nix/docker-builder.nix {
             name = "hopr-pluto";
-            tag = "latest";
-            # breaks binary reproducibility, but makes usage easier
-            created = "now";
-            contents = with pkgs; [
-              coreutils
-              curl
-              findutils
-              foundry-bin
-              gnumake
-              hoprd
-              hopli
-              jq
-              lsof
-              openssl
-              plutoSrc
-              python313
-              runtimeShellPackage
-              solcDefault
-              time
-              tini
-              uv
-              which
+            pkgs = pkgs;
+            extraContents = plutoDeps;
+            extraPorts = {
+              "3001-3006/tcp" = { };
+              "10001-10101/tcp" = { };
+              "10001-10101/udp" = { };
+            };
+            Cmd = [
+              "/bin/tini"
+              "--"
+              "bash"
+              "/scripts/run-local-cluster.sh"
             ];
-            enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
 
@@ -549,29 +570,8 @@
               # need to point to the contracts directory for forge to work
               ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
 
-              export PATH="/target/debug/:$PATH"
-
               mkdir /tmp/
-              mkdir /tmp/hopr-localcluster
-              mkdir /tmp/hopr-localcluster/anvil
-
             '';
-            config = {
-              Env = [
-                "LD_LIBRARY_PATH=${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH"
-              ];
-              Cmd = [
-                "/bin/tini"
-                "--"
-                "bash"
-                "/scripts/run-local-cluster.sh"
-              ];
-              ExposedPorts = {
-                "8545/tcp" = { };
-                "3003-3018/tcp" = { };
-                "10001-10101/tcp" = { };
-              };
-            };
           };
 
           dockerImageUploadScript =
@@ -602,7 +602,7 @@
             drv = dockerImageUploadScript hopli-profile-docker;
           };
           hopr-pluto-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hopr-pluto;
+            drv = dockerImageUploadScript pluto-docker;
           };
           docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs // { buildDocs = true; }
@@ -958,7 +958,7 @@
               ;
             inherit hoprd-candidate hopli-candidate;
             inherit hopr-test hopr-test-nightly;
-            inherit anvil-docker hopr-pluto;
+            inherit anvil-docker pluto-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
             inherit hoprd-bench;

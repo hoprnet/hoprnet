@@ -25,12 +25,12 @@ random.seed(SEED)
 
 async def bringup(
     config: str,
-    size: Optional[int] = None,
     test_mode: bool = False,
     fully_connected: bool = False,
     use_nat: bool = False,
     exposed: bool = False,
     base_port: int = BASE_PORT,
+    size: Optional[int] = None,
 ) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 

@@ -469,13 +469,21 @@ where
                             error!(%peer, %error, "failed to process the received message");
 
                             // Send random signed acknowledgement to give feedback to the sender
-                            let now = std::time::Instant::now();
-                            if let Err(error) = ack_out_tx.send((None, peer_key)).await {
-                                tracing::error!(%error, "failed to send ack to the egress queue");
-                            }
-                            let elapsed = now.elapsed();
-                            if elapsed.as_millis() > SLOW_OP_MS {
-                                warn!(%peer, ?elapsed, "ack_out.send on failed packet took too long");
+                            if let hopr_crypto_packet::errors::PacketError::PacketDecodingError(_) | hopr_crypto_packet::errors::PacketError::SphinxError(_) = error {
+                                // Do not send an ack back if the packet could not be decoded at all
+                                // 
+                                // Potentially adversarial behavior
+                                tracing::trace!(%peer, "not sending ack back on undecodable packet - possible adversarial behavior");
+                            } else {
+                                let now = std::time::Instant::now();
+
+                                if let Err(error) = ack_out_tx.send((None, peer_key)).await {
+                                    tracing::error!(%error, "failed to send ack to the egress queue");
+                                }
+                                let elapsed = now.elapsed();
+                                if elapsed.as_millis() > SLOW_OP_MS {
+                                    warn!(%peer, ?elapsed, "ack_out.send on failed packet took too long");
+                                }
                             }
                         }
 
@@ -496,28 +504,28 @@ where
                     let tbf = tbf.clone();
 
                     async move {
-                    if let Some(packet) = maybe_packet {
-                        match packet {
-                            IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
-                            IncomingPacket::Final { packet_tag, previous_hop,.. } |
-                            IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
-                                if tbf.is_tag_replay(&packet_tag).await {
-                                    warn!(%previous_hop, "replayed packet received");
+                        if let Some(packet) = maybe_packet {
+                            match packet {
+                                IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
+                                IncomingPacket::Final { packet_tag, previous_hop,.. } |
+                                IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
+                                    if tbf.is_tag_replay(&packet_tag).await {
+                                        warn!(%previous_hop, "replayed packet received");
 
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_REPLAYED_PACKET_COUNT.increment();
+                                        #[cfg(all(feature = "prometheus", not(test)))]
+                                        METRIC_REPLAYED_PACKET_COUNT.increment();
 
-                                    None
-                                } else {
-                                    Some(packet)
+                                        None
+                                    } else {
+                                        Some(packet)
+                                    }
                                 }
                             }
+                        } else {
+                            trace!("received empty packet");
+                            None
                         }
-                    } else {
-                        trace!("received empty packet");
-                        None
                     }
-                }
                 })
                 .then_concurrent(move |packet| {
                     let mut msg_to_send_tx = wire_msg.0.clone();
@@ -543,6 +551,10 @@ where
                             let elapsed = now.elapsed();
                             if elapsed.as_millis() > SLOW_OP_MS {
                                 warn!(?elapsed," ack_tx.send took too long");
+                            }
+                            let elapsed = now.elapsed();
+                            if elapsed.as_millis() > SLOW_OP_MS {
+                                warn!(%previous_hop, ?elapsed, "ack_processor.handle_acknowledgement took too long");
                             }
 
                             // We do not acknowledge back acknowledgements.

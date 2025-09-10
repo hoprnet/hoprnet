@@ -30,6 +30,7 @@ futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
 hashbrown = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
+mimalloc = { workspace = true }
 pin-project = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }

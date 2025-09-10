@@ -4,21 +4,33 @@ use hopr_db_api::{
     errors::{DbError, Result},
     resolver::HoprDbResolverOperations,
 };
-use hopr_primitive_types::primitives::Address;
+use hopr_primitive_types::{primitives::Address, traits::ToHex};
+use multiaddr::PeerId;
 
 use crate::{accounts::HoprDbAccountOperations, db::HoprDb};
 
 #[async_trait]
 impl HoprDbResolverOperations for HoprDb {
+    #[tracing::instrument(level = "trace", skip_all, fields(onchain_key = onchain_key.to_hex().as_str()), err)]
     async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>> {
         Ok(self
             .translate_key(None, *onchain_key)
             .await?
             .map(|k| k.try_into())
+            .inspect(|v: &std::result::Result<OffchainPublicKey, _>| {
+                if let Ok(offchain_pk) = v {
+                    tracing::trace!(
+                        peer = %Into::<PeerId>::into(offchain_pk),
+                        offchain_pk = offchain_pk.to_hex(),
+                        "found offchain key",
+                    );
+                }
+            })
             .transpose()
             .map_err(|_e| DbError::LogicalError("failed to transpose the translated key".into()))?)
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(offchain_key = %Into::<PeerId>::into(offchain_key)), ret, err)]
     async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Result<Option<Address>> {
         Ok(self
             .translate_key(None, *offchain_key)

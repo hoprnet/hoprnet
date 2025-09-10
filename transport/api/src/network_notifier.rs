@@ -72,8 +72,8 @@ where
         self.network
             .find_peers_to_ping(from_timestamp)
             .await
-            .unwrap_or_else(|e| {
-                tracing::error!(error = %e, "Failed to generate peers for the heartbeat procedure");
+            .unwrap_or_else(|error| {
+                tracing::error!(%error, "failed to generate peers for the heartbeat procedure");
                 vec![]
             })
     }

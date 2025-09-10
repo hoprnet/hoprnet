@@ -12,7 +12,7 @@ import subprocess
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from functools import partial
 
@@ -168,8 +168,8 @@ def generate_self_signed_cert(cert_file_with_key):
         .issuer_name(issuer)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.utcnow())
-        .not_valid_after(datetime.utcnow() + timedelta(days=365))
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
         .add_extension(
             x509.SubjectAlternativeName([x509.DNSName("localhost")]),
             critical=False,
@@ -356,7 +356,7 @@ class TestSessionWithSwarm:
             assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
 
             # Leave some space for SURBs in the packet, because no response buffer is used
-            packet_len = int(session.mtu / 2)
+            packet_len = int(session.hopr_mtu / 2)
             expected = [f"{i}".ljust(packet_len) for i in range(packet_count)]
             actual = []
             with session.client_socket() as sock:

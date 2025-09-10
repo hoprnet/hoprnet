@@ -21,5 +21,8 @@ mkCargoDerivation (
     buildPhaseCargoCommand = "cargo bench --locked";
 
     nativeBuildInputs = (args.nativeBuildInputs or [ ]);
+
+    RUST_BACKTRACE = "full";
+    MIMALLOC_SHOW_STATS = 1;
   }
 )

@@ -93,6 +93,7 @@ where
                         ticket: Box::new(v.0),
                     })
                 }
+                hopr_db_api::errors::DbError::PossibleAdversaryError(e) => PacketError::PacketDecodingError(e),
                 _ => PacketError::PacketConstructionError(e.to_string()),
             })?;
 
