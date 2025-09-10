@@ -158,28 +158,28 @@ jobs:
 
       - name: Build and push ${{ inputs.package }}-profile docker image - Commit
         run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
-        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != ''
+        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.package != 'hopr-pluto'
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG }}-profile
 
       - name: Build and push ${{ inputs.package }}-profile docker image - PR
         run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
-        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != ''
+        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.package != 'hopr-pluto'
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG_PR }}-profile
 
       - name: Build and push ${{ inputs.package }}-profile docker image - latest
         run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
-        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.production && github.event.pull_request.base.ref == 'master'
+        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.production && github.event.pull_request.base.ref == 'master' && inputs.package != 'hopr-pluto'
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:latest-profile
 
       - name: Build and push ${{ inputs.package }}-profile docker image - release-latest
         run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET_PROFILE }}
-        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.production && steps.options.outputs.DOCKER_RELEASE_LATEST_TAG != ''
+        if: steps.options.outputs.NIX_BUILD_TARGET_PROFILE != '' && inputs.production && steps.options.outputs.DOCKER_RELEASE_LATEST_TAG != '' && inputs.package != 'hopr-pluto'
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}-profile
