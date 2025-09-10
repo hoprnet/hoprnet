@@ -147,6 +147,15 @@ pub struct StoredSessionEntry {
     pub forward_path: RoutingOptions,
     /// Return path used for the Session.
     pub return_path: RoutingOptions,
+    /// The maximum number of client sessions that the listener can spawn.
+    pub max_client_sessions: usize,
+    /// The maximum number of SURB packets that can be sent upstream.
+    pub max_surb_upstream: Option<human_bandwidth::re::bandwidth::Bandwidth>,
+    /// The amount of response data the Session counterparty can deliver back to us, without us
+    /// having to request it.
+    pub response_buffer: Option<bytesize::ByteSize>,
+    /// How many Sessions to pool for clients.
+    pub session_pool: Option<usize>,
     /// The abort handle for the Session processing.
     pub abort_handle: AbortHandle,
 
@@ -528,16 +537,20 @@ impl SessionClientRequest {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "destination": "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
         "target": "example.com:80",
+        "destination": "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
         "forwardPath": { "Hops": 1 },
         "returnPath": { "Hops": 1 },
         "protocol": "tcp",
         "ip": "127.0.0.1",
         "port": 5542,
-        "hopr_mtu": 1002,
-        "surb_len": 398,
-        "active_clients": []
+        "hoprMtu": 1002,
+        "surbLen": 398,
+        "activeClients": [],
+        "maxClientSessions": 2,
+        "maxSurbUpstream": "2000 kb/s",
+        "responseBuffer": "2 MB",
+        "sessionPool": 0
     }))]
 #[serde(rename_all = "camelCase")]
 /// Response body for creating a new client session.
@@ -574,6 +587,24 @@ pub(crate) struct SessionClientResponse {
     /// Can contain multiple entries on TCP sessions, but currently
     /// always only a single entry on UDP sessions.
     pub active_clients: Vec<String>,
+    /// The maximum number of client sessions that the listener can spawn.
+    ///
+    /// This currently applies only to the TCP sessions, as UDP sessions cannot
+    /// have multiple clients (defaults to 1 for UDP).
+    pub max_client_sessions: usize,
+    /// The maximum throughput at which artificial SURBs might be generated and sent
+    /// to the recipient of the Session.    
+    #[serde(default)]
+    #[serde(with = "human_bandwidth::option")]
+    #[schema(value_type = String)]
+    pub max_surb_upstream: Option<human_bandwidth::re::bandwidth::Bandwidth>,
+    /// The amount of response data the Session counterparty can deliver back to us, without us
+    /// sending any SURBs to them.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = String)]
+    pub response_buffer: Option<bytesize::ByteSize>,
+    /// How many Sessions to pool for clients.
+    pub session_pool: Option<usize>,
 }
 
 /// This function first tries to parse `requested` as the `ip:port` host pair.
@@ -714,7 +745,7 @@ async fn create_tcp_client_binding(
     bind_host: std::net::SocketAddr,
     state: Arc<InternalState>,
     args: SessionClientRequest,
-) -> Result<(std::net::SocketAddr, Option<HoprSessionId>), (StatusCode, ApiErrorStatus)> {
+) -> Result<(std::net::SocketAddr, Option<HoprSessionId>, usize), (StatusCode, ApiErrorStatus)> {
     let target_spec = args.target.clone();
     let (dst, target, data) = args
         .clone()
@@ -848,17 +879,21 @@ async fn create_tcp_client_binding(
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
             clients: active_sessions,
+            max_client_sessions: max_clients,
+            max_surb_upstream: args.max_surb_upstream,
+            response_buffer: args.response_buffer,
+            session_pool: Some(session_pool_size),
             abort_handle,
         },
     );
-    Ok((bound_host, None))
+    Ok((bound_host, None, max_clients))
 }
 
 async fn create_udp_client_binding(
     bind_host: std::net::SocketAddr,
     state: Arc<InternalState>,
     args: SessionClientRequest,
-) -> Result<(std::net::SocketAddr, Option<HoprSessionId>), (StatusCode, ApiErrorStatus)> {
+) -> Result<(std::net::SocketAddr, Option<HoprSessionId>, usize), (StatusCode, ApiErrorStatus)> {
     let target_spec = args.target.clone();
     let (dst, target, data) = args
         .clone()
@@ -883,7 +918,7 @@ async fn create_udp_client_binding(
     let hopr = state.hopr.clone();
 
     // Create a single session for the UDP socket
-    let session = hopr.connect_to(dst, target, data).await.map_err(|e| {
+    let session = hopr.connect_to(dst, target, data.clone()).await.map_err(|e| {
         (
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure(e.to_string()),
@@ -905,6 +940,8 @@ async fn create_udp_client_binding(
     // This is needed because the `udp_socket` cannot terminate by itself.
     let (abort_handle, abort_reg) = AbortHandle::new_pair();
     let clients = Arc::new(DashMap::new());
+    let max_clients: usize = 1; // Maximum number of clients for this session. Currently always 1.
+
     // TODO: add multiple client support to UDP sessions (#7370)
     let session_id = *session.id();
     clients.insert(session_id, (bind_host, abort_handle.clone()));
@@ -928,11 +965,15 @@ async fn create_udp_client_binding(
             target: target_spec.clone(),
             forward_path: args.forward_path.clone(),
             return_path: args.return_path.clone(),
+            max_client_sessions: max_clients,
+            max_surb_upstream: args.max_surb_upstream,
+            response_buffer: args.response_buffer,
+            session_pool: None,
             abort_handle,
             clients,
         },
     );
-    Ok((bound_host, Some(session_id)))
+    Ok((bound_host, Some(session_id), max_clients))
 }
 
 /// Creates a new client session returning the given session listening host and port over TCP or UDP.
@@ -988,7 +1029,7 @@ pub(crate) async fn create_client(
     }
 
     debug!("binding {protocol} session listening socket to {bind_host}");
-    let (bound_host, udp_session_id) = match protocol {
+    let (bound_host, udp_session_id, max_clients) = match protocol {
         IpProtocol::TCP => create_tcp_client_binding(bind_host, state.clone(), args.clone()).await?,
         IpProtocol::UDP => create_udp_client_binding(bind_host, state.clone(), args.clone()).await?,
     };
@@ -1007,6 +1048,10 @@ pub(crate) async fn create_client(
                 hopr_mtu: SESSION_MTU,
                 surb_len: SURB_SIZE,
                 active_clients: udp_session_id.into_iter().map(|s| s.to_string()).collect(),
+                max_client_sessions: max_clients,
+                max_surb_upstream: args.max_surb_upstream,
+                response_buffer: args.response_buffer,
+                session_pool: args.session_pool,
             }),
         )
             .into_response(),
@@ -1032,8 +1077,12 @@ pub(crate) async fn create_client(
                 "ip": "127.0.0.1",
                 "port": 5542,
                 "surbLen": 400,
-                "mtu": 1020,
-                "activeClients": []
+                "hoprMtu": 1020,
+                "activeClients": [],
+                "maxClientSessions": 2,
+                "maxSurbUpstream": "2000 kb/s",
+                "responseBuffer": "2 MB",
+                "sessionPool": 0
             }
         ])),
         (status = 400, description = "Invalid IP protocol.", body = ApiError),
@@ -1067,6 +1116,10 @@ pub(crate) async fn list_clients(
             hopr_mtu: SESSION_MTU,
             surb_len: SURB_SIZE,
             active_clients: entry.clients.iter().map(|e| e.key().to_string()).collect(),
+            max_client_sessions: entry.max_client_sessions,
+            max_surb_upstream: entry.max_surb_upstream,
+            response_buffer: entry.response_buffer,
+            session_pool: entry.session_pool,
         })
         .collect::<Vec<_>>();
 
