@@ -203,13 +203,13 @@ where
             let task = spawn(async move {
                 match aggregator_clone.aggregate_tickets(&channel_id, criteria).await {
                     Ok(_) => {
-                        debug!("tried ticket aggregation in channel {channel_id} without any issues");
+                        debug!(%channel_id, "aggregation attempted without issues for a channel");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_COUNT_AGGREGATIONS.increment();
                     }
-                    Err(e) => {
-                        error!("cannot complete aggregation in channel {channel_id}: {e}");
+                    Err(error) => {
+                        error!(%channel_id, %error, "aggregation failed to complete for a channel");
                     }
                 }
 

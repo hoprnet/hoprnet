@@ -4735,7 +4735,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "async-trait",
  "futures",
@@ -4784,7 +4784,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5087,7 +5087,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5123,7 +5123,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.13.1"
+version = "0.13.2"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5311,7 +5311,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5361,7 +5361,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.13.0"
+version = "0.13.1"
 dependencies = [
  "anyhow",
  "arrayvec",
