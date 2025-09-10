@@ -209,6 +209,7 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
 pub async fn chain_events_to_transport_events<StreamIn, Db>(
     event_stream: StreamIn,
     me_onchain: Address,
+    // TODO: (dbmig) must be node's DB instead
     db: Db,
     multi_strategy: Arc<MultiStrategy>,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
@@ -219,7 +220,7 @@ where
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
 {
     Box::pin(event_stream.filter_map(move |event| {
-        let db = db.clone();
+        //let db = db.clone();
         let multi_strategy = multi_strategy.clone();
         let channel_graph = channel_graph.clone();
         let indexer_action_tracker = indexer_action_tracker.clone();
@@ -234,16 +235,7 @@ where
 
             match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {
-                    let allowed = db
-                        .is_allowed_in_network_registry(None, &address)
-                        .await
-                        .unwrap_or(false);
-
-                    Some(vec![PeerDiscovery::Announce(peer, multiaddresses), if allowed {
-                        PeerDiscovery::Allow(peer)
-                    } else {
-                        PeerDiscovery::Ban(peer)
-                    }])
+                    Some(vec![PeerDiscovery::Announce(peer, multiaddresses), PeerDiscovery::Allow(peer)])
                 }
                 ChainEventType::ChannelOpened(channel) |
                 ChainEventType::ChannelClosureInitiated(channel) |
@@ -288,6 +280,7 @@ where
                     None
                 }
                 ChainEventType::NetworkRegistryUpdate(address, allowed) => {
+                    // TODO: (dbmig) will become Node's DB instead
                     let packet_key = db.translate_key(None, address).await;
                     match packet_key {
                         Ok(pk) => {
@@ -376,7 +369,7 @@ pub struct Hopr {
     transport_api: HoprTransport<HoprDb>,
     hopr_chain_api: HoprChain<HoprDb>,
     // objects that could be removed pending architectural cleanup ========
-    db: HoprDb,
+    //db: HoprDb,
     chain_cfg: ChainNetworkConfig,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
@@ -685,6 +678,7 @@ impl Hopr {
         }
 
         // set safe and module addresses in the DB
+        // TODO: (dbmig) must be moved into Node's DB
         self.db
             .set_safe_info(
                 None,
@@ -713,7 +707,7 @@ impl Hopr {
             // This has to happen before the indexing process starts in order to make sure that the pre-existing data is
             // properly populated into the transport mechanism before the synced data in the follow up process.
             info!("Syncing peer announcements and network registry updates from previous runs");
-            let accounts = self.db.get_accounts(None, true).await?;
+            let accounts = self.hopr_chain_api.accounts_announced_on_chain().await?;
             for account in accounts.into_iter() {
                 match account.entry_type {
                     AccountType::NotAnnounced => {}
@@ -725,17 +719,7 @@ impl Hopr {
                                 HoprLibError::GeneralError(format!("Failed to send peer discovery announcement: {e}"))
                             })?;
 
-                        let allow_status = if self
-                            .db
-                            .is_allowed_in_network_registry(None, &account.chain_addr)
-                            .await?
-                        {
-                            PeerDiscovery::Allow(account.public_key.into())
-                        } else {
-                            PeerDiscovery::Ban(account.public_key.into())
-                        };
-
-                        indexer_peer_update_tx.send(allow_status).await.map_err(|e| {
+                        indexer_peer_update_tx.send(PeerDiscovery::Allow(account.public_key.into())).await.map_err(|e| {
                             HoprLibError::GeneralError(format!(
                                 "Failed to send peer discovery network registry event: {e}"
                             ))
@@ -762,30 +746,7 @@ impl Hopr {
             processes.insert(nid, proc);
         }
 
-        {
-            // Show onboarding information
-            let my_ethereum_address = self.me_onchain();
-            let my_peer_id = self.me_peer_id();
-            let my_version = crate::constants::APP_VERSION;
-
-            while !self
-                .db
-                .clone()
-                .is_allowed_in_network_registry(None, &my_ethereum_address)
-                .await
-                .unwrap_or(false)
-            {
-                info!(
-                    "Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.",
-                    my_ethereum_address.to_hex()
-                );
-
-                sleep(ONBOARDING_INFORMATION_INTERVAL).await;
-
-                info!(peer_id = %my_peer_id, address = %my_ethereum_address.to_hex(), version = &my_version, "Node information");
-                info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
-            }
-        }
+        info!(peer_id = %self.me_peer_id(), address = %self.me_onchain(), version = constants::APP_VERSION, "Node information");
 
         // Check Safe-module status:
         // 1) if the node is already included into the module
@@ -869,7 +830,7 @@ impl Hopr {
 
             info!("Syncing channels from the previous runs");
             let mut channel_stream = self
-                .db
+                .hopr_chain_api
                 .stream_active_channels()
                 .await
                 .map_err(hopr_db_sql::api::errors::DbError::from)?;
@@ -896,6 +857,7 @@ impl Hopr {
                     constants::DEFAULT_MIN_QUALITY_TO_SYNC
                 });
 
+            // TODO: (dbmig) will become node's DB instead
             let mut peer_stream = self
                 .db
                 .get_network_peers(Default::default(), false)
@@ -903,6 +865,7 @@ impl Hopr {
                 .filter(|status| futures::future::ready(status.quality >= min_quality_to_sync));
 
             while let Some(peer) = peer_stream.next().await {
+                // TODO: (dbmig) will become Node's DB instead
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
                     // For nodes that had a good quality, we assign a perfect score
                     cg.update_node_score(&key, NodeScoreUpdate::Initialize(peer.last_seen_latency, 1.0));
@@ -924,6 +887,7 @@ impl Hopr {
         // notifier on acknowledged ticket reception
         let multi_strategy_ack_ticket = self.multistrategy.clone();
         let (on_ack_tkt_tx, mut on_ack_tkt_rx) = unbounded::<AcknowledgedTicket>();
+        // TODO: (dbmig) will become Ticket DB instead
         self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
         processes.insert(
@@ -984,6 +948,7 @@ impl Hopr {
             processes.insert(id.into(), proc);
         }
 
+        // TODO: (dbmig) will become Ticket DB instead
         let db_clone = self.db.clone();
         processes.insert(
             HoprLibProcesses::TicketIndexFlush,
@@ -1006,9 +971,10 @@ impl Hopr {
         // redeemed but on-chain state does not align with that. This implies there was a problem
         // right when the transaction was sent on-chain. In such cases, we simply let it retry and
         // handle errors appropriately.
-        if let Err(e) = self.db.fix_channels_next_ticket_state().await {
-            error!(error = %e, "failed to fix channels ticket states");
-        }
+        // TODO: (dbmig) dissolve this here
+        //if let Err(e) = self.db.fix_channels_next_ticket_state().await {
+        //    error!(error = %e, "failed to fix channels ticket states");
+        //}
 
         // NOTE: strategy ticks must start after the chain is synced, otherwise
         // the strategy would react to historical data and drain through the native
@@ -1069,7 +1035,8 @@ impl Hopr {
     }
 
     /// Returns the most recently indexed log, if any.
-    pub async fn get_indexer_state(&self) -> errors::Result<IndexerStateInfo> {
+    // TODO: (dbmig) make sure this code is in the Blokli
+    /*pub async fn get_indexer_state(&self) -> errors::Result<IndexerStateInfo> {
         let indexer_state_info = self.db.get_indexer_state_info(None).await?;
 
         match self.db.get_last_checksummed_log().await? {
@@ -1086,7 +1053,7 @@ impl Hopr {
             }
             None => Ok(indexer_state_info),
         }
-    }
+    }*/
 
     /// Test whether the peer with PeerId is allowed to access the network
     pub async fn is_allowed_to_access_network(
@@ -1213,7 +1180,7 @@ impl Hopr {
             }
         };
 
-        match self.db.get_account(None, pubkey).await {
+        match self.hopr_chain_api.account(pubkey).await {
             Ok(Some(entry)) => Vec::from_iter(entry.get_multiaddr()),
             Ok(None) => {
                 error!(%peer, "no information");
@@ -1288,11 +1255,13 @@ impl Hopr {
 
     /// Reset the ticket metrics to zero
     pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
+        // TODO: (dbmig) will become Ticket DB instead
         Ok(self.db.reset_ticket_statistics().await?)
     }
 
     // DB ============
     pub fn peer_resolver(&self) -> &impl HoprDbResolverOperations {
+        // TODO: (dbmig) will become Node's DB instead
         &self.db
     }
 
@@ -1308,11 +1277,7 @@ impl Hopr {
 
     /// Get minimum incoming ticket winning probability
     pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<WinningProbability> {
-        Ok(self
-            .db
-            .get_indexer_data(None)
-            .await?
-            .minimum_incoming_ticket_winning_prob)
+        Ok(self.hopr_chain_api.minimum_incoming_ticket_win_probability()?)
     }
 
     /// List of all accounts announced on the chain
@@ -1323,7 +1288,7 @@ impl Hopr {
     /// Get the channel entry from Hash.
     /// @returns the channel entry of those two nodes
     pub async fn channel_from_hash(&self, channel_id: &Hash) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.db.get_channel_by_id(None, channel_id).await?)
+        Ok(self.hopr_chain_api.channel_by_id(channel_id).await?)
     }
 
     /// Get the channel entry between source and destination node.
@@ -1510,7 +1475,7 @@ impl Hopr {
     ) -> errors::Result<usize> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let channel = self.db.get_channel_by_id(None, channel_id).await?;
+        let channel = self.hopr_chain_api.channel_by_id(channel_id).await?;
         let mut redeem_count = 0;
 
         if let Some(channel) = channel {
@@ -1544,10 +1509,13 @@ impl Hopr {
         let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer_id))
             .await
             .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
+
+        // TODO: (dbmig) will become Node's DB instead
         Ok(self.db.resolve_chain_key(&pubkey).await?)
     }
 
     pub async fn chain_key_to_peerid(&self, address: &Address) -> errors::Result<Option<PeerId>> {
+        // TODO: (dbmig) will become Node's DB instead
         Ok(self
             .db
             .resolve_packet_key(address)

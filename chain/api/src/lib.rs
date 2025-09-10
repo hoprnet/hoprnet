@@ -16,6 +16,8 @@ use alloy::{
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use futures::future::AbortHandle;
+use futures::stream::BoxStream;
+use futures::TryStreamExt;
 use hopr_async_runtime::{prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
@@ -40,7 +42,7 @@ use hopr_internal_types::{
 };
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
-
+use hopr_db_sql::prelude::ChainOrPacketKey;
 use crate::errors::{HoprChainError, Result};
 
 pub type DefaultHttpRequestor = hopr_chain_rpc::transport::ReqwestClient;
@@ -284,16 +286,20 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_accounts(None, true).await?)
     }
 
+    pub async fn account<T: Into<ChainOrPacketKey>>(&self, key: T) -> errors::Result<Option<AccountEntry>> {
+        Ok(self.db.get_account(None, key)?)
+    }
+
+    pub async fn channel_by_id(&self, channel_id: &Hash) -> errors::Result<Option<ChannelEntry>> {
+        Ok(self.db.get_channel_by_id(None, channel_id).await?)
+    }
+
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
-        self.db
+        Ok(self.db
             .get_channel_by_parties(None, src, dest, false)
-            .await
-            .map_err(HoprChainError::from)
-            .and_then(|v| {
-                v.ok_or(errors::HoprChainError::Api(format!(
-                    "Channel entry not available {src}-{dest}"
-                )))
-            })
+            .await?
+            .ok_or(errors::HoprChainError::Api(format!("Channel entry not available {src}-{dest}")))?
+        )
     }
 
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
@@ -308,6 +314,13 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_all_channels(None).await?)
     }
 
+    pub async fn stream_active_channels<'a>(&'a self) -> errors::Result<impl futures::Stream<Item = errors::Result<ChannelEntry>>> {
+        Ok(self.db.stream_active_channels()
+               .await?
+               .map_err(|e| errors::HoprChainError::DbError(e)))
+
+    }
+
     pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
         Ok(self.db.get_all_corrupted_channels(None).await?)
     }
@@ -318,6 +331,14 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
         Ok(self.db.get_safe_hopr_allowance(None).await?)
+    }
+
+    pub async fn minimum_incoming_ticket_win_probability(&self) -> errors::Result<WinningProbability> {
+        Ok(self
+            .db
+            .get_indexer_data(None)
+            .await?
+            .minimum_incoming_ticket_winning_prob)
     }
 
     pub fn actions_ref(&self) -> &ChainActions<T> {
