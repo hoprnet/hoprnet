@@ -42,6 +42,13 @@ impl ProofOfRelayValues {
         Self(ret)
     }
 
+    /// Generate random Proof of Relay values for 0-hop packets.
+    pub fn random() -> Self {
+        let mut ret = hopr_crypto_random::random_bytes::<{Self::SIZE}>();
+        ret[0] = 1;
+        Self(ret)
+    }
+
     /// Length of this PoR challenge chain (number of hops + 1).
     // TODO: needed to know how to price the ticket on the return path, will be fixed in #3765
     pub fn chain_length(&self) -> u8 {

@@ -55,7 +55,14 @@ struct PathKeyData {
 impl PathKeyData {
     fn new(path: &[OffchainPublicKey]) -> Result<Self> {
         let shared_keys = HoprSphinxSuite::new_shared_keys(path)?;
-        let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
+
+        // For 0-hop we just generate random proof of relay values
+        let (por_strings, por_values)  = if path.len() > 1 {
+            generate_proof_of_relay(&shared_keys.secrets)?
+        } else {
+            (Vec::with_capacity(0), ProofOfRelayValues::random())
+        };
+
         Ok(Self {
             shared_keys,
             por_strings,
