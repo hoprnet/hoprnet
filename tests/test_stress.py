@@ -62,7 +62,8 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
     api_target = HoprdAPI(
         f"http://{stress_fixture['target']['url']}", Bearer(stress_fixture["target"]["token"], "/api/v4")
     )
-    target_address = (await api_target.addresses()).native
+    if addr := await api_target.addresses():
+        target_address = addr.native
 
     async with AsyncExitStack() as channels:
         await asyncio.gather(
@@ -74,7 +75,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                 channels.enter_async_context(
                     create_channel(
                         ApiWrapper(source, (await source.addresses()).native),
-                        ApiWrapper(api_target, (await api_target.addresses()).native),
+                        ApiWrapper(api_target, target_address),
                         funding=STRESS_1_HOP_TO_SELF_MESSAGE_COUNT * TICKET_PRICE_PER_HOP * 3,
                         close_from_dest=False,
                     )
@@ -84,7 +85,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
             *[
                 channels.enter_async_context(
                     create_channel(
-                        ApiWrapper(api_target, (await api_target.addresses()).native),
+                        ApiWrapper(api_target, target_address),
                         ApiWrapper(source, (await source.addresses()).native),
                         funding=STRESS_1_HOP_TO_SELF_MESSAGE_COUNT * TICKET_PRICE_PER_HOP * 3,
                         close_from_dest=False,
@@ -145,12 +146,10 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                         source["url"].split(":")[0],
                         source["url"].split(":")[1],
                         source["token"],
-                        (
-                            await HoprdAPI(f"http://{source['url']}", Bearer(source["token"], "/api/v4")).addresses()
-                        ).native,
+                        (await api.addresses()).native,
                     ),
                     timeout=60.0,
                 )
-                for source in stress_fixture["sources"]
+                for api, source in zip(api_sources, stress_fixture["sources"])
             ]
         )
