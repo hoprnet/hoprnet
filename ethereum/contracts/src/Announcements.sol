@@ -7,6 +7,7 @@ import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
 error ZeroAddress(string reason);
 
+/// forge-lint:disable-next-item(mixed-case-variable)
 abstract contract HoprAnnouncementsEvents {
     event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
 
@@ -44,6 +45,7 @@ abstract contract HoprAnnouncementsEvents {
  * Publishes transport-layer information in the hopr network.
  *
  */
+/// forge-lint:disable-next-item(mixed-case-variable)
 contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
     constructor(HoprNodeSafeRegistry safeRegistry) {
         if (address(safeRegistry) == address(0)) {

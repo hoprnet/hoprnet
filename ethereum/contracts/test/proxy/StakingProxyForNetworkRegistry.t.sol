@@ -9,7 +9,9 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
     address public owner;
     address public stakeContract;
 
+    /// forge-lint: disable-next-line(mixed-case-variable)
     uint256[] public NFT_TYPE = [1, 2];
+    /// forge-lint: disable-next-line(mixed-case-variable)
     string[] public NFT_RANK = ["123", "456"];
     uint256 public constant INITIAL_MIN_STAKE = 1000;
     uint256 public constant HIGH_STAKE = 2000;

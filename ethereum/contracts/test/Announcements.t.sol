@@ -12,6 +12,7 @@ bytes32 constant ED25519_PUB_KEY = 0x3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec
 
 string constant MULTIADDRESS = "/ip6/2604:1380:2000:7a00::1/udp/4001/quic";
 
+/// forge-lint:disable-next-item(mixed-case-variable)
 contract AnnouncementsTest is Test {
     HoprNodeSafeRegistry safeRegistry;
     HoprAnnouncements announcements;

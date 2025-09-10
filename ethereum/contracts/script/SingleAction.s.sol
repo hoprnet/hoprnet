@@ -763,8 +763,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         bool isEnabled;
 
         // 2. check if current NR is enabled.
-        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNREnabled) {
-            isEnabled = isNREnabled;
+        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNetworkRegistryEnabled) {
+            isEnabled = isNetworkRegistryEnabled;
         } catch {
             revert("Cannot read enabled from network registry contract.");
         }
@@ -791,8 +791,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         bool isEnabled;
 
         // 2. check if current NR is enabled.
-        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNREnabled) {
-            isEnabled = isNREnabled;
+        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNetworkRegistryEnabled) {
+            isEnabled = isNetworkRegistryEnabled;
         } catch {
             revert("Cannot read enabled from network registry contract.");
         }
@@ -1235,7 +1235,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                 }
             } else {
                 // if transfer cannot be called, try minting token as a minter
-                bytes32 MINTER_ROLE = keccak256("MINTER_ROLE");
                 (bool successHasRole, bytes memory returndataHasRole) = hoprTokenContractAddress.staticcall(
                     abi.encodeWithSignature("hasRole(bytes32,address)", MINTER_ROLE, msgSender)
                 );

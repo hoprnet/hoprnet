@@ -10,13 +10,15 @@ contract ERC777SnapshotTest is Test, ERC1820RegistryFixtureTest {
     using stdStorage for StdStorage;
 
     ERC777SnapshotMock public erc777SnapshotMock;
-    string public NAME = "ERC 777 Token";
-    string public SYMBOL = "ERC777";
+    string public constant NAME = "ERC 777 Token";
+    string public constant SYMBOL = "ERC777";
+    /// forge-lint: disable-start(mixed-case-variable)
     address public INITIAL_HOLDER;
     uint256 public INITIAL_BALANCE = 10 ether;
     uint128 public INITIAL_MINT_BLOCK;
     address public DEFAULT_RECIPIENT;
     address public OTHER_RECIPIENT;
+    /// forge-lint: disable-end
 
     function setUp() public virtual override {
         super.setUp();

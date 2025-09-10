@@ -8,6 +8,7 @@ import { SECP2561k } from "solcrypto/SECP2561k.sol";
 import { HoprCrypto } from "../src/Crypto.sol";
 
 // Use proxy contract to have proper gas measurements for internal functions
+/// forge-lint:disable-next-item(mixed-case-variable)
 contract CryptoProxy is HoprCrypto {
     function pointToAddressProxy(uint256 p_x, uint256 p_y) public pure returns (address) {
         return pointToAddress(p_x, p_y);
@@ -61,6 +62,7 @@ contract CryptoProxy is HoprCrypto {
     }
 }
 
+/// forge-lint:disable-next-item(mixed-case-variable)
 contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
     struct CurvePoint {
         uint256 x;

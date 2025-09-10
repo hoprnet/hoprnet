@@ -6,6 +6,7 @@ import { HoprChannels, HoprChannelsType } from "../../src/Channels.sol";
 import { SECP2561k } from "solcrypto/SECP2561k.sol";
 import { Test } from "forge-std/Test.sol";
 
+/// forge-lint:disable-next-item(mixed-case-variable)
 abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
     uint256 constant SECP256K1_HALF_FIELD_ORDER = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0;
 

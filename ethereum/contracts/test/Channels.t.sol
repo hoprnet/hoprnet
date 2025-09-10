@@ -85,7 +85,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
     MyHoprChannels public hoprChannels;
     HoprNodeSafeRegistry public hoprNodeSafeRegistry;
 
+    /// forge-lint:disable-next-line(mixed-case-variable)
     uint256 MIN_USED_BALANCE;
+    /// forge-lint:disable-next-line(mixed-case-variable)
     uint256 MAX_USED_BALANCE;
 
     function setUp() public virtual override {
@@ -1091,6 +1093,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         }
     }
 
+    /// forge-lint:disable-next-item(mixed-case-variable)
     function test_redeemTicket_bidirectional(
         uint256 privKeyA,
         uint256 privKeyB,
@@ -1574,8 +1577,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         } else {
             v = 27;
         }
-        HoprCrypto.CompactSignature memory tweaked_sig = toCompactSignature(v, r, s);
-        redeemable.signature.vs = tweaked_sig.vs;
+        HoprCrypto.CompactSignature memory tweakedSig = toCompactSignature(v, r, s);
+        redeemable.signature.vs = tweakedSig.vs;
 
         vm.prank(dest);
 
