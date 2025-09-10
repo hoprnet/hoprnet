@@ -1,12 +1,10 @@
 use std::fmt::Formatter;
 
 use hopr_crypto_sphinx::prelude::SharedSecret;
-use hopr_crypto_types::{
-    prelude::{SecretKey, sample_secp256k1_field_element},
-    types::{Challenge, HalfKey, HalfKeyChallenge, Response},
-};
+use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::instrument;
+
 use crate::errors::{PacketError, Result};
 
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
@@ -274,6 +272,7 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
 #[cfg(test)]
 mod tests {
     use hopr_crypto_random::Randomizable;
+
     use super::*;
 
     impl ProofOfRelayValues {
