@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-api"
-version = "0.11.0"
+version = "0.11.1"
 edition = "2021"
 description = "API interface specifying the desired implementation details of the HOPR database."
 homepage = "https://hoprnet.org/"

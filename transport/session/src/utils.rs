@@ -146,7 +146,12 @@ where
             })
             .then(move |res| {
                 match res {
-                    Ok(_) => debug!(%session_id, "keep-alive stream done"),
+                    Ok(_) => tracing::info!(
+                        component = "session",
+                        %session_id,
+                        task = "transport event notifier",
+                        "long-running background task finished"
+                    ),
                     Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
                 }
                 futures::future::ready(())
