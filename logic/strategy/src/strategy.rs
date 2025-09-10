@@ -166,7 +166,6 @@ impl MultiStrategy {
                 ))),
                 Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
                     *sub_cfg,
-                    db.clone(),
                     hopr_chain_actions.clone(),
                 ))),
                 Strategy::AutoFunding(sub_cfg) => {

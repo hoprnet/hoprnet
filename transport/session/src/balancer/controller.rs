@@ -74,9 +74,9 @@ pub struct SurbBalancerConfig {
     pub target_surb_buffer_size: u64,
     /// Maximum outflow of SURBs.
     ///
-    /// - In the context of the local SURB buffer, this is the maximum egress Session traffic.
+    /// - In the context of the local SURB buffer, this is the maximum egress Session traffic (= SURB consumption).
     /// - In the context of the remote SURB buffer, this is the maximum egress of keep-alive messages to the
-    ///   counterparty.
+    ///   counterparty (= artificial SURB production).
     ///
     /// The default is 5000 (which is 2500 packets/second currently)
     #[default(5_000)]
@@ -233,7 +233,6 @@ where
 
     /// Spawns a new task that performs updates of the given [`SurbBalancer`] at the given `sampling_interval`.
     ///
-    /// If `surb_decay` is given, SURBs are removed at each window as the given percentage of the target buffer.
     /// If `cfg_feedback` is given, [`SurbBalancerConfig`] can be queried for updates and also updated
     /// if the underlying [`SurbBalancerController`] also does target updates.
     ///
@@ -266,6 +265,8 @@ where
             async move {
                 pin_mut!(sampling_stream);
                 while sampling_stream.next().await.is_some() {
+                    // This call should not update the popularity estimator of the cache,
+                    // so that it is still allowed to expire.
                     let Ok(mut current_cfg) = cfg_feedback.get_config(&self.session_id).await else {
                         error!("cannot get config for session");
                         break;

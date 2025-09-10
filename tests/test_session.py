@@ -356,7 +356,7 @@ class TestSessionWithSwarm:
             assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
 
             # Leave some space for SURBs in the packet, because no response buffer is used
-            packet_len = int(session.mtu / 2)
+            packet_len = int(session.hopr_mtu / 2)
             expected = [f"{i}".ljust(packet_len) for i in range(packet_count)]
             actual = []
             with session.client_socket() as sock:

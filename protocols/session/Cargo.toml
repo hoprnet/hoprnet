@@ -30,6 +30,7 @@ futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
 hashbrown = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
+mimalloc = { workspace = true }
 pin-project = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
@@ -63,6 +64,7 @@ hopr-network-types = { workspace = true, features = [
   "capture",
   "runtime-tokio",
 ] }
+hopr-protocol-app = { workspace = true }
 
 [[example]]
 name = "session-socket"

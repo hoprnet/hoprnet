@@ -56,7 +56,7 @@ use hopr_path::{
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
 use hopr_primitive_types::prelude::*;
-pub use hopr_protocol_app::prelude::{ApplicationData, Tag};
+pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_mixer::MixerConfig;
@@ -78,8 +78,8 @@ use hopr_transport_protocol::{
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    Capabilities as SessionCapabilities, Capability as SessionCapability, IncomingSession, SESSION_MTU, SURB_SIZE,
-    ServiceId, Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
+    Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
+    SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
@@ -195,7 +195,7 @@ where
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<Sender<(DestinationRouting, ApplicationData)>>,
+    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>>,
 }
 
 impl<T> HoprTransport<T>
@@ -246,6 +246,16 @@ where
                 // TODO(v3.1): Use the entire range of tags properly
                 session_tag_range: (16..65535),
                 maximum_sessions: cfg.session.maximum_sessions as usize,
+                frame_mtu: std::env::var("HOPR_SESSION_FRAME_SIZE")
+                    .ok()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or_else(|| SessionManagerConfig::default().frame_mtu)
+                    .max(ApplicationData::PAYLOAD_SIZE),
+                max_frame_timeout: std::env::var("HOPR_SESSION_FRAME_TIMEOUT_MS")
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok().map(Duration::from_millis))
+                    .unwrap_or_else(|| SessionManagerConfig::default().max_frame_timeout)
+                    .max(Duration::from_millis(100)),
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
@@ -272,7 +282,7 @@ where
         &self,
         me_onchain: &ChainKeypair,
         tbf_path: String,
-        on_incoming_data: UnboundedSender<ApplicationData>,
+        on_incoming_data: UnboundedSender<ApplicationDataIn>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
         on_incoming_session: UnboundedSender<IncomingSession>,
     ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>> {
@@ -397,7 +407,7 @@ where
         let tkt_agg_writer = ticket_agg_proc.writer();
 
         let (external_msg_send, external_msg_rx) =
-            mpsc::channel::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>(
+            mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>(
                 MAXIMUM_MSG_OUTGOING_BUFFER_SIZE,
             );
 
@@ -525,7 +535,7 @@ where
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationData)>();
+        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationDataIn)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -546,7 +556,7 @@ where
         }
 
         // -- network probing
-        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationData)>();
+        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let (manual_ping_tx, manual_ping_rx) = unbounded::<(PeerId, PingQueryReplier)>();
 
@@ -675,7 +685,7 @@ where
         destination: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-    ) -> errors::Result<Session> {
+    ) -> errors::Result<HoprSession> {
         Ok(self.smgr.new_session(destination, target, cfg).await?)
     }
 
@@ -712,8 +722,12 @@ where
             )));
         }
 
-        let app_data = ApplicationData::new_from_owned(tag, msg);
-        let routing = self.path_planner.resolve_routing(app_data.len(), routing).await?.0;
+        let app_data = ApplicationData::new(tag, msg.into_vec())?;
+        let routing = self
+            .path_planner
+            .resolve_routing(app_data.total_len(), usize::MAX, routing)
+            .await?
+            .0;
 
         // Here we do not use msg_sender directly,
         // since it internally follows Session-oriented logic
@@ -722,7 +736,7 @@ where
         })?;
 
         sender
-            .send_packet(app_data, routing)
+            .send_packet(ApplicationDataOut::with_no_packet_info(app_data), routing)
             .await
             .map_err(|e| HoprTransportError::Api(format!("send msg failed to enqueue msg: {e}")))?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)

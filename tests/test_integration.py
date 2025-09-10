@@ -13,7 +13,7 @@ from sdk.python.api.response_objects import Metrics
 from sdk.python.localcluster.constants import OPEN_CHANNEL_FUNDING_VALUE_HOPR
 from sdk.python.localcluster.node import Node
 
-from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
+from .conftest import barebone_nodes, default_nodes
 from .utils import (
     PARAMETERIZED_SAMPLE_SIZE,
     TICKET_AGGREGATION_THRESHOLD,
@@ -28,7 +28,8 @@ from .utils import (
     create_bidirectional_channels_for_route,
     create_channel,
     get_ticket_price,
-    shuffled,
+    random_distinct_pairs_from,
+    random_non_looping_routes_from,
 )
 
 
@@ -126,7 +127,7 @@ class TestIntegrationWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+        "src,dest", [random_non_looping_routes_from((barebone_nodes(), 2)) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
     async def test_hoprd_api_channel_should_register_fund_increase_using_fund_endpoint(
         self, src: str, dest: str, swarm7: dict[str, Node]
@@ -164,7 +165,8 @@ class TestIntegrationWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+        "src, mid, dest",
+        [random_non_looping_routes_from((barebone_nodes(), 3)) for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_reset_ticket_statistics_from_metrics(self, src: str, mid: str, dest: str, swarm7: dict[str, Node]):
         def count_metrics(metrics: Metrics):
@@ -193,7 +195,8 @@ class TestIntegrationWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+        "src,mid,dest",
+        [random_non_looping_routes_from((barebone_nodes(), 3)) for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_hoprd_should_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
@@ -231,7 +234,7 @@ class TestIntegrationWithSwarm:
                     s.settimeout(5)
                     # These messages will pass through
                     for i in range(message_count):
-                        message = f"#{i}".ljust(session.mtu)
+                        message = f"#{i}".ljust(session.hopr_mtu)
                         s.sendto(message.encode(), ("127.0.0.1", session.listen_port))
 
                         # Each packet increases the unredeemed value
@@ -245,7 +248,7 @@ class TestIntegrationWithSwarm:
 
                     # This additional message is not covered
                     s.sendto(
-                        "This message is not covered".ljust(session.mtu).encode(),
+                        "This message is not covered".ljust(session.hopr_mtu).encode(),
                         ("127.0.0.1", session.listen_port),
                     )
 
@@ -276,23 +279,17 @@ class TestIntegrationWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
     @pytest.mark.parametrize(
-        "route",
+        "src, mid, dest",
         [
-            [
-                random.sample(barebone_nodes(), 1)[0],
-                random.sample(default_nodes(), 1)[0],
-                random.sample(barebone_nodes(), 1)[0],
-            ]
+            random_non_looping_routes_from((barebone_nodes(), 1), (default_nodes(), 1), (barebone_nodes(), 1))
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
     async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming(
-        self, route, swarm7: dict[str, Node]
+        self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
     ):
         ticket_count = int(TICKET_AGGREGATION_THRESHOLD)
-        src = route[0]
-        mid = route[1]
-        dest = route[-1]
+
         ticket_price = await get_ticket_price(swarm7[src])
         aggregated_ticket_price = TICKET_AGGREGATION_THRESHOLD * ticket_price
 
