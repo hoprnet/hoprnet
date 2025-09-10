@@ -209,8 +209,6 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
 pub async fn chain_events_to_transport_events<StreamIn, Db>(
     event_stream: StreamIn,
     me_onchain: Address,
-    // TODO: (dbmig) must be node's DB instead
-    db: Db,
     multi_strategy: Arc<MultiStrategy>,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     indexer_action_tracker: Arc<IndexerActionTracker>,
@@ -220,7 +218,6 @@ where
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
 {
     Box::pin(event_stream.filter_map(move |event| {
-        //let db = db.clone();
         let multi_strategy = multi_strategy.clone();
         let channel_graph = channel_graph.clone();
         let indexer_action_tracker = indexer_action_tracker.clone();
@@ -280,35 +277,8 @@ where
                     None
                 }
                 ChainEventType::NetworkRegistryUpdate(address, allowed) => {
-                    // TODO: (dbmig) will become Node's DB instead
-                    let packet_key = db.translate_key(None, address).await;
-                    match packet_key {
-                        Ok(pk) => {
-                            if let Some(pk) = pk {
-                                let offchain_key: Result<OffchainPublicKey, _> = pk.try_into();
-
-                                if let Ok(offchain_key) = offchain_key {
-                                    let peer_id = offchain_key.into();
-
-                                    let res = match allowed {
-                                        hopr_chain_types::chain_events::NetworkRegistryStatus::Allowed => PeerDiscovery::Allow(peer_id),
-                                        hopr_chain_types::chain_events::NetworkRegistryStatus::Denied => PeerDiscovery::Ban(peer_id),
-                                    };
-
-                                    Some(vec![res])
-                                } else {
-                                    error!("Failed to unwrap as offchain key at this point");
-                                    None
-                                }
-                            } else {
-                                None
-                            }
-                        }
-                        Err(error) => {
-                            error!(%error, "on_network_registry_node_allowed failed");
-                            None
-                        },
-                    }
+                    info!(%address, ?allowed, "network registry update received as a no-op");
+                    None
                 }
                 ChainEventType::NodeSafeRegistered(safe_address) =>  {
                     info!(%safe_address, "Node safe registered");
