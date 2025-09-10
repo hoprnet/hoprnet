@@ -32,7 +32,7 @@ use std::{
 use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
-    SinkExt, StreamExt,
+    FutureExt, SinkExt, StreamExt,
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
 };
 use helpers::PathPlanner;
@@ -516,6 +516,12 @@ where
                     }
                 }
             }
+            .inspect(|_| {
+                tracing::info!(
+                    task = "transport event notifier",
+                    "long-running background task finished"
+                )
+            })
         }));
 
         processes.insert(
