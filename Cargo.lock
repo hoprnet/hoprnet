@@ -4784,7 +4784,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.18.1"
+version = "0.18.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -4814,6 +4814,7 @@ dependencies = [
  "libp2p-identity",
  "moka",
  "multiaddr",
+ "parking_lot",
  "rand 0.8.5",
  "ringbuffer",
  "sea-orm",
@@ -5168,18 +5169,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-bloom"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
- "async-lock 3.4.1",
- "bincode",
  "bloomfilter",
  "criterion",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-platform",
- "serde",
- "tokio",
  "tracing",
 ]
 
@@ -5311,7 +5308,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5345,6 +5342,7 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "moka",
+ "parking_lot",
  "pcap-file",
  "rust-stream-ext-concurrent",
  "serde",
