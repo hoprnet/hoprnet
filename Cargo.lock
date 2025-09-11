@@ -4784,7 +4784,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.18.1"
+version = "0.18.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -4814,6 +4814,7 @@ dependencies = [
  "libp2p-identity",
  "moka",
  "multiaddr",
+ "parking_lot",
  "rand 0.8.5",
  "ringbuffer",
  "sea-orm",

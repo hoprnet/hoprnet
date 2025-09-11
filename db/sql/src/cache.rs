@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Mutex, atomic::AtomicU64},
+    sync::{Arc, atomic::AtomicU64},
     time::Duration,
 };
 
@@ -83,7 +83,7 @@ pub struct PoppedSurb<S> {
 /// All these SURBs usually belong to the same pseudonym and are therefore identified
 /// only by the [`HoprSurbId`].
 #[derive(Clone, Debug)]
-pub(crate) struct SurbRingBuffer<S>(Arc<Mutex<AllocRingBuffer<(HoprSurbId, S)>>>);
+pub(crate) struct SurbRingBuffer<S>(Arc<parking_lot::Mutex<AllocRingBuffer<(HoprSurbId, S)>>>);
 
 impl<S> Default for SurbRingBuffer<S> {
     fn default() -> Self {
@@ -94,17 +94,14 @@ impl<S> Default for SurbRingBuffer<S> {
 
 impl<S> SurbRingBuffer<S> {
     pub fn new(capacity: usize) -> Self {
-        Self(Arc::new(Mutex::new(AllocRingBuffer::new(capacity))))
+        Self(Arc::new(parking_lot::Mutex::new(AllocRingBuffer::new(capacity))))
     }
 
     /// Push all SURBs with their IDs into the RB.
     ///
     /// Returns the total number of elements in the RB after the push.
     pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> Result<usize, DbError> {
-        let mut rb = self
-            .0
-            .lock()
-            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
+        let mut rb = self.0.lock();
 
         rb.extend(surbs);
         Ok(rb.len())
@@ -112,10 +109,7 @@ impl<S> SurbRingBuffer<S> {
 
     /// Pop the latest SURB and its IDs from the RB.
     pub fn pop_one(&self) -> Result<PoppedSurb<S>, DbError> {
-        let mut rb = self
-            .0
-            .lock()
-            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
+        let mut rb = self.0.lock();
 
         let (id, surb) = rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))?;
         Ok(PoppedSurb {
@@ -127,10 +121,7 @@ impl<S> SurbRingBuffer<S> {
 
     /// Check if the next SURB has the given ID and pop it from the RB.
     pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<PoppedSurb<S>, DbError> {
-        let mut rb = self
-            .0
-            .lock()
-            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
+        let mut rb = self.0.lock();
 
         if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
             let (id, surb) = rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))?;
