@@ -281,7 +281,6 @@ where
     pub async fn run(
         &self,
         me_onchain: &ChainKeypair,
-        tbf_path: String,
         public_nodes: Vec<AccountEntry>,
         on_incoming_data: UnboundedSender<ApplicationDataIn>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
@@ -485,7 +484,6 @@ where
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
-            Some(tbf_path),
             (
                 mixing_channel_tx.with(|(peer, msg): (PeerId, Box<[u8]>)| {
                     trace!(%peer, "sending message to peer");

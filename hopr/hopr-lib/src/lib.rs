@@ -70,7 +70,7 @@ pub use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions};
 pub use hopr_path::channel_graph::GraphExportConfig;
 use hopr_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate};
-use hopr_platform::file::native::{join, remove_dir_all};
+use hopr_platform::file::native::remove_dir_all;
 pub use hopr_primitive_types::prelude::*;
 pub use hopr_strategy::Strategy;
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
@@ -907,14 +907,7 @@ impl Hopr {
 
         for (id, proc) in self
             .transport_api
-            .run(
-                &self.me_chain,
-                join(&[&self.cfg.db.data, "tbf"])
-                    .map_err(|e| HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}")))?,
-                transport_output_tx,
-                indexer_peer_update_rx,
-                session_tx,
-            )
+            .run(&self.me_chain, transport_output_tx, indexer_peer_update_rx, session_tx)
             .await?
             .into_iter()
         {
