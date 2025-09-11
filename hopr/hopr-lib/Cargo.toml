@@ -67,6 +67,7 @@ hopr-chain-api = { workspace = true }
 hopr-chain-indexer = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-chain-types = { workspace = true }
+hopr-crypto-keypair = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-api = { workspace = true }
 hopr-db-sql = { workspace = true }
