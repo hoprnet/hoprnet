@@ -353,38 +353,6 @@ pub trait HoprDbTicketOperations {
     /// Returns the number of updated ticket indices.
     async fn persist_outgoing_ticket_indices(&self) -> Result<usize>;
 
-    /// Prepare a viable collection of tickets to be aggregated.
-    ///
-    /// Some preconditions for tickets apply. This callback will collect the aggregatable
-    /// tickets and marks them as being aggregated.
-    async fn prepare_aggregation_in_channel(
-        &self,
-        channel: &Hash,
-        prerequisites: AggregationPrerequisites,
-    ) -> Result<Option<(OffchainPublicKey, Vec<TransferableWinningTicket>, Hash)>>;
-
-    /// Perform a ticket aggregation rollback in the channel.
-    ///
-    /// If a ticket aggregation fails, this callback can be invoked to make sure that
-    /// resources are properly restored and cleaned up in the database, allowing further
-    /// aggregations.
-    async fn rollback_aggregation_in_channel(&self, channel: Hash) -> Result<()>;
-
-    /// Replace the aggregated tickets locally with an aggregated ticket from the counterparty.
-    async fn process_received_aggregated_ticket(
-        &self,
-        aggregated_ticket: Ticket,
-        chain_keypair: &ChainKeypair,
-    ) -> Result<AcknowledgedTicket>;
-
-    /// Performs ticket aggregation as an issuing party of the given tickets.
-    async fn aggregate_tickets(
-        &self,
-        destination: OffchainPublicKey,
-        acked_tickets: Vec<TransferableWinningTicket>,
-        me: &ChainKeypair,
-    ) -> Result<VerifiedTicket>;
-
     /// Fix the next ticket state if it's out-of-sync in all this node's channels.
     async fn fix_channels_next_ticket_state(&self) -> Result<()>;
 }

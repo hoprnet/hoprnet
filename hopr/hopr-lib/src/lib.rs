@@ -65,7 +65,6 @@ use hopr_db_sql::{
     db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, IndexerStateInfo},
     prelude::{ChainOrPacketKey::ChainKey, HoprDbPeersOperations},
-    registry::HoprDbRegistryOperations,
 };
 pub use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions};
@@ -121,6 +120,7 @@ lazy_static::lazy_static! {
 }
 
 pub use async_trait::async_trait;
+use hopr_db_sql::node_db::{HoprNodeDb, HoprNodeDbConfig};
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
@@ -214,7 +214,6 @@ pub async fn chain_events_to_transport_events<StreamIn, Db>(
     indexer_action_tracker: Arc<IndexerActionTracker>,
 ) -> impl Stream<Item = PeerDiscovery> + Send + 'static
 where
-    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
 {
     Box::pin(event_stream.filter_map(move |event| {
@@ -338,8 +337,8 @@ pub struct Hopr {
     state: Arc<AtomicHoprState>,
     transport_api: HoprTransport<HoprDb>,
     hopr_chain_api: HoprChain<HoprDb>,
+    node_db: HoprNodeDb,
     // objects that could be removed pending architectural cleanup ========
-    //db: HoprDb,
     chain_cfg: ChainNetworkConfig,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
@@ -378,7 +377,7 @@ impl Hopr {
             }
         }
 
-        let db_cfg = HoprDbConfig {
+        let db_cfg = HoprNodeDbConfig {
             create_if_missing: cfg.db.initialize,
             force_create: cfg.db.force_initialize,
             log_slow_queries: std::time::Duration::from_millis(150),
@@ -391,7 +390,7 @@ impl Hopr {
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
                 .unwrap_or_else(|| HoprDbConfig::default().surb_distress_threshold),
         };
-        let db = futures::executor::block_on(HoprDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
+        let db = futures::executor::block_on(HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 
         if let Some(provider) = &cfg.chain.provider {
             info!(provider, "Creating chain components using the custom provider");
@@ -666,7 +665,6 @@ impl Hopr {
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),
             self.me_onchain(),
-            self.db.clone(),
             self.multistrategy.clone(),
             self.channel_graph.clone(),
             self.hopr_chain_api.action_state(),
@@ -1006,7 +1004,16 @@ impl Hopr {
 
     /// Get the list of all announced public nodes in the network
     pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
-        Ok(self.transport_api.get_public_nodes().await?)
+        Ok(self
+            .hopr_chain_api
+            .accounts_announced_on_chain()
+            .await?
+            .into_iter()
+            .filter_map(|entry| entry
+                .get_multiaddr()
+                .map(|maddr| (PeerId::from(entry.public_key), entry.chain_addr, vec![maddr]))
+            ).collect()
+        )
     }
 
     /// Returns the most recently indexed log, if any.

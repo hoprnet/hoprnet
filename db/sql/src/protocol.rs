@@ -22,6 +22,7 @@ use crate::{
     cache::SurbRingBuffer, channels::HoprDbChannelOperations, db::HoprDb, errors::DbSqlError,
     info::HoprDbInfoOperations, prelude::HoprDbTicketOperations,
 };
+use crate::node_db::HoprNodeDb;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -48,7 +49,7 @@ lazy_static::lazy_static! {
 
 const SLOW_OP_MS: u128 = 150;
 
-impl HoprDb {
+impl HoprNodeDb {
     /// Validates a ticket from a forwarded packet and replaces it with a new ticket for the next hop.
     #[instrument(level = "trace", skip_all, err)]
     async fn validate_and_replace_ticket(
@@ -247,7 +248,7 @@ impl HoprDb {
 }
 
 #[async_trait]
-impl HoprDbProtocolOperations for HoprDb {
+impl HoprDbProtocolOperations for HoprNodeDb {
     #[instrument(level = "trace", skip(self, ack), err(Debug), ret)]
     async fn handle_acknowledgement(&self, ack: VerifiedAcknowledgement) -> Result<()> {
         let result = self.find_ticket_to_acknowledge(&ack).await?;

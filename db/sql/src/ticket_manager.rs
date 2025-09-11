@@ -1,6 +1,7 @@
 use std::sync::{Arc, OnceLock};
 
 use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::BoxFuture, pin_mut};
+use futures::channel::mpsc::UnboundedSender;
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
@@ -12,6 +13,7 @@ use tracing::{debug, error};
 use crate::{
     OpenTransaction, cache::HoprDbCaches, errors::Result, prelude::DbSqlError, tickets::WrappedTicketSelector,
 };
+use crate::node_db::HoprNodeDb;
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///
@@ -314,48 +316,42 @@ impl TicketManager {
     }
 }
 
+impl HoprNodeDb {
+    /// Starts ticket processing by the `TicketManager` with an optional new ticket notifier.
+    /// Without calling this method, tickets will not be persisted into the DB.
+    ///
+    /// If the notifier is given, it will receive notifications once a new ticket has been
+    /// persisted into the Tickets DB.
+    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> crate::errors::Result<()> {
+        if let Some(notifier) = ticket_notifier {
+            self.ticket_manager.start_ticket_processing(notifier)
+        } else {
+            self.ticket_manager.start_ticket_processing(futures::sink::drain())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use futures::StreamExt;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::info::DomainSeparator;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
-    use crate::{
-        accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
-    };
+    use crate::node_db::HoprNodeDb;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be valid");
-    }
-
-    lazy_static::lazy_static! {
         static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::random();
         static ref BOB_OFFCHAIN: OffchainKeypair = OffchainKeypair::random();
     }
 
     const TICKET_VALUE: u64 = 100_000;
-
-    async fn add_peer_mappings(db: &HoprDb, peers: Vec<(OffchainKeypair, ChainKeypair)>) -> crate::errors::Result<()> {
-        for (peer_offchain, peer_onchain) in peers.into_iter() {
-            db.insert_account(
-                None,
-                AccountEntry {
-                    public_key: *peer_offchain.public(),
-                    chain_addr: peer_onchain.public().to_address(),
-                    entry_type: AccountType::NotAnnounced,
-                    published_at: 0,
-                },
-            )
-            .await?
-        }
-
-        Ok(())
-    }
 
     fn generate_random_ack_ticket(index: u32) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
@@ -376,17 +372,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
-        db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
-            .await?;
-        add_peer_mappings(
-            &db,
-            vec![
-                (ALICE_OFFCHAIN.clone(), ALICE.clone()),
-                (BOB_OFFCHAIN.clone(), BOB.clone()),
-            ],
-        )
-        .await?;
+        let db = HoprNodeDb::new_in_memory(*BOB).await?;
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -397,7 +383,6 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel).await?;
 
         assert_eq!(
             HoprBalance::zero(),

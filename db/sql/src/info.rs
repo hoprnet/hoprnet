@@ -74,12 +74,6 @@ pub trait HoprDbInfoOperations {
     /// Sets node's Safe allowance of HOPR tokens.
     async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: HoprBalance) -> Result<()>;
 
-    /// Gets node's Safe addresses info.
-    async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>>;
-
-    /// Sets node's Safe addresses info.
-    async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()>;
-
     /// Gets stored Indexer data (either from the cache or from the DB).
     ///
     /// To update information stored in [IndexerData], use the individual setter methods,
@@ -110,11 +104,6 @@ pub trait HoprDbInfoOperations {
 
     /// Updates the indexer state info.
     async fn set_indexer_state_info<'a>(&'a self, tx: OptTx<'a>, block_num: u32) -> Result<()>;
-
-    /// Updates the network registry state.
-    /// To retrieve the stored network registry state, use [`HoprDbInfoOperations::get_indexer_data`],
-    /// note that this setter should invalidate the cache.
-    async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()>;
 
     /// Gets global setting value with the given key.
     async fn get_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str) -> Result<Option<Box<[u8]>>>;
@@ -255,69 +244,6 @@ impl HoprDbInfoOperations for HoprDb {
                 })
             })
             .await
-    }
-
-    async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>> {
-        let myself = self.clone();
-        Ok(self
-            .caches
-            .single_values
-            .try_get_with_by_ref(&CachedValueDiscriminants::SafeInfoCache, async move {
-                myself
-                    .nest_transaction(tx)
-                    .and_then(|op| {
-                        op.perform(|tx| {
-                            Box::pin(async move {
-                                let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                                    .one(tx.as_ref())
-                                    .await?
-                                    .ok_or(MissingFixedTableEntry("node_info".into()))?;
-                                Ok::<_, DbSqlError>(info.safe_address.zip(info.module_address))
-                            })
-                        })
-                    })
-                    .await
-                    .and_then(|addrs| {
-                        if let Some((safe_address, module_address)) = addrs {
-                            Ok(Some(SafeInfo {
-                                safe_address: safe_address.parse()?,
-                                module_address: module_address.parse()?,
-                            }))
-                        } else {
-                            Ok(None)
-                        }
-                    })
-                    .map(CachedValue::SafeInfoCache)
-            })
-            .await?
-            .try_into()?)
-    }
-
-    async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> Result<()> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    node_info::ActiveModel {
-                        id: Set(SINGULAR_TABLE_FIXED_ID),
-                        safe_address: Set(Some(safe_info.safe_address.to_hex())),
-                        module_address: Set(Some(safe_info.module_address.to_hex())),
-                        ..Default::default()
-                    }
-                    .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
-                    .await?;
-                    Ok::<_, DbSqlError>(())
-                })
-            })
-            .await?;
-        self.caches
-            .single_values
-            .insert(
-                CachedValueDiscriminants::SafeInfoCache,
-                CachedValue::SafeInfoCache(Some(safe_info)),
-            )
-            .await;
-        Ok(())
     }
 
     async fn get_indexer_data<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerData> {
@@ -509,30 +435,6 @@ impl HoprDbInfoOperations for HoprDb {
                 })
             })
             .await
-    }
-
-    async fn set_network_registry_enabled<'a>(&'a self, tx: OptTx<'a>, enabled: bool) -> Result<()> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    chain_info::ActiveModel {
-                        id: Set(SINGULAR_TABLE_FIXED_ID),
-                        network_registry_enabled: Set(enabled),
-                        ..Default::default()
-                    }
-                    .update(tx.as_ref())
-                    .await?;
-                    Ok::<_, DbSqlError>(())
-                })
-            })
-            .await?;
-
-        self.caches
-            .single_values
-            .invalidate(&CachedValueDiscriminants::IndexerDataCache)
-            .await;
-        Ok(())
     }
 
     async fn get_global_setting<'a>(&'a self, tx: OptTx<'a>, key: &str) -> Result<Option<Box<[u8]>>> {

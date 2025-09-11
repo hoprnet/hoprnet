@@ -14,10 +14,10 @@ pub mod info;
 pub mod logs;
 pub mod peers;
 pub mod protocol;
-pub mod registry;
 pub mod resolver;
 mod ticket_manager;
 pub mod tickets;
+pub mod node_db;
 
 use std::path::PathBuf;
 
@@ -38,7 +38,6 @@ use crate::{
     db::HoprDb,
     errors::{DbSqlError, Result},
     info::HoprDbInfoOperations,
-    registry::HoprDbRegistryOperations,
 };
 
 /// Primary key used in tables that contain only a single row.

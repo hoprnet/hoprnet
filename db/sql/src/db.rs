@@ -85,14 +85,9 @@ impl DbConnection {
 #[derive(Debug, Clone)]
 pub struct HoprDb {
     pub(crate) index_db: DbConnection,
-    pub(crate) tickets_db: sea_orm::DatabaseConnection,
-    pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) logs_db: sea_orm::DatabaseConnection,
-
-    pub(crate) caches: Arc<HoprDbCaches>,
     pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
-    pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) cfg: HoprDbConfig,
 }
 
@@ -143,33 +138,6 @@ impl HoprDb {
         )
         .await?;
 
-        let peers_options = PoolOptions::new()
-            .acquire_timeout(Duration::from_secs(60)) // Default is 30
-            .idle_timeout(Some(Duration::from_secs(10 * 60))) // This is the default
-            .max_lifetime(Some(Duration::from_secs(30 * 60))); // This is the default
-
-        let peers = Self::create_pool(
-            cfg.clone(),
-            directory.to_path_buf(),
-            peers_options,
-            Some(0),
-            Some(300),
-            false,
-            SQL_DB_PEERS_FILE_NAME,
-        )
-        .await?;
-
-        let tickets = Self::create_pool(
-            cfg.clone(),
-            directory.to_path_buf(),
-            PoolOptions::new(),
-            Some(0),
-            Some(50),
-            false,
-            SQL_DB_TICKETS_FILE_NAME,
-        )
-        .await?;
-
         let logs = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
@@ -182,7 +150,7 @@ impl HoprDb {
         .await?;
 
         #[cfg(feature = "sqlite")]
-        Self::new_sqlx_sqlite(chain_key, index, index_ro, peers, tickets, logs, cfg).await
+        Self::new_sqlx_sqlite(chain_key, index, index_ro, logs, cfg).await
     }
 
     #[cfg(feature = "sqlite")]
@@ -198,12 +166,6 @@ impl HoprDb {
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| DbSqlError::Construction(e.to_string()))?,
-            SqlitePool::connect(":memory:")
-                .await
-                .map_err(|e| DbSqlError::Construction(e.to_string()))?,
-            SqlitePool::connect(":memory:")
-                .await
-                .map_err(|e| DbSqlError::Construction(e.to_string()))?,
             Default::default(),
         )
         .await
@@ -214,8 +176,6 @@ impl HoprDb {
         chain_key: ChainKeypair,
         index_db_pool: SqlitePool,
         index_db_ro_pool: SqlitePool,
-        peers_db_pool: SqlitePool,
-        tickets_db_pool: SqlitePool,
         logs_db_pool: SqlitePool,
         cfg: HoprDbConfig,
     ) -> Result<Self> {
@@ -226,103 +186,23 @@ impl HoprDb {
             .await
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
-        let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db_pool);
-
-        MigratorTickets::up(&tickets_db, None)
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
-
-        let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db_pool);
-
-        MigratorPeers::up(&peers_db, None)
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
-
         let logs_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(logs_db_pool.clone());
 
         MigratorChainLogs::up(&logs_db, None)
             .await
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
-        // Reset the peer network information
-        let res = hopr_db_entity::network_peer::Entity::delete_many()
-            .filter(
-                sea_orm::Condition::all().add(
-                    hopr_db_entity::network_peer::Column::LastSeen.lt(chrono::DateTime::<chrono::Utc>::from(
-                        hopr_platform::time::native::current_time()
-                            .checked_sub(std::time::Duration::from_secs(
-                                std::env::var("HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS")
-                                    .unwrap_or_else(|_| {
-                                        HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS.to_string()
-                                    })
-                                    .parse::<u64>()
-                                    .unwrap_or(HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS),
-                            ))
-                            .unwrap_or_else(hopr_platform::time::native::current_time),
-                    )),
-                ),
-            )
-            .exec(&peers_db)
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("must reset peers on init: {e}")))?;
-        debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
-
-        // Reset all BeingAggregated ticket states to Untouched
-        ticket::Entity::update_many()
-            .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
-            .col_expr(
-                ticket::Column::State,
-                Expr::value(AcknowledgedTicketStatus::Untouched as u8),
-            )
-            .exec(&tickets_db)
-            .await?;
-
-        let caches = Arc::new(HoprDbCaches::default());
-        caches.invalidate_all();
-
-        // Initialize KeyId mapping for accounts
-        Account::find()
-            .find_with_related(Announcement)
-            .all(&index_db_rw)
-            .await?
-            .into_iter()
-            .try_for_each(|(a, b)| match model_to_account_entry(a, b) {
-                Ok(account) => caches.key_id_mapper.update_key_id_binding(&account),
-                Err(error) => {
-                    // Undecodeable accounts are skipped and will be unreachable
-                    tracing::error!(%error, "undecodeable account");
-                    Ok(())
-                }
-            })?;
 
         Ok(Self {
             me_onchain: chain_key.public().to_address(),
             chain_key,
-            ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
-            caches,
-
             index_db: DbConnection {
                 ro: index_db_ro,
                 rw: index_db_rw,
             },
-            tickets_db,
-            peers_db,
             logs_db,
             cfg,
         })
-    }
-
-    /// Starts ticket processing by the `TicketManager` with an optional new ticket notifier.
-    /// Without calling this method, tickets will not be persisted into the DB.
-    ///
-    /// If the notifier is given, it will receive notifications once new ticket has been
-    /// persisted into the Tickets DB.
-    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> Result<()> {
-        if let Some(notifier) = ticket_notifier {
-            self.ticket_manager.start_ticket_processing(notifier)
-        } else {
-            self.ticket_manager.start_ticket_processing(futures::sink::drain())
-        }
     }
 
     /// Default SQLite config values for all DBs with RW  (read-write) access.

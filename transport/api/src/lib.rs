@@ -282,6 +282,7 @@ where
         &self,
         me_onchain: &ChainKeypair,
         tbf_path: String,
+        public_nodes: Vec<AccountEntry>,
         on_incoming_data: UnboundedSender<ApplicationDataIn>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
         on_incoming_session: UnboundedSender<IncomingSession>,
@@ -301,40 +302,8 @@ where
 
                     async move {
                         match event {
-                            PeerDiscovery::Allow(peer_id) => {
-                                debug!(peer = %peer_id, "Processing peer discovery event: Allow");
-
-                                // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-                                if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer_id))
-                                    .await {
-                                    if !network.has(&peer_id).await {
-                                        let mas = db
-                                            .get_account(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pubkey))
-                                            .await
-                                            .map(|entry| {
-                                                entry
-                                                    .map(|v| Vec::from_iter(v.get_multiaddr().into_iter()))
-                                                    .unwrap_or_default()
-                                            })
-                                            .unwrap_or_default();
-
-                                        if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, mas).await {
-                                            error!(peer = %peer_id, error = %e, "Failed to allow locally (already allowed on-chain)");
-                                            return None;
-                                        }
-                                    }
-
-                                    return Some(PeerDiscovery::Allow(peer_id))
-                                } else {
-                                    error!(peer = %peer_id, "Failed to allow locally (already allowed on-chain): peer id not convertible to off-chain public key")
-                                }
-                            }
-                            PeerDiscovery::Ban(peer_id) => {
-                                if let Err(e) = network.remove(&peer_id).await {
-                                    error!(peer = %peer_id, error = %e, "Failed to ban locally (already banned on-chain)")
-                                } else {
-                                    return Some(PeerDiscovery::Ban(peer_id))
-                                }
+                            PeerDiscovery::Allow(peer_id) | PeerDiscovery::Ban(peer_id) => {
+                                debug!(%peer_id, "processed peer discovery event as a no-op")
                             }
                             PeerDiscovery::Announce(peer, multiaddresses) => {
                                 debug!(peer = %peer, ?multiaddresses, "Processing peer discovery event: Announce");
@@ -346,31 +315,8 @@ where
                                         .filter(|v| !v.is_empty())
                                         .collect::<Vec<_>>();
 
-                                    if ! mas.is_empty() {
-                                        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-                                        if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-                                            .await {
-                                            if let Ok(Some(key)) = db.translate_key(None, hopr_db_sql::accounts::ChainOrPacketKey::PacketKey(pubkey)).await {
-                                                let key: Result<Address, _> = key.try_into();
-
-                                                if let Ok(key) = key {
-                                                    if db
-                                                        .is_allowed_in_network_registry(None, &key)
-                                                        .await
-                                                        .unwrap_or(false)
-                                                    {
-                                                        if let Err(e) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await
-                                                        {
-                                                            error!(%peer, error = %e, "failed to record peer from the NetworkRegistry");
-                                                        } else {
-                                                            return Some(PeerDiscovery::Announce(peer, mas))
-                                                        }
-                                                    }
-                                                }
-                                            } else {
-                                                error!(%peer, "Failed to announce peer due to convertibility error");
-                                            }
-                                        }
+                                    if !mas.is_empty() {
+                                        return Some(PeerDiscovery::Announce(peer, mas))
                                     }
                                 }
                             }
@@ -383,9 +329,11 @@ where
         info!("Loading initial peers from the storage");
 
         let mut addresses: HashSet<Multiaddr> = HashSet::new();
-        let nodes = self.get_public_nodes().await?;
-        for (peer, _address, multiaddresses) in nodes {
-            if self.is_allowed_to_access_network(either::Left(&peer)).await? {
+        for node_entry in public_nodes {
+            if let AccountType::Announced { multiaddr, ..} = node_entry.entry_type {
+                let peer: PeerId = node_entry.public_key.into();
+                let multiaddresses = vec![multiaddr];
+
                 debug!(%peer, ?multiaddresses, "Using initial public node");
                 addresses.extend(multiaddresses.clone());
 
@@ -403,9 +351,6 @@ where
 
         let mut processes: HashMap<HoprTransportProcess, AbortHandle> = HashMap::new();
 
-        let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
-        let tkt_agg_writer = ticket_agg_proc.writer();
-
         let (external_msg_send, external_msg_rx) =
             mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>(
                 MAXIMUM_MSG_OUTGOING_BUFFER_SIZE,
@@ -415,11 +360,6 @@ where
             .clone()
             .set(MsgSender::new(external_msg_send.clone()))
             .expect("must set the packet processing writer only once");
-
-        self.process_ticket_aggregate
-            .clone()
-            .set(tkt_agg_writer.clone())
-            .expect("must set the ticket aggregation writer only once");
 
         // -- transport medium
         let mixer_cfg = build_mixer_cfg_from_env();
@@ -517,7 +457,7 @@ where
                 }
             }
             .inspect(|_| {
-                tracing::info!(
+                info!(
                     task = "transport event notifier",
                     "long-running background task finished"
                 )
@@ -748,98 +688,6 @@ where
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
             .map_err(|e| HoprTransportError::Api(e.to_string()))
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn aggregate_tickets(&self, channel_id: &Hash) -> errors::Result<()> {
-        let entry = self
-            .db
-            .get_channel_by_id(None, channel_id)
-            .await
-            .map_err(hopr_db_sql::api::errors::DbError::from)
-            .map_err(HoprTransportError::from)
-            .and_then(|c| {
-                if let Some(c) = c {
-                    Ok(c)
-                } else {
-                    Err(ProtocolError::ChannelNotFound.into())
-                }
-            })?;
-
-        if entry.status != ChannelStatus::Open {
-            return Err(ProtocolError::ChannelClosed.into());
-        }
-
-        // Ok(Arc::new(proxy::TicketAggregatorProxy::new(
-        //     self.db.clone(),
-        //     self.process_ticket_aggregate.clone(),
-        //     std::time::Duration::from_secs(15),
-        // ))
-        // .aggregate_tickets(&entry.get_id(), Default::default())
-        // .await?)
-
-        Err(TicketAggregationError::TransportError(
-            "Ticket aggregation not supported as a session protocol yet".to_string(),
-        )
-        .into())
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
-        Ok(self
-            .db
-            .get_accounts(None, true)
-            .await
-            .map_err(hopr_db_sql::api::errors::DbError::from)?
-            .into_iter()
-            .map(|entry| {
-                (
-                    PeerId::from(entry.public_key),
-                    entry.chain_addr,
-                    Vec::from_iter(entry.get_multiaddr().into_iter()),
-                )
-            })
-            .collect())
-    }
-
-    pub async fn is_allowed_to_access_network<'a>(
-        &self,
-        address_like: either::Either<&'a PeerId, Address>,
-    ) -> errors::Result<bool>
-    where
-        T: 'a,
-    {
-        let db_clone = self.db.clone();
-        let address_like_noref = address_like.map_left(|peer| *peer);
-
-        Ok(self
-            .db
-            .begin_transaction()
-            .await
-            .map_err(hopr_db_sql::api::errors::DbError::from)?
-            .perform(|tx| {
-                Box::pin(async move {
-                    match address_like_noref {
-                        either::Left(peer) => {
-                            // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-                            let pubkey =
-                                hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-                                    .await
-                                    .map_err(|e| hopr_db_sql::api::errors::DbError::General(e.to_string()))?;
-                            if let Some(address) = db_clone.translate_key(Some(tx), pubkey).await? {
-                                db_clone.is_allowed_in_network_registry(Some(tx), &address).await
-                            } else {
-                                Err(hopr_db_sql::errors::DbSqlError::LogicalError(
-                                    "cannot translate off-chain key".into(),
-                                ))
-                            }
-                        }
-                        either::Right(address) => db_clone.is_allowed_in_network_registry(Some(tx), &address).await,
-                    }
-                })
-            })
-            .await
-            .map_err(hopr_db_sql::api::errors::DbError::from)?)
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
