@@ -88,10 +88,10 @@ impl Challenge {
         #[cfg(not(feature = "rust-ecdsa"))]
         {
             let own_share = secp256k1::PublicKey::from_byte_array_compressed(own_share.0)
-                .map_err(|_| ParseError("invalid half-key challenge".into()))?;
+                .map_err(|_| ParseError("invalid half-key challenge for own share".into()))?;
 
             let hint = secp256k1::PublicKey::from_byte_array_compressed(hint.0)
-                .map_err(|_| ParseError("invalid half-key challenge".into()))?;
+                .map_err(|_| ParseError("invalid half-key challenge for hint".into()))?;
 
             let res = own_share.combine(&hint).map_err(|_| CalculationError)?;
 
