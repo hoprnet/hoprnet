@@ -5167,7 +5167,6 @@ name = "hopr-transport-bloom"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "async-lock 3.4.1",
  "bincode",
  "bloomfilter",
  "criterion",
@@ -5175,7 +5174,6 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-platform",
  "serde",
- "tokio",
  "tracing",
 ]
 

@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [features]
 default = ["persistent"]
-persistent = ["serde", "dep:async-lock"]
+persistent = ["serde"]
 serde = [
   "dep:bincode",
   "dep:serde",
@@ -22,7 +22,6 @@ serde = [
 ]
 
 [dependencies]
-async-lock = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
 bincode = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
@@ -35,7 +34,6 @@ hopr-platform = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
-tokio = { workspace = true }
 
 [[bench]]
 name = "bloom_filter"
