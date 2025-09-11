@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["persistent"]
+default = ["persistent", "dep:parking_lot"]
 persistent = ["serde"]
 serde = [
   "dep:bincode",
@@ -24,6 +24,7 @@ serde = [
 [dependencies]
 bloomfilter = { workspace = true }
 bincode = { workspace = true, optional = true }
+parking_lot = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 tracing = { workspace = true }
 

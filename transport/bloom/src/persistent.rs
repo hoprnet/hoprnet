@@ -9,7 +9,7 @@ use crate::raw::TagBloomFilter;
 #[derive(Debug, Clone)]
 pub struct WrappedTagBloomFilter {
     path: String,
-    tbf: Arc<std::sync::RwLock<TagBloomFilter>>,
+    tbf: Arc<parking_lot::RwLock<TagBloomFilter>>,
 }
 
 impl WrappedTagBloomFilter {
@@ -32,7 +32,7 @@ impl WrappedTagBloomFilter {
 
         Self {
             path,
-            tbf: Arc::new(std::sync::RwLock::new(tbf)),
+            tbf: Arc::new(parking_lot::RwLock::new(tbf)),
         }
     }
 
@@ -41,22 +41,18 @@ impl WrappedTagBloomFilter {
     /// There is a 0.1% chance that the positive result is not a replay because a Bloom filter is used.
     #[tracing::instrument(level = "trace", skip(self, tag))]
     pub fn is_tag_replay(&self, tag: &PacketTag) -> bool {
-        if let Ok(mut tbf) = self.tbf.write() {
-            tbf.check_and_set(tag)
-        } else {
-            // If the locking failed and the lock is poisoned,
-            // we will always indicate a replay.
-            error!("failed to acquire write lock on tag bloom filter");
-            true
-        }
+        self.tbf.write().check_and_set(tag)
     }
 
     pub fn save(&self) {
-        // Lock the filter, clone it to release the lock immediately.
-        let bloom = self.tbf.read().map(|tbf| tbf.deref().clone()).ok();
+        // Try to lock the filter, serialize it in memory, and release the lock immediately.
+        let bloom = self
+            .tbf
+            .try_read()
+            .map(|tbf| bincode::serde::encode_to_vec(tbf.deref(), Self::TAGBLOOM_BINCODE_CONFIGURATION));
 
         if let Some(bloom) = bloom {
-            if let Err(error) = bincode::serde::encode_to_vec(&bloom, Self::TAGBLOOM_BINCODE_CONFIGURATION)
+            if let Err(error) = bloom
                 .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
                 .and_then(|d| write(&self.path, &d))
             {

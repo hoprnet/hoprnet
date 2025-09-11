@@ -5173,6 +5173,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-platform",
+ "parking_lot",
  "serde",
  "tracing",
 ]
