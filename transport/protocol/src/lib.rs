@@ -75,7 +75,7 @@ mod capture;
 
 use std::{collections::HashMap, time::Duration};
 
-use futures::{SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::{HalfKey, OffchainPublicKey};
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
@@ -240,9 +240,13 @@ where
             spawn_as_abortable!(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 // TBF saving is an IO-bound operation, so should be called via spawn-blocking
-                hopr_async_runtime::prelude::spawn_blocking(move || {
-                    tbf_2.save();
-                }),
+                move || hopr_async_runtime::prelude::spawn_blocking({
+                    let tbf = tbf_2.clone();
+                    move || {
+                        tbf.save();
+                    }
+                })
+                .map(|_| ()),
                 "persisting the bloom filter to disk".into(),
             ))),
         );
