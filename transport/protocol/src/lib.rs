@@ -141,8 +141,6 @@ pub enum ProtocolProcesses {
     TicketAck,
     #[strum(to_string = "HOPR [msg] - mixer")]
     Mixer,
-    #[strum(to_string = "bloom filter persistence (periodic)")]
-    BloomPersist,
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,
