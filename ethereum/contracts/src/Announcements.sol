@@ -4,8 +4,10 @@ pragma solidity 0.8.30;
 import { Multicall } from "openzeppelin-contracts-4.9.2/utils/Multicall.sol";
 import { HoprMultiSig } from "./MultiSig.sol";
 import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
+import { MAX_KEY_ID, KeyId, EnumerableKeyBindingSet, KeyBindingSet, KeyBindingWithSignature } from "./utils/EnumerableKeyBindingSet.sol";
 
 error ZeroAddress(string reason);
+error EmptyMultiaddr();
 
 /// forge-lint:disable-next-item(mixed-case-variable)
 abstract contract HoprAnnouncementsEvents {
@@ -44,9 +46,32 @@ abstract contract HoprAnnouncementsEvents {
  *
  * Publishes transport-layer information in the hopr network.
  *
+ * Relay nodes MUST bind their off-chain keys to their on-chain identity
+ * and announce a base multiaddress to be publicly reachable.
+ * Edge nodes MUST bind their off-chain keys to their on-chain identity.
+ * and they MAY announce a base multiaddress to be publicly reachable.
+ * 
+ * A key id is a 4 byte unsigned integer, which is incremented on each new key binding.
+ * The key id is used to retrieve the off-chain keys and the chain-key.
+ * A unique key id is bound to a set of off-chain key and a chain-key (Ethereum address)
+ * A node MAY bind multiple off-chain keys to the same chain-key.
+ * A node MUST NOT bind the same off-chain keys to multiple chain-keys.
+ * Key ids cannot be re-used or overwritten.
+ * Key id 0 is reserved and MUST NOT be used.
+ * The range of valid key ids is [1, 2^32 - 1].
+ *
+ * The chain-key is used to retrieve the multiaddress base of a node.
+ * By knowing the key id of a peer, a node can retrieve the off-chain keys and then the multiaddress base.
  */
 /// forge-lint:disable-next-item(mixed-case-variable)
 contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
+    using EnumerableKeyBindingSet for KeyBindingSet;
+
+    // key bindings
+    KeyBindingSet internal _keyBindings;
+    // announcements: chain-key => base-multiaddr
+    mapping(address => string) public multiaddrOf;
+
     constructor(HoprNodeSafeRegistry safeRegistry) {
         if (address(safeRegistry) == address(0)) {
             revert ZeroAddress({ reason: "safeRegistry must not be empty" });
@@ -129,6 +154,61 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
         _revokeInternal(msg.sender);
     }
 
+    // View functions for key bindings
+    // // --- The following mappings are for easier lookups ---
+    // // keybindings: key-id => { offchain keys + chain-key }
+    // mapping(KeyId => KeyBinding) keyBindingOf;  // This is similar to _values
+    // // reverse lookup: pubkey => key-id
+    // mapping(bytes32 => KeyId) keyIdOf;
+
+    /**
+     * @dev Returns the range of valid key ids.
+     */
+    function getKeyIdRange() external pure returns (uint32 minKeyId, uint32 maxKeyId) {
+        return (0, MAX_KEY_ID);
+    }
+    /**
+     * @dev Returns the number of key bindings.
+     */
+    function getKeyBindingCount() external view returns (uint256) {
+        return _keyBindings.length();
+    }
+
+    /**
+     * @dev Returns the list of all key bindings.
+     *      The key id can be derived from the index in the array (starting from 0, capped at MAX_KEY_ID).
+     * Note: this function is gas expensive.
+     */
+    function getAllKeyBindings() external view returns (KeyBindingWithSignature[] memory) {
+        return _keyBindings._values;
+    }
+
+
+    function isOffchainKeyBound(bytes32 ed25519_pub_key) external view returns (bool) {
+        return _keyBindings.contains(ed25519_pub_key);
+    }
+
+    function tryGetKeyBinding(bytes32 ed25519_pub_key) external view returns (bool, KeyId, KeyBindingWithSignature memory) {
+        (bool success, uint256 possibleKeyId, KeyBindingWithSignature memory keyBinding) = _keyBindings.tryGet(ed25519_pub_key);
+        return (success, KeyId.wrap(uint32(possibleKeyId)), keyBinding);
+    }
+
+    function getKeyBindingWithKeyId(KeyId keyId) external view returns (KeyBindingWithSignature memory) {
+        uint256 index = uint256(uint32(KeyId.unwrap(keyId)));
+        return _keyBindings.at(index);
+    }
+
+    function getOffchainKeyWithKeyId(KeyId keyId) external view returns (bytes32 ed25519_pub_key) {
+        uint256 index = uint256(uint32(KeyId.unwrap(keyId)));
+        return _keyBindings.at(index).ed25519_pub_key;
+    }
+
+    function getKeyIdWithOffchainKey(bytes32 ed25519_pub_key) external view returns (bool, KeyId) {
+        (bool success, uint256 possibleKeyId, ) = _keyBindings.tryGet(ed25519_pub_key);
+
+        return (success, KeyId.wrap(uint32(possibleKeyId)));
+    }
+
     /**
      * [mandatory] Registers a node within the Hopr network and cross-signs on-chain and off-chain keys.
      *
@@ -153,6 +233,12 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
     )
         internal
     {
+        _keyBindings.add(KeyBindingWithSignature(
+            ed25519_sig_0,
+            ed25519_sig_1,
+            ed25519_pub_key,
+            selfAddress
+        ));
         emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, selfAddress);
     }
 
@@ -164,6 +250,10 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
      * @param baseMultiaddr base multiaddress of the node
      */
     function _announceInternal(address selfAddress, string calldata baseMultiaddr) internal {
+        if (bytes(baseMultiaddr).length == 0) {
+            revert EmptyMultiaddr();
+        }
+        multiaddrOf[selfAddress] = baseMultiaddr;
         emit AddressAnnouncement(selfAddress, baseMultiaddr);
     }
 
@@ -171,6 +261,7 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
      * Opts out from acting as a public relay node (PRN)
      */
     function _revokeInternal(address selfAddress) internal {
+        delete multiaddrOf[selfAddress];
         emit RevokeAnnouncement(selfAddress);
     }
 }
