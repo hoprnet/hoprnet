@@ -85,7 +85,7 @@ use hopr_internal_types::{
 };
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
-use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
+use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, error, trace, warn};
@@ -141,8 +141,6 @@ pub enum ProtocolProcesses {
     TicketAck,
     #[strum(to_string = "HOPR [msg] - mixer")]
     Mixer,
-    #[strum(to_string = "bloom filter persistence (periodic)")]
-    BloomPersist,
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,
@@ -173,7 +171,6 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
 pub async fn run_msg_ack_protocol<Db>(
     packet_cfg: processor::PacketInteractionConfig,
     db: Db,
-    bloom_filter_persistent_path: Option<String>,
     wire_msg: (
         impl futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + Sync + 'static,
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
@@ -232,25 +229,7 @@ where
         capture
     };
 
-    let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
-        let tbf = WrappedTagBloomFilter::new(bloom_filter_persistent_path);
-        let tbf_2 = tbf.clone();
-        processes.insert(
-            ProtocolProcesses::BloomPersist,
-            spawn_as_abortable!(Box::pin(execute_on_tick(
-                std::time::Duration::from_secs(90),
-                move || {
-                    let tbf_clone = tbf_2.clone();
-
-                    async move { tbf_clone.save().await }
-                },
-                "persisting the bloom filter to disk".into(),
-            ))),
-        );
-        tbf
-    } else {
-        WrappedTagBloomFilter::new("no_tbf".into())
-    };
+    let tbf = std::sync::Arc::new(parking_lot::Mutex::new(TagBloomFilter::default()));
 
     let (ticket_ack_tx, ticket_ack_rx) =
         futures::channel::mpsc::channel::<(Acknowledgement, OffchainPublicKey)>(TICKET_ACK_BUFFER_SIZE);
@@ -503,13 +482,15 @@ where
                 .filter_map(move |maybe_packet| {
                     let tbf = tbf.clone();
 
-                    async move {
+                    futures::future::ready(
                         if let Some(packet) = maybe_packet {
                             match packet {
                                 IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
                                 IncomingPacket::Final { packet_tag, previous_hop,.. } |
                                 IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
-                                    if tbf.is_tag_replay(&packet_tag).await {
+                                    // This operation has run-time of ~10 nanoseconds,
+                                    // and therefore does not need to be invoked via spawn_blocking
+                                    if tbf.lock().check_and_set(&packet_tag) {
                                         warn!(%previous_hop, "replayed packet received");
 
                                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -525,7 +506,7 @@ where
                             trace!("received empty packet");
                             None
                         }
-                    }
+                    )
                 })
                 .then_concurrent(move |packet| {
                     let mut msg_to_send_tx = wire_msg.0.clone();
