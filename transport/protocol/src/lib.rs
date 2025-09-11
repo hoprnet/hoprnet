@@ -239,11 +239,10 @@ where
             ProtocolProcesses::BloomPersist,
             spawn_as_abortable!(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
-                move || {
-                    let tbf_clone = tbf_2.clone();
-
-                    async move { tbf_clone.save().await }
-                },
+                // TBF saving is an IO-bound operation, so should be called via spawn-blocking
+                hopr_async_runtime::prelude::spawn_blocking(move || {
+                    tbf_2.save();
+                }),
                 "persisting the bloom filter to disk".into(),
             ))),
         );
@@ -503,13 +502,15 @@ where
                 .filter_map(move |maybe_packet| {
                     let tbf = tbf.clone();
 
-                    async move {
+                    futures::future::ready(
                         if let Some(packet) = maybe_packet {
                             match packet {
                                 IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
                                 IncomingPacket::Final { packet_tag, previous_hop,.. } |
                                 IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
-                                    if tbf.is_tag_replay(&packet_tag).await {
+                                    // This operation has run-time of ~10 nanoseconds,
+                                    // and therefore does not need to be invoked via spawn_blocking
+                                    if tbf.is_tag_replay(&packet_tag) {
                                         warn!(%previous_hop, "replayed packet received");
 
                                         #[cfg(all(feature = "prometheus", not(test)))]
@@ -525,7 +526,7 @@ where
                             trace!("received empty packet");
                             None
                         }
-                    }
+                    )
                 })
                 .then_concurrent(move |packet| {
                     let mut msg_to_send_tx = wire_msg.0.clone();
