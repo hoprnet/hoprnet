@@ -23,6 +23,7 @@ hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
+parking_lot = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -50,7 +51,7 @@ hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
-hopr-transport-bloom = { workspace = true, features = ["persistent"] }
+hopr-transport-bloom = { workspace = true }
 hopr-transport-identity = { workspace = true }
 
 

@@ -11,21 +11,8 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
-[features]
-default = ["persistent", "dep:parking_lot"]
-persistent = ["serde"]
-serde = [
-  "dep:bincode",
-  "dep:serde",
-  "bloomfilter/serde",
-  "hopr-crypto-types/serde",
-]
-
 [dependencies]
 bloomfilter = { workspace = true }
-bincode = { workspace = true, optional = true }
-parking_lot = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 hopr-crypto-random = { workspace = true }

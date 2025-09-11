@@ -5167,14 +5167,11 @@ name = "hopr-transport-bloom"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "bincode",
  "bloomfilter",
  "criterion",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-platform",
- "parking_lot",
- "serde",
  "tracing",
 ]
 
@@ -5340,6 +5337,7 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "moka",
+ "parking_lot",
  "pcap-file",
  "rust-stream-ext-concurrent",
  "serde",

@@ -202,7 +202,6 @@ pub async fn peer_setup_for(
         hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             db,
-            None,
             (mixer_channel_tx, wire_msg_send_rx),
             (api_recv_tx, api_send_rx),
         )

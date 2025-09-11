@@ -75,7 +75,7 @@ mod capture;
 
 use std::{collections::HashMap, time::Duration};
 
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::{HalfKey, OffchainPublicKey};
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
@@ -85,7 +85,7 @@ use hopr_internal_types::{
 };
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
-use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
+use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, error, trace, warn};
@@ -173,7 +173,6 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
 pub async fn run_msg_ack_protocol<Db>(
     packet_cfg: processor::PacketInteractionConfig,
     db: Db,
-    bloom_filter_persistent_path: Option<String>,
     wire_msg: (
         impl futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + Sync + 'static,
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
@@ -232,28 +231,7 @@ where
         capture
     };
 
-    let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
-        let tbf = WrappedTagBloomFilter::new(bloom_filter_persistent_path);
-        let tbf_2 = tbf.clone();
-        processes.insert(
-            ProtocolProcesses::BloomPersist,
-            spawn_as_abortable!(Box::pin(execute_on_tick(
-                std::time::Duration::from_secs(90),
-                // TBF saving is an IO-bound operation, so should be called via spawn-blocking
-                move || hopr_async_runtime::prelude::spawn_blocking({
-                    let tbf = tbf_2.clone();
-                    move || {
-                        tbf.save();
-                    }
-                })
-                .map(|_| ()),
-                "persisting the bloom filter to disk".into(),
-            ))),
-        );
-        tbf
-    } else {
-        WrappedTagBloomFilter::new("no_tbf".into())
-    };
+    let tbf = std::sync::Arc::new(parking_lot::Mutex::new(TagBloomFilter::default()));
 
     let (ticket_ack_tx, ticket_ack_rx) =
         futures::channel::mpsc::channel::<(Acknowledgement, OffchainPublicKey)>(TICKET_ACK_BUFFER_SIZE);
@@ -514,7 +492,7 @@ where
                                 IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
                                     // This operation has run-time of ~10 nanoseconds,
                                     // and therefore does not need to be invoked via spawn_blocking
-                                    if tbf.is_tag_replay(&packet_tag) {
+                                    if tbf.lock().check_and_set(&packet_tag) {
                                         warn!(%previous_hop, "replayed packet received");
 
                                         #[cfg(all(feature = "prometheus", not(test)))]
