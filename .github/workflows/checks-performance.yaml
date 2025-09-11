@@ -1,0 +1,84 @@
+---
+#################################################################################
+# Pipeline triggered on every pull request to check performance baseline
+#################################################################################
+name: Performance
+
+on:
+  workflow_call:
+    inputs:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
+        required: true
+        type: string
+
+env:
+  K6_CLUSTER_NODES: local
+  K6_TOPOLOGY_NAME: receiver
+  K6_WORKLOAD_NAME: sanity-check
+  K6_TEST_DURATION: 1
+  K6_ECHO_SERVERS_REPLICAS: 3
+  HOPRD_API_TOKEN: e2e-API-token^^ # only for local testing
+
+concurrency:
+  group: ${{ inputs.source_branch || github.ref_name }}-performance
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Download
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 30
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_branch }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@c134e4c9e34bac6cab09cf239815f9339aaaf84e # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Checkout hoprd-test repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          repository: hoprnet/hoprd-test
+          ref: ${{ vars.K6_REPOSITORY_BRANCH_NAME || 'main' }}
+          path: ./hoprd-test
+
+      - name: Setup NodeJs
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+
+      - name: Run download test
+        id: vars
+        run: |
+          npm run test:udp
+        working-directory: ./hoprd-test/k6
+        env:
+          TESTID: pr-${{ github.event.pull_request.number }}
+          K6_EXECUTION_NAME: pr-${{ github.event.pull_request.number }}
+          K6_SKIP_SCENARIO_UPLOAD: true
