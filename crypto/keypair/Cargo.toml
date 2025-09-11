@@ -1,6 +1,6 @@
 [package]
-name = "hoprd-keypair"
-version = "0.4.0"
+name = "hopr-crypto-keypair"
+version = "0.4.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Rust keypair modules for HOPRd"
@@ -17,6 +17,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 scrypt = { workspace = true, default-features = false }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 typenum = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
 
@@ -24,7 +25,6 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
-tracing = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -32,5 +32,5 @@ tempfile = { workspace = true }
 
 [features]
 default = []
-hopli = []
+to-file = []
 geth-compat = []

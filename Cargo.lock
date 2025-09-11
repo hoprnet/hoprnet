@@ -4419,7 +4419,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4431,11 +4431,11 @@ dependencies = [
  "hopr-chain-api",
  "hopr-chain-rpc",
  "hopr-chain-types",
+ "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
- "hoprd-keypair",
  "mimalloc",
  "rpassword",
  "serde",
@@ -4634,6 +4634,26 @@ dependencies = [
  "strum 0.27.2",
  "thiserror 2.0.16",
  "tracing",
+]
+
+[[package]]
+name = "hopr-crypto-keypair"
+version = "0.4.1"
+dependencies = [
+ "anyhow",
+ "hex",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "scrypt",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.16",
+ "tracing",
+ "typenum",
+ "uuid",
 ]
 
 [[package]]
@@ -4872,6 +4892,7 @@ dependencies = [
  "hopr-chain-indexer",
  "hopr-chain-rpc",
  "hopr-chain-types",
+ "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-api",
@@ -5440,6 +5461,7 @@ dependencies = [
  "futures",
  "home",
  "hopr-async-runtime",
+ "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-lib",
  "hopr-metrics",
@@ -5447,7 +5469,6 @@ dependencies = [
  "hopr-parallelize",
  "hopr-platform",
  "hoprd-api",
- "hoprd-keypair",
  "lazy_static",
  "mimalloc",
  "opentelemetry",
@@ -5515,26 +5536,6 @@ dependencies = [
  "utoipa-scalar",
  "utoipa-swagger-ui",
  "validator",
-]
-
-[[package]]
-name = "hoprd-keypair"
-version = "0.4.0"
-dependencies = [
- "anyhow",
- "hex",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-platform",
- "hopr-primitive-types",
- "scrypt",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.16",
- "tracing",
- "typenum",
- "uuid",
 ]
 
 [[package]]

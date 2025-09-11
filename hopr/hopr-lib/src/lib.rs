@@ -55,6 +55,7 @@ use hopr_chain_api::{
 };
 use hopr_chain_rpc::HoprRpcOperations;
 use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
+pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
