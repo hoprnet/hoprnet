@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
-use futures::{StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
+use futures::{FutureExt, StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::crypto_traits::Randomizable;
@@ -208,48 +208,51 @@ where
         .unwrap_or(DEFAULT_PACKET_PLANNER_CONCURRENCY);
 
     let distress_threshold = planner.db.get_surb_config().distress_threshold;
-    hopr_async_runtime::prelude::spawn(rx.for_each_concurrent(planner_concurrency, move |(routing, mut data)| {
-        let planner = planner.clone();
-        let packet_sender = packet_sender.clone();
-        async move {
-            let max_surbs = data.estimate_surbs_with_msg();
+    hopr_async_runtime::prelude::spawn(
+        rx.for_each_concurrent(planner_concurrency, move |(routing, mut data)| {
+            let planner = planner.clone();
+            let packet_sender = packet_sender.clone();
+            async move {
+                let max_surbs = data.estimate_surbs_with_msg();
 
-            match planner.resolve_routing(data.data.total_len(), max_surbs, routing).await {
-                Ok((resolved, rem_surbs)) => {
-                    // Set the SURB distress/out-of-SURBs flag if applicable.
-                    // These flags are translated into HOPR protocol packet signals and are
-                    // applicable only on the return path.
-                    let mut signals_to_dst = data
-                        .packet_info
-                        .as_ref()
-                        .map(|info| info.signals_to_destination)
-                        .unwrap_or_default();
+                match planner.resolve_routing(data.data.total_len(), max_surbs, routing).await {
+                    Ok((resolved, rem_surbs)) => {
+                        // Set the SURB distress/out-of-SURBs flag if applicable.
+                        // These flags are translated into HOPR protocol packet signals and are
+                        // applicable only on the return path.
+                        let mut signals_to_dst = data
+                            .packet_info
+                            .as_ref()
+                            .map(|info| info.signals_to_destination)
+                            .unwrap_or_default();
 
-                    if resolved.is_return() {
-                        signals_to_dst = match rem_surbs {
-                            Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                                signals_to_dst | PacketSignal::SurbDistress
-                            }
-                            Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
-                            _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
-                        };
-                    } else {
-                        // Unset these flags as they make no sense on the forward path.
-                        signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
+                        if resolved.is_return() {
+                            signals_to_dst = match rem_surbs {
+                                Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                                    signals_to_dst | PacketSignal::SurbDistress
+                                }
+                                Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
+                                _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
+                            };
+                        } else {
+                            // Unset these flags as they make no sense on the forward path.
+                            signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
+                        }
+
+                        data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
+
+                        // The awaiter here is intentionally dropped,
+                        // since we do not intend to be notified about packet delivery to the first hop
+                        if let Err(error) = packet_sender.send_packet(data, resolved).await {
+                            tracing::error!(%error, "failed to enqueue packet for sending");
+                        }
                     }
-
-                    data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
-
-                    // The awaiter here is intentionally dropped,
-                    // since we do not intend to be notified about packet delivery to the first hop
-                    if let Err(error) = packet_sender.send_packet(data, resolved).await {
-                        tracing::error!(%error, "failed to enqueue packet for sending");
-                    }
+                    Err(error) => tracing::error!(%error, "failed to resolve path for routing"),
                 }
-                Err(error) => tracing::error!(%error, "failed to resolve path for routing"),
             }
-        }
-    }));
+        })
+        .inspect(|_| tracing::info!(task = "packet planner", "long-running background task finished")),
+    );
 
     tx
 }

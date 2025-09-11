@@ -705,6 +705,11 @@ impl Hopr {
                 .forward(indexer_peer_update_tx)
                 .await
                 .expect("The index to transport event chain failed");
+
+            tracing::info!(
+                task = "indexer pipeline for transport",
+                "long-running background task finished"
+            )
         });
 
         info!("Start the chain process and sync the indexer");

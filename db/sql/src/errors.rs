@@ -7,6 +7,7 @@ use hopr_internal_types::{errors::CoreTypesError, tickets::Ticket};
 use sea_orm::TransactionError;
 use thiserror::Error;
 
+// TODO: remove the DbSqlError and implement the entire db/sql crate with hopr_db_api::errors::DbError
 #[derive(Debug, Error)]
 pub enum DbSqlError {
     #[error("failed to construct the database: {0}")]
@@ -17,6 +18,9 @@ pub enum DbSqlError {
 
     #[error("log not found")]
     MissingLog,
+
+    #[error("adversarial behavior detected: {0}")]
+    PossibleAdversaryError(String),
 
     #[error("list of logs is empty")]
     EmptyLogsList,
@@ -84,7 +88,10 @@ impl From<TicketValidationError> for DbSqlError {
 
 impl From<DbSqlError> for hopr_db_api::errors::DbError {
     fn from(value: DbSqlError) -> Self {
-        hopr_db_api::errors::DbError::General(value.to_string())
+        match value {
+            DbSqlError::PossibleAdversaryError(reason) => hopr_db_api::errors::DbError::PossibleAdversaryError(reason),
+            _ => hopr_db_api::errors::DbError::General(value.to_string()),
+        }
     }
 }
 
