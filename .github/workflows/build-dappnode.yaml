@@ -108,7 +108,7 @@ jobs:
           repository: dappnode/${{ steps.vars.outputs.dappnode_repository }}
           path: "./dappnode"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          ref: main
+          ref: ${{ vars.DAPPNODE_REPOSITORY_BRANCH_NAME }}
 
       - name: Setup variables
         id: setup
