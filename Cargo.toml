@@ -127,6 +127,7 @@ moka = { version = "0.12.10", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num_enum = "0.7.4"
+once_cell = { version = "1.21.3" }
 opentelemetry = { version = "0.30.0" }
 opentelemetry-otlp = { version = "0.30.0", default-features = false }
 opentelemetry_sdk = { version = "0.30.0" }
@@ -148,6 +149,7 @@ reqwest = { version = "0.12.23", features = ["json"] }
 ringbuffer = "0.16.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
+rstest = { version = "0.26.1" }
 scrypt = { version = "0.11.0", default-features = false }
 sea-orm = { version = "1.1.15", default-features = false, features = [
   "sqlx-sqlite",

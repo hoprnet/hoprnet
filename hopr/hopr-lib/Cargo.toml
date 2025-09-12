@@ -85,7 +85,9 @@ anyhow = { workspace = true }
 env_logger = { workspace = true }
 hex-literal = { workspace = true }
 mockito = { workspace = true }
+once_cell = { workspace = true }
 parameterized = { workspace = true }
+rstest = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 test-log = { workspace = true }
