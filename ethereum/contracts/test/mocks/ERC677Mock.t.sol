@@ -1,6 +1,6 @@
 pragma solidity ^0.8.0;
 
-import "../../src/static/stake/mocks/ERC677Mock.sol";
+import { ERC677Mock } from "../../src/static/stake/mocks/ERC677Mock.sol";
 import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 
 /**
@@ -38,7 +38,8 @@ contract ERC677MockTest is Test {
 
         vm.prank(msgSender);
         vm.expectRevert();
-        erc677Mock.transferFrom(sender, address(erc677Mock), 0);
+        bool success = erc677Mock.transferFrom(sender, address(erc677Mock), 0);
+        assertFalse(success);
         vm.clearMockedCalls();
     }
 
@@ -57,7 +58,8 @@ contract ERC677MockTest is Test {
 
         vm.prank(msgSender);
         vm.expectRevert();
-        erc677Mock.transfer(address(erc677Mock), 0);
+        bool success = erc677Mock.transfer(address(erc677Mock), 0);
+        assertFalse(success);
         vm.clearMockedCalls();
     }
 }

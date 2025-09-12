@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/Script.sol";
+import { Script, stdJson } from "forge-std/Script.sol";
 
 /**
  * Get environment_type from the environment variable `FOUNDRY_PROFILE`
@@ -51,8 +51,9 @@ contract NetworkConfig is Script {
     address public constant DEV_BANK_ADDRESS = 0x2402da10A6172ED018AEEa22CA60EDe1F766655C;
     address public constant COMM_MULTISIG_ADDRESS = 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05;
     address public constant PRODUCT_MULTISIG_ADDRESS = 0xD720099cBC14e669695EaE0708E6Ca614B387921; // only used in
-        // "stake_hub_test" network
+    // "stake_hub_test" network
     // CORE's deployer is the caller, therefore not in this array
+    /// forge-lint:disable-next-item(mixed-case-variable)
     address[3] public PRODUCT_TEAM_MANAGER_ADDRESSES = [
         0x01BFbCB6A2924b083969ce6237AdBbF3BFa7De13, // RPCh staging
         0xDCcC4a8ee2BF3CaF5a4AB1cDBa1ee7cc04E324Dd, // RPCh production
@@ -72,7 +73,7 @@ contract NetworkConfig is Script {
         currentEnvironmentType = parseEnvironmentTypeFromString(profile);
     }
 
-    function readNetwork(string memory networkName) internal returns (NetworkDetail memory networkDetail) {
+    function readNetwork(string memory networkName) internal view returns (NetworkDetail memory networkDetail) {
         string memory json = vm.readFile(pathToDeploymentFile);
         bytes memory networkDetailPath = abi.encodePacked(".networks.", networkName);
 
@@ -95,7 +96,6 @@ contract NetworkConfig is Script {
     function writeNetwork(string memory networkName, NetworkDetail memory networkDetail) internal {
         // write parsedNewEnvDetail to corresponding key
         string memory configKey = string(abi.encodePacked(".networks.", networkName));
-        string memory configKeyAddresses = string(abi.encodePacked(".networks.", networkName, ".addresses"));
 
         // the keys must be unique because they are stored in shared memory
         string memory obj = string(abi.encodePacked("obj-", networkName));

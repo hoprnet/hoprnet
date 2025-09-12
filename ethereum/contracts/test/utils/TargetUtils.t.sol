@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { Test, stdError } from "forge-std/Test.sol";
-
-import "../mocks/TargetUtilsMock.sol";
+import { Clearance, CapabilityPermission, Target, TargetType, TargetPermission, TooManyCapabilities, PermissionNotFound } from "../../src/utils/TargetUtils.sol";
+import { TargetUtilsMock } from "../mocks/TargetUtilsMock.sol";
 
 contract TargetUtilsTest is Test {
     bytes32 private constant TARGET_ADDRESS_MASK = hex"ffffffffffffffffffffffffffffffffffffffff000000000000000000000000";

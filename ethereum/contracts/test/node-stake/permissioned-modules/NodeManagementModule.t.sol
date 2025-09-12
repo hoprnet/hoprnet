@@ -3,14 +3,14 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
 
-import "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
-import "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
-import "../../utils/CapabilityLibrary.sol";
-import "../../../src/utils/SafeSuiteLib.sol";
-import "../../utils/SafeSingleton.sol";
-import "../../../src/interfaces/IAvatar.sol";
-import "../../../src/Crypto.sol";
-import "openzeppelin-contracts-upgradeable/proxy/ClonesUpgradeable.sol";
+import { HoprChannels, HoprChannelsType, IERC20 } from "../../../src/Channels.sol";
+import { HoprNodeManagementModule, Enum } from "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
+import { GranularPermission, CapabilityPermission, TargetPermission, TargetUtils, Target, HoprCapabilityPermissions, Clearance, TargetType } from "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
+import { CapabilityPermissionsLibFixtureTest } from "../../utils/CapabilityLibrary.sol";
+import { SafeSingletonFixtureTest } from "../../utils/SafeSingleton.sol";
+import { IAvatar } from "../../../src/interfaces/IAvatar.sol";
+import { HoprCrypto } from "../../../src/Crypto.sol";
+import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 import { SimplifiedModuleEvents } from "../../../src/node-stake/permissioned-module/SimplifiedModule.sol";
 
 /**
@@ -83,7 +83,7 @@ contract HoprNodeManagementModuleTest is
     function test_CanInitializeProxy() public {
         address _channels = 0x0101010101010101010101010101010101010101;
         address _token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(_channels, abi.encodeWithSignature("token()"), abi.encode(_token));
+        vm.mockCall(_channels, abi.encodeWithSignature("TOKEN()"), abi.encode(_token));
         emit SetMultisendAddress(multiaddr);
         moduleProxy.initialize(
             abi.encode(
@@ -104,7 +104,7 @@ contract HoprNodeManagementModuleTest is
     //     vm.mockCall(
     //         _channels,
     //         abi.encodeWithSignature(
-    //             'token()'
+    //             'TOKEN()'
     //         ),
     //         abi.encode(_token)
     //     );
@@ -480,7 +480,7 @@ contract HoprNodeManagementModuleTest is
         vm.assume(channelAddress != tokenAddress);
 
         vm.startPrank(owner);
-        vm.mockCall(channelAddress, abi.encodeWithSignature("token()"), abi.encode(tokenAddress));
+        vm.mockCall(channelAddress, abi.encodeWithSignature("TOKEN()"), abi.encode(tokenAddress));
 
         // token target overwritten mask
         // <         160 bits for address         >    <>              <func>
@@ -850,7 +850,7 @@ contract HoprNodeManagementModuleTest is
             channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.BLOCK_ALL, defaultFunctionPermission
         ); // clerance: FUNCTION default ALLOW_ALL
         stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
@@ -882,7 +882,7 @@ contract HoprNodeManagementModuleTest is
             channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         ); // clerance: FUNCTION default ALLOW_ALL
         stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
@@ -920,7 +920,7 @@ contract HoprNodeManagementModuleTest is
             defaultFunctionPermission
         ); // clerance: FUNCTION default ALLOW_ALL
         stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
 
         address owner = moduleProxy.owner();
@@ -952,7 +952,7 @@ contract HoprNodeManagementModuleTest is
             channels, Clearance.FUNCTION, TargetType.CHANNELS, TargetPermission.ALLOW_ALL, defaultFunctionPermission
         ); // clerance: FUNCTION default ALLOW_ALL
         stdstore.target(address(moduleProxy)).sig("owner()").checked_write(safe);
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(
             safe,
             abi.encodeWithSelector(IAvatar.execTransactionFromModuleReturnData.selector),
@@ -1157,11 +1157,11 @@ contract HoprNodeManagementModuleTest is
 
         HoprChannels.TicketData memory dummyTicketData = HoprChannels.TicketData(
             bytes32(hex"11"),
-            HoprChannels.Balance.wrap(1),
-            HoprChannels.TicketIndex.wrap(1),
-            HoprChannels.TicketIndexOffset.wrap(1),
-            HoprChannels.ChannelEpoch.wrap(1),
-            HoprChannels.WinProb.wrap(1)
+            HoprChannelsType.Balance.wrap(1),
+            HoprChannelsType.TicketIndex.wrap(1),
+            HoprChannelsType.TicketIndexOffset.wrap(1),
+            HoprChannelsType.ChannelEpoch.wrap(1),
+            HoprChannelsType.WinProb.wrap(1)
         );
         HoprChannels.CompactSignature memory dummyCompactSignature =
             HoprCrypto.CompactSignature(bytes32(hex"22"), bytes32(hex"33"));
@@ -1177,7 +1177,7 @@ contract HoprNodeManagementModuleTest is
         data[5] =
             abi.encodeWithSelector(HoprChannels.finalizeOutgoingChannelClosureSafe.selector, msgSender, vm.addr(404));
         data[6] = abi.encodeWithSelector(
-            HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannels.Balance.wrap(66)
+            HoprChannels.fundChannelSafe.selector, msgSender, vm.addr(404), HoprChannelsType.Balance.wrap(66)
         );
         // data[7] nothing
         // data[8] nothing
@@ -1320,7 +1320,7 @@ contract HoprNodeManagementModuleTest is
         uint256 randomIndex
     )
         private
-        view
+        pure
         returns (address[] memory, address)
     {
         if (addrs.length == 0) {
@@ -1390,7 +1390,7 @@ contract HoprNodeManagementModuleTest is
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
 
-        vm.mockCall(channels, abi.encodeWithSignature("token()"), abi.encode(token));
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
         vm.mockCall(safe, abi.encodeWithSelector(IAvatar.execTransactionFromModule.selector), abi.encode(true));
         vm.deal(safe, 1 ether);
         assertEq(safe.balance, 1 ether);

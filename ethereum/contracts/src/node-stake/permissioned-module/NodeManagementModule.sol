@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
  * This contract follows the principle of `zodiac/core/Module.sol`
  * but implement differently in order to overwrite functionalities
  */
-import { Enum } from "safe-contracts/common/Enum.sol";
+import { Enum } from "safe-contracts-1.4.1/common/Enum.sol";
 import { SimplifiedModule } from "./SimplifiedModule.sol";
 import { HoprCapabilityPermissions, Role, GranularPermission } from "./CapabilityPermissions.sol";
 import { HoprChannels } from "../../Channels.sol";
@@ -46,7 +46,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     using TargetUtils for Target;
     using EnumerableTargetSet for TargetSet;
 
-    bool public constant isHoprNodeManagementModule = true;
+    string public constant override VERSION = "2.0.0";
+
     // address to send delegated multisend calls to
     address public multisend;
     // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
@@ -221,6 +222,9 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
     /**
      * @dev Revokes the target address from the scope
+     * @notice After removing a target, if the target contains some custom permissions,
+     * the customized granular permissions are not automatically removed.
+     * When the target gets added again to the module, all the previously added custom permissions are retained.
      * @param targetAddress The address of the target to be revoked.
      */
     function revokeTarget(address targetAddress) external onlyOwner {
@@ -374,7 +378,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     function _addChannelsAndTokenTarget(Target defaultTarget) private {
         // get channels andtokens contract
         address hoprChannelsAddress = defaultTarget.getTargetAddress();
-        address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
+        address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).TOKEN());
 
         // add default scope for Channels TargetType, with the build target for hoprChannels address
         HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget.forceWriteTargetAddress(hoprChannelsAddress));

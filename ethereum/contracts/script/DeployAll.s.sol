@@ -4,10 +4,10 @@ pragma abicoder v2;
 
 import { Script } from "forge-std/Script.sol";
 
-import "../test/utils/ERC1820Registry.sol";
-import "../test/utils/PermittableToken.sol";
-import "./utils/NetworkConfig.s.sol";
-import "./utils/BoostUtilsLib.sol";
+import { ERC1820RegistryFixtureTest } from "../test/utils/ERC1820Registry.sol";
+import { PermittableTokenFixtureTest } from "../test/utils/PermittableToken.sol";
+import { NetworkConfig } from "./utils/NetworkConfig.s.sol";
+import { BoostUtilsLib } from "./utils/BoostUtilsLib.sol";
 import { WinProb } from "src/WinningProbabilityOracle.sol";
 
 /**
@@ -52,11 +52,11 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         vm.startBroadcast(deployerPrivateKey);
 
         // 3. Deploy
-        // 3.1 HoprNodeStakeFactory
-        _deployHoprNodeStakeFactory();
-
-        // 3.2 HoprNodeManagementModule singleton
+        // 3.1 HoprNodeManagementModule singleton
         _deployHoprNodeManagementModule();
+
+        // 3.2 HoprNodeStakeFactory
+        _deployHoprNodeStakeFactory(deployerAddress);
 
         // 3.3 HoprNodeSafeRegistry
         _deployHoprHoprNodeSafeRegistry();
@@ -77,7 +77,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         // Only deploy NetworkRegistryProxy contract when no deployed one is detected.
         // E.g. Always in local environment, or should a new NetworkRegistryProxy contract be introduced in
         // development/staging/production
-        _deployNRProxy(deployerAddress);
+        _deployNetworkRegistryProxy(deployerAddress);
 
         // 3.7. NetworkRegistry Contract
         // Only deploy NetworkRegistrycontract when no deployed one is detected.
@@ -109,20 +109,6 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     }
 
     /**
-     * @dev deploy node safe factory
-     */
-    function _deployHoprNodeStakeFactory() internal {
-        if (
-            currentEnvironmentType == EnvironmentType.LOCAL
-                || !isValidAddress(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress)
-        ) {
-            // deploy HoprNodeStakeFactory contract
-            currentNetworkDetail.addresses.nodeStakeV2FactoryAddress =
-                deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory");
-        }
-    }
-
-    /**
      * @dev Deploy node management module
      */
     function _deployHoprNodeManagementModule() internal {
@@ -133,6 +119,22 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             // deploy HoprNodeManagementModule contract
             currentNetworkDetail.addresses.moduleImplementationAddress =
                 deployCode("NodeManagementModule.sol:HoprNodeManagementModule");
+        }
+    }
+
+    /**
+     * @dev deploy node safe factory
+     */
+    function _deployHoprNodeStakeFactory(address deployerAddress) internal {
+        if (
+            currentEnvironmentType == EnvironmentType.LOCAL
+                || !isValidAddress(currentNetworkDetail.addresses.nodeStakeV2FactoryAddress)
+        ) {
+            // deploy HoprNodeStakeFactory contract
+            currentNetworkDetail.addresses.nodeStakeV2FactoryAddress =
+                deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory", abi.encode(
+                    currentNetworkDetail.addresses.moduleImplementationAddress, deployerAddress
+                ));
         }
     }
 
@@ -206,7 +208,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * @dev deploy network registry proxy.
      * In development, dummy is used
      */
-    function _deployNRProxy(address deployerAddress) internal {
+    function _deployNetworkRegistryProxy(address deployerAddress) internal {
         bool shouldDeployStakingProxy = false;
 
         if (currentEnvironmentType == EnvironmentType.LOCAL && vm.envBool("USE_STAKING_PROXY")) {
@@ -345,9 +347,12 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         }
         // grant manager roles to more accounts
         for (uint256 i = 0; i < PRODUCT_TEAM_MANAGER_ADDRESSES.length; i++) {
-            contractAddress.call(
+            (bool successGrantManagerRole,) = contractAddress.call(
                 abi.encodeWithSignature("grantRole(bytes32,address)", MANAGER_ROLE, PRODUCT_TEAM_MANAGER_ADDRESSES[i])
             );
+            if (!successGrantManagerRole) {
+                emit log_string("Cannot grant MANAGER_ROLE role on ");
+            }
         }
         if (!successGrantDefaultAdminRole) {
             emit log_string("Cannot grant MANAGER_ROLE role on ");

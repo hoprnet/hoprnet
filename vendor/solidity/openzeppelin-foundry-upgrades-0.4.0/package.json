@@ -1,0 +1,48 @@
+{
+  "name": "@openzeppelin/foundry-upgrades",
+  "version": "0.4.0",
+  "description": "Foundry library for deploying and managing upgradeable contracts",
+  "license": "MIT",
+  "files": [
+    "src/**/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OpenZeppelin/openzeppelin-foundry-upgrades.git"
+  },
+  "scripts": {
+    "clean": "forge clean && hardhat clean",
+    "compile": "forge build",
+    "test": "npm run forge:test && npm run forge:script && npm run forge:test-v4 && npm run forge:script-v4 && npm run forge:test-v4-with-v5-proxies && npm run forge:script-v4-with-v5-proxies && npm run test-reference-builds",
+    "forge:test": "FOUNDRY_PROFILE=default forge test -vvv --ffi --force",
+    "forge:script": "FOUNDRY_PROFILE=default forge script test/Upgrades.s.sol --ffi --force",
+    "forge:test-v4": "FOUNDRY_PROFILE=openzeppelin-contracts-v4 forge test -vvv --ffi --force --use solc:0.8.2",
+    "forge:script-v4": "FOUNDRY_PROFILE=openzeppelin-contracts-v4 forge script test-profiles/openzeppelin-contracts-v4/test/LegacyUpgrades.s.sol --ffi --force --use solc:0.8.2",
+    "forge:test-v4-with-v5-proxies": "FOUNDRY_PROFILE=openzeppelin-contracts-v4-with-v5-proxies forge test -vvv --ffi --force",
+    "forge:script-v4-with-v5-proxies": "FOUNDRY_PROFILE=openzeppelin-contracts-v4-with-v5-proxies forge script test-profiles/openzeppelin-contracts-v4-with-v5-proxies/test/Upgrades.s.sol --ffi --force",
+    "test-reference-builds": "bash scripts/test-reference-builds.sh",
+    "lint": "prettier --log-level warn --ignore-path .gitignore '{src,test}/**/*.sol' --check && solhint 'src/**/*.sol'",
+    "lint:fix": "prettier --log-level warn --ignore-path .gitignore '{src,test}/**/*.sol' --write",
+    "docgen": "hardhat clean && hardhat compile && hardhat docgen",
+    "docgen:test": "yarn docgen && git diff --exit-code docs/modules/api/pages"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@openzeppelin/contracts-upgradeable": "^5.0.2",
+    "@openzeppelin/contracts-v4": "npm:@openzeppelin/contracts@^v4.9.6",
+    "@openzeppelin/contracts-upgradeable-v4": "npm:@openzeppelin/contracts-upgradeable@^v4.9.6",
+    "@openzeppelin/defender-deploy-client-cli": "0.0.1-alpha.10",
+    "@openzeppelin/upgrades-core": "^1.37.0",
+    "hardhat": "^2.21.0",
+    "prettier": "^3.0.0",
+    "prettier-plugin-solidity": "^1.1.0",
+    "solhint": "^3.3.6",
+    "solhint-plugin-openzeppelin": "file:scripts/solhint-custom",
+    "solidity-docgen": "^0.6.0-beta.36"
+  },
+  "peerDependencies": {
+    "@openzeppelin/defender-deploy-client-cli": "0.0.1-alpha.10",
+    "@openzeppelin/upgrades-core": "^1.37.0"
+  }
+}

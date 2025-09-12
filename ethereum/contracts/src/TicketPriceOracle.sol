@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
+import { Ownable } from "openzeppelin-contracts-4.9.2/access/Ownable.sol";
 
 abstract contract HoprTicketPriceOracleEvents {
     // emitted when ticket price was updated
@@ -38,6 +38,8 @@ contract HoprTicketPriceOracle is Ownable, HoprTicketPriceOracleEvents {
     error TicketPriceMustNotBeZero();
     // when new ticket price is equal to old ticket price
     error TicketPriceMustNotBeSame();
+    // when address is zero
+    error ZeroAddress(string reason);
 
     /**
      * @param _newOwner Address of the new owner.

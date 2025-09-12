@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import { Test, console2 } from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 import { HoprChannelsEvents } from "../src/Channels.sol";
-import { HoprLedgerEvents, HoprLedger } from "../src/Ledger.sol";
-import { CryptoUtils } from "./utils/Crypto.sol";
+import { HoprLedger } from "../src/Ledger.sol";
 
 uint256 constant ONE_HOUR = 60 * 60 * 1000; // in milliseconds
 

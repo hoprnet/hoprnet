@@ -6,7 +6,7 @@
  */
 pragma solidity ^0.8.0;
 
-import { Enum } from "safe-contracts/common/Enum.sol";
+import { Enum } from "safe-contracts-1.4.1/common/Enum.sol";
 
 interface IAvatar {
     function getOwners() external view returns (address[] memory);
@@ -23,7 +23,7 @@ interface IAvatar {
     /// @notice Must emit DisabledModule(address module) if successful.
     /// @param prevModule Address that pointed to the module to be removed in the linked list
     /// @param module Module to be removed.
-    function disableModule(address prevModule, address module) external;
+    function disableModule(address prevModule, address module) external; 
 
     /// @dev Allows a Module to execute a transaction.
     /// @notice Can only be called by an enabled module.
