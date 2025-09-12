@@ -143,3 +143,62 @@ async fn test_open_channel(
 
     Ok(())
 }
+
+#[rstest]
+#[cfg(feature = "runtime-tokio")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_cluster_connectivity(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
+    let results = futures::future::join_all(cluster_fixture.iter().map(|node| node.network_connected_peers()))
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .expect("failed to get connected peers");
+
+    for peers in &results {
+        assert_eq!(peers.len(), SWARM_N - 1);
+    }
+
+    Ok(())
+}
+
+#[rstest]
+#[cfg(feature = "runtime-tokio")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_send_0_hop_without_open_channels(
+    #[future(awt)] cluster_fixture: &Vec<Hopr>,
+    random_int_pair: (usize, usize),
+) -> anyhow::Result<()> {
+    use hopr_lib::{DestinationRouting, Tag};
+    use hopr_primitive_types::bounded::BoundedSize;
+
+    let (src, dst) = random_int_pair;
+
+    cluster_fixture[src]
+        .send_message(
+            b"Hello, HOPR!".to_vec().into(),
+            DestinationRouting::forward_only(
+                cluster_fixture[dst].me_onchain(),
+                hopr_lib::RoutingOptions::Hops(BoundedSize::default()),
+            ),
+            Tag::Application(1024),
+        )
+        .await
+        .expect("failed to send 0-hop message");
+
+    Ok(())
+}
+
+#[rstest]
+#[cfg(feature = "runtime-tokio")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_get_ticket_price(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
+    use hopr_lib::{Balance, WxHOPR};
+
+    let ticket_price = cluster_fixture[0]
+        .get_ticket_price()
+        .await?
+        .expect("ticket price should not be None");
+
+    assert!(ticket_price > Balance::<WxHOPR>::zero());
+    Ok(())
+}
