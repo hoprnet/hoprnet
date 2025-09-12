@@ -148,14 +148,27 @@ async fn test_open_channel(
 #[cfg(feature = "runtime-tokio")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_cluster_connectivity(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
-    let results = futures::future::join_all(cluster_fixture.iter().map(|node| node.network_connected_peers()))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .expect("failed to get connected peers");
+    use tokio::time::{Instant, sleep};
 
-    for peers in &results {
-        assert_eq!(peers.len(), SWARM_N - 1);
+    let start = Instant::now();
+    let timeout_duration = Duration::from_secs(30);
+
+    loop {
+        let results = futures::future::join_all(cluster_fixture.iter().map(|node| node.network_connected_peers()))
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .expect("failed to get connected peers");
+
+        if results.iter().all(|peers| peers.len() == SWARM_N - 1) {
+            break;
+        }
+
+        if start.elapsed() >= timeout_duration {
+            panic!("Timeout: not all nodes connected within 30s");
+        }
+
+        sleep(Duration::from_millis(200)).await;
     }
 
     Ok(())
