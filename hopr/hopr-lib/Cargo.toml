@@ -87,6 +87,7 @@ hex-literal = { workspace = true }
 mockito = { workspace = true }
 once_cell = { workspace = true }
 parameterized = { workspace = true }
+rand = { workspace = true }
 rstest = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }

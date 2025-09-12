@@ -1,23 +1,30 @@
 mod common;
 
-use std::str::FromStr;
-use std::time::Duration;
-
-use common::TestChainEnv;
-use hopr_lib::Hopr;
+use std::{str::FromStr, time::Duration};
 
 use alloy::primitives::U256;
+use common::TestChainEnv;
+use hopr_lib::Hopr;
 use once_cell::sync::Lazy;
 use rstest::rstest;
 use tokio::sync::OnceCell;
-use tracing::info;
 
 const SNAPSHOT_BASE: &str = "tests/snapshots/node_snapshot_base";
 const PATH_TO_PROTOCOL_CONFIG: &str = "tests/protocol-config-anvil.json";
-const SWARM_N: usize = 1;
+const SWARM_N: usize = 2;
 
 static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
 static SWARM_N_FIXTURE: Lazy<OnceCell<Vec<Hopr>>> = Lazy::new(|| OnceCell::const_new());
+
+#[rstest::fixture]
+fn random_int_pair() -> (usize, usize) {
+    use rand::prelude::SliceRandom;
+
+    let mut numbers: Vec<usize> = (0..SWARM_N).collect();
+    numbers.shuffle(&mut rand::thread_rng());
+
+    (numbers[0], numbers[1])
+}
 
 #[rstest::fixture]
 async fn chainenv_fixture() -> &'static TestChainEnv {
@@ -28,41 +35,42 @@ async fn chainenv_fixture() -> &'static TestChainEnv {
         .get_or_init(|| async {
             env_logger::init();
 
-            let block_time = Duration::from_secs(1);
-            let finality = 2;
-
             let requestor_base = SnapshotRequestor::new(SNAPSHOT_BASE)
                 .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
                 .load(true)
                 .await;
+            let block_time = Duration::from_secs(1);
+            let finality = 2;
 
             deploy_test_environment(requestor_base, block_time, finality).await
         })
         .await
 }
 #[rstest::fixture]
-async fn swarm_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'static Vec<Hopr> {
-    use common::{NodeSafeConfig, onboard_node};
-    use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
+async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'static Vec<Hopr> {
+    use std::fs::read_to_string;
+
+    use common::onboard_node;
+    use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
     use hopr_lib::{
         ProtocolsConfig,
         config::{Chain, HoprLibConfig, SafeModule},
     };
-    use std::fs::read_to_string;
 
     SWARM_N_FIXTURE
         .get_or_init(|| async {
-            let onchain_keys = chainenv_fixture.node_chain_keys[0..SWARM_N]
-                .iter()
-                .map(|k| k.clone())
-                .collect::<Vec<ChainKeypair>>();
+            let protocol_config = ProtocolsConfig::from_str(
+                &read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
+            )
+            .expect("failed to parse protocol config");
 
-            let offchain_keys: OffchainKeypair = OffchainKeypair::random();
+            // Use the first SWARM_N onchain keypairs from the chainenv fixture
+            let onchain_keys = chainenv_fixture.node_chain_keys[0..SWARM_N].to_vec();
 
             // Setup SWARM_N safes
             let mut safes = Vec::with_capacity(SWARM_N);
             for i in 0..SWARM_N {
-                let safe: NodeSafeConfig = onboard_node(
+                let safe = onboard_node(
                     &chainenv_fixture,
                     &onchain_keys[i],
                     U256::from(10_u32),
@@ -72,45 +80,40 @@ async fn swarm_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'stat
                 safes.push(safe);
             }
 
-            let protocol_config = ProtocolsConfig::from_str(
-                &read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
-            )
-            .expect("failed to parse protocol config");
-
             // Setup SWARM_N nodes
-            let mut hopr_instances = Vec::with_capacity(SWARM_N);
-            for i in 0..SWARM_N {
-                let hopr_instance = Hopr::new(
-                    HoprLibConfig {
-                        chain: Chain {
-                            protocols: protocol_config.clone(),
-                            provider: Some(chainenv_fixture.anvil.endpoint()),
+            let hopr_instances: Vec<Hopr> = (0..SWARM_N)
+                .map(|i| {
+                    Hopr::new(
+                        HoprLibConfig {
+                            chain: Chain {
+                                protocols: protocol_config.clone(),
+                                provider: Some(chainenv_fixture.anvil.endpoint()),
+                                ..Default::default()
+                            },
+                            host: hopr_lib::config::HostConfig {
+                                address: hopr_lib::config::HostType::default(),
+                                port: 3001 + i as u16,
+                            },
+                            db: hopr_lib::config::Db {
+                                data: format!("/tmp/hopr-tests/node_{i}"),
+                                force_initialize: false,
+                                ..Default::default()
+                            },
+                            safe_module: SafeModule {
+                                safe_address: safes[i].safe_address,
+                                module_address: safes[i].module_address,
+                                ..Default::default()
+                            },
                             ..Default::default()
                         },
-                        host: hopr_lib::config::HostConfig {
-                            address: hopr_lib::config::HostType::default(),
-                            port: 3001 + i as u16,
-                        },
-                        db: hopr_lib::config::Db {
-                            data: format!("/tmp/hopr-tests/node{}", i),
-                            force_initialize: false,
-                            ..Default::default()
-                        },
-                        safe_module: SafeModule {
-                            safe_address: safes[i].safe_address,
-                            module_address: safes[i].module_address,
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    },
-                    &offchain_keys,
-                    &chainenv_fixture.node_chain_keys[i],
-                )
-                .expect("failed to create hopr instance");
+                        &OffchainKeypair::random(),
+                        &onchain_keys[i],
+                    )
+                    .expect(format!("failed to create hopr instance no. {i}").as_str())
+                })
+                .collect();
 
-                hopr_instances.push(hopr_instance);
-            }
-
+            // TODO: enable this once the network registry is removed
             // let (_a, _b) = hopr_instance.run().await?;
 
             hopr_instances
@@ -119,26 +122,24 @@ async fn swarm_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'stat
 }
 
 #[rstest]
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[cfg(feature = "runtime-tokio")]
-async fn test_open_channel(#[future(awt)] swarm_fixture: &Vec<Hopr>) -> Result<(), Box<dyn std::error::Error>> {
-    let channels = swarm_fixture[0].all_channels().await?;
-    info!("Node has {} channels", channels.len());
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_open_channel(
+    #[future(awt)] cluster_fixture: &Vec<Hopr>,
+    random_int_pair: (usize, usize),
+) -> anyhow::Result<()> {
+    use hopr_lib::HoprBalance;
 
-    // let res = node_fixture
-    //     .open_channel(
-    //         &(node_chain_keys[1].public().to_address()),
-    //         HoprBalance::from_str("1 wxHOPR")?,
-    //     )
-    //     .await
-    //     .expect("failed to open channel");
+    let (src, dst) = random_int_pair;
 
-    // println!("Opened channel: {:?}", res.channel_id);
+    assert_eq!((cluster_fixture[src].all_channels().await?).len(), 0);
 
-    // println!("Node has {} channels", channels.len());
+    cluster_fixture[src]
+        .open_channel(&(cluster_fixture[dst].me_onchain()), HoprBalance::from_str("1 wxHOPR")?)
+        .await
+        .expect("failed to open channel");
 
-    // debug!("Created Hopr instances for both nodes");
+    assert_eq!((cluster_fixture[src].all_channels().await?).len(), 1);
 
-    // finish the test
     Ok(())
 }
