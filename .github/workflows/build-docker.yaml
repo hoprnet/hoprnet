@@ -103,6 +103,12 @@ jobs:
             echo "NIX_BUILD_TARGET=${{ inputs.package }}${nix_debug_option}-docker-build-and-upload" >> $GITHUB_OUTPUT
             echo "NIX_BUILD_TARGET_PROFILE=${{ inputs.package }}-profile-docker-build-and-upload" >> $GITHUB_OUTPUT
           else
+            # For PR builds, use the merge commit SHA if the PR is merged, otherwise use the head SHA
+            if [[ "${{ github.event.pull_request.merged }}" == "true" ]]; then
+              export COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+            else
+              export COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+            fi
             next_version=$(./scripts/get-next-version.sh Build)
             ./scripts/bump-version.sh ${next_version}
             docker_tag=$(echo "${next_version}" | sed 's/+/-/')
@@ -127,8 +133,6 @@ jobs:
           else
             echo "HOPRD_CLUSTER_NAME=hoprd-node-${docker_tag_pr//./-}" >> $GITHUB_OUTPUT
           fi
-        env:
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Build and push ${{ inputs.package }} docker image - Commit
         run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
@@ -185,7 +189,7 @@ jobs:
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}-profile
 
       - name: Trigger deploy workflow if needed
-        if: vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && inputs.package == 'hoprd' && env.GITHUB_PR_LABEL_DEPLOY_NODES == '1'
+        if: vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && inputs.package == 'hoprd' && ( env.GITHUB_PR_LABEL_DEPLOY_NODES == '1' || inputs.production )
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
