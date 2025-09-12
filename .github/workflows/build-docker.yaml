@@ -104,10 +104,10 @@ jobs:
             echo "NIX_BUILD_TARGET_PROFILE=${{ inputs.package }}-profile-docker-build-and-upload" >> $GITHUB_OUTPUT
           else
             # For PR builds, use the merge commit SHA if the PR is merged, otherwise use the head SHA
-            if [[ "${{ github.event.pull_request.merged }}  == "true" ]]; then
+            if [[ "${{ github.event.pull_request.merged }}" == "true" ]]; then
               export COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
             else
-              export COMMIT_SHA=${{ github.event.pull_request.head.sha }}
+              export COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
             fi
             next_version=$(./scripts/get-next-version.sh Build)
             ./scripts/bump-version.sh ${next_version}

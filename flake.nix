@@ -582,7 +582,7 @@
               ${pkgs.skopeo}/bin/skopeo copy --insecure-policy \
                 --dest-registry-token="$GOOGLE_ACCESS_TOKEN" \
                 "docker-archive:$OCI_ARCHIVE" "docker://$IMAGE_TARGET"
-                echo "Uploaded image to $IMAGE_TARGET"
+              echo "Uploaded image to $IMAGE_TARGET"
             '';
           hoprd-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-docker;
