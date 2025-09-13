@@ -31,7 +31,7 @@ abstract contract HoprLedger is HoprLedgerEvents {
     // Prevents from initializing the contract with a zero interval
     error ZeroInterval();
 
-    string public constant LEDGER_VERSION = "1.0.0";
+    string public constant LEDGER_VERSION = "2.0.0";
 
     uint256 public immutable SNAPSHOT_INTERVAL;
 
