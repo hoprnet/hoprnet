@@ -19,6 +19,7 @@ permissions:
   contents: write
   actions: write
   security-events: write
+  pull-requests: write
 
 concurrency:
   group: ${{ github.event.pull_request.head.ref || github.ref_name }}-build

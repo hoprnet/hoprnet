@@ -30,6 +30,9 @@ on:
         description: 'Package network (rotsee: testnet, dufour: mainnet)'
         default: rotsee
 
+permissions:
+  pull-requests: write
+
 concurrency:
   group: dappnode-${{ inputs.dappnode_repository }}-${{ inputs.source_branch || github.ref_name }}
   cancel-in-progress: false
