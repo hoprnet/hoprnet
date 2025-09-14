@@ -162,3 +162,4 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             The latest dAppNode package for ${{ inputs.dappnode_repository }} has been built and uploaded with IPFS hash: ${{ steps.publish.outputs.ipfs_hash }}
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
