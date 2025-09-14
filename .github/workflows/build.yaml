@@ -57,6 +57,7 @@ jobs:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       dappnode_repository: ${{ matrix.dappnode_repository }}
       labels: ${{ format('{0},', join(github.event.pull_request.labels.*.name, ',')) }}
+      github_token: ${{ secrets.GITHUB_TOKEN }}
     secrets: inherit
 
   build-binaries:
