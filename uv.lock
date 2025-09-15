@@ -1,6 +1,6 @@
 version = 1
 revision = 3
-requires-python = ">=3.13.7, <3.14"
+requires-python = ">=3.13, <3.14"
 
 [manifest]
 members = [
@@ -285,14 +285,14 @@ lint = [
 
 [package.metadata]
 requires-dist = [
-    { name = "sdk-api", editable = "sdk/python/api" },
-    { name = "sdk-localcluster", editable = "sdk/python/localcluster" },
+    { name = "sdk-api", virtual = "sdk/python/api" },
+    { name = "sdk-localcluster", virtual = "sdk/python/localcluster" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "ruff", specifier = ">=0.13.0" },
-    { name = "tests", editable = "tests" },
+    { name = "tests", virtual = "tests" },
 ]
 lint = [{ name = "black", specifier = "==25.1.0" }]
 
@@ -589,7 +589,7 @@ wheels = [
 [[package]]
 name = "sdk-api"
 version = "1.1.0"
-source = { editable = "sdk/python/api" }
+source = { virtual = "sdk/python/api" }
 dependencies = [
     { name = "aiohttp" },
     { name = "api-lib" },
@@ -610,7 +610,7 @@ requires-dist = [
 [[package]]
 name = "sdk-localcluster"
 version = "1.0.1"
-source = { editable = "sdk/python/localcluster" }
+source = { virtual = "sdk/python/localcluster" }
 dependencies = [
     { name = "click" },
     { name = "pyyaml" },
@@ -625,7 +625,7 @@ requires-dist = [
 [[package]]
 name = "tests"
 version = "1.0.0"
-source = { editable = "tests" }
+source = { virtual = "tests" }
 dependencies = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
