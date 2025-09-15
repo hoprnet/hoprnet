@@ -140,7 +140,6 @@ jobs:
         id: publish
         run: |
           set -x
-          node --version
           docker_tag=$(gcloud artifacts docker tags list "${{ vars.DOCKER_IMAGE_REGISTRY }}/hoprd" --filter="tag:${{ steps.setup.outputs.current_version }}" --format="csv[no-heading](tag,version)" | grep -F "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
           yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" "./docker-compose.yml"
           npm install
