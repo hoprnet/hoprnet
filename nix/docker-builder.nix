@@ -19,6 +19,9 @@ let
       findutils
       iana-etc
       nettools
+      gnugrep # Used for searching env variables
+      gnutar # Used to extract the database files from the docker container
+
     ]
     ++ extraContents;
   Env = [
