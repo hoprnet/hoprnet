@@ -47,14 +47,14 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.30", default-features = false, features = [
+alloy = { version = "=1.0.31", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
   "contract",
   "k256",
   "std",
-] } # pinned to 1.0.16 due to many breaking changes in patch releases
+] }
 anyhow = "1.0.99"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
