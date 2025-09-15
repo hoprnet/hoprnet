@@ -591,6 +591,7 @@ dependencies = [
     { name = "base58" },
     { name = "cryptography" },
     { name = "pynacl" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -600,6 +601,7 @@ requires-dist = [
     { name = "base58", specifier = ">=2.1.1" },
     { name = "cryptography", specifier = ">=45.0.7" },
     { name = "pynacl", specifier = ">=1.5.0" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
 ]
 
 [[package]]

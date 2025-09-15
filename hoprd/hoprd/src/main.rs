@@ -207,10 +207,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
-        let node_cfg_value =
-            serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
-
         let api_cfg = cfg.api.clone();
+
+        let node_cfg_value =
+            serde_yaml::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
         let listen_address = match &cfg.api.host.address {
             hopr_lib::HostType::IPv4(a) | hopr_lib::HostType::Domain(a) => {
