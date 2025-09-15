@@ -19,9 +19,6 @@ on:
       labels:
         required: true
         type: string
-      github_token:
-        required: true
-        type: string
   workflow_dispatch:
     inputs:
       network:
@@ -32,9 +29,6 @@ on:
         required: true
         description: 'Package network (rotsee: testnet, dufour: mainnet)'
         default: rotsee
-
-permissions:
-  pull-requests: write
 
 concurrency:
   group: dappnode-${{ inputs.dappnode_repository }}-${{ inputs.source_branch || github.ref_name }}
@@ -160,12 +154,3 @@ jobs:
         working-directory: "./dappnode"
         env:
           DEVELOPER_ADDRESS: "0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E"
-
-      - name: Create comment
-        if: github.event_name == 'pull_request_target'
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4.0.0
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            The latest dAppNode package for ${{ inputs.dappnode_repository }} has been built and uploaded with IPFS hash: ${{ steps.publish.outputs.ipfs_hash }}
-          token: ${{ inputs.github_token || secrets.GITHUB_TOKEN }}
