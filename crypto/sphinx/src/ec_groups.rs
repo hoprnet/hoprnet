@@ -77,8 +77,11 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::Edward
     }
 
     fn is_valid(&self) -> bool {
+        // Ed25519 scalars always come clamped (pre-multiplied by the curve's co-factor)
+        // and therefore cannot result into points of small order.
+        // See `x25519_scalar_from_bytes` for more details.
         use curve25519_dalek::traits::IsIdentity;
-        self.is_torsion_free() && !self.is_identity() && !self.is_small_order()
+        !self.is_identity()
     }
 }
 
