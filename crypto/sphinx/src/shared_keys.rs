@@ -74,7 +74,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     pub(crate) fn generate(
         peer_group_elements: Vec<(G, &Alpha<G::AlphaLen>)>,
     ) -> hopr_crypto_types::errors::Result<SharedKeys<E, G>> {
-        let mut shared_keys = Vec::new();
+        let mut shared_keys = Vec::with_capacity(peer_group_elements.len());
 
         // coeff_prev becomes: x * b_0 * b_1 * b_2 * ...
         // alpha_prev becomes: x * b_0 * b_1 * b_2 * ... * G
