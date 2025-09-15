@@ -30,6 +30,7 @@ async def bringup(
     use_nat: bool = False,
     exposed: bool = False,
     base_port: int = BASE_PORT,
+    size: Optional[int] = None,
 ) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
@@ -41,7 +42,7 @@ async def bringup(
         config = yaml.safe_load(f)
 
     cluster = Cluster(
-        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port
+        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port, size
     )
     anvil = Anvil(
         ANVIL_FOLDER.joinpath("anvil.log"),

@@ -3,6 +3,7 @@ use std::fmt::Formatter;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use subtle::ConstantTimeEq;
 use typenum::Unsigned;
 
 use crate::{
@@ -116,6 +117,27 @@ where
     }
 }
 
+impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialEq for SURB<S, H>
+where
+    H::KeyId: PartialEq,
+    H::SurbReceiverData: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.first_relayer.eq(&other.first_relayer)
+            && self.alpha.eq(&other.alpha)
+            && self.header.eq(&other.header)
+            && self.sender_key.ct_eq(&other.sender_key).into()
+            && self.additional_data_receiver.eq(&other.additional_data_receiver)
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Eq for SURB<S, H>
+where
+    H::KeyId: Eq,
+    H::SurbReceiverData: Eq,
+{
+}
+
 impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
     type Error = GeneralError;
 
@@ -222,6 +244,8 @@ mod tests {
     fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
+        for<'a> &'a Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>:
+            From<&'a <<S as SphinxSuite>::P as Keypair>::Public>,
     {
         let pub_keys = keypairs.iter().map(|kp| *kp.public()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;

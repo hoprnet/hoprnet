@@ -10,8 +10,7 @@ use hopr_db_api::{
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
-use hopr_transport_identity::PeerId;
-use hopr_transport_packet::prelude::ApplicationData;
+use hopr_protocol_app::prelude::*;
 use tracing::error;
 
 lazy_static::lazy_static! {
@@ -23,14 +22,14 @@ lazy_static::lazy_static! {
 pub trait PacketWrapping {
     type Input;
 
-    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket>;
+    async fn send(&self, data: ApplicationDataOut, routing: ResolvedTransportRouting) -> Result<OutgoingPacket>;
 }
 
 #[async_trait::async_trait]
 pub trait PacketUnwrapping {
     type Packet;
 
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet>;
+    async fn recv(&self, peer: OffchainPublicKey, data: Box<[u8]>) -> Result<Self::Packet>;
 }
 
 /// Implements protocol acknowledgement logic for msg packets
@@ -48,17 +47,18 @@ impl<Db> PacketWrapping for PacketProcessor<Db>
 where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
-    type Input = ApplicationData;
+    type Input = ApplicationDataOut;
 
     #[tracing::instrument(level = "trace", skip(self, data), ret(Debug), err)]
-    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket> {
+    async fn send(&self, data: ApplicationDataOut, routing: ResolvedTransportRouting) -> Result<OutgoingPacket> {
         let packet = self
             .db
             .to_send(
-                data.to_bytes(),
+                data.data.to_bytes(),
                 routing,
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
+                data.packet_info.unwrap_or_default().signals_to_destination,
             )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
@@ -75,10 +75,7 @@ where
     type Packet = IncomingPacket;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet> {
-        let previous_hop = OffchainPublicKey::try_from(peer)
-            .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
-
+    async fn recv(&self, previous_hop: OffchainPublicKey, data: Box<[u8]>) -> Result<Self::Packet> {
         let packet = self
             .db
             .from_recv(
@@ -96,6 +93,7 @@ where
                         ticket: Box::new(v.0),
                     })
                 }
+                hopr_db_api::errors::DbError::PossibleAdversaryError(e) => PacketError::PacketDecodingError(e),
                 _ => PacketError::PacketConstructionError(e.to_string()),
             })?;
 
@@ -196,7 +194,7 @@ impl PacketSendAwaiter {
     }
 }
 
-pub type SendMsgInput = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer);
+pub type SendMsgInput = (ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer);
 
 #[derive(Debug, Clone)]
 pub struct MsgSender<T>
@@ -218,7 +216,7 @@ where
     #[tracing::instrument(level = "trace", skip(self, data))]
     pub async fn send_packet(
         &self,
-        data: ApplicationData,
+        data: ApplicationDataOut,
         routing: ResolvedTransportRouting,
     ) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
@@ -276,7 +274,7 @@ mod tests {
 
         let sender = MsgSender::new(tx);
 
-        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09])?;
+        let expected_data = ApplicationData::try_from([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09].as_ref())?;
         let expected_path = ValidatedPath::direct(
             *OffchainKeypair::random().public(),
             ChainKeypair::random().public().to_address(),
@@ -288,7 +286,12 @@ mod tests {
             return_paths: vec![],
         };
 
-        let result = sender.send_packet(expected_data.clone(), routing.clone()).await;
+        let result = sender
+            .send_packet(
+                ApplicationDataOut::with_no_packet_info(expected_data.clone()),
+                routing.clone(),
+            )
+            .await;
         assert!(result.is_ok());
 
         let received = rx.next();
@@ -297,7 +300,7 @@ mod tests {
             .context("Timeout")?
             .context("value should be present")?;
 
-        assert_eq!(data, expected_data);
+        assert_eq!(data.data, expected_data);
         assert!(matches!(path, ResolvedTransportRouting::Forward { forward_path,.. } if forward_path == expected_path));
 
         tokio::task::spawn(async move {

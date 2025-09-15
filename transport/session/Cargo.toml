@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.11.0"
+version = "0.13.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -12,33 +12,32 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["serde"]
-serde = [
-  "dep:serde",
-  "dep:serde_repr",
-  "dep:serde_with",
-  "dep:bincode",
-  "flagset/serde",
-  "hopr-network-types/serde",
+default = []
+runtime-tokio = [
+  "hopr-network-types/runtime-tokio",
+  "hopr-protocol-session/runtime-tokio",
+  "dep:tokio",
 ]
-runtime-tokio = ["hopr-network-types/runtime-tokio", "dep:tokio"]
-prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
+prometheus = [
+  "hopr-network-types/prometheus",
+  "hopr-protocol-session/prometheus",
+  "dep:hopr-metrics",
+  "dep:lazy_static",
+]
 
 [dependencies]
-aquamarine = { workspace = true }
 arrayvec = { workspace = true }
 async-trait = { workspace = true }
-bincode = { workspace = true, optional = true }
-flagset = { workspace = true }
+flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
+mimalloc = { workspace = true }
 moka = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
-serde = { workspace = true, optional = true }
-serde_repr = { workspace = true, optional = true }
-serde_with = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_repr = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -51,18 +50,23 @@ hopr-crypto-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-network-types = { workspace = true }
+hopr-network-types = { workspace = true, features = ["serde"] }
 hopr-primitive-types = { workspace = true }
-hopr-protocol-session = { workspace = true }
-hopr-transport-packet = { workspace = true }
+hopr-protocol-app = { workspace = true, features = ["serde"] }
+hopr-protocol-session = { workspace = true, features = ["serde"] }
+hopr-protocol-start = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 criterion = { workspace = true }
-hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
-hopr-protocol-session = { workspace = true, features = ["session-types"] }
+hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
+hopr-protocol-session = { workspace = true, features = [
+  "session-types",
+  "serde",
+] }
 mockall = { workspace = true }
 rand = { workspace = true }
+serde_cbor_2 = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 

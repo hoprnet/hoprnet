@@ -10,7 +10,7 @@ use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_network::config::NetworkConfig;
 pub use hopr_transport_probe::config::ProbeConfig;
 pub use hopr_transport_protocol::config::ProtocolConfig;
-use hopr_transport_session::MIN_BALANCER_SAMPLING_INTERVAL;
+use hopr_transport_session::{MIN_BALANCER_SAMPLING_INTERVAL, MIN_SURB_BUFFER_DURATION};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -193,6 +193,8 @@ pub struct TransportConfig {
     pub prefer_local_addresses: bool,
 }
 
+const DEFAULT_SESSION_MAX_SESSIONS: u32 = 2048;
+
 const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(180);
 
 const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(60);
@@ -201,7 +203,17 @@ const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 
-const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_secs(1);
+const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_millis(500);
+
+const DEFAULT_SESSION_BALANCER_BUFFER_DURATION: Duration = Duration::from_millis(5000);
+
+fn default_session_max_sessions() -> u32 {
+    DEFAULT_SESSION_MAX_SESSIONS
+}
+
+fn default_session_balancer_buffer_duration() -> std::time::Duration {
+    DEFAULT_SESSION_BALANCER_BUFFER_DURATION
+}
 
 fn default_session_establish_max_retries() -> u32 {
     DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
@@ -235,7 +247,15 @@ fn validate_balancer_sampling(value: &std::time::Duration) -> Result<(), Validat
     }
 }
 
-/// Global configuration of Sessions.
+fn validate_balancer_buffer_duration(value: &std::time::Duration) -> Result<(), ValidationError> {
+    if MIN_SURB_BUFFER_DURATION <= *value {
+        Ok(())
+    } else {
+        Err(ValidationError::new("minmum SURB buffer duration is too low"))
+    }
+}
+
+/// Global configuration of Sessions and the Session manager.
 #[serde_as]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Validate, smart_default::SmartDefault)]
 #[serde(deny_unknown_fields)]
@@ -248,6 +268,16 @@ pub struct SessionGlobalConfig {
     #[serde(default = "default_session_idle_timeout")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub idle_timeout: std::time::Duration,
+
+    /// The maximum number of outgoing or incoming Sessions that
+    /// are allowed by the Session manager.
+    ///
+    /// Minimum is 1, the maximum is given by the Session tag range.
+    /// Default is 2048.
+    #[default(DEFAULT_SESSION_MAX_SESSIONS)]
+    #[serde(default = "default_session_max_sessions")]
+    #[validate(range(min = 1))]
+    pub maximum_sessions: u32,
 
     /// Maximum retries to attempt to establish the Session
     /// Set 0 for no retries.
@@ -268,12 +298,25 @@ pub struct SessionGlobalConfig {
 
     /// Sampling interval for SURB balancer in milliseconds.
     ///
-    /// Default is 1000 milliseconds.
+    /// Default is 500 milliseconds.
     #[validate(custom(function = "validate_balancer_sampling"))]
     #[default(DEFAULT_SESSION_BALANCER_SAMPLING)]
     #[serde(default = "default_session_balancer_sampling")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     pub balancer_sampling_interval: std::time::Duration,
+
+    /// Minimum runway of received SURBs in seconds.
+    ///
+    /// This applies to incoming Sessions on Exit nodes only and is the main indicator of how
+    /// the egress traffic will be shaped, unless the `NoRateControl` Session
+    /// capability is specified during initiation.
+    ///
+    /// Default is 5 seconds, minimum is 1 second.
+    #[validate(custom(function = "validate_balancer_buffer_duration"))]
+    #[default(DEFAULT_SESSION_BALANCER_BUFFER_DURATION)]
+    #[serde(default = "default_session_balancer_buffer_duration")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub balancer_minimum_surb_buffer_duration: std::time::Duration,
 }
 
 #[cfg(test)]

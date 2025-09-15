@@ -13,6 +13,7 @@ members = [
   "common/network-types",
   "common/parallelize",
   "common/primitive-types",
+  "crypto/keypair",
   "crypto/packet",
   "crypto/random",
   "crypto/sphinx",
@@ -25,19 +26,19 @@ members = [
   "hopli",
   "hopr/hopr-lib",
   "hoprd/hoprd",
-  "hoprd/keypair",
   "hoprd/rest-api",
   "logic/path",
   "logic/strategy",
   "misc/metrics",
   "misc/platform",
+  "protocols/app",
   "protocols/session",
+  "protocols/start",
   "transport/api",
   "transport/bloom",
   "transport/identity",
   "transport/mixer",
   "transport/network",
-  "transport/packet",
   "transport/p2p",
   "transport/probe",
   "transport/protocol",
@@ -46,7 +47,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.23", default-features = false, features = [
+alloy = { version = "=1.0.27", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -54,16 +55,16 @@ alloy = { version = "=1.0.23", default-features = false, features = [
   "k256",
   "std",
 ] } # pinned to 1.0.16 due to many breaking changes in patch releases
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-async-compression = "0.4.27"
+async-compression = "0.4.30"
 async-channel = "2.5.0"
-async-lock = "3.4.0"
+async-lock = "3.4.1"
 async-signal = "0.2.12"
 async-stream = "0.3.6"
 async-tar = "0.5.0"
-async-trait = "0.1.88"
+async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
 axum = { version = "0.8.4", features = ["ws", "http2"] }
@@ -78,22 +79,19 @@ bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.0.1", features = ["serde"] }
 bytes = "1.10.1"
 cfg_eval = "0.1.2"
-cfg-if = "1.0.1"
+cfg-if = "1.0.3"
 chrono = { version = "0.4.41", default-features = false }
-clap = { version = "4.5.42", features = ["derive", "env", "string"] }
+clap = { version = "4.5.47", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.7.0", features = ["async_tokio", "html_reports"] }
-crossbeam-queue = "0.3.12"
-crossbeam-skiplist = "0.1.3"
-ctor = "0.4.3"
 ctr = "0.9.2"
+curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
 dashmap = "6.1.0"
-divan = "0.1.21"
 env_logger = "0.11.8"
 either = "1.15.0"
 flagset = "0.4.7"
-flate2 = "1.0"
+flate2 = "1.1"
 flume = "0.11.1"
 float-cmp = "0.10.0"
 futures = "0.3.31"
@@ -102,11 +100,12 @@ futures-timer = "3.0.3"
 futures-time = "3.0.0"
 futures-util = "0.3"
 generic-array = "1.2.0"
-hashbrown = "0.15.4"
+hashbrown = "0.16.0"
 hex = "0.4.3"
 hex-literal = "1.0.0"
 hickory-resolver = "0.25.2"
 http = "1.3.1"
+human-bandwidth = { version = "0.1.4", features = ["serde"] }
 k256 = { version = "0.13.4", features = [
   "arithmetic",
   "ecdh",
@@ -121,6 +120,7 @@ libp2p-identity = { version = "0.2.12", features = [
   "rand",
 ] }
 libp2p-stream = { version = "0.4.0-alpha" }
+mimalloc = "0.1.48"
 mockall = "0.13.1"
 mockito = "1.7.0"
 moka = { version = "0.12.10", features = ["future"] }
@@ -142,28 +142,28 @@ primitive-types = { version = "0.13.1", features = ["serde"] }
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones
-rayon = "1.10.0"
-regex = "1.11.1"
-reqwest = { version = "0.12.22", features = ["json"] }
+rayon = "1.11.0"
+regex = "1.11.2"
+reqwest = { version = "0.12.23", features = ["json"] }
 ringbuffer = "0.16.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.14", default-features = false, features = [
+sea-orm = { version = "1.1.15", default-features = false, features = [
   "sqlx-sqlite",
   "with-chrono",
   "with-json",
   "debug-print",
 ] }
-sea-orm-cli = { version = "1.1.14", default-features = false, features = [
+sea-orm-cli = { version = "1.1.15", default-features = false, features = [
   "codegen",
 ] }
-sea-orm-migration = { version = "1.1.14", default-features = false, features = [
+sea-orm-migration = { version = "1.1.15", default-features = false, features = [
   "cli",
   "sqlx-sqlite",
   "with-chrono",
 ] }
-sea-query = { version = "0.32.6", default-features = false }
+sea-query = { version = "0.32.7", default-features = false }
 sea-query-binder = { version = "0.7.0", default-features = false, features = [
   "with-chrono",
   "sqlx-sqlite",
@@ -171,7 +171,8 @@ sea-query-binder = { version = "0.7.0", default-features = false, features = [
 semver = "1.0.26"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_bytes = "0.11.17"
-serde_json = "1.0.141"
+serde_cbor_2 = "0.13.0"
+serde_json = "1.0.143"
 serde_repr = "0.1.20"
 serde_with = { version = "3.14.0", features = ["base64"] }
 serde_yaml = { version = "0.9.33" } # using last version before the library was deprecated
@@ -187,24 +188,23 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 ] }
 strum = { version = "0.27.2", features = ["derive"] }
 subtle = "2.6.1"
-sysinfo = "0.30"
-tempfile = "3.20.0"
+sysinfo = "0.37"
+tempfile = "3.21.0"
 test-log = { version = "0.2.18", features = ["trace"] }
-thiserror = "2.0.12"
-tokio = { version = "1.47.0", features = [
+thiserror = "2.0.16"
+tokio = { version = "1.47.1", features = [
   "rt-multi-thread",
   "macros",
   "tracing",
 ] }
-tokio-util = { version = "0.7.15", default-features = false, features = [
+tokio-util = { version = "0.7.16", default-features = false, features = [
   "codec",
   "compat",
 ] }
 tokio-retry = "0.3.0"
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
 tracing = { version = "0.1.41" }
-tracing-futures = { version = "0.2.5" }
-tracing-subscriber = { version = "0.3.19", features = [
+tracing-subscriber = { version = "0.3.20", features = [
   "env-filter",
   "fmt",
   "registry",
@@ -212,8 +212,8 @@ tracing-subscriber = { version = "0.3.19", features = [
 ] }
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.18.0"
-uuid = { version = "1.17.0" }
-url = { version = "2.5.4", features = ["serde"] }
+uuid = { version = "1.18.1" }
+url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
 
@@ -224,10 +224,12 @@ hopr-chain-api = { path = "chain/api", default-features = false }
 hopr-chain-indexer = { path = "chain/indexer", default-features = false }
 hopr-chain-rpc = { path = "chain/rpc", default-features = false }
 hopr-chain-types = { path = "chain/types", default-features = false }
+hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
 hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [
   "x25519",
+  "ed25519",
 ] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
 hopr-db-api = { path = "db/api" }
@@ -242,7 +244,9 @@ hopr-path = { path = "logic/path" }
 hopr-parallelize = { path = "common/parallelize" }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
+hopr-protocol-app = { path = "protocols/app" }
 hopr-protocol-session = { path = "protocols/session" }
+hopr-protocol-start = { path = "protocols/start" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
 hopr-transport = { path = "transport/api" }
 hopr-transport-bloom = { path = "transport/bloom" }
@@ -251,17 +255,15 @@ hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
-hopr-transport-packet = { path = "transport/packet" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hopr-transport-ticket-aggregation = { path = "transport/ticket-aggregation" } # dead package waiting for reimplementation as a session protocol
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
-hoprd-keypair = { path = "hoprd/keypair", default-features = false }
 
 [profile.dev]
 panic = "abort"
 
-# this profile focuses on speed of compilation
+# this profile focuses on the speed of compilation
 [profile.candidate]
 inherits = "release"
 codegen-units = 16   # normal release default
@@ -274,10 +276,16 @@ opt-level = 2
 [profile.test]
 opt-level = 1
 
-# this profile focuses on best runtime performance and smallest binary size
+# this profile focuses on the best runtime performance and the smallest binary size
 [profile.release]
 codegen-units = 1
 lto = "fat"
 panic = "abort"
 strip = true
 opt-level = 3
+
+# uses extended debug symbols for profiling but does not harm benchmarking performance
+[profile.bench]
+debug = 2
+split-debuginfo = "off"
+strip = false

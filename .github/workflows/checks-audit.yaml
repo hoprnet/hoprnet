@@ -28,14 +28,14 @@ jobs:
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
 
       - name: Install Nix
-        uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31
+        uses: cachix/install-nix-action@c134e4c9e34bac6cab09cf239815f9339aaaf84e # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 

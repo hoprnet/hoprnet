@@ -56,6 +56,7 @@ clap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.11"
 lazy_static = { workspace = true, optional = true }
+mimalloc = { workspace = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -89,7 +90,8 @@ hopr-lib = { workspace = true, features = [
   "session-server",
 ] }
 hoprd-api = { workspace = true }
-hoprd-keypair = { workspace = true }
+hopr-crypto-keypair = { workspace = true }
+hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }

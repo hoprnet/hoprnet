@@ -7,6 +7,7 @@
 pub mod accounts;
 mod cache;
 pub mod channels;
+pub mod corrupted_channels;
 pub mod db;
 pub mod errors;
 pub mod info;
@@ -33,6 +34,7 @@ pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
 use crate::{
     accounts::HoprDbAccountOperations,
     channels::HoprDbChannelOperations,
+    corrupted_channels::HoprDbCorruptedChannelOperations,
     db::HoprDb,
     errors::{DbSqlError, Result},
     info::HoprDbInfoOperations,
@@ -55,12 +57,14 @@ pub struct OpenTransaction(DatabaseTransaction, TargetDb);
 impl OpenTransaction {
     /// Executes the given `callback` inside the transaction
     /// and commits the transaction if it succeeds or rollbacks otherwise.
+    #[tracing::instrument(level = "trace", name = "Sql::perform_in_transaction", skip_all, err)]
     pub async fn perform<F, T, E>(self, callback: F) -> std::result::Result<T, E>
     where
         F: for<'c> FnOnce(&'c OpenTransaction) -> BoxFuture<'c, std::result::Result<T, E>> + Send,
         T: Send,
         E: std::error::Error + From<DbSqlError>,
     {
+        let start = std::time::Instant::now();
         let res = callback(&self).await;
 
         if res.is_ok() {
@@ -68,6 +72,13 @@ impl OpenTransaction {
         } else {
             self.rollback().await?;
         }
+
+        tracing::trace!(
+            elapsed_ms = start.elapsed().as_millis(),
+            was_successful = res.is_ok(),
+            "transaction completed",
+        );
+
         res
     }
 
@@ -201,7 +212,8 @@ impl HoprDbGeneralModelOperations for HoprDb {
     /// Retrieves raw database connection to the given [DB](TargetDb).
     fn conn(&self, target_db: TargetDb) -> &DatabaseConnection {
         match target_db {
-            TargetDb::Index => &self.index_db,
+            TargetDb::Index => self.index_db.read_only(), // TODO: no write access needed here, deserves better
+            // wrapping
             TargetDb::Tickets => &self.tickets_db,
             TargetDb::Peers => &self.peers_db,
             TargetDb::Logs => &self.logs_db,
@@ -212,7 +224,8 @@ impl HoprDbGeneralModelOperations for HoprDb {
     async fn begin_transaction_in_db(&self, target_db: TargetDb) -> Result<OpenTransaction> {
         match target_db {
             TargetDb::Index => Ok(OpenTransaction(
-                self.index_db.begin_with_config(None, None).await?,
+                self.index_db.read_write().begin_with_config(None, None).await?, /* TODO: cannot estimate intent,
+                                                                                  * must be readwrite */
                 target_db,
             )),
             // TODO: when adding Postgres support, redirect `Tickets` and `Peers` into `self.db`
@@ -272,6 +285,7 @@ pub trait HoprDbAllOperations:
     HoprDbGeneralModelOperations
     + HoprDbAccountOperations
     + HoprDbChannelOperations
+    + HoprDbCorruptedChannelOperations
     + HoprDbInfoOperations
     + HoprDbLogOperations
     + HoprDbPeersOperations
@@ -287,5 +301,5 @@ pub mod prelude {
     pub use hopr_db_api::{logs::*, peers::*, protocol::*, resolver::*, tickets::*};
 
     pub use super::*;
-    pub use crate::{accounts::*, channels::*, db::*, errors::*, info::*, registry::*};
+    pub use crate::{accounts::*, channels::*, corrupted_channels::*, db::*, errors::*, info::*, registry::*};
 }

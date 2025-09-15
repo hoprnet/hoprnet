@@ -10,7 +10,7 @@ use subtle::{Choice, ConstantTimeEq};
 use crate::{
     errors,
     errors::CryptoError::InvalidInputValue,
-    types::{CompressedPublicKey, OffchainPublicKey, PublicKey},
+    types::{OffchainPublicKey, PublicKey},
     utils::{SecretValue, k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes},
 };
 
@@ -113,22 +113,19 @@ impl From<&OffchainKeypair> for libp2p_identity::PeerId {
 
 /// Represents a keypair consisting of a secp256k1 private and public key
 #[derive(Clone)]
-pub struct ChainKeypair(SecretValue<typenum::U32>, CompressedPublicKey);
+pub struct ChainKeypair(SecretValue<typenum::U32>, PublicKey);
 
 impl Keypair for ChainKeypair {
-    type Public = CompressedPublicKey;
+    type Public = PublicKey;
     type SecretLen = typenum::U32;
 
     fn random() -> Self {
         let (secret, public) = random_group_element();
-        Self(
-            GenericArray::from(secret).into(),
-            CompressedPublicKey(public.try_into().unwrap()),
-        )
+        Self(GenericArray::from(secret).into(), public.into())
     }
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
-        let compressed = PublicKey::from_privkey(bytes).map(CompressedPublicKey)?;
+        let compressed = PublicKey::from_privkey(bytes)?;
 
         Ok(Self(
             bytes.try_into().map_err(|_| InvalidInputValue("bytes"))?,
@@ -215,7 +212,7 @@ mod tests {
     fn test_chain_keypair() {
         let kp_1 = ChainKeypair::random();
 
-        let public = CompressedPublicKey(PublicKey::from_privkey(kp_1.secret().as_ref()).unwrap());
+        let public = PublicKey::from_privkey(kp_1.secret().as_ref()).unwrap();
         assert_eq!(&public, kp_1.public(), "secret keys must yield compatible public keys");
 
         let kp_2 = ChainKeypair::from_secret(kp_1.secret().as_ref()).unwrap();

@@ -18,8 +18,10 @@ from .request_objects import (
     CreateSessionBody,
     FundChannelBody,
     GetChannelsBody,
+    GetPeersBody,
     OpenChannelBody,
     SessionCapabilitiesBody,
+    SetSessionConfigBody,
     WithdrawBody,
 )
 from .response_objects import (
@@ -34,6 +36,7 @@ from .response_objects import (
     OpenedChannel,
     Ping,
     Session,
+    SessionConfig,
     Ticket,
     TicketPrice,
     TicketProbability,
@@ -210,21 +213,16 @@ class HoprdAPI(ApiLib):
 
     async def peers(
         self,
+        status: str = "connected",
     ) -> list[ConnectedPeer]:
         """
         Returns a list of peers.
         :return: peers: list
         """
-        response = await self.try_req(Method.GET, "/node/peers", dict)
-
-        if response is None:
+        if r := await self.try_req(Method.GET, f"/node/peers"):
+            return [ConnectedPeer(peer) for peer in r.get(status, [])]
+        else:
             return []
-
-        if "connected" not in response:
-            logging.warning("No 'connected' field returned from the API")
-            return []
-
-        return [ConnectedPeer(peer) for peer in response["connected"]]
 
     async def ping(self, destination: str) -> Optional[Ping]:
         """
@@ -245,8 +243,7 @@ class HoprdAPI(ApiLib):
         """
         Returns some configurations value of the node.
         """
-        response = await self.try_req(Method.GET, "/node/configuration", dict)
-        return Configuration(response["config"]) if response else response
+        return await self.try_req(Method.GET, "/node/configuration", Configuration)
 
     async def node_info(self) -> Optional[Infos]:
         """
@@ -304,6 +301,24 @@ class HoprdAPI(ApiLib):
         """
         return await self.try_req(Method.GET, f"/session/{protocol.name.lower()}", list[Session])
 
+    async def session_get_config(self, session_id: str) -> Optional[SessionConfig]:
+        """
+        Gets the configurable parameters of a Session.
+        :param: session_id: String
+        :return: SessionConfig
+        """
+        return await self.try_req(Method.GET, f"/session/config/{session_id}", SessionConfig)
+
+    async def session_set_config(self, session_id: str, cfg: SessionConfig):
+        """
+        Sets the configurable parameters of a Session.
+        :param: session_id: String
+        :param: cfg: SessionConfig
+        :return: SessionConfig
+        """
+        data = SetSessionConfigBody(cfg.response_buffer, cfg.max_surb_upstream)
+        return await self.try_req(Method.POST, f"/session/config/{session_id}", data=data)
+
     async def session_client(
         self,
         destination: str,
@@ -347,7 +362,7 @@ class HoprdAPI(ApiLib):
 
     async def session_close_client(self, session: Session) -> bool:
         """
-        Closes an existing Session listener for the given IP protocol, IP and port.
+        Closes an existing Session listener for the given IP protocol, IP address and port.
         :param: session: Session
         """
         path = f"/session/{session.protocol}/{session.ip}/{session.port}"

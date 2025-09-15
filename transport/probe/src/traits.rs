@@ -20,11 +20,11 @@ pub trait ProbeStatusUpdate {
 /// to the network layer.
 #[async_trait]
 pub trait DbOperations {
-    /// Attempts to find SURB and its ID given the [`SurbMatcher`].
+    /// Attempts to find SURB and its ID given the [`SurbMatcher`](hopr_network_types::types::SurbMatcher).
     async fn find_surb(
         &self,
         matcher: hopr_network_types::types::SurbMatcher,
-    ) -> hopr_db_api::errors::Result<(hopr_db_api::protocol::HoprSenderId, hopr_db_api::protocol::HoprSurb)>;
+    ) -> hopr_db_api::errors::Result<hopr_db_api::protocol::FoundSurb>;
 
     /// Tries to resolve on-chain public key given the off-chain public key
     async fn resolve_chain_key(

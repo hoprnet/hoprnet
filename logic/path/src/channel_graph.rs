@@ -239,7 +239,7 @@ impl ChannelGraph {
         self.me
     }
 
-    fn get_edge(&self, src: &Address, dst: &Address) -> Option<petgraph::stable_graph::EdgeReference<ChannelEdge>> {
+    fn get_edge(&self, src: &Address, dst: &Address) -> Option<petgraph::stable_graph::EdgeReference<'_, ChannelEdge>> {
         let (src_idx, dst_idx) = self
             .indices
             .get(src)

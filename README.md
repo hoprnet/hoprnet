@@ -59,7 +59,8 @@
 
 ## About
 
-The HOPR project produces multiple artifacts that allow running, maintaining and modifying the HOPR node. The most relevant components for production use cases are:
+The HOPR project produces multiple artifacts that allow running, maintaining and modifying the HOPR node.
+The most relevant components for production use cases are:
 
 1. [hopr-lib](https://hoprnet.github.io/hoprnet/hopr_lib/index.html)
    - A fully self-contained referential implementation of the HOPR protocol over a libp2p based connection mechanism that can be incorporated into other projects as a transport layer.
@@ -229,15 +230,22 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
 - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
 - `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
-- `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in SURB balancer (default: `0.6`)
-- `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in SURB balancer (default: `0.7`)
-- `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in SURB balancer (default: `0.2`)
+- `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in outgoing SURB balancer (default: `0.6`)
+- `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in outgoing SURB balancer (default: `0.7`)
+- `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in outgoing SURB balancer (default: `0.2`)
+- `HOPR_SURB_RB_SIZE` - number of incoming SURBs the ring buffer can hold (default: 10 000)
 - `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
 - `HOPR_CAPTURE_PACKETS` - allow capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Note that `hoprd` must be built with the `capture` feature.
 - `HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS` - maximum number of concurrently processed incoming packets from all peers (default: 10)
 - `HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS` - maximum time (in milliseconds) to wait until a stream connection is established to a peer (default: `2000 ms`)
 - `HOPR_PACKET_PLANNER_CONCURRENCY` - maximum number of concurrently planned outgoing packets (default: `10`)
+- `HOPR_SESSION_FRAME_SIZE` - The maximum chunk of data that can be written to the Session's input buffer (default: 1500)
+- `HOPR_SESSION_FRAME_TIMEOUT_MS` - The maximum time (in milliseconds) for an incomplete frame to stay in the Session's output buffer (default: 800 ms)
+- `HOPR_PROTOCOL_SURB_RB_SIZE` - size of the SURB ring buffer (default: 10 000)
+- `HOPR_PROTOCOL_SURB_RB_DISTRESS` - threshold since number of SURBs in the ring buffer triggers a distress packet signal (default: 1000)
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
+- `HOPRD_SESSION_ENTRY_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Entry node (defaults to number of CPU cores)
+- `HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Exit node (defaults to number of CPU cores)
 - `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
 
 ### Example execution
@@ -580,6 +588,37 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 - `HOPRD_USE_OPENTELEMETRY` - `true` to enable the OpenTelemetry streaming, `false` to disable it
 - `OTEL_SERVICE_NAME` - the identifier used to assign traces from this instance to (e.g. `my_hoprd_instance`)
 - `OTEL_EXPORTER_OTLP_ENDPOINT` - URL of an endpoint accepting the OpenTelemetry format (e.g. http://jaeger:4317/)
+
+### Profiling Criterion benchmarks via `flamegraph`
+
+#### Prerequisites
+
+- `perf` installed on the host system
+- flamegraph (install via e.g. `cargo install flamegraph`)
+
+#### Profiling the benchmarking binaries
+
+1. Perform a build of your chosen benchmark with `--no-rosegment` linker flag:
+
+   ```
+   RUSTFLAGS="-Clink-arg=-fuse-ld=lld -Clink-arg=-Wl,--no-rosegment" cargo bench --no-run -p hopr-crypto-packet
+   ```
+
+   Use `mold` instead of `lld` if needed.
+
+2. Find the built benchmarking binary and check if it contains debug symbols:
+
+   ```
+   readelf -S target/release/deps/packet_benches-ce70d68371e6d19a | grep debug
+   ```
+
+   The output of the above command should contain AT LEAST: `.debug_line`, `.debug_info` and `.debug_loc`
+
+3. Run `flamegraph` on the benchmarking binary of a selected benchmark with a fixed profile time (e.g.: 30 seconds):
+   ```
+   flamegraph -- ./target/release/deps/packet_benches-ce70d68371e6d19a --bench --exact packet_sending_no_precomputation/0_hop_0_surbs --profile-time 30
+   ```
+4. The `flamegraph.svg` will be generated in the project root directory and can be opened in a browser.
 
 ### HOPR packet capture
 

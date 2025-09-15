@@ -3,16 +3,20 @@ name = "hopr-protocol-session"
 version = "1.0.0"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Contains implementation of Session protocol according to HOPR RFC-0006"
+description = "Contains implementation of Session protocol according to HOPR RFC-0007"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
 [features]
 default = ["hashbrown"]
-serde = ["dep:serde", "hopr-crypto-packet/serde"]
+serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 session-types = []
 
 [dependencies]
@@ -24,12 +28,14 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
-hex = { workspace = true }
 hashbrown = { workspace = true, optional = true }
+lazy_static = { workspace = true, optional = true }
+mimalloc = { workspace = true }
 pin-project = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
 serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -40,6 +46,7 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -53,11 +60,11 @@ test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true, features = ["io-util", "io-std", "net", "signal"] }
 tokio-util = { workspace = true }
 
-hopr-protocol-session = { workspace = true }
 hopr-network-types = { workspace = true, features = [
   "capture",
   "runtime-tokio",
 ] }
+hopr-protocol-app = { workspace = true }
 
 [[example]]
 name = "session-socket"

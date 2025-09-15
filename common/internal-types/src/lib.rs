@@ -5,15 +5,14 @@
 pub mod account;
 /// Implements types for on-chain announcement of nodes.
 pub mod announcement;
-/// Implements types for tickets.
-pub mod tickets;
-
 /// Implements types related to HOPR payment channels.
 pub mod channels;
 /// Enumerates all errors in this crate.
 pub mod errors;
 /// Types related to internal HOPR protocol logic.
 pub mod protocol;
+/// Implements types for tickets.
+pub mod tickets;
 #[doc(hidden)]
 pub mod prelude {
     pub use super::{account::*, announcement::*, channels::*, errors::CoreTypesError, protocol::*, tickets::*};

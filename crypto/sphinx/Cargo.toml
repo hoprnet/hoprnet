@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-sphinx"
-version = "0.7.0"
+version = "0.10.0"
 description = "Implements Sphinx packet format for the HOPR protocol"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["x25519"]
+default = ["x25519", "ed25519"]
 secp256k1 = []
 ed25519 = []
 x25519 = []
@@ -27,12 +27,13 @@ serde = [
 
 [dependencies]
 bimap = { workspace = true }
-curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
+curve25519-dalek = { workspace = true }
 elliptic-curve = "0.13.8"
 generic-array = { workspace = true }
 k256 = { workspace = true, features = ["arithmetic", "ecdh", "hash2curve"] }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
+subtle = { workspace = true }
 thiserror = { workspace = true }
 typenum = { workspace = true }
 

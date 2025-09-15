@@ -5,8 +5,8 @@ use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_db_api::{
     errors::Result,
-    prelude::DbError,
-    protocol::{HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
+    prelude::{AuxiliaryPacketInfo, DbError, SurbCacheConfig},
+    protocol::{FoundSurb, HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
     resolver::HoprDbResolverOperations,
 };
 use hopr_internal_types::prelude::*;
@@ -19,8 +19,8 @@ use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 
 use crate::{
-    channels::HoprDbChannelOperations, db::HoprDb, errors::DbSqlError, info::HoprDbInfoOperations,
-    prelude::HoprDbTicketOperations,
+    cache::SurbRingBuffer, channels::HoprDbChannelOperations, db::HoprDb, errors::DbSqlError,
+    info::HoprDbInfoOperations, prelude::HoprDbTicketOperations,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -135,7 +135,9 @@ impl HoprDb {
             .unacked_tickets
             .insert(
                 fwd.outgoing.ack_challenge,
-                PendingAcknowledgement::WaitingAsRelayer(verified_incoming_ticket.into_unacknowledged(fwd.own_key)),
+                PendingAcknowledgement::WaitingAsRelayer(
+                    verified_incoming_ticket.into_unacknowledged(fwd.own_key).into(),
+                ),
             )
             .await;
 
@@ -168,30 +170,29 @@ impl HoprDb {
         };
 
         // Finally, replace the ticket in the outgoing packet with a new one
-        fwd.outgoing.ticket = ticket_builder
-            .challenge(fwd.next_challenge)
-            .build_signed(me, &domain_separator)?
+        let ticket_builder = ticket_builder.eth_challenge(fwd.next_challenge);
+        let me_clone = me.clone();
+        fwd.outgoing.ticket = spawn_fifo_blocking(move || ticket_builder.build_signed(&me_clone, &domain_separator))
+            .await?
             .leak();
 
         Ok(fwd)
     }
 
     #[instrument(level = "trace", skip(self, ack), err)]
-    async fn validate_acknowledgement(
+    async fn find_ticket_to_acknowledge(
         &self,
-        ack: &Acknowledgement,
+        ack: &VerifiedAcknowledgement,
     ) -> std::result::Result<ResolvedAcknowledgement, DbSqlError> {
-        let pending_ack = self
-            .caches
-            .unacked_tickets
-            .remove(&ack.ack_challenge()?)
-            .await
-            .ok_or_else(|| {
-                DbSqlError::AcknowledgementValidationError(format!(
-                    "received unexpected acknowledgement for half key challenge {}",
-                    ack.to_hex()
-                ))
-            })?;
+        let ack_half_key = *ack.ack_key_share();
+        let challenge = hopr_parallelize::cpu::spawn_blocking(move || ack_half_key.to_challenge()).await?;
+
+        let pending_ack = self.caches.unacked_tickets.remove(&challenge).await.ok_or_else(|| {
+            DbSqlError::AcknowledgementValidationError(format!(
+                "received unexpected acknowledgement for half key challenge {}",
+                ack.ack_key_share().to_hex()
+            ))
+        })?;
 
         match pending_ack {
             PendingAcknowledgement::WaitingAsSender => {
@@ -221,7 +222,7 @@ impl HoprDb {
                         // solves the challenge on the ticket. It must be done before we
                         // check that the ticket is winning, which is a lengthy operation
                         // and should not be done for bogus unacknowledged tickets
-                        let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share()?)?;
+                        let ack_ticket = unacknowledged.acknowledge(ack.ack_key_share())?;
 
                         if ack_ticket.is_winning(&myself.chain_key, &domain_separator) {
                             trace!("Found a winning ticket");
@@ -248,8 +249,8 @@ impl HoprDb {
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self, ack), err(Debug), ret)]
-    async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()> {
-        let result = self.validate_acknowledgement(&ack).await?;
+    async fn handle_acknowledgement(&self, ack: VerifiedAcknowledgement) -> Result<()> {
+        let result = self.find_ticket_to_acknowledge(&ack).await?;
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
                 // If the ticket was a win, store it
@@ -310,7 +311,7 @@ impl HoprDbProtocolOperations for HoprDb {
     }
 
     #[tracing::instrument(level = "trace", skip(self, matcher), err)]
-    async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)> {
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb> {
         let pseudonym = matcher.pseudonym();
         let surbs_for_pseudonym = self
             .caches
@@ -320,16 +321,30 @@ impl HoprDbProtocolOperations for HoprDb {
             .ok_or(DbError::NoSurbAvailable("pseudonym not found".into()))?;
 
         match matcher {
-            SurbMatcher::Pseudonym(_) => Ok(surbs_for_pseudonym
-                .pop_one()
-                .map(|(id, surb)| (HoprSenderId::from_pseudonym_and_id(&pseudonym, id), surb))?),
+            SurbMatcher::Pseudonym(_) => Ok(surbs_for_pseudonym.pop_one().map(|popped_surb| FoundSurb {
+                sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
+                surb: popped_surb.surb,
+                remaining: popped_surb.remaining,
+            })?),
             // The following code intentionally only checks the first SURB in the ring buffer
             // and does not search the entire RB.
             // This is because the exact match use-case is suited only for situations
-            // when there is a single SURB.
+            // when there is a single SURB in the RB.
             SurbMatcher::Exact(id) => Ok(surbs_for_pseudonym
                 .pop_one_if_has_id(&id.surb_id())
-                .map(|(id, surb)| (HoprSenderId::from_pseudonym_and_id(&pseudonym, id), surb))?),
+                .map(|popped_surb| FoundSurb {
+                    sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
+                    surb: popped_surb.surb,
+                    remaining: popped_surb.remaining, // = likely 0
+                })?),
+        }
+    }
+
+    #[inline]
+    fn get_surb_config(&self) -> SurbCacheConfig {
+        SurbCacheConfig {
+            rb_capacity: self.cfg.surb_ring_buffer_size,
+            distress_threshold: self.cfg.surb_distress_threshold,
         }
     }
 
@@ -363,8 +378,11 @@ impl HoprDbProtocolOperations for HoprDb {
                 next_ticket,
                 &myself.caches.key_id_mapper,
                 &domain_separator,
+                None, // NoAck messages currently do not have signals
             )
-            .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
+            .map_err(|e| {
+                DbSqlError::LogicalError(format!("failed to construct chain components for a no-ack packet: {e}"))
+            })
         })
         .await?;
 
@@ -393,6 +411,7 @@ impl HoprDbProtocolOperations for HoprDb {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
+        signals: PacketSignals,
     ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -469,6 +488,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 next_ticket,
                 &myself.caches.key_id_mapper,
                 &domain_separator,
+                signals,
             )
             .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
         })
@@ -518,7 +538,12 @@ impl HoprDbProtocolOperations for HoprDb {
             HoprPacket::from_incoming(&data, &offchain_keypair, sender, &myself.caches.key_id_mapper, |p| {
                 myself.caches.extract_pseudonym_opener(p)
             })
-            .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
+            .map_err(|error| match error {
+                errors::PacketError::PacketDecodingError(_) | errors::PacketError::SphinxError(_) => {
+                    DbSqlError::PossibleAdversaryError(format!("possibly adversarial behavior: {error}"))
+                }
+                _ => DbSqlError::LogicalError(format!("failed to construct an incoming packet: {error}")),
+            })
         })
         .await?;
         if start.elapsed().as_millis() > SLOW_OP_MS {
@@ -531,20 +556,25 @@ impl HoprDbProtocolOperations for HoprDb {
 
         match packet {
             HoprPacket::Final(incoming) => {
+                // Extract additional information from the packet that will be passed upwards
+                let info = AuxiliaryPacketInfo {
+                    packet_signals: incoming.signals,
+                    num_surbs: incoming.surbs.len(),
+                };
+
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
-                    let num_surbs = incoming.surbs.len();
-
-                    // TODO: make the capacity of the SURB RB configurable
                     self.caches
                         .surbs_per_pseudonym
                         .entry_by_ref(&incoming.sender)
-                        .or_default() // Default capacity SurbRingBuffer
+                        .or_insert_with(futures::future::lazy(|_| {
+                            SurbRingBuffer::new(self.cfg.surb_ring_buffer_size)
+                        }))
                         .await
                         .value()
                         .push(incoming.surbs)?;
 
-                    trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
+                    trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, "stored incoming surbs for pseudonym");
                 }
 
                 Ok(match incoming.ack_key {
@@ -557,17 +587,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .plain_text
                                 .as_ref()
                                 .try_into()
-                                .map_err(|_| DbSqlError::DecodingError)
-                                .and_then(|ack: Acknowledgement| {
-                                    ack.validate(&incoming.previous_hop)
-                                        .map_err(|e| DbSqlError::AcknowledgementValidationError(e.to_string()))
-                                })
-                                .inspect_err(|error| {
-                                    tracing::error!(%error, "failed to decode the acknowledgement");
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_RECEIVED_ACKS.increment(&["false"]);
-                                })?,
+                                .map_err(|_| DbSqlError::DecodingError)?,
                         }
                     }
                     Some(ack_key) => IncomingPacket::Final {
@@ -576,6 +596,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         sender: incoming.sender,
                         plain_text: incoming.plain_text,
                         ack_key,
+                        info,
                     },
                 })
             }
@@ -602,7 +623,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
-                            ack: Acknowledgement::new(fwd.ack_key, pkt_keypair),
+                            ack_key: fwd.ack_key,
                         })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {

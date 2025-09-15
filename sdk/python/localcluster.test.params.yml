@@ -1,0 +1,26 @@
+---
+defaults:
+  api_token: e2e-API-token^^
+
+networks:
+  anvil-localhost:
+    nodes:
+      - config_file: 'barebone.cfg.yaml'
+        identity_path: './sdk/identities/hopr-node_1.id'
+        host: localhost
+      - config_file: 'barebone.cfg.yaml'
+        identity_path: './sdk/identities/hopr-node_2.id'
+        host: '127.0.0.1'
+        api_token: ~
+      - config_file: 'barebone.cfg.yaml'
+        identity_path: './sdk/identities/hopr-node_3.id'
+        host: localhost
+      - config_file: 'barebone.cfg.yaml'
+        identity_path: './sdk/identities/hopr-node_4.id'
+        host: '127.0.0.1'
+      - config_file: 'default.cfg.yaml'
+        identity_path: './sdk/identities/hopr-node_5.id'
+        host: localhost
+      - config_file: 'barebone-lower-win-prob.cfg.yaml'
+        identity_path: './sdk/identities/hopr-node_6.id'
+        host: '127.0.0.1'

@@ -13,12 +13,22 @@ use tracing::instrument;
 
 use crate::{
     errors::SessionError,
-    frames::{Frame, FrameId, Segment},
     processing::types::{
         FrameBuilder, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry,
         FrameMapVacantEntry,
     },
+    protocol::{Frame, FrameId, Segment},
 };
+
+#[cfg(all(not(test), feature = "prometheus"))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_FRAME_FINISH: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
+            "hopr_session_time_to_finish_frame",
+            "Measures time in milliseconds it takes a frame to be reassembled",
+            vec![1.0, 2.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 150.0, 200.0, 250.0, 300.0, 400.0, 500.0],
+        ).unwrap();
+}
 
 /// Reassembler is a stream adaptor that reads [`Segments`](Segment) from the underlying
 /// stream and tries to put them into correct order so they form a [`Frame`].
@@ -63,7 +73,7 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
     fn new(inner: S, incomplete_frames: M, max_age: Duration, capacity: usize) -> Self {
         Self {
             inner,
-            timer: futures_time::task::sleep(max_age.into()),
+            timer: futures_time::task::sleep(max_age.max(Duration::from_millis(1)).into()),
             incomplete_frames,
             expired_frames: Vec::with_capacity(capacity),
             last_expiration: None,
@@ -134,6 +144,10 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                                 Ok(_) => {
                                     tracing::trace!(frame_id = builder.frame_id(), %seg_id, "added segment");
                                     if builder.is_complete() {
+                                        #[cfg(all(not(test), feature = "prometheus"))]
+                                        METRIC_TIME_TO_FRAME_FINISH
+                                            .observe(builder.created.elapsed().as_millis() as f64);
+
                                         tracing::trace!(frame_id = builder.frame_id(), "frame is complete");
                                         return Poll::Ready(Some(e.finalize().try_into()));
                                     }
@@ -146,6 +160,9 @@ impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reasse
                         FrameMapEntry::Vacant(e) => {
                             let builder = FrameBuilder::from(item);
                             if builder.is_complete() {
+                                #[cfg(all(not(test), feature = "prometheus"))]
+                                METRIC_TIME_TO_FRAME_FINISH.observe(builder.created.elapsed().as_millis() as f64);
+
                                 tracing::trace!(frame_id = builder.frame_id(), "segment frame is complete");
                                 return Poll::Ready(Some(builder.try_into()));
                             } else {
@@ -450,11 +467,33 @@ mod tests {
         }
         reassembled.sort_by(result_comparator);
 
-        assert!(matches!(reassembled[0], Err(SessionError::FrameDiscarded(1))));
-        assert!(matches!(reassembled[1], Err(SessionError::FrameDiscarded(2))));
-        assert!(matches!(reassembled[2], Err(SessionError::FrameDiscarded(3))));
-        assert!(matches!(&reassembled[3], Ok(f) if f == &expected[3].clone()));
-        assert!(matches!(&reassembled[4], Ok(f) if f == &expected[4].clone()));
+        assert!(
+            matches!(reassembled[0], Err(SessionError::FrameDiscarded(1))),
+            "{:?} must be discarded ID 1",
+            reassembled[0]
+        );
+        assert!(
+            matches!(reassembled[1], Err(SessionError::FrameDiscarded(2))),
+            "{:?} must be discarded ID 2",
+            reassembled[1]
+        );
+        assert!(
+            matches!(reassembled[2], Err(SessionError::FrameDiscarded(3))),
+            "{:?} must be discarded ID 3",
+            reassembled[2]
+        );
+        assert!(
+            matches!(&reassembled[3], Ok(f) if f == &expected[3].clone()),
+            "{:?} (idx 3) must be {:?}",
+            reassembled[3],
+            expected[3]
+        );
+        assert!(
+            matches!(&reassembled[4], Ok(f) if f == &expected[4].clone()),
+            "{:?} (idx 3) must be {:?}",
+            reassembled[4],
+            expected[4]
+        );
 
         r_sink.close().await?;
         assert_eq!(None, r_stream.try_next().await?);

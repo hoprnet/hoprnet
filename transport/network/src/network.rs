@@ -197,7 +197,12 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
-            self.refresh_metrics(&stats)
+            self.refresh_metrics(&stats);
+            tracing::trace!(
+                health = %health_from_stats(&stats, self.am_i_public),
+                trigger = "peer removal",
+                "Network health updated"
+            );
         }
 
         Ok(())
@@ -260,12 +265,18 @@ where
                 },
             }
 
+            tracing::trace!(%peer, quality = entry.quality, quality_avg = hopr_primitive_types::sma::SMA::average(&entry.quality_avg), "Updating peer status in the store");
             self.db.update_network_peer(entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
                 let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
-                self.refresh_metrics(&stats)
+                self.refresh_metrics(&stats);
+                tracing::trace!(
+                    health = %health_from_stats(&stats, self.am_i_public),
+                    trigger = "peer update",
+                    "Network health updated"
+                );
             }
 
             Ok(())
@@ -314,12 +325,16 @@ where
         F: FnMut(PeerStatus) -> Fut,
         Fut: std::future::Future<Output = Option<V>>,
     {
-        let stream = self.db.get_network_peers(Default::default(), false).await?;
-        futures::pin_mut!(stream);
-        Ok(stream.filter_map(filter).collect().await)
+        Ok(self
+            .db
+            .get_network_peers(Default::default(), false)
+            .await?
+            .filter_map(filter)
+            .collect()
+            .await)
     }
 
-    /// Returns a list of peer IDs eligible for pinging based on last seen time, ignore status, and backoff delay.
+    /// Returns a list of peer IDs eligible for pinging based on last-seen time, ignore status, and backoff delay.
     ///
     /// Peers are filtered to exclude self, those currently within their ignore timeframe, and those whose
     /// backoff-adjusted delay has not yet elapsed. The resulting peers are sorted by last seen time in ascending order.
@@ -331,12 +346,10 @@ where
     /// A vector of peer IDs that should be pinged.
     #[tracing::instrument(level = "debug", skip(self, threshold), ret(level = "trace"), err, fields(since = ?threshold))]
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> Result<Vec<PeerId>> {
-        let stream = self
+        Ok(self
             .db
-            .get_network_peers(PeerSelector::default().with_last_seen_lte(threshold), false)
-            .await?;
-        futures::pin_mut!(stream);
-        let mut data: Vec<PeerStatus> = stream
+            .get_network_peers(PeerSelector::default().with_last_seen_lte(threshold), true)
+            .await?
             .filter_map(|v| async move {
                 if v.id.1 == self.me {
                     return None;
@@ -356,23 +369,13 @@ where
                 let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
 
                 if (v.last_seen + delay) < threshold {
-                    Some(v)
+                    Some(v.id.1)
                 } else {
                     None
                 }
             })
             .collect()
-            .await;
-
-        data.sort_by(|a, b| {
-            if a.last_seen < b.last_seen {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Greater
-            }
-        });
-
-        Ok(data.into_iter().map(|peer| peer.id.1).collect())
+            .await)
     }
 }
 

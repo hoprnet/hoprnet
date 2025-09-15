@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-bloom"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Bloom filter and its wrappers for HOPR transport use cases"
@@ -11,21 +11,8 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
-[features]
-default = ["persistent"]
-persistent = ["serde", "dep:async-lock"]
-serde = [
-  "dep:bincode",
-  "dep:serde",
-  "bloomfilter/serde",
-  "hopr-crypto-types/serde",
-]
-
 [dependencies]
-async-lock = { workspace = true, optional = true }
 bloomfilter = { workspace = true }
-bincode = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
@@ -35,7 +22,6 @@ hopr-platform = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
-tokio = { workspace = true }
 
 [[bench]]
 name = "bloom_filter"

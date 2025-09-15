@@ -11,7 +11,7 @@ use std::{
 use futures_time::future::Timer;
 use tracing::instrument;
 
-use crate::{errors::SessionError, frames::FrameId};
+use crate::{errors::SessionError, protocol::FrameId};
 
 /// Sequencer is an adaptor for streams, that yield elements that have a natural ordering and
 /// can be compared with [`FrameId`] and puts them in the correct sequence starting with
@@ -64,7 +64,7 @@ where
         Self {
             inner,
             buffer: BinaryHeap::with_capacity(capacity),
-            timer: futures_time::task::sleep(max_wait.into()),
+            timer: futures_time::task::sleep(max_wait.max(Duration::from_millis(1)).into()),
             next_id: 1,
             last_emitted: Instant::now(),
             max_wait,

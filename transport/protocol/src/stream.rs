@@ -1,5 +1,5 @@
-//! Infrastructure supporting converting a collection of [`libp2p::PeerId`] split [`libp2p_stream`] managed
-//! individual peer-to-peer [`libp2p::swarm::Stream`]s.
+//! Infrastructure supporting converting a collection of [`PeerId`] split `libp2p_stream` managed
+//! individual peer-to-peer `libp2p::swarm::Stream`s.
 
 use std::sync::Arc;
 
@@ -17,7 +17,7 @@ use tokio_util::{
 
 /// Global timeout for the [`BidirectionalStreamControl::open`] operation.
 const GLOBAL_STREAM_OPEN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
-const MAX_CONCURRENT_PACKETS: usize = 10;
+const MAX_CONCURRENT_PACKETS: usize = 30;
 
 #[async_trait::async_trait]
 pub trait BidirectionalStreamControl: std::fmt::Debug {
@@ -57,7 +57,7 @@ where
             .map(Ok)
             .forward(frame_writer)
             .inspect(move |res| {
-                tracing::debug!(%peer, ?res, "writing stream with peer done");
+                tracing::debug!(%peer, ?res, component = "stream", "writing stream with peer finished");
             }),
     );
 
@@ -79,14 +79,16 @@ where
             .map(Ok)
             .forward(ingress_from_peers)
             .inspect(move |res| match res {
-                Ok(_) => tracing::debug!(%peer, "received incoming stream done reading"),
-                Err(error) => tracing::error!(%peer, %error, "received incoming stream failed on reading"),
+                Ok(_) => tracing::debug!(%peer, component = "stream", "incoming stream done reading"),
+                Err(error) => {
+                    tracing::error!(%peer, %error, component = "stream", "incoming stream failed on reading")
+                }
             })
             .then(move |_| {
                 // Make sure we invalidate the peer entry from the cache once the stream ends
-                let peer_cpy = peer;
+                let peer = peer;
                 async move {
-                    cache_internal.invalidate(&peer_cpy).await;
+                    cache_internal.invalidate(&peer).await;
                 }
             }),
     );
@@ -144,7 +146,12 @@ where
                     cache.insert(peer, send).await;
                 }
             })
-            .inspect(|_| tracing::trace!("incoming peer stream processing terminated")),
+            .inspect(|_| {
+                tracing::info!(
+                    task = "ingress stream processing",
+                    "long-running background task finished"
+                )
+            }),
     );
 
     let max_concurrent_packets = std::env::var("HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS")
@@ -215,7 +222,12 @@ where
                     }
                 }
             })
-            .inspect(|_| tracing::trace!("packet reading from peer streams terminated")),
+            .inspect(|_| {
+                tracing::info!(
+                    task = "egress stream processing",
+                    "long-running background task finished"
+                )
+            }),
     );
 
     Ok((tx_out, rx_in))
