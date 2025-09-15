@@ -5026,7 +5026,6 @@ name = "hopr-protocol-app"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "flagset",
  "hopr-crypto-packet",
  "hopr-primitive-types",
  "serde",
@@ -5182,7 +5181,6 @@ dependencies = [
  "criterion",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-platform",
  "tracing",
 ]
 
@@ -5448,7 +5446,6 @@ dependencies = [
  "futures",
  "home",
  "hopr-async-runtime",
- "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-lib",
  "hopr-metrics",

@@ -14,11 +14,9 @@ serde = [
   "dep:serde",
   "dep:serde_bytes",
   "hopr-crypto-packet/serde",
-  "flagset/serde",
 ]
 
 [dependencies]
-flagset = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
