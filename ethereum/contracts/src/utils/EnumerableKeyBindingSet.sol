@@ -32,7 +32,6 @@ struct KeyBindingSet {
  * library, for KeyBindingWithSignature type.
  */
 library EnumerableKeyBindingSet {
-
     // when the address is not stared as a target address
     error NonExistentKey();
     // when the key id is out of range

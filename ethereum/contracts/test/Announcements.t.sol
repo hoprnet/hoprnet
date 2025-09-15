@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import { Test } from "forge-std/Test.sol";
-import { HoprAnnouncements } from "../src/Announcements.sol";
+import { HoprAnnouncements, ZeroAddress } from "../src/Announcements.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 
 // Dummy since there is no verification happening on-chain
@@ -22,6 +22,11 @@ contract AnnouncementsTest is Test {
     function setUp() public {
         safeRegistry = new HoprNodeSafeRegistry();
         announcements = new HoprAnnouncements(safeRegistry);
+    }
+
+    function testRevert_ZeroAddressOnDeployment() public {
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector, "safeRegistry must not be empty"));
+        announcements = new HoprAnnouncements(HoprNodeSafeRegistry(address(0)));
     }
 
     function testKeyBinding(address caller) public {
