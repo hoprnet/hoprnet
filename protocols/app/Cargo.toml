@@ -10,11 +10,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-serde = [
-  "dep:serde",
-  "dep:serde_bytes",
-  "hopr-crypto-packet/serde",
-]
+serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 
 [dependencies]
 strum = { workspace = true }
