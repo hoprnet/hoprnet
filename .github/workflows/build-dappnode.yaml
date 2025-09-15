@@ -145,7 +145,7 @@ jobs:
           npx @dappnode/dappnodesdk publish patch  --provider "remote" --upload_to "ipfs" --verbose | tee build.log
 
           echo "DNP (DAppNode Package) built and uploaded" >> "$GITHUB_STEP_SUMMARY"
-          echo "Branch: ${{ steps.vars.outputs.GITHUB_REF_NAME }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch name: ${{ steps.vars.outputs.GITHUB_REF_NAME }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Network: ${{ steps.vars.outputs.HOPRD_NETWORK }}" >> "$GITHUB_STEP_SUMMARY"
           grep "ipfs" build.log >> "$GITHUB_STEP_SUMMARY"
           ipfs_hash=$(grep -oP 'Release hash : \K/ipfs/\w+' build.log)
