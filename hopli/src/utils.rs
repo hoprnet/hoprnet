@@ -5,7 +5,7 @@ use alloy::{
     primitives::{Address, keccak256},
     providers::{MulticallError, PendingTransactionError},
 };
-use hoprd_keypair::errors::KeyPairError;
+use hopr_crypto_keypair::errors::KeyPairError;
 use thiserror::Error;
 
 pub trait Cmd: clap::Parser + Sized {

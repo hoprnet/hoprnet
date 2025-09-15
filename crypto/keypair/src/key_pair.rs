@@ -61,7 +61,7 @@ pub enum IdentityRetrievalModes<'a> {
     },
     /// takes a private key and create an identity file at the
     /// provided file destination
-    #[cfg(any(feature = "hopli", test))]
+    #[cfg(any(feature = "to-file", test))]
     FromIdIntoFile {
         /// identifier of this keypair
         id: Uuid,
@@ -123,7 +123,7 @@ impl TryFrom<&str> for HoprKeys {
     /// Deserializes HoprKeys from string
     ///
     /// ```rust
-    /// use hoprd_keypair::key_pair::HoprKeys;
+    /// use hopr_crypto_keypair::key_pair::HoprKeys;
     ///
     /// let priv_keys = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
     /// assert!(HoprKeys::try_from(priv_keys).is_ok());
@@ -151,7 +151,7 @@ impl TryFrom<[u8; PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH]> for HoprKeys {
     /// Deserializes HoprKeys from binary string
     ///
     /// ```rust
-    /// use hoprd_keypair::key_pair::HoprKeys;
+    /// use hopr_crypto_keypair::key_pair::HoprKeys;
     ///
     /// let priv_keys = [
     ///     0x56, 0xb2, 0x9c, 0xef, 0xcd, 0xf5, 0x76, 0xee, 0xa3, 0x06, 0xba, 0x2f, 0xd5, 0xf3, 0x2e, 0x65, 0x1c, 0x09,
@@ -177,7 +177,7 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
     /// Deserializes HoprKeys from tuple of two binary private keys
     ///
     /// ```rust
-    /// use hoprd_keypair::key_pair::HoprKeys;
+    /// use hopr_crypto_keypair::key_pair::HoprKeys;
     ///
     /// let priv_keys = (
     ///     [
@@ -255,7 +255,7 @@ impl HoprKeys {
 
                 private_key.try_into()
             }
-            #[cfg(any(feature = "hopli", test))]
+            #[cfg(any(feature = "to-file", test))]
             IdentityRetrievalModes::FromIdIntoFile { id, password, id_path } => {
                 let identity_file_exists = metadata(id_path).is_ok();
 
