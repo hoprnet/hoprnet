@@ -1,59 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import { Script } from "forge-std/Script.sol";
-import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
-
-import "./utils/NetworkConfig.s.sol";
-import "./utils/BoostUtilsLib.sol";
-import "../src/utils/TargetUtils.sol";
+import { Test, stdStorage, stdJson, StdStorage } from "forge-std/Test.sol";
+import { NetworkConfig } from "./utils/NetworkConfig.s.sol";
+import { BoostUtilsLib } from "./utils/BoostUtilsLib.sol";
+import { Clearance, CapabilityPermission, Target, TargetType, TargetUtils, TargetPermission } from "../src/utils/TargetUtils.sol";
 import { HoprNetworkRegistry } from "../src/NetworkRegistry.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
-
-abstract contract Enum {
-    enum Operation {
-        Call,
-        DelegateCall
-    }
-}
-
-abstract contract ISafe {
-    function getTransactionHash(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address refundReceiver,
-        uint256 _nonce
-    )
-        public
-        view
-        virtual
-        returns (bytes32);
-
-    function execTransaction(
-        address to,
-        uint256 value,
-        bytes calldata data,
-        Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes memory signatures
-    )
-        public
-        payable
-        virtual
-        returns (bool success);
-
-    function nonce() public virtual returns (uint256);
-}
+import { Enum, ISafe } from "../src/utils/ISafe.sol";
 
 abstract contract IFactory {
     function clone(
@@ -809,8 +763,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         bool isEnabled;
 
         // 2. check if current NR is enabled.
-        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNREnabled) {
-            isEnabled = isNREnabled;
+        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNetworkRegistryEnabled) {
+            isEnabled = isNetworkRegistryEnabled;
         } catch {
             revert("Cannot read enabled from network registry contract.");
         }
@@ -837,8 +791,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
         bool isEnabled;
 
         // 2. check if current NR is enabled.
-        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNREnabled) {
-            isEnabled = isNREnabled;
+        try HoprNetworkRegistry(nrContractAddress).enabled() returns (bool isNetworkRegistryEnabled) {
+            isEnabled = isNetworkRegistryEnabled;
         } catch {
             revert("Cannot read enabled from network registry contract.");
         }
@@ -1281,7 +1235,6 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                 }
             } else {
                 // if transfer cannot be called, try minting token as a minter
-                bytes32 MINTER_ROLE = keccak256("MINTER_ROLE");
                 (bool successHasRole, bytes memory returndataHasRole) = hoprTokenContractAddress.staticcall(
                     abi.encodeWithSignature("hasRole(bytes32,address)", MINTER_ROLE, msgSender)
                 );

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import { Test } from "forge-std/Test.sol";
-
-import "../../../src/static/stake/HoprStakeSeason6.sol";
-import "../../utils/ERC1820Registry.sol";
-import "../../utils/PermittableToken.sol";
+import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
+import { HoprStakeSeason6 } from "../../../src/static/stake/HoprStakeSeason6.sol";
+import { ERC1820RegistryFixtureTest } from "../../utils/ERC1820Registry.sol";
+import { PermittableTokenFixtureTest } from "../../utils/PermittableToken.sol";
 
 contract HoprStakeSeason6Test is Test, ERC1820RegistryFixtureTest, PermittableTokenFixtureTest {
     // to alter the storage

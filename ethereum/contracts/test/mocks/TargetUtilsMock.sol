@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.0;
 
-import "../../src/utils/TargetUtils.sol";
+import { Clearance, CapabilityPermission, Target, TargetType, TargetUtils, TargetPermission } from "../../src/utils/TargetUtils.sol";
 
 /**
  * @dev Mock contract to test internal library of TargetUtils

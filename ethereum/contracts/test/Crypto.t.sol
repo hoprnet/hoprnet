@@ -8,6 +8,7 @@ import { SECP2561k } from "solcrypto/SECP2561k.sol";
 import { HoprCrypto } from "../src/Crypto.sol";
 
 // Use proxy contract to have proper gas measurements for internal functions
+/// forge-lint:disable-next-item(mixed-case-variable)
 contract CryptoProxy is HoprCrypto {
     function pointToAddressProxy(uint256 p_x, uint256 p_y) public pure returns (address) {
         return pointToAddress(p_x, p_y);
@@ -39,6 +40,7 @@ contract CryptoProxy is HoprCrypto {
         return ecAdd(p_x, p_y, q_x, q_y, a);
     }
 
+    /// forge-lint: disable-next-line(mixed-case-function)
     function mapToCurveSimpleSWUProxy(uint256 u) public view returns (uint256 r_x, uint256 r_y) {
         return mapToCurveSimpleSWU(u);
     }
@@ -60,6 +62,7 @@ contract CryptoProxy is HoprCrypto {
     }
 }
 
+/// forge-lint:disable-next-item(mixed-case-variable)
 contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
     struct CurvePoint {
         uint256 x;
@@ -78,7 +81,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         secp256k1 = new SECP2561k();
     }
 
-    function testPointToAddress() public {
+    function test_PointToAddress() public {
         address converted = crypto.pointToAddressProxy(
             0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75,
             0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5
@@ -87,7 +90,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         assertEq(converted, accountA.accountAddr);
     }
 
-    function testIsCurvePoint() public {
+    function test_IsCurvePoint() public {
         assertTrue(
             crypto.isCurvePointInternalProxy(
                 0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75,
@@ -105,11 +108,11 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         );
     }
 
-    function testScalarTimeBasepoint() public {
+    function test_ScalarTimeBasepoint() public {
         assertEq(crypto.scalarTimesBasepointProxy(accountA.privateKey), accountA.accountAddr);
     }
 
-    function testEcAddPointAddition() public {
+    function test_EcAddPointAddition() public {
         CurvePoint memory p = CurvePoint(
             0x8318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed75,
             0x3547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5
@@ -158,7 +161,26 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         assertEq(maybe_p_double_y, p_double.y);
     }
 
-    function testEcAddFuzzy(uint256 u_0, uint256 u_1) public {
+    function test_EcAddPointDoubleWhenAIsNotZero() public {
+        // for a general elliptic curver where a != 0 over prime field
+        // where F_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+        // y^2 = x^3 + 2x + 1 (mod F_p) where a simple point P (0, 1)  is on the curve
+        // its double point should be calculated with
+        // lambda: (3 * p.x ^ 2 + a) * (2 * p.y) ^ - 1 = 1
+        // r.x = lambda ^2 - 2 * p.x = 1
+        // r.y = lambada * (p.x - r.x - p.y) = F_p - 2
+        CurvePoint memory p = CurvePoint(0x00, 0x01);
+
+        CurvePoint memory p_double =
+            CurvePoint(0x01, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D);
+
+        (uint256 maybe_p_double_x, uint256 maybe_p_double_y) = crypto.ecAddProxy(p.x, p.y, p.x, p.y, 2);
+
+        assertEq(maybe_p_double_x, p_double.x);
+        assertEq(maybe_p_double_y, p_double.y);
+    }
+
+    function test_EcAddFuzzy(uint256 u_0, uint256 u_1) public {
         vm.assume(crypto.isFieldElementInternalProxy(u_0));
         vm.assume(crypto.isFieldElementInternalProxy(u_1));
 
@@ -192,7 +214,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         crypto.ecAddProxy(p_x, p_y, p_x, HoprCrypto.SECP256K1_BASE_FIELD_ORDER - p_y, 0);
     }
 
-    function testSWUMap() public {
+    function test_SWUMap() public {
         // Test vector taken from
         // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
 
@@ -272,7 +294,72 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         expand_message_xmd_keccak256_single(message, abi.encodePacked(superLongDST));
     }
 
-    function testHashToCurve() public {
+    /**
+     * @dev test the expand_message_xmd_keccak256 function
+     */
+    function testFuzz_expandMessageXmdKeccak256(uint256 firstIndex, uint256 secondIndex) public {
+        firstIndex = bound(firstIndex, 0, 4);
+        secondIndex = bound(secondIndex, 0, 4);
+
+        bytes memory dst = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
+        // Test vectors taken from
+        // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
+
+        bytes[5] memory testStrings = [
+            bytes(""),
+            bytes("abc"),
+            bytes("abcdef0123456789"),
+            bytes(
+                "q128_qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+            ),
+            bytes(
+                "a512_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+        ];
+
+
+        (bytes32 maybe_out_first_b1, bytes32 maybe_out_first_b2, bytes32 maybe_out_first_b3) = expand_message_xmd_keccak256(testStrings[firstIndex], dst);
+         expand_message_xmd_keccak256(testStrings[secondIndex], dst);
+        (bytes32 maybe_out_second_b1, bytes32 maybe_out_second_b2, bytes32 maybe_out_second_b3) = expand_message_xmd_keccak256(testStrings[firstIndex], dst);
+
+        assertEq(maybe_out_first_b1, maybe_out_second_b1, "b1 mismatch between run #1 and run #2");
+        assertEq(maybe_out_first_b2, maybe_out_second_b2, "b2 mismatch between run #1 and run #2");
+        assertEq(maybe_out_first_b3, maybe_out_second_b3, "b3 mismatch between run #1 and run #2");
+    }
+
+    /**
+     * @dev test the expand_message_xmd_keccak256 function
+     */
+    function testFuzz_expandMessageXmdKeccak256Single(uint256 firstIndex, uint256 secondIndex) public {
+        firstIndex = bound(firstIndex, 0, 4);
+        secondIndex = bound(secondIndex, 0, 4);
+
+        bytes memory dst = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
+        // Test vectors taken from
+        // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
+
+        bytes[5] memory testStrings = [
+            bytes(""),
+            bytes("abc"),
+            bytes("abcdef0123456789"),
+            bytes(
+                "q128_qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+            ),
+            bytes(
+                "a512_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+        ];
+
+
+        (bytes32 maybe_out_first_b1, bytes32 maybe_out_first_b2) = expand_message_xmd_keccak256_single(testStrings[firstIndex], dst);
+        expand_message_xmd_keccak256_single(testStrings[secondIndex], dst);
+        (bytes32 maybe_out_second_b1, bytes32 maybe_out_second_b2) = expand_message_xmd_keccak256_single(testStrings[firstIndex], dst);
+
+        assertEq(maybe_out_first_b1, maybe_out_second_b1, "b1 mismatch between run #1 and run #2");
+        assertEq(maybe_out_first_b2, maybe_out_second_b2, "b2 mismatch between run #1 and run #2");
+    }
+
+    function test_HashToCurve() public {
         bytes memory dst = "QUUX-V01-CS02-with-secp256k1_XMD:Keccak256_SSWU_RO_";
 
         // test strings taken from https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-16.html#appendix-J.8.1
@@ -328,7 +415,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         }
     }
 
-    function testFuzzyHashToCurve(bytes memory vrfMessage) public {
+    function testFuzz_HashToCurve(bytes memory vrfMessage) public {
         string memory dst = "some DST tag";
 
         (uint256 p_x, uint256 p_y) = crypto.hashToCurveProxy(vrfMessage, abi.encodePacked(dst));
@@ -336,7 +423,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         assertTrue(crypto.isCurvePointInternalProxy(p_x, p_y));
     }
 
-    function testVRFVerify() public {
+    function test_VRFVerify() public {
         // sample Rust code:
         // ```rust
         // use elliptic_curve::{hash2curve::{ExpandMsgXmd, GroupDigest}, ScalarPrimitive};
@@ -400,7 +487,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         assertTrue(crypto.vrfVerifyProxy(params, payload));
     }
 
-    function testFuzzVRFVerify(uint256 privKey, bytes32 vrfMessage) public {
+    function testFuzz_VRFVerify(uint256 privKey, bytes32 vrfMessage) public {
         string memory dst = "some DST tag";
 
         privKey = bound(privKey, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);

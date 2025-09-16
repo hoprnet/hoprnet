@@ -2,14 +2,16 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import { HoprStakingProxyForNetworkRegistry } from "../../src/proxy/StakingProxyForNetworkRegistry.sol";
-import "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 
 contract HoprStakingProxyForNetworkRegistryTest is Test {
     HoprStakingProxyForNetworkRegistry public hoprStakingProxyForNetworkRegistry;
     address public owner;
     address public stakeContract;
 
+    /// forge-lint: disable-next-line(mixed-case-variable)
     uint256[] public NFT_TYPE = [1, 2];
+    /// forge-lint: disable-next-line(mixed-case-variable)
     string[] public NFT_RANK = ["123", "456"];
     uint256 public constant INITIAL_MIN_STAKE = 1000;
     uint256 public constant HIGH_STAKE = 2000;
@@ -393,6 +395,18 @@ contract HoprStakingProxyForNetworkRegistryTest is Test {
     function testFuzz_MaxAllowedRegistrations(address account, address nodeAddress) public {
         assertTrue(hoprStakingProxyForNetworkRegistry.canOperateFor(account, nodeAddress));
         vm.prank(owner);
+    }
+
+    /**
+     * @dev allowance should be zerowhen threshold is 0.
+     * @notice This essentially disables "selfRegister" a node
+     */
+
+    function test_SetThresholdToZero(address stakingAccount) public {
+        vm.prank(owner);
+        hoprStakingProxyForNetworkRegistry.ownerUpdateThreshold(0);
+        assertEq(hoprStakingProxyForNetworkRegistry.maxAllowedRegistrations(stakingAccount), 0);
+        vm.clearMockedCalls();
     }
 
     /**
