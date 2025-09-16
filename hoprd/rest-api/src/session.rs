@@ -464,7 +464,7 @@ pub(crate) struct SessionClientRequest {
     /// All syntaxes like "2 MB", "128 kiB", "3MiB" are supported. The value must be
     /// at least the size of 2 Session packet payloads.
     #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = String)]
+    #[schema(value_type = Option<String>)]
     pub response_buffer: Option<bytesize::ByteSize>,
     /// The maximum throughput at which artificial SURBs might be generated and sent
     /// to the recipient of the Session.
@@ -475,7 +475,7 @@ pub(crate) struct SessionClientRequest {
     /// All syntaxes like "2 MBps", "1.2Mbps", "300 kb/s", "1.23 Mb/s" are supported.
     #[serde(default)]
     #[serde(with = "human_bandwidth::option")]
-    #[schema(value_type = String)]
+    #[schema(value_type = Option<String>)]
     pub max_surb_upstream: Option<human_bandwidth::re::bandwidth::Bandwidth>,
     /// How many Sessions to pool for clients.
     ///
