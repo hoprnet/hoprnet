@@ -7,5 +7,5 @@ pub enum HoprConfigError {
     Configuration(String),
 }
 
-/// The default [Result] object translating errors in the [HoprChainError] type
+/// The default [Result] object translating errors in the [HoprConfigError] type
 pub type Result<T> = core::result::Result<T, HoprConfigError>;

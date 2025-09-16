@@ -49,4 +49,10 @@ cd "${mydir}/../"
 declare protocol_config="${mydir}/../hopr/config/data/protocol-config.json"
 declare deployments_summary="${mydir}/../ethereum/contracts/contracts-addresses.json"
 
+# Sanity checks
+if [[ ! -f $protocol_config ]]; then
+  echo "ERROR: protocol config not found at: $protocol_config" >&2
+  exit 1
+fi
+
 update_protocol_config_addresses "${protocol_config}" "${deployments_summary}" "${network}" "${network}"

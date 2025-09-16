@@ -7,9 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
 
-use crate::errors::HoprConfigError;
-
-mod errors;
+pub mod errors;
+pub use errors::{HoprConfigError, Result};
 
 /// Holds all information we need about the blockchain network
 /// the client is going to use
