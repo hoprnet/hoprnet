@@ -104,9 +104,9 @@ pub struct PeerStatus {
     /// Until when the peer should be ignored.
     pub ignored_until: Option<SystemTime>,
     pub multiaddresses: Vec<Multiaddr>,
-    // Should be public(crate) but the separation through api-traits does not allow direct SQL ORM serde
+    // Should be public(crate) but the separation through traits does not allow direct SQL ORM serde
     pub quality: f64,
-    // Should be public(crate) but the separation through api-traits does not allow direct SQL ORM serde
+    // Should be public(crate) but the separation through traits does not allow direct SQL ORM serde
     pub quality_avg: SingleSumSMA<f64>,
 }
 

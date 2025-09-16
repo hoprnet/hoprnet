@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// Type for any possible error, because the api-traits in this module
+/// Type for any possible error, because the traits in this module
 /// can be used in with any possible contexts (and error types).
 pub type AnyError = Box<dyn std::error::Error + Send + Sync + 'static>;
 

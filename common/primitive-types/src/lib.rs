@@ -12,7 +12,7 @@ pub mod errors;
 pub mod primitives;
 /// Contains various implementations of Simple Moving Average.
 pub mod sma;
-/// Defines commonly used api-traits across the entire code base.
+/// Defines commonly used traits across the entire code base.
 pub mod traits;
 
 /// Approximately compares two double-precision floats.

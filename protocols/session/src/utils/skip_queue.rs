@@ -61,7 +61,7 @@ struct SkipDelayQueue<T> {
 
 /// An item with a deadline, which can be pushed into the [`SkipDelayQueue`].
 ///
-/// For convenience, the type implements From api-traits from
+/// For convenience, the type implements From traits from
 /// `(T, Instant)`, `(T, Duration)` and `(T, Skip)`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DelayedItem<T> {

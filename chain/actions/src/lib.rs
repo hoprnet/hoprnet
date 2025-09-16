@@ -1,4 +1,4 @@
-//! Contains high-level api-traits that translate to on-chain transaction interactions
+//! Contains high-level traits that translate to on-chain transaction interactions
 //!
 //! ## Actions
 //! The main concept is an "action", which a node can perform and results into an on-chain
