@@ -5144,6 +5144,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-traits"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "hopr-crypto-packet",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "multiaddr",
+]
+
+[[package]]
 name = "hopr-transport"
 version = "0.13.2"
 dependencies = [

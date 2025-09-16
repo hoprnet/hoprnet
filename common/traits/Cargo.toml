@@ -1,0 +1,18 @@
+[package]
+name = "hopr-traits"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Common HOPR-related high-level traits used in the code base"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[dependencies]
+async-trait = { workspace = true }
+futures = { workspace = true }
+multiaddr = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-primitive-types = { workspace = true }
+hopr-crypto-packet = { workspace = true }
+hopr-crypto-types = { workspace = true }

@@ -13,6 +13,7 @@ members = [
   "common/network-types",
   "common/parallelize",
   "common/primitive-types",
+  "common/traits",
   "crypto/keypair",
   "crypto/packet",
   "crypto/random",
@@ -252,6 +253,7 @@ hopr-protocol-app = { path = "protocols/app" }
 hopr-protocol-session = { path = "protocols/session" }
 hopr-protocol-start = { path = "protocols/start" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
+hopr-traits = { path = "common/traits" }
 hopr-transport = { path = "transport/api" }
 hopr-transport-bloom = { path = "transport/bloom" }
 hopr-transport-identity = { path = "transport/identity" }
