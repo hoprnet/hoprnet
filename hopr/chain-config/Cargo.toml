@@ -1,5 +1,5 @@
 [package]
-name = "hopr-config"
+name = "hopr-chain-config"
 version = "1.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"

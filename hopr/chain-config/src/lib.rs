@@ -160,7 +160,7 @@ pub struct ChainNetworkConfig {
 }
 
 /// Check whether the version is allowed
-fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<bool> {
+fn satisfies(version: &str, allowed_versions: &str) -> Result<bool> {
     let allowed_versions = VersionReq::parse(allowed_versions)
         .map_err(|e| HoprConfigError::Configuration(format!("failed to deserialize allowed version string: {e}")))?;
 
@@ -179,7 +179,7 @@ impl ChainNetworkConfig {
         maybe_custom_provider: Option<&str>,
         max_rpc_requests_per_sec: Option<u32>,
         protocol_config: &mut ProtocolsConfig,
-    ) -> Result<Self, String> {
+    ) -> std::result::Result<Self, String> {
         let network = protocol_config
             .networks
             .get_mut(id)
@@ -215,10 +215,7 @@ impl ChainNetworkConfig {
                 max_block_range: network.max_block_range,
                 max_requests_per_sec: max_rpc_requests_per_sec.or(chain.max_rpc_requests_per_sec),
             }),
-            Ok(false) => Err(format!(
-                "network {id} is not supported, supported networks {:?}",
-                protocol_config.supported_networks(version).join(", ")
-            )),
+            Ok(false) => Err(HoprConfigError::UnsupportedNetwork(id.into()).to_string()),
             Err(e) => Err(e.to_string()),
         }
     }
@@ -261,7 +258,7 @@ impl FromStr for ProtocolsConfig {
     type Err = String;
 
     /// Reads the protocol config JSON file and returns it
-    fn from_str(data: &str) -> Result<Self, Self::Err> {
+    fn from_str(data: &str) -> std::result::Result<Self, Self::Err> {
         serde_json::from_str::<ProtocolsConfig>(data).map_err(|e| e.to_string())
     }
 }

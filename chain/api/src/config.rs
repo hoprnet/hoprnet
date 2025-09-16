@@ -250,7 +250,7 @@ pub struct ProtocolsConfig {
 
 impl Default for ProtocolsConfig {
     fn default() -> Self {
-        Self::from_str(include_str!("../../../hopr/config/data/protocol-config.json"))
+        Self::from_str(include_str!("../../../hopr/chain-config/data/protocol-config.json"))
             .expect("bundled protocol config should be always valid")
     }
 }
