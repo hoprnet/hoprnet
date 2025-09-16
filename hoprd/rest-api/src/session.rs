@@ -596,12 +596,12 @@ pub(crate) struct SessionClientResponse {
     /// to the recipient of the Session.    
     #[serde(default)]
     #[serde(with = "human_bandwidth::option")]
-    #[schema(value_type = String)]
+    #[schema(value_type = Option<String>)]
     pub max_surb_upstream: Option<human_bandwidth::re::bandwidth::Bandwidth>,
     /// The amount of response data the Session counterparty can deliver back to us, without us
     /// sending any SURBs to them.
     #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = String)]
+    #[schema(value_type = Option<String>)]
     pub response_buffer: Option<bytesize::ByteSize>,
     /// How many Sessions to pool for clients.
     pub session_pool: Option<usize>,
