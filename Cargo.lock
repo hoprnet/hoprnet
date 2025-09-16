@@ -4521,6 +4521,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-chain-config"
+version = "1.0.0"
+dependencies = [
+ "hopr-chain-types",
+ "hopr-primitive-types",
+ "semver 1.0.27",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "smart-default",
+ "strum 0.27.2",
+ "thiserror 2.0.16",
+ "validator",
+]
+
+[[package]]
 name = "hopr-chain-indexer"
 version = "0.9.4"
 dependencies = [
@@ -5482,7 +5498,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.2.1"
+version = "4.2.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
