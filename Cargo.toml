@@ -8,6 +8,7 @@ members = [
   "chain/indexer",
   "chain/rpc",
   "chain/types",
+  "common/api",
   "common/async-runtime",
   "common/internal-types",
   "common/network-types",
@@ -218,6 +219,7 @@ url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
 
+hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { path = "ethereum/bindings", default-features = false }
 hopr-chain-actions = { path = "chain/actions", default-features = false }
