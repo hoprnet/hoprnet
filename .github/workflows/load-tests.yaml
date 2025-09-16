@@ -106,7 +106,7 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -171,11 +171,6 @@ jobs:
           login-gke: 'true'
           project: hopr-staging
 
-      - name: Setup NodeJs
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-
       - name: Get Hoprd Api token
         id: token
         run: |
@@ -184,8 +179,8 @@ jobs:
 
       - name: Setup Load Testing environment
         run: |
-          npm install
-          npm run setup
+          yarn install
+          yarn run setup
         working-directory: "./k6"
 
       - name: Run Load test

@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "4.2.1"
+version = "4.2.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
@@ -70,7 +70,7 @@ hopr-platform = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-oas3 = "0.17.0"
+oas3 = "0.19.0"
 test-log = { workspace = true }
 
 hopr-transport-session = { workspace = true }
