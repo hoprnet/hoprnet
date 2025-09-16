@@ -1,5 +1,5 @@
 [package]
-name = "hopr-api-traits"
+name = "hopr-api"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
