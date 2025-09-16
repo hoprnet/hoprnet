@@ -47,21 +47,21 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.27", default-features = false, features = [
+alloy = { version = "=1.0.31", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
   "contract",
   "k256",
   "std",
-] } # pinned to 1.0.16 due to many breaking changes in patch releases
+] }
 anyhow = "1.0.99"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 async-compression = "0.4.30"
 async-channel = "2.5.0"
 async-lock = "3.4.1"
-async-signal = "0.2.12"
+async-signal = "0.2.13"
 async-stream = "0.3.6"
 async-tar = "0.5.0"
 async-trait = "0.1.89"
@@ -80,7 +80,7 @@ bytesize = { version = "2.0.1", features = ["serde"] }
 bytes = "1.10.1"
 cfg_eval = "0.1.2"
 cfg-if = "1.0.3"
-chrono = { version = "0.4.41", default-features = false }
+chrono = { version = "0.4.42", default-features = false }
 clap = { version = "4.5.47", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
@@ -91,7 +91,7 @@ dashmap = "6.1.0"
 env_logger = "0.11.8"
 either = "1.15.0"
 flagset = "0.4.7"
-flate2 = "1.1"
+flate2 = "1.1.2"
 flume = "0.11.1"
 float-cmp = "0.10.0"
 futures = "0.3.31"
@@ -149,16 +149,16 @@ ringbuffer = "0.16.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.15", default-features = false, features = [
+sea-orm = { version = "1.1.16", default-features = false, features = [
   "sqlx-sqlite",
   "with-chrono",
   "with-json",
   "debug-print",
 ] }
-sea-orm-cli = { version = "1.1.15", default-features = false, features = [
+sea-orm-cli = { version = "1.1.16", default-features = false, features = [
   "codegen",
 ] }
-sea-orm-migration = { version = "1.1.15", default-features = false, features = [
+sea-orm-migration = { version = "1.1.16", default-features = false, features = [
   "cli",
   "sqlx-sqlite",
   "with-chrono",
@@ -168,11 +168,11 @@ sea-query-binder = { version = "0.7.0", default-features = false, features = [
   "with-chrono",
   "sqlx-sqlite",
 ] }
-semver = "1.0.26"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_bytes = "0.11.17"
+semver = "1.0.27"
+serde = { version = "1.0.223", features = ["derive"] }
+serde_bytes = "0.11.18"
 serde_cbor_2 = "0.13.0"
-serde_json = "1.0.143"
+serde_json = "1.0.145"
 serde_repr = "0.1.20"
 serde_with = { version = "3.14.0", features = ["base64"] }
 serde_yaml = { version = "0.9.33" } # using last version before the library was deprecated
@@ -189,7 +189,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 strum = { version = "0.27.2", features = ["derive"] }
 subtle = "2.6.1"
 sysinfo = "0.37"
-tempfile = "3.21.0"
+tempfile = "3.22.0"
 test-log = { version = "0.2.18", features = ["trace"] }
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = [
