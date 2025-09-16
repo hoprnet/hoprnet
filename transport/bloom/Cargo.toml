@@ -17,7 +17,6 @@ tracing = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-platform = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
