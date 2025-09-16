@@ -77,6 +77,5 @@ class Anvil:
 
     @property
     def process_id(self) -> str:
-        if self.proc is None:
-            return "N/A"
-        return str(self.proc.pid)
+        proc = getattr(self, "proc", None)
+        return str(proc.pid) if proc else "N/A"

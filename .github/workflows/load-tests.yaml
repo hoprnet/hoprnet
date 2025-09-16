@@ -143,12 +143,12 @@ jobs:
               echo "K6_UPLOAD_THROUGHPUT=${{ github.event.inputs.upload_throughput }}"
             } >> $GITHUB_ENV
           fi
-          if [[ "${{ inputs.download_throughput }}" -eq 0 ]]; then
+          if [[ "${{ inputs.download_throughput || github.event.inputs.download_throughput }}" -eq 0 ]]; then
             echo "Download throughput is disabled"
             echo "K6_SKIP_SCENARIO_DOWNLOAD=true" >> $GITHUB_ENV
             echo "K6_DOWNLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
           fi
-          if [[ "${{ inputs.upload_throughput }}" -eq 0 ]]; then
+          if [[ "${{ inputs.upload_throughput || github.event.inputs.upload_throughput }}" -eq 0 ]]; then
             echo "Upload throughput is disabled"
             echo "K6_SKIP_SCENARIO_UPLOAD=true" >> $GITHUB_ENV
             echo "K6_UPLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
