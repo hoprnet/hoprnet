@@ -59,7 +59,9 @@ jobs:
         run: nix build -L .#hoprd-x86_64-linux
 
       - name: Run local cluster in background
-        run: nix develop -L .#citest -c uv run -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected --exposed --background
+        run: |
+          nix develop -L .#citest -c uv run -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected --exposed --background | tee cluster.log
+          grep "Process ID:" cluster.log | awk '{print $3}' | grep -E '^[0-9]+$' > cluster_pids.txt
 
       - name: Run download test
         run: |
@@ -74,3 +76,17 @@ jobs:
           K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM: true
           K6_OUT: xk6-prometheus-rw
           K6_PROMETHEUS_RW_SERVER_URL: https://prometheus.staging.hoprnet.link/api/v1/write
+
+      - name: Stop local cluster
+        if: always()
+        run: |
+          if [[ -f cluster_pids.txt ]]; then
+            echo "Cleaning up cluster processes..."
+            while read pid; do
+              echo "Killing PID $pid"
+              kill -TERM "$pid" || true
+              pkill -TERM -P "$pid" || true
+            done < cluster_pids.txt
+          else
+            echo "No cluster_pids.txt file found, skipping cleanup."
+          fi
