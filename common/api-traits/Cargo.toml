@@ -1,9 +1,9 @@
 [package]
-name = "hopr-traits"
+name = "hopr-api-traits"
 version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "Common HOPR-related high-level traits used in the code base"
+description = "Common HOPR-related high-level API traits used in the code base"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
