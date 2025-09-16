@@ -46,7 +46,6 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
-  "transport/ticket-aggregation",
 ]
 
 [workspace.dependencies]
@@ -220,6 +219,7 @@ url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
 
+hopr-api-traits = { path = "common/api-traits" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { path = "ethereum/bindings", default-features = false }
 hopr-chain-actions = { path = "chain/actions", default-features = false }
@@ -253,7 +253,6 @@ hopr-protocol-app = { path = "protocols/app" }
 hopr-protocol-session = { path = "protocols/session" }
 hopr-protocol-start = { path = "protocols/start" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
-hopr-api-traits = { path = "common/api-traits" }
 hopr-transport = { path = "transport/api" }
 hopr-transport-bloom = { path = "transport/bloom" }
 hopr-transport-identity = { path = "transport/identity" }
@@ -263,7 +262,6 @@ hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
-hopr-transport-ticket-aggregation = { path = "transport/ticket-aggregation" } # dead package waiting for reimplementation as a session protocol
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 
 [profile.dev]

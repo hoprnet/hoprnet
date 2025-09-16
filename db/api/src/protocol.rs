@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use hopr_api_traits::chain::{ChainKeyOperations, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::PacketSignals;
 pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_types::prelude::*;
@@ -7,8 +8,6 @@ use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_primitive_types::balance::HoprBalance;
 
 use crate::errors::Result;
-use crate::prelude::HoprDbSimpleChannelOperations;
-use crate::resolver::HoprDbResolverOperations;
 
 /// Contains a SURB found in the SURB ring buffer via [`HoprDbProtocolOperations::find_surb`].
 #[derive(Debug)]
@@ -41,7 +40,7 @@ pub trait HoprDbProtocolOperations {
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
     async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, chain_resolver: &R) -> Result<()>
-    where R: HoprDbSimpleChannelOperations + Send + Sync + 'static;
+    where R: ChainReadChannelOperations + Send + Sync + 'static;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
     async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
@@ -57,7 +56,7 @@ pub trait HoprDbProtocolOperations {
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
     async fn to_send_no_ack<R>(&self, data: Box<[u8]>, destination: OffchainPublicKey, resolver: &R) -> Result<OutgoingPacket>
-    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static;
+    where R: ChainReadChannelOperations + ChainKeyOperations + Send + Sync + 'static;
 
     /// Process the data into an outgoing packet
     async fn to_send<R>(
@@ -69,7 +68,7 @@ pub trait HoprDbProtocolOperations {
         signals: PacketSignals,
         resolver: &R,
     ) -> Result<OutgoingPacket>
-    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static;
+    where R: ChainReadChannelOperations + ChainKeyOperations + Send + Sync + 'static;
 
     /// Process the incoming packet into data
     #[allow(clippy::wrong_self_convention)]
@@ -82,7 +81,7 @@ pub trait HoprDbProtocolOperations {
         outgoing_ticket_price: HoprBalance,
         resolver: &R,
     ) -> Result<IncomingPacket>
-    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static;
+    where R: ChainReadChannelOperations + ChainKeyOperations + Send + Sync + 'static;
 }
 
 /// Contains some miscellaneous information about a received packet.

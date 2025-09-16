@@ -31,7 +31,7 @@ pub trait OpenTransaction {
     /// Commits the transaction.
     async fn commit(self) -> Result<(), DbError>;
 
-    /// Rollbacks the transaction.
+    /// Rolls back the transaction.
     async fn rollback(self) -> Result<(), DbError>;
 
 }

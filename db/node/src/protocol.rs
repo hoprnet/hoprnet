@@ -14,6 +14,7 @@ use hopr_parallelize::cpu::spawn_fifo_blocking;
 use hopr_path::{Path, PathAddressResolver, ValidatedPath, errors::PathError};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
+use hopr_api_traits::chain::ChainReadChannelOperations;
 use hopr_db_api::prelude::{HoprDbSimpleChannelOperations, HoprDbTicketOperations};
 use crate::{
     cache::SurbRingBuffer,
@@ -184,7 +185,7 @@ impl HoprNodeDb {
         ack: &VerifiedAcknowledgement,
         chain_resolver: &R,
     ) -> std::result::Result<ResolvedAcknowledgement, DbError>
-    where R: HoprDbSimpleChannelOperations + Send + Sync + 'static,{
+    where R: ChainReadChannelOperations + Send + Sync + 'static,{
         let ack_half_key = *ack.ack_key_share();
         let challenge = hopr_parallelize::cpu::spawn_blocking(move || ack_half_key.to_challenge()).await?;
 
@@ -203,7 +204,7 @@ impl HoprNodeDb {
 
             PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                 let maybe_channel_with_issuer = chain_resolver
-                    .get_channel_by_parties(unacknowledged.ticket.verified_issuer(), &self.me_onchain)
+                    .channel_by_parties(unacknowledged.ticket.verified_issuer(), &self.me_address)
                     .await?;
 
                 // Issuer's channel must have an epoch matching with the unacknowledged ticket
@@ -250,7 +251,7 @@ impl HoprNodeDb {
 impl HoprDbProtocolOperations for HoprNodeDb {
     #[instrument(level = "trace", skip(self, ack), err(Debug), ret)]
     async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, chain_resolver: &R) -> Result<(), DbError>
-    where R: HoprDbSimpleChannelOperations + Send + Sync + 'static {
+    where R: ChainReadChannelOperations + Send + Sync + 'static {
         let result = self.find_ticket_to_acknowledge(&ack, chain_resolver).await?;
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {

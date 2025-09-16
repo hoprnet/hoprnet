@@ -19,7 +19,6 @@ runtime-tokio = [
   "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
-  "hopr-transport-ticket-aggregation/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
@@ -31,7 +30,6 @@ prometheus = [
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
-  "hopr-transport-ticket-aggregation/prometheus",
 ]
 mixer-stream = ["dep:rust-stream-ext-concurrent"]
 mixer-channel = []
@@ -76,7 +74,6 @@ hopr-transport-p2p = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
-hopr-transport-ticket-aggregation = { workspace = true }
 
 [dev-dependencies]
 temp-env = { workspace = true }
@@ -86,6 +83,4 @@ hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
-hopr-transport-ticket-aggregation = { workspace = true, features = [
-  "runtime-tokio",
-] }
+
