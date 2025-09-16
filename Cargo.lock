@@ -4440,6 +4440,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-api"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "hopr-crypto-packet",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "multiaddr",
+]
+
+[[package]]
 name = "hopr-async-runtime"
 version = "0.3.0"
 dependencies = [
@@ -4517,6 +4530,22 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "validator",
+]
+
+[[package]]
+name = "hopr-chain-config"
+version = "1.0.0"
+dependencies = [
+ "hopr-chain-types",
+ "hopr-primitive-types",
+ "semver 1.0.27",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "smart-default",
+ "strum 0.27.2",
+ "thiserror 2.0.16",
  "validator",
 ]
 
@@ -5478,7 +5507,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.2.1"
+version = "4.2.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
