@@ -47,18 +47,18 @@ pub trait ChainWriteChannelOperations {
         &self,
         dst: &Address,
         amount: HoprBalance,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
 
     /// Funds an existing channel.
     async fn fund_channel(
         &self,
         channel_id: &ChannelId,
         amount: HoprBalance,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
 
     /// Closes an existing channel.
     async fn close_channel(
         &self,
         channel_id: &ChannelId,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
 }

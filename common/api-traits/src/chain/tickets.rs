@@ -12,5 +12,5 @@ pub trait ChainTicketOperations {
     async fn redeem_ticket(
         &self,
         ticket: RedeemableTicket,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
 }

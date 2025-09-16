@@ -19,19 +19,19 @@ pub trait ChainWriteAccountOperations {
         &self,
         multiaddrs: &[Multiaddr],
         key: &OffchainPublicKey,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
 
     /// Withdraws native or token currency.
     async fn withdraw<C: Currency>(
         &self,
         balance: Balance<C>,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
 
     /// Registers Safe address with the current node.
     async fn register_safe(
         &self,
         safe_address: Address,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
 }
 
 /// Selector for on-chain node accounts.
@@ -48,8 +48,8 @@ pub trait ChainReadAccountOperations {
     type Error;
 
     /// Returns on-chain node accounts with the given [`AccountSelector`].
-    async fn stream_accounts(
-        &self,
+    async fn stream_accounts<'a>(
+        &'a self,
         selector: AccountSelector,
-    ) -> Result<BoxStream<'_, Result<AccountEntry, Self::Error>>, Self::Error>;
+    ) -> Result<BoxStream<'a, Result<AccountEntry, Self::Error>>, Self::Error>;
 }
