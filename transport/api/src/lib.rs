@@ -38,7 +38,6 @@ use futures::{
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::HoprPacket;
-pub use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, KeyIdMapper};
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, Hash, OffchainPublicKey},
