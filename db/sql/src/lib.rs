@@ -50,7 +50,7 @@ pub type DbTimestamp = chrono::DateTime<chrono::Utc>;
 /// Represents an already opened transaction.
 /// This is a thin wrapper over [DatabaseTransaction].
 /// The wrapping behavior is needed to allow transaction agnostic functionalities
-/// of the DB traits.
+/// of the DB api-traits.
 #[derive(Debug)]
 pub struct OpenTransaction(DatabaseTransaction, TargetDb);
 

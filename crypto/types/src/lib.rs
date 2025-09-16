@@ -23,7 +23,7 @@ pub mod utils;
 /// Contains implementation of Verifiable Random Function used in tickets
 pub mod vrf;
 
-/// Re-exports from the generic cryptographic traits.
+/// Re-exports from the generic cryptographic api-traits.
 pub mod crypto_traits {
     pub use cipher::{
         Block, BlockSizeUser, Iv, IvSizeUser, Key, KeyInit, KeyIvInit, KeySizeUser, StreamCipher, StreamCipherSeek,

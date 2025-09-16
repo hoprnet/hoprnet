@@ -5,7 +5,7 @@
 //! ## Modularity
 //!
 //! `rust-libp2p` is highly modular allowing for reimplmenting expected behavior using custom implementations for API
-//! traits.
+//! api-traits.
 //!
 //! This way it is possible to experiment with and combine different components of the library in order to construct a
 //! specific targeted use case.

@@ -1,11 +1,11 @@
-//! This crate contains types and traits that ensure correct interfacing with Ethereum RPC providers.
+//! This crate contains types and api-traits that ensure correct interfacing with Ethereum RPC providers.
 //!
 //! The most important trait is [HoprRpcOperations] which allows to send arbitrary on-chain transactions
 //! and also to perform the selection of HOPR-related smart contract operations.
 //! Secondly, the [HoprIndexerRpcOperations] is a trait that contains all operations required by the
 //! Indexer to subscribe to the block with logs from the chain.
 //!
-//! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
+//! Both of these api-traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
 //! so this represents the main entry point to all RPC related operations.
 
 extern crate core;
