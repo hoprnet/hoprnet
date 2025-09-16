@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hopr_api_traits::chain::{ChainKeyOperations, ChainReadChannelOperations};
+use hopr_api::chain::{ChainKeyOperations, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::PacketSignals;
 pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_types::prelude::*;

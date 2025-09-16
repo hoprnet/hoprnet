@@ -339,9 +339,6 @@ pub trait HoprDbTicketOperations {
     ///
     /// Returns the number of updated ticket indices.
     async fn persist_outgoing_ticket_indices(&self) -> Result<usize>;
-
-    /// Fix the next ticket state if it's out-of-sync in all this node's channels.
-    async fn fix_channels_next_ticket_state(&self) -> Result<()>;
 }
 
 /// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.

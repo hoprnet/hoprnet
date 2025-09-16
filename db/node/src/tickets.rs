@@ -651,30 +651,6 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
         Ok(Ok::<_, DbError>(updated)?)
     }
-
-
-    async fn fix_channels_next_ticket_state(&self) -> Result<(),DbError> {
-        let channels = self.get_incoming_channels(None).await?;
-
-        for channel in channels.into_iter() {
-            let selector = TicketSelector::from(&channel)
-                .with_state(AcknowledgedTicketStatus::BeingRedeemed)
-                .with_index(channel.ticket_index.as_u64());
-
-            let mut tickets_stream = self
-                .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::Untouched)
-                .await?;
-
-            while let Some(ticket) = tickets_stream.next().await {
-                let channel_id = channel.get_id();
-                let ticket_index = ticket.verified_ticket().index;
-                let ticket_amount = ticket.verified_ticket().amount;
-                info!(%channel_id, %ticket_index, %ticket_amount, "fixed next out-of-sync ticket");
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl HoprNodeDb {
