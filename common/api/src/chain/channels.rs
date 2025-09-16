@@ -1,6 +1,6 @@
-use std::{error::Error, future::Future};
+use std::error::Error;
 
-use futures::stream::BoxStream;
+use futures::{future::BoxFuture, stream::BoxStream};
 pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatus};
 use hopr_primitive_types::prelude::Address;
 pub use hopr_primitive_types::prelude::HoprBalance;
@@ -47,18 +47,18 @@ pub trait ChainWriteChannelOperations {
         &self,
         dst: &Address,
         amount: HoprBalance,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
+    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
 
     /// Funds an existing channel.
     async fn fund_channel(
         &self,
         channel_id: &ChannelId,
         amount: HoprBalance,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
+    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
 
     /// Closes an existing channel.
     async fn close_channel(
         &self,
         channel_id: &ChannelId,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
+    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }

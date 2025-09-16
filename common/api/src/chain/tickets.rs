@@ -1,5 +1,6 @@
-use std::{error::Error, future::Future};
+use std::error::Error;
 
+use futures::future::BoxFuture;
 pub use hopr_internal_types::prelude::{RedeemableTicket, WinningProbability};
 use hopr_primitive_types::balance::HoprBalance;
 
@@ -13,7 +14,7 @@ pub trait ChainWriteTicketOperations {
     async fn redeem_ticket(
         &self,
         ticket: RedeemableTicket,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, Self::Error>> + Send + '_, Self::Error>;
+    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }
 
 /// On-chain read operations with tickets.
