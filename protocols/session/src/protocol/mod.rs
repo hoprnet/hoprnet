@@ -90,7 +90,7 @@ impl<const C: usize> SessionMessage<C> {
     /// and two bytes for the message length.
     pub const HEADER_SIZE: usize = 1 + size_of::<SessionMessageDiscriminants>() + size_of::<u16>();
     /// Maximum size of the message in v1.
-    pub const MAX_MESSAGE_LENGTH: usize = 2047;
+    pub const MAX_MESSAGE_LENGTH: usize = C.saturating_sub(Self::HEADER_SIZE);
     /// Size of the overhead that's added to the raw payload of each [`Segment`].
     ///
     /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
@@ -98,7 +98,7 @@ impl<const C: usize> SessionMessage<C> {
     /// Current version of the protocol.
     pub const VERSION: u8 = 1;
 
-    /// Returns the minimum size of a [SessionMessage].
+    /// Returns the minimum size of a [`SessionMessage`].
     pub fn minimum_message_size() -> usize {
         // Make this a "const fn" once "min" is const fn too
         Self::HEADER_SIZE
@@ -115,6 +115,10 @@ impl<const C: usize> SessionMessage<C> {
 
 impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     fn from(message: SessionMessage<C>) -> Self {
+        debug_assert!(
+            C > SessionMessage::<C>::HEADER_SIZE && SessionMessage::<C>::MAX_MESSAGE_LENGTH <= u16::MAX as usize
+        );
+
         let mut result = BytesMut::new();
         SessionCodec::<C>
             .encode(message, &mut result)
@@ -142,6 +146,10 @@ impl<const C: usize> Encoder for SessionCodec<C> {
     type Item<'a> = SessionMessage<C>;
 
     fn encode(&mut self, item: Self::Item<'_>, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        debug_assert!(
+            C > SessionMessage::<C>::HEADER_SIZE && SessionMessage::<C>::MAX_MESSAGE_LENGTH <= u16::MAX as usize
+        );
+
         let disc = SessionMessageDiscriminants::from(&item) as u8;
 
         let msg = match item {
@@ -149,6 +157,10 @@ impl<const C: usize> Encoder for SessionCodec<C> {
             SessionMessage::Request(r) => Vec::from(r),
             SessionMessage::Acknowledge(a) => Vec::from(a),
         };
+
+        if msg.len() > SessionMessage::<C>::MAX_MESSAGE_LENGTH {
+            return Err(SessionError::IncorrectMessageLength);
+        }
 
         let msg_len = msg.len() as u16;
         dst.put_u8(SessionMessage::<C>::VERSION);
@@ -166,6 +178,8 @@ impl<const C: usize> Decoder for SessionCodec<C> {
     type Item = SessionMessage<C>;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        debug_assert!(C > SessionMessage::<C>::HEADER_SIZE);
+
         tracing::trace!(msg_len = src.len(), "decoding message");
         if src.len() < SessionMessage::<C>::minimum_message_size() {
             return Ok(None);
@@ -213,6 +227,7 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
+    use hopr_protocol_app::prelude::ApplicationData;
     use rand::{Rng, thread_rng};
 
     use super::*;
@@ -224,10 +239,16 @@ mod tests {
     #[test]
     fn ensure_session_protocol_version_1_values() {
         // All of these values are independent of C, so we can set C = 0
-        assert_eq!(1, SessionMessage::<0>::VERSION);
-        assert_eq!(4, SessionMessage::<0>::HEADER_SIZE);
-        assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
-        assert_eq!(2047, SessionMessage::<0>::MAX_MESSAGE_LENGTH);
+        assert_eq!(1, SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::VERSION);
+        assert_eq!(4, SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::HEADER_SIZE);
+        assert_eq!(
+            10,
+            SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::SEGMENT_OVERHEAD
+        );
+        assert_eq!(
+            1008,
+            SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_MESSAGE_LENGTH
+        );
     }
 
     #[test]
@@ -236,7 +257,7 @@ mod tests {
 
         let mut segments = segment(hex!("deadbeefcafebabe"), SEG_SIZE, 10)?;
 
-        const MTU: usize = SEG_SIZE + Segment::HEADER_SIZE + 2;
+        const MTU: usize = SEG_SIZE + SessionMessage::<0>::SEGMENT_OVERHEAD;
 
         let msg_1 = SessionMessage::<MTU>::Segment(segments.pop().unwrap());
         let data = Vec::from(msg_1.clone());

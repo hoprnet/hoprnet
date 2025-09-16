@@ -4,7 +4,7 @@ use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use hopr_async_runtime::AbortHandle;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::prelude::DestinationRouting;
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataOut};
 use tracing::{debug, error};
 
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
     types::HoprStartProtocol,
 };
 
-/// Convenience function to copy data in both directions between a [`Session`](crate::Session) and arbitrary
+/// Convenience function to copy data in both directions between a [`Session`](crate::HoprSession) and arbitrary
 /// async IO stream.
 /// This function is only available with Tokio and will panic with other runtimes.
 ///
@@ -24,7 +24,7 @@ use crate::{
 /// 3. The function terminates, returning the number of bytes transferred in both directions.
 #[cfg(feature = "runtime-tokio")]
 pub async fn transfer_session<S>(
-    session: &mut crate::Session,
+    session: &mut crate::HoprSession,
     stream: &mut S,
     max_buffer: usize,
     abort_stream: Option<futures::future::AbortRegistration>,
@@ -112,7 +112,7 @@ pub(crate) fn spawn_keep_alive_stream<S>(
     routing: DestinationRouting,
 ) -> (SurbControllerWithCorrection, AbortHandle)
 where
-    S: futures::Sink<(DestinationRouting, ApplicationData)> + Clone + Send + Sync + Unpin + 'static,
+    S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
     let elem = HoprStartProtocol::KeepAlive(session_id.into());
@@ -130,7 +130,10 @@ where
     debug!(%session_id, "spawning keep-alive stream");
     hopr_async_runtime::prelude::spawn(
         ka_stream
-            .map(move |msg| ApplicationData::try_from(msg).map(|m| (fwd_routing_clone.clone(), m)))
+            .map(move |msg| {
+                ApplicationData::try_from(msg)
+                    .map(|data| (fwd_routing_clone.clone(), ApplicationDataOut::with_no_packet_info(data)))
+            })
             .map_err(TransportSessionError::from)
             .try_for_each_concurrent(None, move |msg| {
                 let mut sender_clone = sender_clone.clone();
@@ -143,7 +146,12 @@ where
             })
             .then(move |res| {
                 match res {
-                    Ok(_) => debug!(%session_id, "keep-alive stream done"),
+                    Ok(_) => tracing::info!(
+                        component = "session",
+                        %session_id,
+                        task = "transport event notifier",
+                        "long-running background task finished"
+                    ),
                     Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
                 }
                 futures::future::ready(())

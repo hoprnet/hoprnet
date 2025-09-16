@@ -487,7 +487,10 @@ pub(crate) mod tests {
     use parameterized::parameterized;
 
     use super::*;
-    use crate::{shared_keys::SphinxSuite, tests::*};
+    use crate::{
+        shared_keys::{Alpha, GroupElement, SphinxSuite},
+        tests::*,
+    };
 
     #[test]
     fn test_filler_generate_verify() -> anyhow::Result<()> {
@@ -537,6 +540,7 @@ pub(crate) mod tests {
     fn generic_test_generate_routing_info_and_forward<S>(keypairs: Vec<S::P>, reply: bool) -> anyhow::Result<()>
     where
         S: SphinxSuite,
+        for<'a> &'a Alpha<<S::G as GroupElement<S::E>>::AlphaLen>: From<&'a <S::P as Keypair>::Public>,
     {
         let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;

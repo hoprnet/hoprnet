@@ -244,6 +244,8 @@ mod tests {
     fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
+        for<'a> &'a Alpha<<<S as SphinxSuite>::G as GroupElement<<S as SphinxSuite>::E>>::AlphaLen>:
+            From<&'a <<S as SphinxSuite>::P as Keypair>::Public>,
     {
         let pub_keys = keypairs.iter().map(|kp| *kp.public()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;

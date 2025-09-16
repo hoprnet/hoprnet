@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.12.0"
+version = "0.13.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -32,6 +32,7 @@ flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
+mimalloc = { workspace = true }
 moka = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
@@ -55,9 +56,9 @@ hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde"] }
 hopr-protocol-start = { workspace = true }
 
-
 [dev-dependencies]
 anyhow = { workspace = true }
+criterion = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",

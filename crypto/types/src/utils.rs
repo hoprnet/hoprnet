@@ -19,6 +19,7 @@ use crate::{
         CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize},
     },
     prelude::{HalfKey, SecretKey},
+    types::PublicKey,
 };
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
@@ -26,8 +27,9 @@ use crate::{
 pub(crate) fn random_group_element() -> ([u8; 32], NonIdentity<AffinePoint>) {
     // Since sep256k1 has a group of prime order, a non-zero scalar cannot result into an identity point.
     let scalar = k256::NonZeroScalar::random(&mut hopr_crypto_random::rng());
-    let point = NonIdentity::new(k256::ProjectivePoint::GENERATOR * scalar.as_ref());
-    (scalar.to_bytes().into(), point.unwrap().to_affine())
+    let point =
+        PublicKey::from_privkey(&scalar.to_bytes()).expect("non-zero scalar cannot represent an invalid public key");
+    (scalar.to_bytes().into(), point.into())
 }
 
 /// Creates X25519 secret scalar (also compatible with Ed25519 scalar) from the given bytes.
@@ -40,7 +42,7 @@ pub fn x25519_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<curve2551
         clamped.copy_from_slice(&bytes[..32]);
         clamped[00] &= 0b1111_1000; // clear the 3 LSB bits (= multiply by Curve25519's co-factor)
         clamped[31] &= 0b0111_1111; // clear the 256-th bit
-        clamped[31] |= 0b0100_0000; // make it 255-bit number
+        clamped[31] |= 0b0100_0000; // make it a 255-bit number
 
         Ok(curve25519_dalek::scalar::Scalar::from_bytes_mod_order(clamped))
     } else {
@@ -59,6 +61,7 @@ pub fn k256_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<k256::Scala
 }
 
 /// Sample a random secp256k1 field element that can represent a valid secp256k1 point.
+///
 /// The implementation uses the ` hash_to_field ` function as defined in
 /// `<https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field>`
 /// The `secret` must be at least `SecretKey::LENGTH` long.
@@ -136,6 +139,12 @@ impl<L: ArrayLength> AsMut<[u8]> for SecretValue<L> {
 impl<L: ArrayLength> From<SecretValue<L>> for Box<[u8]> {
     fn from(value: SecretValue<L>) -> Self {
         value.as_ref().into()
+    }
+}
+
+impl From<SecretValue<typenum::U32>> for [u8; 32] {
+    fn from(value: SecretValue<typenum::U32>) -> Self {
+        value.0.into_array()
     }
 }
 

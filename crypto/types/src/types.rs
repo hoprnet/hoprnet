@@ -1,18 +1,21 @@
 use std::{
+    cmp::Ordering,
     fmt::{Debug, Display, Formatter},
     hash,
     hash::Hasher,
+    marker::PhantomData,
     result,
     str::FromStr,
 };
 
-use cipher::crypto_common::{Output, OutputSizeUser};
+use cipher::crypto_common::OutputSizeUser;
 use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},
     montgomery::MontgomeryPoint,
 };
 use digest::Digest;
-use elliptic_curve::{NonZeroScalar, ProjectivePoint};
+use elliptic_curve::NonZeroScalar;
+use generic_array::GenericArray;
 use hopr_crypto_random::Randomizable;
 use hopr_primitive_types::{errors::GeneralError::ParseError, prelude::*};
 use k256::{
@@ -24,8 +27,6 @@ use k256::{
     },
 };
 use libp2p_identity::PeerId;
-use sha3::Keccak256;
-use typenum::Unsigned;
 
 use crate::{
     errors::{
@@ -84,14 +85,32 @@ impl Challenge {
     /// Note that this is an expensive operation that involves point decompression of the
     /// both [`HalfKeyChallenges`](HalfKeyChallenge).
     pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
-        let own_share: ProjectivePoint<Secp256k1> = affine_point_from_bytes(own_share.as_ref())?.into();
+        #[cfg(not(feature = "rust-ecdsa"))]
+        {
+            let own_share = secp256k1::PublicKey::from_byte_array_compressed(own_share.0)
+                .map_err(|_| ParseError("invalid half-key challenge for own share".into()))?;
 
-        let hint: ProjectivePoint<Secp256k1> = affine_point_from_bytes(hint.as_ref())?.into();
+            let hint = secp256k1::PublicKey::from_byte_array_compressed(hint.0)
+                .map_err(|_| ParseError("invalid half-key challenge for hint".into()))?;
 
-        NonIdentity::new((own_share + hint).to_affine())
-            .into_option()
-            .ok_or(CalculationError)
-            .map(Self)
+            let res = own_share.combine(&hint).map_err(|_| CalculationError)?;
+
+            affine_point_from_bytes(&res.serialize_uncompressed())
+                .and_then(|p| NonIdentity::new(p).into_option().ok_or(CryptoError::InvalidPublicKey))
+                .map(Self)
+        }
+
+        #[cfg(feature = "rust-ecdsa")]
+        {
+            let own_share: k256::ProjectivePoint = affine_point_from_bytes(own_share.as_ref())?.into();
+
+            let hint: k256::ProjectivePoint = affine_point_from_bytes(hint.as_ref())?.into();
+
+            NonIdentity::new((own_share + hint).to_affine())
+                .into_option()
+                .ok_or(CalculationError)
+                .map(Self)
+        }
     }
 
     /// Gets the PoR challenge by converting the given HalfKey into a secp256k1 point and
@@ -228,26 +247,69 @@ impl FromStr for HalfKeyChallenge {
     }
 }
 
-/// Represents an Ethereum 256-bit hash value
-/// This implementation instantiates the hash via Keccak256 digest.
-#[derive(Clone, Copy, Eq, PartialEq, Default, PartialOrd, Ord, std::hash::Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct Hash(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
+const HASH_BASE_SIZE: usize = 32;
 
-impl Debug for Hash {
+/// Represents a generic 256-bit hash value.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HashBase<H>(
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; HASH_BASE_SIZE],
+    #[cfg_attr(feature = "serde", serde(skip))] PhantomData<H>,
+);
+
+impl<H> Clone for HashBase<H> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<H> Copy for HashBase<H> {}
+
+impl<H> PartialEq for HashBase<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<H> Eq for HashBase<H> {}
+
+impl<H> Default for HashBase<H> {
+    fn default() -> Self {
+        Self([0u8; HASH_BASE_SIZE], PhantomData)
+    }
+}
+
+impl<H> PartialOrd<Self> for HashBase<H> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<H> Ord for HashBase<H> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl<H> std::hash::Hash for HashBase<H> {
+    fn hash<H2: Hasher>(&self, state: &mut H2) {
+        self.0.hash(state);
+    }
+}
+
+impl<H> Debug for HashBase<H> {
     // Intentionally same as Display
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_hex())
     }
 }
 
-impl Display for Hash {
+impl<H> Display for HashBase<H> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_hex())
     }
 }
 
-impl FromStr for Hash {
+impl<H> FromStr for HashBase<H> {
     type Err = GeneralError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
@@ -255,71 +317,85 @@ impl FromStr for Hash {
     }
 }
 
-impl Hash {
+impl<H> HashBase<H>
+where
+    H: OutputSizeUser<OutputSize = typenum::U32> + Digest,
+{
     /// Convenience method that creates a new hash by hashing this.
     pub fn hash(&self) -> Self {
         Self::create(&[&self.0])
     }
 
     /// Takes all the byte slices and computes hash of their concatenated value.
-    /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
-        let mut output = Output::<Keccak256>::default();
-        let mut hash = Keccak256::default();
+        let mut hash = H::new();
         inputs.iter().for_each(|v| hash.update(v));
-        hash.finalize_into(&mut output);
-        Self(output.into())
+        Self(hash.finalize().into(), PhantomData)
     }
 }
 
-impl AsRef<[u8]> for Hash {
+impl<H> AsRef<[u8]> for HashBase<H> {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl TryFrom<&[u8]> for Hash {
+impl<H> TryFrom<&[u8]> for HashBase<H> {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(value.try_into().map_err(|_| ParseError("Hash".into()))?))
+        Ok(Self(
+            value.try_into().map_err(|_| ParseError("Hash".into()))?,
+            PhantomData,
+        ))
     }
 }
 
-impl BytesRepresentable for Hash {
-    /// Size of the digest is 32 bytes.
-    const SIZE: usize = <Keccak256 as OutputSizeUser>::OutputSize::USIZE;
+impl<H> BytesRepresentable for HashBase<H> {
+    /// The size of the digest is 32 bytes.
+    const SIZE: usize = HASH_BASE_SIZE;
 }
 
-impl From<[u8; Self::SIZE]> for Hash {
-    fn from(hash: [u8; Self::SIZE]) -> Self {
-        Self(hash)
+impl<H> From<[u8; HASH_BASE_SIZE]> for HashBase<H> {
+    fn from(hash: [u8; HASH_BASE_SIZE]) -> Self {
+        Self(hash, PhantomData)
     }
 }
 
-impl From<Hash> for [u8; Hash::SIZE] {
-    fn from(value: Hash) -> Self {
+impl<H> From<HashBase<H>> for [u8; HASH_BASE_SIZE] {
+    fn from(value: HashBase<H>) -> Self {
         value.0
     }
 }
 
-impl From<&Hash> for [u8; Hash::SIZE] {
-    fn from(value: &Hash) -> Self {
+impl<H> From<&HashBase<H>> for [u8; HASH_BASE_SIZE] {
+    fn from(value: &HashBase<H>) -> Self {
         value.0
     }
 }
 
-impl From<Hash> for primitive_types::H256 {
-    fn from(value: Hash) -> Self {
+impl<H> From<HashBase<H>> for primitive_types::H256 {
+    fn from(value: HashBase<H>) -> Self {
         value.0.into()
     }
 }
 
-impl From<primitive_types::H256> for Hash {
+impl<H> From<primitive_types::H256> for HashBase<H> {
     fn from(value: primitive_types::H256) -> Self {
-        Self(value.0)
+        Self(value.0, PhantomData)
     }
 }
+
+/// Represents an Ethereum 256-bit hash value.
+///
+/// This implementation instantiates the hash via Keccak256 digest.
+pub type Hash = HashBase<sha3::Keccak256>;
+
+/// Represents an alternative 256-bit hash value computed via a faster hashing algorithm.
+///
+/// This implementation instantiates the hash via Blake3 digest, which is usually 8-9x faster
+/// than Keccak256.
+pub type HashFast = HashBase<blake3::Hasher>;
 
 /// Represents an Ed25519 public key.
 #[derive(Clone, Copy, Eq)]
@@ -327,7 +403,6 @@ impl From<primitive_types::H256> for Hash {
 pub struct OffchainPublicKey {
     compressed: CompressedEdwardsY,
     pub(crate) edwards: EdwardsPoint,
-    montgomery: MontgomeryPoint,
 }
 
 impl std::fmt::Debug for OffchainPublicKey {
@@ -351,7 +426,7 @@ impl PartialEq for OffchainPublicKey {
 
 impl AsRef<[u8]> for OffchainPublicKey {
     fn as_ref(&self) -> &[u8] {
-        self.compressed.as_bytes()
+        &self.compressed.0
     }
 }
 
@@ -363,11 +438,7 @@ impl TryFrom<&[u8]> for OffchainPublicKey {
         let edwards = compressed
             .decompress()
             .ok_or(ParseError("OffchainPublicKey.decompress".into()))?;
-        Ok(Self {
-            compressed,
-            edwards,
-            montgomery: edwards.to_montgomery(),
-        })
+        Ok(Self { compressed, edwards })
     }
 }
 
@@ -385,37 +456,10 @@ impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
     }
 }
 
-impl TryFrom<&PeerId> for OffchainPublicKey {
-    type Error = GeneralError;
-
-    fn try_from(value: &PeerId) -> std::result::Result<Self, Self::Error> {
-        let mh = value.as_ref();
-        if mh.code() == 0 {
-            libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
-                .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
-                .and_then(|pk| {
-                    pk.try_into_ed25519()
-                        .map(|p| p.to_bytes())
-                        .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
-                })
-                .and_then(Self::try_from)
-        } else {
-            Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
-        }
-    }
-}
-
-impl TryFrom<PeerId> for OffchainPublicKey {
-    type Error = GeneralError;
-
-    fn try_from(value: PeerId) -> std::result::Result<Self, Self::Error> {
-        Self::try_from(&value)
-    }
-}
-
 impl From<OffchainPublicKey> for PeerId {
     fn from(value: OffchainPublicKey) -> Self {
-        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.compressed.as_bytes()).unwrap();
+        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.compressed.as_bytes())
+            .expect("offchain public key is always a valid ed25519 public key");
         PeerId::from_public_key(&k.into())
     }
 }
@@ -448,6 +492,26 @@ impl OffchainPublicKey {
     pub fn to_peerid_str(&self) -> String {
         PeerId::from(self).to_base58()
     }
+
+    /// Tries to convert an Ed25519 `PeerId` to `OffchainPublicKey`.
+    ///
+    /// This is a CPU-intensive operation, as it performs Ed25519 point decompression
+    /// and mapping to the Curve255919 point representation.
+    pub fn from_peerid(peerid: &PeerId) -> std::result::Result<Self, GeneralError> {
+        let mh = peerid.as_ref();
+        if mh.code() == 0 {
+            libp2p_identity::PublicKey::try_decode_protobuf(mh.digest())
+                .map_err(|_| ParseError("invalid ed25519 peer id".into()))
+                .and_then(|pk| {
+                    pk.try_into_ed25519()
+                        .map(|p| p.to_bytes())
+                        .map_err(|_| ParseError("invalid ed25519 peer id".into()))
+                })
+                .and_then(Self::try_from)
+        } else {
+            Err(ParseError("invalid ed25519 peer id".into()))
+        }
+    }
 }
 
 impl From<&OffchainPublicKey> for EdwardsPoint {
@@ -456,32 +520,17 @@ impl From<&OffchainPublicKey> for EdwardsPoint {
     }
 }
 
+impl<'a> From<&'a OffchainPublicKey> for &'a GenericArray<u8, typenum::U32> {
+    fn from(value: &'a OffchainPublicKey) -> &'a GenericArray<u8, typenum::U32> {
+        GenericArray::from_slice(&value.compressed.0)
+    }
+}
+
 impl From<&OffchainPublicKey> for MontgomeryPoint {
     fn from(value: &OffchainPublicKey) -> Self {
-        value.montgomery
-    }
-}
-
-/// Compact representation of [`OffchainPublicKey`] suitable for use in enums.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct CompactOffchainPublicKey(CompressedEdwardsY);
-
-impl From<OffchainPublicKey> for CompactOffchainPublicKey {
-    fn from(value: OffchainPublicKey) -> Self {
-        Self(value.compressed)
-    }
-}
-
-impl CompactOffchainPublicKey {
-    /// Performs an **expensive** operation of converting back to the [`OffchainPublicKey`].
-    pub fn into_offchain_public_key(self) -> OffchainPublicKey {
-        let decompressed = self.0.decompress().expect("decompression must not fail");
-        OffchainPublicKey {
-            compressed: self.0,
-            edwards: decompressed,
-            montgomery: decompressed.to_montgomery(),
-        }
+        // The Curve25519 computations are mostly not used, so we can do the conversion
+        // here without caching.
+        value.edwards.to_montgomery()
     }
 }
 
@@ -512,15 +561,33 @@ impl PublicKey {
     /// The private key must be a big-endian encoding of a non-zero scalar in the field
     /// of the `secp256k1` curve.
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {
-        // This verifies that it is indeed a non-zero scalar, and thus represents a valid public key
-        let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key)
-            .map_err(|_| GeneralError::ParseError("PublicKey".into()))?;
+        #[cfg(feature = "rust-ecdsa")]
+        {
+            // This verifies that it is indeed a non-zero scalar, and thus represents a valid public key
+            let secret_scalar = NonZeroScalar::<Secp256k1>::try_from(private_key)
+                .map_err(|_| GeneralError::ParseError("PublicKey".into()))?;
 
-        Ok(
-            elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar)
-                .to_nonidentity()
-                .into(),
-        )
+            Ok(
+                elliptic_curve::PublicKey::<Secp256k1>::from_secret_scalar(&secret_scalar)
+                    .to_nonidentity()
+                    .into(),
+            )
+        }
+
+        #[cfg(not(feature = "rust-ecdsa"))]
+        {
+            let sk = secp256k1::SecretKey::from_byte_array(
+                private_key
+                    .try_into()
+                    .map_err(|_| GeneralError::ParseError("private_key.len".into()))?,
+            )
+            .map_err(|_| GeneralError::ParseError("private_key".into()))?;
+
+            let pk = secp256k1::PublicKey::from_secret_key_global(&sk);
+            affine_point_from_bytes(&pk.serialize_uncompressed())
+                .and_then(|p| NonIdentity::new(p).into_option().ok_or(CryptoError::InvalidPublicKey))
+                .map(Self::from)
+        }
     }
 
     /// Converts the public key to an Ethereum address
@@ -644,6 +711,12 @@ impl TryFrom<AffinePoint> for PublicKey {
 impl From<&PublicKey> for k256::ProjectivePoint {
     fn from(value: &PublicKey) -> Self {
         (*value.0.as_ref()).into()
+    }
+}
+
+impl<'a> From<&'a PublicKey> for &'a GenericArray<u8, typenum::U33> {
+    fn from(value: &'a PublicKey) -> &'a GenericArray<u8, typenum::U33> {
+        GenericArray::from_slice(&value.1)
     }
 }
 
@@ -873,15 +946,15 @@ mod tests {
     #[test]
     fn test_offchain_public_key_peerid() -> anyhow::Result<()> {
         let valid_peerid = PeerId::from_str("12D3KooWLYKsvDB4xEELYoHXxeStj2gzaDXjra2uGaFLpKCZkJHs")?;
-        let valid = OffchainPublicKey::try_from(valid_peerid)?;
+        let valid = OffchainPublicKey::from_peerid(&valid_peerid)?;
         assert_eq!(valid_peerid, valid.into(), "must work with ed25519 peer ids");
 
         let invalid_peerid = PeerId::from_str("16Uiu2HAmPHGyJ7y1Rj3kJ64HxJQgM9rASaeT2bWfXF9EiX3Pbp3K")?;
-        let invalid = OffchainPublicKey::try_from(invalid_peerid);
+        let invalid = OffchainPublicKey::from_peerid(&invalid_peerid);
         assert!(invalid.is_err(), "must not work with secp256k1 peer ids");
 
         let invalid_peerid_2 = PeerId::from_str("QmWvEwidPYBbLHfcZN6ATHdm4NPM4KbUx72LZnZRoRNKEN")?;
-        let invalid_2 = OffchainPublicKey::try_from(invalid_peerid_2);
+        let invalid_2 = OffchainPublicKey::from_peerid(&invalid_peerid_2);
         assert!(invalid_2.is_err(), "must not work with rsa peer ids");
 
         Ok(())

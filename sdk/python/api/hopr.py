@@ -18,6 +18,7 @@ from .request_objects import (
     CreateSessionBody,
     FundChannelBody,
     GetChannelsBody,
+    GetPeersBody,
     OpenChannelBody,
     SessionCapabilitiesBody,
     SetSessionConfigBody,
@@ -212,21 +213,16 @@ class HoprdAPI(ApiLib):
 
     async def peers(
         self,
+        status: str = "connected",
     ) -> list[ConnectedPeer]:
         """
         Returns a list of peers.
         :return: peers: list
         """
-        response = await self.try_req(Method.GET, "/node/peers", dict)
-
-        if response is None:
+        if r := await self.try_req(Method.GET, f"/node/peers"):
+            return [ConnectedPeer(peer) for peer in r.get(status, [])]
+        else:
             return []
-
-        if "connected" not in response:
-            logging.warning("No 'connected' field returned from the API")
-            return []
-
-        return [ConnectedPeer(peer) for peer in response["connected"]]
 
     async def ping(self, destination: str) -> Optional[Ping]:
         """

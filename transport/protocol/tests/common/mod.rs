@@ -17,7 +17,7 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
 use hopr_primitive_types::prelude::*;
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
     DEFAULT_PRICE_PER_PACKET,
@@ -140,8 +140,8 @@ pub type WireChannels = (
 
 #[allow(dead_code)]
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>,
-    futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationData)>,
+    futures::channel::mpsc::UnboundedSender<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>,
+    futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationDataIn)>,
 );
 
 #[allow(dead_code)]
@@ -187,8 +187,8 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>();
-        let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
+            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>();
+        let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let opk: &OffchainKeypair = &PEERS[i];
         let packet_cfg = PacketInteractionConfig {
@@ -202,7 +202,6 @@ pub async fn peer_setup_for(
         hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             db,
-            None,
             (mixer_channel_tx, wire_msg_send_rx),
             (api_recv_tx, api_send_rx),
         )
@@ -343,7 +342,8 @@ pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
                 &random_bytes::<300>(),
             )
         })
-        .collect::<Vec<_>>()
+        .collect::<Result<Vec<_>, _>>()
+        .expect("data generation must not fail")
 }
 
 #[allow(dead_code)]
@@ -385,7 +385,9 @@ pub async fn send_relay_receive_channel_of_n_peers(
             return_paths: vec![],
         };
 
-        let awaiter = sender.send_packet(test_msg.clone(), routing).await?;
+        let awaiter = sender
+            .send_packet(ApplicationDataOut::with_no_packet_info(test_msg.clone()), routing)
+            .await?;
 
         if awaiter
             .consume_and_wait(std::time::Duration::from_millis(500))
@@ -413,9 +415,12 @@ pub async fn send_relay_receive_channel_of_n_peers(
         assert_eq!(recv_packets.len(), test_msgs.len());
 
         test_msgs.sort_by(|a, b| a.plain_text.cmp(&b.plain_text));
-        recv_packets.sort_by(|(_, a), (_, b)| a.plain_text.cmp(&b.plain_text));
+        recv_packets.sort_by(|(_, a), (_, b)| a.data.plain_text.cmp(&b.data.plain_text));
 
-        assert_eq!(recv_packets.into_iter().map(|(_, b)| b).collect::<Vec<_>>(), test_msgs);
+        assert_eq!(
+            recv_packets.into_iter().map(|(_, b)| b.data).collect::<Vec<_>>(),
+            test_msgs
+        );
     };
 
     let res = timeout(TIMEOUT_SECONDS, compare_packets).await;

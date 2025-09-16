@@ -9,11 +9,11 @@ use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::HoprBalance;
-use hopr_protocol_app::prelude::ApplicationData;
+use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
 use libp2p::PeerId;
 
-const SAMPLE_SIZE: usize = 20;
+const SAMPLE_SIZE: usize = 50;
 
 pub fn protocol_throughput_sender(c: &mut Criterion) {
     const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE;
@@ -22,6 +22,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("protocol_throughput_pipeline");
     group.sample_size(SAMPLE_SIZE);
+    group.measurement_time(std::time::Duration::from_secs(30));
     for bytes in [5 * 1024 * 2 * PAYLOAD_SIZE, 10 * 1024 * 2 * PAYLOAD_SIZE].iter() {
         group.throughput(Throughput::Bytes(*bytes as u64));
         group.bench_with_input(
@@ -54,12 +55,12 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
                         let (api_send_tx, api_send_rx) = futures::channel::mpsc::unbounded::<(
-                            ApplicationData,
+                            ApplicationDataOut,
                             ResolvedTransportRouting,
                             PacketSendFinalizer,
                         )>();
                         let (api_recv_tx, _api_recv_rx) =
-                            futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
+                            futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
                         let cfg = PacketInteractionConfig {
                             packet_keypair: PEERS[TESTED_PEER_ID].clone(),
@@ -100,7 +101,11 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                                 let sender = sender.clone();
                                 let path = routing.clone();
 
-                                async move { sender.send_packet(packet, path.clone()).await }
+                                async move {
+                                    sender
+                                        .send_packet(ApplicationDataOut::with_no_packet_info(packet), path.clone())
+                                        .await
+                                }
                             })
                             .for_each_concurrent(Some(50), |v| async {
                                 assert!(v.await.is_ok());

@@ -5,7 +5,7 @@ use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_db_api::{
     errors::Result,
-    prelude::{DbError, SurbCacheConfig},
+    prelude::{AuxiliaryPacketInfo, DbError, SurbCacheConfig},
     protocol::{FoundSurb, HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
     resolver::HoprDbResolverOperations,
 };
@@ -170,9 +170,10 @@ impl HoprDb {
         };
 
         // Finally, replace the ticket in the outgoing packet with a new one
-        fwd.outgoing.ticket = ticket_builder
-            .eth_challenge(fwd.next_challenge)
-            .build_signed(me, &domain_separator)?
+        let ticket_builder = ticket_builder.eth_challenge(fwd.next_challenge);
+        let me_clone = me.clone();
+        fwd.outgoing.ticket = spawn_fifo_blocking(move || ticket_builder.build_signed(&me_clone, &domain_separator))
+            .await?
             .leak();
 
         Ok(fwd)
@@ -379,7 +380,9 @@ impl HoprDbProtocolOperations for HoprDb {
                 &domain_separator,
                 None, // NoAck messages currently do not have signals
             )
-            .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
+            .map_err(|e| {
+                DbSqlError::LogicalError(format!("failed to construct chain components for a no-ack packet: {e}"))
+            })
         })
         .await?;
 
@@ -408,7 +411,7 @@ impl HoprDbProtocolOperations for HoprDb {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-        signals: Option<u8>,
+        signals: PacketSignals,
     ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -535,7 +538,12 @@ impl HoprDbProtocolOperations for HoprDb {
             HoprPacket::from_incoming(&data, &offchain_keypair, sender, &myself.caches.key_id_mapper, |p| {
                 myself.caches.extract_pseudonym_opener(p)
             })
-            .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
+            .map_err(|error| match error {
+                errors::PacketError::PacketDecodingError(_) | errors::PacketError::SphinxError(_) => {
+                    DbSqlError::PossibleAdversaryError(format!("possibly adversarial behavior: {error}"))
+                }
+                _ => DbSqlError::LogicalError(format!("failed to construct an incoming packet: {error}")),
+            })
         })
         .await?;
         if start.elapsed().as_millis() > SLOW_OP_MS {
@@ -548,10 +556,14 @@ impl HoprDbProtocolOperations for HoprDb {
 
         match packet {
             HoprPacket::Final(incoming) => {
+                // Extract additional information from the packet that will be passed upwards
+                let info = AuxiliaryPacketInfo {
+                    packet_signals: incoming.signals,
+                    num_surbs: incoming.surbs.len(),
+                };
+
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
-                    let num_surbs = incoming.surbs.len();
-
                     self.caches
                         .surbs_per_pseudonym
                         .entry_by_ref(&incoming.sender)
@@ -562,34 +574,20 @@ impl HoprDbProtocolOperations for HoprDb {
                         .value()
                         .push(incoming.surbs)?;
 
-                    trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
+                    trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, "stored incoming surbs for pseudonym");
                 }
 
                 Ok(match incoming.ack_key {
                     None => {
-                        let ack: Acknowledgement = incoming
-                            .plain_text
-                            .as_ref()
-                            .try_into()
-                            .map_err(|_| DbSqlError::DecodingError)?;
-
-                        let prev_hop = incoming.previous_hop;
-                        let ack = spawn_fifo_blocking(move || ack.verify(&prev_hop))
-                            .await
-                            .map_err(|error| {
-                                tracing::error!(%error, "failed to validate the acknowledgement");
-
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_RECEIVED_ACKS.increment(&["false"]);
-
-                                DbSqlError::AcknowledgementValidationError(error.to_string())
-                            })?;
-
                         // The contained payload represents an Acknowledgement
                         IncomingPacket::Acknowledgement {
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
-                            ack,
+                            ack: incoming
+                                .plain_text
+                                .as_ref()
+                                .try_into()
+                                .map_err(|_| DbSqlError::DecodingError)?,
                         }
                     }
                     Some(ack_key) => IncomingPacket::Final {
@@ -598,7 +596,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         sender: incoming.sender,
                         plain_text: incoming.plain_text,
                         ack_key,
-                        signals: incoming.signals,
+                        info,
                     },
                 })
             }
@@ -620,17 +618,12 @@ impl HoprDbProtocolOperations for HoprDb {
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        let keypair_clone = pkt_keypair.clone();
-                        let ack =
-                            spawn_fifo_blocking(move || VerifiedAcknowledgement::new(fwd.ack_key, &keypair_clone))
-                                .await;
-
                         Ok(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
-                            ack,
+                            ack_key: fwd.ack_key,
                         })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
