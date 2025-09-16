@@ -4637,6 +4637,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-config"
+version = "1.0.0"
+dependencies = [
+ "hopr-chain-types",
+ "hopr-primitive-types",
+ "semver 1.0.26",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "smart-default",
+ "strum 0.27.2",
+ "thiserror 2.0.16",
+ "validator",
+]
+
+[[package]]
 name = "hopr-crypto-keypair"
 version = "0.4.1"
 dependencies = [
