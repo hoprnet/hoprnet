@@ -93,38 +93,6 @@ impl<S> SurbRingBuffer<S> {
     }
 }
 
-/// Lists all singular data that can be cached and
-/// cannot be represented by a key. These values can be cached for the long term.
-#[derive(Debug, Clone, strum::EnumDiscriminants)]
-#[strum_discriminants(derive(Hash))]
-pub enum CachedValue {
-    /// Cached [IndexerData].
-    IndexerDataCache(IndexerData),
-    /// Cached [SafeInfo].
-    SafeInfoCache(Option<SafeInfo>),
-}
-
-impl TryFrom<CachedValue> for IndexerData {
-    type Error = DbSqlError;
-
-    fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
-        match value {
-            CachedValue::IndexerDataCache(data) => Ok(data),
-            _ => Err(DbSqlError::DecodingError),
-        }
-    }
-}
-
-impl TryFrom<CachedValue> for Option<SafeInfo> {
-    type Error = DbSqlError;
-
-    fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
-        match value {
-            CachedValue::SafeInfoCache(data) => Ok(data),
-            _ => Err(DbSqlError::DecodingError),
-        }
-    }
-}
 
 struct ExpiryNever;
 
@@ -134,25 +102,14 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
-
-
-
 /// Contains all caches used by the [crate::db::HoprDb].
 #[derive(Debug)]
 pub struct HoprDbCaches {
-    pub(crate) single_values: Cache<CachedValueDiscriminants, CachedValue>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
     // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
     // include tickets from other epochs
     pub(crate) unrealized_value: Cache<(Hash, U256), HoprBalance>,
-    /*pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
-    pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
-    pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
-    // KeyIdMapper must be synchronous because it is used from a sync context.
-    pub(crate) key_id_mapper: CacheKeyMapper,*/
     pseudonym_openers: moka::sync::Cache<HoprPseudonym, moka::sync::Cache<HoprSurbId, ReplyOpener>>,
     pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
 }
@@ -160,25 +117,12 @@ pub struct HoprDbCaches {
 impl Default for HoprDbCaches {
     fn default() -> Self {
         Self {
-            single_values: Cache::builder().time_to_idle(Duration::from_secs(1800)).build(),
             unacked_tickets: Cache::builder()
                 .time_to_live(Duration::from_secs(30))
                 .max_capacity(1_000_000_000)
                 .build(),
             ticket_index: Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build(),
             unrealized_value: Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build(),
-            /*chain_to_offchain: Cache::builder()
-                .time_to_idle(Duration::from_secs(600))
-                .max_capacity(100_000)
-                .build(),
-            offchain_to_chain: Cache::builder()
-                .time_to_idle(Duration::from_secs(600))
-                .max_capacity(100_000)
-                .build(),
-            src_dst_to_channel: Cache::builder()
-                .time_to_live(Duration::from_secs(600))
-                .max_capacity(10_000)
-                .build(),*/
             // Reply openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
             // in a cascade fashion, allowing the entire batches (by Pseudonym) to be evicted
             // if not used.
@@ -200,7 +144,6 @@ impl Default for HoprDbCaches {
                 })
                 .max_capacity(10_000)
                 .build(),
-            //key_id_mapper: CacheKeyMapper::with_capacity(10_000),
         }
     }
 }
@@ -236,12 +179,17 @@ impl HoprDbCaches {
 
     /// Invalidates all caches.
     pub fn invalidate_all(&self) {
-        self.single_values.invalidate_all();
         self.unacked_tickets.invalidate_all();
         self.unrealized_value.invalidate_all();
-        // NOTE: key_id_mapper intentionally not invalidated
+        self.surbs_per_pseudonym.invalidate_all();
+        self.pseudonym_openers.invalidate_all();
     }
 }
+
+// TODO: (dbmig) move this into the implementation of ChainKeyOperations
+/*
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
 #[derive(Debug)]
 pub(crate) struct CacheKeyMapper(
@@ -319,7 +267,7 @@ impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for 
 }
 
 
-
+*/
 
 #[cfg(test)]
 mod tests {

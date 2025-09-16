@@ -4777,7 +4777,7 @@ version = "0.11.1"
 dependencies = [
  "async-trait",
  "futures",
- "hopr-api-traits",
+ "hopr-api",
  "hopr-crypto-packet",
  "hopr-crypto-types",
  "hopr-internal-types",
@@ -4835,7 +4835,7 @@ dependencies = [
  "futures",
  "hex",
  "hex-literal",
- "hopr-api-traits",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",

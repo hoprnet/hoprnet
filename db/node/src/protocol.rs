@@ -14,8 +14,8 @@ use hopr_parallelize::cpu::spawn_fifo_blocking;
 use hopr_path::{Path, PathAddressResolver, ValidatedPath, errors::PathError};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
-use hopr_api_traits::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations};
-use hopr_db_api::prelude::{HoprDbSimpleChannelOperations, HoprDbTicketOperations};
+use hopr_api::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations};
+use hopr_db_api::tickets::HoprDbTicketOperations;
 use crate::{
     cache::SurbRingBuffer,
 };
@@ -422,7 +422,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
             ),
             ResolvedTransportRouting::Return(sender_id, surb) => {
                 let next = resolver
-                    .key_id_mapper()
+                    .key_id_mapper_ref()
                     .map_id_to_public(&surb.first_relayer)
                     .ok_or(DbError::MissingAccount)?;
 

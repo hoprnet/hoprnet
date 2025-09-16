@@ -8,6 +8,7 @@ mod tickets;
 
 mod cache;
 mod ticket_manager;
+mod safe_info;
 
 use hopr_db_api::prelude::{DbError, OpenTransaction};
 pub use node_db::{HoprNodeDb, HoprNodeDbConfig};
