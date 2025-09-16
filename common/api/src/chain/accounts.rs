@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{error::Error, future::Future};
 
 use futures::stream::BoxStream;
 use hopr_crypto_types::prelude::OffchainPublicKey;
@@ -12,7 +12,7 @@ use crate::chain::ChainReceipt;
 /// On-chain write operations regarding on-chain node accounts.
 #[async_trait::async_trait]
 pub trait ChainWriteAccountOperations {
-    type Error;
+    type Error: Error + Send + Sync + 'static;
 
     /// Announces transport key and list of multi addresses.
     async fn announce(
@@ -45,7 +45,7 @@ pub struct AccountSelector {
 /// Chain operations that read on-chain node accounts.
 #[async_trait::async_trait]
 pub trait ChainReadAccountOperations {
-    type Error;
+    type Error: Error + Send + Sync + 'static;
 
     /// Returns on-chain node accounts with the given [`AccountSelector`].
     async fn stream_accounts<'a>(

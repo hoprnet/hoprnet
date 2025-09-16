@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use hopr_crypto_types::prelude::Hash;
 
 /// Contains domain separator information.
@@ -14,7 +16,7 @@ pub struct DomainSeparators {
 /// Retrieves various on-chain information.
 #[async_trait::async_trait]
 pub trait ChainMiscOperations {
-    type Error;
+    type Error: Error + Send + Sync + 'static;
     /// Retrieves the domain separators of HOPR smart contracts.
     async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error>;
 }

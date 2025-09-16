@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{error::Error, future::Future};
 
 use futures::stream::BoxStream;
 pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatus};
@@ -23,7 +23,7 @@ pub struct ChannelSelector {
 /// On-chain read operations regarding channels.
 #[async_trait::async_trait]
 pub trait ChainReadChannelOperations {
-    type Error;
+    type Error: Error + Send + Sync + 'static;
 
     /// Returns a single channel given `src` and `dst`.
     async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error>;
@@ -41,7 +41,7 @@ pub trait ChainReadChannelOperations {
 /// On-chain write operations regarding channels.
 #[async_trait::async_trait]
 pub trait ChainWriteChannelOperations {
-    type Error;
+    type Error: Error + Send + Sync + 'static;
     /// Opens a channel with `dst` and `amount`.
     async fn open_channel(
         &self,

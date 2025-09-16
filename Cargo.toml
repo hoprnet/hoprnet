@@ -8,12 +8,12 @@ members = [
   "chain/indexer",
   "chain/rpc",
   "chain/types",
+  "common/api",
   "common/async-runtime",
   "common/internal-types",
   "common/network-types",
   "common/parallelize",
   "common/primitive-types",
-  "common/api-traits",
   "crypto/keypair",
   "crypto/packet",
   "crypto/random",
@@ -219,6 +219,7 @@ url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
 
+hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { path = "ethereum/bindings", default-features = false }
 hopr-chain-actions = { path = "chain/actions", default-features = false }
@@ -251,7 +252,6 @@ hopr-protocol-app = { path = "protocols/app" }
 hopr-protocol-session = { path = "protocols/session" }
 hopr-protocol-start = { path = "protocols/start" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
-hopr-api-traits = { path = "common/api-traits" }
 hopr-transport = { path = "transport/api" }
 hopr-transport-bloom = { path = "transport/bloom" }
 hopr-transport-identity = { path = "transport/identity" }
