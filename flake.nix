@@ -87,7 +87,7 @@
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
-              ./hopr/hopr-lib/data
+              ./hopr/config/data
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
@@ -104,7 +104,7 @@
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
-              ./hopr/hopr-lib/data
+              ./hopr/config/data
               ./hopr/hopr-lib/tests
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
