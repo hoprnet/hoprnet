@@ -270,7 +270,7 @@ impl FromStr for ProtocolsConfig {
 impl std::cmp::PartialEq for ProtocolsConfig {
     fn eq(&self, other: &Self) -> bool {
         Vec::from_iter(self.networks.clone()) == Vec::from_iter(other.networks.clone())
-            && Vec::from_iter(self.chains.clone()) == Vec::from_iter(self.chains.clone())
+            && Vec::from_iter(self.chains.clone()) == Vec::from_iter(other.chains.clone())
     }
 }
 
