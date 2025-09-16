@@ -10,7 +10,6 @@ pub mod protocol;
 pub mod resolver;
 pub mod tickets;
 pub mod tx;
-pub mod channels;
 
 use crate::{
     peers::HoprDbPeersOperations, protocol::HoprDbProtocolOperations,
@@ -28,5 +27,5 @@ pub trait HoprNodeDbAllAbstractedOperations:
 #[doc(hidden)]
 pub mod prelude {
     pub use super::*;
-    pub use crate::{errors::*, channels::*, info::*, logs::*, peers::*, protocol::*, resolver::*, tickets::*, tx::*};
+    pub use crate::{errors::*, info::*, logs::*, peers::*, protocol::*, resolver::*, tickets::*, tx::*};
 }

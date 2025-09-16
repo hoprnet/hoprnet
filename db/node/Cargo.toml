@@ -60,6 +60,7 @@ hopr-path = { workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-traits = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
