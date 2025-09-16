@@ -255,11 +255,11 @@ impl Default for ProtocolsConfig {
 }
 
 impl FromStr for ProtocolsConfig {
-    type Err = String;
+    type Err = HoprConfigError;
 
     /// Reads the protocol config JSON file and returns it
     fn from_str(data: &str) -> std::result::Result<Self, Self::Err> {
-        serde_json::from_str::<ProtocolsConfig>(data).map_err(|e| e.to_string())
+        serde_json::from_str::<ProtocolsConfig>(data).map_err(|e| HoprConfigError::Configuration(e.to_string()))
     }
 }
 
