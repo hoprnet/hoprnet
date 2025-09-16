@@ -142,7 +142,7 @@ impl WinProbSubcommands {
         Ok(current_win_prob_f64)
     }
 
-    pub async fn execute_convert_win_prob(winning_probability: f64) -> Result<(), HelperErrors> {
+    pub fn execute_convert_win_prob(winning_probability: f64) -> Result<(), HelperErrors> {
         // convert the winning probability to the format required by the contract
         let winning_probability_val = WinningProbability::try_from(winning_probability).map_err(|_| {
             HelperErrors::ParseError("Failed to convert winning probability to the required format".into())
