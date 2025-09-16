@@ -14,7 +14,7 @@ use hopr_parallelize::cpu::spawn_fifo_blocking;
 use hopr_path::{Path, PathAddressResolver, ValidatedPath, errors::PathError};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
-use hopr_api_traits::chain::ChainReadChannelOperations;
+use hopr_api_traits::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations};
 use hopr_db_api::prelude::{HoprDbSimpleChannelOperations, HoprDbTicketOperations};
 use crate::{
     cache::SurbRingBuffer,
@@ -57,7 +57,7 @@ impl HoprNodeDb {
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
     ) -> Result<HoprForwardedPacket, DbError>
-    where R: HoprDbResolverOperations + HoprDbSimpleChannelOperations + Send + Sync + 'static {
+    where R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static {
         let previous_hop_addr = self.resolve_chain_key(&fwd.previous_hop).await?.ok_or_else(|| {
             DbError::LogicalError(format!(
                 "failed to find channel key for packet key {} on previous hop",
@@ -298,20 +298,6 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         Ok(())
     }
 
-    async fn get_network_winning_probability(&self) -> Result<WinningProbability, DbError> {
-        Ok(self
-            .get_indexer_data(None)
-            .await
-            .map(|data| data.minimum_incoming_ticket_winning_prob)?)
-    }
-
-    async fn get_network_ticket_price(&self) -> Result<HoprBalance, DbError> {
-        Ok(self.get_indexer_data(None).await.and_then(|data| {
-            data.ticket_price
-                .ok_or(DbError::LogicalError("missing ticket price".into()))
-        })?)
-    }
-
     #[tracing::instrument(level = "trace", skip(self, matcher), err)]
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb, DbError> {
         let pseudonym = matcher.pseudonym();
@@ -352,7 +338,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
 
     #[tracing::instrument(level = "trace", skip(self, data))]
     async fn to_send_no_ack<R>(&self, data: Box<[u8]>, destination: OffchainPublicKey, resolver: &R) -> Result<OutgoingPacket, DbError>
-    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static {
+    where R: ChainReadChannelOperations + ChainKeyOperations + Send + Sync + 'static {
         let next_peer = resolver.resolve_chain_key(&destination).await?.ok_or_else(|| {
             DbError::LogicalError(format!(
                 "failed to find chain key for packet key {} on previous hop",
@@ -371,15 +357,16 @@ impl HoprDbProtocolOperations for HoprNodeDb {
             .ok_or_else(|| DbError::LogicalError("failed to fetch the domain separator".into()))?;
 
         // Construct the outgoing packet
-        let myself = self.clone();
+        let chain_key = self.me_onchain.clone();
+        let mapper = resolver.key_id_mapper();
         let (packet, _) = spawn_fifo_blocking(move || {
             HoprPacket::into_outgoing(
                 &data,
                 &pseudonym,
                 PacketRouting::NoAck::<ValidatedPath>(destination),
-                &myself.me_onchain,
+                &chain_key,
                 next_ticket,
-                &myself.caches.key_id_mapper,
+                &mapper,
                 &domain_separator,
                 None, // NoAck messages currently do not have signals
             )
@@ -417,7 +404,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         signals: PacketSignals,
         resolver: &R,
     ) -> Result<OutgoingPacket, DbError>
-    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static {
+    where R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
             ResolvedTransportRouting::Forward {
@@ -434,9 +421,8 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 },
             ),
             ResolvedTransportRouting::Return(sender_id, surb) => {
-                let next = self
-                    .caches
-                    .key_id_mapper
+                let next = resolver
+                    .key_id_mapper()
                     .map_id_to_public(&surb.first_relayer)
                     .ok_or(DbError::MissingAccount)?;
 
@@ -476,22 +462,21 @@ impl HoprDbProtocolOperations for HoprNodeDb {
             TicketBuilder::zero_hop().direction(&self.me_address, &next_peer)
         };
 
-        let domain_separator = self
-            .get_indexer_data(None)
+        let domain_separator = resolver.domain_separators()
             .await?
-            .channels_dst
-            .ok_or_else(|| DbError::LogicalError("failed to fetch the domain separator".into()))?;
-
+            .channel;
+        
         // Construct the outgoing packet
-        let myself = self.clone();
+        let chain_key = self.me_onchain.clone();
+        let mapper = resolver.key_id_mapper();
         let (packet, openers) = spawn_fifo_blocking(move || {
             HoprPacket::into_outgoing(
                 &data,
                 &pseudonym,
                 routing,
-                &myself.me_onchain,
+                &chain_key,
                 next_ticket,
-                &myself.caches.key_id_mapper,
+                &mapper,
                 &domain_separator,
                 signals,
             )
@@ -536,13 +521,14 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         outgoing_ticket_price: HoprBalance,
         resolver: &R,
     ) -> Result<IncomingPacket, DbError>
-    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static {
+    where R: ChainReadChannelOperations + ChainKeyOperations + Send + Sync + 'static {
         let offchain_keypair = pkt_keypair.clone();
         let myself = self.clone();
 
         let start = std::time::Instant::now();
+        let mapper = resolver.key_id_mapper();
         let packet = spawn_fifo_blocking(move || {
-            HoprPacket::from_incoming(&data, &offchain_keypair, sender, &myself.caches.key_id_mapper, |p| {
+            HoprPacket::from_incoming(&data, &offchain_keypair, sender, &mapper, |p| {
                 myself.caches.extract_pseudonym_opener(p)
             })
             .map_err(|error| match error {
@@ -695,23 +681,5 @@ impl HoprNodeDb {
             .channel_epoch(channel.channel_epoch.as_u32());
 
         Ok(ticket_builder)
-    }
-}
-
-#[async_trait::async_trait]
-impl PathAddressResolver for HoprNodeDb {
-    async fn resolve_transport_address(
-        &self,
-        address: &Address,
-    ) -> std::result::Result<Option<OffchainPublicKey>, PathError> {
-        self.resolve_packet_key(address)
-            .await
-            .map_err(|_| PathError::UnknownPeer(address.to_string()))
-    }
-
-    async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> std::result::Result<Option<Address>, PathError> {
-        self.resolve_chain_key(key)
-            .await
-            .map_err(|_| PathError::UnknownPeer(key.to_string()))
     }
 }

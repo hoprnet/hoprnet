@@ -41,13 +41,7 @@ pub trait HoprDbProtocolOperations {
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
     async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, chain_resolver: &R) -> Result<()>
     where R: ChainReadChannelOperations + Send + Sync + 'static;
-
-    /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
-    async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
-
-    /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
-    async fn get_network_ticket_price(&self) -> Result<HoprBalance>;
-
+    
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb>;
 
