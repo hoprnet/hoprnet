@@ -32,10 +32,6 @@ use crate::{
     ticket_manager::TicketManager,
 };
 
-pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
-
-pub const MIN_SURB_RING_BUFFER_SIZE: usize = 1024;
-
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 pub struct HoprDbConfig {
     #[default(true)]
@@ -44,12 +40,6 @@ pub struct HoprDbConfig {
     pub force_create: bool,
     #[default(Duration::from_secs(5))]
     pub log_slow_queries: Duration,
-    #[default(10_000)]
-    #[validate(range(min = MIN_SURB_RING_BUFFER_SIZE))]
-    pub surb_ring_buffer_size: usize,
-    #[default(1000)]
-    #[validate(range(min = 2))]
-    pub surb_distress_threshold: usize,
 }
 
 #[cfg(feature = "sqlite")]
@@ -93,10 +83,7 @@ pub struct HoprDb {
 
 /// Filename for the blockchain-indexing database.
 pub const SQL_DB_INDEX_FILE_NAME: &str = "hopr_index.db";
-/// Filename for the network peers database.
-pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
-/// Filename for the payment tickets database.
-pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
+
 /// Filename for the blockchain logs database (used in snapshots).
 pub const SQL_DB_LOGS_FILE_NAME: &str = "hopr_logs.db";
 

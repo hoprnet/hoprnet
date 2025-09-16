@@ -1,3 +1,5 @@
+use std::error::Error;
+use std::future::Future;
 use std::sync::{Arc, OnceLock};
 
 use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::BoxFuture, pin_mut};
@@ -9,10 +11,8 @@ use hopr_internal_types::{prelude::AcknowledgedTicketStatus, tickets::Acknowledg
 use hopr_primitive_types::prelude::{HoprBalance, IntoEndian, ToHex};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use tracing::{debug, error};
-
-use crate::{
-    OpenTransaction, cache::HoprDbCaches, errors::Result, prelude::DbSqlError, tickets::WrappedTicketSelector,
-};
+use hopr_db_api::errors::DbError;
+use crate::{OpenTransaction, cache::HoprDbCaches, tickets::WrappedTicketSelector, NodeDbTx};
 use crate::node_db::HoprNodeDb;
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
@@ -63,7 +63,7 @@ impl TicketManager {
     }
 
     /// Must be called to start processing tickets into the DB.
-    pub fn start_ticket_processing<S, E>(&self, ticket_notifier: S) -> Result<()>
+    pub fn start_ticket_processing<S, E>(&self, ticket_notifier: S) -> Result<(), DbError>
     where
         S: Sink<AcknowledgedTicket, Error = E> + Send + 'static,
         E: std::error::Error,
@@ -72,7 +72,7 @@ impl TicketManager {
 
         self.incoming_ack_tickets_tx
             .set(tx)
-            .map_err(|_| DbSqlError::LogicalError("ticket processing already started".into()))?;
+            .map_err(|_| DbError::LogicalError("ticket processing already started".into()))?;
 
         // Creates a process to desynchronize storing of the ticket into the database
         // and the processing calls triggering such an operation.
@@ -88,14 +88,12 @@ impl TicketManager {
                 let ticket_inserted = match db_clone
                     .begin_with_config(None, None)
                     .await
-                    .map_err(DbSqlError::BackendError)
+                    .map_err(|e| DbError::SqlError(e.into()))
                 {
                     Ok(transaction) => {
-                        let transaction = OpenTransaction(transaction, crate::TargetDb::Tickets);
-
                         let _quard = mutex_clone.lock().await;
 
-                        if let Err(error) = transaction
+                        if let Err(error) = NodeDbTx(transaction)
                             .perform(|tx| {
                                 Box::pin(async move {
                                     match ticket_op {
@@ -150,7 +148,7 @@ impl TicketManager {
                                                 .await?;
 
                                             if deleted.rows_affected > offset {
-                                                return Err(DbSqlError::LogicalError(format!(
+                                                return Err(DbError::LogicalError(format!(
                                                     "deleted ticket count ({}) must not be more than the ticket index \
                                                      offset {offset}",
                                                     deleted.rows_affected,
@@ -159,10 +157,11 @@ impl TicketManager {
 
                                             ticket::Entity::insert::<ticket::ActiveModel>(ack_ticket.into())
                                                 .exec(tx.as_ref())
-                                                .await?;
+                                                .await
+                                                .map_err(|e| DbError::SqlError(e.into()))?;
                                         }
                                     }
-                                    Ok::<_, DbSqlError>(())
+                                    Ok::<_, DbError>(())
                                 })
                             })
                             .await
@@ -198,18 +197,18 @@ impl TicketManager {
     ///
     /// The [`start_ticket_processing`](TicketManager::start_ticket_processing) method
     /// must be called before calling this method, or it will fail.
-    pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<()> {
+    pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), DbError> {
         let channel = ticket.verified_ticket().channel_id;
         let value = ticket.verified_ticket().amount;
         let epoch = ticket.verified_ticket().channel_epoch;
 
         self.incoming_ack_tickets_tx
             .get()
-            .ok_or(DbSqlError::LogicalError("ticket processing not started".into()))?
+            .ok_or(DbError::LogicalError("ticket processing not started".into()))?
             .clone()
             .try_send(TicketOperation::Insert(ticket))
             .map_err(|e| {
-                DbSqlError::LogicalError(format!(
+                DbError::LogicalError(format!(
                     "failed to enqueue acknowledged ticket processing into the DB: {e}"
                 ))
             })?;
@@ -236,23 +235,23 @@ impl TicketManager {
     ///
     /// The [`start_ticket_processing`](TicketManager::start_ticket_processing) method
     /// must be called before calling this method, or it will fail.
-    pub async fn replace_tickets(&self, ticket: AcknowledgedTicket) -> Result<()> {
+    pub async fn replace_tickets(&self, ticket: AcknowledgedTicket) -> Result<(), DbError> {
         self.incoming_ack_tickets_tx
             .get()
-            .ok_or(DbSqlError::LogicalError("ticket processing not started".into()))?
+            .ok_or(DbError::LogicalError("ticket processing not started".into()))?
             .clone()
             .try_send(TicketOperation::Replace(ticket))
             .map_err(|e| {
-                DbSqlError::LogicalError(format!(
+                DbError::LogicalError(format!(
                     "failed to enqueue acknowledged ticket processing into the DB: {e}"
                 ))
             })
     }
 
     /// Get unrealized value for a channel
-    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance> {
+    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, DbError> {
         if !selector.is_single_channel() {
-            return Err(crate::DbSqlError::LogicalError(
+            return Err(crate::DbError::LogicalError(
                 "selector must represent a single channel".into(),
             ));
         }
@@ -268,21 +267,16 @@ impl TicketManager {
             .unrealized_value
             .try_get_with_by_ref(&(channel_id, channel_epoch), async move {
                 tracing::warn!(%channel_id, %channel_epoch, "cache miss on unrealized value");
-                OpenTransaction(
-                    tickets_db
-                        .begin_with_config(None, None)
-                        .await
-                        .map_err(DbSqlError::BackendError)?,
-                    crate::TargetDb::Tickets,
-                )
+                NodeDbTx::new(&tickets_db)
+                .await?
                 .perform(|tx| {
                     Box::pin(async move {
                         ticket::Entity::find()
                             .filter(selector_clone)
                             .stream(tx.as_ref())
                             .await
-                            .map_err(crate::errors::DbSqlError::from)?
-                            .map_err(crate::errors::DbSqlError::from)
+                            .map_err(|e| DbError::SqlError(e.into()))?
+                            .map_err(|e| DbError::SqlError(e.into()))
                             .try_fold(HoprBalance::zero(), |value, t| async move {
                                 Ok(value + HoprBalance::from_be_bytes(t.amount))
                             })
@@ -294,25 +288,34 @@ impl TicketManager {
             .await?)
     }
 
-    /// Acquires write lock to the Ticket DB and starts a new transaction.
-    pub async fn with_write_locked_db<'a, F, T, E>(&'a self, f: F) -> std::result::Result<T, E>
+
+    /// Creates a transaction into the DB that acquires a write-lock
+    pub fn write_locked_tx(&self) -> impl OpenTransaction {
+        WriteLockedNodeTx(NodeDbTx::new(&self.tickets_db), self.mutex.clone())
+    }
+
+}
+
+struct WriteLockedNodeTx(NodeDbTx, Arc<async_lock::Mutex<()>>);
+
+impl OpenTransaction for WriteLockedNodeTx {
+    async fn perform<F, Fut, T, E>(self, callback: F) -> Result<T, E>
     where
-        F: for<'c> FnOnce(&'c OpenTransaction) -> BoxFuture<'c, std::result::Result<T, E>> + Send,
+        F: for<'c> FnOnce(&'c Self) -> Fut + Send,
+        Fut: Future<Output=Result<T, E>> + Send,
         T: Send,
-        E: std::error::Error + From<crate::errors::DbSqlError>,
+        E: Error + From<DbError> + Send
     {
-        let mutex = self.mutex.clone();
-        let _guard = mutex.lock().await;
+        let _g = self.1.lock().await;
+        self.0.perform(callback)
+    }
 
-        let transaction = OpenTransaction(
-            self.tickets_db
-                .begin_with_config(None, None)
-                .await
-                .map_err(crate::errors::DbSqlError::BackendError)?,
-            crate::TargetDb::Tickets,
-        );
+    async fn commit(self) -> Result<(), DbError> {
+        self.0.commit().await
+    }
 
-        transaction.perform(f).await
+    async fn rollback(self) -> Result<(), DbError> {
+        self.0.rollback().await
     }
 }
 
@@ -322,7 +325,7 @@ impl HoprNodeDb {
     ///
     /// If the notifier is given, it will receive notifications once a new ticket has been
     /// persisted into the Tickets DB.
-    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> crate::errors::Result<()> {
+    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> Result<(), DbError> {
         if let Some(notifier) = ticket_notifier {
             self.ticket_manager.start_ticket_processing(notifier)
         } else {

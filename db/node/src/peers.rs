@@ -16,8 +16,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryF
 use sea_query::{Condition, Expr, IntoCondition, Order};
 use sqlx::types::chrono::{self, DateTime, Utc};
 use tracing::{error, trace};
-
-use crate::{db::HoprDb, prelude::DbSqlError};
+use hopr_db_api::prelude::DbError;
 use crate::node_db::HoprNodeDb;
 
 const DB_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
@@ -76,8 +75,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
         let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-            .await
-            .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
+            .await?;
 
         let new_peer = hopr_db_entity::network_peer::ActiveModel {
             packet_key: sea_orm::ActiveValue::Set(Vec::from(pubkey.as_ref())),
@@ -91,12 +89,12 @@ impl HoprDbPeersOperations for HoprNodeDb {
                     SingleSumSMA::<f64>::new(quality_window as usize),
                     DB_BINCODE_CONFIGURATION,
                 )
-                .map_err(|_| crate::errors::DbSqlError::DecodingError)?,
+                .map_err(|e| DbError::LogicalError(format!("cannot serialize sma: {e}")))?,
             )),
             ..Default::default()
         };
 
-        let _ = new_peer.insert(&self.peers_db).await.map_err(DbSqlError::from)?;
+        let _ = new_peer.insert(&self.peers_db).await.map_err(|e| DbError::SqlError(e.into()))?;
 
         Ok(())
     }
@@ -112,22 +110,18 @@ impl HoprDbPeersOperations for HoprNodeDb {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
         let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-            .await
-            .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
+            .await?;
 
         let res = hopr_db_entity::network_peer::Entity::delete_many()
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(pubkey.as_ref())))
             .exec(&self.peers_db)
             .await
-            .map_err(DbSqlError::from)?;
+            .map_err(|e| DbError::SqlError(e.into()))?;
 
         if res.rows_affected > 0 {
             Ok(())
         } else {
-            Err(
-                crate::errors::DbSqlError::LogicalError("peer cannot be removed because it does not exist".into())
-                    .into(),
-            )
+            Err(DbError::LogicalError("peer cannot be removed because it does not exist".into()))
         }
     }
 
@@ -143,7 +137,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(new_status.id.0.as_ref())))
             .one(&self.peers_db)
             .await
-            .map_err(DbSqlError::from)?;
+            .map_err(DbError::from)?;
 
         if let Some(model) = row {
             let mut peer_data: hopr_db_entity::network_peer::ActiveModel = model.into();
@@ -163,17 +157,17 @@ impl HoprDbPeersOperations for HoprNodeDb {
             peer_data.quality = sea_orm::ActiveValue::Set(new_status.quality);
             peer_data.quality_sma = sea_orm::ActiveValue::Set(Some(
                 bincode::serde::encode_to_vec(&new_status.quality_avg, DB_BINCODE_CONFIGURATION)
-                    .map_err(|e| crate::errors::DbSqlError::LogicalError(format!("cannot serialize sma: {e}")))?,
+                    .map_err(|e| DbError::LogicalError(format!("cannot serialize sma: {e}")))?,
             ));
             peer_data.backoff = sea_orm::ActiveValue::Set(Some(new_status.backoff));
             peer_data.heartbeats_sent = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_sent as i32));
             peer_data.heartbeats_successful = sea_orm::ActiveValue::Set(Some(new_status.heartbeats_succeeded as i32));
 
-            peer_data.update(&self.peers_db).await.map_err(DbSqlError::from)?;
+            peer_data.update(&self.peers_db).await.map_err(|e| DbError::SqlError(e.into()))?;
 
             Ok(())
         } else {
-            Err(crate::errors::DbSqlError::LogicalError(format!(
+            Err(DbError::LogicalError(format!(
                 "cannot update a non-existing peer '{}'",
                 new_status.id.1
             ))
@@ -192,13 +186,12 @@ impl HoprDbPeersOperations for HoprNodeDb {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
         let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-            .await
-            .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
+            .await?;
         let row = hopr_db_entity::network_peer::Entity::find()
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(pubkey.as_ref())))
             .one(&self.peers_db)
             .await
-            .map_err(DbSqlError::from)?;
+            .map_err(|e| DbError::SqlError(e.into()))?;
 
         if let Some(model) = row {
             let status: WrappedPeerStatus = model.try_into()?;
@@ -223,7 +216,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
             )
             .stream(&self.peers_db)
             .await
-            .map_err(DbSqlError::from)?;
+            .map_err(|e| DbError::SqlError(e.into()))?;
 
         Ok(Box::pin(stream! {
             loop {
@@ -265,7 +258,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
                 )
                 .count(&self.peers_db)
                 .await
-                .map_err(DbSqlError::from)? as u32,
+                .map_err(|e| DbError::SqlError(e.into()))? as u32,
             good_quality_non_public: 0u32, // TODO: Only public peers supported in v3
             bad_quality_public: hopr_db_entity::network_peer::Entity::find()
                 .filter(
@@ -275,7 +268,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
                 )
                 .count(&self.peers_db)
                 .await
-                .map_err(DbSqlError::from)? as u32,
+                .map_err(|e| DbError::SqlError(e.into()))? as u32,
             bad_quality_non_public: 0u32, // TODO: Only public peers supported in v3
         })
     }
@@ -290,13 +283,13 @@ impl From<PeerStatus> for WrappedPeerStatus {
 }
 
 impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
-    type Error = crate::errors::DbSqlError;
+    type Error = DbError;
 
     fn try_from(value: hopr_db_entity::network_peer::Model) -> std::result::Result<Self, Self::Error> {
-        let key = OffchainPublicKey::try_from(value.packet_key.as_slice()).map_err(|_| Self::Error::DecodingError)?;
+        let key = OffchainPublicKey::try_from(value.packet_key.as_slice())?;
         Ok(PeerStatus {
             id: (key, key.into()),
-            origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::DecodingError)?,
+            origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::LogicalError("invalid origin".into()))?,
             last_seen: value.last_seen.into(),
             last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,
@@ -316,9 +309,9 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
                         .filter(|s| !s.trim().is_empty())
                         .map(Multiaddr::try_from)
                         .collect::<std::result::Result<Vec<_>, multiaddr::Error>>()
-                        .map_err(|_| Self::Error::DecodingError)
+                        .map_err(|e| Self::Error::LogicalError("invalid multi-address".into()))
                 } else {
-                    Err(Self::Error::DecodingError)
+                    Err(Self::Error::LogicalError("invalid multi-addresses".into()))
                 }?
             },
             quality: value.quality,
@@ -330,7 +323,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
                 DB_BINCODE_CONFIGURATION,
             )
             .map(|(v, _bytes)| v)
-            .map_err(|_| Self::Error::DecodingError)?,
+            .map_err(|_| Self::Error::LogicalError("cannot deserialize SMA".into()))?,
         }
         .into())
     }

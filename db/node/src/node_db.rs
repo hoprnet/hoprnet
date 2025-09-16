@@ -2,9 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use futures::channel::mpsc::UnboundedSender;
-use sea_orm::{ActiveModelTrait, EntityTrait, Set, SqlxSqliteConnector};
-use sea_query::Expr;
+use futures::TryFutureExt;
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set, SqlxSqliteConnector, QueryFilter, ColumnTrait};
 use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
@@ -12,24 +11,41 @@ use tracing::debug;
 use tracing::log::LevelFilter;
 use validator::Validate;
 use hopr_crypto_types::keypairs::ChainKeypair;
+use hopr_crypto_types::prelude::Keypair;
+use hopr_db_api::errors::DbError;
 use hopr_db_api::info::SafeInfo;
-use hopr_db_entity::{node_info, ticket};
-use hopr_db_entity::prelude::{Account, Announcement};
-use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
+use hopr_db_entity::{node_info,};
 use hopr_primitive_types::prelude::ToHex;
+use hopr_primitive_types::primitives::Address;
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 
-use crate::accounts::model_to_account_entry;
 use crate::cache::{CachedValue, CachedValueDiscriminants, HoprDbCaches};
-use crate::db::{DbConnection, HoprDbConfig, HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS, SQL_DB_INDEX_FILE_NAME, SQL_DB_LOGS_FILE_NAME, SQL_DB_PEERS_FILE_NAME, SQL_DB_TICKETS_FILE_NAME};
-use crate::errors::DbSqlError;
-use crate::{OptTx, SINGULAR_TABLE_FIXED_ID};
-use crate::errors::DbSqlError::MissingFixedTableEntry;
+use crate::{NodeDbTx, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
 use crate::ticket_manager::TicketManager;
 
-#[derive(Clone, Debug, validator::Validate)]
-pub struct HoprNodeDbConfig {
+/// Filename for the network peers database.
+pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
+/// Filename for the payment tickets database.
+pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
 
+pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
+
+pub const MIN_SURB_RING_BUFFER_SIZE: usize = 1024;
+
+#[derive(Clone, Debug, validator::Validate, smart_default::SmartDefault)]
+pub struct HoprNodeDbConfig {
+    #[default(true)]
+    pub create_if_missing: bool,
+    #[default(false)]
+    pub force_create: bool,
+    #[default(Duration::from_secs(5))]
+    pub log_slow_queries: Duration,
+    #[default(10_000)]
+    #[validate(range(min = MIN_SURB_RING_BUFFER_SIZE))]
+    pub surb_ring_buffer_size: usize,
+    #[default(1000)]
+    #[validate(range(min = 2))]
+    pub surb_distress_threshold: usize,
 }
 
 #[derive(Clone)]
@@ -38,12 +54,13 @@ pub struct HoprNodeDb {
     pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) caches: Arc<HoprDbCaches>,
-    me_onchain: ChainKeypair,
-    cfg: HoprNodeDbConfig,
+    pub(crate) me_onchain: ChainKeypair,
+    pub(crate) me_address: Address,
+    pub(crate) cfg: HoprNodeDbConfig,
 }
 
 impl HoprNodeDb {
-    pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprNodeDbConfig) -> crate::errors::Result<Self> {
+    pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprNodeDbConfig) -> Result<Self, DbError> {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
@@ -52,10 +69,10 @@ impl HoprNodeDb {
         }
 
         cfg.validate()
-            .map_err(|e| DbSqlError::Construction(format!("failed configuration validation: {e}")))?;
+            .map_err(|e| DbError::General(format!("failed configuration validation: {e}")))?;
 
         fs::create_dir_all(directory)
-            .map_err(|_e| DbSqlError::Construction(format!("cannot create main database directory {directory:?}")))?;
+            .map_err(|_e| DbError::General(format!("cannot create main database directory {directory:?}")))?;
 
         let peers_options = PoolOptions::new()
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
@@ -87,15 +104,15 @@ impl HoprNodeDb {
     }
 
     #[cfg(feature = "sqlite")]
-    pub async fn new_in_memory(chain_key: ChainKeypair) -> crate::errors::Result<Self> {
+    pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self, DbError> {
         Self::new_sqlx_sqlite(
             chain_key,
             SqlitePool::connect(":memory:")
                 .await
-                .map_err(|e| DbSqlError::Construction(e.to_string()))?,
+                .map_err(|e| DbError::General(e.to_string()))?,
             SqlitePool::connect(":memory:")
                 .await
-                .map_err(|e| DbSqlError::Construction(e.to_string()))?,
+                .map_err(|e| DbError::General(e.to_string()))?,
             Default::default(),
         )
             .await
@@ -107,18 +124,18 @@ impl HoprNodeDb {
         peers_db_pool: SqlitePool,
         tickets_db_pool: SqlitePool,
         cfg: HoprNodeDbConfig,
-    ) -> crate::errors::Result<Self> {
+    ) -> Result<Self, DbError> {
         let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db_pool);
 
         MigratorTickets::up(&tickets_db, None)
             .await
-            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
+            .map_err(|e| DbError::General(format!("cannot apply database migration: {e}")))?;
 
         let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db_pool);
 
         MigratorPeers::up(&peers_db, None)
             .await
-            .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
+            .map_err(|e| DbError::General(format!("cannot apply database migration: {e}")))?;
 
         // Reset the peer network information
         let res = hopr_db_entity::network_peer::Entity::delete_many()
@@ -140,18 +157,8 @@ impl HoprNodeDb {
             )
             .exec(&peers_db)
             .await
-            .map_err(|e| DbSqlError::Construction(format!("must reset peers on init: {e}")))?;
+            .map_err(|e| DbError::General(format!("must reset peers on init: {e}")))?;
         debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
-
-        // Reset all BeingAggregated ticket states to Untouched
-        ticket::Entity::update_many()
-            .filter(ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
-            .col_expr(
-                ticket::Column::State,
-                Expr::value(AcknowledgedTicketStatus::Untouched as u8),
-            )
-            .exec(&tickets_db)
-            .await?;
 
         let caches = Arc::new(HoprDbCaches::default());
         caches.invalidate_all();
@@ -177,19 +184,20 @@ impl HoprNodeDb {
             tickets_db,
             peers_db,
             caches,
+            me_address: me_onchain.public().to_address(),
             me_onchain,
             cfg,
         })
     }
 
-    pub async fn create_pool(
+    async fn create_pool(
         cfg: HoprNodeDbConfig,
         directory: PathBuf,
         mut options: PoolOptions<sqlx::Sqlite>,
         min_conn: Option<u32>,
         max_conn: Option<u32>,
         path: &str,
-    ) -> crate::errors::Result<SqlitePool> {
+    ) -> Result<SqlitePool, DbError> {
         if let Some(min_conn) = min_conn {
             options = options.min_connections(min_conn);
         }
@@ -207,20 +215,19 @@ impl HoprNodeDb {
             //.optimize_on_close(true, None) // Removed, because it causes optimization on each connection, due to min_connections being set to 0
             .page_size(4096)
             .pragma("cache_size", "-30000") // 32M
-            .pragma("busy_timeout", "1000") // 1000ms
+            .pragma("busy_timeout", "1000"); // 1000ms
 
         let pool = options
             .connect_with(sqlite_cfg.filename(directory.join(path)))
             .await
-            .map_err(|e| DbSqlError::Construction(format!("failed to create {path} database: {e}")))?;
+            .map_err(|e| DbError::General(format!("failed to create {path} database: {e}")))?;
 
         Ok(pool)
     }
 
-
     // TODO: move this into separate trait
 
-    async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> crate::errors::Result<Option<SafeInfo>> {
+    async fn get_safe_info<'a>(&'a self, tx: OptTx<'a, TargetNodeDb>) -> crate::errors::Result<Option<SafeInfo>> {
         let myself = self.clone();
         Ok(self
             .caches
@@ -256,7 +263,7 @@ impl HoprNodeDb {
             .try_into()?)
     }
 
-    async fn set_safe_info<'a>(&'a self, tx: OptTx<'a>, safe_info: SafeInfo) -> crate::errors::Result<()> {
+    async fn set_safe_info<'a>(&'a self, tx: OptTx<'a, TargetNodeDb>, safe_info: SafeInfo) -> crate::errors::Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {

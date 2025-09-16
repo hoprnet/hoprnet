@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use async_trait::async_trait;
 use hopr_crypto_types::prelude::Hash;
 use hopr_primitive_types::prelude::{Address, SerializableLog};
@@ -6,6 +7,49 @@ use crate::errors::Result;
 
 #[async_trait]
 pub trait HoprDbLogOperations {
+    /// Import logs-database from a snapshot directory.
+    ///
+    /// Replaces all data in the current logs database with data from a snapshot's
+    /// `hopr_logs.db` file. This is used for fast synchronization during node startup.
+    ///
+    /// # Process
+    ///
+    /// 1. Attaches the source database from the snapshot directory
+    /// 2. Clears existing data from all logs-related tables
+    /// 3. Copies all data from the snapshot database
+    /// 4. Detaches the source database
+    ///
+    /// All operations are performed within a single transaction for atomicity.
+    ///
+    /// # Arguments
+    ///
+    /// * `src_dir` - Directory containing the extracted snapshot with `hopr_logs.db`
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on successful import, or [`DbSqlError::Construction`] if the source
+    /// database doesn't exist or the import operation fails.
+    ///
+    /// # Errors
+    ///
+    /// - Returns error if `hopr_logs.db` is not found in the source directory
+    /// - Returns error if SQLite ATTACH, data transfer, or DETACH operations fail
+    /// - All database errors are wrapped in [`DbSqlError::Construction`]
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use std::path::PathBuf;
+    /// # use hopr_db_sql::HoprDbLogOperations;
+    /// # async fn example(db: impl HoprDbLogOperations) -> Result<(), Box<dyn std::error::Error>> {
+    /// let snapshot_dir = PathBuf::from("/tmp/snapshot_extracted");
+    /// db.import_logs_db(snapshot_dir).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn import_logs_db(self, src_dir: PathBuf) -> Result<()>;
+
+
     /// Ensures that logs in this database have been created by scanning the given contract address
     /// and their corresponding topics. If the log DB is empty, the given addresses and topics
     /// are used to prime the table.

@@ -7061,6 +7061,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "node"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-lock 3.4.1",
+ "async-stream",
+ "async-trait",
+ "bincode",
+ "chrono",
+ "dashmap",
+ "futures",
+ "hex",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-crypto-packet",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-entity",
+ "hopr-db-migration",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-network-types",
+ "hopr-parallelize",
+ "hopr-path",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p-identity",
+ "moka",
+ "multiaddr",
+ "parking_lot",
+ "rand 0.8.5",
+ "ringbuffer",
+ "sea-orm",
+ "sea-query",
+ "sea-query-binder",
+ "smart-default",
+ "sqlx",
+ "strum 0.27.2",
+ "thiserror 2.0.16",
+ "tokio",
+ "tracing",
+ "validator",
+]
+
+[[package]]
 name = "nohash-hasher"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

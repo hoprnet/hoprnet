@@ -9,44 +9,30 @@ use std::{
 
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{StreamExt, TryStreamExt, stream::BoxStream};
+use futures::{StreamExt, TryStreamExt, stream::BoxStream, FutureExt};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::{
-    errors::Result,
-    info::DomainSeparator,
     prelude::{TicketIndexSelector, TicketMarker},
-    resolver::HoprDbResolverOperations,
-    tickets::{AggregationPrerequisites, ChannelTicketStatistics, HoprDbTicketOperations, TicketSelector},
+    tickets::{ChannelTicketStatistics, HoprDbTicketOperations, TicketSelector},
 };
 use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
 use hopr_internal_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::MultiGauge;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait};
 use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace, warn};
-
-use crate::{
-    HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb,
-    channels::HoprDbChannelOperations,
-    db::HoprDb,
-    errors::{DbSqlError, DbSqlError::LogicalError},
-    info::HoprDbInfoOperations,
-};
+use hopr_db_api::errors::DbError;
 use crate::node_db::HoprNodeDb;
+use crate::{NodeDbTx, OpenTransaction};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    pub static ref METRIC_HOPR_TICKETS_INCOMING_STATISTICS: MultiGauge = MultiGauge::new(
+    pub static ref METRIC_HOPR_TICKETS_INCOMING_STATISTICS: hopr_metrics::metrics::MultiGauge = hopr_metrics::metrics::MultiGauge::new(
         "hopr_tickets_incoming_statistics",
         "Ticket statistics for channels with incoming tickets.",
         &["channel", "statistic"]
     ).unwrap();
 }
-
-/// The maximum number of tickets that can sent for aggregation in a single request.
-pub const MAX_TICKETS_TO_AGGREGATE_BATCH: u64 = 500;
 
 /// The type is necessary solely to allow
 /// implementing the [`IntoCondition`] trait for [`TicketSelector`]
@@ -149,13 +135,14 @@ impl IntoCondition for WrappedTicketSelector {
 }
 
 pub(crate) async fn find_stats_for_channel(
-    tx: &OpenTransaction,
+    tx: &NodeDbTx,
     channel_id: &Hash,
-) -> crate::errors::Result<ticket_statistics::Model> {
+) -> Result<ticket_statistics::Model, DbError> {
     if let Some(model) = ticket_statistics::Entity::find()
         .filter(ticket_statistics::Column::ChannelId.eq(channel_id.to_hex()))
-        .one(tx.as_ref())
-        .await?
+        .one(&tx.0)
+        .await
+        .map_err(|e| DbError::SqlError(e.into()))?
     {
         Ok(model)
     } else {
@@ -164,7 +151,8 @@ pub(crate) async fn find_stats_for_channel(
             ..Default::default()
         }
         .insert(tx.as_ref())
-        .await?;
+        .await
+        .map_err(|e| DbError::SqlError(e.into()))?;
 
         Ok(new_stats)
     }
@@ -172,9 +160,8 @@ pub(crate) async fn find_stats_for_channel(
 
 #[async_trait]
 impl HoprDbTicketOperations for HoprNodeDb {
-    async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>> {
-        Ok(self
-            .nest_transaction_in_db(None, TargetDb::Tickets)
+    async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>, DbError> {
+        Ok(NodeDbTx::new(&self.tickets_db)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -184,18 +171,17 @@ impl HoprDbTicketOperations for HoprNodeDb {
                         .into_iter()
                         .map(AcknowledgedTicket::try_from)
                         .collect::<hopr_db_entity::errors::Result<Vec<_>>>()
-                        .map_err(DbSqlError::from)
+                        .map_err(DbError::from)
                 })
             })
             .await?)
     }
 
-    async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>> {
+    async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>, DbError> {
         debug!("fetching tickets via {selector}");
         let selector: WrappedTicketSelector = selector.into();
 
-        Ok(self
-            .nest_transaction_in_db(None, TargetDb::Tickets)
+        Ok(NodeDbTx::new(&self.tickets_db)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -206,17 +192,18 @@ impl HoprDbTicketOperations for HoprNodeDb {
                         .into_iter()
                         .map(AcknowledgedTicket::try_from)
                         .collect::<hopr_db_entity::errors::Result<Vec<_>>>()
-                        .map_err(DbSqlError::from)
+                        .map_err(DbError::from)
                 })
             })
             .await?)
     }
 
-    async fn mark_tickets_as(&self, selector: TicketSelector, mark_as: TicketMarker) -> Result<usize> {
+    async fn mark_tickets_as(&self, selector: TicketSelector, mark_as: TicketMarker) -> Result<usize, DbError> {
         let myself = self.clone();
         Ok(self
             .ticket_manager
-            .with_write_locked_db(|tx| {
+            .write_locked_tx()
+            .perform(|tx| {
                 Box::pin(async move {
                     let mut total_marked_count = 0;
                     for (channel_id, epoch) in selector.channel_identifiers.iter() {
@@ -286,7 +273,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
                                 myself.caches.unrealized_value.invalidate(&(*channel_id, *epoch)).await;
                             } else {
-                                return Err(DbSqlError::LogicalError(format!(
+                                return Err(DbError::LogicalError(format!(
                                     "could not mark {marked_count} ticket as {mark_as}"
                                 )));
                             }
@@ -308,12 +295,13 @@ impl HoprDbTicketOperations for HoprNodeDb {
             .await?)
     }
 
-    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<()> {
+    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<(), DbError> {
         let channel_id = ticket.channel_id;
         let amount = ticket.amount;
         Ok(self
             .ticket_manager
-            .with_write_locked_db(|tx| {
+            .write_locked_tx()
+            .perform(|tx| {
                 Box::pin(async move {
                     let stats = find_stats_for_channel(tx, &channel_id).await?;
 
@@ -331,7 +319,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                         );
                     }
 
-                    Ok::<(), DbSqlError>(())
+                    Ok::<(), DbError>(())
                 })
             })
             .await?)
@@ -341,12 +329,12 @@ impl HoprDbTicketOperations for HoprNodeDb {
         &'a self,
         selector: TicketSelector,
         new_state: AcknowledgedTicketStatus,
-    ) -> Result<BoxStream<'a, AcknowledgedTicket>> {
+    ) -> Result<BoxStream<'a, AcknowledgedTicket>, DbError> {
         let selector: WrappedTicketSelector = selector.into();
         Ok(Box::pin(stream! {
             match ticket::Entity::find()
                 .filter(selector)
-                .stream(self.conn(TargetDb::Tickets))
+                .stream(&self.tickets_db)
                 .await {
                 Ok(mut stream) => {
                     while let Ok(Some(ticket)) = stream.try_next().await {
@@ -358,7 +346,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
                         {
                             let _g = self.ticket_manager.mutex.lock();
-                            if let Err(e) = active_ticket.update(self.conn(TargetDb::Tickets)).await {
+                            if let Err(e) = active_ticket.update(&self.tickets_db).await {
                                 error!(error = %e,"failed to update ticket in the db");
                             }
                         }
@@ -384,30 +372,31 @@ impl HoprDbTicketOperations for HoprNodeDb {
         &self,
         selector: TicketSelector,
         new_state: AcknowledgedTicketStatus,
-    ) -> Result<usize> {
+    ) -> Result<usize, DbError> {
         let selector: WrappedTicketSelector = selector.into();
         Ok(self
             .ticket_manager
-            .with_write_locked_db(|tx| {
+            .write_locked_tx()
+            .perform(|tx| {
                 Box::pin(async move {
                     let update = ticket::Entity::update_many()
                         .filter(selector)
                         .col_expr(ticket::Column::State, Expr::value(new_state as u8))
                         .exec(tx.as_ref())
                         .await?;
-                    Ok::<_, DbSqlError>(update.rows_affected as usize)
+                    Ok::<_, DbError>(update.rows_affected as usize)
                 })
             })
             .await?)
     }
 
-    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics> {
+    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics, DbError> {
         let res = match channel_id {
             None => {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 let mut per_channel_unredeemed = std::collections::HashMap::new();
 
-                self.nest_transaction_in_db(None, TargetDb::Tickets)
+                NodeDbTx::new(&self.tickets_db)
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
@@ -469,7 +458,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
                             all_stats.unredeemed_value = unredeemed_value.into();
 
-                            Ok::<_, DbSqlError>(all_stats)
+                            Ok::<_, DbError>(all_stats)
                         })
                     })
                     .await
@@ -478,10 +467,10 @@ impl HoprDbTicketOperations for HoprNodeDb {
                 // We need to make sure the channel exists to avoid creating
                 // statistic entry for a non-existing channel
                 if self.get_channel_by_id(None, &channel).await?.is_none() {
-                    return Err(DbSqlError::ChannelNotFound(channel).into());
+                    return Err(DbError::ChannelNotFound(channel).into());
                 }
 
-                self.nest_transaction_in_db(None, TargetDb::Tickets)
+                NodeDbTx::new(&self.tickets_db)
                     .await?
                     .perform(|tx| {
                         Box::pin(async move {
@@ -495,7 +484,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                 })
                                 .await?;
 
-                            Ok::<_, DbSqlError>(ChannelTicketStatistics {
+                            Ok::<_, DbError>(ChannelTicketStatistics {
                                 winning_tickets: stats.winning_tickets as u128,
                                 neglected_value: HoprBalance::from_be_bytes(stats.neglected_value),
                                 redeemed_value: HoprBalance::from_be_bytes(stats.redeemed_value),
@@ -510,9 +499,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(res?)
     }
 
-    async fn reset_ticket_statistics(&self) -> Result<()> {
-        let res = self
-            .nest_transaction_in_db(None, TargetDb::Tickets)
+    async fn reset_ticket_statistics(&self) -> Result<(), DbError> {
+        let res = NodeDbTx::new(&self.tickets_db)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -537,7 +525,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
                     debug!("reset ticket statistics for {:} channel(s)", deleted.rows_affected);
 
-                    Ok::<_, DbSqlError>(())
+                    Ok::<_, DbError>(())
                 })
             })
             .await;
@@ -545,11 +533,11 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(res?)
     }
 
-    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance)> {
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance), DbError> {
         self.get_tickets_value_int(None, selector).await
     }
 
-    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64> {
+    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64, DbError> {
         let old_value = self
             .get_outgoing_ticket_index(channel_id)
             .await?
@@ -561,7 +549,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn reset_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64> {
+    async fn reset_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, DbError> {
         let old_value = self
             .get_outgoing_ticket_index(channel_id)
             .await?
@@ -573,7 +561,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64> {
+    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, DbError> {
         let old_value = self
             .get_outgoing_ticket_index(channel_id)
             .await?
@@ -584,7 +572,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>> {
+    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>, DbError> {
         let tkt_manager = self.ticket_manager.clone();
 
         Ok(self
@@ -600,7 +588,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     Some(model) => U256::from_be_bytes(model.index).as_u64(),
                     None => {
                         tkt_manager
-                            .with_write_locked_db(|tx| {
+                            .write_locked_tx()
+                            .perform(|tx| {
                                 Box::pin(async move {
                                     outgoing_ticket_index::ActiveModel {
                                         channel_id: Set(channel_id.to_hex()),
@@ -608,7 +597,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                     }
                                     .insert(tx.as_ref())
                                     .await?;
-                                    Ok::<_, DbSqlError>(())
+                                    Ok::<_, DbError>(())
                                 })
                             })
                             .await?;
@@ -617,18 +606,18 @@ impl HoprDbTicketOperations for HoprNodeDb {
                 })))
             })
             .await
-            .map_err(|e: Arc<DbSqlError>| LogicalError(format!("failed to retrieve ticket index: {e}")))?)
+            .map_err(|e: Arc<DbError>| DbError::LogicalError(format!("failed to retrieve ticket index: {e}")))?)
     }
 
-    async fn persist_outgoing_ticket_indices(&self) -> Result<usize> {
+    async fn persist_outgoing_ticket_indices(&self) -> Result<usize, DbError> {
         let outgoing_indices = outgoing_ticket_index::Entity::find()
             .all(&self.tickets_db)
             .await
-            .map_err(DbSqlError::from)?;
+            .map_err(DbError::from)?;
 
         let mut updated = 0;
         for index_model in outgoing_indices {
-            let channel_id = Hash::from_hex(&index_model.channel_id).map_err(DbSqlError::from)?;
+            let channel_id = Hash::from_hex(&index_model.channel_id).map_err(DbError::from)?;
             let db_index = U256::from_be_bytes(&index_model.index).as_u64();
             if let Some(cached_index) = self.caches.ticket_index.get(&channel_id).await {
                 // Note that the persisted value is always lagging behind the cache,
@@ -641,10 +630,11 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     let mut index_active_model = index_model.into_active_model();
                     index_active_model.index = Set(cached_index.to_be_bytes().to_vec());
                     self.ticket_manager
-                        .with_write_locked_db(|wtx| {
+                        .write_locked_tx()
+                        .perform(|wtx| {
                             Box::pin(async move {
                                 index_active_model.save(wtx.as_ref()).await?;
-                                Ok::<_, DbSqlError>(())
+                                Ok::<_, DbError>(())
                             })
                         })
                         .await?;
@@ -659,11 +649,11 @@ impl HoprDbTicketOperations for HoprNodeDb {
             }
         }
 
-        Ok(Ok::<_, DbSqlError>(updated)?)
+        Ok(Ok::<_, DbError>(updated)?)
     }
 
 
-    async fn fix_channels_next_ticket_state(&self) -> Result<()> {
+    async fn fix_channels_next_ticket_state(&self) -> Result<(),DbError> {
         let channels = self.get_incoming_channels(None).await?;
 
         for channel in channels.into_iter() {
@@ -689,51 +679,59 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
 impl HoprNodeDb {
     /// Used only by non-SQLite code and tests.
-    pub async fn upsert_ticket<'a>(&'a self, tx: OptTx<'a>, acknowledged_ticket: AcknowledgedTicket) -> Result<()> {
-        self.nest_transaction_in_db(tx, TargetDb::Tickets)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    // For upserting, we must select only by the triplet (channel id, epoch, index)
-                    let selector = WrappedTicketSelector::from(
-                        TicketSelector::new(
-                            acknowledged_ticket.verified_ticket().channel_id,
-                            acknowledged_ticket.verified_ticket().channel_epoch,
-                        )
-                        .with_index(acknowledged_ticket.verified_ticket().index),
-                    );
+    pub async fn upsert_ticket<'a>(&'a self, tx: Option<&'a NodeDbTx>, acknowledged_ticket: AcknowledgedTicket) -> Result<(), DbError> {
+        let tx = if let Some(tx) = tx {
+            NodeDbTx(tx.0.begin().await.map_err(|e| DbError::SqlError(e.into()))?)
+        } else {
+            NodeDbTx::new(&self.tickets_db).await?
+        };
 
-                    debug!("upserting ticket {acknowledged_ticket}");
-                    let mut model = ticket::ActiveModel::from(acknowledged_ticket);
+        tx.perform(|tx| {
+            Box::pin(async move {
+                // For upserting, we must select only by the triplet (channel id, epoch, index)
+                let selector = WrappedTicketSelector::from(
+                    TicketSelector::new(
+                        acknowledged_ticket.verified_ticket().channel_id,
+                        acknowledged_ticket.verified_ticket().channel_epoch,
+                    )
+                    .with_index(acknowledged_ticket.verified_ticket().index),
+                );
 
-                    if let Some(ticket) = ticket::Entity::find().filter(selector).one(tx.as_ref()).await? {
-                        model.id = Set(ticket.id);
-                    }
+                debug!("upserting ticket {acknowledged_ticket}");
+                let mut model = ticket::ActiveModel::from(acknowledged_ticket);
 
-                    Ok::<_, DbSqlError>(model.save(tx.as_ref()).await?)
-                })
+                if let Some(ticket) = ticket::Entity::find().filter(selector).one(tx.as_ref()).await? {
+                    model.id = Set(ticket.id);
+                }
+
+                Ok::<_, DbError>(model.save(tx.as_ref()).await?)
             })
-            .await?;
+        })
+        .await?;
         Ok(())
     }
 
     async fn get_tickets_value_int<'a>(
         &'a self,
-        tx: OptTx<'a>,
+        tx: Option<&'a NodeDbTx>,
         selector: TicketSelector,
-    ) -> Result<(usize, HoprBalance)> {
+    ) -> Result<(usize, HoprBalance), DbError> {
+        let tx = if let Some(tx) = tx {
+            NodeDbTx(tx.0.begin().await.map_err(|e| DbError::SqlError(e.into()))?)
+        } else {
+            NodeDbTx::new(&self.tickets_db).await?
+        };
+
         let selector: WrappedTicketSelector = selector.into();
-        Ok(self
-            .nest_transaction_in_db(tx, TargetDb::Tickets)
-            .await?
+        Ok(tx
             .perform(|tx| {
                 Box::pin(async move {
                     ticket::Entity::find()
                         .filter(selector)
                         .stream(tx.as_ref())
                         .await
-                        .map_err(DbSqlError::from)?
-                        .map_err(DbSqlError::from)
+                        .map_err(DbError::from)?
+                        .map_err(DbError::from)
                         .try_fold((0_usize, HoprBalance::zero()), |(count, value), t| async move {
                             Ok((count + 1, value + HoprBalance::from_be_bytes(t.amount)))
                         })

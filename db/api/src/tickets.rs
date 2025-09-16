@@ -255,19 +255,6 @@ pub enum TicketMarker {
     Neglected,
 }
 
-/// Prerequisites for the ticket aggregator.
-/// The prerequisites are **independent** of each other.
-/// If none of the prerequisites are given, they are considered satisfied.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct AggregationPrerequisites {
-    /// Minimum number of tickets in the channel.
-    pub min_ticket_count: Option<usize>,
-    /// Minimum ratio between balance of unaggregated messages and channel stake.
-    /// I.e.: the condition is met if a sum of unaggregated ticket amounts divided by
-    /// the total channel stake is greater than `min_unaggregated_ratio`.
-    pub min_unaggregated_ratio: Option<f64>,
-}
-
 #[async_trait]
 pub trait HoprDbTicketOperations {
     /// Retrieve acknowledged winning tickets, according to the given `selector`.

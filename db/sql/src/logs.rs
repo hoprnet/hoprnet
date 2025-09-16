@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use async_trait::async_trait;
 use futures::{StreamExt, stream};
 use hopr_crypto_types::prelude::Hash;
@@ -11,13 +12,7 @@ use hopr_db_entity::{
     prelude::{Log, LogStatus, LogTopicInfo},
 };
 use hopr_primitive_types::prelude::*;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect,
-    entity::Set,
-    query::QueryTrait,
-    sea_query::{Expr, OnConflict, Value},
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, entity::Set, query::QueryTrait, sea_query::{Expr, OnConflict, Value}, ConnectionTrait};
 use tracing::{error, trace, warn};
 
 use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb, errors::DbSqlError};
@@ -29,6 +24,8 @@ struct BlockNumber {
 
 #[async_trait]
 impl HoprDbLogOperations for HoprDb {
+    
+    
     async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<()> {
         match self.store_logs([log].to_vec()).await {
             Ok(results) => {
@@ -418,6 +415,41 @@ impl HoprDbLogOperations for HoprDb {
                 })
             })
             .await
+    }
+
+    async fn import_logs_db(self, src_dir: PathBuf) -> crate::errors::Result<()> {
+        let src_db_path = src_dir.join("hopr_logs.db");
+        if !src_db_path.exists() {
+            return Err(DbSqlError::Construction(format!(
+                "Source logs database file does not exist: {}",
+                src_db_path.display()
+            )));
+        }
+
+        let sql = format!(
+            r#"
+            ATTACH DATABASE '{}' AS source_logs;
+            BEGIN TRANSACTION;
+            DELETE FROM log;
+            DELETE FROM log_status;
+            DELETE FROM log_topic_info;
+            INSERT INTO log_topic_info SELECT * FROM source_logs.log_topic_info;
+            INSERT INTO log_status SELECT * FROM source_logs.log_status;
+            INSERT INTO log SELECT * FROM source_logs.log;
+            COMMIT;
+            DETACH DATABASE source_logs;
+        "#,
+            src_db_path.to_string_lossy().replace("'", "''")
+        );
+
+        let logs_conn = self.conn(TargetDb::Logs);
+
+        logs_conn
+            .execute_unprepared(sql.as_str())
+            .await
+            .map_err(|e| DbSqlError::Construction(format!("Failed to import logs data: {e}")))?;
+
+        Ok(())
     }
 }
 

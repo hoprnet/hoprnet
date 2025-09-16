@@ -7,6 +7,8 @@ use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_primitive_types::balance::HoprBalance;
 
 use crate::errors::Result;
+use crate::prelude::HoprDbSimpleChannelOperations;
+use crate::resolver::HoprDbResolverOperations;
 
 /// Contains a SURB found in the SURB ring buffer via [`HoprDbProtocolOperations::find_surb`].
 #[derive(Debug)]
@@ -38,7 +40,8 @@ pub trait HoprDbProtocolOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: VerifiedAcknowledgement) -> Result<()>;
+    async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, chain_resolver: &R) -> Result<()>
+    where R: HoprDbSimpleChannelOperations + Send + Sync + 'static;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
     async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
@@ -53,28 +56,33 @@ pub trait HoprDbProtocolOperations {
     fn get_surb_config(&self) -> SurbCacheConfig;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
-    async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket>;
+    async fn to_send_no_ack<R>(&self, data: Box<[u8]>, destination: OffchainPublicKey, resolver: &R) -> Result<OutgoingPacket>
+    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static;
 
     /// Process the data into an outgoing packet
-    async fn to_send(
+    async fn to_send<R>(
         &self,
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
         signals: PacketSignals,
-    ) -> Result<OutgoingPacket>;
+        resolver: &R,
+    ) -> Result<OutgoingPacket>
+    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static;
 
     /// Process the incoming packet into data
     #[allow(clippy::wrong_self_convention)]
-    async fn from_recv(
+    async fn from_recv<R>(
         &self,
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-    ) -> Result<IncomingPacket>;
+        resolver: &R,
+    ) -> Result<IncomingPacket>
+    where R: HoprDbSimpleChannelOperations + HoprDbResolverOperations + Send + Sync + 'static;
 }
 
 /// Contains some miscellaneous information about a received packet.

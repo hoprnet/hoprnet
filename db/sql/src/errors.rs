@@ -18,6 +18,10 @@ pub enum DbSqlError {
 
     #[error("log not found")]
     MissingLog,
+    
+    #[error("invalid target db")]
+    InvalidDb,
+    
 
     #[error("adversarial behavior detected: {0}")]
     PossibleAdversaryError(String),

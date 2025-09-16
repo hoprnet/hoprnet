@@ -9,24 +9,24 @@ pub mod peers;
 pub mod protocol;
 pub mod resolver;
 pub mod tickets;
+pub mod tx;
+pub mod channels;
 
 use crate::{
-    logs::HoprDbLogOperations, peers::HoprDbPeersOperations, protocol::HoprDbProtocolOperations,
+    peers::HoprDbPeersOperations, protocol::HoprDbProtocolOperations,
     resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations,
 };
 
 /// Convenience trait that contains all HOPR DB operation interfaces.
-pub trait HoprDbAllAbstractedOperations:
+pub trait HoprNodeDbAllAbstractedOperations:
     HoprDbTicketOperations
     + HoprDbPeersOperations
-    + HoprDbResolverOperations
     + HoprDbProtocolOperations
-    + HoprDbLogOperations
 {
 }
 
 #[doc(hidden)]
 pub mod prelude {
     pub use super::*;
-    pub use crate::{errors::*, info::*, logs::*, peers::*, protocol::*, resolver::*, tickets::*};
+    pub use crate::{errors::*, channels::*, info::*, logs::*, peers::*, protocol::*, resolver::*, tickets::*, tx::*};
 }

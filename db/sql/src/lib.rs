@@ -12,12 +12,7 @@ pub mod db;
 pub mod errors;
 pub mod info;
 pub mod logs;
-pub mod peers;
-pub mod protocol;
 pub mod resolver;
-mod ticket_manager;
-pub mod tickets;
-pub mod node_db;
 
 use std::path::PathBuf;
 
@@ -116,10 +111,6 @@ pub enum TargetDb {
     #[default]
     /// Indexer database.
     Index,
-    /// Acknowledged winning ticket database.
-    Tickets,
-    /// Network peers database
-    Peers,
     /// RPC logs database
     Logs,
 }
@@ -134,48 +125,6 @@ pub trait HoprDbGeneralModelOperations {
 
     /// Creates a new transaction.
     async fn begin_transaction_in_db(&self, target: TargetDb) -> Result<OpenTransaction>;
-
-    /// Import logs database from a snapshot directory.
-    ///
-    /// Replaces all data in the current logs database with data from a snapshot's
-    /// `hopr_logs.db` file. This is used for fast synchronization during node startup.
-    ///
-    /// # Process
-    ///
-    /// 1. Attaches the source database from the snapshot directory
-    /// 2. Clears existing data from all logs-related tables
-    /// 3. Copies all data from the snapshot database
-    /// 4. Detaches the source database
-    ///
-    /// All operations are performed within a single transaction for atomicity.
-    ///
-    /// # Arguments
-    ///
-    /// * `src_dir` - Directory containing the extracted snapshot with `hopr_logs.db`
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` on successful import, or [`DbSqlError::Construction`] if the source
-    /// database doesn't exist or the import operation fails.
-    ///
-    /// # Errors
-    ///
-    /// - Returns error if `hopr_logs.db` is not found in the source directory
-    /// - Returns error if SQLite ATTACH, data transfer, or DETACH operations fail
-    /// - All database errors are wrapped in [`DbSqlError::Construction`]
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// # use std::path::PathBuf;
-    /// # use hopr_db_sql::HoprDbGeneralModelOperations;
-    /// # async fn example(db: impl HoprDbGeneralModelOperations) -> Result<(), Box<dyn std::error::Error>> {
-    /// let snapshot_dir = PathBuf::from("/tmp/snapshot_extracted");
-    /// db.import_logs_db(snapshot_dir).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    async fn import_logs_db(self, src_dir: PathBuf) -> Result<()>;
 
     /// Same as [`HoprDbGeneralModelOperations::begin_transaction_in_db`] with default [TargetDb].
     async fn begin_transaction(&self) -> Result<OpenTransaction> {
@@ -212,9 +161,6 @@ impl HoprDbGeneralModelOperations for HoprDb {
     fn conn(&self, target_db: TargetDb) -> &DatabaseConnection {
         match target_db {
             TargetDb::Index => self.index_db.read_only(), // TODO: no write access needed here, deserves better
-            // wrapping
-            TargetDb::Tickets => &self.tickets_db,
-            TargetDb::Peers => &self.peers_db,
             TargetDb::Logs => &self.logs_db,
         }
     }
@@ -227,55 +173,11 @@ impl HoprDbGeneralModelOperations for HoprDb {
                                                                                   * must be readwrite */
                 target_db,
             )),
-            // TODO: when adding Postgres support, redirect `Tickets` and `Peers` into `self.db`
-            TargetDb::Tickets => Ok(OpenTransaction(
-                self.tickets_db.begin_with_config(None, None).await?,
-                target_db,
-            )),
-            TargetDb::Peers => Ok(OpenTransaction(
-                self.peers_db.begin_with_config(None, None).await?,
-                target_db,
-            )),
             TargetDb::Logs => Ok(OpenTransaction(
                 self.logs_db.begin_with_config(None, None).await?,
                 target_db,
             )),
         }
-    }
-
-    async fn import_logs_db(self, src_dir: PathBuf) -> Result<()> {
-        let src_db_path = src_dir.join("hopr_logs.db");
-        if !src_db_path.exists() {
-            return Err(DbSqlError::Construction(format!(
-                "Source logs database file does not exist: {}",
-                src_db_path.display()
-            )));
-        }
-
-        let sql = format!(
-            r#"
-            ATTACH DATABASE '{}' AS source_logs;
-            BEGIN TRANSACTION;
-            DELETE FROM log;
-            DELETE FROM log_status;
-            DELETE FROM log_topic_info;
-            INSERT INTO log_topic_info SELECT * FROM source_logs.log_topic_info;
-            INSERT INTO log_status SELECT * FROM source_logs.log_status;
-            INSERT INTO log SELECT * FROM source_logs.log;
-            COMMIT;
-            DETACH DATABASE source_logs;
-        "#,
-            src_db_path.to_string_lossy().replace("'", "''")
-        );
-
-        let logs_conn = self.conn(TargetDb::Logs);
-
-        logs_conn
-            .execute_unprepared(sql.as_str())
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("Failed to import logs data: {e}")))?;
-
-        Ok(())
     }
 }
 
@@ -287,11 +189,7 @@ pub trait HoprDbAllOperations:
     + HoprDbCorruptedChannelOperations
     + HoprDbInfoOperations
     + HoprDbLogOperations
-    + HoprDbPeersOperations
-    + HoprDbProtocolOperations
-    + HoprDbRegistryOperations
     + HoprDbResolverOperations
-    + HoprDbTicketOperations
 {
 }
 
