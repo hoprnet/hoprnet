@@ -48,6 +48,7 @@ profiling = [
   "dep:console-subscriber",
   "mimalloc/secure",
   "mimalloc/override",
+  "mimalloc/debug",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
 [dependencies]
@@ -58,7 +59,7 @@ clap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.11"
 lazy_static = { workspace = true, optional = true }
-mimalloc = { workspace = true }
+mimalloc = { workspace = true, features = [ "secure", "override", "debug" ] }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
