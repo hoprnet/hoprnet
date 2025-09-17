@@ -59,7 +59,7 @@ clap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.11"
 lazy_static = { workspace = true, optional = true }
-mimalloc = { workspace = true, features = [ "secure", "override", "debug" ] }
+mimalloc = { workspace = true, features = ["secure", "override", "debug"] }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }

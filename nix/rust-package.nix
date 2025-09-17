@@ -129,7 +129,9 @@ let
     VERGEN_GIT_SHA = rev;
 
     # For profiling feature we need to enable the unstable tokio feature
-    RUSTFLAGS = lib.optionalString (lib.strings.hasInfix "-F profiling" cargoExtraArgs) "--cfg tokio_unstable"; 
+    lib.optionalAttrs (lib.strings.hasInfix "-F profiling" cargoExtraArgs) {
+      RUSTFLAGS = "--cfg tokio_unstable";
+    };
   };
 
   sharedArgs =

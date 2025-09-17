@@ -134,7 +134,7 @@ impl std::fmt::Debug for HoprdProcesses {
 
 #[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Check current env vars
+    // Temporary code to check MIMALLOC env vars
     for (key, value) in std::env::vars() {
         if key.contains("MIMALLOC") {
             println!("  {}={}", key, value);
