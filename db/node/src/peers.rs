@@ -3,10 +3,8 @@ use std::time::Duration;
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{TryStreamExt, stream::BoxStream};
+use hopr_api::db::*;
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_api::{
-    peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats},
-};
 use hopr_db_entity::network_peer;
 use hopr_primitive_types::prelude::*;
 use libp2p_identity::PeerId;
@@ -284,7 +282,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
         let key = OffchainPublicKey::try_from(value.packet_key.as_slice())?;
         Ok(PeerStatus {
             id: (key, key.into()),
-            origin: PeerOrigin::try_from(value.origin as u8).map_err(|_| Self::Error::LogicalError("invalid origin".into()))?,
+            origin: PeerOrigin::from_repr(value.origin as u8).ok_or_else(|| Self::Error::LogicalError("invalid origin".into()))?,
             last_seen: value.last_seen.into(),
             last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,

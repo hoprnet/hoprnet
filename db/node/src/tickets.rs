@@ -9,11 +9,8 @@ use std::{
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{TryStreamExt, stream::BoxStream};
+use hopr_api::db::*;
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::{
-    prelude::{TicketIndexSelector, TicketMarker},
-    tickets::{ChannelTicketStatistics, HoprDbTicketOperations, TicketSelector},
-};
 use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -694,14 +691,10 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::{
-        prelude::TicketMarker,
-        tickets::ChannelTicketStatistics,
-    };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
+    use hopr_api::db::{ChannelTicketStatistics, TicketMarker};
     use crate::{
         tickets::{HoprDbTicketOperations, TicketSelector},
     };

@@ -4448,8 +4448,11 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-network-types",
+ "hopr-platform",
  "hopr-primitive-types",
  "multiaddr",
+ "strum 0.27.2",
 ]
 
 [[package]]
@@ -4841,7 +4844,6 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-migration",
  "hopr-internal-types",

@@ -3,10 +3,7 @@ use std::ops::{Mul, Sub};
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
-use hopr_db_api::{
-    prelude::{AuxiliaryPacketInfo, SurbCacheConfig},
-    protocol::{FoundSurb, HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
-};
+use hopr_api::db::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_parallelize::cpu::spawn_fifo_blocking;
@@ -14,7 +11,7 @@ use hopr_path::{Path, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 use hopr_api::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations};
-use hopr_db_api::tickets::HoprDbTicketOperations;
+
 use crate::{
     cache::SurbRingBuffer,
 };
@@ -280,7 +277,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                         &[&channel, "unredeemed"],
                         self.ticket_manager
-                            .unrealized_value(hopr_db_api::tickets::TicketSelector::new(
+                            .unrealized_value(TicketSelector::new(
                                 verified_ticket.channel_id,
                                 verified_ticket.channel_epoch,
                             ))

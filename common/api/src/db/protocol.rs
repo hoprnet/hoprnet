@@ -1,11 +1,11 @@
-use async_trait::async_trait;
-use hopr_api::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations};
-use hopr_crypto_packet::prelude::PacketSignals;
+pub use hopr_crypto_packet::prelude::PacketSignals;
 pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_primitive_types::balance::HoprBalance;
+
+use crate::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations};
 
 /// Contains a SURB found in the SURB ring buffer via [`HoprDbProtocolOperations::find_surb`].
 #[derive(Debug)]
@@ -29,10 +29,10 @@ pub struct SurbCacheConfig {
 }
 
 /// Trait defining all DB functionality needed by a packet/acknowledgement processing pipeline.
-#[async_trait]
+#[async_trait::async_trait]
 pub trait HoprDbProtocolOperations {
     type Error: std::error::Error + Send + Sync + 'static;
-    
+
     /// Processes the acknowledgements for the pending tickets
     ///
     /// There are three cases:

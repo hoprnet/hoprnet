@@ -3,15 +3,15 @@ use std::time::{Duration, SystemTime};
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use hopr_crypto_types::prelude::OffchainPublicKey;
+pub use hopr_crypto_types::prelude::PeerId;
 use hopr_primitive_types::prelude::*;
-use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use tracing::warn;
+
 
 /// Actual origin.
 ///
 /// First occurence of the peer in the network mechanism.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 #[repr(u8)]
 pub enum PeerOrigin {
     #[strum(to_string = "node initialization")]
@@ -127,11 +127,11 @@ impl PeerStatus {
 
     // Update both the immediate last quality and the average windowed quality
     pub fn update_quality(&mut self, new_value: f64) {
+        debug_assert!((0.0f64..=1.0f64).contains(&new_value), "quality failed to update with value outside the [0,1] range");
+
         if (0.0f64..=1.0f64).contains(&new_value) {
             self.quality = new_value;
             self.quality_avg.push(new_value);
-        } else {
-            warn!("Quality failed to update with value outside the [0,1] range")
         }
     }
 

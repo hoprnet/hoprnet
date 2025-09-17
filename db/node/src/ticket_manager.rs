@@ -5,13 +5,12 @@ use std::sync::{Arc, OnceLock};
 use futures::{Sink, SinkExt, StreamExt, TryStreamExt, pin_mut};
 use futures::channel::mpsc::UnboundedSender;
 use hopr_async_runtime::prelude::spawn;
-use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
 use hopr_internal_types::tickets::AcknowledgedTicket;
 use hopr_primitive_types::prelude::{HoprBalance, IntoEndian, ToHex};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use tracing::{debug, error};
-
+use hopr_api::db::TicketSelector;
 use crate::{cache::HoprDbCaches, tickets::WrappedTicketSelector};
 use crate::errors::NodeDbError;
 use crate::node_db::HoprNodeDb;

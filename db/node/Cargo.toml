@@ -51,7 +51,6 @@ validator = { workspace = true }
 hopr-api = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
 hopr-async-runtime = { workspace = true }
