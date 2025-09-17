@@ -14,7 +14,7 @@ use hopr_path::{Path, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 
-use crate::{cache::SurbRingBuffer, errors::NodeDbError, node_db::HoprNodeDb};
+use crate::{cache::SurbRingBuffer, errors::NodeDbError, db::HoprNodeDb};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -429,7 +429,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 data: transport_payload.into_boxed_slice(),
             })
         } else {
-            Err(NodeDbError::LogicalError("must be an outgoing packet".into()).into())
+            Err(NodeDbError::LogicalError("must be an outgoing packet".into()))
         }
     }
 
@@ -557,7 +557,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 data: transport_payload.into_boxed_slice(),
             })
         } else {
-            Err(NodeDbError::LogicalError("must be an outgoing packet".into()).into())
+            Err(NodeDbError::LogicalError("must be an outgoing packet".into()))
         }
     }
 
@@ -684,13 +684,13 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                             )))
                         })?;
 
-                        Err(NodeDbError::TicketValidationError(Box::new((rejected_ticket, error))).into())
+                        Err(NodeDbError::TicketValidationError(Box::new((rejected_ticket, error))))
                     }
-                    Err(e) => Err(e.into()),
+                    Err(e) => Err(e),
                 }
             }
             HoprPacket::Outgoing(_) => {
-                Err(NodeDbError::LogicalError("cannot receive an outgoing packet".into()).into())
+                Err(NodeDbError::LogicalError("cannot receive an outgoing packet".into()))
             }
         }
     }

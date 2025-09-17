@@ -15,7 +15,7 @@ use sea_orm::{
 };
 use tracing::{debug, error};
 
-use crate::{cache::NodeDbCaches, errors::NodeDbError, node_db::HoprNodeDb, tickets::WrappedTicketSelector};
+use crate::{cache::NodeDbCaches, errors::NodeDbError, db::HoprNodeDb, tickets::WrappedTicketSelector};
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///
@@ -250,7 +250,7 @@ mod tests {
     use hopr_internal_types::prelude::*;
 
     use super::*;
-    use crate::node_db::HoprNodeDb;
+    use crate::db::HoprNodeDb;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");

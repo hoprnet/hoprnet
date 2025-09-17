@@ -7,7 +7,7 @@ use std::{
 use hopr_crypto_types::{keypairs::Keypair, prelude::ChainKeypair};
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorChainLogs, MigratorIndex, MigratorTrait};
-use sea_orm::SqlxSqliteConnector;
+use sea_orm::{EntityTrait, SqlxSqliteConnector};
 use sqlx::{
     ConnectOptions, SqlitePool,
     pool::PoolOptions,
@@ -15,12 +15,13 @@ use sqlx::{
 };
 use tracing::log::LevelFilter;
 use validator::Validate;
-
+use hopr_db_entity::prelude::{Account, Announcement};
 use crate::{
     HoprDbAllOperations,
     cache::HoprDbCaches,
     errors::{DbSqlError, Result},
 };
+use crate::prelude::model_to_account_entry;
 
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
 pub struct HoprDbConfig {
@@ -159,6 +160,22 @@ impl HoprDb {
             .await
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
+        let caches = HoprDbCaches::default();
+
+        Account::find()
+            .find_with_related(Announcement)
+            .all(&index_db_rw)
+            .await?
+            .into_iter()
+            .try_for_each(|(a, b)| match model_to_account_entry(a, b) {
+                Ok(account) => caches.key_id_mapper.update_key_id_binding(&account),
+                Err(error) => {
+                // Undecodeable accounts are skipped and will be unreachable
+                tracing::error!(%error, "undecodeable account");
+                Ok(())
+            }
+        })?;
+
         Ok(Self {
             me_onchain: chain_key.public().to_address(),
             index_db: DbConnection {
@@ -166,7 +183,7 @@ impl HoprDb {
                 rw: index_db_rw,
             },
             logs_db,
-            caches: Default::default(),
+            caches,
         })
     }
 

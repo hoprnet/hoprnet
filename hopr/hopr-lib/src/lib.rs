@@ -249,6 +249,8 @@ where
                         .await
                         .update_channel(channel);
 
+                    // TODO: (dbmig) invalidate unrealized balance on the channel ID + Epoch
+
                     // Check if this is our own channel
                     if let Some(own_channel_direction) = maybe_direction {
                         if let Some(change_set) = change {

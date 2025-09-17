@@ -255,19 +255,15 @@ impl HoprDbLogOperations for HoprDb {
             .filter(log::Column::LogIndex.eq(log_index_enc))
             .find_also_related(LogStatus);
 
-        match query.all(self.conn(TargetDb::Logs)).await {
-            Ok(mut res) => {
-                if let Some((log, log_status)) = res.pop() {
-                    if let Some(status) = log_status {
-                        create_log(log, status).map_err(DbSqlError::from)
-                    } else {
-                        Err(DbSqlError::MissingLogStatus)
-                    }
-                } else {
-                    Err(DbSqlError::MissingLog)
-                }
+        let mut res = query.all(self.conn(TargetDb::Logs)).await?;
+        if let Some((log, log_status)) = res.pop() {
+            if let Some(status) = log_status {
+                create_log(log, status)
+            } else {
+                Err(DbSqlError::MissingLogStatus)
             }
-            Err(e) => Err(DbSqlError::from(e)),
+        } else {
+            Err(DbSqlError::MissingLog)
         }
     }
 
@@ -312,7 +308,7 @@ impl HoprDbLogOperations for HoprDb {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
-        Log::find()
+        Ok(Log::find()
             .select_only()
             .column(log::Column::BlockNumber)
             .column(log::Column::TransactionIndex)
@@ -322,8 +318,7 @@ impl HoprDbLogOperations for HoprDb {
                 q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
             })
             .count(self.conn(TargetDb::Logs))
-            .await
-            .map_err(|e| DbSqlError::from(e).into())
+            .await?)
     }
 
     async fn get_logs_block_numbers<'a>(
@@ -460,8 +455,7 @@ impl HoprDbLogOperations for HoprDb {
                         .order_by_desc(log_status::Column::TransactionIndex)
                         .order_by_desc(log_status::Column::LogIndex)
                         .one(tx.as_ref())
-                        .await
-                        .map_err(|e| DbSqlError::from(e))?
+                        .await?
                         .and_then(|m| m.checksum)
                         .and_then(|c| Hash::try_from(c.as_slice()).ok())
                         .unwrap_or_default();
@@ -529,12 +523,10 @@ impl HoprDbLogOperations for HoprDb {
                         .column(log::Column::TransactionIndex)
                         .column(log::Column::LogIndex)
                         .count(tx.as_ref())
-                        .await
-                        .map_err(|e| DbSqlError::from(e))?;
+                        .await?;
                     let log_topic_count = LogTopicInfo::find()
                         .count(tx.as_ref())
-                        .await
-                        .map_err(|e| DbSqlError::from(e))?;
+                        .await?;
 
                     if log_count == 0 && log_topic_count == 0 {
                         // Prime the DB with the values
@@ -546,8 +538,7 @@ impl HoprDbLogOperations for HoprDb {
                             }
                         }))
                         .exec(tx.as_ref())
-                        .await
-                        .map_err(|e| DbSqlError::from(e))?;
+                        .await?;
                     } else {
                         // Check that all contract addresses and topics are in the DB
                         for (addr, topic) in contract_address_topics {
@@ -555,8 +546,7 @@ impl HoprDbLogOperations for HoprDb {
                                 .filter(log_topic_info::Column::Address.eq(addr.to_string()))
                                 .filter(log_topic_info::Column::Topic.eq(topic.to_string()))
                                 .count(tx.as_ref())
-                                .await
-                                .map_err(|e| DbSqlError::from(e))?;
+                                .await?;
                             if log_topic_count != 1 {
                                 return Err(DbSqlError::InconsistentLogs);
                             }

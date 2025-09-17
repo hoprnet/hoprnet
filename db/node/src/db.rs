@@ -152,19 +152,6 @@ impl HoprNodeDb {
 
         // TODO: (dbmig) initialize key-id mapper via the HoprChain
         // Initialize KeyId mapping for accounts
-        // Account::find()
-        // .find_with_related(Announcement)
-        // .all(&index_db_rw)
-        // .await?
-        // .into_iter()
-        // .try_for_each(|(a, b)| match model_to_account_entry(a, b) {
-        // Ok(account) => caches.key_id_mapper.update_key_id_binding(&account),
-        // Err(error) => {
-        // Undecodeable accounts are skipped and will be unreachable
-        // tracing::error!(%error, "undecodeable account");
-        // Ok(())
-        // }
-        // })?;
 
         Ok(Self {
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
@@ -257,7 +244,7 @@ mod tests {
         }
 
         {
-            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+            let db = HoprNodeDb::new(path, ChainKeypair::random(), HoprNodeDbConfig::default()).await?;
 
             let not_found_peer = db.get_network_peer(&peer_id).await?;
 
@@ -284,7 +271,7 @@ mod tests {
         let path = std::path::Path::new(&random_tmp_file);
 
         {
-            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+            let db = HoprNodeDb::new(path, ChainKeypair::random(), HoprNodeDbConfig::default()).await?;
 
             db.add_network_peer(
                 &peer_id,
@@ -297,7 +284,7 @@ mod tests {
 
             let ten_seconds_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(10);
 
-            db.update_network_peer(hopr_db_api::peers::PeerStatus {
+            db.update_network_peer(PeerStatus {
                 id: (*ofk.public(), peer_id),
                 origin: PeerOrigin::Initialization,
                 last_seen: ten_seconds_ago,
@@ -313,7 +300,7 @@ mod tests {
             .await?;
         }
         {
-            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+            let db = HoprNodeDb::new(path, ChainKeypair::random(), HoprNodeDbConfig::default()).await?;
 
             let found_peer = db.get_network_peer(&peer_id).await?.map(|p| p.id.1);
 

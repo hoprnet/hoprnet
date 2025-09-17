@@ -18,7 +18,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace};
 
-use crate::{errors::NodeDbError, node_db::HoprNodeDb};
+use crate::{errors::NodeDbError, db::HoprNodeDb};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -631,7 +631,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
 impl HoprNodeDb {
     /// Used only by non-SQLite code and tests.
-    pub async fn upsert_ticket<'a>(&'a self, acknowledged_ticket: AcknowledgedTicket) -> Result<(), NodeDbError> {
+    pub async fn upsert_ticket(&self, acknowledged_ticket: AcknowledgedTicket) -> Result<(), NodeDbError> {
         self.tickets_db
             .transaction(|tx| {
                 Box::pin(async move {
@@ -651,15 +651,15 @@ impl HoprNodeDb {
                         model.id = Set(ticket.id);
                     }
 
-                    Ok::<_, sea_orm::DbErr>(model.save(tx).await?)
+                    model.save(tx).await
                 })
             })
             .await?;
         Ok(())
     }
 
-    async fn get_tickets_value_int<'a>(
-        &'a self,
+    async fn get_tickets_value_int(
+        &self,
         tx: &impl TransactionTrait,
         selector: TicketSelector,
     ) -> Result<(usize, HoprBalance), NodeDbError> {
@@ -696,7 +696,7 @@ mod tests {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
     use crate::{
-        node_db::HoprNodeDb,
+        db::HoprNodeDb,
         tickets::{HoprDbTicketOperations, TicketSelector},
     };
 
