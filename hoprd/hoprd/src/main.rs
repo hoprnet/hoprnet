@@ -134,6 +134,10 @@ impl std::fmt::Debug for HoprdProcesses {
 
 #[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Check current env vars
+    println!("MIMALLOC_CONF: {:?}", std::env::var("MIMALLOC_CONF"));
+    println!("MIMALLOC_SHOW_STATS: {:?}", std::env::var("MIMALLOC_SHOW_STATS"));
+    println!("MIMALLOC_VERBOSE: {:?}", std::env::var("MIMALLOC_VERBOSE"));
     init_logger()?;
 
     if hopr_crypto_random::is_rng_fixed() {
