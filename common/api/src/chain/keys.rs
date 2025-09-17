@@ -10,7 +10,7 @@ use hopr_primitive_types::prelude::Address;
 #[async_trait::async_trait]
 pub trait ChainKeyOperations {
     type Error: Error + Send + Sync + 'static;
-    type Mapper: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> + Clone;
+    type Mapper: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> + Clone + Send + Sync + 'static;
     /// Translates [`Address`] into [`OffchainPublicKey`].
     async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error>;
     /// Translates [`OffchainPublicKey`] into [`Address`].

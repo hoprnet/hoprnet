@@ -11,8 +11,6 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::Result;
-
 /// Allows selecting a range of ticket indices in [TicketSelector].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TicketIndexSelector {
@@ -257,28 +255,30 @@ pub enum TicketMarker {
 
 #[async_trait]
 pub trait HoprDbTicketOperations {
+    type Error: std::error::Error + Send + Sync + 'static;
+    
     /// Retrieve acknowledged winning tickets, according to the given `selector`.
     ///
     /// The optional transaction `tx` must be in the database.
-    async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>>;
+    async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>, Self::Error>;
 
     /// Retrieve acknowledged winning tickets, according to the given `selector`.
     ///
     /// The optional transaction `tx` must be in the database.
-    async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>>;
+    async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>, Self::Error>;
 
     /// Marks tickets as the given [`TicketMarker`], removing them from the DB and updating the
     /// ticket statistics for each ticket's channel.
     ///
     /// Returns the number of marked tickets.
-    async fn mark_tickets_as(&self, selector: TicketSelector, mark_as: TicketMarker) -> Result<usize>;
+    async fn mark_tickets_as(&self, selector: TicketSelector, mark_as: TicketMarker) -> Result<usize, Self::Error>;
 
     /// Updates the ticket statistics according to the fact that the given ticket has
     /// been rejected by the packet processing pipeline.
     ///
     /// This ticket is not yet stored in the ticket DB;
     /// therefore, only the statistics in the corresponding channel are updated.
-    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<()>;
+    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<(), Self::Error>;
 
     /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.
     ///
@@ -287,27 +287,27 @@ pub trait HoprDbTicketOperations {
         &'a self,
         selector: TicketSelector,
         new_state: AcknowledgedTicketStatus,
-    ) -> Result<BoxStream<'a, AcknowledgedTicket>>;
+    ) -> Result<BoxStream<'a, AcknowledgedTicket>, Self::Error>;
 
     /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.
     async fn update_ticket_states(
         &self,
         selector: TicketSelector,
         new_state: AcknowledgedTicketStatus,
-    ) -> Result<usize>;
+    ) -> Result<usize, Self::Error>;
 
     /// Retrieves the ticket statistics for the given channel.
     ///
     /// If no channel is given, it retrieves aggregate ticket statistics for all channels.
-    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics>;
+    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics, Self::Error>;
 
     /// Resets the ticket statistics about neglected, rejected, and redeemed tickets.
-    async fn reset_ticket_statistics(&self) -> Result<()>;
+    async fn reset_ticket_statistics(&self) -> Result<(), Self::Error>;
 
     /// Counts the tickets matching the given `selector` and their total value.
     ///
     /// The optional transaction `tx` must be in the database.
-    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance)>;
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance), Self::Error>;
 
     /// Sets the stored outgoing ticket index to `index`, only if the currently stored value
     /// is less than `index`. This ensures the stored value can only be growing.
@@ -315,30 +315,30 @@ pub trait HoprDbTicketOperations {
     /// Returns the old value.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64>;
+    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64, Self::Error>;
 
     /// Resets the outgoing ticket index to 0 for the given channel id.
     ///
     /// Returns the old value before reset.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn reset_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64>;
+    async fn reset_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, Self::Error>;
 
     /// Increments the outgoing ticket index in the given channel ID and returns the value before incrementing.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0 and incremented.
-    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64>;
+    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, Self::Error>;
 
     /// Gets the current outgoing ticket index for the given channel id.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>>;
+    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>, Self::Error>;
 
     /// Compares outgoing ticket indices in the cache with the stored values
     /// and updates the stored value where changed.
     ///
     /// Returns the number of updated ticket indices.
-    async fn persist_outgoing_ticket_indices(&self) -> Result<usize>;
+    async fn persist_outgoing_ticket_indices(&self) -> Result<usize, Self::Error>;
 }
 
 /// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.

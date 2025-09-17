@@ -1,18 +1,19 @@
-use std::error::Error;
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 
-use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::BoxFuture, pin_mut};
+use futures::{Sink, SinkExt, StreamExt, TryStreamExt, pin_mut};
 use futures::channel::mpsc::UnboundedSender;
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
-use hopr_internal_types::{prelude::AcknowledgedTicketStatus, tickets::AcknowledgedTicket};
+use hopr_internal_types::tickets::AcknowledgedTicket;
 use hopr_primitive_types::prelude::{HoprBalance, IntoEndian, ToHex};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use tracing::{debug, error};
-use hopr_db_api::errors::DbError;
-use crate::{OpenTransaction, cache::HoprDbCaches, tickets::WrappedTicketSelector, NodeDbTx};
+
+use crate::{cache::HoprDbCaches, tickets::WrappedTicketSelector};
+use crate::errors::NodeDbError;
 use crate::node_db::HoprNodeDb;
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
@@ -32,25 +33,10 @@ use crate::node_db::HoprNodeDb;
 pub(crate) struct TicketManager {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) mutex: Arc<async_lock::Mutex<()>>,
-    incoming_ack_tickets_tx: Arc<OnceLock<futures::channel::mpsc::Sender<TicketOperation>>>,
+    incoming_ack_tickets_tx: Arc<OnceLock<futures::channel::mpsc::Sender<AcknowledgedTicket>>>,
     caches: Arc<HoprDbCaches>,
 }
 
-enum TicketOperation {
-    /// Inserts a new ticket
-    Insert(AcknowledgedTicket),
-    /// Replaces multiple tickets (in BeingAggregated state) with the given aggregated ticket.
-    Replace(AcknowledgedTicket),
-}
-
-impl TicketOperation {
-    fn ticket(&self) -> &AcknowledgedTicket {
-        match self {
-            TicketOperation::Insert(ticket) => ticket,
-            TicketOperation::Replace(ticket) => ticket,
-        }
-    }
-}
 
 impl TicketManager {
     pub fn new(tickets_db: sea_orm::DatabaseConnection, caches: Arc<HoprDbCaches>) -> Self {
@@ -63,16 +49,16 @@ impl TicketManager {
     }
 
     /// Must be called to start processing tickets into the DB.
-    pub fn start_ticket_processing<S, E>(&self, ticket_notifier: S) -> Result<(), DbError>
+    pub fn start_ticket_processing<S, E>(&self, ticket_notifier: S) -> Result<(), NodeDbError>
     where
         S: Sink<AcknowledgedTicket, Error = E> + Send + 'static,
         E: std::error::Error,
     {
-        let (tx, mut rx) = futures::channel::mpsc::channel::<TicketOperation>(100_000);
+        let (tx, mut rx) = futures::channel::mpsc::channel::<AcknowledgedTicket>(100_000);
 
         self.incoming_ack_tickets_tx
             .set(tx)
-            .map_err(|_| DbError::LogicalError("ticket processing already started".into()))?;
+            .map_err(|_| NodeDbError::LogicalError("ticket processing already started".into()))?;
 
         // Creates a process to desynchronize storing of the ticket into the database
         // and the processing calls triggering such an operation.
@@ -83,88 +69,49 @@ impl TicketManager {
         // be automatically dropped when the event sender object is dropped.
         spawn(async move {
             pin_mut!(ticket_notifier);
-            while let Some(ticket_op) = rx.next().await {
-                let ticket_to_insert = ticket_op.ticket().clone();
+            while let Some(ticket_to_insert) = rx.next().await {
                 let ticket_inserted = match db_clone
                     .begin_with_config(None, None)
                     .await
-                    .map_err(|e| DbError::SqlError(e.into()))
                 {
                     Ok(transaction) => {
                         let _quard = mutex_clone.lock().await;
+                        let ticket_to_insert_clone = ticket_to_insert.clone();
+                        if let Err(error) = transaction.transaction(|tx| {
+                            Box::pin(async move {
+                                 // Insertion of a new acknowledged ticket
+                                let channel_id = ticket_to_insert_clone.verified_ticket().channel_id.to_hex();
 
-                        if let Err(error) = NodeDbTx(transaction)
-                            .perform(|tx| {
-                                Box::pin(async move {
-                                    match ticket_op {
-                                        // Insertion of a new acknowledged ticket
-                                        TicketOperation::Insert(ack_ticket) => {
-                                            let channel_id = ack_ticket.verified_ticket().channel_id.to_hex();
+                                hopr_db_entity::ticket::ActiveModel::from(ticket_to_insert_clone)
+                                    .insert(tx)
+                                    .await?;
 
-                                            hopr_db_entity::ticket::ActiveModel::from(ack_ticket)
-                                                .insert(tx.as_ref())
-                                                .await?;
-
-                                            // Update the ticket winning count in the statistics
-                                            if let Some(model) = hopr_db_entity::ticket_statistics::Entity::find()
-                                                .filter(
-                                                    hopr_db_entity::ticket_statistics::Column::ChannelId
-                                                        .eq(channel_id.clone()),
-                                                )
-                                                .one(tx.as_ref())
-                                                .await?
-                                            {
-                                                let winning_tickets = model.winning_tickets + 1;
-                                                let mut active_model = model.into_active_model();
-                                                active_model.winning_tickets = sea_orm::Set(winning_tickets);
-                                                active_model
-                                            } else {
-                                                hopr_db_entity::ticket_statistics::ActiveModel {
-                                                    channel_id: sea_orm::Set(channel_id),
-                                                    winning_tickets: sea_orm::Set(1),
-                                                    ..Default::default()
-                                                }
-                                            }
-                                            .save(tx.as_ref())
-                                            .await?;
-                                        }
-                                        TicketOperation::Replace(ack_ticket) => {
-                                            // Replacement range on the aggregated ticket
-                                            let start_idx = ack_ticket.verified_ticket().index;
-                                            let offset = ack_ticket.verified_ticket().index_offset as u64;
-
-                                            // Replace all BeingAggregated tickets with aggregated index range in this
-                                            // channel
-                                            let selector = TicketSelector::new(
-                                                ack_ticket.verified_ticket().channel_id,
-                                                ack_ticket.verified_ticket().channel_epoch,
-                                            )
-                                            .with_index_range(start_idx..start_idx + offset)
-                                            .with_state(AcknowledgedTicketStatus::BeingAggregated);
-
-                                            let deleted = ticket::Entity::delete_many()
-                                                .filter(WrappedTicketSelector::from(selector))
-                                                .exec(tx.as_ref())
-                                                .await?;
-
-                                            if deleted.rows_affected > offset {
-                                                return Err(DbError::LogicalError(format!(
-                                                    "deleted ticket count ({}) must not be more than the ticket index \
-                                                     offset {offset}",
-                                                    deleted.rows_affected,
-                                                )));
-                                            }
-
-                                            ticket::Entity::insert::<ticket::ActiveModel>(ack_ticket.into())
-                                                .exec(tx.as_ref())
-                                                .await
-                                                .map_err(|e| DbError::SqlError(e.into()))?;
-                                        }
+                                // Update the ticket winning count in the statistics
+                                if let Some(model) = hopr_db_entity::ticket_statistics::Entity::find()
+                                    .filter(
+                                        hopr_db_entity::ticket_statistics::Column::ChannelId
+                                            .eq(channel_id.clone()),
+                                    )
+                                    .one(tx)
+                                    .await?
+                                {
+                                    let winning_tickets = model.winning_tickets + 1;
+                                    let mut active_model = model.into_active_model();
+                                    active_model.winning_tickets = sea_orm::Set(winning_tickets);
+                                    active_model
+                                } else {
+                                    hopr_db_entity::ticket_statistics::ActiveModel {
+                                        channel_id: sea_orm::Set(channel_id),
+                                        winning_tickets: sea_orm::Set(1),
+                                        ..Default::default()
                                     }
-                                    Ok::<_, DbError>(())
-                                })
+                                }
+                                .save(tx)
+                                .await?;
+                                Ok::<_, sea_orm::DbErr>(())
                             })
-                            .await
+                        })
+                        .await
                         {
                             error!(%error, "failed to insert the winning ticket and update the ticket stats");
                             false
@@ -197,18 +144,18 @@ impl TicketManager {
     ///
     /// The [`start_ticket_processing`](TicketManager::start_ticket_processing) method
     /// must be called before calling this method, or it will fail.
-    pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), DbError> {
+    pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), NodeDbError> {
         let channel = ticket.verified_ticket().channel_id;
         let value = ticket.verified_ticket().amount;
         let epoch = ticket.verified_ticket().channel_epoch;
 
         self.incoming_ack_tickets_tx
             .get()
-            .ok_or(DbError::LogicalError("ticket processing not started".into()))?
+            .ok_or(NodeDbError::LogicalError("ticket processing not started".into()))?
             .clone()
-            .try_send(TicketOperation::Insert(ticket))
+            .try_send(ticket)
             .map_err(|e| {
-                DbError::LogicalError(format!(
+                NodeDbError::LogicalError(format!(
                     "failed to enqueue acknowledged ticket processing into the DB: {e}"
                 ))
             })?;
@@ -231,27 +178,10 @@ impl TicketManager {
         Ok(())
     }
 
-    /// Sends aggregated replacement ticket into the FIFO queue.
-    ///
-    /// The [`start_ticket_processing`](TicketManager::start_ticket_processing) method
-    /// must be called before calling this method, or it will fail.
-    pub async fn replace_tickets(&self, ticket: AcknowledgedTicket) -> Result<(), DbError> {
-        self.incoming_ack_tickets_tx
-            .get()
-            .ok_or(DbError::LogicalError("ticket processing not started".into()))?
-            .clone()
-            .try_send(TicketOperation::Replace(ticket))
-            .map_err(|e| {
-                DbError::LogicalError(format!(
-                    "failed to enqueue acknowledged ticket processing into the DB: {e}"
-                ))
-            })
-    }
-
     /// Get unrealized value for a channel
-    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, DbError> {
+    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, NodeDbError> {
         if !selector.is_single_channel() {
-            return Err(crate::DbError::LogicalError(
+            return Err(NodeDbError::LogicalError(
                 "selector must represent a single channel".into(),
             ));
         }
@@ -267,16 +197,12 @@ impl TicketManager {
             .unrealized_value
             .try_get_with_by_ref(&(channel_id, channel_epoch), async move {
                 tracing::warn!(%channel_id, %channel_epoch, "cache miss on unrealized value");
-                NodeDbTx::new(&tickets_db)
-                .await?
-                .perform(|tx| {
+                tickets_db.transaction(|tx| {
                     Box::pin(async move {
                         ticket::Entity::find()
                             .filter(selector_clone)
-                            .stream(tx.as_ref())
-                            .await
-                            .map_err(|e| DbError::SqlError(e.into()))?
-                            .map_err(|e| DbError::SqlError(e.into()))
+                            .stream(tx)
+                            .await?
                             .try_fold(HoprBalance::zero(), |value, t| async move {
                                 Ok(value + HoprBalance::from_be_bytes(t.amount))
                             })
@@ -288,36 +214,15 @@ impl TicketManager {
             .await?)
     }
 
-
-    /// Creates a transaction into the DB that acquires a write-lock
-    pub fn write_locked_tx(&self) -> impl OpenTransaction {
-        WriteLockedNodeTx(NodeDbTx::new(&self.tickets_db), self.mutex.clone())
-    }
-
-}
-
-struct WriteLockedNodeTx(NodeDbTx, Arc<async_lock::Mutex<()>>);
-
-impl OpenTransaction for WriteLockedNodeTx {
-    async fn perform<F, Fut, T, E>(self, callback: F) -> Result<T, E>
-    where
-        F: for<'c> FnOnce(&'c Self) -> Fut + Send,
-        Fut: Future<Output=Result<T, E>> + Send,
-        T: Send,
-        E: Error + From<DbError> + Send
-    {
-        let _g = self.1.lock().await;
-        self.0.perform(callback)
-    }
-
-    async fn commit(self) -> Result<(), DbError> {
-        self.0.commit().await
-    }
-
-    async fn rollback(self) -> Result<(), DbError> {
-        self.0.rollback().await
+    pub async fn write_transaction<'a, F, T, E>(&self, action: F) -> Result<T, sea_orm::TransactionError<E>>
+    where F: for<'c> FnOnce(&'c DatabaseTransaction) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'c>> + Send,
+          T: Send,
+          E: std::error::Error + Send {
+        let _guard = self.mutex.lock().await;
+        self.tickets_db.transaction(action).await
     }
 }
+
 
 impl HoprNodeDb {
     /// Starts ticket processing by the `TicketManager` with an optional new ticket notifier.
@@ -325,7 +230,7 @@ impl HoprNodeDb {
     ///
     /// If the notifier is given, it will receive notifications once a new ticket has been
     /// persisted into the Tickets DB.
-    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> Result<(), DbError> {
+    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> Result<(), NodeDbError> {
         if let Some(notifier) = ticket_notifier {
             self.ticket_manager.start_ticket_processing(notifier)
         } else {
@@ -343,7 +248,6 @@ mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
 
     use crate::node_db::HoprNodeDb;
 
@@ -363,7 +267,7 @@ mod tests {
         let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         let ticket = TicketBuilder::default()
-            .direction(&BOB.public().to_address(), &ALICE.public().to_address())
+            .direction(BOB.public().as_ref(), ALICE.public().as_ref())
             .amount(TICKET_VALUE)
             .index(index as u64)
             .channel_epoch(4)
@@ -375,7 +279,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(*BOB).await?;
+        let db = HoprNodeDb::new_in_memory(BOB.clone()).await?;
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),

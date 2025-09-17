@@ -4,14 +4,13 @@ use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_db_api::{
-    prelude::{AuxiliaryPacketInfo, DbError, SurbCacheConfig},
+    prelude::{AuxiliaryPacketInfo, SurbCacheConfig},
     protocol::{FoundSurb, HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
-    resolver::HoprDbResolverOperations,
 };
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_parallelize::cpu::spawn_fifo_blocking;
-use hopr_path::{Path, PathAddressResolver, ValidatedPath, errors::PathError};
+use hopr_path::{Path, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 use hopr_api::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations};
@@ -19,6 +18,7 @@ use hopr_db_api::tickets::HoprDbTicketOperations;
 use crate::{
     cache::SurbRingBuffer,
 };
+use crate::errors::NodeDbError;
 use crate::node_db::HoprNodeDb;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -55,44 +55,54 @@ impl HoprNodeDb {
         chain_resolver: &R,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
-    ) -> Result<HoprForwardedPacket, DbError>
+    ) -> Result<HoprForwardedPacket, NodeDbError>
     where R: ChainReadChannelOperations + ChainKeyOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static {
         let previous_hop_addr = chain_resolver.packet_key_to_chain_key(&fwd.previous_hop)
-            .await?.ok_or_else(|| {
-            DbError::LogicalError(format!(
+            .await
+            .map_err(|e| NodeDbError::Other(e.into()))?
+            .ok_or_else(|| {
+            NodeDbError::LogicalError(format!(
                 "failed to find channel key for packet key {} on previous hop",
                 fwd.previous_hop.to_peerid_str()
             ))
         })?;
 
-        let next_hop_addr = chain_resolver.packet_key_to_chain_key(&fwd.outgoing.next_hop).await?.ok_or_else(|| {
-            DbError::LogicalError(format!(
+        let next_hop_addr = chain_resolver.packet_key_to_chain_key(&fwd.outgoing.next_hop)
+            .await
+            .map_err(|e| NodeDbError::Other(e.into()))?
+            .ok_or_else(|| {
+            NodeDbError::LogicalError(format!(
                 "failed to find channel key for packet key {} on next hop",
                 fwd.outgoing.next_hop.to_peerid_str()
             ))
         })?;
 
-        let incoming_channel = self
+        let incoming_channel = chain_resolver
             .channel_by_parties(&previous_hop_addr, &self.me_address)
-            .await?
+            .await
+            .map_err(|e| NodeDbError::Other(e.into()))?
             .ok_or_else(|| {
-                DbError::LogicalError(format!(
+                NodeDbError::LogicalError(format!(
                     "no channel found for previous hop address '{previous_hop_addr}'"
                 ))
             })?;
 
         // Check: is the ticket in the packet really for the given channel?
         if !fwd.outgoing.ticket.channel_id.eq(&incoming_channel.get_id()) {
-            return Err(DbError::LogicalError("invalid ticket for channel".into()));
+            return Err(NodeDbError::LogicalError("invalid ticket for channel".into()));
         }
 
-        let domain_separator = chain_resolver.domain_separators().await?.channel;
+        let domain_separator = chain_resolver.domain_separators()
+            .await
+            .map_err(|e| NodeDbError::Other(e.into()))?
+            .channel;
 
         // The ticket price from the oracle times my node's position on the
         // path is the acceptable minimum
         let minimum_ticket_price = chain_resolver
             .minimum_ticket_price()
-            .await?
+            .await
+            .map_err(|e| NodeDbError::Other(e.into()))?
             .mul(U256::from(fwd.path_pos));
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -107,7 +117,8 @@ impl HoprNodeDb {
         // (which is equal to `previous_hop_addr`) has issued this
         // ticket.
         let start = std::time::Instant::now();
-        let win_prob = chain_resolver.minimum_incoming_ticket_win_prob().await?;
+        let win_prob = chain_resolver.minimum_incoming_ticket_win_prob().await
+            .map_err(|e| NodeDbError::Other(e.into()))?;
         let verified_incoming_ticket = spawn_fifo_blocking(move || {
             validate_unacknowledged_ticket(
                 fwd.outgoing.ticket,
@@ -119,6 +130,7 @@ impl HoprNodeDb {
             )
         })
         .await?;
+
         if start.elapsed().as_millis() > SLOW_OP_MS {
             warn!("validate_unacknowledged_ticket took {} ms", start.elapsed().as_millis());
         }
@@ -148,15 +160,15 @@ impl HoprNodeDb {
         let ticket_builder = if fwd.path_pos > 1 {
             // There must be a channel to the next node if it's not the final hop
             let outgoing_channel = chain_resolver
-                .channel_by_parties(&self.me_onchain, &next_hop_addr)
-                .await?
-                .ok_or(DbError::LogicalError(format!(
+                .channel_by_parties(&self.me_address, &next_hop_addr)
+                .await
+                .map_err(|e| NodeDbError::Other(e.into()))?
+                .ok_or(NodeDbError::LogicalError(format!(
                     "channel to '{next_hop_addr}' not found",
                 )))?;
 
             self.create_multihop_ticket(
                 outgoing_channel,
-                self.me_onchain,
                 next_hop_addr,
                 fwd.path_pos,
                 outgoing_ticket_win_prob,
@@ -164,7 +176,7 @@ impl HoprNodeDb {
             )
             .await?
         } else {
-            TicketBuilder::zero_hop().direction(&self.me_onchain, &next_hop_addr)
+            TicketBuilder::zero_hop().direction(&self.me_address, &next_hop_addr)
         };
 
         // Finally, replace the ticket in the outgoing packet with a new one
@@ -177,18 +189,18 @@ impl HoprNodeDb {
         Ok(fwd)
     }
 
-    #[instrument(level = "trace", skip(self, ack), err)]
+    #[instrument(level = "trace", skip(self, ack, chain_resolver), err)]
     async fn find_ticket_to_acknowledge<R>(
         &self,
         ack: &VerifiedAcknowledgement,
         chain_resolver: &R,
-    ) -> std::result::Result<ResolvedAcknowledgement, DbError>
-    where R: ChainReadChannelOperations + Send + Sync + 'static,{
+    ) -> std::result::Result<ResolvedAcknowledgement, NodeDbError>
+    where R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static,{
         let ack_half_key = *ack.ack_key_share();
         let challenge = hopr_parallelize::cpu::spawn_blocking(move || ack_half_key.to_challenge()).await?;
 
         let pending_ack = self.caches.unacked_tickets.remove(&challenge).await.ok_or_else(|| {
-            DbError::AcknowledgementValidationError(format!(
+            NodeDbError::AcknowledgementValidationError(format!(
                 "received unexpected acknowledgement for half key challenge {}",
                 ack.ack_key_share().to_hex()
             ))
@@ -203,27 +215,27 @@ impl HoprNodeDb {
             PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                 let maybe_channel_with_issuer = chain_resolver
                     .channel_by_parties(unacknowledged.ticket.verified_issuer(), &self.me_address)
-                    .await?;
+                    .await
+                    .map_err(|e| NodeDbError::Other(e.into()))?;
 
                 // Issuer's channel must have an epoch matching with the unacknowledged ticket
                 if maybe_channel_with_issuer
                     .is_some_and(|c| c.channel_epoch.as_u32() == unacknowledged.verified_ticket().channel_epoch)
                 {
-                    let domain_separator = self
-                        .get_indexer_data(None)
-                        .await?
-                        .channels_dst
-                        .ok_or_else(|| DbError::LogicalError("domain separator missing".into()))?;
+                    let domain_separator = chain_resolver.domain_separators()
+                        .await
+                        .map_err(|e| NodeDbError::Other(e.into()))?
+                        .channel;
 
-                    let ck = self.me_onchain.clone();
+                    let chain_key = self.me_onchain.clone();
                     hopr_parallelize::cpu::spawn_blocking(move || {
                         // This explicitly checks whether the acknowledgement
                         // solves the challenge on the ticket. It must be done before we
                         // check that the ticket is winning, which is a lengthy operation
                         // and should not be done for bogus unacknowledged tickets
-                        let ack_ticket = unacknowledged.acknowledge(ack_half_key)?;
+                        let ack_ticket = unacknowledged.acknowledge(&ack_half_key)?;
 
-                        if ack_ticket.is_winning(&ck, &domain_separator) {
+                        if ack_ticket.is_winning(&chain_key, &domain_separator) {
                             trace!("Found a winning ticket");
                             Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                         } else {
@@ -235,7 +247,7 @@ impl HoprNodeDb {
                     })
                     .await
                 } else {
-                    Err(DbError::LogicalError(format!(
+                    Err(NodeDbError::LogicalError(format!(
                         "no channel found for  address '{}' with a matching epoch",
                         unacknowledged.ticket.verified_issuer()
                     )))
@@ -247,9 +259,11 @@ impl HoprNodeDb {
 
 #[async_trait]
 impl HoprDbProtocolOperations for HoprNodeDb {
-    #[instrument(level = "trace", skip(self, ack), err(Debug), ret)]
-    async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, chain_resolver: &R) -> Result<(), DbError>
-    where R: ChainReadChannelOperations + Send + Sync + 'static {
+    type Error = NodeDbError;
+
+    #[instrument(level = "trace", skip(self, ack, chain_resolver), err(Debug), ret)]
+    async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, chain_resolver: &R) -> Result<(), NodeDbError>
+    where R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static {
         let result = self.find_ticket_to_acknowledge(&ack, chain_resolver).await?;
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
@@ -297,14 +311,14 @@ impl HoprDbProtocolOperations for HoprNodeDb {
     }
 
     #[tracing::instrument(level = "trace", skip(self, matcher), err)]
-    async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb, DbError> {
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb, NodeDbError> {
         let pseudonym = matcher.pseudonym();
         let surbs_for_pseudonym = self
             .caches
             .surbs_per_pseudonym
             .get(&pseudonym)
             .await
-            .ok_or(DbError::NoSurbAvailable("pseudonym not found".into()))?;
+            .ok_or(NodeDbError::NoSurbAvailable("pseudonym not found".into()))?;
 
         match matcher {
             SurbMatcher::Pseudonym(_) => Ok(surbs_for_pseudonym.pop_one().map(|popped_surb| FoundSurb {
@@ -334,21 +348,28 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn to_send_no_ack<R>(&self, data: Box<[u8]>, destination: OffchainPublicKey, resolver: &R) -> Result<OutgoingPacket, DbError>
+    #[tracing::instrument(level = "trace", skip(self, data, resolver))]
+    async fn to_send_no_ack<R>(&self, data: Box<[u8]>, destination: OffchainPublicKey, resolver: &R) -> Result<OutgoingPacket, NodeDbError>
     where R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static {
-        let next_peer = resolver.resolve_chain_key(&destination).await?.ok_or_else(|| {
-            DbError::LogicalError(format!(
-                "failed to find chain key for packet key {} on previous hop",
-                destination.to_peerid_str()
-            ))
+        let next_peer = resolver
+            .packet_key_to_chain_key(&destination)
+            .await
+            .map_err(|e| NodeDbError::Other(e.into()))?
+            .ok_or_else(|| {
+                NodeDbError::LogicalError(format!(
+                    "failed to find chain key for packet key {} on previous hop",
+                    destination.to_peerid_str()
+                ))
         })?;
 
         // No-ack packets are always sent as zero-hops with a random pseudonym
         let pseudonym = HoprPseudonym::random();
         let next_ticket = TicketBuilder::zero_hop().direction(&self.me_address, &next_peer);
-        let domain_separator = resolver.domain_separators().await?.channel;
-        
+        let domain_separator = resolver.domain_separators()
+            .await
+            .map_err(|e| NodeDbError::Other(e.into()))?
+            .channel;
+
         // Construct the outgoing packet
         let chain_key = self.me_onchain.clone();
         let mapper = resolver.key_id_mapper();
@@ -364,7 +385,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 None, // NoAck messages currently do not have signals
             )
             .map_err(|e| {
-                DbError::LogicalError(format!("failed to construct chain components for a no-ack packet: {e}"))
+                NodeDbError::LogicalError(format!("failed to construct chain components for a no-ack packet: {e}"))
             })
         })
         .await?;
@@ -383,11 +404,11 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 data: transport_payload.into_boxed_slice(),
             })
         } else {
-            Err(DbError::LogicalError("must be an outgoing packet".into()).into())
+            Err(NodeDbError::LogicalError("must be an outgoing packet".into()).into())
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, data, routing))]
+    #[tracing::instrument(level = "trace", skip(self, data, routing, resolver))]
     async fn to_send<R>(
         &self,
         data: Box<[u8]>,
@@ -396,7 +417,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         outgoing_ticket_price: HoprBalance,
         signals: PacketSignals,
         resolver: &R,
-    ) -> Result<OutgoingPacket, DbError>
+    ) -> Result<OutgoingPacket, NodeDbError>
     where R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -417,7 +438,10 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 let next = resolver
                     .key_id_mapper_ref()
                     .map_id_to_public(&surb.first_relayer)
-                    .ok_or(DbError::MissingAccount)?;
+                    .ok_or(NodeDbError::LogicalError(format!(
+                        "failed to find public key for key id {}",
+                        surb.first_relayer
+                    )))?;
 
                 (
                     next,
@@ -428,9 +452,10 @@ impl HoprDbProtocolOperations for HoprNodeDb {
             }
         };
 
-        let next_peer = resolver.packet_key_to_chain_key(&next_peer).await?
+        let next_peer = resolver.packet_key_to_chain_key(&next_peer).await
+            .map_err(|e| NodeDbError::Other(e.into()))?
             .ok_or_else(|| {
-                DbError::LogicalError(format!(
+                NodeDbError::LogicalError(format!(
                     "failed to find chain key for packet key {} on previous hop",
                     next_peer.to_peerid_str()
                 ))
@@ -440,12 +465,12 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         let next_ticket = if num_hops > 1 {
             let channel = resolver
                 .channel_by_parties(&self.me_address, &next_peer)
-                .await?
-                .ok_or(DbError::LogicalError(format!("channel to '{next_peer}' not found")))?;
+                .await
+                .map_err(|e| NodeDbError::Other(e.into()))?
+                .ok_or(NodeDbError::LogicalError(format!("channel to '{next_peer}' not found")))?;
 
             self.create_multihop_ticket(
                 channel,
-                self.me_address,
                 next_peer,
                 num_hops as u8,
                 outgoing_ticket_win_prob,
@@ -457,7 +482,8 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         };
 
         let domain_separator = resolver.domain_separators()
-            .await?
+            .await
+            .map_err(|e| NodeDbError::Other(e.into()))?
             .channel;
         
         // Construct the outgoing packet
@@ -474,7 +500,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 &domain_separator,
                 signals,
             )
-            .map_err(|e| DbError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
+            .map_err(|e| NodeDbError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
         })
         .await?;
 
@@ -501,7 +527,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 data: transport_payload.into_boxed_slice(),
             })
         } else {
-            Err(DbError::LogicalError("must be an outgoing packet".into()).into())
+            Err(NodeDbError::LogicalError("must be an outgoing packet".into()).into())
         }
     }
 
@@ -514,8 +540,8 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
         resolver: &R,
-    ) -> Result<IncomingPacket, DbError>
-    where R: ChainReadChannelOperations + ChainKeyOperations + ChainReadTicketOperations + Send + Sync + 'static {
+    ) -> Result<IncomingPacket, NodeDbError>
+    where R: ChainReadChannelOperations + ChainKeyOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static {
         let offchain_keypair = pkt_keypair.clone();
         let caches = self.caches.clone();
         let start = std::time::Instant::now();
@@ -526,9 +552,9 @@ impl HoprDbProtocolOperations for HoprNodeDb {
             })
             .map_err(|error| match error {
                 errors::PacketError::PacketDecodingError(_) | errors::PacketError::SphinxError(_) => {
-                    DbError::PossibleAdversaryError(format!("possibly adversarial behavior: {error}"))
+                    NodeDbError::PossibleAdversaryError(format!("possibly adversarial behavior: {error}"))
                 }
-                _ => DbError::LogicalError(format!("failed to construct an incoming packet: {error}")),
+                _ => NodeDbError::LogicalError(format!("failed to construct an incoming packet: {error}")),
             })
         })
         .await?;
@@ -611,24 +637,24 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                             ack_key: fwd.ack_key,
                         })
                     }
-                    Err(DbError::TicketValidationError(boxed_error)) => {
+                    Err(NodeDbError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
                         warn!(?rejected_ticket, %rejected_value, erorr = ?error, "failure to validate during forwarding");
 
                         self.mark_unsaved_ticket_rejected(&rejected_ticket).await.map_err(|e| {
-                            DbError::TicketValidationError(Box::new((
+                            NodeDbError::TicketValidationError(Box::new((
                                 rejected_ticket.clone(),
                                 format!("during validation error '{error}' update another error occurred: {e}"),
                             )))
                         })?;
 
-                        Err(DbError::TicketValidationError(Box::new((rejected_ticket, error))).into())
+                        Err(NodeDbError::TicketValidationError(Box::new((rejected_ticket, error))).into())
                     }
                     Err(e) => Err(e.into()),
                 }
             }
-            HoprPacket::Outgoing(_) => Err(DbError::LogicalError("cannot receive an outgoing packet".into()).into()),
+            HoprPacket::Outgoing(_) => Err(NodeDbError::LogicalError("cannot receive an outgoing packet".into()).into()),
         }
     }
 }
@@ -638,12 +664,11 @@ impl HoprNodeDb {
     async fn create_multihop_ticket(
         &self,
         channel: ChannelEntry,
-        me_onchain: Address,
         destination: Address,
         current_path_pos: u8,
         winning_prob: WinningProbability,
         ticket_price: HoprBalance,
-    ) -> Result<TicketBuilder, DbError> {
+    ) -> Result<TicketBuilder, NodeDbError> {
         // The next ticket is worth: price * remaining hop count / winning probability
         let amount = HoprBalance::from(
             ticket_price
@@ -651,14 +676,14 @@ impl HoprNodeDb {
                 .mul(U256::from(current_path_pos - 1))
                 .div_f64(winning_prob.into())
                 .map_err(|e| {
-                    DbError::LogicalError(format!(
+                    NodeDbError::LogicalError(format!(
                         "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
                     ))
                 })?,
         );
 
         if channel.balance.lt(&amount) {
-            return Err(DbError::LogicalError(format!(
+            return Err(NodeDbError::LogicalError(format!(
                 "out of funds: {} with counterparty {destination} has balance {} < {amount}",
                 channel.get_id(),
                 channel.balance
@@ -666,7 +691,7 @@ impl HoprNodeDb {
         }
 
         let ticket_builder = TicketBuilder::default()
-            .direction(&me_onchain, &destination)
+            .direction(&self.me_address, &destination)
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
             .index_offset(1) // unaggregated always have index_offset == 1

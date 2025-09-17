@@ -8,8 +8,6 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::warn;
 
-use crate::errors::Result;
-
 /// Actual origin.
 ///
 /// First occurence of the peer in the network mechanism.
@@ -175,6 +173,7 @@ impl std::fmt::Display for PeerStatus {
 
 #[async_trait]
 pub trait HoprDbPeersOperations {
+    type Error: std::error::Error + Send + Sync + 'static;
     /// Adds a peer to the backend.
     ///
     /// Should fail if the given peer id already exists in the store.
@@ -185,21 +184,21 @@ pub trait HoprDbPeersOperations {
         mas: Vec<Multiaddr>,
         backoff: f64,
         quality_window: u32,
-    ) -> Result<()>;
+    ) -> Result<(), Self::Error>;
 
     /// Removes the peer from the backend.
     ///
     /// Should fail if the given peer id does not exist.
-    async fn remove_network_peer(&self, peer: &PeerId) -> Result<()>;
+    async fn remove_network_peer(&self, peer: &PeerId) -> Result<(), Self::Error>;
 
     /// Updates stored information about the peer.
     /// Should fail if the peer does not exist in the store.
-    async fn update_network_peer(&self, new_status: PeerStatus) -> Result<()>;
+    async fn update_network_peer(&self, new_status: PeerStatus) -> Result<(), Self::Error>;
 
     /// Gets stored information about the peer.
     ///
     /// Should return `None` if such peer does not exist in the store.
-    async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>>;
+    async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>, Self::Error>;
 
     /// Returns a stream of all stored peers, optionally matching the given [`PeerSelector`] filter.
     ///
@@ -209,8 +208,8 @@ pub trait HoprDbPeersOperations {
         &'a self,
         selector: PeerSelector,
         sort_last_seen_asc: bool,
-    ) -> Result<BoxStream<'a, PeerStatus>>;
+    ) -> Result<BoxStream<'a, PeerStatus>, Self::Error>;
 
     /// Returns the [statistics](Stats) on the stored peers.
-    async fn network_peer_stats(&self, quality_threshold: f64) -> Result<Stats>;
+    async fn network_peer_stats(&self, quality_threshold: f64) -> Result<Stats, Self::Error>;
 }

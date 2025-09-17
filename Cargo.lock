@@ -4736,7 +4736,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "aes",
  "anyhow",
@@ -4787,6 +4787,7 @@ dependencies = [
  "libp2p-identity",
  "multiaddr",
  "num_enum",
+ "parking_lot",
  "strum 0.27.2",
  "thiserror 2.0.16",
  "tracing",
@@ -4863,6 +4864,7 @@ dependencies = [
  "smart-default",
  "sqlx",
  "strum 0.27.2",
+ "thiserror 2.0.16",
  "tokio",
  "tracing",
  "validator",

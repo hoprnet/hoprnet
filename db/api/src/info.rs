@@ -51,3 +51,4 @@ pub enum DomainSeparator {
     /// Channels smart contract domain separator
     Channel,
 }
+

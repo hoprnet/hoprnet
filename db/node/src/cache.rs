@@ -1,28 +1,24 @@
 use std::sync::Arc;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 use hopr_crypto_packet::prelude::HoprSurbId;
-use hopr_db_api::errors::DbError;
 
 use std::{
     sync::{atomic::AtomicU64},
     time::Duration,
 };
 
-use dashmap::{DashMap, Entry};
 use hopr_crypto_packet::{
-    HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener,
+    HoprSurb, ReplyOpener,
     prelude::{HoprSenderId},
 };
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::{
-    info::{IndexerData, SafeInfo},
-};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::{
     balance::HoprBalance,
-    prelude::{Address, KeyIdent, U256},
+    prelude::U256,
 };
 use moka::{Expiry, future::Cache, notification::RemovalCause};
+use crate::errors::NodeDbError;
 
 /// Represents a single SURB along with its ID popped from the [`SurbRingBuffer`].
 #[derive(Debug, Clone)]
@@ -57,7 +53,7 @@ impl<S> SurbRingBuffer<S> {
     /// Push all SURBs with their IDs into the RB.
     ///
     /// Returns the total number of elements in the RB after the push.
-    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> Result<usize, DbError> {
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> Result<usize, NodeDbError> {
         let mut rb = self.0.lock();
 
         rb.extend(surbs);
@@ -65,10 +61,10 @@ impl<S> SurbRingBuffer<S> {
     }
 
     /// Pop the latest SURB and its IDs from the RB.
-    pub fn pop_one(&self) -> Result<PoppedSurb<S>, DbError> {
+    pub fn pop_one(&self) -> Result<PoppedSurb<S>, NodeDbError> {
         let mut rb = self.0.lock();
 
-        let (id, surb) = rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))?;
+        let (id, surb) = rb.dequeue().ok_or(NodeDbError::NoSurbAvailable("no more surbs".into()))?;
         Ok(PoppedSurb {
             id,
             surb,
@@ -77,18 +73,18 @@ impl<S> SurbRingBuffer<S> {
     }
 
     /// Check if the next SURB has the given ID and pop it from the RB.
-    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<PoppedSurb<S>, DbError> {
+    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<PoppedSurb<S>, NodeDbError> {
         let mut rb = self.0.lock();
 
         if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
-            let (id, surb) = rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))?;
+            let (id, surb) = rb.dequeue().ok_or(NodeDbError::NoSurbAvailable("no more surbs".into()))?;
             Ok(PoppedSurb {
                 id,
                 surb,
                 remaining: rb.len(),
             })
         } else {
-            Err(DbError::NoSurbAvailable("surb does not match the given id".into()))
+            Err(NodeDbError::NoSurbAvailable("surb does not match the given id".into()))
         }
     }
 }

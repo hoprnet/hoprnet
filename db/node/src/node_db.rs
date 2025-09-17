@@ -2,8 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use futures::TryFutureExt;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set, SqlxSqliteConnector, QueryFilter, ColumnTrait};
+use sea_orm::{EntityTrait, SqlxSqliteConnector, QueryFilter, ColumnTrait};
 use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
@@ -12,15 +11,11 @@ use tracing::log::LevelFilter;
 use validator::Validate;
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::Keypair;
-use hopr_db_api::errors::DbError;
-use hopr_db_api::info::SafeInfo;
-use hopr_db_entity::{node_info,};
-use hopr_primitive_types::prelude::ToHex;
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 
-use crate::cache::{CachedValue, CachedValueDiscriminants, HoprDbCaches};
-use crate::{NodeDbTx, OpenTransaction, SINGULAR_TABLE_FIXED_ID};
+use crate::cache::{HoprDbCaches};
+use crate::errors::NodeDbError;
 use crate::ticket_manager::TicketManager;
 
 /// Filename for the network peers database.
@@ -60,7 +55,7 @@ pub struct HoprNodeDb {
 }
 
 impl HoprNodeDb {
-    pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprNodeDbConfig) -> Result<Self, DbError> {
+    pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprNodeDbConfig) -> Result<Self, NodeDbError> {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
@@ -69,10 +64,10 @@ impl HoprNodeDb {
         }
 
         cfg.validate()
-            .map_err(|e| DbError::General(format!("failed configuration validation: {e}")))?;
+            .map_err(|e| NodeDbError::Other(e.into()))?;
 
         fs::create_dir_all(directory)
-            .map_err(|_e| DbError::General(format!("cannot create main database directory {directory:?}")))?;
+            .map_err(|e| NodeDbError::Other(e.into()))?;
 
         let peers_options = PoolOptions::new()
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
@@ -104,15 +99,15 @@ impl HoprNodeDb {
     }
 
     #[cfg(feature = "sqlite")]
-    pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self, DbError> {
+    pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self, NodeDbError> {
         Self::new_sqlx_sqlite(
             chain_key,
             SqlitePool::connect(":memory:")
                 .await
-                .map_err(|e| DbError::General(e.to_string()))?,
+                .map_err(|e| NodeDbError::Other(e.into()))?,
             SqlitePool::connect(":memory:")
                 .await
-                .map_err(|e| DbError::General(e.to_string()))?,
+                .map_err(|e| NodeDbError::Other(e.into()))?,
             Default::default(),
         )
             .await
@@ -124,18 +119,14 @@ impl HoprNodeDb {
         peers_db_pool: SqlitePool,
         tickets_db_pool: SqlitePool,
         cfg: HoprNodeDbConfig,
-    ) -> Result<Self, DbError> {
+    ) -> Result<Self, NodeDbError> {
         let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db_pool);
-
         MigratorTickets::up(&tickets_db, None)
-            .await
-            .map_err(|e| DbError::General(format!("cannot apply database migration: {e}")))?;
+            .await?;
 
         let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db_pool);
-
         MigratorPeers::up(&peers_db, None)
-            .await
-            .map_err(|e| DbError::General(format!("cannot apply database migration: {e}")))?;
+            .await?;
 
         // Reset the peer network information
         let res = hopr_db_entity::network_peer::Entity::delete_many()
@@ -156,8 +147,7 @@ impl HoprNodeDb {
                 ),
             )
             .exec(&peers_db)
-            .await
-            .map_err(|e| DbError::General(format!("must reset peers on init: {e}")))?;
+            .await?;
         debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
 
         let caches = Arc::new(HoprDbCaches::default());
@@ -197,7 +187,7 @@ impl HoprNodeDb {
         min_conn: Option<u32>,
         max_conn: Option<u32>,
         path: &str,
-    ) -> Result<SqlitePool, DbError> {
+    ) -> Result<SqlitePool, NodeDbError> {
         if let Some(min_conn) = min_conn {
             options = options.min_connections(min_conn);
         }
@@ -219,74 +209,8 @@ impl HoprNodeDb {
 
         let pool = options
             .connect_with(sqlite_cfg.filename(directory.join(path)))
-            .await
-            .map_err(|e| DbError::General(format!("failed to create {path} database: {e}")))?;
+            .await?;
 
         Ok(pool)
-    }
-
-    // TODO: move this into separate trait
-
-    async fn get_safe_info<'a>(&'a self, tx: OptTx<'a, TargetNodeDb>) -> crate::errors::Result<Option<SafeInfo>> {
-        let myself = self.clone();
-        Ok(self
-            .caches
-            .single_values
-            .try_get_with_by_ref(&CachedValueDiscriminants::SafeInfoCache, async move {
-                myself
-                    .nest_transaction(tx)
-                    .and_then(|op| {
-                        op.perform(|tx| {
-                            Box::pin(async move {
-                                let info = node_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
-                                    .one(tx.as_ref())
-                                    .await?
-                                    .ok_or(MissingFixedTableEntry("node_info".into()))?;
-                                Ok::<_, DbSqlError>(info.safe_address.zip(info.module_address))
-                            })
-                        })
-                    })
-                    .await
-                    .and_then(|addrs| {
-                        if let Some((safe_address, module_address)) = addrs {
-                            Ok(Some(SafeInfo {
-                                safe_address: safe_address.parse()?,
-                                module_address: module_address.parse()?,
-                            }))
-                        } else {
-                            Ok(None)
-                        }
-                    })
-                    .map(CachedValue::SafeInfoCache)
-            })
-            .await?
-            .try_into()?)
-    }
-
-    async fn set_safe_info<'a>(&'a self, tx: OptTx<'a, TargetNodeDb>, safe_info: SafeInfo) -> crate::errors::Result<()> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    node_info::ActiveModel {
-                        id: Set(SINGULAR_TABLE_FIXED_ID),
-                        safe_address: Set(Some(safe_info.safe_address.to_hex())),
-                        module_address: Set(Some(safe_info.module_address.to_hex())),
-                        ..Default::default()
-                    }
-                        .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
-                        .await?;
-                    Ok::<_, DbSqlError>(())
-                })
-            })
-            .await?;
-        self.caches
-            .single_values
-            .insert(
-                CachedValueDiscriminants::SafeInfoCache,
-                CachedValue::SafeInfoCache(Some(safe_info)),
-            )
-            .await;
-        Ok(())
     }
 }
