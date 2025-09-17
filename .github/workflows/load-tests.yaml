@@ -40,7 +40,7 @@ on:
         type: string
         required: true
         description: 'Test name'
-        default: 'my-load-test'
+        default: 'load-test'
       cluster_nodes:
         type: choice
         options:
