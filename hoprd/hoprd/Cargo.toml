@@ -46,7 +46,7 @@ capture = ["hopr-lib/capture"]
 # 2. Enable the 'profiling' feature: cargo build --feature profiling
 profiling = [
   "dep:console-subscriber",
-  "mimalloc/profiling", 
+  "mimalloc/secure",
   "mimalloc/override",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
