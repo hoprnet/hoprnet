@@ -1,35 +1,25 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::Arc,
     time::Duration,
 };
 
-use futures::channel::mpsc::UnboundedSender;
 use hopr_crypto_types::{keypairs::Keypair, prelude::ChainKeypair};
-use hopr_db_entity::{
-    prelude::{Account, Announcement},
-    ticket,
-};
-use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::primitives::Address;
-use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
-use sea_query::Expr;
+use migration::{MigratorChainLogs, MigratorIndex, MigratorTrait};
+use sea_orm::SqlxSqliteConnector;
 use sqlx::{
     ConnectOptions, SqlitePool,
     pool::PoolOptions,
     sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
 };
-use tracing::{debug, log::LevelFilter};
+use tracing::log::LevelFilter;
 use validator::Validate;
 
 use crate::{
     HoprDbAllOperations,
-    accounts::model_to_account_entry,
     cache::HoprDbCaches,
     errors::{DbSqlError, Result},
-    ticket_manager::TicketManager,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault, validator::Validate)]
@@ -76,10 +66,8 @@ impl DbConnection {
 pub struct HoprDb {
     pub(crate) index_db: DbConnection,
     pub(crate) logs_db: sea_orm::DatabaseConnection,
-    pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
     pub(crate) caches: HoprDbCaches,
-    pub(crate) cfg: HoprDbConfig,
 }
 
 /// Filename for the blockchain-indexing database.
@@ -131,7 +119,7 @@ impl HoprDb {
         .await?;
 
         #[cfg(feature = "sqlite")]
-        Self::new_sqlx_sqlite(chain_key, index, index_ro, logs, cfg).await
+        Self::new_sqlx_sqlite(chain_key, index, index_ro, logs).await
     }
 
     #[cfg(feature = "sqlite")]
@@ -147,7 +135,6 @@ impl HoprDb {
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| DbSqlError::Construction(e.to_string()))?,
-            Default::default(),
         )
         .await
     }
@@ -158,7 +145,6 @@ impl HoprDb {
         index_db_pool: SqlitePool,
         index_db_ro_pool: SqlitePool,
         logs_db_pool: SqlitePool,
-        cfg: HoprDbConfig,
     ) -> Result<Self> {
         let index_db_rw = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db_pool);
         let index_db_ro = SqlxSqliteConnector::from_sqlx_sqlite_pool(index_db_ro_pool);
@@ -173,16 +159,13 @@ impl HoprDb {
             .await
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
-        
         Ok(Self {
             me_onchain: chain_key.public().to_address(),
-            chain_key,
             index_db: DbConnection {
                 ro: index_db_ro,
                 rw: index_db_rw,
             },
             logs_db,
-            cfg,
             caches: Default::default(),
         })
     }
@@ -250,13 +233,8 @@ impl HoprDbAllOperations for HoprDb {}
 
 #[cfg(test)]
 mod tests {
-    use hopr_crypto_types::{
-        keypairs::ChainKeypair,
-        prelude::Keypair,
-    };
-
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use migration::{MigratorChainLogs, MigratorIndex, MigratorTrait};
-
 
     use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb}; // 0.8
 

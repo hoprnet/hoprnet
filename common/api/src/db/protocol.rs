@@ -1,5 +1,7 @@
-pub use hopr_crypto_packet::prelude::PacketSignals;
-pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
+pub use hopr_crypto_packet::{
+    HoprSurb,
+    prelude::{HoprSenderId, PacketSignals},
+};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
@@ -39,9 +41,14 @@ pub trait HoprDbProtocolOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, chain_resolver: &R) -> Result<(), Self::Error>
-    where R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static;
-    
+    async fn handle_acknowledgement<R>(
+        &self,
+        ack: VerifiedAcknowledgement,
+        chain_resolver: &R,
+    ) -> Result<(), Self::Error>
+    where
+        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static;
+
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb, Self::Error>;
 
@@ -49,8 +56,14 @@ pub trait HoprDbProtocolOperations {
     fn get_surb_config(&self) -> SurbCacheConfig;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
-    async fn to_send_no_ack<R>(&self, data: Box<[u8]>, destination: OffchainPublicKey, resolver: &R) -> Result<OutgoingPacket, Self::Error>
-    where R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static;
+    async fn to_send_no_ack<R>(
+        &self,
+        data: Box<[u8]>,
+        destination: OffchainPublicKey,
+        resolver: &R,
+    ) -> Result<OutgoingPacket, Self::Error>
+    where
+        R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static;
 
     /// Process the data into an outgoing packet
     async fn to_send<R>(
@@ -62,7 +75,8 @@ pub trait HoprDbProtocolOperations {
         signals: PacketSignals,
         resolver: &R,
     ) -> Result<OutgoingPacket, Self::Error>
-    where R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static;
+    where
+        R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static;
 
     /// Process the incoming packet into data
     #[allow(clippy::wrong_self_convention)]
@@ -75,7 +89,14 @@ pub trait HoprDbProtocolOperations {
         outgoing_ticket_price: HoprBalance,
         resolver: &R,
     ) -> Result<IncomingPacket, Self::Error>
-    where R: ChainReadChannelOperations + ChainReadTicketOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static;
+    where
+        R: ChainReadChannelOperations
+            + ChainReadTicketOperations
+            + ChainKeyOperations
+            + ChainMiscOperations
+            + Send
+            + Sync
+            + 'static;
 }
 
 /// Contains some miscellaneous information about a received packet.

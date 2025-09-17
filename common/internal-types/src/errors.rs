@@ -25,7 +25,7 @@ pub enum CoreTypesError {
 
     #[error("cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
     LoopbackTicket,
-    
+
     #[error("ticket is not winning")]
     TicketNotWinning,
 

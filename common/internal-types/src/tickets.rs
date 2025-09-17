@@ -954,8 +954,14 @@ impl AcknowledgedTicket {
 
         let vrf_params = derive_vrf_parameters(self.ticket.verified_hash(), chain_keypair, domain_separator.as_ref())?;
 
-        if !check_ticket_win(self.ticket.verified_hash(), self.ticket.verified_signature(), &self.ticket.win_prob(), &self.response, &vrf_params) {
-            return Err(CoreTypesError::TicketNotWinning)
+        if !check_ticket_win(
+            self.ticket.verified_hash(),
+            self.ticket.verified_signature(),
+            &self.ticket.win_prob(),
+            &self.response,
+            &vrf_params,
+        ) {
+            return Err(CoreTypesError::TicketNotWinning);
         }
 
         Ok(RedeemableTicket {

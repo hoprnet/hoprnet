@@ -14,10 +14,10 @@ pub mod info;
 pub mod logs;
 
 use std::path::PathBuf;
+
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use sea_orm::{ConnectionTrait, TransactionTrait};
-
 pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
 
 use crate::{

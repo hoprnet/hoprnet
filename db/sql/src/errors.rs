@@ -17,7 +17,7 @@ pub enum DbSqlError {
 
     #[error("log not found")]
     MissingLog,
-    
+
     #[error("invalid target db")]
     InvalidDb,
 
@@ -80,7 +80,6 @@ pub enum DbSqlError {
 
     #[error(transparent)]
     NonSpecificError(#[from] hopr_primitive_types::errors::GeneralError),
-
 }
 
 impl From<TicketValidationError> for DbSqlError {

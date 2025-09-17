@@ -293,8 +293,8 @@ where
         let db_clone = self.db.clone();
         let me_peerid = self.me_peerid;
         let discovery_updates =
-            futures_concurrency::stream::StreamExt::merge(discovery_updates, internal_discovery_update_rx)
-                .filter_map(move |event| {
+            futures_concurrency::stream::StreamExt::merge(discovery_updates, internal_discovery_update_rx).filter_map(
+                move |event| {
                     let network = network_clone.clone();
                     let db = db_clone.clone();
                     let me = me_peerid;
@@ -315,7 +315,7 @@ where
                                         .collect::<Vec<_>>();
 
                                     if !mas.is_empty() {
-                                        return Some(PeerDiscovery::Announce(peer, mas))
+                                        return Some(PeerDiscovery::Announce(peer, mas));
                                     }
                                 }
                             }
@@ -323,13 +323,14 @@ where
 
                         None
                     }
-                });
+                },
+            );
 
         info!("Loading initial peers from the storage");
 
         let mut addresses: HashSet<Multiaddr> = HashSet::new();
         for node_entry in public_nodes {
-            if let AccountType::Announced { multiaddr, ..} = node_entry.entry_type {
+            if let AccountType::Announced { multiaddr, .. } = node_entry.entry_type {
                 let peer: PeerId = node_entry.public_key.into();
                 let multiaddresses = vec![multiaddr];
 

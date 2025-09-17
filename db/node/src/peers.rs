@@ -3,7 +3,7 @@ use std::time::Duration;
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{TryStreamExt, stream::BoxStream};
-use hopr_api::{*, db::*};
+use hopr_api::{db::*, *};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_entity::network_peer;
 use hopr_primitive_types::prelude::*;
@@ -11,8 +11,8 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryF
 use sea_query::{Condition, Expr, IntoCondition, Order};
 use sqlx::types::chrono::{self, DateTime, Utc};
 use tracing::{error, trace};
-use crate::errors::NodeDbError;
-use crate::node_db::HoprNodeDb;
+
+use crate::{errors::NodeDbError, node_db::HoprNodeDb};
 
 const DB_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
     .with_little_endian()
@@ -71,8 +71,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
     ) -> Result<(), NodeDbError> {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-            .await?;
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
 
         let new_peer = hopr_db_entity::network_peer::ActiveModel {
             packet_key: sea_orm::ActiveValue::Set(Vec::from(pubkey.as_ref())),
@@ -106,8 +105,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
     async fn remove_network_peer(&self, peer: &PeerId) -> Result<(), NodeDbError> {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-            .await?;
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
 
         let res = hopr_db_entity::network_peer::Entity::delete_many()
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(pubkey.as_ref())))
@@ -117,7 +115,9 @@ impl HoprDbPeersOperations for HoprNodeDb {
         if res.rows_affected > 0 {
             Ok(())
         } else {
-            Err(NodeDbError::LogicalError("peer cannot be removed because it does not exist".into()))
+            Err(NodeDbError::LogicalError(
+                "peer cannot be removed because it does not exist".into(),
+            ))
         }
     }
 
@@ -162,11 +162,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
 
             Ok(())
         } else {
-            Err(NodeDbError::LogicalError(format!(
-                "cannot update a non-existing peer '{}'",
-                new_status.id.1
-            ))
-            .into())
+            Err(NodeDbError::LogicalError(format!("cannot update a non-existing peer '{}'", new_status.id.1)).into())
         }
     }
 
@@ -180,8 +176,7 @@ impl HoprDbPeersOperations for HoprNodeDb {
     async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>, NodeDbError> {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-            .await?;
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
         let row = hopr_db_entity::network_peer::Entity::find()
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(pubkey.as_ref())))
             .one(&self.peers_db)
@@ -280,7 +275,8 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
         let key = OffchainPublicKey::try_from(value.packet_key.as_slice())?;
         Ok(PeerStatus {
             id: (key, key.into()),
-            origin: PeerOrigin::from_repr(value.origin as u8).ok_or_else(|| Self::Error::LogicalError("invalid origin".into()))?,
+            origin: PeerOrigin::from_repr(value.origin as u8)
+                .ok_or_else(|| Self::Error::LogicalError("invalid origin".into()))?,
             last_seen: value.last_seen.into(),
             last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,
@@ -298,7 +294,10 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
                             }
                         })
                         .filter(|s| !s.trim().is_empty())
-                        .map(|m| Multiaddr::try_from(m).map_err(|m| Self::Error::LogicalError(format!("invalid multi-address: {m}"))))
+                        .map(|m| {
+                            Multiaddr::try_from(m)
+                                .map_err(|m| Self::Error::LogicalError(format!("invalid multi-address: {m}")))
+                        })
                         .collect::<Result<Vec<_>, NodeDbError>>()
                 } else {
                     Err(Self::Error::LogicalError("invalid multi-addresses".into()))

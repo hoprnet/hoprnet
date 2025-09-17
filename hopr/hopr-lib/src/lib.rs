@@ -217,20 +217,22 @@ pub async fn chain_events_to_transport_events<StreamIn, Db>(
 where
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
 {
-    Box::pin(event_stream.filter_map(move |event| {
-        let multi_strategy = multi_strategy.clone();
-        let channel_graph = channel_graph.clone();
-        let indexer_action_tracker = indexer_action_tracker.clone();
+    Box::pin(
+        event_stream
+            .filter_map(move |event| {
+                let multi_strategy = multi_strategy.clone();
+                let channel_graph = channel_graph.clone();
+                let indexer_action_tracker = indexer_action_tracker.clone();
 
-        async move {
-            let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-            if resolved.is_empty() {
-                trace!(%event, "No indexer expectations resolved for the event");
-            } else {
-                debug!(count = resolved.len(), %event, "resolved indexer expectations");
-            }
+                async move {
+                    let resolved = indexer_action_tracker.match_and_resolve(&event).await;
+                    if resolved.is_empty() {
+                        trace!(%event, "No indexer expectations resolved for the event");
+                    } else {
+                        debug!(count = resolved.len(), %event, "resolved indexer expectations");
+                    }
 
-            match event.event_type {
+                    match event.event_type {
                 ChainEventType::Announcement{peer, address, multiaddresses} => {
                     Some(vec![PeerDiscovery::Announce(peer, multiaddresses), PeerDiscovery::Allow(peer)])
                 }
@@ -285,10 +287,10 @@ where
                     None
                 }
             }
-        }
-    })
-    .flat_map(stream::iter)
-)
+                }
+            })
+            .flat_map(stream::iter),
+    )
 }
 
 /// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
@@ -688,11 +690,14 @@ impl Hopr {
                                 HoprLibError::GeneralError(format!("Failed to send peer discovery announcement: {e}"))
                             })?;
 
-                        indexer_peer_update_tx.send(PeerDiscovery::Allow(account.public_key.into())).await.map_err(|e| {
-                            HoprLibError::GeneralError(format!(
-                                "Failed to send peer discovery network registry event: {e}"
-                            ))
-                        })?;
+                        indexer_peer_update_tx
+                            .send(PeerDiscovery::Allow(account.public_key.into()))
+                            .await
+                            .map_err(|e| {
+                                HoprLibError::GeneralError(format!(
+                                    "Failed to send peer discovery network registry event: {e}"
+                                ))
+                            })?;
                     }
                 }
             }
@@ -939,7 +944,7 @@ impl Hopr {
         // right when the transaction was sent on-chain. In such cases, we simply let it retry and
         // handle errors appropriately.
         // TODO: (dbmig) dissolve this here
-        //if let Err(e) = self.db.fix_channels_next_ticket_state().await {
+        // if let Err(e) = self.db.fix_channels_next_ticket_state().await {
         //    error!(error = %e, "failed to fix channels ticket states");
         //}
 
@@ -1003,33 +1008,34 @@ impl Hopr {
             .accounts_announced_on_chain()
             .await?
             .into_iter()
-            .filter_map(|entry| entry
-                .get_multiaddr()
-                .map(|maddr| (PeerId::from(entry.public_key), entry.chain_addr, vec![maddr]))
-            ).collect()
-        )
+            .filter_map(|entry| {
+                entry
+                    .get_multiaddr()
+                    .map(|maddr| (PeerId::from(entry.public_key), entry.chain_addr, vec![maddr]))
+            })
+            .collect())
     }
 
     /// Returns the most recently indexed log, if any.
     // TODO: (dbmig) make sure this code is in the Blokli
-    /*pub async fn get_indexer_state(&self) -> errors::Result<IndexerStateInfo> {
-        let indexer_state_info = self.db.get_indexer_state_info(None).await?;
-
-        match self.db.get_last_checksummed_log().await? {
-            Some(log) => {
-                let checksum = match log.checksum {
-                    Some(checksum) => Hash::from_hex(checksum.as_str())?,
-                    None => Hash::default(),
-                };
-                Ok(IndexerStateInfo {
-                    latest_log_block_number: log.block_number as u32,
-                    latest_log_checksum: checksum,
-                    ..indexer_state_info
-                })
-            }
-            None => Ok(indexer_state_info),
-        }
-    }*/
+    // pub async fn get_indexer_state(&self) -> errors::Result<IndexerStateInfo> {
+    // let indexer_state_info = self.db.get_indexer_state_info(None).await?;
+    //
+    // match self.db.get_last_checksummed_log().await? {
+    // Some(log) => {
+    // let checksum = match log.checksum {
+    // Some(checksum) => Hash::from_hex(checksum.as_str())?,
+    // None => Hash::default(),
+    // };
+    // Ok(IndexerStateInfo {
+    // latest_log_block_number: log.block_number as u32,
+    // latest_log_checksum: checksum,
+    // ..indexer_state_info
+    // })
+    // }
+    // None => Ok(indexer_state_info),
+    // }
+    // }
 
     /// Test whether the peer with PeerId is allowed to access the network
     pub async fn is_allowed_to_access_network(

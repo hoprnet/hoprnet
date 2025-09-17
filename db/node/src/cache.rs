@@ -1,23 +1,18 @@
-use std::sync::Arc;
-use ringbuffer::{AllocRingBuffer, RingBuffer};
-use hopr_crypto_packet::prelude::HoprSurbId;
-
 use std::{
-    sync::{atomic::AtomicU64},
+    sync::{Arc, atomic::AtomicU64},
     time::Duration,
 };
 
 use hopr_crypto_packet::{
     HoprSurb, ReplyOpener,
-    prelude::{HoprSenderId},
+    prelude::{HoprSenderId, HoprSurbId},
 };
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::{
-    balance::HoprBalance,
-    prelude::U256,
-};
+use hopr_primitive_types::{balance::HoprBalance, prelude::U256};
 use moka::{Expiry, future::Cache, notification::RemovalCause};
+use ringbuffer::{AllocRingBuffer, RingBuffer};
+
 use crate::errors::NodeDbError;
 
 /// Represents a single SURB along with its ID popped from the [`SurbRingBuffer`].
@@ -64,7 +59,9 @@ impl<S> SurbRingBuffer<S> {
     pub fn pop_one(&self) -> Result<PoppedSurb<S>, NodeDbError> {
         let mut rb = self.0.lock();
 
-        let (id, surb) = rb.dequeue().ok_or(NodeDbError::NoSurbAvailable("no more surbs".into()))?;
+        let (id, surb) = rb
+            .dequeue()
+            .ok_or(NodeDbError::NoSurbAvailable("no more surbs".into()))?;
         Ok(PoppedSurb {
             id,
             surb,
@@ -77,7 +74,9 @@ impl<S> SurbRingBuffer<S> {
         let mut rb = self.0.lock();
 
         if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
-            let (id, surb) = rb.dequeue().ok_or(NodeDbError::NoSurbAvailable("no more surbs".into()))?;
+            let (id, surb) = rb
+                .dequeue()
+                .ok_or(NodeDbError::NoSurbAvailable("no more surbs".into()))?;
             Ok(PoppedSurb {
                 id,
                 surb,
@@ -88,7 +87,6 @@ impl<S> SurbRingBuffer<S> {
         }
     }
 }
-
 
 struct ExpiryNever;
 
@@ -183,87 +181,85 @@ impl NodeDbCaches {
 }
 
 // TODO: (dbmig) move this into the implementation of ChainKeyOperations
-/*
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
-
-#[derive(Debug)]
-pub(crate) struct CacheKeyMapper(
-    DashMap<KeyIdent<4>, OffchainPublicKey>,
-    DashMap<OffchainPublicKey, KeyIdent<4>>,
-);
-
-impl CacheKeyMapper {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(DashMap::with_capacity(capacity), DashMap::with_capacity(capacity))
-    }
-
-    /// Creates key id mapping for a public key of an [account](AccountEntry).
-    ///
-    /// Does nothing if the binding already exists. Returns error if an existing binding
-    /// is not consistent.
-    pub fn update_key_id_binding(&self, account: &AccountEntry) -> Result<(), DbError> {
-        let id = account.key_id();
-        let key = account.public_key;
-
-        // Lock entries in the maps to avoid concurrent modifications
-        let id_entry = self.0.entry(id);
-        let key_entry = self.1.entry(key);
-
-        match (id_entry, key_entry) {
-            (Entry::Vacant(v_id), Entry::Vacant(v_key)) => {
-                v_id.insert_entry(key);
-                v_key.insert_entry(id);
-                tracing::debug!(%id, %key, "inserted key-id binding");
-                Ok(())
-            }
-            (Entry::Occupied(v_id), Entry::Occupied(v_key)) => {
-                // Check if the existing binding is consistent with the new one.
-                if v_id.get() != v_key.key() {
-                    Err(DbError::LogicalError(format!(
-                        "attempt to insert key {key} with key-id {id}, but key-id already maps to key {} while {} is \
-                         expected",
-                        v_id.get(),
-                        v_key.key(),
-                    )))
-                } else {
-                    Ok(())
-                }
-            }
-            // This only happens on re-announcements:
-            // The re-announcement uses the same packet key and chain-key, but the block number (published at)
-            // is different, and therefore the id_entry will be vacant.
-            (Entry::Vacant(_), Entry::Occupied(v_key)) => {
-                tracing::debug!(
-                    "attempt to insert key {key} with key-id {id} failed because key is already set as {}",
-                    v_key.get()
-                );
-                Err(DbError::LogicalError("inconsistent key-id binding".into()))
-            }
-            // This should never happen.
-            (Entry::Occupied(v_id), Entry::Vacant(_)) => {
-                tracing::debug!(
-                    "attempt to insert key {key} with key-id {id} failed because key-id is already set as {}",
-                    v_id.get()
-                );
-                Err(DbError::LogicalError("inconsistent key-id binding".into()))
-            }
-        }
-    }
-}
-
-impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for CacheKeyMapper {
-    fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<KeyIdent> {
-        self.1.get(key).map(|k| *k.value())
-    }
-
-    fn map_id_to_public(&self, id: &KeyIdent) -> Option<OffchainPublicKey> {
-        self.0.get(id).map(|k| *k.value())
-    }
-}
-
-
-*/
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+// pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
+//
+// #[derive(Debug)]
+// pub(crate) struct CacheKeyMapper(
+// DashMap<KeyIdent<4>, OffchainPublicKey>,
+// DashMap<OffchainPublicKey, KeyIdent<4>>,
+// );
+//
+// impl CacheKeyMapper {
+// pub fn with_capacity(capacity: usize) -> Self {
+// Self(DashMap::with_capacity(capacity), DashMap::with_capacity(capacity))
+// }
+//
+// Creates key id mapping for a public key of an [account](AccountEntry).
+//
+// Does nothing if the binding already exists. Returns error if an existing binding
+// is not consistent.
+// pub fn update_key_id_binding(&self, account: &AccountEntry) -> Result<(), DbError> {
+// let id = account.key_id();
+// let key = account.public_key;
+//
+// Lock entries in the maps to avoid concurrent modifications
+// let id_entry = self.0.entry(id);
+// let key_entry = self.1.entry(key);
+//
+// match (id_entry, key_entry) {
+// (Entry::Vacant(v_id), Entry::Vacant(v_key)) => {
+// v_id.insert_entry(key);
+// v_key.insert_entry(id);
+// tracing::debug!(%id, %key, "inserted key-id binding");
+// Ok(())
+// }
+// (Entry::Occupied(v_id), Entry::Occupied(v_key)) => {
+// Check if the existing binding is consistent with the new one.
+// if v_id.get() != v_key.key() {
+// Err(DbError::LogicalError(format!(
+// "attempt to insert key {key} with key-id {id}, but key-id already maps to key {} while {} is \
+// expected",
+// v_id.get(),
+// v_key.key(),
+// )))
+// } else {
+// Ok(())
+// }
+// }
+// This only happens on re-announcements:
+// The re-announcement uses the same packet key and chain-key, but the block number (published at)
+// is different, and therefore the id_entry will be vacant.
+// (Entry::Vacant(_), Entry::Occupied(v_key)) => {
+// tracing::debug!(
+// "attempt to insert key {key} with key-id {id} failed because key is already set as {}",
+// v_key.get()
+// );
+// Err(DbError::LogicalError("inconsistent key-id binding".into()))
+// }
+// This should never happen.
+// (Entry::Occupied(v_id), Entry::Vacant(_)) => {
+// tracing::debug!(
+// "attempt to insert key {key} with key-id {id} failed because key-id is already set as {}",
+// v_id.get()
+// );
+// Err(DbError::LogicalError("inconsistent key-id binding".into()))
+// }
+// }
+// }
+// }
+//
+// impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for CacheKeyMapper {
+// fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<KeyIdent> {
+// self.1.get(key).map(|k| *k.value())
+// }
+//
+// fn map_id_to_public(&self, id: &KeyIdent) -> Option<OffchainPublicKey> {
+// self.0.get(id).map(|k| *k.value())
+// }
+// }
+//
+//
 
 #[cfg(test)]
 mod tests {

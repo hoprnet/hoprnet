@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use hopr_crypto_types::prelude::Hash;
-use hopr_db_api::info::*;
 use hopr_db_entity::{
     chain_info, global_settings, node_info,
     prelude::{Account, Announcement, ChainInfo, Channel, NetworkEligibility, NetworkRegistry, NodeInfo},
@@ -534,10 +533,7 @@ mod tests {
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_primitive_types::{balance::HoprBalance, prelude::Address};
 
-    use crate::{
-        db::HoprDb,
-        info::HoprDbInfoOperations,
-    };
+    use crate::{db::HoprDb, info::HoprDbInfoOperations};
 
     lazy_static::lazy_static! {
         static ref ADDR_1: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));
@@ -605,7 +601,6 @@ mod tests {
         assert_eq!(data.minimum_incoming_ticket_winning_prob, 0.5);
         Ok(())
     }
-
 
     #[tokio::test]
     async fn test_set_get_global_setting() -> anyhow::Result<()> {

@@ -21,20 +21,13 @@ prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 sqlite = ["sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite"]
 
 [dependencies]
-async-lock = { workspace = true }
-async-stream = { workspace = true }
 async-trait = { workspace = true }
-bincode = { workspace = true }
 chrono = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
-hex = { workspace = true }
 lazy_static = { workspace = true, optional = true }
-libp2p-identity = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
-parking_lot = { workspace = true }
-ringbuffer = { workspace = true }
 sea-orm = { workspace = true }
 sea-query = { workspace = true, default-features = false, features = [
   "with-chrono",
@@ -50,15 +43,11 @@ validator = { workspace = true }
 
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-migration = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-network-types = { workspace = true }
-hopr-path = { workspace = true }
-hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
@@ -66,7 +55,6 @@ hopr-primitive-types = { workspace = true }
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
-rand = { workspace = true }
 sea-orm = { workspace = true }
 sea-query-binder = { workspace = true, default-features = false, features = [
   "with-chrono",

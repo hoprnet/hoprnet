@@ -7,8 +7,8 @@ mod protocol;
 mod tickets;
 
 mod cache;
-mod ticket_manager;
 mod errors;
+mod ticket_manager;
 
 pub use node_db::{HoprNodeDb, HoprNodeDbConfig};
 

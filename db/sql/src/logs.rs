@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use async_trait::async_trait;
 use futures::{StreamExt, stream};
 use hopr_crypto_types::prelude::Hash;
@@ -8,7 +7,13 @@ use hopr_db_entity::{
     prelude::{Log, LogStatus, LogTopicInfo},
 };
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, entity::Set, query::QueryTrait, sea_query::{Expr, OnConflict, Value}, ConnectionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+    entity::Set,
+    query::QueryTrait,
+    sea_query::{Expr, OnConflict, Value},
+};
 use tracing::{error, trace, warn};
 
 use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb, errors::DbSqlError};
@@ -147,7 +152,11 @@ pub trait HoprDbLogOperations {
     /// # Returns
     ///
     /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
-    async fn set_logs_unprocessed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<(), DbSqlError>;
+    async fn set_logs_unprocessed(
+        &self,
+        block_number: Option<u64>,
+        block_offset: Option<u64>,
+    ) -> Result<(), DbSqlError>;
 
     /// Retrieves the last checksummed log entry from the database.
     ///
@@ -166,8 +175,6 @@ pub trait HoprDbLogOperations {
 
 #[async_trait]
 impl HoprDbLogOperations for HoprDb {
-    
-    
     async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<(), DbSqlError> {
         let results = self.store_logs([log].to_vec()).await?;
         if let Some(result) = results.into_iter().next() {
@@ -210,7 +217,9 @@ impl HoprDbLogOperations for HoprDb {
                                 Ok(_) => Ok(()),
                                 Err(DbErr::RecordNotInserted) => {
                                     warn!(log_id, "log already in the DB");
-                                    Err(DbSqlError::LogicalError(format!("log already exists in the DB: {log_id}")))
+                                    Err(DbSqlError::LogicalError(format!(
+                                        "log already exists in the DB: {log_id}"
+                                    )))
                                 }
                                 Err(e) => {
                                     error!("Failed to insert log into db: {:?}", e);
@@ -394,7 +403,11 @@ impl HoprDbLogOperations for HoprDb {
             .await
     }
 
-    async fn set_logs_unprocessed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<(), DbSqlError> {
+    async fn set_logs_unprocessed(
+        &self,
+        block_number: Option<u64>,
+        block_offset: Option<u64>,
+    ) -> Result<(), DbSqlError> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 

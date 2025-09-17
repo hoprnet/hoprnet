@@ -4573,7 +4573,6 @@ dependencies = [
  "hopr-chain-types",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -4775,28 +4774,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-db-api"
-version = "0.11.1"
-dependencies = [
- "async-trait",
- "futures",
- "hopr-api",
- "hopr-crypto-packet",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-network-types",
- "hopr-platform",
- "hopr-primitive-types",
- "libp2p-identity",
- "multiaddr",
- "num_enum",
- "parking_lot",
- "strum 0.27.2",
- "thiserror 2.0.16",
- "tracing",
-]
-
-[[package]]
 name = "hopr-db-entity"
 version = "0.4.0"
 dependencies = [
@@ -4873,36 +4850,24 @@ name = "hopr-db-sql"
 version = "0.18.2"
 dependencies = [
  "anyhow",
- "async-lock 3.4.1",
- "async-stream",
  "async-trait",
- "bincode",
  "chrono",
  "dashmap",
  "futures",
- "hex",
  "hex-literal",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-migration",
  "hopr-internal-types",
  "hopr-metrics",
- "hopr-network-types",
- "hopr-parallelize",
- "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
- "libp2p-identity",
  "moka",
  "multiaddr",
- "parking_lot",
- "rand 0.8.5",
- "ringbuffer",
  "sea-orm",
  "sea-query",
  "sea-query-binder",
@@ -4962,7 +4927,6 @@ dependencies = [
  "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -5299,7 +5263,6 @@ dependencies = [
  "futures",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-sql",
  "hopr-metrics",
  "hopr-platform",
@@ -5359,7 +5322,6 @@ dependencies = [
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
@@ -5401,7 +5363,6 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -5536,7 +5497,6 @@ dependencies = [
  "futures-time",
  "hopr-async-runtime",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",

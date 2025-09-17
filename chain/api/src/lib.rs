@@ -15,9 +15,7 @@ use alloy::{
 };
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use futures::future::AbortHandle;
-use futures::stream::BoxStream;
-use futures::TryStreamExt;
+use futures::{TryStreamExt, future::AbortHandle, stream::BoxStream};
 use hopr_async_runtime::{prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
@@ -35,15 +33,18 @@ use hopr_chain_rpc::{
 use hopr_chain_types::ContractAddresses;
 pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::HoprDbAllOperations;
+use hopr_db_sql::{
+    HoprDbAllOperations,
+    api::errors::DbError,
+    prelude::{ChainOrPacketKey, HoprDbResolverOperations},
+};
 pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::{
     account::AccountEntry, channels::CorruptedChannelEntry, prelude::ChannelDirection, tickets::WinningProbability,
 };
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
-use hopr_db_sql::api::errors::DbError;
-use hopr_db_sql::prelude::{ChainOrPacketKey, HoprDbResolverOperations};
+
 use crate::errors::{HoprChainError, Result};
 
 pub type DefaultHttpRequestor = hopr_chain_rpc::transport::ReqwestClient;
@@ -296,11 +297,13 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<ChannelEntry> {
-        Ok(self.db
+        Ok(self
+            .db
             .get_channel_by_parties(None, src, dest, false)
             .await?
-            .ok_or(errors::HoprChainError::Api(format!("Channel entry not available {src}-{dest}")))?
-        )
+            .ok_or(errors::HoprChainError::Api(format!(
+                "Channel entry not available {src}-{dest}"
+            )))?)
     }
 
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
@@ -315,11 +318,14 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_all_channels(None).await?)
     }
 
-    pub async fn stream_active_channels<'a>(&'a self) -> errors::Result<impl futures::Stream<Item = errors::Result<ChannelEntry>>> {
-        Ok(self.db.stream_active_channels()
-               .await?
-               .map_err(|e| errors::HoprChainError::DbError(e)))
-
+    pub async fn stream_active_channels<'a>(
+        &'a self,
+    ) -> errors::Result<impl futures::Stream<Item = errors::Result<ChannelEntry>>> {
+        Ok(self
+            .db
+            .stream_active_channels()
+            .await?
+            .map_err(|e| errors::HoprChainError::DbError(e)))
     }
 
     pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
@@ -436,8 +442,13 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 }
 
-impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> HoprDbResolverOperations for HoprChain<T> {
-    async fn resolve_packet_key(&self, onchain_key: &Address) -> hopr_db_sql::api::errors::Result<Option<OffchainPublicKey>> {
+impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> HoprDbResolverOperations
+    for HoprChain<T>
+{
+    async fn resolve_packet_key(
+        &self,
+        onchain_key: &Address,
+    ) -> hopr_db_sql::api::errors::Result<Option<OffchainPublicKey>> {
         // TODO: (dbmig) resolve via get_account and cache
         Ok(self
             .db
@@ -448,7 +459,10 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             .map_err(|_e| DbError::LogicalError("failed to transpose the translated key".into()))?)
     }
 
-    async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> hopr_db_sql::api::errors::Result<Option<Address>> {
+    async fn resolve_chain_key(
+        &self,
+        offchain_key: &OffchainPublicKey,
+    ) -> hopr_db_sql::api::errors::Result<Option<Address>> {
         // TOOD: (dbmig) resolve via get_account and cache
         Ok(self
             .db

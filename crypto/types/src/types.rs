@@ -7,6 +7,7 @@ use std::{
     result,
     str::FromStr,
 };
+
 use cipher::crypto_common::OutputSizeUser;
 use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},

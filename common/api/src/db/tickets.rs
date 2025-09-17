@@ -256,7 +256,7 @@ pub enum TicketMarker {
 #[async_trait]
 pub trait HoprDbTicketOperations {
     type Error: std::error::Error + Send + Sync + 'static;
-    
+
     /// Retrieve acknowledged winning tickets, according to the given `selector`.
     ///
     /// The optional transaction `tx` must be in the database.

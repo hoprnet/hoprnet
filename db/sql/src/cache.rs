@@ -1,13 +1,13 @@
 use std::time::Duration;
+
 use dashmap::{DashMap, Entry};
-use moka::future::Cache;
 use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_internal_types::prelude::{AccountEntry, ChannelEntry};
 use hopr_primitive_types::prelude::{Address, KeyIdent};
+use moka::future::Cache;
 
-use crate::errors::DbSqlError;
-use crate::info::IndexerData;
+use crate::{errors::DbSqlError, info::IndexerData};
 
 /// Lists all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for the long term.
@@ -24,7 +24,6 @@ impl TryFrom<CachedValue> for IndexerData {
     fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
         match value {
             CachedValue::IndexerDataCache(data) => Ok(data),
-            _ => Err(DbSqlError::DecodingError),
         }
     }
 }
@@ -107,7 +106,6 @@ impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for 
     }
 }
 
-
 /// Contains all caches used by the [crate::db::HoprDb].
 #[derive(Debug, Clone)]
 pub struct HoprDbCaches {
@@ -137,5 +135,15 @@ impl Default for HoprDbCaches {
                 .build(),
             key_id_mapper: std::sync::Arc::new(CacheKeyMapper::with_capacity(10_000)),
         }
+    }
+}
+
+#[cfg(test)]
+impl HoprDbCaches {
+    pub fn invalidate_all(&self) {
+        self.src_dst_to_channel.invalidate_all();
+        self.chain_to_offchain.invalidate_all();
+        self.offchain_to_chain.invalidate_all();
+        self.single_values.invalidate_all();
     }
 }

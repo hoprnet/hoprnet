@@ -1,7 +1,8 @@
 use std::sync::Arc;
-use sea_orm::TransactionError;
+
 use hopr_crypto_packet::errors::TicketValidationError;
 use hopr_internal_types::prelude::Ticket;
+use sea_orm::TransactionError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeDbError {
@@ -39,7 +40,7 @@ pub enum NodeDbError {
 
     #[error(transparent)]
     EntityError(#[from] hopr_db_entity::errors::DbEntityError),
-    
+
     #[error(transparent)]
     PacketError(#[from] hopr_crypto_packet::errors::PacketError),
 

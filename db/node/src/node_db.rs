@@ -1,22 +1,23 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
-use sea_orm::{EntityTrait, SqlxSqliteConnector, QueryFilter, ColumnTrait};
-use sqlx::pool::PoolOptions;
-use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
-use sqlx::{ConnectOptions, SqlitePool};
-use tracing::debug;
-use tracing::log::LevelFilter;
-use validator::Validate;
-use hopr_crypto_types::keypairs::ChainKeypair;
-use hopr_crypto_types::prelude::Keypair;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
+
+use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
+use sqlx::{
+    ConnectOptions, SqlitePool,
+    pool::PoolOptions,
+    sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
+};
+use tracing::{debug, log::LevelFilter};
+use validator::Validate;
 
-use crate::cache::{NodeDbCaches};
-use crate::errors::NodeDbError;
-use crate::ticket_manager::TicketManager;
+use crate::{cache::NodeDbCaches, errors::NodeDbError, ticket_manager::TicketManager};
 
 /// Filename for the network peers database.
 pub const SQL_DB_PEERS_FILE_NAME: &str = "hopr_peers.db";
@@ -63,11 +64,9 @@ impl HoprNodeDb {
             lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
         }
 
-        cfg.validate()
-            .map_err(|e| NodeDbError::Other(e.into()))?;
+        cfg.validate().map_err(|e| NodeDbError::Other(e.into()))?;
 
-        fs::create_dir_all(directory)
-            .map_err(|e| NodeDbError::Other(e.into()))?;
+        fs::create_dir_all(directory).map_err(|e| NodeDbError::Other(e.into()))?;
 
         let peers_options = PoolOptions::new()
             .acquire_timeout(Duration::from_secs(60)) // Default is 30
@@ -82,7 +81,7 @@ impl HoprNodeDb {
             Some(300),
             SQL_DB_PEERS_FILE_NAME,
         )
-            .await?;
+        .await?;
 
         let tickets = Self::create_pool(
             cfg.clone(),
@@ -92,7 +91,7 @@ impl HoprNodeDb {
             Some(50),
             SQL_DB_TICKETS_FILE_NAME,
         )
-            .await?;
+        .await?;
 
         #[cfg(feature = "sqlite")]
         Self::new_sqlx_sqlite(chain_key, tickets, peers, cfg).await
@@ -110,7 +109,7 @@ impl HoprNodeDb {
                 .map_err(|e| NodeDbError::Other(e.into()))?,
             Default::default(),
         )
-            .await
+        .await
     }
 
     #[cfg(feature = "sqlite")]
@@ -121,12 +120,10 @@ impl HoprNodeDb {
         cfg: HoprNodeDbConfig,
     ) -> Result<Self, NodeDbError> {
         let tickets_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(tickets_db_pool);
-        MigratorTickets::up(&tickets_db, None)
-            .await?;
+        MigratorTickets::up(&tickets_db, None).await?;
 
         let peers_db = SqlxSqliteConnector::from_sqlx_sqlite_pool(peers_db_pool);
-        MigratorPeers::up(&peers_db, None)
-            .await?;
+        MigratorPeers::up(&peers_db, None).await?;
 
         // Reset the peer network information
         let res = hopr_db_entity::network_peer::Entity::delete_many()
@@ -155,19 +152,19 @@ impl HoprNodeDb {
 
         // TODO: (dbmig) initialize key-id mapper via the HoprChain
         // Initialize KeyId mapping for accounts
-        /*Account::find()
-            .find_with_related(Announcement)
-            .all(&index_db_rw)
-            .await?
-            .into_iter()
-            .try_for_each(|(a, b)| match model_to_account_entry(a, b) {
-                Ok(account) => caches.key_id_mapper.update_key_id_binding(&account),
-                Err(error) => {
-                    // Undecodeable accounts are skipped and will be unreachable
-                    tracing::error!(%error, "undecodeable account");
-                    Ok(())
-                }
-            })?;*/
+        // Account::find()
+        // .find_with_related(Announcement)
+        // .all(&index_db_rw)
+        // .await?
+        // .into_iter()
+        // .try_for_each(|(a, b)| match model_to_account_entry(a, b) {
+        // Ok(account) => caches.key_id_mapper.update_key_id_binding(&account),
+        // Err(error) => {
+        // Undecodeable accounts are skipped and will be unreachable
+        // tracing::error!(%error, "undecodeable account");
+        // Ok(())
+        // }
+        // })?;
 
         Ok(Self {
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
@@ -195,7 +192,7 @@ impl HoprNodeDb {
             options = options.max_connections(max_conn);
         }
 
-        let sqlite_cfg =  SqliteConnectOptions::default()
+        let sqlite_cfg = SqliteConnectOptions::default()
             .create_if_missing(cfg.create_if_missing)
             .log_slow_statements(LevelFilter::Warn, cfg.log_slow_queries)
             .log_statements(LevelFilter::Debug)
@@ -207,9 +204,7 @@ impl HoprNodeDb {
             .pragma("cache_size", "-30000") // 32M
             .pragma("busy_timeout", "1000"); // 1000ms
 
-        let pool = options
-            .connect_with(sqlite_cfg.filename(directory.join(path)))
-            .await?;
+        let pool = options.connect_with(sqlite_cfg.filename(directory.join(path))).await?;
 
         Ok(pool)
     }
@@ -217,11 +212,11 @@ impl HoprNodeDb {
 
 #[cfg(test)]
 mod tests {
-    use rand::distributions::Alphanumeric;
-    use rand::Rng;
-    use hopr_api::{*, db::*};
+    use hopr_api::{db::*, *};
     use hopr_crypto_types::keypairs::OffchainKeypair;
     use hopr_primitive_types::prelude::SingleSumSMA;
+    use rand::{Rng, distributions::Alphanumeric};
+
     use super::*;
 
     #[tokio::test]
@@ -258,7 +253,7 @@ mod tests {
                 0.0,
                 25,
             )
-                .await?;
+            .await?;
         }
 
         {
@@ -298,7 +293,7 @@ mod tests {
                 0.0,
                 25,
             )
-                .await?;
+            .await?;
 
             let ten_seconds_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(10);
 
@@ -315,7 +310,7 @@ mod tests {
                 quality: 1.0,
                 quality_avg: SingleSumSMA::new(2),
             })
-                .await?;
+            .await?;
         }
         {
             let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;

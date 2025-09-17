@@ -17,9 +17,8 @@ use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, TransactionTrait};
 use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace};
-use crate::errors::NodeDbError;
-use crate::node_db::HoprNodeDb;
 
+use crate::{errors::NodeDbError, node_db::HoprNodeDb};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -157,7 +156,9 @@ impl HoprDbTicketOperations for HoprNodeDb {
     type Error = NodeDbError;
 
     async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>, NodeDbError> {
-        Ok(self.tickets_db.transaction(|tx| {
+        Ok(self
+            .tickets_db
+            .transaction(|tx| {
                 Box::pin(async move {
                     ticket::Entity::find()
                         .all(tx)
@@ -366,7 +367,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         let selector: WrappedTicketSelector = selector.into();
         Ok(self
             .ticket_manager
-           .write_transaction(|tx| {
+            .write_transaction(|tx| {
                 Box::pin(async move {
                     ticket::Entity::update_many()
                         .filter(selector)
@@ -410,11 +411,9 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                     .set(&[&channel_id, "unredeemed"], unredeemed_value.as_u128() as f64);
                             }
 
-                            let mut all_stats = ticket_statistics::Entity::find()
-                                .all(tx)
-                                .await?
-                                .into_iter()
-                                .fold(ChannelTicketStatistics::default(), |mut acc, stats| {
+                            let mut all_stats = ticket_statistics::Entity::find().all(tx).await?.into_iter().fold(
+                                ChannelTicketStatistics::default(),
+                                |mut acc, stats| {
                                     let neglected_value = HoprBalance::from_be_bytes(stats.neglected_value);
                                     acc.neglected_value += neglected_value;
                                     let redeemed_value = HoprBalance::from_be_bytes(stats.redeemed_value);
@@ -442,7 +441,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                     }
 
                                     acc
-                                });
+                                },
+                            );
 
                             all_stats.unredeemed_value = unredeemed_value.into();
 
@@ -452,7 +452,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     .await
             }
             Some(channel) => {
-                self.tickets_db.transaction(|tx| {
+                self.tickets_db
+                    .transaction(|tx| {
                         Box::pin(async move {
                             let stats = find_stats_for_channel(tx, &channel).await?;
                             let unredeemed_value = ticket::Entity::find()
@@ -480,7 +481,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
     }
 
     async fn reset_ticket_statistics(&self) -> Result<(), NodeDbError> {
-        Ok(self.tickets_db
+        Ok(self
+            .tickets_db
             .transaction(|tx| {
                 Box::pin(async move {
                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -565,7 +567,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     Some(model) => U256::from_be_bytes(model.index).as_u64(),
                     None => {
                         tkt_manager
-                            .write_transaction(|tx|{
+                            .write_transaction(|tx| {
                                 Box::pin(async move {
                                     outgoing_ticket_index::ActiveModel {
                                         channel_id: Set(channel_id.to_hex()),
@@ -582,13 +584,13 @@ impl HoprDbTicketOperations for HoprNodeDb {
                 })))
             })
             .await
-            .map_err(|e: Arc<NodeDbError>| NodeDbError::LogicalError(format!("failed to retrieve ticket index: {e}")))?)
+            .map_err(|e: Arc<NodeDbError>| {
+                NodeDbError::LogicalError(format!("failed to retrieve ticket index: {e}"))
+            })?)
     }
 
     async fn persist_outgoing_ticket_indices(&self) -> Result<usize, NodeDbError> {
-        let outgoing_indices = outgoing_ticket_index::Entity::find()
-            .all(&self.tickets_db)
-            .await?;
+        let outgoing_indices = outgoing_ticket_index::Entity::find().all(&self.tickets_db).await?;
 
         let mut updated = 0;
         for index_model in outgoing_indices {
@@ -630,30 +632,29 @@ impl HoprDbTicketOperations for HoprNodeDb {
 impl HoprNodeDb {
     /// Used only by non-SQLite code and tests.
     pub async fn upsert_ticket<'a>(&'a self, acknowledged_ticket: AcknowledgedTicket) -> Result<(), NodeDbError> {
-       self.tickets_db
-           .transaction(|tx| {
-            Box::pin(async move {
-                // For upserting, we must select only by the triplet (channel id, epoch, index)
-                let selector = WrappedTicketSelector::from(
-                    TicketSelector::new(
-                        acknowledged_ticket.verified_ticket().channel_id,
-                        acknowledged_ticket.verified_ticket().channel_epoch,
-                    )
-                    .with_index(acknowledged_ticket.verified_ticket().index),
-                );
+        self.tickets_db
+            .transaction(|tx| {
+                Box::pin(async move {
+                    // For upserting, we must select only by the triplet (channel id, epoch, index)
+                    let selector = WrappedTicketSelector::from(
+                        TicketSelector::new(
+                            acknowledged_ticket.verified_ticket().channel_id,
+                            acknowledged_ticket.verified_ticket().channel_epoch,
+                        )
+                        .with_index(acknowledged_ticket.verified_ticket().index),
+                    );
 
-                debug!("upserting ticket {acknowledged_ticket}");
-                let mut model = ticket::ActiveModel::from(acknowledged_ticket);
+                    debug!("upserting ticket {acknowledged_ticket}");
+                    let mut model = ticket::ActiveModel::from(acknowledged_ticket);
 
-                if let Some(ticket) = ticket::Entity::find().filter(selector).one(tx)
-                    .await? {
-                    model.id = Set(ticket.id);
-                }
+                    if let Some(ticket) = ticket::Entity::find().filter(selector).one(tx).await? {
+                        model.id = Set(ticket.id);
+                    }
 
-                Ok::<_, sea_orm::DbErr>(model.save(tx).await?)
+                    Ok::<_, sea_orm::DbErr>(model.save(tx).await?)
+                })
             })
-        })
-        .await?;
+            .await?;
         Ok(())
     }
 
@@ -682,23 +683,22 @@ impl HoprNodeDb {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        sync::atomic::Ordering,
-    };
+    use std::sync::atomic::Ordering;
 
     use anyhow::Context;
     use futures::StreamExt;
     use hex_literal::hex;
+    use hopr_api::db::{ChannelTicketStatistics, TicketMarker};
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-    use hopr_api::db::{ChannelTicketStatistics, TicketMarker};
+
     use crate::{
+        node_db::HoprNodeDb,
         tickets::{HoprDbTicketOperations, TicketSelector},
     };
-    use crate::node_db::HoprNodeDb;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
@@ -737,11 +737,7 @@ mod tests {
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
-    async fn init_db_with_tickets(
-        db: &HoprNodeDb,
-        count_tickets: u64,
-    ) -> anyhow::Result<Vec<AcknowledgedTicket>> {
-
+    async fn init_db_with_tickets(db: &HoprNodeDb, count_tickets: u64) -> anyhow::Result<Vec<AcknowledgedTicket>> {
         let tickets: Vec<AcknowledgedTicket> = (0..count_tickets)
             .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, 1, 1.0))
             .collect::<anyhow::Result<Vec<AcknowledgedTicket>>>()?;
@@ -814,7 +810,6 @@ mod tests {
             assert_eq!(1, r, "must redeem only a single ticket");
         }
 
-
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
             HoprBalance::from(TICKET_VALUE * (COUNT_TICKETS - TO_REDEEM)),
@@ -858,7 +853,9 @@ mod tests {
         let count_tickets = 10;
         init_db_with_tickets(&db, count_tickets).await?;
 
-        let count_marked = db.mark_tickets_as(TicketSelector::new(*CHANNEL_ID, CHANNEL_EPOCH), TicketMarker::Redeemed).await?;
+        let count_marked = db
+            .mark_tickets_as(TicketSelector::new(*CHANNEL_ID, CHANNEL_EPOCH), TicketMarker::Redeemed)
+            .await?;
         assert_eq!(count_tickets, count_marked as u64, "must mark all tickets in channel");
 
         Ok(())
@@ -889,7 +886,8 @@ mod tests {
             "per channel stats must be same"
         );
 
-        db.mark_tickets_as(TicketSelector::new(*CHANNEL_ID, CHANNEL_EPOCH), TicketMarker::Neglected).await?;
+        db.mark_tickets_as(TicketSelector::new(*CHANNEL_ID, CHANNEL_EPOCH), TicketMarker::Neglected)
+            .await?;
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
@@ -1039,8 +1037,7 @@ mod tests {
     async fn test_ticket_stats_must_be_zero_for_non_existing_channel() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let stats = db.get_ticket_statistics(Some(*CHANNEL_ID))
-            .await?;
+        let stats = db.get_ticket_statistics(Some(*CHANNEL_ID)).await?;
 
         assert_eq!(stats, ChannelTicketStatistics::default());
 
@@ -1083,13 +1080,9 @@ mod tests {
         db.upsert_ticket(t1).await?;
         db.upsert_ticket(t2).await?;
 
-        let stats_1 = db
-            .get_ticket_statistics(Some(channel_1))
-            .await?;
+        let stats_1 = db.get_ticket_statistics(Some(channel_1)).await?;
 
-        let stats_2 = db
-            .get_ticket_statistics(Some(channel_2))
-            .await?;
+        let stats_2 = db.get_ticket_statistics(Some(channel_2)).await?;
 
         assert_eq!(value, stats_1.unredeemed_value);
         assert_eq!(value, stats_2.unredeemed_value);
@@ -1099,15 +1092,12 @@ mod tests {
 
         assert_eq!(stats_1, stats_2);
 
-        db.mark_tickets_as(TicketSelector::new(channel_1, CHANNEL_EPOCH), TicketMarker::Neglected).await?;
-
-        let stats_1 = db
-            .get_ticket_statistics(Some(channel_1))
+        db.mark_tickets_as(TicketSelector::new(channel_1, CHANNEL_EPOCH), TicketMarker::Neglected)
             .await?;
 
-        let stats_2 = db
-            .get_ticket_statistics(Some(channel_2))
-            .await?;
+        let stats_1 = db.get_ticket_statistics(Some(channel_1)).await?;
+
+        let stats_2 = db.get_ticket_statistics(Some(channel_2)).await?;
 
         assert_eq!(HoprBalance::zero(), stats_1.unredeemed_value);
         assert_eq!(value, stats_1.neglected_value);

@@ -160,8 +160,6 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>> {
-        let epoch = editor.model.epoch.clone();
-
         let parties = ChannelParties(editor.orig.source, editor.orig.destination);
         let ret = self
             .nest_transaction(tx)
@@ -182,17 +180,6 @@ impl HoprDbChannelOperations for HoprDb {
             })
             .await?;
         self.caches.src_dst_to_channel.invalidate(&parties).await;
-
-        // Finally invalidate any unrealized values from the cache.
-        // This might be a no-op if the channel was not in the cache
-        // like for channels that are not ours.
-        let channel_id = editor.orig.get_id();
-        if let Some(channel_epoch) = epoch.try_as_ref() {
-            self.caches
-                .unrealized_value
-                .invalidate(&(channel_id, U256::from_big_endian(channel_epoch.as_slice())))
-                .await;
-        }
 
         Ok(ret)
     }

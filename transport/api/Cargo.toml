@@ -83,4 +83,3 @@ hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
-
