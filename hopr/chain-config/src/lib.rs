@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use hopr_chain_types::ContractAddresses;
 use hopr_primitive_types::primitives::Address;
@@ -7,18 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
 
-use crate::errors::HoprChainError;
-
-/// Types of HOPR network environments.
-#[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq, strum::Display, strum::EnumString)]
-#[serde(rename_all(deserialize = "lowercase"))]
-#[strum(serialize_all = "lowercase")]
-pub enum EnvironmentType {
-    Production,
-    Staging,
-    Development,
-    Local,
-}
+pub mod errors;
+pub use errors::{HoprConfigError, Result};
 
 /// Holds all information we need about the blockchain network
 /// the client is going to use
@@ -45,6 +35,17 @@ pub struct ChainOptions {
     /// optional maximum number of RPC requests per second for this chain provider
     pub max_rpc_requests_per_sec: Option<u32>,
     pub tags: Option<Vec<String>>,
+}
+
+/// Types of HOPR network environments.
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[serde(rename_all(deserialize = "lowercase"))]
+#[strum(serialize_all = "lowercase")]
+pub enum EnvironmentType {
+    Production,
+    Staging,
+    Development,
+    Local,
 }
 
 /// Holds all information about the protocol network
@@ -159,12 +160,13 @@ pub struct ChainNetworkConfig {
 }
 
 /// Check whether the version is allowed
-fn satisfies(version: &str, allowed_versions: &str) -> crate::errors::Result<bool> {
+fn satisfies(version: &str, allowed_versions: &str) -> Result<bool> {
     let allowed_versions = VersionReq::parse(allowed_versions)
-        .map_err(|e| HoprChainError::Configuration(format!("failed to deserialize allowed version string: {e}")))?;
+        .map_err(|e| HoprConfigError::Configuration(format!("failed to deserialize allowed version string: {e}")))?;
 
-    let version = Version::from_str(version)
-        .map_err(|e| HoprChainError::Configuration(format!("failed to deserialize current lib version string: {e}")))?;
+    let version = Version::from_str(version).map_err(|e| {
+        HoprConfigError::Configuration(format!("failed to deserialize current lib version string: {e}"))
+    })?;
 
     Ok(allowed_versions.matches(&version))
 }
@@ -177,7 +179,7 @@ impl ChainNetworkConfig {
         maybe_custom_provider: Option<&str>,
         max_rpc_requests_per_sec: Option<u32>,
         protocol_config: &mut ProtocolsConfig,
-    ) -> Result<Self, String> {
+    ) -> std::result::Result<Self, String> {
         let network = protocol_config
             .networks
             .get_mut(id)
@@ -213,10 +215,7 @@ impl ChainNetworkConfig {
                 max_block_range: network.max_block_range,
                 max_requests_per_sec: max_rpc_requests_per_sec.or(chain.max_rpc_requests_per_sec),
             }),
-            Ok(false) => Err(format!(
-                "network {id} is not supported, supported networks {:?}",
-                protocol_config.supported_networks(version).join(", ")
-            )),
+            Ok(false) => Err(HoprConfigError::UnsupportedNetwork(id.into()).to_string()),
             Err(e) => Err(e.to_string()),
         }
     }
@@ -244,30 +243,30 @@ impl From<&ChainNetworkConfig> for ContractAddresses {
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[serde(deny_unknown_fields)]
 pub struct ProtocolsConfig {
-    pub networks: std::collections::BTreeMap<String, Network>,
-    pub chains: std::collections::BTreeMap<String, ChainOptions>,
+    pub networks: BTreeMap<String, Network>,
+    pub chains: BTreeMap<String, ChainOptions>,
 }
 
 impl Default for ProtocolsConfig {
     fn default() -> Self {
-        Self::from_str(include_str!("../../../hopr/chain-config/data/protocol-config.json"))
+        Self::from_str(include_str!("../data/protocol-config.json"))
             .expect("bundled protocol config should be always valid")
     }
 }
 
 impl FromStr for ProtocolsConfig {
-    type Err = String;
+    type Err = HoprConfigError;
 
     /// Reads the protocol config JSON file and returns it
-    fn from_str(data: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str::<ProtocolsConfig>(data).map_err(|e| e.to_string())
+    fn from_str(data: &str) -> std::result::Result<Self, Self::Err> {
+        serde_json::from_str::<ProtocolsConfig>(data).map_err(|e| HoprConfigError::Configuration(e.to_string()))
     }
 }
 
 impl std::cmp::PartialEq for ProtocolsConfig {
     fn eq(&self, other: &Self) -> bool {
         Vec::from_iter(self.networks.clone()) == Vec::from_iter(other.networks.clone())
-            && Vec::from_iter(self.chains.clone()) == Vec::from_iter(self.chains.clone())
+            && Vec::from_iter(self.chains.clone()) == Vec::from_iter(other.chains.clone())
     }
 }
 

@@ -8,6 +8,7 @@ members = [
   "chain/indexer",
   "chain/rpc",
   "chain/types",
+  "common/api",
   "common/async-runtime",
   "common/internal-types",
   "common/network-types",
@@ -24,6 +25,7 @@ members = [
   "db/sql",
   "ethereum/bindings",
   "hopli",
+  "hopr/chain-config",
   "hopr/hopr-lib",
   "hoprd/hoprd",
   "hoprd/rest-api",
@@ -217,6 +219,7 @@ url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
 
+hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { path = "ethereum/bindings", default-features = false }
 hopr-chain-actions = { path = "chain/actions", default-features = false }
@@ -237,6 +240,7 @@ hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
 hopr-db-sql = { path = "db/sql" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
+hopr-chain-config = { path = "hopr/chain-config", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-network-types = { path = "common/network-types", default-features = false }
