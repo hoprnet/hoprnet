@@ -3,12 +3,10 @@ use std::time::Duration;
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{TryStreamExt, stream::BoxStream};
-use hopr_api::db::*;
+use hopr_api::{*, db::*};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_entity::network_peer;
 use hopr_primitive_types::prelude::*;
-use libp2p_identity::PeerId;
-use multiaddr::Multiaddr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 use sea_query::{Condition, Expr, IntoCondition, Order};
 use sqlx::types::chrono::{self, DateTime, Utc};
@@ -300,9 +298,8 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
                             }
                         })
                         .filter(|s| !s.trim().is_empty())
-                        .map(Multiaddr::try_from)
-                        .collect::<std::result::Result<Vec<_>, multiaddr::Error>>()
-                        .map_err(|e| Self::Error::LogicalError(format!("invalid multi-address: {e}")))
+                        .map(|m| Multiaddr::try_from(m).map_err(|m| Self::Error::LogicalError(format!("invalid multi-address: {m}"))))
+                        .collect::<Result<Vec<_>, NodeDbError>>()
                 } else {
                     Err(Self::Error::LogicalError("invalid multi-addresses".into()))
                 }?
@@ -331,8 +328,6 @@ mod tests {
 
     use futures::StreamExt;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use libp2p_identity::PeerId;
-    use multiaddr::Multiaddr;
 
     use super::*;
 

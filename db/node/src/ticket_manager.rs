@@ -11,7 +11,7 @@ use hopr_primitive_types::prelude::{HoprBalance, IntoEndian, ToHex};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use tracing::{debug, error};
 use hopr_api::db::TicketSelector;
-use crate::{cache::HoprDbCaches, tickets::WrappedTicketSelector};
+use crate::{cache::NodeDbCaches, tickets::WrappedTicketSelector};
 use crate::errors::NodeDbError;
 use crate::node_db::HoprNodeDb;
 
@@ -33,12 +33,12 @@ pub(crate) struct TicketManager {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) mutex: Arc<async_lock::Mutex<()>>,
     incoming_ack_tickets_tx: Arc<OnceLock<futures::channel::mpsc::Sender<AcknowledgedTicket>>>,
-    caches: Arc<HoprDbCaches>,
+    caches: Arc<NodeDbCaches>,
 }
 
 
 impl TicketManager {
-    pub fn new(tickets_db: sea_orm::DatabaseConnection, caches: Arc<HoprDbCaches>) -> Self {
+    pub fn new(tickets_db: sea_orm::DatabaseConnection, caches: Arc<NodeDbCaches>) -> Self {
         Self {
             tickets_db,
             mutex: Arc::new(async_lock::Mutex::new(())),

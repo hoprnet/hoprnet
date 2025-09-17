@@ -334,15 +334,8 @@ impl HoprDbChannelOperations for HoprDb {
 
         self.caches.src_dst_to_channel.invalidate(&parties).await;
 
-        // Finally, invalidate any unrealized values from the cache.
-        // This might be a no-op if the channel was not in the cache
-        // like for channels that are not ours.
-        let channel_id = channel_entry.get_id();
-        let channel_epoch = channel_entry.channel_epoch;
-        self.caches
-            .unrealized_value
-            .invalidate(&(channel_id, channel_epoch))
-            .await;
+        // The invalidation of the unrealized value is done in the finish_channel_update function.
+        // Has no effect if the channel has been inserted.
 
         Ok(())
     }

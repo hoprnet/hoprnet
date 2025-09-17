@@ -19,7 +19,6 @@ members = [
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
-  "db/api",
   "db/entity",
   "db/migration",
   "db/node",
@@ -235,7 +234,6 @@ hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, feature
   "ed25519",
 ] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
-hopr-db-api = { path = "db/api" }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
 hopr-db-node = { path = "db/node" }

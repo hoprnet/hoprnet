@@ -286,7 +286,6 @@ mod tests {
                 Box::pin(async move {
                     db_clone.set_safe_hopr_allowance(Some(tx), safe_allowance).await?;
                     db_clone.set_safe_hopr_balance(Some(tx), safe_balance).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
                         .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
                         .await?;

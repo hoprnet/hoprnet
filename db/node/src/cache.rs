@@ -100,7 +100,7 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 
 /// Contains all caches used by the [crate::db::HoprDb].
 #[derive(Debug)]
-pub struct HoprDbCaches {
+pub struct NodeDbCaches {
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
     // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
@@ -110,7 +110,7 @@ pub struct HoprDbCaches {
     pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
 }
 
-impl Default for HoprDbCaches {
+impl Default for NodeDbCaches {
     fn default() -> Self {
         Self {
             unacked_tickets: Cache::builder()
@@ -144,7 +144,7 @@ impl Default for HoprDbCaches {
     }
 }
 
-impl HoprDbCaches {
+impl NodeDbCaches {
     pub(crate) fn insert_pseudonym_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
         self.pseudonym_openers
             .get_with(sender_id.pseudonym(), move || {

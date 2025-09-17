@@ -2,10 +2,6 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use futures::{StreamExt, stream};
 use hopr_crypto_types::prelude::Hash;
-use hopr_db_api::{
-    errors::{DbError, Result},
-    logs::HoprDbLogOperations,
-};
 use hopr_db_entity::{
     errors::DbEntityError,
     log, log_status, log_topic_info,
@@ -23,23 +19,165 @@ struct BlockNumber {
 }
 
 #[async_trait]
+pub trait HoprDbLogOperations {
+    /// Ensures that logs in this database have been created by scanning the given contract address
+    /// and their corresponding topics. If the log DB is empty, the given addresses and topics
+    /// are used to prime the table.
+    ///
+    /// # Arguments
+    /// * `contract_address_topics` - list of topics for a contract address. There may be multiple topics
+    /// with the same contract address.
+    ///
+    /// # Returns
+    /// A `Result` which is `Ok(())` if the database contains correct log data,
+    /// or it has been primed successfully. An `Err` is returned otherwise.
+    async fn ensure_logs_origin(&self, contract_address_topics: Vec<(Address, Hash)>) -> Result<(), DbSqlError>;
+
+    /// Stores a single log entry in the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `log` - The log entry to store, of type `SerializableLog`.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
+    async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<(), DbSqlError>;
+
+    /// Stores multiple log entries in the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `logs` - A vector of log entries to store, each of type `SerializableLog`.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a vector of `Result<()>`, each representing the result of storing an individual log entry.
+    async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<(), DbSqlError>>, DbSqlError>;
+
+    /// Retrieves a specific log entry from the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - The block number of the log entry.
+    /// * `tx_index` - The transaction index of the log entry.
+    /// * `log_index` - The log index of the log entry.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the `SerializableLog` if the operation succeeds or an error if it fails.
+    async fn get_log(&self, block_number: u64, tx_index: u64, log_index: u64) -> Result<SerializableLog, DbSqlError>;
+
+    /// Retrieves multiple log entries from the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - An optional block number filter.
+    /// * `block_offset` - An optional block offset filter.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `Vec` of `SerializableLog` entries if the operation succeeds or an error if it fails.
+    async fn get_logs<'a>(
+        &'a self,
+        block_number: Option<u64>,
+        block_offset: Option<u64>,
+    ) -> Result<Vec<SerializableLog>, DbSqlError>;
+
+    /// Retrieves the count of log entries from the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - An optional block number filter.
+    /// * `block_offset` - An optional block offset filter.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the count of log entries if the operation succeeds or an error if it fails.
+    async fn get_logs_count(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<u64, DbSqlError>;
+
+    /// Retrieves block numbers of log entries from the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - An optional block number filter.
+    /// * `block_offset` - An optional block offset filter.
+    /// * `processed` - An optional processed filter.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing a `Vec` of block numbers if the operation succeeds or an error if it fails.
+    async fn get_logs_block_numbers<'a>(
+        &'a self,
+        block_number: Option<u64>,
+        block_offset: Option<u64>,
+        processed: Option<bool>,
+    ) -> Result<Vec<u64>, DbSqlError>;
+
+    /// Marks a specific log entry as processed.
+    ///
+    /// # Arguments
+    ///
+    /// * `log` - The log entry to mark as processed, of type `SerializableLog`.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
+    async fn set_log_processed(&self, log: SerializableLog) -> Result<(), DbSqlError>;
+
+    /// Marks multiple log entries as processed.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - An optional block number filter.
+    /// * `block_offset` - An optional block offset filter.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
+    async fn set_logs_processed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<(), DbSqlError>;
+
+    /// Marks multiple log entries as unprocessed.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_number` - An optional block number filter.
+    /// * `block_offset` - An optional block offset filter.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is `Ok(())` if the operation succeeds or an error if it fails.
+    async fn set_logs_unprocessed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<(), DbSqlError>;
+
+    /// Retrieves the last checksummed log entry from the database.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing an `Option<SerializableLog>` if the operation succeeds or an error if it fails.
+    async fn get_last_checksummed_log(&self) -> Result<Option<SerializableLog>, DbSqlError>;
+
+    /// Updates checksums for log entries in the database.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` which is `Ok(Hash)` if the operation succeeds or an error if it fails.
+    async fn update_logs_checksums(&self) -> Result<Hash, DbSqlError>;
+}
+
+#[async_trait]
 impl HoprDbLogOperations for HoprDb {
     
     
-    async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<()> {
-        match self.store_logs([log].to_vec()).await {
-            Ok(results) => {
-                if let Some(result) = results.into_iter().next() {
-                    result
-                } else {
-                    panic!("when inserting a log into the db, the result should be a single item")
-                }
-            }
-            Err(e) => Err(e),
+    async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<(), DbSqlError> {
+        let results = self.store_logs([log].to_vec()).await?;
+        if let Some(result) = results.into_iter().next() {
+            result
+        } else {
+            panic!("when inserting a log into the db, the result should be a single item")
         }
     }
 
-    async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<()>>> {
+    async fn store_logs(&self, logs: Vec<SerializableLog>) -> Result<Vec<Result<(), DbSqlError>>, DbSqlError> {
         self.nest_transaction_in_db(None, TargetDb::Logs)
             .await?
             .perform(|tx| {
@@ -72,22 +210,22 @@ impl HoprDbLogOperations for HoprDb {
                                 Ok(_) => Ok(()),
                                 Err(DbErr::RecordNotInserted) => {
                                     warn!(log_id, "log already in the DB");
-                                    Err(DbError::General(format!("log already exists in the DB: {log_id}")))
+                                    Err(DbSqlError::LogicalError(format!("log already exists in the DB: {log_id}")))
                                 }
                                 Err(e) => {
                                     error!("Failed to insert log into db: {:?}", e);
-                                    Err(DbError::General(e.to_string()))
+                                    Err(DbSqlError::LogicalError(e.to_string()))
                                 }
                             },
                             Err(DbErr::RecordNotInserted) => {
                                 warn!(log_id, "log already in the DB");
-                                Err(DbError::General(format!(
+                                Err(DbSqlError::LogicalError(format!(
                                     "log status already exists in the DB: {log_id}"
                                 )))
                             }
                             Err(e) => {
                                 error!(%log_id, "Failed to insert log status into db: {:?}", e);
-                                Err(DbError::General(e.to_string()))
+                                Err(DbSqlError::LogicalError(e.to_string()))
                             }
                         }
                     });
@@ -97,7 +235,7 @@ impl HoprDbLogOperations for HoprDb {
             .await
     }
 
-    async fn get_log(&self, block_number: u64, tx_index: u64, log_index: u64) -> Result<SerializableLog> {
+    async fn get_log(&self, block_number: u64, tx_index: u64, log_index: u64) -> Result<SerializableLog, DbSqlError> {
         let bn_enc = block_number.to_be_bytes().to_vec();
         let tx_index_enc = tx_index.to_be_bytes().to_vec();
         let log_index_enc = log_index.to_be_bytes().to_vec();
@@ -112,15 +250,15 @@ impl HoprDbLogOperations for HoprDb {
             Ok(mut res) => {
                 if let Some((log, log_status)) = res.pop() {
                     if let Some(status) = log_status {
-                        create_log(log, status).map_err(DbError::from)
+                        create_log(log, status).map_err(DbSqlError::from)
                     } else {
-                        Err(DbError::MissingLogStatus)
+                        Err(DbSqlError::MissingLogStatus)
                     }
                 } else {
-                    Err(DbError::MissingLog)
+                    Err(DbSqlError::MissingLog)
                 }
             }
-            Err(e) => Err(DbError::from(DbSqlError::from(e))),
+            Err(e) => Err(DbSqlError::from(e)),
         }
     }
 
@@ -128,7 +266,7 @@ impl HoprDbLogOperations for HoprDb {
         &'a self,
         block_number: Option<u64>,
         block_offset: Option<u64>,
-    ) -> Result<Vec<SerializableLog>> {
+    ) -> Result<Vec<SerializableLog>, DbSqlError> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
@@ -156,12 +294,12 @@ impl HoprDbLogOperations for HoprDb {
                 .collect()),
             Err(e) => {
                 error!("Failed to get logs from db: {:?}", e);
-                Err(DbError::from(DbSqlError::from(e)))
+                Err(DbSqlError::from(e))
             }
         }
     }
 
-    async fn get_logs_count(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<u64> {
+    async fn get_logs_count(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<u64, DbSqlError> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
@@ -184,7 +322,7 @@ impl HoprDbLogOperations for HoprDb {
         block_number: Option<u64>,
         block_offset: Option<u64>,
         processed: Option<bool>,
-    ) -> Result<Vec<u64>> {
+    ) -> Result<Vec<u64>, DbSqlError> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
@@ -208,11 +346,11 @@ impl HoprDbLogOperations for HoprDb {
             })
             .map_err(|e| {
                 error!("Failed to get logs block numbers from db: {:?}", e);
-                DbError::from(DbSqlError::from(e))
+                DbSqlError::from(e)
             })
     }
 
-    async fn set_logs_processed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()> {
+    async fn set_logs_processed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<(), DbSqlError> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
         let now = Utc::now();
@@ -230,11 +368,11 @@ impl HoprDbLogOperations for HoprDb {
 
         match query.exec(self.conn(TargetDb::Logs)).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(DbError::from(DbSqlError::from(e))),
+            Err(e) => Err(DbSqlError::from(e)),
         }
     }
 
-    async fn set_log_processed<'a>(&'a self, mut log: SerializableLog) -> Result<()> {
+    async fn set_log_processed<'a>(&'a self, mut log: SerializableLog) -> Result<(), DbSqlError> {
         log.processed = Some(true);
         log.processed_at = Some(Utc::now());
         let log_status = log_status::ActiveModel::from(log);
@@ -248,7 +386,7 @@ impl HoprDbLogOperations for HoprDb {
                         Ok(_) => Ok(()),
                         Err(e) => {
                             error!("Failed to update log status in db");
-                            Err(DbError::from(DbSqlError::from(e)))
+                            Err(DbSqlError::from(e))
                         }
                     }
                 })
@@ -256,7 +394,7 @@ impl HoprDbLogOperations for HoprDb {
             .await
     }
 
-    async fn set_logs_unprocessed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<()> {
+    async fn set_logs_unprocessed(&self, block_number: Option<u64>, block_offset: Option<u64>) -> Result<(), DbSqlError> {
         let min_block_number = block_number.unwrap_or(0);
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
@@ -273,11 +411,11 @@ impl HoprDbLogOperations for HoprDb {
 
         match query.exec(self.conn(TargetDb::Logs)).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(DbError::from(DbSqlError::from(e))),
+            Err(e) => Err(DbSqlError::from(e)),
         }
     }
 
-    async fn get_last_checksummed_log(&self) -> Result<Option<SerializableLog>> {
+    async fn get_last_checksummed_log(&self) -> Result<Option<SerializableLog>, DbSqlError> {
         let query = LogStatus::find()
             .filter(log_status::Column::Checksum.is_not_null())
             .order_by_desc(log_status::Column::BlockNumber)
@@ -294,11 +432,11 @@ impl HoprDbLogOperations for HoprDb {
                 }
             }
             Ok(_) => Ok(None),
-            Err(e) => Err(DbError::from(DbSqlError::from(e))),
+            Err(e) => Err(DbSqlError::from(e)),
         }
     }
 
-    async fn update_logs_checksums(&self) -> Result<Hash> {
+    async fn update_logs_checksums(&self) -> Result<Hash, DbSqlError> {
         self.nest_transaction_in_db(None, TargetDb::Logs)
             .await?
             .perform(|tx| {
@@ -310,7 +448,7 @@ impl HoprDbLogOperations for HoprDb {
                         .order_by_desc(log_status::Column::LogIndex)
                         .one(tx.as_ref())
                         .await
-                        .map_err(|e| DbError::from(DbSqlError::from(e)))?
+                        .map_err(|e| DbSqlError::from(e))?
                         .and_then(|m| m.checksum)
                         .and_then(|c| Hash::try_from(c.as_slice()).ok())
                         .unwrap_or_default();
@@ -353,16 +491,16 @@ impl HoprDbLogOperations for HoprDb {
                             }
                             Ok(last_checksum)
                         }
-                        Err(e) => Err(DbError::from(DbSqlError::from(e))),
+                        Err(e) => Err(DbSqlError::from(e)),
                     }
                 })
             })
             .await
     }
 
-    async fn ensure_logs_origin(&self, contract_address_topics: Vec<(Address, Hash)>) -> Result<()> {
+    async fn ensure_logs_origin(&self, contract_address_topics: Vec<(Address, Hash)>) -> Result<(), DbSqlError> {
         if contract_address_topics.is_empty() {
-            return Err(DbError::LogicalError(
+            return Err(DbSqlError::LogicalError(
                 "contract address topics must not be empty".into(),
             ));
         }
@@ -379,11 +517,11 @@ impl HoprDbLogOperations for HoprDb {
                         .column(log::Column::LogIndex)
                         .count(tx.as_ref())
                         .await
-                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                        .map_err(|e| DbSqlError::from(e))?;
                     let log_topic_count = LogTopicInfo::find()
                         .count(tx.as_ref())
                         .await
-                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                        .map_err(|e| DbSqlError::from(e))?;
 
                     if log_count == 0 && log_topic_count == 0 {
                         // Prime the DB with the values
@@ -396,7 +534,7 @@ impl HoprDbLogOperations for HoprDb {
                         }))
                         .exec(tx.as_ref())
                         .await
-                        .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                        .map_err(|e| DbSqlError::from(e))?;
                     } else {
                         // Check that all contract addresses and topics are in the DB
                         for (addr, topic) in contract_address_topics {
@@ -405,9 +543,9 @@ impl HoprDbLogOperations for HoprDb {
                                 .filter(log_topic_info::Column::Topic.eq(topic.to_string()))
                                 .count(tx.as_ref())
                                 .await
-                                .map_err(|e| DbError::from(DbSqlError::from(e)))?;
+                                .map_err(|e| DbSqlError::from(e))?;
                             if log_topic_count != 1 {
-                                return Err(DbError::InconsistentLogs);
+                                return Err(DbSqlError::InconsistentLogs);
                             }
                         }
                     }
@@ -415,41 +553,6 @@ impl HoprDbLogOperations for HoprDb {
                 })
             })
             .await
-    }
-
-    async fn import_logs_db(self, src_dir: PathBuf) -> crate::errors::Result<()> {
-        let src_db_path = src_dir.join("hopr_logs.db");
-        if !src_db_path.exists() {
-            return Err(DbSqlError::Construction(format!(
-                "Source logs database file does not exist: {}",
-                src_db_path.display()
-            )));
-        }
-
-        let sql = format!(
-            r#"
-            ATTACH DATABASE '{}' AS source_logs;
-            BEGIN TRANSACTION;
-            DELETE FROM log;
-            DELETE FROM log_status;
-            DELETE FROM log_topic_info;
-            INSERT INTO log_topic_info SELECT * FROM source_logs.log_topic_info;
-            INSERT INTO log_status SELECT * FROM source_logs.log_status;
-            INSERT INTO log SELECT * FROM source_logs.log;
-            COMMIT;
-            DETACH DATABASE source_logs;
-        "#,
-            src_db_path.to_string_lossy().replace("'", "''")
-        );
-
-        let logs_conn = self.conn(TargetDb::Logs);
-
-        logs_conn
-            .execute_unprepared(sql.as_str())
-            .await
-            .map_err(|e| DbSqlError::Construction(format!("Failed to import logs data: {e}")))?;
-
-        Ok(())
     }
 }
 

@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use hopr_crypto_types::prelude::OffchainPublicKey;
-pub use hopr_crypto_types::prelude::PeerId;
+use hopr_crypto_types::prelude::PeerId;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 

@@ -29,6 +29,47 @@ pub struct IndexerStateInfo {
     pub latest_log_checksum: Hash,
 }
 
+/// Contains various on-chain information collected by Indexer,
+/// such as domain separators, ticket price, Network Registry status...etc.
+/// All these members change very rarely and therefore can be cached.
+#[derive(Clone, Copy, Debug)]
+pub struct IndexerData {
+    /// Ledger smart contract domain separator
+    pub ledger_dst: Option<Hash>,
+    /// Node safe registry smart contract domain separator
+    pub safe_registry_dst: Option<Hash>,
+    /// Channels smart contract domain separator
+    pub channels_dst: Option<Hash>,
+    /// Current ticket price
+    pub ticket_price: Option<HoprBalance>,
+    /// Minimum winning probability
+    pub minimum_incoming_ticket_winning_prob: WinningProbability,
+    /// Network registry state
+    pub nr_enabled: bool,
+}
+
+/// Enumerates different domain separators
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DomainSeparator {
+    /// Ledger smart contract domain separator
+    Ledger,
+    /// Node safe registry smart contract domain separator
+    SafeRegistry,
+    /// Channels smart contract domain separator
+    Channel,
+}
+
+impl IndexerData {
+    /// Convenience method to retrieve domain separator according to the [DomainSeparator] enum.
+    pub fn domain_separator(&self, dst_type: DomainSeparator) -> Option<Hash> {
+        match dst_type {
+            DomainSeparator::Ledger => self.ledger_dst,
+            DomainSeparator::SafeRegistry => self.safe_registry_dst,
+            DomainSeparator::Channel => self.channels_dst,
+        }
+    }
+}
+
 /// Defines DB access API for various node information.
 ///
 /// # Checksum computation
@@ -495,7 +536,7 @@ mod tests {
 
     use crate::{
         db::HoprDb,
-        info::{HoprDbInfoOperations, SafeInfo},
+        info::HoprDbInfoOperations,
     };
 
     lazy_static::lazy_static! {
@@ -565,40 +606,6 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_set_get_safe_info_with_cache() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
-
-        assert_eq!(None, db.get_safe_info(None).await?);
-
-        let safe_info = SafeInfo {
-            safe_address: *ADDR_1,
-            module_address: *ADDR_2,
-        };
-
-        db.set_safe_info(None, safe_info).await?;
-
-        assert_eq!(Some(safe_info), db.get_safe_info(None).await?);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_set_get_safe_info() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
-
-        assert_eq!(None, db.get_safe_info(None).await?);
-
-        let safe_info = SafeInfo {
-            safe_address: *ADDR_1,
-            module_address: *ADDR_2,
-        };
-
-        db.set_safe_info(None, safe_info).await?;
-        db.caches.single_values.invalidate_all();
-
-        assert_eq!(Some(safe_info), db.get_safe_info(None).await?);
-        Ok(())
-    }
 
     #[tokio::test]
     async fn test_set_get_global_setting() -> anyhow::Result<()> {

@@ -78,6 +78,7 @@ pub struct HoprDb {
     pub(crate) logs_db: sea_orm::DatabaseConnection,
     pub(crate) chain_key: ChainKeypair,
     pub(crate) me_onchain: Address,
+    pub(crate) caches: HoprDbCaches,
     pub(crate) cfg: HoprDbConfig,
 }
 
@@ -89,13 +90,6 @@ pub const SQL_DB_LOGS_FILE_NAME: &str = "hopr_logs.db";
 
 impl HoprDb {
     pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprDbConfig) -> Result<Self> {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
-            lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
-            lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
-        }
-
         cfg.validate()
             .map_err(|e| DbSqlError::Construction(format!("failed configuration validation: {e}")))?;
 
@@ -179,7 +173,7 @@ impl HoprDb {
             .await
             .map_err(|e| DbSqlError::Construction(format!("cannot apply database migration: {e}")))?;
 
-
+        
         Ok(Self {
             me_onchain: chain_key.public().to_address(),
             chain_key,
@@ -189,6 +183,7 @@ impl HoprDb {
             },
             logs_db,
             cfg,
+            caches: Default::default(),
         })
     }
 
@@ -256,15 +251,12 @@ impl HoprDbAllOperations for HoprDb {}
 #[cfg(test)]
 mod tests {
     use hopr_crypto_types::{
-        keypairs::{ChainKeypair, OffchainKeypair},
+        keypairs::ChainKeypair,
         prelude::Keypair,
     };
-    use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin};
-    use hopr_primitive_types::sma::SingleSumSMA;
-    use libp2p_identity::PeerId;
-    use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
-    use multiaddr::Multiaddr;
-    use rand::{Rng, distributions::Alphanumeric};
+
+    use migration::{MigratorChainLogs, MigratorIndex, MigratorTrait};
+
 
     use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb}; // 0.8
 
@@ -275,104 +267,7 @@ mod tests {
         // NOTE: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status
         // must be ok");`
         MigratorIndex::status(db.conn(TargetDb::Index)).await?;
-        MigratorTickets::status(db.conn(TargetDb::Tickets)).await?;
-        MigratorPeers::status(db.conn(TargetDb::Peers)).await?;
         MigratorChainLogs::status(db.conn(TargetDb::Logs)).await?;
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn peers_without_any_recent_updates_should_be_discarded_on_restarts() -> anyhow::Result<()> {
-        let random_filename: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(15)
-            .map(char::from)
-            .collect();
-        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
-
-        let peer_id: PeerId = OffchainKeypair::random().public().into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
-
-        let path = std::path::Path::new(&random_tmp_file);
-
-        {
-            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
-
-            db.add_network_peer(
-                &peer_id,
-                PeerOrigin::IncomingConnection,
-                vec![ma_1.clone(), ma_2.clone()],
-                0.0,
-                25,
-            )
-            .await?;
-        }
-
-        {
-            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
-
-            let not_found_peer = db.get_network_peer(&peer_id).await?;
-
-            assert_eq!(not_found_peer, None);
-        }
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn peers_with_a_recent_update_should_be_retained_in_the_database() -> anyhow::Result<()> {
-        let random_filename: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(15)
-            .map(char::from)
-            .collect();
-        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
-
-        let ofk = OffchainKeypair::random();
-        let peer_id: PeerId = (*ofk.public()).into();
-        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
-        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
-
-        let path = std::path::Path::new(&random_tmp_file);
-
-        {
-            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
-
-            db.add_network_peer(
-                &peer_id,
-                PeerOrigin::IncomingConnection,
-                vec![ma_1.clone(), ma_2.clone()],
-                0.0,
-                25,
-            )
-            .await?;
-
-            let ten_seconds_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(10);
-
-            db.update_network_peer(hopr_db_api::peers::PeerStatus {
-                id: (*ofk.public(), peer_id),
-                origin: PeerOrigin::Initialization,
-                last_seen: ten_seconds_ago,
-                last_seen_latency: std::time::Duration::from_millis(10),
-                heartbeats_sent: 1,
-                heartbeats_succeeded: 1,
-                backoff: 1.0,
-                ignored_until: None,
-                multiaddresses: vec![ma_1.clone(), ma_2.clone()],
-                quality: 1.0,
-                quality_avg: SingleSumSMA::new(2),
-            })
-            .await?;
-        }
-        {
-            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
-
-            let found_peer = db.get_network_peer(&peer_id).await?.map(|p| p.id.1);
-
-            assert_eq!(found_peer, Some(peer_id));
-        }
 
         Ok(())
     }

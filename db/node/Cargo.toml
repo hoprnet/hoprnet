@@ -2,7 +2,7 @@
 name = "hopr-db-node"
 version = "0.1.0"
 edition = "2021"
-description = "Contains SQL Node DB functionality implementing the DB API traits to be used by other crates in the code base"
+description = "Contains SQL Node DB functionality implementing the DB API traits"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -26,13 +26,10 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
 chrono = { workspace = true }
-dashmap = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true, optional = true }
-libp2p-identity = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
-multiaddr = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
 sea-orm = { workspace = true }
@@ -43,7 +40,6 @@ sea-query = { workspace = true, default-features = false, features = [
 ] }
 smart-default = { workspace = true }
 sqlx = { workspace = true }
-strum = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }

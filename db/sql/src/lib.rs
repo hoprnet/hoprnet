@@ -12,18 +12,12 @@ pub mod db;
 pub mod errors;
 pub mod info;
 pub mod logs;
-pub mod resolver;
 
 use std::path::PathBuf;
-
 use async_trait::async_trait;
 use futures::future::BoxFuture;
-pub use hopr_db_api as api;
-use hopr_db_api::{
-    logs::HoprDbLogOperations, peers::HoprDbPeersOperations, protocol::HoprDbProtocolOperations,
-    resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations,
-};
 use sea_orm::{ConnectionTrait, TransactionTrait};
+
 pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
 
 use crate::{
@@ -153,6 +147,48 @@ pub trait HoprDbGeneralModelOperations {
     async fn nest_transaction(&self, tx: OptTx<'_>) -> Result<OpenTransaction> {
         self.nest_transaction_in_db(tx, Default::default()).await
     }
+
+    /// Import logs database from a snapshot directory.
+    ///
+    /// Replaces all data in the current logs database with data from a snapshot's
+    /// `hopr_logs.db` file. This is used for fast synchronization during node startup.
+    ///
+    /// # Process
+    ///
+    /// 1. Attaches the source database from the snapshot directory
+    /// 2. Clears existing data from all logs-related tables
+    /// 3. Copies all data from the snapshot database
+    /// 4. Detaches the source database
+    ///
+    /// All operations are performed within a single transaction for atomicity.
+    ///
+    /// # Arguments
+    ///
+    /// * `src_dir` - Directory containing the extracted snapshot with `hopr_logs.db`
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on successful import, or [`DbSqlError::Construction`] if the source
+    /// database doesn't exist or the import operation fails.
+    ///
+    /// # Errors
+    ///
+    /// - Returns error if `hopr_logs.db` is not found in the source directory
+    /// - Returns error if SQLite ATTACH, data transfer, or DETACH operations fail
+    /// - All database errors are wrapped in [`DbSqlError::Construction`]
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use std::path::PathBuf;
+    /// # use hopr_db_sql::HoprDbGeneralModelOperations;
+    /// # async fn example(db: impl HoprDbGeneralModelOperations) -> Result<(), Box<dyn std::error::Error>> {
+    /// let snapshot_dir = PathBuf::from("/tmp/snapshot_extracted");
+    /// db.import_logs_db(snapshot_dir).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    async fn import_logs_db(self, src_dir: PathBuf) -> Result<()>;
 }
 
 #[async_trait]
@@ -179,6 +215,41 @@ impl HoprDbGeneralModelOperations for HoprDb {
             )),
         }
     }
+
+    async fn import_logs_db(self, src_dir: PathBuf) -> crate::errors::Result<()> {
+        let src_db_path = src_dir.join("hopr_logs.db");
+        if !src_db_path.exists() {
+            return Err(DbSqlError::Construction(format!(
+                "Source logs database file does not exist: {}",
+                src_db_path.display()
+            )));
+        }
+
+        let sql = format!(
+            r#"
+            ATTACH DATABASE '{}' AS source_logs;
+            BEGIN TRANSACTION;
+            DELETE FROM log;
+            DELETE FROM log_status;
+            DELETE FROM log_topic_info;
+            INSERT INTO log_topic_info SELECT * FROM source_logs.log_topic_info;
+            INSERT INTO log_status SELECT * FROM source_logs.log_status;
+            INSERT INTO log SELECT * FROM source_logs.log;
+            COMMIT;
+            DETACH DATABASE source_logs;
+        "#,
+            src_db_path.to_string_lossy().replace("'", "''")
+        );
+
+        let logs_conn = self.conn(TargetDb::Logs);
+
+        logs_conn
+            .execute_unprepared(sql.as_str())
+            .await
+            .map_err(|e| DbSqlError::Construction(format!("Failed to import logs data: {e}")))?;
+
+        Ok(())
+    }
 }
 
 /// Convenience trait that contain all HOPR DB operations crates.
@@ -188,15 +259,11 @@ pub trait HoprDbAllOperations:
     + HoprDbChannelOperations
     + HoprDbCorruptedChannelOperations
     + HoprDbInfoOperations
-    + HoprDbLogOperations
-    + HoprDbResolverOperations
 {
 }
 
 #[doc(hidden)]
 pub mod prelude {
-    pub use hopr_db_api::{logs::*, peers::*, protocol::*, resolver::*, tickets::*};
-
     pub use super::*;
-    pub use crate::{accounts::*, channels::*, corrupted_channels::*, db::*, errors::*, info::*, registry::*};
+    pub use crate::{accounts::*, channels::*, corrupted_channels::*, db::*, errors::*, info::*};
 }

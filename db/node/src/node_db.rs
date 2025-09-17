@@ -14,7 +14,7 @@ use hopr_crypto_types::prelude::Keypair;
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 
-use crate::cache::{HoprDbCaches};
+use crate::cache::{NodeDbCaches};
 use crate::errors::NodeDbError;
 use crate::ticket_manager::TicketManager;
 
@@ -48,7 +48,7 @@ pub struct HoprNodeDb {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) ticket_manager: Arc<TicketManager>,
-    pub(crate) caches: Arc<HoprDbCaches>,
+    pub(crate) caches: Arc<NodeDbCaches>,
     pub(crate) me_onchain: ChainKeypair,
     pub(crate) me_address: Address,
     pub(crate) cfg: HoprNodeDbConfig,
@@ -150,7 +150,7 @@ impl HoprNodeDb {
             .await?;
         debug!(rows = res.rows_affected, "Cleaned up rows from the 'peers' table");
 
-        let caches = Arc::new(HoprDbCaches::default());
+        let caches = Arc::new(NodeDbCaches::default());
         caches.invalidate_all();
 
         // TODO: (dbmig) initialize key-id mapper via the HoprChain
@@ -212,5 +212,119 @@ impl HoprNodeDb {
             .await?;
 
         Ok(pool)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::distributions::Alphanumeric;
+    use rand::Rng;
+    use hopr_api::{*, db::*};
+    use hopr_crypto_types::keypairs::OffchainKeypair;
+    use hopr_primitive_types::prelude::SingleSumSMA;
+    use super::*;
+
+    #[tokio::test]
+    async fn test_basic_db_init() -> anyhow::Result<()> {
+        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        MigratorTickets::status(&db.tickets_db).await?;
+        MigratorPeers::status(&db.peers_db).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn peers_without_any_recent_updates_should_be_discarded_on_restarts() -> anyhow::Result<()> {
+        let random_filename: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect();
+        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
+
+        let peer_id: PeerId = OffchainKeypair::random().public().into();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
+
+        let path = std::path::Path::new(&random_tmp_file);
+
+        {
+            let db = HoprNodeDb::new(path, ChainKeypair::random(), HoprNodeDbConfig::default()).await?;
+
+            db.add_network_peer(
+                &peer_id,
+                PeerOrigin::IncomingConnection,
+                vec![ma_1.clone(), ma_2.clone()],
+                0.0,
+                25,
+            )
+                .await?;
+        }
+
+        {
+            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+
+            let not_found_peer = db.get_network_peer(&peer_id).await?;
+
+            assert_eq!(not_found_peer, None);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn peers_with_a_recent_update_should_be_retained_in_the_database() -> anyhow::Result<()> {
+        let random_filename: String = rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect();
+        let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
+
+        let ofk = OffchainKeypair::random();
+        let peer_id: PeerId = (*ofk.public()).into();
+        let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
+        let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
+
+        let path = std::path::Path::new(&random_tmp_file);
+
+        {
+            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+
+            db.add_network_peer(
+                &peer_id,
+                PeerOrigin::IncomingConnection,
+                vec![ma_1.clone(), ma_2.clone()],
+                0.0,
+                25,
+            )
+                .await?;
+
+            let ten_seconds_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(10);
+
+            db.update_network_peer(hopr_db_api::peers::PeerStatus {
+                id: (*ofk.public(), peer_id),
+                origin: PeerOrigin::Initialization,
+                last_seen: ten_seconds_ago,
+                last_seen_latency: std::time::Duration::from_millis(10),
+                heartbeats_sent: 1,
+                heartbeats_succeeded: 1,
+                backoff: 1.0,
+                ignored_until: None,
+                multiaddresses: vec![ma_1.clone(), ma_2.clone()],
+                quality: 1.0,
+                quality_avg: SingleSumSMA::new(2),
+            })
+                .await?;
+        }
+        {
+            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+
+            let found_peer = db.get_network_peer(&peer_id).await?.map(|p| p.id.1);
+
+            assert_eq!(found_peer, Some(peer_id));
+        }
+
+        Ok(())
     }
 }
