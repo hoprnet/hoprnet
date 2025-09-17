@@ -207,7 +207,6 @@
           hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs // { 
               cargoExtraArgs = "-F profiling"; 
-              RUSTFLAGS = "--cfg tokio_unstable";
             }
           );
           # also used for Docker image
