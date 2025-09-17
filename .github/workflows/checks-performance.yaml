@@ -77,7 +77,7 @@ jobs:
           K6_OUT: xk6-prometheus-rw
           K6_PROMETHEUS_RW_SERVER_URL: https://prometheus.staging.hoprnet.link/api/v1/write
 
-      - name: Stop local cluster
+      - name: Stop the local cluster
         if: always()
         run: |
           if [[ -f cluster_pids.txt ]]; then
