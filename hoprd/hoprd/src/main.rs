@@ -36,7 +36,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
             .add_directive("hyper_util=warn".parse()?),
     };
 
-    #[cfg(feature = "prof")]
+    #[cfg(feature = "profiling")]
     let registry = tracing_subscriber::Registry::default()
         .with(
             env_filter
@@ -45,7 +45,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with(console_subscriber::spawn());
 
-    #[cfg(not(feature = "prof"))]
+    #[cfg(not(feature = "profiling"))]
     let registry = tracing_subscriber::Registry::default().with(env_filter);
 
     let format = tracing_subscriber::fmt::layer()
