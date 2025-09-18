@@ -2,6 +2,8 @@ use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
+#[cfg(feature = "profiling")]
+use dhat::Dhat;
 use futures::{StreamExt, future::AbortHandle};
 use hopr_lib::{HoprKeys, HoprLibProcesses, IdentityRetrievalModes, ToHex};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
@@ -134,12 +136,9 @@ impl std::fmt::Debug for HoprdProcesses {
 
 #[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Temporary code to check MIMALLOC env vars
-    for (key, value) in std::env::vars() {
-        if key.contains("MIMALLOC") {
-            println!("  {}={}", key, value);
-        }
-    }
+    // Start profiling WITHOUT changing allocator
+    #[cfg(feature = "profiling")]
+    let _dhat = Dhat::start_heap_profiling();
 
     init_logger()?;
 
