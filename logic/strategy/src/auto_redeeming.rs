@@ -32,8 +32,12 @@ fn just_true() -> bool {
     true
 }
 
+fn just_false() -> bool {
+    false
+}
+
 fn min_redeem_hopr() -> HoprBalance {
-    HoprBalance::from_str("0.09 wxHOPR").unwrap()
+    HoprBalance::from_str("1 wxHOPR").unwrap()
 }
 
 /// Configuration object for the `AutoRedeemingStrategy`
@@ -43,9 +47,9 @@ pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
     /// Otherwise, it redeems all acknowledged winning tickets.
     ///
-    /// Default is `true`.
-    #[serde(default = "just_true")]
-    #[default = true]
+    /// Default is `false`.
+    #[serde(default = "just_false")]
+    #[default = false]
     pub redeem_only_aggregated: bool,
 
     /// If set to true, will redeem all tickets in the channel (which are over the
@@ -58,9 +62,8 @@ pub struct AutoRedeemingStrategyConfig {
 
     /// The strategy will only redeem an acknowledged winning ticket if it has at least this value of HOPR.
     /// If 0 is given, the strategy will redeem tickets regardless of their value.
-    /// This is not used for cases where `on_close_redeem_single_tickets_value_min` applies.
     ///
-    /// Default is `0.09 wxHOPR`.
+    /// Default is `1 wxHOPR`.
     #[serde(default = "min_redeem_hopr")]
     #[serde_as(as = "DisplayFromStr")]
     #[default(min_redeem_hopr())]
