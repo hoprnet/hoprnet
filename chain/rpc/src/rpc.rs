@@ -417,11 +417,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
     async fn send_transaction(&self, tx: TransactionRequest) -> Result<PendingTransaction> {
         let sent_tx = self.provider.send_transaction(tx).await?;
 
-        let pending_tx = sent_tx
-            .with_required_confirmations(self.cfg.finality as u64)
-            .register()
-            .await
-            .map_err(RpcError::PendingTransactionError)?;
+        let pending_tx = sent_tx.register().await.map_err(RpcError::PendingTransactionError)?;
 
         Ok(pending_tx)
     }
@@ -429,11 +425,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
     async fn send_transaction_with_confirm(&self, tx: TransactionRequest) -> Result<Hash> {
         let sent_tx = self.provider.send_transaction(tx).await?;
 
-        let receipt = sent_tx
-            .with_required_confirmations(self.cfg.finality as u64)
-            .get_receipt()
-            .await
-            .map_err(RpcError::PendingTransactionError)?;
+        let receipt = sent_tx.get_receipt().await.map_err(RpcError::PendingTransactionError)?;
 
         let tx_hash = Hash::from(receipt.transaction_hash.0);
 
