@@ -2,7 +2,7 @@
 name = "hopr-db-sql"
 version = "0.19.0"
 edition = "2021"
-description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
+description = "DEPRECATED: Contains SQL DB for indexing on-chain data."
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"

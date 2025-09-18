@@ -22,6 +22,7 @@ serde = [
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-util",
+  "dep:hopr-async-runtime",
   "hopr-async-runtime/runtime-tokio",
   "hickory-resolver/tokio",
 ]
@@ -51,7 +52,7 @@ hopr-internal-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-async-runtime = { workspace = true }
+hopr-async-runtime = { workspace = true, optional = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-path = { workspace = true }
 

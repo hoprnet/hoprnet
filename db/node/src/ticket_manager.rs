@@ -15,7 +15,7 @@ use sea_orm::{
 };
 use tracing::{debug, error};
 
-use crate::{cache::NodeDbCaches, errors::NodeDbError, db::HoprNodeDb, tickets::WrappedTicketSelector};
+use crate::{cache::NodeDbCaches, db::HoprNodeDb, errors::NodeDbError, tickets::WrappedTicketSelector};
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///

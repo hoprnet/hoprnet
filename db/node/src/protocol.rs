@@ -5,7 +5,7 @@ use hopr_api::{
     chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations},
     db::*,
 };
-use hopr_crypto_packet::prelude::*;
+use hopr_crypto_packet::{errors::PacketError, prelude::*};
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
@@ -14,7 +14,7 @@ use hopr_path::{Path, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 
-use crate::{cache::SurbRingBuffer, errors::NodeDbError, db::HoprNodeDb};
+use crate::{cache::SurbRingBuffer, db::HoprNodeDb, errors::NodeDbError};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -47,7 +47,7 @@ impl HoprNodeDb {
     async fn validate_and_replace_ticket<R>(
         &self,
         mut fwd: HoprForwardedPacket,
-        chain_resolver: &R,
+        resolver: &R,
         outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: HoprBalance,
     ) -> Result<HoprForwardedPacket, NodeDbError>
@@ -57,10 +57,9 @@ impl HoprNodeDb {
             + ChainReadTicketOperations
             + ChainMiscOperations
             + Send
-            + Sync
-            + 'static,
+            + Sync,
     {
-        let previous_hop_addr = chain_resolver
+        let previous_hop_addr = resolver
             .packet_key_to_chain_key(&fwd.previous_hop)
             .await
             .map_err(|e| NodeDbError::Other(e.into()))?
@@ -71,7 +70,7 @@ impl HoprNodeDb {
                 ))
             })?;
 
-        let next_hop_addr = chain_resolver
+        let next_hop_addr = resolver
             .packet_key_to_chain_key(&fwd.outgoing.next_hop)
             .await
             .map_err(|e| NodeDbError::Other(e.into()))?
@@ -82,7 +81,7 @@ impl HoprNodeDb {
                 ))
             })?;
 
-        let incoming_channel = chain_resolver
+        let incoming_channel = resolver
             .channel_by_parties(&previous_hop_addr, &self.me_address)
             .await
             .map_err(|e| NodeDbError::Other(e.into()))?
@@ -97,7 +96,7 @@ impl HoprNodeDb {
             return Err(NodeDbError::LogicalError("invalid ticket for channel".into()));
         }
 
-        let domain_separator = chain_resolver
+        let domain_separator = resolver
             .domain_separators()
             .await
             .map_err(|e| NodeDbError::Other(e.into()))?
@@ -105,7 +104,7 @@ impl HoprNodeDb {
 
         // The ticket price from the oracle times my node's position on the
         // path is the acceptable minimum
-        let minimum_ticket_price = chain_resolver
+        let minimum_ticket_price = resolver
             .minimum_ticket_price()
             .await
             .map_err(|e| NodeDbError::Other(e.into()))?
@@ -123,7 +122,7 @@ impl HoprNodeDb {
         // (which is equal to `previous_hop_addr`) has issued this
         // ticket.
         let start = std::time::Instant::now();
-        let win_prob = chain_resolver
+        let win_prob = resolver
             .minimum_incoming_ticket_win_prob()
             .await
             .map_err(|e| NodeDbError::Other(e.into()))?;
@@ -167,7 +166,7 @@ impl HoprNodeDb {
         // Create the new ticket for the new packet
         let ticket_builder = if fwd.path_pos > 1 {
             // There must be a channel to the next node if it's not the final hop
-            let outgoing_channel = chain_resolver
+            let outgoing_channel = resolver
                 .channel_by_parties(&self.me_address, &next_hop_addr)
                 .await
                 .map_err(|e| NodeDbError::Other(e.into()))?
@@ -197,14 +196,14 @@ impl HoprNodeDb {
         Ok(fwd)
     }
 
-    #[instrument(level = "trace", skip(self, ack, chain_resolver), err)]
+    #[instrument(level = "trace", skip(self, ack, resolver), err)]
     async fn find_ticket_to_acknowledge<R>(
         &self,
         ack: &VerifiedAcknowledgement,
-        chain_resolver: &R,
-    ) -> std::result::Result<ResolvedAcknowledgement, NodeDbError>
+        resolver: &R,
+    ) -> Result<ResolvedAcknowledgement, NodeDbError>
     where
-        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static,
+        R: ChainReadChannelOperations + ChainMiscOperations + Send + Sync,
     {
         let ack_half_key = *ack.ack_key_share();
         let challenge = hopr_parallelize::cpu::spawn_blocking(move || ack_half_key.to_challenge()).await?;
@@ -223,7 +222,7 @@ impl HoprNodeDb {
             }
 
             PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
-                let maybe_channel_with_issuer = chain_resolver
+                let maybe_channel_with_issuer = resolver
                     .channel_by_parties(unacknowledged.ticket.verified_issuer(), &self.me_address)
                     .await
                     .map_err(|e| NodeDbError::Other(e.into()))?;
@@ -232,7 +231,7 @@ impl HoprNodeDb {
                 if maybe_channel_with_issuer
                     .is_some_and(|c| c.channel_epoch.as_u32() == unacknowledged.verified_ticket().channel_epoch)
                 {
-                    let domain_separator = chain_resolver
+                    let domain_separator = resolver
                         .domain_separators()
                         .await
                         .map_err(|e| NodeDbError::Other(e.into()))?
@@ -272,16 +271,12 @@ impl HoprNodeDb {
 impl HoprDbProtocolOperations for HoprNodeDb {
     type Error = NodeDbError;
 
-    #[instrument(level = "trace", skip(self, ack, chain_resolver), err(Debug), ret)]
-    async fn handle_acknowledgement<R>(
-        &self,
-        ack: VerifiedAcknowledgement,
-        chain_resolver: &R,
-    ) -> Result<(), NodeDbError>
+    #[instrument(level = "trace", skip(self, ack, resolver), err(Debug), ret)]
+    async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, resolver: &R) -> Result<(), NodeDbError>
     where
-        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static,
+        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync,
     {
-        let result = self.find_ticket_to_acknowledge(&ack, chain_resolver).await?;
+        let result = self.find_ticket_to_acknowledge(&ack, resolver).await?;
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
                 // If the ticket was a win, store it
@@ -373,7 +368,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         resolver: &R,
     ) -> Result<OutgoingPacket, NodeDbError>
     where
-        R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static,
+        R: ChainKeyOperations + ChainMiscOperations + Send + Sync,
     {
         let next_peer = resolver
             .packet_key_to_chain_key(&destination)
@@ -438,13 +433,18 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         &self,
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
-        outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: HoprBalance,
+        outgoing_ticket_win_prob: Option<WinningProbability>,
+        outgoing_ticket_price: Option<HoprBalance>,
         signals: PacketSignals,
         resolver: &R,
     ) -> Result<OutgoingPacket, NodeDbError>
     where
-        R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static,
+        R: ChainReadChannelOperations
+            + ChainKeyOperations
+            + ChainMiscOperations
+            + ChainReadTicketOperations
+            + Send
+            + Sync,
     {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -497,6 +497,9 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 .await
                 .map_err(|e| NodeDbError::Other(e.into()))?
                 .ok_or(NodeDbError::LogicalError(format!("channel to '{next_peer}' not found")))?;
+
+            let (outgoing_ticket_win_prob, outgoing_ticket_price) =
+                determine_network_config(outgoing_ticket_win_prob, outgoing_ticket_price, resolver).await?;
 
             self.create_multihop_ticket(
                 channel,
@@ -567,18 +570,17 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: HoprBalance,
+        outgoing_ticket_win_prob: Option<WinningProbability>,
+        outgoing_ticket_price: Option<HoprBalance>,
         resolver: &R,
-    ) -> Result<IncomingPacket, NodeDbError>
+    ) -> Result<IncomingPacket, IncomingPacketError<NodeDbError>>
     where
         R: ChainReadChannelOperations
             + ChainKeyOperations
             + ChainReadTicketOperations
             + ChainMiscOperations
             + Send
-            + Sync
-            + 'static,
+            + Sync,
     {
         let offchain_keypair = pkt_keypair.clone();
         let caches = self.caches.clone();
@@ -588,11 +590,13 @@ impl HoprDbProtocolOperations for HoprNodeDb {
             HoprPacket::from_incoming(&data, &offchain_keypair, sender, &mapper, |p| {
                 caches.extract_pseudonym_opener(p)
             })
-            .map_err(|error| match error {
-                errors::PacketError::PacketDecodingError(_) | errors::PacketError::SphinxError(_) => {
-                    NodeDbError::PossibleAdversaryError(format!("possibly adversarial behavior: {error}"))
+            .map_err(|error| match &error {
+                PacketError::PacketDecodingError(_) | PacketError::SphinxError(_) => {
+                    // Such packets should not be acknowledged as this might indicate an adversarial behavior
+                    // or incorrect protocol format
+                    IncomingPacketError::Undecodable(NodeDbError::PacketError(error))
                 }
-                _ => NodeDbError::LogicalError(format!("failed to construct an incoming packet: {error}")),
+                _ => IncomingPacketError::ProcessingError(NodeDbError::PacketError(error)),
             })
         })
         .await?;
@@ -622,7 +626,8 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                         }))
                         .await
                         .value()
-                        .push(incoming.surbs)?;
+                        .push(incoming.surbs)
+                        .map_err(IncomingPacketError::ProcessingError)?;
 
                     trace!(pseudonym = %incoming.sender, num_surbs = info.num_surbs, "stored incoming surbs for pseudonym");
                 }
@@ -633,7 +638,11 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                         IncomingPacket::Acknowledgement {
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
-                            ack: incoming.plain_text.as_ref().try_into()?,
+                            ack: incoming
+                                .plain_text
+                                .as_ref()
+                                .try_into()
+                                .map_err(|e| IncomingPacketError::ProcessingError(NodeDbError::TypeError(e)))?,
                         }
                     }
                     Some(ack_key) => IncomingPacket::Final {
@@ -647,6 +656,11 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 })
             }
             HoprPacket::Forwarded(fwd) => {
+                let (outgoing_ticket_win_prob, outgoing_ticket_price) =
+                    determine_network_config(outgoing_ticket_win_prob, outgoing_ticket_price, resolver)
+                        .await
+                        .map_err(IncomingPacketError::ProcessingError)?;
+
                 let start = std::time::Instant::now();
                 let validation_res = self
                     .validate_and_replace_ticket(*fwd, resolver, outgoing_ticket_win_prob, outgoing_ticket_price)
@@ -677,23 +691,64 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                         let rejected_value = rejected_ticket.amount;
                         warn!(?rejected_ticket, %rejected_value, erorr = ?error, "failure to validate during forwarding");
 
-                        self.mark_unsaved_ticket_rejected(&rejected_ticket).await.map_err(|e| {
-                            NodeDbError::TicketValidationError(Box::new((
-                                rejected_ticket.clone(),
-                                format!("during validation error '{error}' update another error occurred: {e}"),
-                            )))
-                        })?;
+                        self.mark_unsaved_ticket_rejected(&rejected_ticket)
+                            .await
+                            .map_err(|e| {
+                                NodeDbError::TicketValidationError(Box::new((
+                                    rejected_ticket.clone(),
+                                    format!("during validation error '{error}' update another error occurred: {e}"),
+                                )))
+                            })
+                            .map_err(IncomingPacketError::ProcessingError)?;
 
-                        Err(NodeDbError::TicketValidationError(Box::new((rejected_ticket, error))))
+                        #[cfg(all(feature = "prometheus", not(test)))]
+                        METRIC_TICKETS_COUNT.increment(&["rejected"]);
+
+                        Err(IncomingPacketError::ProcessingError(
+                            NodeDbError::TicketValidationError(Box::new((rejected_ticket, error))),
+                        ))
                     }
-                    Err(e) => Err(e),
+                    Err(e) => Err(IncomingPacketError::ProcessingError(e)),
                 }
             }
-            HoprPacket::Outgoing(_) => {
-                Err(NodeDbError::LogicalError("cannot receive an outgoing packet".into()))
-            }
+            HoprPacket::Outgoing(_) => Err(IncomingPacketError::ProcessingError(NodeDbError::LogicalError(
+                "cannot receive an outgoing packet".into(),
+            ))),
         }
     }
+}
+
+async fn determine_network_config<R>(
+    configure_outgoing_wp: Option<WinningProbability>,
+    configured_outgoing_price: Option<HoprBalance>,
+    resolver: &R,
+) -> Result<(WinningProbability, HoprBalance), NodeDbError>
+where
+    R: ChainReadTicketOperations,
+{
+    // This operation hits the cache unless the new value is fetched for the first time
+    // NOTE: as opposed to the winning probability, the ticket price does not have
+    // a reasonable default, and therefore the operation fails
+    let network_ticket_price = resolver
+        .minimum_ticket_price()
+        .await
+        .map_err(|e| NodeDbError::LogicalError(format!("failed to determine current network ticket price: {e}")))?;
+    let outgoing_ticket_price = configured_outgoing_price.unwrap_or(network_ticket_price);
+
+    // This operation hits the cache unless the new value is fetched for the first time
+    let network_win_prob = resolver
+        .minimum_incoming_ticket_win_prob()
+        .await
+        .inspect_err(|error| tracing::error!(%error, "failed to determine current network winning probability"))
+        .ok();
+
+    // If no explicit winning probability is configured, use the network value
+    // or 1 if the network value was not determined.
+    // This code does not take the max from those, as it is the upper layer's responsibility
+    // to ensure the configured value is not smaller than the network value.
+    let outgoing_ticket_win_prob = configure_outgoing_wp.or(network_win_prob).unwrap_or_default(); // Absolute default WinningProbability is 1.0
+
+    Ok((outgoing_ticket_win_prob, outgoing_ticket_price))
 }
 
 impl HoprNodeDb {

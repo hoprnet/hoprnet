@@ -10,7 +10,7 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
-use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
+use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 50;
@@ -57,7 +57,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let (api_send_tx, api_send_rx) = futures::channel::mpsc::unbounded::<(
                             ApplicationDataOut,
                             ResolvedTransportRouting,
-                            PacketSendFinalizer,
                         )>();
                         let (api_recv_tx, _api_recv_rx) =
                             futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();

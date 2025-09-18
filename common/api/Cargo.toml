@@ -20,4 +20,3 @@ hopr-network-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-platform = { workspace = true }
-

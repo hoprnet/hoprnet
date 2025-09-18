@@ -1,3 +1,5 @@
+use std::fmt::Formatter;
+
 pub use hopr_crypto_packet::{
     HoprSurb,
     prelude::{HoprSenderId, PacketSignals},
@@ -30,6 +32,30 @@ pub struct SurbCacheConfig {
     pub distress_threshold: usize,
 }
 
+/// Error that can occur when processing an incoming packet.
+#[derive(Debug, strum::EnumIs, strum::EnumTryAs)]
+pub enum IncomingPacketError<E> {
+    /// Packet is not decodable.
+    ///
+    /// Such errors are fatal and therefore the packet cannot be acknowledged.
+    Undecodable(E),
+    /// Packet is decodable but cannot be processed due to other reasons.
+    ///
+    /// Such errors are protocol-related and packets must be acknowledged.
+    ProcessingError(E),
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for IncomingPacketError<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IncomingPacketError::Undecodable(e) => write!(f, "undecodable packet: {e}"),
+            IncomingPacketError::ProcessingError(e) => write!(f, "packet processing error: {e}"),
+        }
+    }
+}
+
+impl<E: std::error::Error> std::error::Error for IncomingPacketError<E> {}
+
 /// Trait defining all DB functionality needed by a packet/acknowledgement processing pipeline.
 #[async_trait::async_trait]
 pub trait HoprDbProtocolOperations {
@@ -47,7 +73,7 @@ pub trait HoprDbProtocolOperations {
         chain_resolver: &R,
     ) -> Result<(), Self::Error>
     where
-        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync + 'static;
+        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync;
 
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb, Self::Error>;
@@ -63,20 +89,25 @@ pub trait HoprDbProtocolOperations {
         resolver: &R,
     ) -> Result<OutgoingPacket, Self::Error>
     where
-        R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static;
+        R: ChainKeyOperations + ChainMiscOperations + Send + Sync;
 
     /// Process the data into an outgoing packet
     async fn to_send<R>(
         &self,
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
-        outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: HoprBalance,
+        outgoing_ticket_win_prob: Option<WinningProbability>,
+        outgoing_ticket_price: Option<HoprBalance>,
         signals: PacketSignals,
         resolver: &R,
     ) -> Result<OutgoingPacket, Self::Error>
     where
-        R: ChainReadChannelOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync + 'static;
+        R: ChainReadChannelOperations
+            + ChainReadTicketOperations
+            + ChainKeyOperations
+            + ChainMiscOperations
+            + Send
+            + Sync;
 
     /// Process the incoming packet into data
     #[allow(clippy::wrong_self_convention)]
@@ -85,18 +116,17 @@ pub trait HoprDbProtocolOperations {
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: HoprBalance,
+        outgoing_ticket_win_prob: Option<WinningProbability>,
+        outgoing_ticket_price: Option<HoprBalance>,
         resolver: &R,
-    ) -> Result<IncomingPacket, Self::Error>
+    ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>
     where
         R: ChainReadChannelOperations
             + ChainReadTicketOperations
             + ChainKeyOperations
             + ChainMiscOperations
             + Send
-            + Sync
-            + 'static;
+            + Sync;
 }
 
 /// Contains some miscellaneous information about a received packet.

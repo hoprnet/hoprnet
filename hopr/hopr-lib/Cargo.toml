@@ -61,6 +61,7 @@ smart-default = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-actions = { workspace = true }
 hopr-chain-api = { workspace = true }
@@ -69,7 +70,7 @@ hopr-chain-rpc = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-sql = { workspace = true }
+hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }

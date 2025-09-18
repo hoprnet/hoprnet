@@ -12,6 +12,7 @@ default = ["traits", "sqlite"]
 traits = []
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
+  "hopr-db-entity/runtime-tokio",
   "sea-orm/runtime-tokio",
   "sea-orm/runtime-tokio-rustls",
   "sqlx/runtime-tokio-rustls",

@@ -14,9 +14,8 @@ use sea_orm::{
 use tracing::trace;
 
 use crate::{
-    HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID, TargetDb,
+    HoprDbGeneralModelOperations, HoprIndexerDb, OptTx, SINGULAR_TABLE_FIXED_ID, TargetDb,
     cache::{CachedValue, CachedValueDiscriminants},
-    db::HoprDb,
     errors::{DbSqlError, DbSqlError::MissingFixedTableEntry, Result},
 };
 
@@ -156,7 +155,7 @@ pub trait HoprDbInfoOperations {
 }
 
 #[async_trait]
-impl HoprDbInfoOperations for HoprDb {
+impl HoprDbInfoOperations for HoprIndexerDb {
     async fn index_is_empty(&self) -> Result<bool> {
         let c = self.conn(TargetDb::Index);
 
@@ -533,7 +532,7 @@ mod tests {
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_primitive_types::{balance::HoprBalance, prelude::Address};
 
-    use crate::{db::HoprDb, info::HoprDbInfoOperations};
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ADDR_1: Address = Address::from(hex!("86fa27add61fafc955e2da17329bba9f31692fe7"));
@@ -542,7 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_get_balance() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
             HoprBalance::zero(),
@@ -563,7 +562,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_get_allowance() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
             HoprBalance::zero(),
@@ -585,7 +584,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_get_indexer_data() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let data = db.get_indexer_data(None).await?;
         assert_eq!(data.ticket_price, None);
@@ -604,7 +603,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_get_global_setting() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let key = "test";
         let value = hex!("deadbeef");

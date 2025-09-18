@@ -57,15 +57,12 @@ use hopr_chain_rpc::HoprRpcOperations;
 use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
     HoprDbAllOperations,
     accounts::HoprDbAccountOperations,
-    api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
     channels::HoprDbChannelOperations,
-    db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, IndexerStateInfo},
-    prelude::{ChainOrPacketKey::ChainKey, HoprDbPeersOperations},
+    prelude::ChainOrPacketKey::ChainKey,
 };
 pub use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions};
@@ -88,7 +85,7 @@ pub use hopr_transport::{
 };
 use hopr_transport::{
     ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair,
-    PeerDiscovery, PeerStatus, execute_on_tick,
+    PeerDiscovery, execute_on_tick,
 };
 use tracing::{debug, error, info, trace, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -121,7 +118,8 @@ lazy_static::lazy_static! {
 }
 
 pub use async_trait::async_trait;
-use hopr_db_sql::node_db::{HoprNodeDb, HoprNodeDbConfig};
+use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
+use hopr_db_sql::{HoprIndexerDb, HoprIndexerDbConfig};
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
@@ -389,11 +387,11 @@ impl Hopr {
             surb_ring_buffer_size: std::env::var("HOPR_PROTOCOL_SURB_RB_SIZE")
                 .ok()
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-                .unwrap_or_else(|| HoprDbConfig::default().surb_ring_buffer_size),
+                .unwrap_or_else(|| HoprIndexerDbConfig::default().surb_ring_buffer_size),
             surb_distress_threshold: std::env::var("HOPR_PROTOCOL_SURB_RB_DISTRESS")
                 .ok()
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-                .unwrap_or_else(|| HoprDbConfig::default().surb_distress_threshold),
+                .unwrap_or_else(|| HoprIndexerDbConfig::default().surb_distress_threshold),
         };
         let db = futures::executor::block_on(HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 

@@ -16,7 +16,7 @@ use sea_orm::{
 };
 use tracing::{error, trace, warn};
 
-use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb, errors::DbSqlError};
+use crate::{HoprDbGeneralModelOperations, HoprIndexerDb, TargetDb, errors::DbSqlError};
 
 #[derive(FromQueryResult)]
 struct BlockNumber {
@@ -174,7 +174,7 @@ pub trait HoprDbLogOperations {
 }
 
 #[async_trait]
-impl HoprDbLogOperations for HoprDb {
+impl HoprDbLogOperations for HoprIndexerDb {
     async fn store_log<'a>(&'a self, log: SerializableLog) -> Result<(), DbSqlError> {
         let results = self.store_logs([log].to_vec()).await?;
         if let Some(result) = results.into_iter().next() {
@@ -524,9 +524,7 @@ impl HoprDbLogOperations for HoprDb {
                         .column(log::Column::LogIndex)
                         .count(tx.as_ref())
                         .await?;
-                    let log_topic_count = LogTopicInfo::find()
-                        .count(tx.as_ref())
-                        .await?;
+                    let log_topic_count = LogTopicInfo::find().count(tx.as_ref()).await?;
 
                     if log_count == 0 && log_topic_count == 0 {
                         // Prime the DB with the values
@@ -604,7 +602,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_store_single_log() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -630,7 +628,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_store_multiple_logs() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log_1 = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -679,7 +677,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_store_duplicate_log() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -707,7 +705,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_log_processed() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -739,7 +737,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_logs_ordered() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let logs_per_tx = 3;
         let tx_per_block = 3;
@@ -802,7 +800,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_nonexistent_log() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let result = db.get_log(999, 999, 999).await;
 
@@ -811,7 +809,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_logs_with_block_offset() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log_1 = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -855,7 +853,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_logs_unprocessed() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -884,7 +882,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_logs_block_numbers() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         let log_1 = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -957,7 +955,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_logs_checksums() {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
         // insert first log and update checksum
         let log_1 = SerializableLog {
@@ -1022,7 +1020,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_allow_inconsistent_logs_in_the_db() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
         let addr_1 = Address::new(b"my address 123456789");
         let addr_2 = Address::new(b"my 2nd address 12345");
         let topic_1 = Hash::create(&[b"my topic 1"]);

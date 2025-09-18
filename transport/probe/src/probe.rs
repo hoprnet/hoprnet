@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Context;
-use futures::{FutureExt, SinkExt, StreamExt, channel::oneshot::channel, pin_mut};
+use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -10,7 +10,6 @@ use hopr_network_types::types::{ResolvedTransportRouting, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
-use hopr_transport_protocol::processor::{PacketError, PacketSendFinalizer};
 use libp2p_identity::PeerId;
 
 use crate::{
@@ -47,32 +46,19 @@ struct Sender<T> {
 
 impl<T> Sender<T>
 where
-    T: futures::Sink<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>
-        + Clone
-        + Send
-        + Sync
-        + 'static,
+    T: futures::Sink<(ApplicationDataOut, ResolvedTransportRouting)> + Clone + Send + Sync + 'static,
 {
     #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
     async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
-        let (packet_sent_tx, packet_sent_rx) = channel::<std::result::Result<(), PacketError>>();
-
         let push_to_network = self.downstream;
         pin_mut!(push_to_network);
         if push_to_network
             .as_mut()
-            .send((
-                ApplicationDataOut::with_no_packet_info(message.try_into()?),
-                path,
-                packet_sent_tx.into(),
-            ))
+            .send((ApplicationDataOut::with_no_packet_info(message.try_into()?), path))
             .await
             .is_ok()
         {
-            packet_sent_rx
-                .await
-                .map_err(|error| ProbeError::SendError(error.to_string()))?
-                .map_err(|error| ProbeError::SendError(error.to_string()))
+            Ok(())
         } else {
             Err(ProbeError::SendError("transport error".to_string()))
         }
@@ -105,15 +91,11 @@ impl Probe {
         move_up: Up,      // forward up non-probing messages from the network
     ) -> HashMap<HoprProbeProcess, hopr_async_runtime::AbortHandle>
     where
-        T: futures::Sink<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>
-            + Clone
-            + Send
-            + Sync
-            + 'static,
+        T: futures::Sink<(ApplicationDataOut, ResolvedTransportRouting)> + Clone + Send + Sync + 'static,
         T::Error: Send,
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
         W: PeerDiscoveryFetch + ProbeStatusUpdate + Clone + Send + Sync + 'static,
-        C: DbOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+        C: DbOperations + Clone + Send + Sync + 'static,
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
     {
@@ -299,11 +281,12 @@ impl Probe {
 #[cfg(test)]
 mod tests {
     use std::{collections::VecDeque, sync::RwLock, time::Duration};
-
+    use std::convert::Infallible;
     use async_trait::async_trait;
     use futures::future::BoxFuture;
+    use hopr_api::db::FoundSurb;
+    use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use hopr_db_api::prelude::FoundSurb;
     use hopr_network_types::prelude::SurbMatcher;
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
@@ -354,10 +337,13 @@ mod tests {
 
     #[async_trait]
     impl DbOperations for Cache {
-        async fn find_surb(&self, _matcher: SurbMatcher) -> hopr_db_api::errors::Result<FoundSurb> {
+        type DbError = Infallible;
+        type ChainError = Infallible;
+
+        async fn find_surb(&self, _matcher: SurbMatcher) -> Result<FoundSurb, Self::DbError> {
             // Mock implementation for testing purposes
             Ok(FoundSurb {
-                sender_id: hopr_db_api::protocol::HoprSenderId::random(),
+                sender_id: HoprSenderId::random(),
                 surb: random_memory_violating_surb(),
                 remaining: 0,
             })
@@ -366,7 +352,7 @@ mod tests {
         async fn resolve_chain_key(
             &self,
             _offchain_key: &OffchainPublicKey,
-        ) -> hopr_db_api::errors::Result<Option<Address>> {
+        ) -> Result<Option<Address>, Self::ChainError> {
             Ok(Some(ONCHAIN_KEYPAIR.public().to_address()))
         }
     }
@@ -374,18 +360,15 @@ mod tests {
     /// !!! This generates a completely random data blob that pretends to be a SURB.
     ///
     /// !!! It must never be accessed or invoked, only passed around.
-    fn random_memory_violating_surb() -> hopr_db_api::protocol::HoprSurb {
-        const SURB_SIZE: usize = std::mem::size_of::<hopr_db_api::protocol::HoprSurb>();
+    fn random_memory_violating_surb() -> HoprSurb {
+        const SURB_SIZE: usize = size_of::<HoprSurb>();
 
-        unsafe {
-            std::mem::transmute::<[u8; SURB_SIZE], hopr_db_api::protocol::HoprSurb>(hopr_crypto_random::random_bytes())
-        }
+        unsafe { std::mem::transmute::<[u8; SURB_SIZE], HoprSurb>(hopr_crypto_random::random_bytes()) }
     }
 
     struct TestInterface {
         from_probing_up_rx: futures::channel::mpsc::Receiver<(HoprPseudonym, ApplicationDataIn)>,
-        from_probing_to_network_rx:
-            futures::channel::mpsc::Receiver<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>,
+        from_probing_to_network_rx: futures::channel::mpsc::Receiver<(ApplicationDataOut, ResolvedTransportRouting)>,
         from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
         manual_probe_tx: futures::channel::mpsc::Sender<(PeerId, PingQueryReplier)>,
     }
@@ -403,7 +386,7 @@ mod tests {
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
 
         let (from_probing_to_network_tx, from_probing_to_network_rx) =
-            futures::channel::mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>(100);
+            futures::channel::mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting)>(100);
 
         let (from_network_to_probing_tx, from_network_to_probing_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
@@ -442,19 +425,17 @@ mod tests {
         delay: Option<std::time::Duration>,
         pass_rate: f64,
         from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
-    ) -> impl Fn((ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)) -> BoxFuture<'static, ()> {
+    ) -> impl Fn((ApplicationDataOut, ResolvedTransportRouting)) -> BoxFuture<'static, ()> {
         debug_assert!(
             (NO_PROBE_PASSES..=ALL_PROBES_PASS).contains(&pass_rate),
             "Pass rate must be between {NO_PROBE_PASSES} and {ALL_PROBES_PASS}"
         );
 
-        move |(data_out, path, finalizer): (ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)| -> BoxFuture<'static, ()> {
+        move |(data_out, path): (ApplicationDataOut, ResolvedTransportRouting)| -> BoxFuture<'static, ()> {
             let mut from_network_to_probing_tx = from_network_to_probing_tx.clone();
 
             Box::pin(async move {
                 if let ResolvedTransportRouting::Forward { pseudonym, .. } = path {
-                    finalizer.finalize(Ok(()));
-
                     let message: Message = data_out.data.try_into().expect("failed to convert data into message");
                     if let Message::Probe(NeighborProbe::Ping(ping)) = message {
                         let pong_message = Message::Probe(NeighborProbe::Pong(ping));
@@ -464,10 +445,20 @@ mod tests {
                             tokio::time::sleep(delay).await;
                         }
 
-                        if rand::Rng::gen_range(&mut rand::thread_rng(), NO_PROBE_PASSES..=ALL_PROBES_PASS) < pass_rate {
+                        if rand::Rng::gen_range(&mut rand::thread_rng(), NO_PROBE_PASSES..=ALL_PROBES_PASS) < pass_rate
+                        {
                             from_network_to_probing_tx
-                                .send((pseudonym, ApplicationDataIn { data: pong_message.try_into().expect("failed to convert pong message into data"), packet_info: Default::default()}))
-                                .await.expect("failed to send pong message");
+                                .send((
+                                    pseudonym,
+                                    ApplicationDataIn {
+                                        data: pong_message
+                                            .try_into()
+                                            .expect("failed to convert pong message into data"),
+                                        packet_info: Default::default(),
+                                    },
+                                ))
+                                .await
+                                .expect("failed to send pong message");
                         }
                     }
                 };

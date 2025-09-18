@@ -10,7 +10,10 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+runtime-tokio = [
+  "hopr-async-runtime/runtime-tokio",
+  "hopr-db-node/runtime-tokio",
+]
 prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 capture = ["dep:pcap-file"]
 
@@ -38,10 +41,12 @@ tokio-util = { workspace = true, default-features = false, features = [
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }

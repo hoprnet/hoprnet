@@ -18,7 +18,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace};
 
-use crate::{errors::NodeDbError, db::HoprNodeDb};
+use crate::{db::HoprNodeDb, errors::NodeDbError};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

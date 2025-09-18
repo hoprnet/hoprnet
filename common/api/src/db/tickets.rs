@@ -258,13 +258,9 @@ pub trait HoprDbTicketOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Retrieve acknowledged winning tickets, according to the given `selector`.
-    ///
-    /// The optional transaction `tx` must be in the database.
     async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>, Self::Error>;
 
     /// Retrieve acknowledged winning tickets, according to the given `selector`.
-    ///
-    /// The optional transaction `tx` must be in the database.
     async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>, Self::Error>;
 
     /// Marks tickets as the given [`TicketMarker`], removing them from the DB and updating the

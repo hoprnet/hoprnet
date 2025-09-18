@@ -8,9 +8,8 @@ use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Into
 use tracing::instrument;
 
 use crate::{
-    HoprDbGeneralModelOperations, OptTx,
+    HoprDbGeneralModelOperations, HoprIndexerDb, OptTx,
     cache::ChannelParties,
-    db::HoprDb,
     errors::{DbSqlError, Result},
 };
 
@@ -113,7 +112,7 @@ pub trait HoprDbChannelOperations {
 }
 
 #[async_trait]
-impl HoprDbChannelOperations for HoprDb {
+impl HoprDbChannelOperations for HoprIndexerDb {
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>> {
         let id_hex = id.to_hex();
         self.nest_transaction(tx)
@@ -339,11 +338,12 @@ mod tests {
     };
     use hopr_primitive_types::prelude::Address;
 
-    use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations, db::HoprDb};
+    use super::*;
+    use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations};
 
     #[tokio::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let ce = ChannelEntry::new(
             Address::default(),
@@ -367,7 +367,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_get_by_parties() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
@@ -387,7 +387,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_for_destination_that_does_not_exist_returns_none() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let from_db = db
             .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
@@ -402,7 +402,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_for_destination_that_exists_should_be_returned() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let expected_destination = Address::default();
 
@@ -433,7 +433,7 @@ mod tests {
         let addr_1 = ckp.public().to_address();
         let addr_2 = ChainKeypair::random().public().to_address();
 
-        let db = HoprDb::new_in_memory(ckp).await?;
+        let db = HoprIndexerDb::new_in_memory(ckp).await?;
 
         let ce_1 = ChannelEntry::new(
             addr_1,

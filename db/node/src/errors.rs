@@ -18,11 +18,6 @@ pub enum NodeDbError {
     #[error("logical error: {0}")]
     LogicalError(String),
 
-    // Solves the issue when the message producer can send arbitrary data that cannot be decoded
-    // but would then be acknowledged, leading to potentially asymmetrical work on the receiver
-    #[error("adversarial behavior detected: {0}")]
-    PossibleAdversaryError(String),
-
     #[error("orm error: {0}")]
     Orm(#[from] sea_orm::error::DbErr),
 

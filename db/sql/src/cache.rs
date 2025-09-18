@@ -31,7 +31,6 @@ impl TryFrom<CachedValue> for IndexerData {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
-
 // TODO: (dbmig) move this into the implementation of ChainKeyOperations
 #[derive(Debug)]
 pub(crate) struct CacheKeyMapper(
@@ -110,7 +109,7 @@ impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for 
 
 /// Contains all caches used by the [crate::db::HoprDb].
 #[derive(Debug, Clone)]
-pub struct HoprDbCaches {
+pub struct HoprIndexerDbCaches {
     pub(crate) single_values: Cache<CachedValueDiscriminants, CachedValue>,
     pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
@@ -119,7 +118,7 @@ pub struct HoprDbCaches {
     pub(crate) key_id_mapper: std::sync::Arc<CacheKeyMapper>,
 }
 
-impl Default for HoprDbCaches {
+impl Default for HoprIndexerDbCaches {
     fn default() -> Self {
         Self {
             single_values: Cache::builder().time_to_idle(Duration::from_secs(1800)).build(),
@@ -141,7 +140,7 @@ impl Default for HoprDbCaches {
 }
 
 #[cfg(test)]
-impl HoprDbCaches {
+impl HoprIndexerDbCaches {
     pub fn invalidate_all(&self) {
         self.src_dst_to_channel.invalidate_all();
         self.chain_to_offchain.invalidate_all();

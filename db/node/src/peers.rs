@@ -12,7 +12,7 @@ use sea_query::{Condition, Expr, IntoCondition, Order};
 use sqlx::types::chrono::{self, DateTime, Utc};
 use tracing::{error, trace};
 
-use crate::{errors::NodeDbError, db::HoprNodeDb};
+use crate::{db::HoprNodeDb, errors::NodeDbError};
 
 const DB_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
     .with_little_endian()
@@ -162,7 +162,10 @@ impl HoprDbPeersOperations for HoprNodeDb {
 
             Ok(())
         } else {
-            Err(NodeDbError::LogicalError(format!("cannot update a non-existing peer '{}'", new_status.id.1)))
+            Err(NodeDbError::LogicalError(format!(
+                "cannot update a non-existing peer '{}'",
+                new_status.id.1
+            )))
         }
     }
 

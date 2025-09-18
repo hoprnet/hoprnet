@@ -16,6 +16,7 @@ pub mod logs;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+pub use db::{HoprIndexerDb, HoprIndexerDbConfig};
 use futures::future::BoxFuture;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
@@ -24,7 +25,6 @@ use crate::{
     accounts::HoprDbAccountOperations,
     channels::HoprDbChannelOperations,
     corrupted_channels::HoprDbCorruptedChannelOperations,
-    db::HoprDb,
     errors::{DbSqlError, Result},
     info::HoprDbInfoOperations,
 };
@@ -192,7 +192,7 @@ pub trait HoprDbGeneralModelOperations {
 }
 
 #[async_trait]
-impl HoprDbGeneralModelOperations for HoprDb {
+impl HoprDbGeneralModelOperations for HoprIndexerDb {
     /// Retrieves raw database connection to the given [DB](TargetDb).
     fn conn(&self, target_db: TargetDb) -> &DatabaseConnection {
         match target_db {
