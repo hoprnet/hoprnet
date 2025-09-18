@@ -9,6 +9,10 @@ use hoprd_api::{ListenerJoinHandles, RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
+
+#[cfg(all(any(target_env = "musl", target_env = "gnu"), feature = "jemalloc-stats"))]
+mod jemalloc_stats;
+
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -136,6 +140,8 @@ impl std::fmt::Debug for HoprdProcesses {
 #[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
+
+    let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if hopr_crypto_random::is_rng_fixed() {
         warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
