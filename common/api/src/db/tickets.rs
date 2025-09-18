@@ -258,10 +258,12 @@ pub trait HoprDbTicketOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
     /// Retrieve acknowledged winning tickets, according to the given `selector`.
-    async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>, Self::Error>;
-
-    /// Retrieve acknowledged winning tickets, according to the given `selector`.
-    async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>, Self::Error>;
+    ///
+    /// If no selector is given, streams tickets in all channels.
+    async fn stream_tickets<'c>(
+        &'c self,
+        selector: Option<TicketSelector>,
+    ) -> Result<BoxStream<'c, AcknowledgedTicket>, Self::Error>;
 
     /// Marks tickets as the given [`TicketMarker`], removing them from the DB and updating the
     /// ticket statistics for each ticket's channel.

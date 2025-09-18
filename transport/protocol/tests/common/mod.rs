@@ -9,9 +9,7 @@ use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
 };
-use hopr_db_sql::{
-    accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, info::HoprDbInfoOperations,
-};
+use hopr_db_sql::{accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, info::HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
@@ -388,7 +386,6 @@ pub async fn send_relay_receive_channel_of_n_peers(
             .send_packet(ApplicationDataOut::with_no_packet_info(test_msg.clone()), routing)
             .await?;
 
-       
         sent_packet_count += 1;
     }
 

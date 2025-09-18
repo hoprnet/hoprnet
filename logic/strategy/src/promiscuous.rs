@@ -29,12 +29,15 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::StreamExt;
-use hopr_chain_actions::channels::ChannelActions;
-use hopr_db_sql::{HoprDbAllOperations, api::peers::PeerSelector, errors::DbSqlError};
+use futures::{StreamExt, TryFutureExt};
+use hopr_api::{
+    chain::{
+        ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainWriteChannelOperations,
+        ChannelSelector,
+    },
+    db::{HoprDbPeersOperations, PeerSelector},
+};
 use hopr_internal_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
 use hopr_primitive_types::prelude::*;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -43,18 +46,18 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     Strategy,
-    errors::{Result, StrategyError::CriteriaNotSatisfied},
+    errors::{Result, StrategyError, StrategyError::CriteriaNotSatisfied},
     strategy::SingularStrategy,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_OPENS: SimpleCounter =
-        SimpleCounter::new("hopr_strategy_promiscuous_opened_channels_count", "Count of open channel decisions").unwrap();
-    static ref METRIC_COUNT_CLOSURES: SimpleCounter =
-        SimpleCounter::new("hopr_strategy_promiscuous_closed_channels_count", "Count of close channel decisions").unwrap();
-    static ref METRIC_MAX_AUTO_CHANNELS: SimpleGauge =
-        SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
+    static ref METRIC_COUNT_OPENS: hopr_metrics::metrics::SimpleCounter =
+        hopr_metrics::metrics::SimpleCounter::new("hopr_strategy_promiscuous_opened_channels_count", "Count of open channel decisions").unwrap();
+    static ref METRIC_COUNT_CLOSURES: hopr_metrics::metrics::SimpleCounter =
+        hopr_metrics::metrics::SimpleCounter::new("hopr_strategy_promiscuous_closed_channels_count", "Count of close channel decisions").unwrap();
+    static ref METRIC_MAX_AUTO_CHANNELS: hopr_metrics::metrics::SimpleGauge =
+        hopr_metrics::metrics::SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
 }
 
 /// A decision made by the Promiscuous strategy on each tick,
@@ -257,11 +260,7 @@ impl validator::Validate for PromiscuousStrategyConfig {
 
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
 /// At the same time, it closes outgoing channels opened to peers whose quality dropped below this threshold.
-pub struct PromiscuousStrategy<Db, A>
-where
-    Db: HoprDbAllOperations + Clone,
-    A: ChannelActions,
-{
+pub struct PromiscuousStrategy<Db, A> {
     db: Db,
     hopr_chain_actions: A,
     cfg: PromiscuousStrategyConfig,
@@ -276,8 +275,14 @@ struct NetworkStats {
 
 impl<Db, A> PromiscuousStrategy<Db, A>
 where
-    Db: HoprDbAllOperations + Clone,
-    A: ChannelActions,
+    Db: HoprDbPeersOperations,
+    A: ChainReadAccountOperations
+        + ChainReadChannelOperations
+        + ChainWriteChannelOperations
+        + ChainKeyOperations
+        + Clone
+        + Send
+        + Sync,
 {
     pub fn new(cfg: PromiscuousStrategyConfig, db: Db, hopr_chain_actions: A) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -297,6 +302,7 @@ where
 
     async fn get_network_stats(&self) -> Result<NetworkStats> {
         let mut num_online_peers = 0;
+        let chain_actions = self.hopr_chain_actions.clone();
         Ok(NetworkStats {
             peers_with_quality: self
                 .db
@@ -309,18 +315,16 @@ where
                         trace!(peer = %status.id.1, "peer is not online");
                     }
                 })
-                .filter_map(|status| async move {
-                    // Resolve peer's chain key and average quality
-                    if let Ok(addr) = self
-                        .db
-                        .resolve_chain_key(&status.id.0)
-                        .await
-                        .and_then(|addr| addr.ok_or(DbSqlError::MissingAccount.into()))
-                    {
-                        Some((addr, (status.get_average_quality(), status.heartbeats_sent)))
-                    } else {
-                        error!(address = %status.id.1, "could not find on-chain address");
-                        None
+                .filter_map(move |status| {
+                    let chain_actions = chain_actions.clone();
+                    async move {
+                        // Resolve peer's chain key and average quality
+                        if let Ok(Some(addr)) = chain_actions.packet_key_to_chain_key(&status.id.0).await {
+                            Some((addr, (status.get_average_quality(), status.heartbeats_sent)))
+                        } else {
+                            error!(address = %status.id.1, "could not find on-chain address");
+                            None
+                        }
                     }
                 })
                 .collect()
@@ -335,13 +339,25 @@ where
 
         // Get all opened outgoing channels from this node
         let our_outgoing_open_channels = self
-            .db
-            .get_outgoing_channels(None)
+            .hopr_chain_actions
+            .stream_channels(ChannelSelector {
+                direction: vec![ChannelDirection::Outgoing],
+                allowed_states: vec![ChannelStatusDiscriminants::Open],
+                ..Default::default()
+            })
             .await
-            .map_err(hopr_db_sql::api::errors::DbError::from)?
-            .into_iter()
-            .filter(|channel| channel.status == ChannelStatus::Open)
-            .collect::<Vec<_>>();
+            .map_err(|e| StrategyError::Other(e.into()))?
+            .filter_map(|c| {
+                futures::future::ready(match c {
+                    Ok(channel) => Some(channel),
+                    Err(error) => {
+                        error!(%error, "failed to get channel");
+                        None
+                    }
+                })
+            })
+            .collect::<Vec<_>>()
+            .await;
         debug!(
             count = our_outgoing_open_channels.len(),
             "tracking open outgoing channels"
@@ -461,11 +477,11 @@ where
             new_channel_candidates.truncate(max_auto_channels - occupied);
             debug!(count = new_channel_candidates.len(), "got new channel candidates");
 
-            let current_safe_balance = self
-                .db
-                .get_safe_hopr_balance(None)
+            let current_safe_balance: HoprBalance = self
+                .hopr_chain_actions
+                .safe_balance()
                 .await
-                .map_err(hopr_db_sql::api::errors::DbError::from)?;
+                .map_err(|e| StrategyError::Other(e.into()))?;
 
             // Check if we do not surpass the minimum node's balance while opening new channels
             let max_to_open = ((current_safe_balance - self.cfg.minimum_safe_balance).amount()
@@ -488,21 +504,13 @@ where
     }
 }
 
-impl<Db, A> Debug for PromiscuousStrategy<Db, A>
-where
-    Db: HoprDbAllOperations + Clone,
-    A: ChannelActions,
-{
+impl<Db, A> Debug for PromiscuousStrategy<Db, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::Promiscuous(self.cfg.clone()))
     }
 }
 
-impl<Db, A> Display for PromiscuousStrategy<Db, A>
-where
-    Db: HoprDbAllOperations + Clone,
-    A: ChannelActions,
-{
+impl<Db, A> Display for PromiscuousStrategy<Db, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::Promiscuous(self.cfg.clone()))
     }
@@ -511,15 +519,15 @@ where
 #[async_trait]
 impl<Db, A> SingularStrategy for PromiscuousStrategy<Db, A>
 where
-    Db: HoprDbAllOperations + Clone + Send + Sync,
-    A: ChannelActions + Send + Sync,
+    Db: HoprDbPeersOperations + Clone + Send + Sync,
+    A: ChainReadAccountOperations + ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync,
 {
     async fn on_tick(&self) -> Result<()> {
-        let safe_balance = self
-            .db
-            .get_safe_hopr_balance(None)
+        let safe_balance: HoprBalance = self
+            .hopr_chain_actions
+            .safe_balance()
             .await
-            .map_err(hopr_db_sql::api::errors::DbError::from)?;
+            .map_err(|e| StrategyError::Other(e.into()))?;
         if safe_balance <= self.cfg.minimum_safe_balance {
             error!(
                 "strategy cannot work with safe token balance already being less or equal than minimum node balance"
@@ -538,7 +546,7 @@ where
         for channel_to_close in tick_decision.get_to_close() {
             match self
                 .hopr_chain_actions
-                .close_channel(channel_to_close.destination, ChannelDirection::Outgoing, false)
+                .close_channel(&channel_to_close.get_id(), ChannelDirection::Outgoing)
                 .await
             {
                 Ok(_) => {
@@ -557,7 +565,7 @@ where
         for channel_to_open in tick_decision.get_to_open() {
             match self
                 .hopr_chain_actions
-                .open_channel(channel_to_open.0, channel_to_open.1)
+                .open_channel(&channel_to_open.0, channel_to_open.1)
                 .await
             {
                 Ok(_) => {
@@ -584,15 +592,13 @@ mod tests {
     use anyhow::Context;
     use futures::{FutureExt, future::ok};
     use hex_literal::hex;
-    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
-        HoprDbGeneralModelOperations, accounts::HoprDbAccountOperations, api::peers::HoprDbPeersOperations,
-        channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
+        HoprDbGeneralModelOperations, accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations,
+        info::HoprDbInfoOperations,
     };
-    use hopr_transport_network::{PeerId, network::PeerOrigin};
     use lazy_static::lazy_static;
     use mockall::mock;
 

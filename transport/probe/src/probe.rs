@@ -280,8 +280,8 @@ impl Probe {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::VecDeque, sync::RwLock, time::Duration};
-    use std::convert::Infallible;
+    use std::{collections::VecDeque, convert::Infallible, sync::RwLock, time::Duration};
+
     use async_trait::async_trait;
     use futures::future::BoxFuture;
     use hopr_api::db::FoundSurb;
@@ -337,8 +337,8 @@ mod tests {
 
     #[async_trait]
     impl DbOperations for Cache {
-        type DbError = Infallible;
         type ChainError = Infallible;
+        type DbError = Infallible;
 
         async fn find_surb(&self, _matcher: SurbMatcher) -> Result<FoundSurb, Self::DbError> {
             // Mock implementation for testing purposes

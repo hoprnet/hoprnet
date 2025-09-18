@@ -1,7 +1,7 @@
-use std::error::Error;
+use std::{error::Error, time::Duration};
 
 use futures::{future::BoxFuture, stream::BoxStream};
-pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatus};
+pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatusDiscriminants};
 use hopr_primitive_types::prelude::Address;
 pub use hopr_primitive_types::prelude::HoprBalance;
 
@@ -15,9 +15,23 @@ pub struct ChannelSelector {
     /// Filter by counterparty address.
     pub counterparty: Option<Address>,
     /// Filter by direction.
-    pub direction: Option<ChannelDirection>,
+    pub direction: Vec<ChannelDirection>,
     /// Filter by possible channel states.
-    pub allowed_states: Vec<ChannelStatus>,
+    pub allowed_states: Vec<ChannelStatusDiscriminants>,
+}
+
+impl ChannelSelector {
+    pub fn any() -> Self {
+        Self {
+            counterparty: None,
+            direction: vec![ChannelDirection::Incoming, ChannelDirection::Outgoing],
+            allowed_states: vec![
+                ChannelStatusDiscriminants::Open,
+                ChannelStatusDiscriminants::Closed,
+                ChannelStatusDiscriminants::PendingToClose,
+            ],
+        }
+    }
 }
 
 /// On-chain read operations regarding channels.
@@ -36,6 +50,9 @@ pub trait ChainReadChannelOperations {
         &'a self,
         selector: ChannelSelector,
     ) -> Result<BoxStream<'a, Result<ChannelEntry, Self::Error>>, Self::Error>;
+
+    /// Gets the grace period for channel closure finalization.
+    async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error>;
 }
 
 /// On-chain write operations regarding channels.
@@ -60,5 +77,6 @@ pub trait ChainWriteChannelOperations {
     async fn close_channel(
         &self,
         channel_id: &ChannelId,
+        direction: ChannelDirection,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }

@@ -10,7 +10,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use hopr_chain_actions::redeem::TicketRedeemActions;
+use hopr_api::chain::ChainWriteTicketOperations;
 use hopr_internal_types::{prelude::*, tickets::AcknowledgedTicket};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -83,24 +83,24 @@ pub struct AutoRedeemingStrategyConfig {
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<A: TicketRedeemActions> {
+pub struct AutoRedeemingStrategy<A> {
     hopr_chain_actions: A,
     cfg: AutoRedeemingStrategyConfig,
 }
 
-impl<A: TicketRedeemActions> Debug for AutoRedeemingStrategy<A> {
+impl<A: ChainWriteTicketOperations> Debug for AutoRedeemingStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: TicketRedeemActions> Display for AutoRedeemingStrategy<A> {
+impl<A: ChainWriteTicketOperations> Display for AutoRedeemingStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: TicketRedeemActions> AutoRedeemingStrategy<A> {
+impl<A: ChainWriteTicketOperations> AutoRedeemingStrategy<A> {
     pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A) -> Self {
         Self {
             cfg,
@@ -112,7 +112,7 @@ impl<A: TicketRedeemActions> AutoRedeemingStrategy<A> {
 #[async_trait]
 impl<A> SingularStrategy for AutoRedeemingStrategy<A>
 where
-    A: TicketRedeemActions + Send + Sync,
+    A: ChainWriteTicketOperations + Send + Sync,
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {
         if !self.cfg.redeem_on_winning {

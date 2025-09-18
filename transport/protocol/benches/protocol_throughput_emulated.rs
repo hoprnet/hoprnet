@@ -54,10 +54,8 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let (_wire_msg_recv_tx, wire_msg_recv_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
-                        let (api_send_tx, api_send_rx) = futures::channel::mpsc::unbounded::<(
-                            ApplicationDataOut,
-                            ResolvedTransportRouting,
-                        )>();
+                        let (api_send_tx, api_send_rx) =
+                            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting)>();
                         let (api_recv_tx, _api_recv_rx) =
                             futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 

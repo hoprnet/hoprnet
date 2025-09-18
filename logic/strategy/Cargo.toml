@@ -15,13 +15,10 @@ crate-type = ["rlib"]
 default = []
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
-  "hopr-chain-actions/prometheus",
-  "hopr-db-sql/prometheus",
   "hopr-transport-network/prometheus",
   "hopr-transport-protocol/prometheus",
 ]
@@ -40,12 +37,11 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-transport-network = { workspace = true }
-hopr-chain-actions = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-platform = { workspace = true }

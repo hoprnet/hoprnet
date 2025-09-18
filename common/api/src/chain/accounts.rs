@@ -32,6 +32,9 @@ pub trait ChainWriteAccountOperations {
         &self,
         safe_address: Address,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
+
+    /// Checks if the given safe address can be registered with the current node.
+    async fn can_register_with_safe(safe_address: Address) -> Result<bool, Self::Error>;
 }
 
 /// Selector for on-chain node accounts.
@@ -39,7 +42,10 @@ pub trait ChainWriteAccountOperations {
 /// See [`ChainReadAccountOperations::stream_accounts`].
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct AccountSelector {
+    /// Selects accounts that are announced with multi-addresses.
     pub public_only: bool,
+    /// Selects accounts bound with the given chain key.
+    pub chain_key: Option<Address>,
 }
 
 /// Chain operations that read on-chain node accounts.

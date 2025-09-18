@@ -18,32 +18,32 @@
 //! `Closed`. This can be controlled by the `finalize_channel_closure` parameter.
 //!
 //! For details on default parameters see [MultiStrategyConfig].
-use std::{
-    fmt::{Debug, Display, Formatter},
-    sync::Arc,
-};
+use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_chain_actions::ChainActions;
-use hopr_db_sql::HoprDbAllOperations;
+use hopr_api::{
+    chain::{
+        ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainWriteChannelOperations,
+        ChainWriteTicketOperations,
+    },
+    db::HoprDbPeersOperations,
+};
 use hopr_internal_types::prelude::*;
-use hopr_transport_ticket_aggregation::TicketAggregatorTrait;
 use serde::{Deserialize, Serialize};
+#[cfg(all(feature = "prometheus", not(test)))]
+use strum::VariantNames;
 use tracing::{error, warn};
 use validator::Validate;
-#[cfg(all(feature = "prometheus", not(test)))]
-use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
 
 use crate::{
-    Strategy, aggregating::AggregatingStrategy, auto_funding::AutoFundingStrategy,
-    auto_redeeming::AutoRedeemingStrategy, channel_finalizer::ClosureFinalizerStrategy, errors::Result,
-    promiscuous::PromiscuousStrategy,
+    Strategy, auto_funding::AutoFundingStrategy, auto_redeeming::AutoRedeemingStrategy,
+    channel_finalizer::ClosureFinalizerStrategy, errors::Result, promiscuous::PromiscuousStrategy,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ENABLED_STRATEGIES: MultiGauge =
-        MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
+    static ref METRIC_ENABLED_STRATEGIES: hopr_metrics::metrics::MultiGauge =
+        hopr_metrics::metrics::MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
 }
 
 /// Basic single strategy.
@@ -136,14 +136,18 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<Db>(
-        cfg: MultiStrategyConfig,
-        db: Db,
-        hopr_chain_actions: ChainActions<Db>,
-        ticket_aggregator: Arc<dyn TicketAggregatorTrait + Send + Sync + 'static>,
-    ) -> Self
+    pub fn new<Db, A>(cfg: MultiStrategyConfig, db: Db, hopr_chain_actions: A) -> Self
     where
-        Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
+        Db: HoprDbPeersOperations + Clone + Send + Sync + 'static,
+        A: ChainReadChannelOperations
+            + ChainWriteChannelOperations
+            + ChainReadAccountOperations
+            + ChainKeyOperations
+            + ChainWriteTicketOperations
+            + Clone
+            + Send
+            + Sync
+            + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
@@ -159,11 +163,6 @@ impl MultiStrategy {
                     db.clone(),
                     hopr_chain_actions.clone(),
                 ))),
-                Strategy::Aggregating(sub_cfg) => strategies.push(Box::new(AggregatingStrategy::new(
-                    *sub_cfg,
-                    db.clone(),
-                    ticket_aggregator.clone(),
-                ))),
                 Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
                     *sub_cfg,
                     hopr_chain_actions.clone(),
@@ -173,7 +172,6 @@ impl MultiStrategy {
                 }
                 Strategy::ClosureFinalizer(sub_cfg) => strategies.push(Box::new(ClosureFinalizerStrategy::new(
                     *sub_cfg,
-                    db.clone(),
                     hopr_chain_actions.clone(),
                 ))),
                 Strategy::Multi(sub_cfg) => {
@@ -181,12 +179,7 @@ impl MultiStrategy {
                         let mut cfg_clone = sub_cfg.clone();
                         cfg_clone.allow_recursive = false; // Do not allow more levels of recursion
 
-                        strategies.push(Box::new(Self::new(
-                            cfg_clone,
-                            db.clone(),
-                            hopr_chain_actions.clone(),
-                            ticket_aggregator.clone(),
-                        )))
+                        strategies.push(Box::new(Self::new(cfg_clone, db.clone(), hopr_chain_actions.clone())))
                     } else {
                         error!("recursive multi-strategy not allowed and skipped")
                     }

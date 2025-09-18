@@ -8,7 +8,7 @@ use std::{
 
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{TryStreamExt, stream::BoxStream};
+use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_api::db::*;
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
@@ -155,40 +155,28 @@ pub(crate) async fn find_stats_for_channel(
 impl HoprDbTicketOperations for HoprNodeDb {
     type Error = NodeDbError;
 
-    async fn get_all_tickets(&self) -> Result<Vec<AcknowledgedTicket>, NodeDbError> {
-        Ok(self
-            .tickets_db
-            .transaction(|tx| {
-                Box::pin(async move {
-                    ticket::Entity::find()
-                        .all(tx)
-                        .await?
-                        .into_iter()
-                        .map(|m| AcknowledgedTicket::try_from(m).map_err(|e| sea_orm::DbErr::Custom(e.to_string())))
-                        .collect::<Result<Vec<_>, sea_orm::DbErr>>()
-                })
-            })
-            .await?)
-    }
+    async fn stream_tickets<'c>(
+        &'c self,
+        selector: Option<TicketSelector>,
+    ) -> Result<BoxStream<'c, AcknowledgedTicket>, Self::Error> {
+        let qry = if let Some(selector) = selector.map(WrappedTicketSelector::from) {
+            ticket::Entity::find().filter(selector)
+        } else {
+            ticket::Entity::find()
+        };
 
-    async fn get_tickets(&self, selector: TicketSelector) -> Result<Vec<AcknowledgedTicket>, NodeDbError> {
-        debug!("fetching tickets via {selector}");
-        let selector: WrappedTicketSelector = selector.into();
-
-        Ok(self
-            .tickets_db
-            .transaction(|tx| {
-                Box::pin(async move {
-                    ticket::Entity::find()
-                        .filter(selector)
-                        .all(tx)
-                        .await?
-                        .into_iter()
-                        .map(|m| AcknowledgedTicket::try_from(m).map_err(|e| sea_orm::DbErr::Custom(e.to_string())))
-                        .collect::<Result<Vec<_>, sea_orm::DbErr>>()
-                })
+        Ok(qry
+            .stream(&self.tickets_db)
+            .await?
+            .and_then(|model| {
+                futures::future::ready(
+                    AcknowledgedTicket::try_from(model).map_err(|e| sea_orm::DbErr::Custom(e.to_string())),
+                )
             })
-            .await?)
+            .filter_map(|ticket| {
+                futures::future::ready(ticket.inspect_err(|error| error!(%error, "invalid ticket in db")).ok())
+            })
+            .boxed())
     }
 
     async fn mark_tickets_as(&self, selector: TicketSelector, mark_as: TicketMarker) -> Result<usize, NodeDbError> {
@@ -768,8 +756,10 @@ mod tests {
         );
 
         let db_ticket = db
-            .get_tickets((&ack_ticket).into())
+            .stream_tickets(Some((&ack_ticket).into()))
             .await?
+            .collect::<Vec<_>>()
+            .await
             .first()
             .cloned()
             .context("ticket should exist")?;

@@ -5,12 +5,9 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_chain_actions::channels::ChannelActions;
-use hopr_db_sql::{accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations};
+use futures::StreamExt;
+use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector};
 use hopr_internal_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleCounter;
 use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
 use serde_with::{DurationSeconds, serde_as};
@@ -21,7 +18,7 @@ use crate::{Strategy, errors, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: hopr_metrics::metrics::SimpleCounter = hopr_metrics::metrics::SimpleCounter::new(
         "hopr_strategy_closure_auto_finalization_count",
         "Count of channels where closure finalizing was initiated automatically"
     )
@@ -48,35 +45,27 @@ pub struct ClosureFinalizerStrategyConfig {
 
 /// Strategy which runs per tick and finalizes `PendingToClose` channels
 /// which have elapsed the grace period.
-pub struct ClosureFinalizerStrategy<Db, A>
-where
-    Db: HoprDbChannelOperations + Clone + Send + Sync,
-    A: ChannelActions,
-{
-    db: Db,
+pub struct ClosureFinalizerStrategy<A> {
     cfg: ClosureFinalizerStrategyConfig,
     hopr_chain_actions: A,
 }
 
-impl<Db, A> ClosureFinalizerStrategy<Db, A>
+impl<A> ClosureFinalizerStrategy<A>
 where
-    Db: HoprDbChannelOperations + Clone + Send + Sync,
-    A: ChannelActions,
+    A: ChainReadChannelOperations + ChainWriteChannelOperations,
 {
     /// Constructs the strategy.
-    pub fn new(cfg: ClosureFinalizerStrategyConfig, db: Db, hopr_chain_actions: A) -> Self {
+    pub fn new(cfg: ClosureFinalizerStrategyConfig, hopr_chain_actions: A) -> Self {
         Self {
-            db,
             hopr_chain_actions,
             cfg,
         }
     }
 }
 
-impl<Db, A> Display for ClosureFinalizerStrategy<Db, A>
+impl<A> Display for ClosureFinalizerStrategy<A>
 where
-    Db: HoprDbChannelOperations + Clone + Send + Sync,
-    A: ChannelActions,
+    A: ChainReadChannelOperations + ChainWriteChannelOperations,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::ClosureFinalizer(self.cfg))
@@ -84,49 +73,63 @@ where
 }
 
 #[async_trait]
-impl<Db, A> SingularStrategy for ClosureFinalizerStrategy<Db, A>
+impl<A> SingularStrategy for ClosureFinalizerStrategy<A>
 where
-    Db: HoprDbChannelOperations + HoprDbAccountOperations + Clone + Send + Sync,
-    A: ChannelActions + Send + Sync,
+    A: ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync,
 {
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
 
         let outgoing_channels = self
-            .db
-            .get_outgoing_channels(None)
-            .await
-            .map_err(hopr_db_sql::api::errors::DbError::from)?;
-
-        let to_close = outgoing_channels
-            .iter()
-            .filter(|channel| {
-                matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
-                    && channel.closure_time_passed(current_time())
+            .hopr_chain_actions
+            .stream_channels(ChannelSelector {
+                direction: vec![ChannelDirection::Outgoing],
+                allowed_states: vec![ChannelStatusDiscriminants::PendingToClose],
+                ..Default::default()
             })
-            .map(|channel| async {
-                let channel_cpy = *channel;
-                info!(channel = %channel_cpy, "channel closure finalizer: finalizing closure");
-                match self
-                    .hopr_chain_actions
-                    .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
-                    .await
-                {
-                    Ok(_) => {
-                        // Currently, we're not interested in awaiting the Close transactions to confirmation
-                        debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
+            .await
+            .map_err(|e| errors::StrategyError::Other(e.into()))?;
+
+        let chain_actions = self.hopr_chain_actions.clone();
+        outgoing_channels
+            .filter_map(|maybe_channel| {
+                futures::future::ready(match maybe_channel {
+                    Ok(channel) => {
+                        if matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
+                            && channel.closure_time_passed(current_time())
+                        {
+                            Some(channel)
+                        } else {
+                            None
+                        }
                     }
-                    Err(e) => error!(%channel_cpy, error = %e, "channel closure finalizer: failed to finalize closure"),
+                    Err(error) => {
+                        error!(%error, "error processing channel");
+                        None
+                    }
+                })
+            })
+            .for_each(move |channel| {
+                let chain_actions = chain_actions.clone();
+                async move {
+                    info!(%channel, "channel closure finalizer: finalizing closure");
+                    match chain_actions
+                        .close_channel(&channel.get_id(), ChannelDirection::Outgoing)
+                        .await
+                    {
+                        Ok(_) => {
+                            // Currently, we're not interested in awaiting the Close transactions to confirmation
+                            debug!(%channel, "channel closure finalizer: finalizing closure");
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_COUNT_CLOSURE_FINALIZATIONS.increment();
+                        }
+                        Err(e) => error!(%channel, error = %e, "channel closure finalizer: failed to finalize closure"),
+                    }
                 }
             })
-            .collect::<FuturesUnordered<_>>()
-            .count()
             .await;
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_COUNT_CLOSURE_FINALIZATIONS.increment_by(to_close as u64);
-
-        debug!("channel closure finalizer: initiated closure finalization of {to_close} channels");
+        debug!("channel closure finalizer: initiated closure finalization done");
         Ok(())
     }
 }
@@ -137,11 +140,9 @@ mod tests {
 
     use futures::{FutureExt, future::ok};
     use hex_literal::hex;
-    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::{HoprDbGeneralModelOperations, db::HoprDb};
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
