@@ -492,36 +492,39 @@ where
             futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
 
         let network_clone = self.network.clone();
-        spawn(transport_events_rx.for_each(move |event| {
-            let network = network_clone.clone();
+        spawn(
+            transport_events_rx
+                .for_each(move |event| {
+                    let network = network_clone.clone();
 
-            async move {
-                match event {
-                    hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
-                        if let Err(error) = network
-                            .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
-                            .await
-                        {
-                            tracing::error!(%peer, %error, "Failed to add incoming connection peer");
+                    async move {
+                        match event {
+                            hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
+                                if let Err(error) = network
+                                    .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
+                                    .await
+                                {
+                                    tracing::error!(%peer, %error, "Failed to add incoming connection peer");
+                                }
+                            }
+                            hopr_transport_p2p::DiscoveryEvent::FailedDial(peer) => {
+                                if let Err(error) = network
+                                    .update(&peer, Err(hopr_transport_network::network::UpdateFailure::DialFailure))
+                                    .await
+                                {
+                                    tracing::error!(%peer, %error, "Failed to update peer status after failed dial");
+                                }
+                            }
                         }
                     }
-                    hopr_transport_p2p::DiscoveryEvent::FailedDial(peer) => {
-                        if let Err(error) = network
-                            .update(&peer, Err(hopr_transport_network::network::UpdateFailure::DialFailure))
-                            .await
-                        {
-                            tracing::error!(%peer, %error, "Failed to update peer status after failed dial");
-                        }
-                    }
-                }
-            }
-            .inspect(|_| {
-                tracing::info!(
-                    task = "transport event notifier",
-                    "long-running background task finished"
-                )
-            })
-        }));
+                })
+                .inspect(|_| {
+                    tracing::info!(
+                        task = "transport event notifier",
+                        "long-running background task finished"
+                    )
+                }),
+        );
 
         processes.insert(
             HoprTransportProcess::Medium,
