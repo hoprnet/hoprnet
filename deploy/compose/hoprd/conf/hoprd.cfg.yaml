@@ -15,7 +15,7 @@ hopr:
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
-        minimum_redeem_ticket_value: "2 wxHOPR"
+        minimum_redeem_ticket_value: "1 wxHOPR"
       - !ClosureFinalizer
         max_closure_overdue: 300
   chain:
