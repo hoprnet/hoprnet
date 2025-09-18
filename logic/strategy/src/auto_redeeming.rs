@@ -78,8 +78,8 @@ pub struct AutoRedeemingStrategyConfig {
     /// is above 1%).
     ///
     /// Default is `true`
-    #[serde(default = "just_true")]
-    #[default = true]
+    #[serde(default = "just_false")]
+    #[default = false]
     pub redeem_on_winning: bool,
 }
 
