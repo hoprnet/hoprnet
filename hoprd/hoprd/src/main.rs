@@ -2,8 +2,6 @@ use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-#[cfg(feature = "profiling")]
-use dhat::Dhat;
 use futures::{StreamExt, future::AbortHandle};
 use hopr_lib::{HoprKeys, HoprLibProcesses, IdentityRetrievalModes, ToHex};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
@@ -38,7 +36,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
             .add_directive("hyper_util=warn".parse()?),
     };
 
-    #[cfg(feature = "profiling")]
+    #[cfg(feature = "prof")]
     let registry = tracing_subscriber::Registry::default()
         .with(
             env_filter
@@ -47,7 +45,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with(console_subscriber::spawn());
 
-    #[cfg(not(feature = "profiling"))]
+    #[cfg(not(feature = "prof"))]
     let registry = tracing_subscriber::Registry::default().with(env_filter);
 
     let format = tracing_subscriber::fmt::layer()
@@ -136,10 +134,6 @@ impl std::fmt::Debug for HoprdProcesses {
 
 #[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Start profiling WITHOUT changing allocator
-    #[cfg(feature = "profiling")]
-    let _dhat = Dhat::start_heap_profiling();
-
     init_logger()?;
 
     if hopr_crypto_random::is_rng_fixed() {

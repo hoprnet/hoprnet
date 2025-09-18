@@ -205,10 +205,7 @@
           hoprd-x86_64-linux = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
           # also used for Docker image
           hoprd-x86_64-linux-profile = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs
-            // {
-              cargoExtraArgs = "-F profiling";
-            }
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
           # also used for Docker image
           hoprd-x86_64-linux-dev = rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (

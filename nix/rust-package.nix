@@ -127,11 +127,6 @@ let
     doCheck = false;
     # set to the revision because during build the Git info is not available
     VERGEN_GIT_SHA = rev;
-
-    # For profiling feature we need to enable the unstable tokio feature
-    lib.optionalAttrs (lib.strings.hasInfix "-F profiling" cargoExtraArgs) {
-      RUSTFLAGS = "--cfg tokio_unstable";
-    };
   };
 
   sharedArgs =

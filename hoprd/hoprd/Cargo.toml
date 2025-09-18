@@ -43,10 +43,9 @@ explicit-path = ["hoprd-api/explicit-path"]
 capture = ["hopr-lib/capture"]
 # To use profiling:
 # 1. Set RUSTFLAGS="--cfg tokio_unstable" before building
-# 2. Enable the 'profiling' feature: cargo build --feature profiling
-profiling = [
+# 2. Enable the 'prof' feature: cargo build --feature prof
+prof = [
   "dep:console-subscriber",
-  "dep:dhat",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
 [dependencies]
@@ -54,7 +53,6 @@ anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
 clap = { workspace = true }
-dhat = { workspace = true, optional = true }
 futures = { workspace = true }
 home = "0.5.11"
 lazy_static = { workspace = true, optional = true }
