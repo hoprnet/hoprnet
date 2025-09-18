@@ -53,6 +53,9 @@
 - [Profiling \& Instrumentation](#profiling--instrumentation)
   - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
   - [OpenTelemetry tracing](#opentelemetry-tracing)
+  - [Profiling Criterion benchmarks via `flamegraph`](#profiling-criterion-benchmarks-via-flamegraph)
+    - [Prerequisites](#prerequisites-1)
+    - [Profiling the benchmarking binaries](#profiling-the-benchmarking-binaries)
   - [HOPR packet capture](#hopr-packet-capture)
 - [Contact](#contact)
 - [License](#license)
@@ -230,6 +233,7 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
 - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
 - `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
+- `HOPR_INTERNAL_SESSION_CTL_CHANNEL_CAPACITY` - the maximum capacity of the session control channel
 - `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in outgoing SURB balancer (default: `0.6`)
 - `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in outgoing SURB balancer (default: `0.7`)
 - `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in outgoing SURB balancer (default: `0.2`)
