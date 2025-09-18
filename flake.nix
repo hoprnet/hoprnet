@@ -392,7 +392,11 @@
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
             env = [
-              "MIMALLOC_PURGE_DELAY=0"
+              "MIMALLOC_ALLOW_LARGE_OS_PAGES=1" # Use 2-4MB pages for performance
+              "MIMALLOC_RESERVE_HUGE_OS_PAGES=0" # Don't reserve 1GB pages in containers
+              "MIMALLOC_PURGE_DELAY=0" # Delay before purging memory (ms)
+              "MIMALLOC_ARENA_EAGER_COMMIT=2" # Eager commit on overcommit systems
+              "MIMALLOC_USE_NUMA_NODES=1" # Limit NUMA nodes for containers
             ];
           };
           hoprd-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-x86_64-linux [ ]);
