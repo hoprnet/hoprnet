@@ -56,7 +56,6 @@ clap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.11"
 lazy_static = { workspace = true, optional = true }
-mimalloc = { workspace = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -99,6 +98,10 @@ hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+
+# Target-specific dependencies for memory allocators
+[target.'cfg(any(target_env = "musl", target_env = "gnu"))'.dependencies]
+tikv-jemallocator = "0.6.0"
 
 [build-dependencies]
 vergen-gix = { workspace = true, features = ["build"] }

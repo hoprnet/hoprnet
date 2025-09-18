@@ -11,8 +11,9 @@ use rand::{Rng, thread_rng};
 
 // Avoid musl's default allocator due to degraded performance
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[cfg(any(target_env = "musl", target_env = "gnu"))]
 #[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 pub async fn alice_send_data(
     data: &[u8],
