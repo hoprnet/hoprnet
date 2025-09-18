@@ -103,7 +103,7 @@ tempfile = { workspace = true }
 test-log = { workspace = true }
 
 # Target-specific dependencies for memory allocators
-[target.'cfg(any(target_env = "musl", target_env = "gnu"))'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 tikv-jemallocator = "0.6.0"
 tikv-jemalloc-ctl = { version = "0.6.0", features = ["stats"], optional = true }
 

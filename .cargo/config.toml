@@ -19,12 +19,10 @@ root = ".cargo"
 # metadata_thp:auto      - Auto-detect transparent huge pages for metadata
 JEMALLOC_SYS_WITH_MALLOC_CONF = "abort_conf:true,narenas:4,tcache_max:65536,dirty_decay_ms:3000,muzzy_decay_ms:6000,background_thread:true,metadata_thp:auto"
 
-# C/C++ compiler flags to fix jemalloc build issues with newer glibc
+# C/C++ compiler flags for optimized builds and jemalloc working
 # -O3: Maximum optimization level for best performance
 # -ffunction-sections/-fdata-sections: Enable dead code elimination
 # -fPIC: Generate position-independent code for shared libraries
-# -m64: Target 64-bit architecture
-# -D_GNU_SOURCE: Enable GNU extensions needed by jemalloc's strerror_r usage
-CFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC -m64 -D_GNU_SOURCE"
-CPPFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC -m64 -D_GNU_SOURCE"
-LDFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC -m64"
+CFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC"
+CPPFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC"
+LDFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC"

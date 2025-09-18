@@ -71,5 +71,5 @@ name = "validation_bench"
 harness = false
 
 # Target-specific dependencies for memory allocators
-[target.'cfg(any(target_env = "musl", target_env = "gnu"))'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 tikv-jemallocator = "0.6.0"

@@ -10,7 +10,7 @@ use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
 
-#[cfg(all(any(target_env = "musl", target_env = "gnu"), feature = "jemalloc-stats"))]
+#[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
 mod jemalloc_stats;
 
 #[cfg(feature = "telemetry")]
@@ -22,7 +22,7 @@ use {
 
 // Avoid musl's default allocator due to degraded performance
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
-#[cfg(any(target_env = "musl", target_env = "gnu"))]
+#[cfg(target_os = "linux")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
@@ -141,6 +141,7 @@ impl std::fmt::Debug for HoprdProcesses {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
+    #[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if hopr_crypto_random::is_rng_fixed() {

@@ -7,7 +7,7 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 
 // Avoid musl's default allocator due to degraded performance
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
-#[cfg(any(target_env = "musl", target_env = "gnu"))]
+#[cfg(target_os = "linux")]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 

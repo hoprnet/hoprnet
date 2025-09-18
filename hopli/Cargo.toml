@@ -44,5 +44,5 @@ env_logger = { workspace = true }
 hopr-crypto-random = { workspace = true }
 
 # Target-specific dependencies for memory allocators
-[target.'cfg(any(target_env = "musl", target_env = "gnu"))'.dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 tikv-jemallocator = "0.6.0"
