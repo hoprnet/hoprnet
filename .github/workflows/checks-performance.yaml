@@ -60,6 +60,7 @@ jobs:
 
       - name: Run local cluster in background
         run: |
+          set -euo pipefail
           nix develop -L .#citest -c uv run -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected --exposed --background | tee cluster.log
           grep "Process ID:" cluster.log | awk '{print $3}' | grep -E '^[0-9]+$' > cluster_pids.txt
 
