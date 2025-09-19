@@ -494,11 +494,17 @@ where
             mixing_channel_rx
                 .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
                 .map(Ok)
-                .forward(wire_msg_tx),
+                .forward(wire_msg_tx)
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = "mixer -> egress process",
+                        "long-running background task finished"
+                    )
+                }),
         );
 
         let (transport_events_tx, transport_events_rx) =
-            futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
+            futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(2048);
 
         let network_clone = self.network.clone();
         spawn(
@@ -528,8 +534,8 @@ where
                     }
                 })
                 .inspect(|_| {
-                    tracing::info!(
-                        task = "transport event notifier",
+                    tracing::warn!(
+                        task = "transport events recording",
                         "long-running background task finished"
                     )
                 }),
@@ -537,7 +543,10 @@ where
 
         processes.insert(
             HoprTransportProcess::Medium,
-            spawn_as_abortable!(transport_layer.run(transport_events_tx)),
+            spawn_as_abortable!(transport_layer.run(transport_events_tx).inspect(|_| tracing::warn!(
+                task = "p2p transport event dispatch",
+                "long-running background task finished"
+            ))),
         );
 
         // -- msg-ack protocol over the wire transport
@@ -640,8 +649,8 @@ where
         let smgr = self.smgr.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
-            spawn_as_abortable!(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx_from_probing, |(pseudonym, data)| {
+            spawn_as_abortable!(
+                StreamExt::filter_map(rx_from_probing, move |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {
                         match smgr.dispatch_message(pseudonym, data).await {
@@ -662,8 +671,8 @@ where
                 })
                 .map(Ok)
                 .forward(on_incoming_data)
-                .await;
-            }),
+                .inspect(|_| tracing::warn!(task = "session management", "long-running background task finished"))
+            ),
         );
 
         Ok(processes)
