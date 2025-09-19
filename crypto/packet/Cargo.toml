@@ -25,7 +25,6 @@ serde = [
 [dependencies]
 hex = { workspace = true }
 flagset = { workspace = true }
-mimalloc = { workspace = true }
 rayon = { workspace = true, optional = true }
 strum = { workspace = true }
 serde = { workspace = true, optional = true }
@@ -46,7 +45,6 @@ bimap = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
-mimalloc = { workspace = true }
 parameterized = { workspace = true }
 tokio = { workspace = true }
 
@@ -71,3 +69,7 @@ harness = false
 [[bench]]
 name = "validation_bench"
 harness = false
+
+# Target-specific dependencies for memory allocators
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.6.0"
