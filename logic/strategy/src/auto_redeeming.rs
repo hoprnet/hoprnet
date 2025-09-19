@@ -305,13 +305,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem() -> anyhow::Result<()> {
-        let cfg = AutoRedeemingStrategyConfig {
-            redeem_only_aggregated: false,
-            minimum_redeem_ticket_value: 0.into(),
-            redeem_on_winning: true,
-            ..Default::default()
-        };
-
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await?;
@@ -325,10 +318,17 @@ mod tests {
             .once()
             .with(
                 mockall::predicate::eq(ack_ticket.ticket.verified_issuer().clone()),
-                mockall::predicate::eq(HoprBalance::from(cfg.minimum_redeem_ticket_value)),
-                mockall::predicate::eq(cfg.redeem_only_aggregated),
+                mockall::predicate::eq(HoprBalance::from(0)),
+                mockall::predicate::eq(false),
             )
             .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: 0.into(),
+            redeem_on_winning: true,
+            ..Default::default()
+        };
 
         let ars = AutoRedeemingStrategy::new(cfg, actions);
         ars.on_acknowledged_winning_ticket(&ack_ticket).await?;
