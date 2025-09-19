@@ -6,7 +6,6 @@
 //! - [promiscuous strategy](crate::promiscuous)
 //! - [auto funding strategy](crate::auto_funding)
 //! - [auto redeeming strategy](crate::auto_redeeming)
-//! - [aggregating strategy](crate::aggregating)
 //! - [multiple strategy chains](crate::strategy)
 //!
 //! HOPRd can be configured to use any of the above strategies.
@@ -35,8 +34,6 @@
 //!       new_channel_stake: 20
 //!     - !AutoFunding
 //!       funding_amount: 20
-//!     - !Aggregating:
-//!       aggregation_threshold: 1000
 //! ```
 
 use std::str::FromStr;
@@ -46,12 +43,11 @@ use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
 use crate::{
-    Strategy::AutoRedeeming, aggregating::AggregatingStrategyConfig, auto_funding::AutoFundingStrategyConfig,
-    auto_redeeming::AutoRedeemingStrategyConfig, channel_finalizer::ClosureFinalizerStrategyConfig,
-    promiscuous::PromiscuousStrategyConfig, strategy::MultiStrategyConfig,
+    Strategy::AutoRedeeming, auto_funding::AutoFundingStrategyConfig, auto_redeeming::AutoRedeemingStrategyConfig,
+    channel_finalizer::ClosureFinalizerStrategyConfig, promiscuous::PromiscuousStrategyConfig,
+    strategy::MultiStrategyConfig,
 };
 
-pub mod aggregating;
 pub mod auto_funding;
 pub mod auto_redeeming;
 mod channel_finalizer;
@@ -64,7 +60,6 @@ pub mod strategy;
 #[strum(serialize_all = "snake_case")]
 pub enum Strategy {
     Promiscuous(PromiscuousStrategyConfig),
-    Aggregating(AggregatingStrategyConfig),
     AutoRedeeming(AutoRedeemingStrategyConfig),
     AutoFunding(AutoFundingStrategyConfig),
     ClosureFinalizer(ClosureFinalizerStrategyConfig),

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::TryFutureExt;
+use futures::{FutureExt, StreamExt, TryFutureExt, stream::BoxStream};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_entity::{
     account, announcement,
@@ -12,15 +12,14 @@ use hopr_primitive_types::{
 };
 use multiaddr::Multiaddr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
-    Set, sea_query::Expr,
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder,
+    QuerySelect, Related, Set, sea_query::Expr,
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
 use tracing::instrument;
 
 use crate::{
-    HoprDbGeneralModelOperations, OptTx,
-    db::HoprDb,
+    HoprDbGeneralModelOperations, HoprIndexerDb, OptTx,
     errors::{DbSqlError, DbSqlError::MissingAccount, Result},
 };
 
@@ -100,6 +99,8 @@ pub trait HoprDbAccountOperations {
     /// or about all accounts without routeable address announcements (if `public_only` is `false`).
     async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>>;
 
+    async fn stream_accounts<'a>(&'a self, public_only: bool) -> Result<BoxStream<'a, AccountEntry>>;
+
     /// Inserts a new account entry to the database.
     /// Fails if such an entry already exists.
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()>;
@@ -162,7 +163,7 @@ pub(crate) fn model_to_account_entry(
 }
 
 #[async_trait]
-impl HoprDbAccountOperations for HoprDb {
+impl HoprDbAccountOperations for HoprIndexerDb {
     async fn get_account<'a, T: Into<ChainOrPacketKey> + Send + Sync>(
         &'a self,
         tx: OptTx<'a>,
@@ -218,6 +219,32 @@ impl HoprDbAccountOperations for HoprDb {
                 })
             })
             .await
+    }
+
+    async fn stream_accounts<'a>(&'a self, public_only: bool) -> Result<BoxStream<'a, AccountEntry>> {
+        Ok(Account::find()
+            .find_with_related(Announcement)
+            .filter(if public_only {
+                announcement::Column::Multiaddress.ne("")
+            } else {
+                Expr::value(1)
+            })
+            .order_by_desc(announcement::Column::AtBlock)
+            .stream(self.index_db.read_only())
+            .await?
+            // TODO: using Stream::scan, group the Announcement entries by accounts
+            .filter_map(|maybe_model| {
+                futures::future::ready(match maybe_model {
+                    Ok((a, b)) => model_to_account_entry(a, b.into_iter().collect())
+                        .inspect_err(|error| tracing::error!(%error, "unable to map account entity"))
+                        .ok(),
+                    Err(error) => {
+                        tracing::error!(%error, "db error while fetching accounts");
+                        None
+                    }
+                })
+            })
+            .boxed())
     }
 
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()> {
@@ -473,7 +500,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_account_announcement() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -526,7 +553,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_allow_reannouncement() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -567,7 +594,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_insert_account_announcement_to_nonexisting_account() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -585,7 +612,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_allow_duplicate_announcement_per_different_accounts() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -636,7 +663,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_account() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let packet_1 = *OffchainKeypair::random().public();
         let chain_1 = ChainKeypair::random().public().to_address();
@@ -665,7 +692,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_fail_to_delete_nonexistent_account() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -680,7 +707,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_fail_on_duplicate_account_insert() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -712,7 +739,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_announcements() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let packet_1 = *OffchainKeypair::random().public();
         let chain_1 = ChainKeypair::random().public().to_address();
@@ -741,7 +768,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_fail_to_delete_nonexistent_account_announcements() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -756,7 +783,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_key() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -816,7 +843,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_key_no_cache() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -878,7 +905,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_accounts() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let chain_2 = ChainKeypair::random().public().to_address();

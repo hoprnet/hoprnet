@@ -2,18 +2,14 @@ use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_crypto_types::prelude::{OffchainPublicKey, PeerId};
 use hopr_primitive_types::prelude::*;
-use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use tracing::warn;
-
-use crate::errors::Result;
 
 /// Actual origin.
 ///
 /// First occurence of the peer in the network mechanism.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, num_enum::IntoPrimitive, num_enum::TryFromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, strum::Display, strum::FromRepr)]
 #[repr(u8)]
 pub enum PeerOrigin {
     #[strum(to_string = "node initialization")]
@@ -129,11 +125,14 @@ impl PeerStatus {
 
     // Update both the immediate last quality and the average windowed quality
     pub fn update_quality(&mut self, new_value: f64) {
+        debug_assert!(
+            (0.0f64..=1.0f64).contains(&new_value),
+            "quality failed to update with value outside the [0,1] range"
+        );
+
         if (0.0f64..=1.0f64).contains(&new_value) {
             self.quality = new_value;
             self.quality_avg.push(new_value);
-        } else {
-            warn!("Quality failed to update with value outside the [0,1] range")
         }
     }
 
@@ -175,6 +174,7 @@ impl std::fmt::Display for PeerStatus {
 
 #[async_trait]
 pub trait HoprDbPeersOperations {
+    type Error: std::error::Error + Send + Sync + 'static;
     /// Adds a peer to the backend.
     ///
     /// Should fail if the given peer id already exists in the store.
@@ -185,21 +185,21 @@ pub trait HoprDbPeersOperations {
         mas: Vec<Multiaddr>,
         backoff: f64,
         quality_window: u32,
-    ) -> Result<()>;
+    ) -> Result<(), Self::Error>;
 
     /// Removes the peer from the backend.
     ///
     /// Should fail if the given peer id does not exist.
-    async fn remove_network_peer(&self, peer: &PeerId) -> Result<()>;
+    async fn remove_network_peer(&self, peer: &PeerId) -> Result<(), Self::Error>;
 
     /// Updates stored information about the peer.
     /// Should fail if the peer does not exist in the store.
-    async fn update_network_peer(&self, new_status: PeerStatus) -> Result<()>;
+    async fn update_network_peer(&self, new_status: PeerStatus) -> Result<(), Self::Error>;
 
     /// Gets stored information about the peer.
     ///
     /// Should return `None` if such peer does not exist in the store.
-    async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>>;
+    async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>, Self::Error>;
 
     /// Returns a stream of all stored peers, optionally matching the given [`PeerSelector`] filter.
     ///
@@ -209,8 +209,8 @@ pub trait HoprDbPeersOperations {
         &'a self,
         selector: PeerSelector,
         sort_last_seen_asc: bool,
-    ) -> Result<BoxStream<'a, PeerStatus>>;
+    ) -> Result<BoxStream<'a, PeerStatus>, Self::Error>;
 
     /// Returns the [statistics](Stats) on the stored peers.
-    async fn network_peer_stats(&self, quality_threshold: f64) -> Result<Stats>;
+    async fn network_peer_stats(&self, quality_threshold: f64) -> Result<Stats, Self::Error>;
 }

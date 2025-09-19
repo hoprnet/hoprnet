@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use futures::future::BoxFuture;
-pub use hopr_internal_types::prelude::{RedeemableTicket, WinningProbability};
+pub use hopr_internal_types::prelude::{AcknowledgedTicket, WinningProbability};
 use hopr_primitive_types::balance::HoprBalance;
 
 use crate::chain::ChainReceipt;
@@ -13,7 +13,7 @@ pub trait ChainWriteTicketOperations {
     /// Redeems a single ticket on-chain.
     async fn redeem_ticket(
         &self,
-        ticket: RedeemableTicket,
+        ticket: AcknowledgedTicket,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }
 

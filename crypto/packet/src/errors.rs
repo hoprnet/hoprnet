@@ -13,38 +13,14 @@ pub enum PacketError {
     #[error("failed to construct packet: {0}")]
     PacketConstructionError(String),
 
-    #[error("packet tag already present, possible replay")]
-    TagReplay,
-
-    #[error("could not find channel to {0}")]
-    ChannelNotFound(String),
-
-    #[error("ticket validation failed, packet dropped: {0}")]
-    TicketValidation(TicketValidationError),
-
-    #[error("received invalid acknowledgement: {0}")]
-    AcknowledgementValidation(String),
-
     #[error("Proof of Relay challenge could not be verified")]
     PoRVerificationError,
-
-    #[error("channel {0} is out of funds")]
-    OutOfFunds(String),
 
     #[error("logic error during packet processing: {0}")]
     LogicError(String),
 
-    #[error("tx queue is full, retry later")]
-    Retry,
-
     #[error("underlying transport error while sending packet: {0}")]
     TransportError(String),
-
-    #[error("path position from the packet header mismatched with the path position in ticket")]
-    PathPositionMismatch,
-
-    #[error("no channel domain_separator tag found")]
-    MissingDomainSeparator,
 
     #[error(transparent)]
     CryptographicError(#[from] CryptoError),
@@ -75,3 +51,5 @@ impl Display for TicketValidationError {
         write!(f, "{}", self.reason)
     }
 }
+
+impl std::error::Error for TicketValidationError {}

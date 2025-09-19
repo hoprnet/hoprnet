@@ -155,7 +155,9 @@ impl HalfKey {
     /// Returns an error if the instance is a zero scalar.
     pub fn to_challenge(&self) -> Result<HalfKeyChallenge> {
         // This may return an error if the instance was deserialized (e.g., via serde) from a zero scalar
-        Ok(PublicKey::from_privkey(&self.0)?.as_ref().try_into()?)
+        let pk = PublicKey::from_privkey(&self.0)?;
+        let compressed: &[u8] = pk.as_ref();
+        Ok(compressed.try_into()?)
     }
 }
 
@@ -547,7 +549,7 @@ pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 /// The `AsRef` implementation will always return the compressed representation.
 /// However, the `TryFrom` byte slice accepts any representation.
 #[derive(Copy, Clone)]
-pub struct PublicKey(NonIdentity<AffinePoint>, [u8; Self::SIZE_COMPRESSED]);
+pub struct PublicKey(NonIdentity<AffinePoint>, [u8; Self::SIZE_COMPRESSED], Address);
 
 impl PublicKey {
     /// Size of the compressed public key in bytes
@@ -592,7 +594,7 @@ impl PublicKey {
 
     /// Converts the public key to an Ethereum address
     pub fn to_address(&self) -> Address {
-        affine_point_to_address(self.0.as_ref())
+        self.2
     }
 
     /// Serializes the public key to a binary uncompressed form.
@@ -672,6 +674,18 @@ impl TryFrom<&[u8]> for PublicKey {
     }
 }
 
+impl AsRef<Address> for PublicKey {
+    fn as_ref(&self) -> &Address {
+        &self.2
+    }
+}
+
+impl AsRef<NonIdentity<AffinePoint>> for PublicKey {
+    fn as_ref(&self) -> &NonIdentity<AffinePoint> {
+        &self.0
+    }
+}
+
 impl AsRef<[u8]> for PublicKey {
     fn as_ref(&self) -> &[u8] {
         &self.1
@@ -686,7 +700,7 @@ impl From<NonIdentity<AffinePoint>> for PublicKey {
     fn from(value: NonIdentity<AffinePoint>) -> Self {
         let mut compressed = [0u8; PublicKey::SIZE_COMPRESSED];
         compressed.copy_from_slice(value.to_encoded_point(true).as_bytes());
-        Self(value, compressed)
+        Self(value, compressed, affine_point_to_address(&value))
     }
 }
 
@@ -903,7 +917,8 @@ mod tests {
         assert_eq!(pk1, pk2, "pubkeys don't match");
         assert_eq!(pk2, pk3, "pubkeys don't match");
 
-        assert_eq!(PublicKey::SIZE_COMPRESSED, pk1.as_ref().len());
+        let compressed: &[u8] = pk1.as_ref();
+        assert_eq!(PublicKey::SIZE_COMPRESSED, compressed.len());
         assert_eq!(PublicKey::SIZE_UNCOMPRESSED, pk1.to_uncompressed_bytes().len());
 
         let shorter = hex!("f85e38b056284626a7aed0acc5d474605a408e6cccf76d7241ec7b4dedb31929b710e034f4f9a7dba97743b01e1cc35a45a60bebb29642cb0ba6a7fe8433316c");

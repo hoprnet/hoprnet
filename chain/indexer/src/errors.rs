@@ -11,9 +11,6 @@ pub enum CoreEthereumIndexerError {
     DbApiError(#[from] hopr_db_sql::errors::DbSqlError),
 
     #[error(transparent)]
-    DbError(#[from] hopr_db_sql::api::errors::DbError),
-
-    #[error(transparent)]
     DbEntityError(#[from] hopr_db_entity::errors::DbEntityError),
 
     #[error(transparent)]

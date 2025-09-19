@@ -232,6 +232,8 @@ impl BytesRepresentable for WinningProbability {
 }
 
 /// Helper function checks if the given ticket values belong to a winning ticket.
+///
+/// This function is inexpensive to compute.
 pub(crate) fn check_ticket_win(
     ticket_hash: &Hash,
     ticket_signature: &Signature,
@@ -935,9 +937,11 @@ impl AcknowledgedTicket {
         self.ticket.is_winning(&self.response, chain_keypair, domain_separator)
     }
 
-    /// Transforms this ticket into [RedeemableTicket] that can be redeemed on-chain
-    /// or transformed into [TransferableWinningTicket] that can be sent for aggregation.
+    /// Transforms this ticket into [`RedeemableTicket`] that can be redeemed on-chain
+    /// or transformed into [`TransferableWinningTicket`] that can be sent for aggregation.
+    ///
     /// The `chain_keypair` must not be of the ticket's issuer.
+    /// This ticket MUST be winning, otherwise the function fails with [`CoreTypesError::TicketNotWinning`].
     pub fn into_redeemable(
         self,
         chain_keypair: &ChainKeypair,
@@ -949,6 +953,16 @@ impl AcknowledgedTicket {
         }
 
         let vrf_params = derive_vrf_parameters(self.ticket.verified_hash(), chain_keypair, domain_separator.as_ref())?;
+
+        if !check_ticket_win(
+            self.ticket.verified_hash(),
+            self.ticket.verified_signature(),
+            &self.ticket.win_prob(),
+            &self.response,
+            &vrf_params,
+        ) {
+            return Err(CoreTypesError::TicketNotWinning);
+        }
 
         Ok(RedeemableTicket {
             ticket: self.ticket,
