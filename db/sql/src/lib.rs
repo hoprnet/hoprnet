@@ -16,6 +16,7 @@ pub mod logs;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+pub use cache::CacheKeyMapper;
 pub use db::{HoprIndexerDb, HoprIndexerDbConfig};
 use futures::future::BoxFuture;
 use sea_orm::{ConnectionTrait, TransactionTrait};

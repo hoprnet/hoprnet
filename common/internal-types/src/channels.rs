@@ -9,6 +9,8 @@ use hopr_primitive_types::prelude::*;
 /// Describes status of a channel
 #[derive(Copy, Clone, Debug, smart_default::SmartDefault, strum::Display, strum::EnumDiscriminants)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(i8))]
 #[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
     /// The channel is closed.
@@ -291,7 +293,10 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
-    use crate::channels::{ChannelEntry, ChannelStatus, generate_channel_id};
+    use crate::{
+        channels::{ChannelEntry, ChannelStatus, generate_channel_id},
+        prelude::ChannelStatusDiscriminants,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -318,6 +323,19 @@ mod tests {
         assert_eq!(
             "PendingToClose",
             ChannelStatus::PendingToClose(SystemTime::now()).to_string()
+        );
+    }
+
+    #[test]
+    fn channel_status_repr_compat() {
+        assert_eq!(ChannelStatusDiscriminants::Open as i8, i8::from(ChannelStatus::Open));
+        assert_eq!(
+            ChannelStatusDiscriminants::Closed as i8,
+            i8::from(ChannelStatus::Closed)
+        );
+        assert_eq!(
+            ChannelStatusDiscriminants::PendingToClose as i8,
+            i8::from(ChannelStatus::PendingToClose(SystemTime::now()))
         );
     }
 

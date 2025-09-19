@@ -32,15 +32,18 @@ impl TryFrom<CachedValue> for IndexerData {
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
 // TODO: (dbmig) move this into the implementation of ChainKeyOperations
-#[derive(Debug)]
-pub(crate) struct CacheKeyMapper(
-    DashMap<KeyIdent<4>, OffchainPublicKey>,
-    DashMap<OffchainPublicKey, KeyIdent<4>>,
+#[derive(Debug, Clone)]
+pub struct CacheKeyMapper(
+    std::sync::Arc<DashMap<KeyIdent<4>, OffchainPublicKey>>,
+    std::sync::Arc<DashMap<OffchainPublicKey, KeyIdent<4>>>,
 );
 
 impl CacheKeyMapper {
     pub fn with_capacity(capacity: usize) -> Self {
-        Self(DashMap::with_capacity(capacity), DashMap::with_capacity(capacity))
+        Self(
+            std::sync::Arc::new(DashMap::with_capacity(capacity)),
+            std::sync::Arc::new(DashMap::with_capacity(capacity)),
+        )
     }
 
     /// Creates key id mapping for a public key of an [account](AccountEntry).
@@ -115,7 +118,7 @@ pub struct HoprIndexerDbCaches {
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
     // KeyIdMapper must be synchronous because it is used from a sync context.
-    pub(crate) key_id_mapper: std::sync::Arc<CacheKeyMapper>,
+    pub(crate) key_id_mapper: CacheKeyMapper,
 }
 
 impl Default for HoprIndexerDbCaches {
@@ -134,7 +137,7 @@ impl Default for HoprIndexerDbCaches {
                 .time_to_live(Duration::from_secs(600))
                 .max_capacity(10_000)
                 .build(),
-            key_id_mapper: std::sync::Arc::new(CacheKeyMapper::with_capacity(10_000)),
+            key_id_mapper: CacheKeyMapper::with_capacity(10_000),
         }
     }
 }

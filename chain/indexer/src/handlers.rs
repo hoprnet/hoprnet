@@ -22,12 +22,7 @@ use hopr_chain_types::{
     chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent},
 };
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::{
-    HoprDbAllOperations, OpenTransaction,
-    api::{info::DomainSeparator, tickets::TicketSelector},
-    errors::DbSqlError,
-    prelude::TicketMarker,
-};
+use hopr_db_sql::{HoprDbAllOperations, OpenTransaction, errors::DbSqlError};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, trace, warn};

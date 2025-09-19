@@ -1,3 +1,4 @@
+use hopr_primitive_types::prelude::GeneralError;
 use thiserror::Error;
 
 /// Error representing all possible erroneous states of the entire HOPR
@@ -16,8 +17,14 @@ pub enum HoprChainError {
     #[error(transparent)]
     DbError(#[from] hopr_db_sql::errors::DbSqlError),
 
+    #[error(transparent)]
+    ActionsError(#[from] hopr_chain_actions::errors::ChainActionsError),
+
     #[error("configuration error: {0}")]
     Configuration(String),
+
+    #[error(transparent)]
+    General(#[from] GeneralError),
 }
 
 /// The default [Result] object translating errors in the [HoprChainError] type

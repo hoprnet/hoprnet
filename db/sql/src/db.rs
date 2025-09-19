@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use hopr_crypto_packet::KeyIdMapper;
 use hopr_crypto_types::{keypairs::Keypair, prelude::ChainKeypair};
 use hopr_db_entity::prelude::{Account, Announcement};
 use hopr_primitive_types::primitives::Address;
@@ -19,7 +20,7 @@ use validator::Validate;
 
 use crate::{
     HoprDbAllOperations,
-    cache::HoprIndexerDbCaches,
+    cache::{CacheKeyMapper, HoprIndexerDbCaches},
     errors::{DbSqlError, Result},
     prelude::model_to_account_entry,
 };
@@ -244,6 +245,10 @@ impl HoprIndexerDb {
             .map_err(|e| DbSqlError::Construction(format!("failed to create {path} database: {e}")))?;
 
         Ok(pool)
+    }
+
+    pub fn key_id_mapper_ref(&self) -> &CacheKeyMapper {
+        &self.caches.key_id_mapper
     }
 }
 

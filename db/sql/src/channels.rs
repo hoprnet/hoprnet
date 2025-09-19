@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
@@ -5,6 +7,7 @@ use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelud
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_query::{Condition, ExprTrait, SimpleExpr};
 use tracing::instrument;
 
 use crate::{
@@ -103,6 +106,13 @@ pub trait HoprDbChannelOperations {
 
     /// Retrieves all channels information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
+
+    async fn stream_channels<'a>(
+        &'a self,
+        counterparty: Option<Address>,
+        directions: &[ChannelDirection],
+        states: &[ChannelStatusDiscriminants],
+    ) -> Result<BoxStream<'a, ChannelEntry>>;
 
     /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>>;
@@ -278,6 +288,54 @@ impl HoprDbChannelOperations for HoprIndexerDb {
                 })
             })
             .await
+    }
+
+    async fn stream_channels<'a>(
+        &'a self,
+        counterparty: Option<Address>,
+        directions: &[ChannelDirection],
+        states: &[ChannelStatusDiscriminants],
+    ) -> Result<BoxStream<'a, ChannelEntry>> {
+        let mut incoming_cond = Condition::all();
+        if directions.contains(&ChannelDirection::Incoming) {
+            incoming_cond = incoming_cond.add(channel::Column::Destination.eq(self.me_onchain.to_hex()));
+            if let Some(counterparty) = counterparty {
+                incoming_cond = incoming_cond.add(channel::Column::Source.eq(counterparty.to_hex()));
+            }
+        }
+
+        let mut outgoing_cond = Condition::all();
+        if directions.contains(&ChannelDirection::Outgoing) || directions.is_empty() {
+            outgoing_cond = outgoing_cond.add(channel::Column::Source.eq(self.me_onchain.to_hex()));
+            if let Some(counterparty) = counterparty {
+                outgoing_cond = outgoing_cond.add(channel::Column::Destination.eq(counterparty.to_hex()));
+            }
+        }
+
+        let mut states_condition = Condition::any();
+        for state in states {
+            states_condition = states_condition.add(channel::Column::Status.eq(*state as i8));
+        }
+
+        Ok(Channel::find()
+            .filter(sea_query::all![
+                sea_query::any![incoming_cond, outgoing_cond],
+                states_condition
+            ])
+            .stream(self.index_db.read_only())
+            .await?
+            .filter_map(|maybe_channel| {
+                futures::future::ready(
+                    maybe_channel
+                        .and_then(|c| {
+                            ChannelEntry::try_from(c)
+                                .map_err(|e| sea_orm::error::DbErr::Custom(format!("cannot decode entity: {e}")))
+                        })
+                        .inspect_err(|error| tracing::error!(%error, "invalid channel entry"))
+                        .ok(),
+                )
+            })
+            .boxed())
     }
 
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>> {

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::TryFutureExt;
+use futures::{FutureExt, StreamExt, TryFutureExt, stream::BoxStream};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_entity::{
     account, announcement,
@@ -12,8 +12,8 @@ use hopr_primitive_types::{
 };
 use multiaddr::Multiaddr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
-    Set, sea_query::Expr,
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder,
+    QuerySelect, Related, Set, sea_query::Expr,
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
 use tracing::instrument;
@@ -98,6 +98,8 @@ pub trait HoprDbAccountOperations {
     /// Retrieves entries of accounts with routable address announcements (if `public_only` is `true`)
     /// or about all accounts without routeable address announcements (if `public_only` is `false`).
     async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>>;
+
+    async fn stream_accounts<'a>(&'a self, public_only: bool) -> Result<BoxStream<'a, AccountEntry>>;
 
     /// Inserts a new account entry to the database.
     /// Fails if such an entry already exists.
@@ -217,6 +219,32 @@ impl HoprDbAccountOperations for HoprIndexerDb {
                 })
             })
             .await
+    }
+
+    async fn stream_accounts<'a>(&'a self, public_only: bool) -> Result<BoxStream<'a, AccountEntry>> {
+        Ok(Account::find()
+            .find_with_related(Announcement)
+            .filter(if public_only {
+                announcement::Column::Multiaddress.ne("")
+            } else {
+                Expr::value(1)
+            })
+            .order_by_desc(announcement::Column::AtBlock)
+            .stream(self.index_db.read_only())
+            .await?
+            // TODO: using Stream::scan, group the Announcement entries by accounts
+            .filter_map(|maybe_model| {
+                futures::future::ready(match maybe_model {
+                    Ok((a, b)) => model_to_account_entry(a, b.into_iter().collect())
+                        .inspect_err(|error| tracing::error!(%error, "unable to map account entity"))
+                        .ok(),
+                    Err(error) => {
+                        tracing::error!(%error, "db error while fetching accounts");
+                        None
+                    }
+                })
+            })
+            .boxed())
     }
 
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()> {

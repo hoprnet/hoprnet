@@ -15,8 +15,6 @@ pub trait ChainKeyOperations {
     async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error>;
     /// Translates [`OffchainPublicKey`] into [`Address`].
     async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error>;
-    /// Returns [mapper](KeyIdMapper) for offchain key IDs.
-    fn key_id_mapper(&self) -> Self::Mapper;
     /// Returns [mapper](KeyIdMapper) for offchain key IDs as a reference.
     fn key_id_mapper_ref(&self) -> &Self::Mapper;
 }

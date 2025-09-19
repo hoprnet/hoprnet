@@ -24,14 +24,12 @@ lazy_static::lazy_static! {
             "Observes the winning probabilities on incoming tickets",
             vec![0.0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15, 0.25, 0.3, 0.5],
         ).unwrap();
-
     pub(crate) static ref METRIC_RECEIVED_ACKS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
         "hopr_received_ack_count",
         "Number of received acknowledgements",
         &["valid"]
     )
     .unwrap();
-
     pub(crate) static ref METRIC_SENT_ACKS: hopr_metrics::SimpleCounter =
         hopr_metrics::SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
 
@@ -392,7 +390,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
 
         // Construct the outgoing packet
         let chain_key = self.me_onchain.clone();
-        let mapper = resolver.key_id_mapper();
+        let mapper = resolver.key_id_mapper_ref().clone();
         let (packet, _) = spawn_fifo_blocking(move || {
             HoprPacket::into_outgoing(
                 &data,
@@ -521,7 +519,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
 
         // Construct the outgoing packet
         let chain_key = self.me_onchain.clone();
-        let mapper = resolver.key_id_mapper();
+        let mapper = resolver.key_id_mapper_ref().clone();
         let (packet, openers) = spawn_fifo_blocking(move || {
             HoprPacket::into_outgoing(
                 &data,
@@ -585,7 +583,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         let offchain_keypair = pkt_keypair.clone();
         let caches = self.caches.clone();
         let start = std::time::Instant::now();
-        let mapper = resolver.key_id_mapper();
+        let mapper = resolver.key_id_mapper_ref().clone();
         let packet = spawn_fifo_blocking(move || {
             HoprPacket::from_incoming(&data, &offchain_keypair, sender, &mapper, |p| {
                 caches.extract_pseudonym_opener(p)

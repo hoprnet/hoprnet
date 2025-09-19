@@ -33,10 +33,10 @@ use crate::{
 #[async_trait]
 pub trait NodeActions {
     /// Withdraws the specified `amount` of tokens to the given `recipient`.
-    async fn withdraw(&self, recipient: Address, amount: HoprBalance) -> Result<PendingAction>;
+    async fn withdraw(&self, recipient: Address, amount: U256) -> Result<PendingAction>;
 
     /// Withdraws the specified `amount` of native coins to the given `recipient`.
-    async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<PendingAction>;
+    async fn withdraw_native(&self, recipient: Address, amount: U256) -> Result<PendingAction>;
 
     /// Announces node on-chain with key binding.
     /// The operation should also check if such an announcement has not been already made on-chain.
@@ -52,20 +52,22 @@ where
     Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug,
 {
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn withdraw(&self, recipient: Address, amount: HoprBalance) -> Result<PendingAction> {
+    async fn withdraw(&self, recipient: Address, amount: U256) -> Result<PendingAction> {
         if !amount.is_zero() {
             info!(%amount, %recipient, "initiating withdrawal");
-            self.tx_sender.send(Action::Withdraw(recipient, amount)).await
+            self.tx_sender.send(Action::Withdraw(recipient, amount.into())).await
         } else {
             Err(InvalidArguments("cannot withdraw zero amount".into()))
         }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<PendingAction> {
+    async fn withdraw_native(&self, recipient: Address, amount: U256) -> Result<PendingAction> {
         if !amount.is_zero() {
             info!(%amount, %recipient, "initiating native withdrawal");
-            self.tx_sender.send(Action::WithdrawNative(recipient, amount)).await
+            self.tx_sender
+                .send(Action::WithdrawNative(recipient, amount.into()))
+                .await
         } else {
             Err(InvalidArguments("cannot withdraw zero amount".into()))
         }
