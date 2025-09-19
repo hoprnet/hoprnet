@@ -286,7 +286,7 @@ codegen-units = 1
 lto = "fat"
 panic = "abort"
 opt-level = 3
-debug = 1         # minimal debug info for memory profiling
+debug = 2         # minimal debug info for memory profiling
 strip = false     # do not strip debug info
 
 # uses extended debug symbols for profiling but does not harm benchmarking performance
