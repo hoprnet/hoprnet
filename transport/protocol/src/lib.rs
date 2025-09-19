@@ -75,7 +75,7 @@ mod capture;
 
 use std::{collections::HashMap, time::Duration};
 
-use futures::{SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::{HalfKey, OffchainPublicKey};
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
@@ -253,7 +253,8 @@ where
                         error!(%sender, "failed to verify signature on acknowledgement");
                     }
                 }
-            }))
+            })
+            .inspect(|_| tracing::warn!(task = "transport (protocol - ticket acknowledgement)", "long-running background task finished")))
     );
 
     let (ack_out_tx, ack_out_rx) =
@@ -267,62 +268,69 @@ where
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
         ProtocolProcesses::AckOut,
-        spawn_as_abortable!(ack_out_rx.for_each_concurrent(
-            NUM_CONCURRENT_ACK_OUT_PROCESSING,
-            move |(maybe_ack_key, destination)| {
-                let db = db_clone.clone();
-                let me = me_clone.clone();
-                let mut msg_to_send_tx_clone = msg_to_send_tx.clone();
+        spawn_as_abortable!(
+            ack_out_rx
+                .for_each_concurrent(
+                    NUM_CONCURRENT_ACK_OUT_PROCESSING,
+                    move |(maybe_ack_key, destination)| {
+                        let db = db_clone.clone();
+                        let me = me_clone.clone();
+                        let mut msg_to_send_tx_clone = msg_to_send_tx.clone();
 
-                #[cfg(feature = "capture")]
-                let mut capture = capture_clone.clone();
-                async move {
-                    #[cfg(feature = "capture")]
-                    let (is_random, me_pub) = (
-                        maybe_ack_key.is_none(),
-                        *hopr_crypto_types::keypairs::Keypair::public(&me),
-                    );
+                        #[cfg(feature = "capture")]
+                        let mut capture = capture_clone.clone();
+                        async move {
+                            #[cfg(feature = "capture")]
+                            let (is_random, me_pub) = (
+                                maybe_ack_key.is_none(),
+                                *hopr_crypto_types::keypairs::Keypair::public(&me),
+                            );
 
-                    // Sign acknowledgement with the given half-key or generate a signed random one
-                    let ack = hopr_parallelize::cpu::spawn_blocking(move || {
-                        maybe_ack_key
-                            .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &me))
-                            .unwrap_or_else(|| VerifiedAcknowledgement::random(&me))
-                    })
-                    .await;
-
-                    #[cfg(feature = "capture")]
-                    let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
-                        me: me_pub,
-                        ack,
-                        is_random,
-                        next_hop: destination,
-                    }
-                    .into();
-
-                    match db.to_send_no_ack(ack.leak().as_ref().into(), destination).await {
-                        Ok(ack_packet) => {
-                            let now = std::time::Instant::now();
-                            if msg_to_send_tx_clone
-                                .send((ack_packet.next_hop.into(), ack_packet.data))
-                                .await
-                                .is_err()
-                            {
-                                error!("failed to forward an acknowledgement to the transport layer");
-                            }
-                            let elapsed = now.elapsed();
-                            if elapsed.as_millis() > SLOW_OP_MS {
-                                warn!(?elapsed, " msg_to_send_tx.send on ack took too long");
-                            }
+                            // Sign acknowledgement with the given half-key or generate a signed random one
+                            let ack = hopr_parallelize::cpu::spawn_blocking(move || {
+                                maybe_ack_key
+                                    .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &me))
+                                    .unwrap_or_else(|| VerifiedAcknowledgement::random(&me))
+                            })
+                            .await;
 
                             #[cfg(feature = "capture")]
-                            let _ = capture.try_send(captured_packet);
+                            let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
+                                me: me_pub,
+                                ack,
+                                is_random,
+                                next_hop: destination,
+                            }
+                            .into();
+
+                            match db.to_send_no_ack(ack.leak().as_ref().into(), destination).await {
+                                Ok(ack_packet) => {
+                                    let now = std::time::Instant::now();
+                                    if msg_to_send_tx_clone
+                                        .send((ack_packet.next_hop.into(), ack_packet.data))
+                                        .await
+                                        .is_err()
+                                    {
+                                        error!("failed to forward an acknowledgement to the transport layer");
+                                    }
+                                    let elapsed = now.elapsed();
+                                    if elapsed.as_millis() > SLOW_OP_MS {
+                                        warn!(?elapsed, " msg_to_send_tx.send on ack took too long");
+                                    }
+
+                                    #[cfg(feature = "capture")]
+                                    let _ = capture.try_send(captured_packet);
+                                }
+                                Err(error) => tracing::error!(%error, "failed to create ack packet"),
+                            }
                         }
-                        Err(error) => tracing::error!(%error, "failed to create ack packet"),
                     }
-                }
-            }
-        )),
+                )
+                .inspect(|_| tracing::warn!(
+                    task = "transport (protocol - ack outgoing)",
+                    "long-running background task finished"
+                ))
+        ),
     );
 
     let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);
@@ -382,7 +390,13 @@ where
                 .inspect(|(peer, _)| trace!(%peer, "protocol message out"))
                 .map(Ok)
                 .forward(msg_to_send_tx)
-                .instrument(tracing::trace_span!("msg protocol processing - outgoing"))
+                .instrument(tracing::trace_span!("msg protocol processing - egress"))
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = "transport (protocol - msg egress)",
+                        "long-running background task finished"
+                    )
+                })
                 .await;
         }),
     );
@@ -636,7 +650,8 @@ where
                 ))
                 .map(Ok)
                 .forward(api.0)
-                .instrument(tracing::trace_span!("msg protocol processing - incoming"))
+                .instrument(tracing::trace_span!("msg protocol processing - ingress"))
+                .inspect(|_| tracing::warn!(task = "transport (protocol - msg ingress)", "long-running background task finished"))
                 .await;
         }),
     );
