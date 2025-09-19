@@ -92,7 +92,7 @@ hopr:
         # If set, all tickets will be redeemed on channel closure.
         redeem_all_on_close: true
         # Sets the minimum value of a ticket to be able to redeem it.
-        minimum_redeem_ticket_value: "0.09 wxHOPR"
+        minimum_redeem_ticket_value: "1 wxHOPR"
         # If set, the strategy will redeem each incoming winning ticket.
         # Otherwise, it will try to redeem tickets in all channels periodically.
         # Set this to `true` when winning tickets are not happening too often (e.g., when winning probability is below 1%).
