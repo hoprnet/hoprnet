@@ -161,5 +161,3 @@ jobs:
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.asc
           path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.asc
-
-
