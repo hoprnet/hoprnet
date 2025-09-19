@@ -39,7 +39,8 @@ use hopr_chain_actions::{
     payload::SafePayloadGenerator,
     redeem::TicketRedeemActions,
 };
-use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
+use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers};
+pub use hopr_chain_indexer::IndexerConfig;
 use hopr_chain_rpc::{
     HoprRpcOperations,
     client::DefaultRetryPolicy,
@@ -523,13 +524,17 @@ impl ChainWriteChannelOperations for HoprChain {
 
     async fn close_channel(
         &self,
-        counterparty: &Address,
+        channel_id: &ChannelId,
         direction: ChannelDirection,
     ) -> std::result::Result<BoxFuture<'_, std::result::Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>
     {
+        // TODO: (dbmig) make sure the ChainActions::close_channel() accepts ChannelEntry directly
+        let channel = self.db.get_channel_by_id(None, channel_id).await?.ok_or(HoprChainError::Api("channel not found".into()))?;
+        let (_, counterparty) = channel.orientation(&self.me_onchain()).ok_or(HoprChainError::Api("channel not own".into()))?;
+        
         Ok(self
             .actions_ref()
-            .close_channel(*counterparty, direction, false)
+            .close_channel(counterparty, direction, false)
             .await?
             .map(|res| {
                 res.and_then(|c| {

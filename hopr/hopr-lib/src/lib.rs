@@ -40,13 +40,6 @@ use futures::{
     stream::{self},
 };
 use hopr_async_runtime::prelude::{sleep, spawn};
-pub use hopr_chain_actions::errors::ChainActionsError;
-use hopr_chain_actions::{
-    action_state::{ActionState, IndexerActionTracker},
-    channels::ChannelActions,
-    node::NodeActions,
-    redeem::TicketRedeemActions,
-};
 pub use hopr_chain_api::config::{
     Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
 };
@@ -54,8 +47,6 @@ use hopr_chain_api::{
     HoprChain, HoprChainProcess, SignificantChainEvent, config::ChainNetworkConfig, errors::HoprChainError,
     wait_for_funds,
 };
-use hopr_chain_rpc::HoprRpcOperations;
-use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_sql::{
@@ -127,6 +118,8 @@ use hopr_api::{
     },
     db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus},
 };
+use hopr_chain_types::chain_events::ChainEventType;
+use hopr_chain_types::ContractAddresses;
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_db_sql::{HoprIndexerDb, HoprIndexerDbConfig};
 
@@ -214,7 +207,7 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
 /// * `preloading_event_stream` - a stream used by the components to preload the data from the objects (db, channel
 ///   graph...)
 #[allow(clippy::too_many_arguments)]
-pub async fn chain_events_to_transport_events<StreamIn, Db>(
+async fn chain_events_to_transport_events<StreamIn, Db>(
     event_stream: StreamIn,
     me_onchain: Address,
     multi_strategy: Arc<MultiStrategy>,
@@ -456,7 +449,7 @@ impl Hopr {
                 module_implementation: resolved_environment.module_implementation,
             },
             cfg.safe_module.safe_address,
-            hopr_chain_indexer::IndexerConfig {
+            hopr_chain_api::IndexerConfig {
                 start_block_number: resolved_environment.channel_contract_deploy_block as u64,
                 fast_sync: cfg.chain.fast_sync,
                 enable_logs_snapshot: cfg.chain.enable_logs_snapshot,
@@ -1382,9 +1375,9 @@ impl Hopr {
         Ok(awaiter.await?)
     }
 
-    pub async fn close_channel(
+    pub async fn close_channel_by_id(
         &self,
-        counterparty: &Address,
+        channel_id: &ChannelId,
         direction: ChannelDirection,
         _redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
@@ -1392,31 +1385,11 @@ impl Hopr {
 
         let (status, tx_hash) = self
             .hopr_chain_api
-            .close_channel(counterparty, direction)
+            .close_channel(channel_id, direction)
             .await?
             .await?;
 
         Ok(CloseChannelResult { tx_hash, status })
-    }
-
-    pub async fn close_channel_by_id(
-        &self,
-        channel_id: Hash,
-        redeem_before_close: bool,
-    ) -> errors::Result<CloseChannelResult> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        match self.channel_from_hash(&channel_id).await? {
-            Some(channel) => match channel.orientation(&self.me_onchain()) {
-                Some((direction, counterparty)) => {
-                    self.close_channel(&counterparty, direction, redeem_before_close).await
-                }
-                None => Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(
-                    "cannot close channel that is not own".into(),
-                ))),
-            },
-            None => Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)),
-        }
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
