@@ -148,8 +148,17 @@ where
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_COUNT_AUTO_REDEEMS.increment();
 
-            let rx = self.hopr_chain_actions.redeem_ticket(ack.clone()).await?;
-            std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+            let rxs = self
+                .hopr_chain_actions
+                .redeem_tickets_with_counterparty(
+                    ack.ticket.verified_issuer(),
+                    self.cfg.minimum_redeem_ticket_value,
+                    self.cfg.redeem_only_aggregated,
+                )
+                .await?;
+
+            std::mem::drop(rxs); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+
             Ok(())
         } else {
             Err(CriteriaNotSatisfied)
