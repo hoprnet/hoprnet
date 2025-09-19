@@ -186,7 +186,7 @@ impl TicketManager {
                 }
             }
 
-            tracing::info!(task = "ticket processing", "long-running background task finished")
+            tracing::warn!(task = "ticket processing", "long-running background task finished")
         });
 
         Ok(())

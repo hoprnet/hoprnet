@@ -151,8 +151,17 @@ where
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_COUNT_AUTO_REDEEMS.increment();
 
-            let rx = self.hopr_chain_actions.redeem_ticket(ack.clone()).await?;
-            std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+            let rxs = self
+                .hopr_chain_actions
+                .redeem_tickets_with_counterparty(
+                    ack.ticket.verified_issuer(),
+                    self.cfg.minimum_redeem_ticket_value,
+                    self.cfg.redeem_only_aggregated,
+                )
+                .await?;
+
+            std::mem::drop(rxs); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+
             Ok(())
         } else {
             Err(CriteriaNotSatisfied)
@@ -308,10 +317,14 @@ mod tests {
         let mut actions = MockTicketRedeemAct::new();
         let mock_confirm = mock_action_confirmation(ack_ticket.clone())?;
         actions
-            .expect_redeem_ticket()
+            .expect_redeem_tickets_with_counterparty()
             .once()
-            .with(mockall::predicate::eq(ack_ticket.clone()))
-            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
+            .with(
+                mockall::predicate::eq(ack_ticket.ticket.verified_issuer().clone()),
+                mockall::predicate::eq(HoprBalance::from(0)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
@@ -394,10 +407,14 @@ mod tests {
         let mut actions = MockTicketRedeemAct::new();
         let mock_confirm = mock_action_confirmation(ack_ticket_agg.clone())?;
         actions
-            .expect_redeem_ticket()
+            .expect_redeem_tickets_with_counterparty()
             .once()
-            .with(mockall::predicate::eq(ack_ticket_agg.clone()))
-            .return_once(|_| Ok(ok(mock_confirm).boxed()));
+            .with(
+                mockall::predicate::eq(ack_ticket_agg.ticket.verified_issuer().clone()),
+                mockall::predicate::eq(HoprBalance::from(0)),
+                mockall::predicate::eq(true),
+            )
+            .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
@@ -423,10 +440,14 @@ mod tests {
         let mock_confirm = mock_action_confirmation(ack_ticket_at.clone())?;
         let mut actions = MockTicketRedeemAct::new();
         actions
-            .expect_redeem_ticket()
+            .expect_redeem_tickets_with_counterparty()
             .once()
-            .with(mockall::predicate::eq(ack_ticket_at.clone()))
-            .return_once(|_| Ok(ok(mock_confirm).boxed()));
+            .with(
+                mockall::predicate::eq(ack_ticket_at.ticket.verified_issuer().clone()),
+                mockall::predicate::eq(HoprBalance::from(*PRICE_PER_PACKET * 5)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
@@ -533,6 +554,44 @@ mod tests {
             },
         )
         .await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_auto_redeeming_strategy_redeem_multiple_tickets_in_channel() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await?;
+
+        let ack_ticket_0 = generate_random_ack_ticket(0, 1, 5)?;
+        let ack_ticket_1 = generate_random_ack_ticket(0, 2, 5)?;
+
+        let mut actions: MockTicketRedeemAct = MockTicketRedeemAct::new();
+        let mock_confirms = vec![
+            mock_action_confirmation(ack_ticket_0.clone())?,
+            mock_action_confirmation(ack_ticket_1.clone())?,
+        ];
+        actions
+            .expect_redeem_tickets_with_counterparty()
+            .once()
+            .with(
+                mockall::predicate::eq(ack_ticket_1.ticket.verified_issuer().clone()),
+                mockall::predicate::eq(HoprBalance::from(0)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _, _| Ok(mock_confirms.into_iter().map(|c| ok(c).boxed()).collect()));
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: 0.into(),
+            redeem_on_winning: true,
+            ..Default::default()
+        };
+
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
+        ars.on_acknowledged_winning_ticket(&ack_ticket_1).await?;
+        assert!(ars.on_tick().await.is_err());
 
         Ok(())
     }

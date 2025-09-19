@@ -2,13 +2,17 @@ use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-use futures::{StreamExt, future::AbortHandle};
+use futures::{FutureExt, StreamExt, future::AbortHandle};
 use hopr_lib::{HoprKeys, HoprLibProcesses, IdentityRetrievalModes, ToHex};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{ListenerJoinHandles, RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
+
+#[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
+mod jemalloc_stats;
+
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -18,8 +22,9 @@ use {
 
 // Avoid musl's default allocator due to degraded performance
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[cfg(target_os = "linux")]
 #[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -136,6 +141,9 @@ impl std::fmt::Debug for HoprdProcesses {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
+    #[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
+    let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
+
     if hopr_crypto_random::is_rng_fixed() {
         warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
     }
@@ -243,6 +251,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     error!(error = %e, "the REST API server could not start")
                 }
             }
+            .inspect(|_| tracing::warn!(task = "hoprd - REST API", "long-running background task finished"))
         )));
     }
 

@@ -2,7 +2,7 @@ use std::ops::Div;
 
 use futures::{
     StreamExt,
-    channel::mpsc::{UnboundedSender, unbounded},
+    channel::mpsc::{Sender, channel},
 };
 use hopr_async_runtime::prelude::timeout_fut;
 use libp2p_identity::PeerId;
@@ -11,14 +11,7 @@ use tracing::{debug, warn};
 use crate::errors::{ProbeError, Result};
 
 /// Heartbeat send ping TX type
-///
-/// NOTE: UnboundedSender and UnboundedReceiver are bound only by available memory
-/// in case of faster input than output the memory might run out.
-///
-/// The unboundedness relies on the fact that a back pressure mechanism exists on a
-/// higher level of the business logic making sure that only a fixed maximum count
-/// of pings ever enter the queues at any given time.
-pub type HeartbeatSendPingTx = UnboundedSender<(PeerId, PingQueryReplier)>;
+pub type HeartbeatSendPingTx = Sender<(PeerId, PingQueryReplier)>;
 
 /// Configuration for the [`Ping`] mechanism
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
@@ -37,11 +30,11 @@ pub type PingQueryResult = Result<std::time::Duration>;
 #[derive(Debug, Clone)]
 pub struct PingQueryReplier {
     /// Back channel for notifications, is [`Clone`] to allow caching
-    notifier: UnboundedSender<PingQueryResult>,
+    notifier: Sender<PingQueryResult>,
 }
 
 impl PingQueryReplier {
-    pub fn new(notifier: UnboundedSender<PingQueryResult>) -> Self {
+    pub fn new(notifier: Sender<PingQueryResult>) -> Self {
         Self { notifier }
     }
 
@@ -49,10 +42,10 @@ impl PingQueryReplier {
     /// transport layer.
     ///
     /// The resulting timing information about the RTT is halved to provide a unidirectional latency.
-    pub fn notify(self, result: PingQueryResult) {
+    pub fn notify(mut self, result: PingQueryResult) {
         let result = result.map(|rtt| rtt.div(2u32));
 
-        if self.notifier.unbounded_send(result).is_err() {
+        if self.notifier.try_send(result).is_err() {
             warn!("Failed to notify the ping query result due to upper layer ping timeout");
         }
     }
@@ -73,10 +66,10 @@ impl Pinger {
     /// Performs a ping to a single peer.
     #[tracing::instrument(level = "info", skip(self))]
     pub async fn ping(&self, peer: PeerId) -> Result<std::time::Duration> {
-        let (tx, mut rx) = unbounded::<PingQueryResult>();
+        let (tx, mut rx) = channel::<PingQueryResult>(1);
         let replier = PingQueryReplier::new(tx);
 
-        if let Err(error) = self.send_ping.clone().unbounded_send((peer, replier)) {
+        if let Err(error) = self.send_ping.clone().try_send((peer, replier)) {
             warn!(%peer, %error, "Failed to initiate a ping request");
         }
 
@@ -118,7 +111,7 @@ mod tests {
 
     #[tokio::test]
     async fn ping_query_replier_should_yield_a_failed_probe() -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
+        let (tx, mut rx) = futures::channel::mpsc::channel::<PingQueryResult>(256);
 
         let replier = PingQueryReplier::new(tx);
 
@@ -133,7 +126,7 @@ mod tests {
     async fn ping_query_replier_should_yield_a_successful_probe_as_unidirectional_latency() -> anyhow::Result<()> {
         const RTT: Duration = Duration::from_millis(100);
 
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
+        let (tx, mut rx) = futures::channel::mpsc::channel::<PingQueryResult>(256);
 
         let replier = PingQueryReplier::new(tx);
 
@@ -150,7 +143,7 @@ mod tests {
 
     #[tokio::test]
     async fn pinger_should_return_an_error_if_the_latency_is_longer_than_the_configure_timeout() -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+        let (tx, mut rx) = futures::channel::mpsc::channel::<(PeerId, PingQueryReplier)>(256);
 
         let delay = Duration::from_millis(10);
         let delaying_channel = tokio::task::spawn(async move {
