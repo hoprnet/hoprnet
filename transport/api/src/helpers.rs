@@ -292,7 +292,12 @@ where
                 }
             }
         })
-        .inspect(|_| tracing::info!(task = "packet planner", "long-running background task finished")),
+        .inspect(|_| {
+            tracing::warn!(
+                task = "transport (packet planner)",
+                "long-running background task finished"
+            )
+        }),
     );
 
     tx

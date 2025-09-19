@@ -246,7 +246,10 @@ impl HoprChain {
 
         processes.insert(
             HoprChainProcess::OutgoingOnchainActionQueue,
-            spawn_as_abortable!(self.action_queue.clone().start()),
+            spawn_as_abortable!(self.action_queue.clone().start().inspect(|_| tracing::warn!(
+                task = "action queue - outgoing",
+                "long-running background task finished"
+            ))),
         );
         processes.insert(
             HoprChainProcess::Indexer,
