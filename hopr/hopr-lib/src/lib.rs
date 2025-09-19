@@ -764,7 +764,7 @@ impl Hopr {
                 .inspect(|result| {
                     tracing::warn!(
                         ?result,
-                        task = "indexer pipeline for transport",
+                        task = "indexer -> transport",
                         "long-running background task finished"
                     )
                 })
@@ -967,7 +967,7 @@ impl Hopr {
                 }
 
                 tracing::warn!(
-                    task = "received ack processing",
+                    task = %HoprLibProcesses::OnReceivedAcknowledgement,
                     "long-running background task finished"
                 )
             }),
@@ -1004,7 +1004,7 @@ impl Hopr {
                             }
                         })
                         .inspect(|_| tracing::warn!(
-                            task = "session server (incoming session handling)",
+                            task = %HoprLibProcesses::SessionServer,
                             "long-running background task finished"
                         ))
                 ),
@@ -1037,7 +1037,10 @@ impl Hopr {
                     },
                     "flush the states of outgoing ticket indices".into(),
                 ))
-                .inspect(|_| tracing::warn!(task = "ticket index flush", "long-running background task finished"))
+                .inspect(|_| tracing::warn!(
+                    task = %HoprLibProcesses::TicketIndexFlush,
+                    "long-running background task finished"
+                ))
             ),
         );
 
@@ -1070,7 +1073,9 @@ impl Hopr {
                     },
                     "run strategies".into(),
                 )
-                .inspect(|_| tracing::warn!(task = "strategy tick", "long-running background task finished"))
+                .inspect(
+                    |_| tracing::warn!(task = %HoprLibProcesses::StrategyTick, "long-running background task finished")
+                )
             ),
         );
 

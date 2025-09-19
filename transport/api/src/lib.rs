@@ -544,7 +544,7 @@ where
         processes.insert(
             HoprTransportProcess::Medium,
             spawn_as_abortable!(transport_layer.run(transport_events_tx).inspect(|_| tracing::warn!(
-                task = "p2p transport event dispatch",
+                task = %HoprTransportProcess::Medium,
                 "long-running background task finished"
             ))),
         );
@@ -671,7 +671,10 @@ where
                 })
                 .map(Ok)
                 .forward(on_incoming_data)
-                .inspect(|_| tracing::warn!(task = "session management", "long-running background task finished"))
+                .inspect(|_| tracing::warn!(
+                    task = %HoprTransportProcess::SessionsManagement(0),
+                    "long-running background task finished"
+                ))
             ),
         );
 

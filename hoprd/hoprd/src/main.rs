@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-use futures::{StreamExt, future::AbortHandle};
+use futures::{FutureExt, StreamExt, future::AbortHandle};
 use hopr_lib::{HoprKeys, HoprLibProcesses, IdentityRetrievalModes, ToHex};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{ListenerJoinHandles, RestApiParameters, serve_api};
@@ -243,6 +243,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     error!(error = %e, "the REST API server could not start")
                 }
             }
+            .inspect(|_| tracing::warn!(task = "hoprd - REST API", "long-running background task finished"))
         )));
     }
 

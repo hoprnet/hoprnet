@@ -225,7 +225,7 @@ impl Probe {
                             };
                         }
                     })
-                    .inspect(|_| tracing::warn!(task = "probe - generate outgoing", "long-running background task finished"))
+                    .inspect(|_| tracing::warn!(task = "transport (probe - generate outgoing)", "long-running background task finished"))
                     .await;
             })
         );
@@ -291,7 +291,7 @@ impl Probe {
                         }
                     }
                 }
-            }).inspect(|_| tracing::warn!(task = "probe - processing incoming", "long-running background task finished")))
+            }).inspect(|_| tracing::warn!(task = "transport (probe - processing incoming)", "long-running background task finished")))
         );
 
         processes
