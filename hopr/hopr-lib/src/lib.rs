@@ -33,8 +33,8 @@ use std::{
 use async_lock::RwLock;
 use errors::{HoprLibError, HoprStatusError};
 use futures::{
-    SinkExt, Stream, StreamExt,
-    channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
+    FutureExt, SinkExt, Stream, StreamExt,
+    channel::mpsc::{Receiver, Sender, channel},
     future::AbortHandle,
     stream::{self},
 };
@@ -333,13 +333,18 @@ where
 ///
 /// Provides a read and write stream for Hopr socket recognized data formats.
 pub struct HoprSocket {
-    rx: UnboundedReceiver<ApplicationDataIn>,
-    tx: UnboundedSender<ApplicationDataIn>,
+    rx: Receiver<ApplicationDataIn>,
+    tx: Sender<ApplicationDataIn>,
 }
 
 impl Default for HoprSocket {
     fn default() -> Self {
-        let (tx, rx) = unbounded::<ApplicationDataIn>();
+        let channel_capacity = std::env::var("HOPR_INTERNAL_RAW_SOCKET_LIKE_CHANNEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(16_384);
+
+        let (tx, rx) = channel::<ApplicationDataIn>(channel_capacity);
         Self { rx, tx }
     }
 }
@@ -349,11 +354,11 @@ impl HoprSocket {
         Self::default()
     }
 
-    pub fn reader(self) -> UnboundedReceiver<ApplicationDataIn> {
+    pub fn reader(self) -> Receiver<ApplicationDataIn> {
         self.rx
     }
 
-    pub fn writer(&self) -> UnboundedSender<ApplicationDataIn> {
+    pub fn writer(&self) -> Sender<ApplicationDataIn> {
         self.tx.clone()
     }
 }
@@ -698,7 +703,13 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
-        let (mut indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
+        let chain_discovery_events_capacity = std::env::var("HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(2048);
+
+        let (mut indexer_peer_update_tx, indexer_peer_update_rx) =
+            futures::channel::mpsc::channel::<PeerDiscovery>(chain_discovery_events_capacity);
 
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),
@@ -747,16 +758,19 @@ impl Hopr {
         }
 
         spawn(async move {
-            indexer_event_pipeline
+            let result = indexer_event_pipeline
                 .map(Ok)
                 .forward(indexer_peer_update_tx)
-                .await
-                .expect("The index to transport event chain failed");
+                .inspect(|result| {
+                    tracing::warn!(
+                        ?result,
+                        task = "indexer -> transport",
+                        "long-running background task finished"
+                    )
+                })
+                .await;
 
-            tracing::info!(
-                task = "indexer pipeline for transport",
-                "long-running background task finished"
-            )
+            result.expect("The index to transport event chain failed")
         });
 
         info!("Start the chain process and sync the indexer");
@@ -933,7 +947,13 @@ impl Hopr {
 
         // notifier on acknowledged ticket reception
         let multi_strategy_ack_ticket = self.multistrategy.clone();
-        let (on_ack_tkt_tx, mut on_ack_tkt_rx) = unbounded::<AcknowledgedTicket>();
+
+        let ack_ticket_channel_capacity = std::env::var("HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(2048);
+
+        let (on_ack_tkt_tx, mut on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
         self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
         processes.insert(
@@ -949,32 +969,49 @@ impl Hopr {
                         error!(%error, "Failed to process acknowledged winning ticket with the strategy");
                     }
                 }
+
+                tracing::warn!(
+                    task = %HoprLibProcesses::OnReceivedAcknowledgement,
+                    "long-running background task finished"
+                )
             }),
         );
 
-        let (session_tx, _session_rx) = unbounded::<IncomingSession>();
+        let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(256);
+
+        let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
 
         #[cfg(feature = "session-server")]
         {
             processes.insert(
                 HoprLibProcesses::SessionServer,
-                hopr_async_runtime::spawn_as_abortable!(_session_rx.for_each_concurrent(None, move |session| {
-                    let serve_handler = serve_handler.clone();
-                    async move {
-                        let session_id = *session.session.id();
-                        match serve_handler.process(session).await {
-                            Ok(_) => debug!(
-                                session_id = ?session_id,
-                                "Client session processed successfully"
-                            ),
-                            Err(e) => error!(
-                                session_id = ?session_id,
-                                error = %e,
-                                "Client session processing failed"
-                            ),
-                        }
-                    }
-                })),
+                hopr_async_runtime::spawn_as_abortable!(
+                    _session_rx
+                        .for_each_concurrent(None, move |session| {
+                            let serve_handler = serve_handler.clone();
+                            async move {
+                                let session_id = *session.session.id();
+                                match serve_handler.process(session).await {
+                                    Ok(_) => debug!(
+                                        session_id = ?session_id,
+                                        "Client session processed successfully"
+                                    ),
+                                    Err(e) => error!(
+                                        session_id = ?session_id,
+                                        error = %e,
+                                        "Client session processing failed"
+                                    ),
+                                }
+                            }
+                        })
+                        .inspect(|_| tracing::warn!(
+                            task = %HoprLibProcesses::SessionServer,
+                            "long-running background task finished"
+                        ))
+                ),
             );
         }
 
@@ -990,19 +1027,25 @@ impl Hopr {
         let db_clone = self.db.clone();
         processes.insert(
             HoprLibProcesses::TicketIndexFlush,
-            hopr_async_runtime::spawn_as_abortable!(Box::pin(execute_on_tick(
-                Duration::from_secs(5),
-                move || {
-                    let db_clone = db_clone.clone();
-                    async move {
-                        match db_clone.persist_outgoing_ticket_indices().await {
-                            Ok(n) => debug!(count = n, "Successfully flushed states of outgoing ticket indices"),
-                            Err(e) => error!(error = %e, "Failed to flush ticket indices"),
+            hopr_async_runtime::spawn_as_abortable!(
+                Box::pin(execute_on_tick(
+                    Duration::from_secs(5),
+                    move || {
+                        let db_clone = db_clone.clone();
+                        async move {
+                            match db_clone.persist_outgoing_ticket_indices().await {
+                                Ok(n) => debug!(count = n, "Successfully flushed states of outgoing ticket indices"),
+                                Err(e) => error!(error = %e, "Failed to flush ticket indices"),
+                            }
                         }
-                    }
-                },
-                "flush the states of outgoing ticket indices".into(),
-            ))),
+                    },
+                    "flush the states of outgoing ticket indices".into(),
+                ))
+                .inspect(|_| tracing::warn!(
+                    task = %HoprLibProcesses::TicketIndexFlush,
+                    "long-running background task finished"
+                ))
+            ),
         );
 
         // NOTE: after the chain is synced, we can reset tickets which are considered
@@ -1020,7 +1063,7 @@ impl Hopr {
         let strategy_interval = self.cfg.strategy.execution_interval;
         processes.insert(
             HoprLibProcesses::StrategyTick,
-            hopr_async_runtime::spawn_as_abortable!(async move {
+            hopr_async_runtime::spawn_as_abortable!(
                 execute_on_tick(
                     Duration::from_secs(strategy_interval),
                     move || {
@@ -1034,8 +1077,10 @@ impl Hopr {
                     },
                     "run strategies".into(),
                 )
-                .await;
-            }),
+                .inspect(
+                    |_| tracing::warn!(task = %HoprLibProcesses::StrategyTick, "long-running background task finished")
+                )
+            ),
         );
 
         self.state.store(HoprState::Running, Ordering::Relaxed);

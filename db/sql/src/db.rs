@@ -5,7 +5,6 @@ use std::{
     time::Duration,
 };
 
-use futures::channel::mpsc::UnboundedSender;
 use hopr_crypto_types::{keypairs::Keypair, prelude::ChainKeypair};
 use hopr_db_entity::{
     prelude::{Account, Announcement},
@@ -322,7 +321,11 @@ impl HoprDb {
     ///
     /// If the notifier is given, it will receive notifications once new ticket has been
     /// persisted into the Tickets DB.
-    pub fn start_ticket_processing(&self, ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>) -> Result<()> {
+    pub fn start_ticket_processing<S>(&self, ticket_notifier: Option<S>) -> Result<()>
+    where
+        S: futures::Sink<AcknowledgedTicket> + Send + 'static,
+        S::Error: std::fmt::Display + std::error::Error,
+    {
         if let Some(notifier) = ticket_notifier {
             self.ticket_manager.start_ticket_processing(notifier)
         } else {
