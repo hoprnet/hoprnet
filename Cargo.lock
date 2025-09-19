@@ -4821,7 +4821,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5064,7 +5064,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5157,7 +5157,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5301,7 +5301,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -5391,7 +5391,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.13.1"
+version = "0.13.2"
 dependencies = [
  "anyhow",
  "arrayvec",
