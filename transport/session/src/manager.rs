@@ -502,7 +502,7 @@ where
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(128);
+        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;

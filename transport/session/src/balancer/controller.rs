@@ -293,7 +293,9 @@ where
                     // Perform controller update (this internally samples the SurbFlowEstimator)
                     // and send an update about the current level to the outgoing stream
                     let level = self.update(current_cfg.surb_decay.as_ref());
-                    let _ = level_tx.try_send(level);
+                    if let Err(error) = level_tx.try_send(level) {
+                        tracing::error!(%error, "cannot send balancer level update");
+                    }
 
                     // See if the setpoint has been updated at the controller as a result
                     // of the update step, because some controllers (such as the SimpleBalancerController)
