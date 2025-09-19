@@ -409,6 +409,7 @@ pub struct SessionManagerConfig {
 /// See the `growable_target_surb_buffer` field in the [`SessionManagerConfig`] for details.
 pub struct SessionManager<S, T> {
     session_initiations: SessionInitiationCache,
+    #[allow(clippy::type_complexity)]
     session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
