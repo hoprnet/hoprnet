@@ -122,7 +122,6 @@ libp2p-identity = { version = "0.2.12", features = [
   "rand",
 ] }
 libp2p-stream = { version = "0.4.0-alpha" }
-mimalloc = "0.1.48"
 mockall = "0.13.1"
 mockito = "1.7.0"
 moka = { version = "0.12.10", features = ["future"] }
@@ -218,6 +217,7 @@ uuid = { version = "1.18.1" }
 url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
+tikv-jemallocator = "0.6.0"
 
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }

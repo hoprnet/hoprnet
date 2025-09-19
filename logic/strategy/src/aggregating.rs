@@ -318,7 +318,7 @@ mod tests {
     use std::{pin::pin, sync::Arc, time::Duration};
 
     use anyhow::Context;
-    use futures::{FutureExt, StreamExt, pin_mut};
+    use futures::{FutureExt, StreamExt, channel::mpsc::Sender, pin_mut};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
@@ -643,7 +643,7 @@ mod tests {
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
 
-        db_bob.start_ticket_processing(None)?;
+        db_bob.start_ticket_processing::<Sender<AcknowledgedTicket>>(None)?;
 
         const NUM_TICKETS: usize = 4;
         let (mut acked_tickets, mut channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await?;
@@ -749,7 +749,7 @@ mod tests {
         init_db(db_alice.clone()).await?;
         init_db(db_bob.clone()).await?;
 
-        db_bob.start_ticket_processing(None)?;
+        db_bob.start_ticket_processing::<Sender<AcknowledgedTicket>>(None)?;
 
         const NUM_TICKETS: usize = 1;
         let (_, channel) = populate_db_with_ack_tickets(db_bob.clone(), NUM_TICKETS).await?;

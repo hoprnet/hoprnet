@@ -15,7 +15,7 @@ use alloy::{
 };
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use futures::future::AbortHandle;
+use futures::{FutureExt, future::AbortHandle};
 use hopr_async_runtime::{prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
@@ -249,7 +249,10 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         processes.insert(
             HoprChainProcess::OutgoingOnchainActionQueue,
-            spawn_as_abortable!(self.action_queue.clone().start()),
+            spawn_as_abortable!(self.action_queue.clone().start().inspect(|_| tracing::warn!(
+                task = "action queue - outgoing",
+                "long-running background task finished"
+            ))),
         );
         processes.insert(
             HoprChainProcess::Indexer,
