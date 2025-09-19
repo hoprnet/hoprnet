@@ -229,10 +229,11 @@ impl HoprNodeDb {
     ///
     /// If the notifier is given, it will receive notifications once a new ticket has been
     /// persisted into the Tickets DB.
-    pub fn start_ticket_processing(
-        &self,
-        ticket_notifier: Option<UnboundedSender<AcknowledgedTicket>>,
-    ) -> Result<(), NodeDbError> {
+    pub fn start_ticket_processing<S>(&self, ticket_notifier: Option<S>) -> Result<(), NodeDbError>
+    where
+        S: futures::Sink<AcknowledgedTicket> + Send + 'static,
+        S::Error: std::fmt::Display + std::error::Error,
+    {
         if let Some(notifier) = ticket_notifier {
             self.ticket_manager.start_ticket_processing(notifier)
         } else {

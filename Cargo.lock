@@ -4425,13 +4425,13 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
- "mimalloc",
  "rpassword",
  "serde",
  "serde_json",
  "serde_with",
  "tempfile",
  "thiserror 2.0.16",
+ "tikv-jemallocator",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -4548,7 +4548,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "smart-default",
  "strum 0.27.2",
  "thiserror 2.0.16",
  "validator",
@@ -4695,13 +4694,13 @@ dependencies = [
  "hopr-path",
  "hopr-primitive-types",
  "lazy_static",
- "mimalloc",
  "parameterized",
  "rayon",
  "serde",
  "serde_bytes",
  "strum 0.27.2",
  "thiserror 2.0.16",
+ "tikv-jemallocator",
  "tokio",
  "tracing",
 ]
@@ -4761,7 +4760,6 @@ dependencies = [
  "k256",
  "lazy_static",
  "libp2p-identity",
- "mimalloc",
  "poly1305",
  "primitive-types 0.13.1",
  "secp256k1 0.31.1",
@@ -4771,6 +4769,7 @@ dependencies = [
  "sha3",
  "subtle",
  "thiserror 2.0.16",
+ "tikv-jemallocator",
  "typenum",
  "zeroize",
 ]
@@ -5081,7 +5080,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5104,7 +5103,6 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-protocol-app",
  "lazy_static",
- "mimalloc",
  "mockall",
  "parameterized",
  "parking_lot",
@@ -5117,6 +5115,7 @@ dependencies = [
  "strum 0.27.2",
  "test-log",
  "thiserror 2.0.16",
+ "tikv-jemallocator",
  "tokio",
  "tokio-util",
  "tracing",
@@ -5138,7 +5137,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.15.1"
+version = "0.15.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5173,7 +5172,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5317,7 +5316,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -5409,7 +5408,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.13.1"
+version = "0.13.2"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5430,7 +5429,6 @@ dependencies = [
  "hopr-protocol-session",
  "hopr-protocol-start",
  "lazy_static",
- "mimalloc",
  "mockall",
  "moka",
  "pid",
@@ -5443,6 +5441,7 @@ dependencies = [
  "strum 0.27.2",
  "test-log",
  "thiserror 2.0.16",
+ "tikv-jemallocator",
  "tokio",
  "tracing",
 ]
@@ -5467,7 +5466,6 @@ dependencies = [
  "hopr-platform",
  "hoprd-api",
  "lazy_static",
- "mimalloc",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
@@ -5479,7 +5477,10 @@ dependencies = [
  "signal-hook",
  "smart-default",
  "tempfile",
+ "test-log",
  "thiserror 2.0.16",
+ "tikv-jemalloc-ctl",
+ "tikv-jemallocator",
  "tokio",
  "tokio-retry",
  "tracing",
@@ -6244,16 +6245,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
-name = "libmimalloc-sys"
-version = "0.1.44"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "667f4fec20f29dfc6bc7357c582d91796c169ad7e2fce709468aefeb2c099870"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
 name = "libp2p"
 version = "0.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6773,15 +6764,6 @@ dependencies = [
  "keccak",
  "rand_core 0.6.4",
  "zeroize",
-]
-
-[[package]]
-name = "mimalloc"
-version = "0.1.48"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1ee66a4b64c74f4ef288bcbb9192ad9c3feaad75193129ac8509af543894fd8"
-dependencies = [
- "libmimalloc-sys",
 ]
 
 [[package]]
@@ -9966,6 +9948,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d050e60b33d41c19108b32cea32164033a9013fe3b46cbd4457559bfbf77afaa"
 dependencies = [
  "num_cpus",
+]
+
+[[package]]
+name = "tikv-jemalloc-ctl"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f21f216790c8df74ce3ab25b534e0718da5a1916719771d3fec23315c99e468b"
+dependencies = [
+ "libc",
+ "paste",
+ "tikv-jemalloc-sys",
+]
+
+[[package]]
+name = "tikv-jemalloc-sys"
+version = "0.6.0+5.3.0-1-ge13ca993e8ccb9ba9847cc330696e02839f328f7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd3c60906412afa9c2b5b5a48ca6a5abe5736aec9eb48ad05037a677e52e4e2d"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
+name = "tikv-jemallocator"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cec5ff18518d81584f477e9bfdf957f5bb0979b0bac3af4ca30b5b3ae2d2865"
+dependencies = [
+ "libc",
+ "tikv-jemalloc-sys",
 ]
 
 [[package]]
