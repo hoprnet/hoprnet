@@ -19,7 +19,7 @@ concurrency:
 jobs:
   cargo-audit:
     name: Audit
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
@@ -33,18 +33,6 @@ jobs:
           persist-credentials: false
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@7be5dee1421f63d07e71ce6e0a9f8a4b07c2a487 # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
 
       - name: Run Audit
         run: nix run .#audit
