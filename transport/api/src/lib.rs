@@ -32,8 +32,7 @@ use std::{
 use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
-    FutureExt, SinkExt, StreamExt,
-    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
+    channel::mpsc::{self, unbounded, SendError, Sender}, FutureExt, SinkExt, StreamExt
 };
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
@@ -195,7 +194,7 @@ where
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>>,
+    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
 }
 
 impl<T> HoprTransport<T>
@@ -278,13 +277,17 @@ where
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
-    pub async fn run(
+    pub async fn run<S1, S2>(
         &self,
         me_onchain: &ChainKeypair,
-        on_incoming_data: UnboundedSender<ApplicationDataIn>,
-        discovery_updates: UnboundedReceiver<PeerDiscovery>,
-        on_incoming_session: UnboundedSender<IncomingSession>,
-    ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>> {
+        on_incoming_data: S1,
+        discovery_updates: S2,
+        on_incoming_session: Sender<IncomingSession>,
+    ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>>
+    where
+        S1: futures::Sink<ApplicationDataIn, Error = SendError> + Send + 'static,
+        S2: futures::Stream<Item = PeerDiscovery> + Send + 'static,
+    {
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
             futures::channel::mpsc::unbounded::<PeerDiscovery>();
 

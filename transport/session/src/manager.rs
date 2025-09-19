@@ -5,7 +5,10 @@ use std::{
 };
 
 use futures::{
-    FutureExt, SinkExt, StreamExt, TryStreamExt, channel::mpsc::UnboundedSender, future::AbortHandle, pin_mut,
+    FutureExt, SinkExt, StreamExt, TryStreamExt,
+    channel::mpsc::{Sender, UnboundedSender},
+    future::AbortHandle,
+    pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
 use hopr_crypto_random::Randomizable;
@@ -162,12 +165,6 @@ pub enum DispatchResult {
     /// The message was not related to Start or Session protocol.
     Unrelated(ApplicationDataIn),
 }
-
-/// Incoming session notifier and session closure notifier
-type SessionNotifiers = (
-    UnboundedSender<IncomingSession>,
-    UnboundedSender<(SessionId, ClosureReason)>,
-);
 
 /// Configuration for the [`SessionManager`].
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault)]
@@ -410,15 +407,15 @@ pub struct SessionManagerConfig {
 /// over some given time period, the Exit can decide to increase the initial hint to the newly observed value.
 ///
 /// See the `growable_target_surb_buffer` field in the [`SessionManagerConfig`] for details.
-pub struct SessionManager<S> {
+pub struct SessionManager<S, T> {
     session_initiations: SessionInitiationCache,
-    session_notifiers: Arc<OnceLock<SessionNotifiers>>,
+    session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
 }
 
-impl<S> Clone for SessionManager<S> {
+impl<S, T> Clone for SessionManager<S, T> {
     fn clone(&self) -> Self {
         Self {
             session_initiations: self.session_initiations.clone(),
@@ -430,10 +427,17 @@ impl<S> Clone for SessionManager<S> {
     }
 }
 
-impl<S> SessionManager<S>
+impl<S, T> SessionManager<S, T>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
+    T: futures::Sink<IncomingSession, Error = futures::channel::mpsc::SendError>
+        + Unpin
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    T::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
     /// Creates a new instance given the [`config`](SessionManagerConfig).
     pub fn new(mut cfg: SessionManagerConfig) -> Self {
@@ -492,16 +496,12 @@ where
     ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
-    pub fn start(
-        &self,
-        msg_sender: S,
-        new_session_notifier: UnboundedSender<IncomingSession>,
-    ) -> crate::errors::Result<Vec<AbortHandle>> {
+    pub fn start(&self, msg_sender: S, new_session_notifier: T) -> crate::errors::Result<Vec<AbortHandle>> {
         self.msg_sender
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (session_close_tx, session_close_rx) = futures::channel::mpsc::unbounded();
+        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(128);
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -691,10 +691,10 @@ where
                     .session_notifiers
                     .get()
                     .map(|(_, notifier)| {
-                        let notifier = notifier.clone();
+                        let mut notifier = notifier.clone();
                         Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             let _ = notifier
-                                .unbounded_send((session_id, reason))
+                                .try_send((session_id, reason))
                                 .inspect_err(|error| error!(%session_id, %error, "failed to notify session closure"));
                         })
                     })
@@ -1016,7 +1016,7 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (new_session_notifier, close_session_notifier) = self
+        let (mut new_session_notifier, mut close_session_notifier) = self
             .session_notifiers
             .get()
             .cloned()
@@ -1065,7 +1065,7 @@ where
             debug!(%session_id, ?session_req, "assigned a new session");
 
             let closure_notifier = Box::new(move |session_id: SessionId, reason: ClosureReason| {
-                if let Err(error) = close_session_notifier.unbounded_send((session_id, reason)) {
+                if let Err(error) = close_session_notifier.try_send((session_id, reason)) {
                     error!(%session_id, %error, %reason, "failed to notify session closure");
                 }
             });
@@ -1214,8 +1214,8 @@ where
             };
 
             // Notify that a new incoming session has been created
-            if let Err(error) = new_session_notifier.unbounded_send(incoming_session) {
-                warn!(%error, "failed to send session to incoming session queue");
+            if let Err(error) = new_session_notifier.send(incoming_session).await {
+                tracing::error!(%session_id, %error, "failed to notify about new incoming session");
             }
 
             trace!(?session_id, "session notification sent");
@@ -1502,11 +1502,11 @@ mod tests {
         let mut ahs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
         ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -1651,11 +1651,11 @@ mod tests {
         let mut ahs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
         ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -1717,8 +1717,10 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr =
-            SessionManager::<UnboundedSender<(DestinationRouting, ApplicationDataOut)>>::new(Default::default());
+        let alice_mgr = SessionManager::<
+            UnboundedSender<(DestinationRouting, ApplicationDataOut)>,
+            futures::channel::mpsc::Sender<IncomingSession>,
+        >::new(Default::default());
 
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         alice_mgr
@@ -1845,11 +1847,11 @@ mod tests {
         let mut jhs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
         jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let result = alice_mgr
@@ -1961,11 +1963,11 @@ mod tests {
         let mut jhs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
         jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let result = alice_mgr
@@ -2053,7 +2055,7 @@ mod tests {
             });
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
 
         let alice_session = alice_mgr
@@ -2106,11 +2108,11 @@ mod tests {
             .returning(|_, _| Box::pin(async { Ok(()) }));
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
 
         // Start Bob
-        let (new_session_tx_bob, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
         bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?;
 
         let result = alice_mgr
@@ -2257,11 +2259,11 @@ mod tests {
         let mut ahs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
         ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::unbounded();
+        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
         ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);

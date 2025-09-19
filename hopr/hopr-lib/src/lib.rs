@@ -34,7 +34,7 @@ use async_lock::RwLock;
 use errors::{HoprLibError, HoprStatusError};
 use futures::{
     SinkExt, Stream, StreamExt,
-    channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
+    channel::mpsc::{Receiver, Sender, channel},
     future::AbortHandle,
     stream::{self},
 };
@@ -333,13 +333,18 @@ where
 ///
 /// Provides a read and write stream for Hopr socket recognized data formats.
 pub struct HoprSocket {
-    rx: UnboundedReceiver<ApplicationDataIn>,
-    tx: UnboundedSender<ApplicationDataIn>,
+    rx: Receiver<ApplicationDataIn>,
+    tx: Sender<ApplicationDataIn>,
 }
 
 impl Default for HoprSocket {
     fn default() -> Self {
-        let (tx, rx) = unbounded::<ApplicationDataIn>();
+        let channel_capacity = std::env::var("HOPR_INTERNAL_RAW_SOCKET_LIKE_CHANNEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(16_384);
+
+        let (tx, rx) = channel::<ApplicationDataIn>(channel_capacity);
         Self { rx, tx }
     }
 }
@@ -349,11 +354,11 @@ impl HoprSocket {
         Self::default()
     }
 
-    pub fn reader(self) -> UnboundedReceiver<ApplicationDataIn> {
+    pub fn reader(self) -> Receiver<ApplicationDataIn> {
         self.rx
     }
 
-    pub fn writer(&self) -> UnboundedSender<ApplicationDataIn> {
+    pub fn writer(&self) -> Sender<ApplicationDataIn> {
         self.tx.clone()
     }
 }
@@ -929,7 +934,13 @@ impl Hopr {
 
         // notifier on acknowledged ticket reception
         let multi_strategy_ack_ticket = self.multistrategy.clone();
-        let (on_ack_tkt_tx, mut on_ack_tkt_rx) = unbounded::<AcknowledgedTicket>();
+
+        let ack_ticket_channel_capacity = std::env::var("HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(2048);
+
+        let (on_ack_tkt_tx, mut on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
         self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
         processes.insert(
@@ -948,7 +959,12 @@ impl Hopr {
             }),
         );
 
-        let (session_tx, _session_rx) = unbounded::<IncomingSession>();
+        let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(256);
+
+        let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
 
         #[cfg(feature = "session-server")]
         {
