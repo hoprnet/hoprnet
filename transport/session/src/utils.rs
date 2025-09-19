@@ -146,11 +146,11 @@ where
             })
             .then(move |res| {
                 match res {
-                    Ok(_) => tracing::info!(
+                    Ok(_) => tracing::trace!(
                         component = "session",
                         %session_id,
-                        task = "transport event notifier",
-                        "long-running background task finished"
+                        task = "session keepalive",
+                        "background task finished"
                     ),
                     Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
                 }
