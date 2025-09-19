@@ -104,7 +104,7 @@ test-log = { workspace = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.0"
+tikv-jemallocator = { version = "0.6.0", features = ["profiling"] }
 tikv-jemalloc-ctl = { version = "0.6.0", features = ["stats"], optional = true }
 
 [build-dependencies]
