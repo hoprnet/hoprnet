@@ -265,6 +265,10 @@ where
             .and_then(|s| s.parse().ok())
             .unwrap_or(32_768);
 
+        tracing::debug!(
+            "Creating session balancer level channel with capacity: {}",
+            balancer_level_capacity
+        );
         let (mut level_tx, level_rx) = futures::channel::mpsc::channel(balancer_level_capacity);
         hopr_async_runtime::prelude::spawn(
             async move {

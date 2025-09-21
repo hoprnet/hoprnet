@@ -289,11 +289,24 @@ where
         S1: futures::Sink<ApplicationDataIn, Error = SendError> + Send + 'static,
         S2: futures::Stream<Item = PeerDiscovery> + Send + 'static,
     {
+        info!("Loading initial peers from the storage");
+        let mut addresses: HashSet<Multiaddr> = HashSet::new();
+        let nodes = self.get_public_nodes().await?;
+
+        // Calculate the minimum capacity based on public nodes (each node can generate 2 messages)
+        // plus 100 as additional buffer
+        let minimum_capacity = (nodes.len() * 2) + 100;
+
         let internal_discovery_updates_capacity = std::env::var("HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY")
             .ok()
             .and_then(|s| s.parse().ok())
-            .unwrap_or(2048);
+            .unwrap_or(2048)
+            .max(minimum_capacity);
 
+        debug!(
+            "Creating internal discovery updates channel with capacity: {} (minimum required: {})",
+            internal_discovery_updates_capacity, minimum_capacity
+        );
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
 
@@ -388,10 +401,6 @@ where
                     }
                 });
 
-        info!("Loading initial peers from the storage");
-
-        let mut addresses: HashSet<Multiaddr> = HashSet::new();
-        let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
             if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
@@ -567,6 +576,10 @@ where
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(16_384);
 
+        debug!(
+            "Creating protocol bidirectional channel with capacity: {}",
+            msg_protocol_bidirectional_channel_capacity
+        );
         let (tx_from_protocol, rx_from_protocol) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
@@ -588,6 +601,10 @@ where
         }
 
         // -- network probing
+        debug!(
+            "Creating probing channel with capacity: {} (same as protocol bidirectional)",
+            msg_protocol_bidirectional_channel_capacity
+        );
         let (tx_from_probing, rx_from_probing) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
@@ -595,6 +612,10 @@ where
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(128);
+        debug!(
+            "Creating manual ping channel with capacity: {}",
+            manual_ping_channel_capacity
+        );
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
@@ -1020,13 +1041,17 @@ fn build_mixer_cfg_from_env() -> MixerConfig {
                 })
                 .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
         ),
-        capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-            .map(|v| {
-                v.trim()
-                    .parse::<usize>()
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
-            })
-            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
+        capacity: {
+            let capacity = std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
+                .map(|v| {
+                    v.trim()
+                        .parse::<usize>()
+                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
+                })
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY);
+            debug!("Setting mixer capacity: {}", capacity);
+            capacity
+        },
         ..MixerConfig::default()
     };
     debug!(?mixer_cfg, "Mixer configuration");

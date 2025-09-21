@@ -238,6 +238,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             .and_then(|s| s.parse().ok())
             .unwrap_or(2048);
 
+        tracing::debug!(
+            "Creating session control channel with capacity: {}",
+            ctl_channel_capacity
+        );
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(ctl_channel_capacity);
         state.run(SocketComponents {
             inspector: Some(inspector.clone()),

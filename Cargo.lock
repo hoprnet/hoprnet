@@ -5064,7 +5064,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5157,7 +5157,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.13.3"
+version = "0.13.4"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5391,7 +5391,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.13.2"
+version = "0.13.3"
 dependencies = [
  "anyhow",
  "arrayvec",

@@ -344,6 +344,7 @@ impl Default for HoprSocket {
             .and_then(|s| s.parse().ok())
             .unwrap_or(16_384);
 
+        debug!("Creating HoprSocket channel with capacity: {}", channel_capacity);
         let (tx, rx) = channel::<ApplicationDataIn>(channel_capacity);
         Self { rx, tx }
     }
@@ -703,11 +704,23 @@ impl Hopr {
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
+        // Get the accounts first to determine the minimum capacity needed
+        let accounts = self.db.get_accounts(None, true).await?;
+
+        // Calculate the minimum capacity based on accounts (each account can generate 2 messages),
+        // plus 100 as additional buffer
+        let minimum_capacity = (accounts.len() * 2) + 100;
+
         let chain_discovery_events_capacity = std::env::var("HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY")
             .ok()
             .and_then(|s| s.parse().ok())
-            .unwrap_or(2048);
+            .unwrap_or(2048)
+            .max(minimum_capacity);
 
+        debug!(
+            "Creating chain discovery events channel with capacity: {} (minimum required: {})",
+            chain_discovery_events_capacity, minimum_capacity
+        );
         let (mut indexer_peer_update_tx, indexer_peer_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(chain_discovery_events_capacity);
 
@@ -722,10 +735,8 @@ impl Hopr {
         .await;
 
         {
-            // This has to happen before the indexing process starts in order to make sure that the pre-existing data is
-            // properly populated into the transport mechanism before the synced data in the follow up process.
+            // Process the pre-existing accounts into the channel
             info!("Syncing peer announcements and network registry updates from previous runs");
-            let accounts = self.db.get_accounts(None, true).await?;
             for account in accounts.into_iter() {
                 match account.entry_type {
                     AccountType::NotAnnounced => {}
@@ -949,6 +960,10 @@ impl Hopr {
             .and_then(|s| s.parse().ok())
             .unwrap_or(2048);
 
+        debug!(
+            "Creating acknowledged ticket channel with capacity: {}",
+            ack_ticket_channel_capacity
+        );
         let (on_ack_tkt_tx, mut on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
         self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
@@ -978,6 +993,10 @@ impl Hopr {
             .and_then(|s| s.parse().ok())
             .unwrap_or(256);
 
+        debug!(
+            "Creating incoming session channel with capacity: {}",
+            incoming_session_channel_capacity
+        );
         let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
 
         #[cfg(feature = "session-server")]
