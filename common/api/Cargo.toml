@@ -17,6 +17,7 @@ strum = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true }
+hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-platform = { workspace = true }

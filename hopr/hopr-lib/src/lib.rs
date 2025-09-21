@@ -112,14 +112,13 @@ lazy_static::lazy_static! {
 pub use async_trait::async_trait;
 use hopr_api::{
     chain::{
-        AccountSelector, AnnouncementError, ChainKeyOperations, ChainMiscOperations, ChainReadAccountOperations,
-        ChainReadChannelOperations, ChainReadTicketOperations, ChainWriteAccountOperations,
+        AccountSelector, AnnouncementError, ChainEventType, ChainEvents, ChainKeyOperations, ChainMiscOperations,
+        ChainReadAccountOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainWriteAccountOperations,
         ChainWriteChannelOperations, ChainWriteTicketOperations, ChannelSelector,
     },
-    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus},
+    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus, TicketSelector},
 };
-use hopr_chain_types::chain_events::ChainEventType;
-use hopr_chain_types::ContractAddresses;
+use hopr_chain_types::{ContractAddresses, actions::Action};
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_db_sql::{HoprIndexerDb, HoprIndexerDbConfig};
 
@@ -207,12 +206,12 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
 /// * `preloading_event_stream` - a stream used by the components to preload the data from the objects (db, channel
 ///   graph...)
 #[allow(clippy::too_many_arguments)]
-async fn chain_events_to_transport_events<StreamIn, Db>(
+fn chain_events_to_transport_events<StreamIn>(
     event_stream: StreamIn,
     me_onchain: Address,
     multi_strategy: Arc<MultiStrategy>,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
-    indexer_action_tracker: Arc<IndexerActionTracker>,
+    db: HoprNodeDb,
 ) -> impl Stream<Item = PeerDiscovery> + Send + 'static
 where
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
@@ -222,73 +221,66 @@ where
             .filter_map(move |event| {
                 let multi_strategy = multi_strategy.clone();
                 let channel_graph = channel_graph.clone();
-                let indexer_action_tracker = indexer_action_tracker.clone();
+                let db = db.clone();
 
                 async move {
-                    let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-                    if resolved.is_empty() {
-                        trace!(%event, "No indexer expectations resolved for the event");
-                    } else {
-                        debug!(count = resolved.len(), %event, "resolved indexer expectations");
-                    }
-
                     match event.event_type {
-                ChainEventType::Announcement{peer, address, multiaddresses} => {
-                    Some(vec![PeerDiscovery::Announce(peer, multiaddresses), PeerDiscovery::Allow(peer)])
-                }
-                ChainEventType::ChannelOpened(channel) |
-                ChainEventType::ChannelClosureInitiated(channel) |
-                ChainEventType::ChannelClosed(channel) |
-                ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
-                ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
-                ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
-                    let maybe_direction = channel.direction(&me_onchain);
+                        ChainEventType::Announcement{peer, multiaddresses, ..} => {
+                            Some(vec![PeerDiscovery::Announce(peer, multiaddresses), PeerDiscovery::Allow(peer)])
+                        }
+                        ChainEventType::ChannelOpened(channel) |
+                        ChainEventType::ChannelClosureInitiated(channel) |
+                        ChainEventType::ChannelClosed(channel) |
+                        ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
+                        ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
+                        ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
+                            let maybe_direction = channel.direction(&me_onchain);
 
-                    let change = channel_graph
-                        .write_arc()
-                        .await
-                        .update_channel(channel);
+                            let change = channel_graph
+                                .write_arc()
+                                .await
+                                .update_channel(channel);
 
-                    // TODO: (dbmig) invalidate unrealized balance on the channel ID + Epoch
+                            db.invalidate_unrealized_value(&channel).await;
 
-                    // Check if this is our own channel
-                    if let Some(own_channel_direction) = maybe_direction {
-                        if let Some(change_set) = change {
-                            for channel_change in change_set {
-                                let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
-                                    &*multi_strategy,
-                                    &channel,
-                                    own_channel_direction,
-                                    channel_change,
-                                )
-                                .await;
+                            // Check if this is our own channel
+                            if let Some(own_channel_direction) = maybe_direction {
+                                if let Some(change_set) = change {
+                                    for channel_change in change_set {
+                                        let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
+                                            &*multi_strategy,
+                                            &channel,
+                                            own_channel_direction,
+                                            channel_change,
+                                        )
+                                        .await;
+                                    }
+                                } else if channel.status == ChannelStatus::Open {
+                                    // Emit Opening event if the channel did not exist before in the graph
+                                    let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
+                                        &*multi_strategy,
+                                        &channel,
+                                        own_channel_direction,
+                                        ChannelChange::Status {
+                                            left: ChannelStatus::Closed,
+                                            right: ChannelStatus::Open,
+                                        },
+                                    )
+                                    .await;
+                                }
                             }
-                        } else if channel.status == ChannelStatus::Open {
-                            // Emit Opening event if the channel did not exist before in the graph
-                            let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
-                                &*multi_strategy,
-                                &channel,
-                                own_channel_direction,
-                                ChannelChange::Status {
-                                    left: ChannelStatus::Closed,
-                                    right: ChannelStatus::Open,
-                                },
-                            )
-                            .await;
+
+                            None
+                        }
+                        ChainEventType::NetworkRegistryUpdate(address, allowed) => {
+                            info!(%address, ?allowed, "network registry update received as a no-op");
+                            None
+                        }
+                        ChainEventType::NodeSafeRegistered(safe_address) =>  {
+                            info!(%safe_address, "Node safe registered");
+                            None
                         }
                     }
-
-                    None
-                }
-                ChainEventType::NetworkRegistryUpdate(address, allowed) => {
-                    info!(%address, ?allowed, "network registry update received as a no-op");
-                    None
-                }
-                ChainEventType::NodeSafeRegistered(safe_address) =>  {
-                    info!(%safe_address, "Node safe registered");
-                    None
-                }
-            }
                 }
             })
             .flat_map(stream::iter),
@@ -352,7 +344,6 @@ pub struct Hopr {
     chain_cfg: ChainNetworkConfig,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
-    rx_indexer_significant_events: async_channel::Receiver<SignificantChainEvent>,
 }
 
 impl Hopr {
@@ -425,8 +416,6 @@ impl Hopr {
 
         let my_multiaddresses = vec![multiaddress];
 
-        let (tx_indexer_events, rx_indexer_events) = async_channel::unbounded::<SignificantChainEvent>();
-
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(
             me_onchain.public().to_address(),
             ChannelGraphConfig::default(),
@@ -456,7 +445,6 @@ impl Hopr {
                 logs_snapshot_url: cfg.chain.logs_snapshot_url.clone(),
                 data_directory: cfg.db.data.clone(),
             },
-            tx_indexer_events,
         )?;
 
         let hopr_transport_api = HoprTransport::new(
@@ -515,7 +503,6 @@ impl Hopr {
             chain_cfg: resolved_environment,
             channel_graph,
             multistrategy: multi_strategy,
-            rx_indexer_significant_events: rx_indexer_events,
         })
     }
 
@@ -652,13 +639,12 @@ impl Hopr {
             futures::channel::mpsc::channel::<PeerDiscovery>(chain_discovery_events_capacity);
 
         let indexer_event_pipeline = chain_events_to_transport_events(
-            self.rx_indexer_significant_events.clone(),
+            self.hopr_chain_api.subscribe(),
             self.me_onchain(),
             self.multistrategy.clone(),
             self.channel_graph.clone(),
-            self.hopr_chain_api.action_state(),
-        )
-        .await;
+            self.node_db.clone(),
+        );
 
         let mut public_accounts = Vec::new();
 
@@ -1383,11 +1369,7 @@ impl Hopr {
     ) -> errors::Result<CloseChannelResult> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let (status, tx_hash) = self
-            .hopr_chain_api
-            .close_channel(channel_id, direction)
-            .await?
-            .await?;
+        let (status, tx_hash) = self.hopr_chain_api.close_channel(channel_id, direction).await?.await?;
 
         Ok(CloseChannelResult { tx_hash, status })
     }
@@ -1403,11 +1385,28 @@ impl Hopr {
     ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        // We do not await the on-chain confirmation
-        self.hopr_chain_api
-            .actions_ref()
-            .redeem_all_tickets(min_value.into(), only_aggregated)
+        let mut channels = self
+            .hopr_chain_api
+            .stream_channels(ChannelSelector {
+                counterparty: None,
+                direction: vec![ChannelDirection::Incoming],
+                allowed_states: vec![
+                    ChannelStatusDiscriminants::Open,
+                    ChannelStatusDiscriminants::PendingToClose,
+                ],
+            })
             .await?;
+
+        while let Some(channel) = channels.next().await {
+            let _ = self
+                .hopr_chain_api
+                .redeem_tickets_via_selector(
+                    TicketSelector::from(channel)
+                        .with_amount(min_value.into()..)
+                        .with_aggregated_only(only_aggregated),
+                )
+                .await?;
+        }
 
         Ok(())
     }
@@ -1418,16 +1417,12 @@ impl Hopr {
         min_value: B,
         only_aggregated: bool,
     ) -> errors::Result<()> {
-        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
-
-        // We do not await the on-chain confirmation
-        let _ = self
-            .hopr_chain_api
-            .actions_ref()
-            .redeem_tickets_with_counterparty(counterparty, min_value.into(), only_aggregated)
-            .await?;
-
-        Ok(())
+        self.redeem_tickets_in_channel(
+            &generate_channel_id(counterparty, &self.me_onchain()),
+            min_value,
+            only_aggregated,
+        )
+        .await
     }
 
     pub async fn redeem_tickets_in_channel<B: Into<HoprBalance>>(
@@ -1435,25 +1430,25 @@ impl Hopr {
         channel_id: &Hash,
         min_value: B,
         only_aggregated: bool,
-    ) -> errors::Result<usize> {
+    ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let channel = self.hopr_chain_api.channel_by_id(channel_id).await?;
-        let mut redeem_count = 0;
+        let channel = self
+            .hopr_chain_api
+            .channel_by_id(channel_id)
+            .await?
+            .ok_or(HoprLibError::GeneralError("Channel not found".into()))?;
 
-        if let Some(channel) = channel {
-            if channel.destination == self.hopr_chain_api.me_onchain() {
-                // We do not await the on-chain confirmation
-                redeem_count = self
-                    .hopr_chain_api
-                    .actions_ref()
-                    .redeem_tickets_in_channel(&channel, min_value.into(), only_aggregated)
-                    .await?
-                    .len();
-            }
-        }
+        let _ = self
+            .hopr_chain_api
+            .redeem_tickets_via_selector(
+                TicketSelector::from(channel)
+                    .with_amount(min_value.into()..)
+                    .with_aggregated_only(only_aggregated),
+            )
+            .await?;
 
-        Ok(redeem_count)
+        Ok(())
     }
 
     pub async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> errors::Result<()> {

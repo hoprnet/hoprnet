@@ -5,7 +5,6 @@ use std::{
     sync::{Arc, atomic::AtomicU64},
 };
 
-use async_trait::async_trait;
 use futures::stream::BoxStream;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -37,16 +36,15 @@ impl Display for TicketIndexSelector {
     }
 }
 
-/// Allows selecting multiple tickets (if `index` does not contain a single value)
-/// or a single ticket (with unitary `index`) in the given channel and epoch.
-/// The selection can be further restricted to select ticket only in the given `state`.
+/// Allows selecting tickets via [`HoprDbTicketOperations`].
 #[derive(Clone, Debug)]
 pub struct TicketSelector {
     /// Channel ID and Epoch pairs.
     pub channel_identifiers: Vec<(Hash, U256)>,
     /// If given, will select ticket(s) with the given indices
     /// in the given channel and epoch.
-    /// See [TicketIndexSelector] for possible options.
+    ///
+    /// See [`TicketIndexSelector`] for possible options.
     pub index: TicketIndexSelector,
     /// If given, the tickets are further restricted to the ones with a winning probability
     /// in this range.
@@ -96,7 +94,7 @@ impl TicketSelector {
         }
     }
 
-    /// Allows matching tickets on multiple channels, by adding the given
+    /// Allows matching tickets on multiple channels by adding the given
     /// `channel_id` and `epoch` to the selector.
     ///
     /// This also nullifies any prior effect of any prior calls to [`TicketSelector::with_index`] or
@@ -110,6 +108,7 @@ impl TicketSelector {
     }
 
     /// Sets the selector to match only tickets on the given `channel_id` and `epoch`.
+    ///
     /// This nullifies any prior calls to [`TicketSelector::also_on_channel`].
     pub fn just_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
         let mut ret = self.clone();
@@ -134,6 +133,7 @@ impl TicketSelector {
     }
 
     /// Returns this instance with a ticket index set.
+    ///
     /// This method can be called multiple times to select multiple tickets.
     /// If [`TicketSelector::with_index_range`] was previously called, it will be replaced.
     /// If [`TicketSelector::also_on_channel`] was previously called, its effect will be nullified.
@@ -253,7 +253,8 @@ pub enum TicketMarker {
     Neglected,
 }
 
-#[async_trait]
+/// Database operations for tickets.
+#[async_trait::async_trait]
 pub trait HoprDbTicketOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 

@@ -55,25 +55,6 @@ lazy_static::lazy_static! {
 /// Gathers all the ticket redemption-related on-chain calls.
 #[async_trait]
 pub trait TicketRedeemActions {
-    /// Redeems all redeemable tickets in all channels.
-    async fn redeem_all_tickets(&self, min_value: HoprBalance, only_aggregated: bool) -> Result<Vec<PendingAction>>;
-
-    /// Redeems all redeemable tickets in the incoming channel from the given counterparty.
-    async fn redeem_tickets_with_counterparty(
-        &self,
-        counterparty: &Address,
-        min_value: HoprBalance,
-        only_aggregated: bool,
-    ) -> Result<Vec<PendingAction>>;
-
-    /// Redeems all redeemable tickets in the given channel.
-    async fn redeem_tickets_in_channel(
-        &self,
-        channel: &ChannelEntry,
-        min_value: HoprBalance,
-        only_aggregated: bool,
-    ) -> Result<Vec<PendingAction>>;
-
     /// Redeems all tickets based on the given [`TicketSelector`].
     async fn redeem_tickets(&self, selector: TicketSelector) -> Result<Vec<PendingAction>>;
 
@@ -85,79 +66,8 @@ pub trait TicketRedeemActions {
 #[async_trait]
 impl<Db> TicketRedeemActions for ChainActions<Db>
 where
-    Db: HoprDbChannelOperations + HoprDbTicketOperations + HoprDbInfoOperations + Clone + Send + Sync + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug,
 {
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn redeem_all_tickets(&self, min_value: HoprBalance, only_aggregated: bool) -> Result<Vec<PendingAction>> {
-        let incoming_channels = self
-            .db
-            .get_channels_via(None, ChannelDirection::Incoming, &self.self_address())
-            .await?;
-        debug!(
-            channel_count = incoming_channels.len(),
-            "starting to redeem all tickets in channels to self"
-        );
-
-        let mut receivers: Vec<PendingAction> = vec![];
-
-        // Must be synchronous because underlying Ethereum transactions are sequential
-        for incoming_channel in incoming_channels {
-            match self
-                .redeem_tickets_in_channel(&incoming_channel, min_value, only_aggregated)
-                .await
-            {
-                Ok(mut successful_txs) => {
-                    receivers.append(&mut successful_txs);
-                }
-                Err(e) => {
-                    warn!(
-                        channel = %generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
-                        error = %e,
-                        "Failed to redeem tickets in channel",
-                    );
-                }
-            }
-        }
-
-        Ok(receivers)
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn redeem_tickets_with_counterparty(
-        &self,
-        counterparty: &Address,
-        min_value: HoprBalance,
-        only_aggregated: bool,
-    ) -> Result<Vec<PendingAction>> {
-        let maybe_channel = self
-            .db
-            .get_channel_by_parties(None, counterparty, &self.self_address(), false)
-            .await?;
-        if let Some(channel) = maybe_channel {
-            self.redeem_tickets_in_channel(&channel, min_value, only_aggregated)
-                .await
-        } else {
-            Err(ChannelDoesNotExist)
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn redeem_tickets_in_channel(
-        &self,
-        channel: &ChannelEntry,
-        min_value: HoprBalance,
-        only_aggregated: bool,
-    ) -> Result<Vec<PendingAction>> {
-        self.redeem_tickets(
-            TicketSelector::from(channel)
-                .with_aggregated_only(only_aggregated)
-                .with_index_range(channel.ticket_index.as_u64()..)
-                .with_amount(min_value..)
-                .with_state(AcknowledgedTicketStatus::Untouched),
-        )
-        .await
-    }
-
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets(&self, selector: TicketSelector) -> Result<Vec<PendingAction>> {
         let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector.clone()).await?;

@@ -16,31 +16,33 @@ use alloy::{
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use futures::{
-    FutureExt, TryFutureExt, TryStreamExt,
+    FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
     future::{AbortHandle, BoxFuture},
     stream::BoxStream,
 };
 use hopr_api::{
     Multiaddr,
     chain::{
-        AccountSelector, AnnouncementError, ChainKeyOperations, ChainMiscOperations, ChainReadAccountOperations,
-        ChainReadChannelOperations, ChainReadTicketOperations, ChainReceipt, ChainWriteAccountOperations,
-        ChainWriteChannelOperations, ChainWriteTicketOperations, ChannelSelector, DomainSeparators,
+        AccountSelector, AnnouncementError, ChainEvents, ChainKeyOperations, ChainMiscOperations,
+        ChainReadAccountOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainReceipt,
+        ChainWriteAccountOperations, ChainWriteChannelOperations, ChainWriteTicketOperations, ChannelSelector,
+        DomainSeparators,
     },
+    db::TicketSelector,
 };
 use hopr_async_runtime::{prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
     action_queue::{ActionQueue, ActionQueueConfig},
-    action_state::IndexerActionTracker,
+    action_state::{ActionState, IndexerActionTracker},
     channels::ChannelActions,
     errors::ChainActionsError,
     node::NodeActions,
     payload::SafePayloadGenerator,
     redeem::TicketRedeemActions,
 };
-use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers};
 pub use hopr_chain_indexer::IndexerConfig;
+use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers};
 use hopr_chain_rpc::{
     HoprRpcOperations,
     client::DefaultRetryPolicy,
@@ -65,7 +67,7 @@ use hopr_internal_types::{
     tickets::WinningProbability,
 };
 use hopr_primitive_types::prelude::*;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::errors::{HoprChainError, Result};
 
@@ -137,6 +139,7 @@ pub struct HoprChain {
     contract_addresses: ContractAddresses,
     indexer_cfg: IndexerConfig,
     indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
+    indexer_events_rx: Arc<std::sync::Mutex<Option<async_channel::Receiver<SignificantChainEvent>>>>,
     db: HoprIndexerDb,
     hopr_chain_actions: ChainActions<HoprIndexerDb>,
     action_queue: ActionQueueType<HoprIndexerDb>,
@@ -153,7 +156,6 @@ impl HoprChain {
         contract_addresses: ContractAddresses,
         safe_address: Address,
         indexer_cfg: IndexerConfig,
-        indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
     ) -> Result<Self> {
         let db = futures::executor::block_on(HoprIndexerDb::new(
             "path".into(),
@@ -224,12 +226,15 @@ impl HoprChain {
         // Instantiate Chain Actions
         let hopr_chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
 
+        let (indexer_events_tx, indexer_events_rx) = async_channel::unbounded::<SignificantChainEvent>();
+
         Ok(Self {
             me_onchain,
             safe_address,
             contract_addresses,
             indexer_cfg,
             indexer_events_tx,
+            indexer_events_rx: Arc::new(std::sync::Mutex::new(Some(indexer_events_rx))),
             db,
             hopr_chain_actions,
             action_queue,
@@ -529,9 +534,15 @@ impl ChainWriteChannelOperations for HoprChain {
     ) -> std::result::Result<BoxFuture<'_, std::result::Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>
     {
         // TODO: (dbmig) make sure the ChainActions::close_channel() accepts ChannelEntry directly
-        let channel = self.db.get_channel_by_id(None, channel_id).await?.ok_or(HoprChainError::Api("channel not found".into()))?;
-        let (_, counterparty) = channel.orientation(&self.me_onchain()).ok_or(HoprChainError::Api("channel not own".into()))?;
-        
+        let channel = self
+            .db
+            .get_channel_by_id(None, channel_id)
+            .await?
+            .ok_or(HoprChainError::Api("channel not found".into()))?;
+        let (_, counterparty) = channel
+            .orientation(&self.me_onchain())
+            .ok_or(HoprChainError::Api("channel not own".into()))?;
+
         Ok(self
             .actions_ref()
             .close_channel(counterparty, direction, false)
@@ -623,11 +634,56 @@ impl ChainWriteTicketOperations for HoprChain {
         &self,
         ticket: AcknowledgedTicket,
     ) -> std::result::Result<BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>, Self::Error> {
+        // TODO: (dbmig) the BeingRedeemed marking logic should be moved here
         Ok(self
             .actions_ref()
             .redeem_ticket(ticket)
             .await?
             .map(|r| r.map(|c| c.tx_hash).map_err(HoprChainError::from))
             .boxed())
+    }
+
+    async fn redeem_tickets_via_selector(
+        &self,
+        selector: TicketSelector,
+    ) -> std::result::Result<Vec<BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>>, Self::Error> {
+        // TODO: (dbmig) the BeingRedeemed marking logic should be moved here
+        Ok(self
+            .actions_ref()
+            .redeem_tickets(selector)
+            .await?
+            .into_iter()
+            .map(|r| r.map(|c| c.map(|ac| ac.tx_hash).map_err(HoprChainError::from)).boxed())
+            .collect())
+    }
+}
+
+impl ChainEvents for HoprChain {
+    type Error = HoprChainError;
+
+    fn subscribe(
+        &self,
+    ) -> std::result::Result<impl Stream<Item = SignificantChainEvent> + Send + 'static, Self::Error> {
+        if let Some(stream) = self
+            .indexer_events_rx
+            .lock()
+            .map_err(|_| HoprChainError::Api("failed to lock mutex".into()))?
+            .take()
+        {
+            let indexer_action_tracker = self.action_state.clone();
+            Ok(stream.then(move |event| {
+                let indexer_action_tracker = indexer_action_tracker.clone();
+                async move {
+                    let resolved = indexer_action_tracker.match_and_resolve(&event).await;
+                    if resolved.is_empty() {
+                        trace!(%event, "No indexer expectations resolved for the event");
+                    } else {
+                        debug!(count = resolved.len(), %event, "resolved indexer expectations");
+                    }
+                }
+            }))
+        } else {
+            Err(HoprChainError::Api("cannot subscribe more than once".into()))
+        }
     }
 }

@@ -4,7 +4,7 @@ use futures::future::BoxFuture;
 pub use hopr_internal_types::prelude::{AcknowledgedTicket, WinningProbability};
 use hopr_primitive_types::balance::HoprBalance;
 
-use crate::chain::ChainReceipt;
+use crate::{chain::ChainReceipt, db::TicketSelector};
 
 /// On-chain write operations with tickets.
 #[async_trait::async_trait]
@@ -15,6 +15,12 @@ pub trait ChainWriteTicketOperations {
         &self,
         ticket: AcknowledgedTicket,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
+
+    /// Allows to batch-redeem multiple tickets on-chain.
+    async fn redeem_tickets_via_selector(
+        &self,
+        selector: TicketSelector,
+    ) -> Result<Vec<BoxFuture<'_, Result<ChainReceipt, Self::Error>>>, Self::Error>;
 }
 
 /// On-chain read operations with tickets.

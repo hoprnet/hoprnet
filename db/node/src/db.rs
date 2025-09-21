@@ -6,6 +6,7 @@ use std::{
 };
 
 use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
+use hopr_internal_types::prelude::ChannelEntry;
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
@@ -194,6 +195,13 @@ impl HoprNodeDb {
         let pool = options.connect_with(sqlite_cfg.filename(directory.join(path))).await?;
 
         Ok(pool)
+    }
+
+    pub async fn invalidate_unrealized_value(&self, channel: &ChannelEntry) {
+        self.caches
+            .unrealized_value
+            .invalidate(&(channel.get_id(), channel.channel_epoch))
+            .await;
     }
 }
 

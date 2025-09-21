@@ -313,18 +313,18 @@ where
                             }
                             .into();
 
-                    match db
-                        .to_send_no_ack(ack.leak().as_ref().into(), destination, &resolver)
-                        .await
-                            {
-                        Ok(ack_packet) => {
-                            let now = std::time::Instant::now();
-                            if msg_to_send_tx_clone
-                                .send((ack_packet.next_hop.into(), ack_packet.data))
+                            match db
+                                .to_send_no_ack(ack.leak().as_ref().into(), destination, &resolver)
                                 .await
-                                .is_err()
                             {
-                                tracing::error!("failed to forward an acknowledgement to the transport layer");
+                                Ok(ack_packet) => {
+                                    let now = std::time::Instant::now();
+                                    if msg_to_send_tx_clone
+                                        .send((ack_packet.next_hop.into(), ack_packet.data))
+                                        .await
+                                        .is_err()
+                                    {
+                                        tracing::error!("failed to forward an acknowledgement to the transport layer");
                                     }
                                     let elapsed = now.elapsed();
                                     if elapsed.as_millis() > SLOW_OP_MS {
