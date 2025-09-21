@@ -828,7 +828,12 @@ async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> 
     fs::create_dir_all(&data_directory).await?;
 
     let chain_key = ChainKeypair::random();
-    let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
+    let db = HoprDb::new(
+        &data_directory.join("db"),
+        chain_key.clone(),
+        HoprIndexerDbConfig::default(),
+    )
+    .await?;
 
     // Verify snapshot file exists
     let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.xz");
@@ -903,7 +908,12 @@ async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> 
     fs::create_dir_all(&data_directory).await?;
 
     let chain_key = ChainKeypair::random();
-    let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
+    let db = HoprDb::new(
+        &data_directory.join("db"),
+        chain_key.clone(),
+        HoprIndexerDbConfig::default(),
+    )
+    .await?;
 
     // Verify snapshot file exists
     let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.xz");

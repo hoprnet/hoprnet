@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "3.0.0"
+version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
@@ -17,20 +17,13 @@ session-client = []
 session-server = []
 transport-quic = ["hopr-transport/transport-quic"]
 runtime-tokio = [
-  "hopr-chain-api/runtime-tokio",
-  "hopr-chain-rpc/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-strategy/runtime-tokio",
   "hopr-transport/runtime-tokio",
 ]
 prometheus = [
-  "hopr-chain-api/prometheus",
-  "hopr-chain-indexer/prometheus",
-  "hopr-chain-rpc/prometheus",
   "dep:hopr-metrics",
-  "hopr-db-sql/prometheus",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
   "hopr-strategy/prometheus",
@@ -61,16 +54,13 @@ smart-default = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-chain-actions = { workspace = true }
 hopr-chain-api = { workspace = true }
-hopr-chain-indexer = { workspace = true }
-hopr-chain-rpc = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
-hopr-db-sql = { workspace = true }
+hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }

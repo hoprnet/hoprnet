@@ -9,20 +9,14 @@ use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
 };
-use hopr_db_api::{info::DomainSeparator, resolver::HoprDbResolverOperations};
-use hopr_db_sql::{
-    accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
-};
+use hopr_db_sql::{accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, info::HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::{
-    DEFAULT_PRICE_PER_PACKET,
-    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-};
+use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig};
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 use tokio::time::timeout;
@@ -39,6 +33,9 @@ lazy_static! {
     .iter()
     .map(|private| OffchainKeypair::from_secret(private).expect("lazy static keypair should be valid"))
     .collect();
+
+    /// Fixed price per packet to 0.01 HOPR
+    pub static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
 }
 
 lazy_static! {
@@ -140,7 +137,7 @@ pub type WireChannels = (
 
 #[allow(dead_code)]
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>,
+    futures::channel::mpsc::UnboundedSender<(ApplicationDataOut, ResolvedTransportRouting)>,
     futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationDataIn)>,
 );
 
@@ -187,7 +184,7 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>();
+            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let opk: &OffchainKeypair = &PEERS[i];
@@ -389,13 +386,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
             .send_packet(ApplicationDataOut::with_no_packet_info(test_msg.clone()), routing)
             .await?;
 
-        if awaiter
-            .consume_and_wait(std::time::Duration::from_millis(500))
-            .await
-            .is_ok()
-        {
-            sent_packet_count += 1;
-        }
+        sent_packet_count += 1;
     }
 
     assert_eq!(

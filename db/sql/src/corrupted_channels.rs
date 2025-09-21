@@ -7,8 +7,7 @@ use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::{
-    HoprDbGeneralModelOperations, OptTx,
-    db::HoprDb,
+    HoprDbGeneralModelOperations, HoprIndexerDb, OptTx,
     errors::{DbSqlError, Result},
 };
 
@@ -32,7 +31,7 @@ pub trait HoprDbCorruptedChannelOperations {
 }
 
 #[async_trait]
-impl HoprDbCorruptedChannelOperations for HoprDb {
+impl HoprDbCorruptedChannelOperations for HoprIndexerDb {
     async fn get_corrupted_channel_by_id<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -106,11 +105,12 @@ mod tests {
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair, types::Hash};
 
-    use crate::{corrupted_channels::HoprDbCorruptedChannelOperations, db::HoprDb};
+    use super::*;
+    use crate::corrupted_channels::HoprDbCorruptedChannelOperations;
 
     #[tokio::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let channel_id = Hash::from(random_bytes());
 
@@ -128,7 +128,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_duplicates_should_not_insert() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
         let channel_id = Hash::from(random_bytes());
 
         db.upsert_corrupted_channel(None, channel_id)

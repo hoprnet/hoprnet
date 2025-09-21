@@ -1,12 +1,15 @@
-use async_trait::async_trait;
-use hopr_crypto_packet::prelude::PacketSignals;
-pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
+use std::fmt::Formatter;
+
+pub use hopr_crypto_packet::{
+    HoprSurb,
+    prelude::{HoprSenderId, PacketSignals},
+};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_primitive_types::balance::HoprBalance;
 
-use crate::errors::Result;
+use crate::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations};
 
 /// Contains a SURB found in the SURB ring buffer via [`HoprDbProtocolOperations::find_surb`].
 #[derive(Debug)]
@@ -29,52 +32,101 @@ pub struct SurbCacheConfig {
     pub distress_threshold: usize,
 }
 
+/// Error that can occur when processing an incoming packet.
+#[derive(Debug, strum::EnumIs, strum::EnumTryAs)]
+pub enum IncomingPacketError<E> {
+    /// Packet is not decodable.
+    ///
+    /// Such errors are fatal and therefore the packet cannot be acknowledged.
+    Undecodable(E),
+    /// Packet is decodable but cannot be processed due to other reasons.
+    ///
+    /// Such errors are protocol-related and packets must be acknowledged.
+    ProcessingError(E),
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for IncomingPacketError<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IncomingPacketError::Undecodable(e) => write!(f, "undecodable packet: {e}"),
+            IncomingPacketError::ProcessingError(e) => write!(f, "packet processing error: {e}"),
+        }
+    }
+}
+
+impl<E: std::error::Error> std::error::Error for IncomingPacketError<E> {}
+
 /// Trait defining all DB functionality needed by a packet/acknowledgement processing pipeline.
-#[async_trait]
+#[async_trait::async_trait]
 pub trait HoprDbProtocolOperations {
+    type Error: std::error::Error + Send + Sync + 'static;
+
     /// Processes the acknowledgements for the pending tickets
     ///
     /// There are three cases:
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: VerifiedAcknowledgement) -> Result<()>;
-
-    /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
-    async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
-
-    /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
-    async fn get_network_ticket_price(&self) -> Result<HoprBalance>;
+    async fn handle_acknowledgement<R>(
+        &self,
+        ack: VerifiedAcknowledgement,
+        chain_resolver: &R,
+    ) -> Result<(), Self::Error>
+    where
+        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync;
 
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
-    async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb>;
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb, Self::Error>;
 
     /// Returns the SURB cache configuration.
     fn get_surb_config(&self) -> SurbCacheConfig;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
-    async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket>;
+    async fn to_send_no_ack<R>(
+        &self,
+        data: Box<[u8]>,
+        destination: OffchainPublicKey,
+        resolver: &R,
+    ) -> Result<OutgoingPacket, Self::Error>
+    where
+        R: ChainKeyOperations + ChainMiscOperations + Send + Sync;
 
     /// Process the data into an outgoing packet
-    async fn to_send(
+    async fn to_send<R>(
         &self,
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
-        outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: HoprBalance,
+        outgoing_ticket_win_prob: Option<WinningProbability>,
+        outgoing_ticket_price: Option<HoprBalance>,
         signals: PacketSignals,
-    ) -> Result<OutgoingPacket>;
+        resolver: &R,
+    ) -> Result<OutgoingPacket, Self::Error>
+    where
+        R: ChainReadChannelOperations
+            + ChainReadTicketOperations
+            + ChainKeyOperations
+            + ChainMiscOperations
+            + Send
+            + Sync;
 
     /// Process the incoming packet into data
     #[allow(clippy::wrong_self_convention)]
-    async fn from_recv(
+    async fn from_recv<R>(
         &self,
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: HoprBalance,
-    ) -> Result<IncomingPacket>;
+        outgoing_ticket_win_prob: Option<WinningProbability>,
+        outgoing_ticket_price: Option<HoprBalance>,
+        resolver: &R,
+    ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>
+    where
+        R: ChainReadChannelOperations
+            + ChainReadTicketOperations
+            + ChainKeyOperations
+            + ChainMiscOperations
+            + Send
+            + Sync;
 }
 
 /// Contains some miscellaneous information about a received packet.

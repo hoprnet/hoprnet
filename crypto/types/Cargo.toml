@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-types"
-version = "0.7.1"
+version = "0.7.2"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
 

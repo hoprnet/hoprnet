@@ -25,14 +25,13 @@ scrape_configs:
 - `hopr_packets_count`: Number of processed packets of different types (sent, received, forwarded), keys: `type`
 - `hopr_packets_per_peer_count`: Number of processed packets to/from distinct peers, keys: `peer`, `direction`
 - `hopr_replayed_packet_count`: The total count of replayed packets during the packet processing pipeline run
-- `hopr_rejected_tickets_count`: Number of rejected tickets
 - `hopr_mixer_queue_size`: Current mixer queue size
 - `hopr_mixer_average_packet_delay`: Average mixer packet delay averaged over a packet window
 - `hopr_aggregated_tickets_count`: Number of aggregated tickets
 - `hopr_aggregations_count`: Number of performed ticket aggregations
 - `hopr_received_ack_count`: Number of received acknowledgements, keys: `valid`
 - `hopr_sent_acks_count`: Number of sent message acknowledgements
-- `hopr_tickets_count`: Number of tickets (winning, losing), keys: `type`
+- `hopr_tickets_count`: Number of tickets (winning, losing, rejected), keys: `type`
 - `hopr_ping_time_sec`: Measures total time it takes to ping a single node (seconds), buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0
 - `hopr_probe_count`: Total number of probes by result, keys: `success`
 - `hopr_heartbeat_round_time_sec`: Measures total time in seconds it takes to probe all other nodes, buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0

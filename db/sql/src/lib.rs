@@ -12,22 +12,13 @@ pub mod db;
 pub mod errors;
 pub mod info;
 pub mod logs;
-pub mod peers;
-pub mod protocol;
-pub mod registry;
-pub mod resolver;
-mod ticket_manager;
-pub mod tickets;
 
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+pub use cache::CacheKeyMapper;
+pub use db::{HoprIndexerDb, HoprIndexerDbConfig};
 use futures::future::BoxFuture;
-pub use hopr_db_api as api;
-use hopr_db_api::{
-    logs::HoprDbLogOperations, peers::HoprDbPeersOperations, protocol::HoprDbProtocolOperations,
-    resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations,
-};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
 
@@ -35,10 +26,8 @@ use crate::{
     accounts::HoprDbAccountOperations,
     channels::HoprDbChannelOperations,
     corrupted_channels::HoprDbCorruptedChannelOperations,
-    db::HoprDb,
     errors::{DbSqlError, Result},
     info::HoprDbInfoOperations,
-    registry::HoprDbRegistryOperations,
 };
 
 /// Primary key used in tables that contain only a single row.
@@ -117,10 +106,6 @@ pub enum TargetDb {
     #[default]
     /// Indexer database.
     Index,
-    /// Acknowledged winning ticket database.
-    Tickets,
-    /// Network peers database
-    Peers,
     /// RPC logs database
     Logs,
 }
@@ -135,6 +120,34 @@ pub trait HoprDbGeneralModelOperations {
 
     /// Creates a new transaction.
     async fn begin_transaction_in_db(&self, target: TargetDb) -> Result<OpenTransaction>;
+
+    /// Same as [`HoprDbGeneralModelOperations::begin_transaction_in_db`] with default [TargetDb].
+    async fn begin_transaction(&self) -> Result<OpenTransaction> {
+        self.begin_transaction_in_db(Default::default()).await
+    }
+
+    /// Creates a nested transaction inside the given transaction.
+    ///
+    /// If `None` is given, behaves exactly as [`HoprDbGeneralModelOperations::begin_transaction`].
+    ///
+    /// This method is useful for creating APIs that should be agnostic whether they are being
+    /// run from an existing transaction or without it (via [OptTx]).
+    ///
+    /// If `tx` is `Some`, the `target_db` must match with the one in `tx`. In other words,
+    /// nesting across different databases is forbidden and the method will panic.
+    async fn nest_transaction_in_db(&self, tx: OptTx<'_>, target_db: TargetDb) -> Result<OpenTransaction> {
+        if let Some(t) = tx {
+            assert_eq!(t.1, target_db, "attempt to create nest into tx from a different db");
+            Ok(OpenTransaction(t.as_ref().begin().await?, target_db))
+        } else {
+            self.begin_transaction_in_db(target_db).await
+        }
+    }
+
+    /// Same as [`HoprDbGeneralModelOperations::nest_transaction_in_db`] with default [TargetDb].
+    async fn nest_transaction(&self, tx: OptTx<'_>) -> Result<OpenTransaction> {
+        self.nest_transaction_in_db(tx, Default::default()).await
+    }
 
     /// Import logs database from a snapshot directory.
     ///
@@ -177,45 +190,14 @@ pub trait HoprDbGeneralModelOperations {
     /// # }
     /// ```
     async fn import_logs_db(self, src_dir: PathBuf) -> Result<()>;
-
-    /// Same as [`HoprDbGeneralModelOperations::begin_transaction_in_db`] with default [TargetDb].
-    async fn begin_transaction(&self) -> Result<OpenTransaction> {
-        self.begin_transaction_in_db(Default::default()).await
-    }
-
-    /// Creates a nested transaction inside the given transaction.
-    ///
-    /// If `None` is given, behaves exactly as [`HoprDbGeneralModelOperations::begin_transaction`].
-    ///
-    /// This method is useful for creating APIs that should be agnostic whether they are being
-    /// run from an existing transaction or without it (via [OptTx]).
-    ///
-    /// If `tx` is `Some`, the `target_db` must match with the one in `tx`. In other words,
-    /// nesting across different databases is forbidden and the method will panic.
-    async fn nest_transaction_in_db(&self, tx: OptTx<'_>, target_db: TargetDb) -> Result<OpenTransaction> {
-        if let Some(t) = tx {
-            assert_eq!(t.1, target_db, "attempt to create nest into tx from a different db");
-            Ok(OpenTransaction(t.as_ref().begin().await?, target_db))
-        } else {
-            self.begin_transaction_in_db(target_db).await
-        }
-    }
-
-    /// Same as [`HoprDbGeneralModelOperations::nest_transaction_in_db`] with default [TargetDb].
-    async fn nest_transaction(&self, tx: OptTx<'_>) -> Result<OpenTransaction> {
-        self.nest_transaction_in_db(tx, Default::default()).await
-    }
 }
 
 #[async_trait]
-impl HoprDbGeneralModelOperations for HoprDb {
+impl HoprDbGeneralModelOperations for HoprIndexerDb {
     /// Retrieves raw database connection to the given [DB](TargetDb).
     fn conn(&self, target_db: TargetDb) -> &DatabaseConnection {
         match target_db {
             TargetDb::Index => self.index_db.read_only(), // TODO: no write access needed here, deserves better
-            // wrapping
-            TargetDb::Tickets => &self.tickets_db,
-            TargetDb::Peers => &self.peers_db,
             TargetDb::Logs => &self.logs_db,
         }
     }
@@ -228,15 +210,6 @@ impl HoprDbGeneralModelOperations for HoprDb {
                                                                                   * must be readwrite */
                 target_db,
             )),
-            // TODO: when adding Postgres support, redirect `Tickets` and `Peers` into `self.db`
-            TargetDb::Tickets => Ok(OpenTransaction(
-                self.tickets_db.begin_with_config(None, None).await?,
-                target_db,
-            )),
-            TargetDb::Peers => Ok(OpenTransaction(
-                self.peers_db.begin_with_config(None, None).await?,
-                target_db,
-            )),
             TargetDb::Logs => Ok(OpenTransaction(
                 self.logs_db.begin_with_config(None, None).await?,
                 target_db,
@@ -244,7 +217,7 @@ impl HoprDbGeneralModelOperations for HoprDb {
         }
     }
 
-    async fn import_logs_db(self, src_dir: PathBuf) -> Result<()> {
+    async fn import_logs_db(self, src_dir: PathBuf) -> crate::errors::Result<()> {
         let src_db_path = src_dir.join("hopr_logs.db");
         if !src_db_path.exists() {
             return Err(DbSqlError::Construction(format!(
@@ -287,19 +260,11 @@ pub trait HoprDbAllOperations:
     + HoprDbChannelOperations
     + HoprDbCorruptedChannelOperations
     + HoprDbInfoOperations
-    + HoprDbLogOperations
-    + HoprDbPeersOperations
-    + HoprDbProtocolOperations
-    + HoprDbRegistryOperations
-    + HoprDbResolverOperations
-    + HoprDbTicketOperations
 {
 }
 
 #[doc(hidden)]
 pub mod prelude {
-    pub use hopr_db_api::{logs::*, peers::*, protocol::*, resolver::*, tickets::*};
-
     pub use super::*;
-    pub use crate::{accounts::*, channels::*, corrupted_channels::*, db::*, errors::*, info::*, registry::*};
+    pub use crate::{accounts::*, channels::*, corrupted_channels::*, db::*, errors::*, info::*};
 }

@@ -7,22 +7,24 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_chain_actions::channels::ChannelActions;
+use hopr_api::chain::ChainWriteChannelOperations;
 use hopr_internal_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleCounter;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::info;
 use validator::Validate;
 
-use crate::{Strategy, errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy};
+use crate::{
+    Strategy,
+    errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
+    strategy::SingularStrategy,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_AUTO_FUNDINGS: SimpleCounter =
-        SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
+    static ref METRIC_COUNT_AUTO_FUNDINGS: hopr_metrics::metrics::SimpleCounter =
+        hopr_metrics::metrics::SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
 }
 
 /// Configuration for `AutoFundingStrategy`
@@ -46,12 +48,12 @@ pub struct AutoFundingStrategyConfig {
 
 /// The `AutoFundingStrategy` automatically funds a channel that
 /// dropped it's staked balance below the configured threshold.
-pub struct AutoFundingStrategy<A: ChannelActions> {
+pub struct AutoFundingStrategy<A> {
     hopr_chain_actions: A,
     cfg: AutoFundingStrategyConfig,
 }
 
-impl<A: ChannelActions> AutoFundingStrategy<A> {
+impl<A: ChainWriteChannelOperations> AutoFundingStrategy<A> {
     pub fn new(cfg: AutoFundingStrategyConfig, hopr_chain_actions: A) -> Self {
         Self {
             cfg,
@@ -60,20 +62,20 @@ impl<A: ChannelActions> AutoFundingStrategy<A> {
     }
 }
 
-impl<A: ChannelActions> Debug for AutoFundingStrategy<A> {
+impl<A: ChainWriteChannelOperations> Debug for AutoFundingStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoFunding(self.cfg))
     }
 }
 
-impl<A: ChannelActions> Display for AutoFundingStrategy<A> {
+impl<A: ChainWriteChannelOperations> Display for AutoFundingStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoFunding(self.cfg))
     }
 }
 
 #[async_trait]
-impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A> {
+impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFundingStrategy<A> {
     async fn on_own_channel_changed(
         &self,
         channel: &ChannelEntry,
@@ -96,8 +98,10 @@ impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A
 
                 let rx = self
                     .hopr_chain_actions
-                    .fund_channel(channel.get_id(), self.cfg.funding_amount)
-                    .await?;
+                    .fund_channel(&channel.get_id(), self.cfg.funding_amount)
+                    .await
+                    .map_err(|e| StrategyError::Other(e.into()))?;
+
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
                 info!(%channel, amount = %self.cfg.funding_amount, "issued re-staking of channel", );
             }
@@ -113,10 +117,6 @@ mod tests {
     use async_trait::async_trait;
     use futures::{FutureExt, future::ok};
     use hex_literal::hex;
-    use hopr_chain_actions::{
-        action_queue::{ActionConfirmation, PendingAction},
-        channels::ChannelActions,
-    };
     use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;

@@ -5,9 +5,8 @@ use thiserror::Error;
 pub enum NetworkingError {
     #[error("performing an operation on own PeerId")]
     DisallowedOperationOnOwnPeerIdError,
-
-    #[error("db error: {0}")]
-    DbError(#[from] hopr_db_api::errors::DbError),
+    #[error("database or chain error: {0}")]
+    DbChainError(Box<dyn std::error::Error + Send + Sync + 'static>),
 }
 
 /// Result built on top of the crate error [NetworkingError]

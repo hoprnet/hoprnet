@@ -4444,12 +4444,17 @@ name = "hopr-api"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "futures",
+ "hopr-chain-types",
  "hopr-crypto-packet",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-network-types",
+ "hopr-platform",
  "hopr-primitive-types",
  "multiaddr",
+ "strum 0.27.2",
 ]
 
 [[package]]
@@ -4511,6 +4516,7 @@ dependencies = [
  "async-channel 2.5.0",
  "async-trait",
  "futures",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-chain-actions",
  "hopr-chain-indexer",
@@ -4569,7 +4575,6 @@ dependencies = [
  "hopr-chain-types",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -4735,7 +4740,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "aes",
  "anyhow",
@@ -4771,26 +4776,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-db-api"
-version = "0.11.1"
-dependencies = [
- "async-trait",
- "futures",
- "hopr-crypto-packet",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-network-types",
- "hopr-platform",
- "hopr-primitive-types",
- "libp2p-identity",
- "multiaddr",
- "num_enum",
- "strum 0.27.2",
- "thiserror 2.0.16",
- "tracing",
-]
-
-[[package]]
 name = "hopr-db-entity"
 version = "0.4.0"
 dependencies = [
@@ -4820,8 +4805,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-db-sql"
-version = "0.18.3"
+name = "hopr-db-node"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -4829,15 +4814,14 @@ dependencies = [
  "async-trait",
  "bincode",
  "chrono",
- "dashmap",
  "futures",
  "hex",
  "hex-literal",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-entity",
  "hopr-db-migration",
  "hopr-internal-types",
@@ -4848,12 +4832,44 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
- "libp2p-identity",
  "moka",
- "multiaddr",
  "parking_lot",
  "rand 0.8.5",
  "ringbuffer",
+ "sea-orm",
+ "sea-query",
+ "sea-query-binder",
+ "smart-default",
+ "sqlx",
+ "thiserror 2.0.16",
+ "tokio",
+ "tracing",
+ "validator",
+]
+
+[[package]]
+name = "hopr-db-sql"
+version = "0.19.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "dashmap",
+ "futures",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-crypto-packet",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-entity",
+ "hopr-db-migration",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "lazy_static",
+ "moka",
+ "multiaddr",
  "sea-orm",
  "sea-query",
  "sea-query-binder",
@@ -4891,7 +4907,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4904,16 +4920,14 @@ dependencies = [
  "either",
  "futures",
  "hex-literal",
+ "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-actions",
  "hopr-chain-api",
- "hopr-chain-indexer",
- "hopr-chain-rpc",
  "hopr-chain-types",
  "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-node",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -5128,8 +5142,8 @@ dependencies = [
  "async-trait",
  "futures",
  "hex-literal",
+ "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-actions",
  "hopr-chain-types",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -5140,7 +5154,6 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-transport-network",
  "hopr-transport-protocol",
- "hopr-transport-ticket-aggregation",
  "lazy_static",
  "mockall",
  "rand 0.8.5",
@@ -5165,6 +5178,7 @@ dependencies = [
  "either",
  "futures",
  "futures-concurrency",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-chain-types",
  "hopr-crypto-packet",
@@ -5184,7 +5198,6 @@ dependencies = [
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
- "hopr-transport-ticket-aggregation",
  "lazy_static",
  "proc-macro-regex",
  "rand 0.8.5",
@@ -5250,10 +5263,10 @@ version = "0.8.1"
 dependencies = [
  "anyhow",
  "futures",
+ "hopr-api",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
- "hopr-db-sql",
+ "hopr-db-node",
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
@@ -5309,10 +5322,11 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "hex",
+ "hopr-api",
  "hopr-async-runtime",
+ "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
@@ -5350,11 +5364,12 @@ dependencies = [
  "futures",
  "futures-time",
  "hex-literal",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
+ "hopr-db-node",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -5430,39 +5445,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-transport-ticket-aggregation"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-channel 2.5.0",
- "async-trait",
- "async_channel_io",
- "bytesize",
- "criterion",
- "futures",
- "hex-literal",
- "hopr-async-runtime",
- "hopr-crypto-types",
- "hopr-db-api",
- "hopr-db-sql",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-parallelize",
- "hopr-primitive-types",
- "hopr-transport-identity",
- "hopr-transport-mixer",
- "lazy_static",
- "libp2p",
- "more-asserts",
- "rust-stream-ext-concurrent",
- "serial_test",
- "thiserror 2.0.16",
- "tokio",
- "tracing",
- "tracing-test",
-]
-
-[[package]]
 name = "hoprd"
 version = "3.0.0"
 dependencies = [
@@ -5524,7 +5506,6 @@ dependencies = [
  "futures-time",
  "hopr-async-runtime",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",

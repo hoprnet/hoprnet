@@ -16,8 +16,7 @@ use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
 use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
-use hopr_db_api::logs::HoprDbLogOperations;
-use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations};
+use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations, logs::HoprDbLogOperations};
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, trace};
 
@@ -830,7 +829,7 @@ mod tests {
         keypairs::{Keypair, OffchainKeypair},
         prelude::ChainKeypair,
     };
-    use hopr_db_sql::{accounts::HoprDbAccountOperations, db::HoprDb};
+    use hopr_db_sql::{HoprIndexerDb, accounts::HoprDbAccountOperations, db::HoprDb};
     use hopr_internal_types::account::{AccountEntry, AccountType};
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
@@ -912,7 +911,7 @@ mod tests {
     -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let addr = Address::new(b"my address 123456789");
         let topic = Hash::create(&[b"my topic"]);
@@ -965,7 +964,7 @@ mod tests {
     {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
         let head_block = 1000;
         let latest_block = 15u64;
 
@@ -1041,7 +1040,7 @@ mod tests {
     async fn test_indexer_should_pass_blocks_that_are_finalized() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let cfg = IndexerConfig::default();
 
@@ -1106,7 +1105,7 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn test_indexer_fast_sync_full_with_resume() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let addr = Address::new(b"my address 123456789");
         let topic = Hash::create(&[b"my topic"]);
@@ -1270,7 +1269,7 @@ mod tests {
     async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let cfg = IndexerConfig::default();
 
@@ -1356,7 +1355,7 @@ mod tests {
     async fn test_indexer_should_not_reprocess_last_processed_block() -> anyhow::Result<()> {
         let last_processed_block = 100_u64;
 
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let addr = Address::new(b"my address 123456789");
         let topic = Hash::create(&[b"my topic"]);
