@@ -1,6 +1,6 @@
 [package]
 name = "hopr-api"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Common HOPR-related high-level API traits used in the code base"
@@ -10,9 +10,14 @@ license = "GPL-3.0-only"
 
 [dependencies]
 async-trait = { workspace = true }
+chrono = { workspace = true }
 futures = { workspace = true }
 multiaddr = { workspace = true }
+strum = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-network-types = { workspace = true }
+hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-platform = { workspace = true }

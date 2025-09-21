@@ -1,7 +1,8 @@
-use std::error::Error;
+use std::{error::Error, time::Duration};
 
 use futures::{future::BoxFuture, stream::BoxStream};
-pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatus};
+use hopr_internal_types::prelude::ChannelStatus;
+pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatusDiscriminants};
 use hopr_primitive_types::prelude::Address;
 pub use hopr_primitive_types::prelude::HoprBalance;
 
@@ -15,9 +16,23 @@ pub struct ChannelSelector {
     /// Filter by counterparty address.
     pub counterparty: Option<Address>,
     /// Filter by direction.
-    pub direction: Option<ChannelDirection>,
+    pub direction: Vec<ChannelDirection>,
     /// Filter by possible channel states.
-    pub allowed_states: Vec<ChannelStatus>,
+    pub allowed_states: Vec<ChannelStatusDiscriminants>,
+}
+
+impl ChannelSelector {
+    pub fn any() -> Self {
+        Self {
+            counterparty: None,
+            direction: vec![ChannelDirection::Incoming, ChannelDirection::Outgoing],
+            allowed_states: vec![
+                ChannelStatusDiscriminants::Open,
+                ChannelStatusDiscriminants::Closed,
+                ChannelStatusDiscriminants::PendingToClose,
+            ],
+        }
+    }
 }
 
 /// On-chain read operations regarding channels.
@@ -35,7 +50,10 @@ pub trait ChainReadChannelOperations {
     async fn stream_channels<'a>(
         &'a self,
         selector: ChannelSelector,
-    ) -> Result<BoxStream<'a, Result<ChannelEntry, Self::Error>>, Self::Error>;
+    ) -> Result<BoxStream<'a, ChannelEntry>, Self::Error>;
+
+    /// Gets the grace period for channel closure finalization.
+    async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error>;
 }
 
 /// On-chain write operations regarding channels.
@@ -47,7 +65,7 @@ pub trait ChainWriteChannelOperations {
         &self,
         dst: &Address,
         amount: HoprBalance,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'_, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error>;
 
     /// Funds an existing channel.
     async fn fund_channel(
@@ -60,5 +78,6 @@ pub trait ChainWriteChannelOperations {
     async fn close_channel(
         &self,
         channel_id: &ChannelId,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
+        direction: ChannelDirection,
+    ) -> Result<BoxFuture<'_, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>;
 }
