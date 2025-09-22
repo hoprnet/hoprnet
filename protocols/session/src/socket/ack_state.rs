@@ -124,6 +124,7 @@ struct AcknowledgementStateContext<const C: usize> {
     ack_tx: hopr_async_runtime::InstrumentedSender<FrameId>,
     inspector: FrameInspector,
     ctl_tx: hopr_async_runtime::InstrumentedSender<SessionMessage<C>>,
+    task_handles: Vec<hopr_async_runtime::AbortHandle>,
 }
 
 #[cfg_attr(doc, aquamarine::aquamarine)]
@@ -262,6 +263,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             inspector: socket_components
                 .inspector
                 .ok_or(SessionError::InvalidState("inspector is not available".into()))?,
+            task_handles: Vec::new(),
         });
 
         if self.cfg.mode.is_partial_ack_enabled() {
@@ -271,7 +273,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             let ctl_tx_clone = context.ctl_tx.clone();
             let frame_inspector_clone = context.inspector.clone();
             let cfg = self.cfg;
-            hopr_async_runtime::prelude::spawn(incoming_frame_retries_rx
+            let abort_handle = hopr_async_runtime::spawn_as_abortable!(incoming_frame_retries_rx
                 .filter_map(move |rf| {
                     let frame_id = rf.frame_id;
                     let missing_segments = frame_inspector_clone.missing_segments(&frame_id).unwrap_or_default();
@@ -305,12 +307,13 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 })
                 .instrument(tracing::debug_span!("incoming_frame_retries_sender"))
             );
+            context.task_handles.push(abort_handle);
         }
 
         // Send out Frame Acknowledgements chunked as Control messages
         let ctl_tx_clone = context.ctl_tx.clone();
         let ack_delay = self.cfg.acknowledgement_delay;
-        hopr_async_runtime::prelude::spawn(
+        let abort_handle = hopr_async_runtime::spawn_as_abortable!(
             ack_rx
                 .buffer(futures_time::time::Duration::from(ack_delay))
                 .flat_map(|acks| futures::stream::iter(FrameAcknowledgements::<C>::new_multiple(acks)))
@@ -322,15 +325,16 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     Ok(_) => tracing::debug!("acknowledgement forwarding done"),
                     Err(error) => tracing::debug!(%error, "acknowledgement forwarding failed"),
                 })
-                .instrument(tracing::debug_span!("acknowledgement_sender")),
+                .instrument(tracing::debug_span!("acknowledgement_sender"))
         );
+        context.task_handles.push(abort_handle);
 
         // Resend outgoing frame Segments if they were not (partially or fully) acknowledged
         let mut outgoing_frame_retries_tx_clone = context.outgoing_frame_retries_tx.clone();
         let ctl_tx_clone = context.ctl_tx.clone();
         let rb_rx_clone = context.rb_rx.clone();
         let cfg = self.cfg;
-        hopr_async_runtime::prelude::spawn(
+        let abort_handle = hopr_async_runtime::spawn_as_abortable!(
             outgoing_frame_retries_rx
                 .map(move |rf: RetriedFrameId| {
                     // Find out if the frame can be retried again in the future
@@ -365,8 +369,9 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     Ok(_) => tracing::debug!("outgoing frame retries processing done"),
                     Err(error) => tracing::error!(%error, "error while processing outgoing frame retries"),
                 })
-                .instrument(tracing::debug_span!("outgoing_frame_retries_sender")),
+                .instrument(tracing::debug_span!("outgoing_frame_retries_sender"))
         );
+        context.task_handles.push(abort_handle);
 
         tracing::debug!("acknowledgement state has been started");
         self.started.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -377,6 +382,10 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     #[tracing::instrument(name = "AcknowledgementState::stop", skip(self), fields(session_id = self.id))]
     fn stop(&mut self) -> Result<(), SessionError> {
         if let Some(mut ctx) = self.context.take() {
+            // Abort all background tasks first
+            for handle in ctx.task_handles {
+                handle.abort();
+            }
             ctx.outgoing_frame_retries_tx.force_close();
             ctx.incoming_frame_retries_tx.force_close();
             ctx.ack_tx.close_channel();

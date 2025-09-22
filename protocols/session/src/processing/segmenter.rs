@@ -455,7 +455,7 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn segmenter_should_work_with_buffering_backend() -> anyhow::Result<()> {
-        let (tx, rx) = hopr_async_runtime::monitored_channel(5, "test_segmenter");
+        let (tx, rx) = hopr_async_runtime::monitored_channel(50, "test_segmenter");
         let mut writer = tx.segmenter::<MTU>(FRAME_SIZE);
 
         let data = hopr_crypto_random::random_bytes::<{ 10 * FRAME_SIZE }>();

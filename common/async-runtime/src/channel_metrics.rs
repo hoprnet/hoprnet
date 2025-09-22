@@ -345,7 +345,7 @@ impl<T> InstrumentedSender<T> {
     /// Tokio channels automatically close when all senders are dropped.
     /// This method is provided for API compatibility but is a no-op.
     #[cfg(feature = "runtime-tokio")]
-    pub fn close_channel(&self) {
+    pub fn close_channel(&mut self) {
         // tokio channels don't have a close_channel method
         // The channel closes when all senders are dropped
     }
@@ -450,7 +450,7 @@ impl<T> Sink<T> for InstrumentedSender<T> {
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // tokio channels are always ready unless closed
         if self.is_closed() {
-            Poll::Pending // Channel is closed, caller should stop polling
+            Poll::Ready(Err(create_futures_send_error()))
         } else {
             Poll::Ready(Ok(()))
         }
@@ -472,7 +472,7 @@ impl<T> Sink<T> for InstrumentedSender<T> {
     }
 
     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.close_channel();
+        self.get_mut().close_channel();
         Poll::Ready(Ok(()))
     }
 }
