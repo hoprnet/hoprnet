@@ -430,10 +430,10 @@ where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
     T: futures::Sink<IncomingSession, Error = futures::channel::mpsc::SendError>
-        + Unpin
         + Clone
         + Send
         + Sync
+        + Unpin
         + 'static,
     T::Error: std::error::Error + Send + Sync + Clone + 'static,
 {

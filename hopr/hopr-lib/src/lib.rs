@@ -1044,12 +1044,7 @@ impl Hopr {
 
         for (id, proc) in self
             .transport_api
-            .run(
-                &self.me_chain,
-                transport_output_tx,
-                indexer_peer_update_rx,
-                session_tx.into_inner(),
-            )
+            .run(&self.me_chain, transport_output_tx, indexer_peer_update_rx, session_tx)
             .await?
             .into_iter()
         {

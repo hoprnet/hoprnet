@@ -199,7 +199,7 @@ where
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
+    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, InstrumentedSender<IncomingSession>>,
 }
 
 impl<T> HoprTransport<T>
@@ -287,7 +287,7 @@ where
         me_onchain: &ChainKeypair,
         on_incoming_data: S1,
         discovery_updates: S2,
-        on_incoming_session: Sender<IncomingSession>,
+        on_incoming_session: InstrumentedSender<IncomingSession>,
     ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>>
     where
         S1: futures::Sink<ApplicationDataIn, Error = SendError> + Send + 'static,
@@ -661,7 +661,7 @@ where
                 PingConfig {
                     timeout: self.cfg.probe.timeout,
                 },
-                manual_ping_tx.into_inner(),
+                manual_ping_tx,
             ))
             .expect("must set the ticket aggregation writer only once");
 

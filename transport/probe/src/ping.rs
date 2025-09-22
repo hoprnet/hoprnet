@@ -1,9 +1,6 @@
 use std::ops::Div;
 
-use futures::{
-    StreamExt,
-    channel::mpsc::{Sender, channel},
-};
+use futures::StreamExt;
 use hopr_async_runtime::prelude::timeout_fut;
 use libp2p_identity::PeerId;
 use tracing::{debug, warn};
@@ -11,7 +8,7 @@ use tracing::{debug, warn};
 use crate::errors::{ProbeError, Result};
 
 /// Heartbeat send ping TX type
-pub type HeartbeatSendPingTx = Sender<(PeerId, PingQueryReplier)>;
+pub type HeartbeatSendPingTx = hopr_async_runtime::InstrumentedSender<(PeerId, PingQueryReplier)>;
 
 /// Configuration for the [`Ping`] mechanism
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
@@ -30,11 +27,11 @@ pub type PingQueryResult = Result<std::time::Duration>;
 #[derive(Debug, Clone)]
 pub struct PingQueryReplier {
     /// Back channel for notifications, is [`Clone`] to allow caching
-    notifier: Sender<PingQueryResult>,
+    notifier: hopr_async_runtime::InstrumentedSender<PingQueryResult>,
 }
 
 impl PingQueryReplier {
-    pub fn new(notifier: Sender<PingQueryResult>) -> Self {
+    pub fn new(notifier: hopr_async_runtime::InstrumentedSender<PingQueryResult>) -> Self {
         Self { notifier }
     }
 
@@ -42,7 +39,7 @@ impl PingQueryReplier {
     /// transport layer.
     ///
     /// The resulting timing information about the RTT is halved to provide a unidirectional latency.
-    pub fn notify(mut self, result: PingQueryResult) {
+    pub fn notify(self, result: PingQueryResult) {
         let result = result.map(|rtt| rtt.div(2u32));
 
         if self.notifier.try_send(result).is_err() {
@@ -66,7 +63,7 @@ impl Pinger {
     /// Performs a ping to a single peer.
     #[tracing::instrument(level = "info", skip(self))]
     pub async fn ping(&self, peer: PeerId) -> Result<std::time::Duration> {
-        let (tx, mut rx) = channel::<PingQueryResult>(1);
+        let (tx, mut rx) = hopr_async_runtime::monitored_channel::<PingQueryResult>(1, "ping_query_result");
         let replier = PingQueryReplier::new(tx);
 
         if let Err(error) = self.send_ping.clone().try_send((peer, replier)) {
@@ -111,7 +108,7 @@ mod tests {
 
     #[tokio::test]
     async fn ping_query_replier_should_yield_a_failed_probe() -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::channel::<PingQueryResult>(256);
+        let (tx, mut rx) = hopr_async_runtime::monitored_channel::<PingQueryResult>(256, "test_ping_failed");
 
         let replier = PingQueryReplier::new(tx);
 
@@ -126,7 +123,7 @@ mod tests {
     async fn ping_query_replier_should_yield_a_successful_probe_as_unidirectional_latency() -> anyhow::Result<()> {
         const RTT: Duration = Duration::from_millis(100);
 
-        let (tx, mut rx) = futures::channel::mpsc::channel::<PingQueryResult>(256);
+        let (tx, mut rx) = hopr_async_runtime::monitored_channel::<PingQueryResult>(256, "test_ping_success");
 
         let replier = PingQueryReplier::new(tx);
 
@@ -143,7 +140,8 @@ mod tests {
 
     #[tokio::test]
     async fn pinger_should_return_an_error_if_the_latency_is_longer_than_the_configure_timeout() -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::channel::<(PeerId, PingQueryReplier)>(256);
+        let (tx, mut rx) =
+            hopr_async_runtime::monitored_channel::<(PeerId, PingQueryReplier)>(256, "test_ping_timeout");
 
         let delay = Duration::from_millis(10);
         let delaying_channel = tokio::task::spawn(async move {

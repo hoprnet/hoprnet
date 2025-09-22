@@ -205,6 +205,7 @@ lazy_static! {
 /// | `send()` | `&self` | `&mut self` | Mutability requirement differs |
 /// | `try_send()` | `&self` | `&mut self` | Same mutability pattern |
 /// | `capacity()` | Available via receiver | Always 0 | Tokio provides accurate tracking |
+#[derive(Debug)]
 #[cfg(feature = "prometheus")]
 pub struct InstrumentedSender<T> {
     sender: Sender<T>,
@@ -217,6 +218,7 @@ pub struct InstrumentedSender<T> {
 /// When the `prometheus` feature is disabled, this becomes a zero-overhead
 /// wrapper around the underlying channel sender, providing the same API
 /// without any metrics collection.
+#[derive(Debug)]
 #[cfg(not(feature = "prometheus"))]
 pub struct InstrumentedSender<T> {
     sender: Sender<T>,
@@ -232,18 +234,13 @@ impl<T> InstrumentedSender<T> {
     /// Returns `SendError` if the receiver has been dropped.
     #[cfg(all(feature = "runtime-tokio", feature = "prometheus"))]
     pub async fn send(&self, msg: T) -> Result<(), SendError> {
-        let timer = match HOPR_CHANNEL_SEND_DURATION.start_measure(&[&self.channel_name]) {
-            Ok(timer) => timer,
-            Err(_) => {
-                // If metrics fail, continue without timing
-                // TODO: log error - metrics infrastructure failure shouldn't break channels
-                return self.sender.send(msg).await.map_err(|_| create_futures_send_error());
-            }
-        };
-
+        let start = std::time::Instant::now();
         let result = self.sender.send(msg).await.map_err(|_| create_futures_send_error());
 
-        HOPR_CHANNEL_SEND_DURATION.record_measure(timer);
+        if result.is_ok() {
+            let duration = start.elapsed().as_secs_f64();
+            HOPR_CHANNEL_SEND_DURATION.observe(&[&self.channel_name], duration);
+        }
         self.update_channel_capacity();
 
         result
@@ -259,18 +256,13 @@ impl<T> InstrumentedSender<T> {
     /// Returns `SendError` if the receiver has been dropped.
     #[cfg(all(not(feature = "runtime-tokio"), feature = "prometheus"))]
     pub async fn send(&mut self, msg: T) -> Result<(), SendError> {
-        let timer = match HOPR_CHANNEL_SEND_DURATION.start_measure(&[&self.channel_name]) {
-            Ok(timer) => timer,
-            Err(_) => {
-                // If metrics fail, continue without timing
-                // TODO: log error - metrics infrastructure failure shouldn't break channels
-                return self.sender.send(msg).await;
-            }
-        };
-
+        let start = std::time::Instant::now();
         let result = self.sender.send(msg).await;
 
-        HOPR_CHANNEL_SEND_DURATION.record_measure(timer);
+        if result.is_ok() {
+            let duration = start.elapsed().as_secs_f64();
+            HOPR_CHANNEL_SEND_DURATION.observe(&[&self.channel_name], duration);
+        }
         self.update_channel_capacity();
 
         result
@@ -357,64 +349,6 @@ impl<T> InstrumentedSender<T> {
     #[cfg(not(feature = "runtime-tokio"))]
     pub fn close_channel(&mut self) {
         self.sender.close_channel()
-    }
-
-    /// Get the underlying sender for compatibility with existing APIs
-    ///
-    /// This method provides a unified API surface by always returning a
-    /// `futures::channel::mpsc::Sender<T>`, regardless of the underlying backend.
-    /// This ensures API compatibility across different runtime configurations.
-    ///
-    /// ## Backend Behavior
-    ///
-    /// **Tokio backend**: Creates a bridge between the tokio sender and a new
-    /// futures sender. Messages sent to the returned futures sender are
-    /// automatically forwarded to the original tokio sender via a spawned task.
-    ///
-    /// **Futures backend**: Returns the underlying sender directly with no overhead.
-    ///
-    /// ## Performance Considerations
-    ///
-    /// - **Tokio**: Introduces a bridge task and additional buffering (1000 message buffer)
-    /// - **Futures**: Zero overhead, direct passthrough
-    /// - **Recommendation**: Use native methods when possible, `into_inner()` for compatibility only
-    ///
-    /// ## Example
-    ///
-    /// ```rust
-    /// use futures::SinkExt;
-    /// use hopr_async_runtime::monitored_channel;
-    ///
-    /// let (sender, _receiver) = monitored_channel::<String>(100, "example");
-    /// let mut futures_sender = sender.into_inner();
-    /// futures_sender.send("message".to_string()).await?;
-    /// ```
-    pub fn into_inner(self) -> futures::channel::mpsc::Sender<T>
-    where
-        T: Send + 'static,
-    {
-        #[cfg(feature = "runtime-tokio")]
-        {
-            // Convert tokio sender to futures sender for API compatibility
-            let (futures_tx, mut futures_rx) = futures::channel::mpsc::channel(1000); // Use a reasonable buffer size
-            let tokio_sender = self.sender;
-
-            // Spawn a task to bridge futures receiver to tokio sender
-            crate::prelude::spawn(async move {
-                use futures::StreamExt;
-                while let Some(msg) = futures_rx.next().await {
-                    if tokio_sender.send(msg).await.is_err() {
-                        break; // Receiver dropped
-                    }
-                }
-            });
-
-            futures_tx
-        }
-        #[cfg(not(feature = "runtime-tokio"))]
-        {
-            self.sender
-        }
     }
 
     /// Update the channel capacity metric
@@ -555,6 +489,7 @@ impl<T> Clone for InstrumentedSender<T> {
 ///     println!("Received: {}", msg);
 /// }
 /// ```
+#[derive(Debug)]
 #[cfg(feature = "prometheus")]
 pub struct InstrumentedReceiver<T> {
     receiver: Receiver<T>,
@@ -566,6 +501,7 @@ pub struct InstrumentedReceiver<T> {
 /// When the `prometheus` feature is disabled, this becomes a zero-overhead
 /// wrapper around the underlying channel receiver, providing the same API
 /// without any metrics collection.
+#[derive(Debug)]
 #[cfg(not(feature = "prometheus"))]
 pub struct InstrumentedReceiver<T> {
     receiver: Receiver<T>,
@@ -578,7 +514,7 @@ impl<T> InstrumentedReceiver<T> {
         let start = std::time::Instant::now();
         let result = self.receiver.try_recv();
 
-        if let Ok(_) = &result {
+        if result.is_ok() {
             let duration = start.elapsed().as_secs_f64();
             HOPR_CHANNEL_RECEIVE_DURATION.observe(&[&self.channel_name], duration);
             self.update_channel_capacity();

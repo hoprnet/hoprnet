@@ -25,6 +25,7 @@
 //! More information about parallization, execution and executors can be found in an excellent blog post [here](https://ryhl.io/blog/async-what-is-blocking/).
 
 /// Module for real thread pool based parallelization of CPU heavy blocking workloads.
+#[cfg(feature = "rayon")]
 pub mod cpu {
     pub use rayon;
 
