@@ -151,7 +151,7 @@ impl PeerStatus {
     pub fn is_ignored(&self) -> bool {
         let now = hopr_platform::time::current_time();
         self.ignored_until
-            .is_some_and(|t| now.saturating_sub(t) == std::time::Duration::from_secs(0))
+            .is_some_and(|t| now <= t)
     }
 }
 
