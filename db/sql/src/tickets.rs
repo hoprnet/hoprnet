@@ -1395,19 +1395,19 @@ mod tests {
         init_db_with_tickets_and_channel(db, count_tickets, None, 1.0).await
     }
 
-    async fn init_db_with_low_winn_prob_tickets(
+    async fn init_db_with_low_win_prob_tickets(
         db: &HoprDb,
         count_tickets: u64,
-        winn_prob: f64,
+        win_prob: f64,
     ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
-        init_db_with_tickets_and_channel(db, count_tickets, None, winn_prob).await
+        init_db_with_tickets_and_channel(db, count_tickets, None, win_prob).await
     }
 
     async fn init_db_with_tickets_and_channel(
         db: &HoprDb,
         count_tickets: u64,
         channel_ticket_index: Option<u32>,
-        winn_prob: f64,
+        win_prob: f64,
     ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -1421,7 +1421,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let tickets: Vec<AcknowledgedTicket> = (0..count_tickets)
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, 1, winn_prob))
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, 1, win_prob))
             .collect::<anyhow::Result<Vec<AcknowledgedTicket>>>()?;
 
         let db_clone = db.clone();
@@ -1640,11 +1640,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_mark_unsaved_low_winn_prob_ticket_rejected() -> anyhow::Result<()> {
+    async fn test_mark_unsaved_low_win_prob_ticket_rejected() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
-        let winn_prob: f64 = 0.25;
+        let win_prob: f64 = 0.25;
 
-        let tickets = init_db_with_low_winn_prob_tickets(&db, 10, winn_prob).await?.1;
+        let tickets = init_db_with_low_win_prob_tickets(&db, 10, win_prob).await?.1;
 
         assert!(!tickets.is_empty(), "tickets must be present");
 
@@ -1663,7 +1663,7 @@ mod tests {
         let stats = db.get_ticket_statistics(None).await?;
         let sum_all_tickets: HoprBalance = tickets.iter().map(|t| t.verified_ticket().amount).sum();
 
-        assert_eq!(sum_all_tickets.mul_f64(winn_prob)?, stats.rejected_value);
+        assert_eq!(sum_all_tickets.mul_f64(win_prob)?, stats.rejected_value);
         assert_eq!(
             stats,
             db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
