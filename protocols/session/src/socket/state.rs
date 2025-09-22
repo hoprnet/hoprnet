@@ -1,4 +1,3 @@
-
 use crate::{
     errors::SessionError,
     processing::types::FrameInspector,

@@ -7,7 +7,7 @@ pub use futures::future::AbortHandle;
 pub mod channel_metrics;
 
 #[cfg(feature = "prometheus")]
-pub use channel_metrics::{monitored_channel, InstrumentedSender, InstrumentedReceiver};
+pub use channel_metrics::{InstrumentedReceiver, InstrumentedSender, monitored_channel};
 
 // Both features could be enabled during testing; therefore, we only use tokio when it's
 // exclusively enabled.
@@ -30,5 +30,5 @@ macro_rules! spawn_as_abortable {
 }
 
 // If no runtime is enabled, fail compilation
-#[cfg(not(feature = "runtime-tokio"))]
+#[cfg(not(any(feature = "runtime-tokio", feature = "runtime-futures")))]
 compile_error!("No runtime enabled");

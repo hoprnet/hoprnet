@@ -11,7 +11,11 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
-prometheus = ["dep:hopr-metrics", "hopr-async-runtime/prometheus", "hopr-path/prometheus"]
+prometheus = [
+  "dep:hopr-metrics",
+  "hopr-async-runtime/prometheus",
+  "hopr-path/prometheus",
+]
 capture = ["dep:pcap-file"]
 
 [dependencies]

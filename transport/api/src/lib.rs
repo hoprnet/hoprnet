@@ -37,12 +37,10 @@ use futures::{
 };
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
-
 #[cfg(feature = "prometheus")]
-pub use hopr_async_runtime::{monitored_channel, InstrumentedSender, InstrumentedReceiver};
-
+pub use hopr_async_runtime::{InstrumentedReceiver, InstrumentedSender, monitored_channel};
 #[cfg(not(feature = "prometheus"))]
-pub use hopr_async_runtime::{monitored_channel, InstrumentedSender, InstrumentedReceiver};
+pub use hopr_async_runtime::{InstrumentedReceiver, InstrumentedSender, monitored_channel};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -315,10 +313,10 @@ where
             minimum_required = minimum_capacity,
             "Creating internal discovery updates channel"
         );
-        let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
+        let (internal_discovery_update_tx, internal_discovery_update_rx) =
             hopr_async_runtime::monitored_channel::<PeerDiscovery>(
                 internal_discovery_updates_capacity,
-                "discovery_updates"
+                "discovery_updates",
             );
 
         let network_clone = self.network.clone();
@@ -595,7 +593,7 @@ where
         let (tx_from_protocol, rx_from_protocol) =
             hopr_async_runtime::monitored_channel::<(HoprPseudonym, ApplicationDataIn)>(
                 msg_protocol_bidirectional_channel_capacity,
-                "protocol_bidirectional"
+                "protocol_bidirectional",
             );
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
@@ -621,11 +619,10 @@ where
             note = "same as protocol bidirectional",
             "Creating probing channel"
         );
-        let (tx_from_probing, rx_from_probing) =
-            hopr_async_runtime::monitored_channel::<(HoprPseudonym, ApplicationDataIn)>(
-                msg_protocol_bidirectional_channel_capacity,
-                "probing"
-            );
+        let (tx_from_probing, rx_from_probing) = hopr_async_runtime::monitored_channel::<(
+            HoprPseudonym,
+            ApplicationDataIn,
+        )>(msg_protocol_bidirectional_channel_capacity, "probing");
 
         let manual_ping_channel_capacity = std::env::var("HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY")
             .ok()
@@ -635,7 +632,7 @@ where
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
         let (manual_ping_tx, manual_ping_rx) = hopr_async_runtime::monitored_channel::<(PeerId, PingQueryReplier)>(
             manual_ping_channel_capacity,
-            "manual_ping"
+            "manual_ping",
         );
 
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);

@@ -345,10 +345,7 @@ impl Default for HoprSocket {
             .unwrap_or(16_384);
 
         debug!(capacity = channel_capacity, "Creating HoprSocket channel");
-        let (tx, rx) = hopr_transport::monitored_channel::<ApplicationDataIn>(
-            channel_capacity,
-            "hopr_socket"
-        );
+        let (tx, rx) = hopr_transport::monitored_channel::<ApplicationDataIn>(channel_capacity, "hopr_socket");
         Self { rx, tx }
     }
 }
@@ -726,11 +723,10 @@ impl Hopr {
             minimum_required = minimum_capacity,
             "Creating chain discovery events channel"
         );
-        let (mut indexer_peer_update_tx, indexer_peer_update_rx) =
-            hopr_transport::monitored_channel::<PeerDiscovery>(
-                chain_discovery_events_capacity,
-                "chain_discovery_events"
-            );
+        let (indexer_peer_update_tx, indexer_peer_update_rx) = hopr_transport::monitored_channel::<PeerDiscovery>(
+            chain_discovery_events_capacity,
+            "chain_discovery_events",
+        );
 
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),
@@ -975,7 +971,7 @@ impl Hopr {
         );
         let (on_ack_tkt_tx, mut on_ack_tkt_rx) = hopr_transport::monitored_channel::<AcknowledgedTicket>(
             ack_ticket_channel_capacity,
-            "acknowledged_tickets"
+            "acknowledged_tickets",
         );
         self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
@@ -1012,7 +1008,7 @@ impl Hopr {
         );
         let (session_tx, _session_rx) = hopr_transport::monitored_channel::<IncomingSession>(
             incoming_session_channel_capacity,
-            "incoming_sessions"
+            "incoming_sessions",
         );
 
         #[cfg(feature = "session-server")]
@@ -1048,7 +1044,12 @@ impl Hopr {
 
         for (id, proc) in self
             .transport_api
-            .run(&self.me_chain, transport_output_tx, indexer_peer_update_rx, session_tx.into_inner())
+            .run(
+                &self.me_chain,
+                transport_output_tx,
+                indexer_peer_update_rx,
+                session_tx.into_inner(),
+            )
             .await?
             .into_iter()
         {

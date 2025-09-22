@@ -5,10 +5,7 @@ use std::{
 };
 
 use futures::{
-    FutureExt, SinkExt, StreamExt, TryStreamExt,
-    channel::mpsc::UnboundedSender,
-    future::AbortHandle,
-    pin_mut,
+    FutureExt, SinkExt, StreamExt, TryStreamExt, channel::mpsc::UnboundedSender, future::AbortHandle, pin_mut,
 };
 use futures_time::future::FutureExt as TimeExt;
 use hopr_crypto_random::Randomizable;
@@ -502,7 +499,8 @@ where
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (session_close_tx, session_close_rx) = hopr_async_runtime::monitored_channel(self.cfg.maximum_sessions + 10, "session_close");
+        let (session_close_tx, session_close_rx) =
+            hopr_async_runtime::monitored_channel(self.cfg.maximum_sessions + 10, "session_close");
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -692,7 +690,7 @@ where
                     .session_notifiers
                     .get()
                     .map(|(_, notifier)| {
-                        let mut notifier = notifier.clone();
+                        let notifier = notifier.clone();
                         Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             let _ = notifier
                                 .try_send((session_id, reason))
@@ -1017,7 +1015,7 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (mut new_session_notifier, mut close_session_notifier) = self
+        let (mut new_session_notifier, close_session_notifier) = self
             .session_notifiers
             .get()
             .cloned()
