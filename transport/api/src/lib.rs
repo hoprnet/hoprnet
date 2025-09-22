@@ -295,17 +295,19 @@ where
 
         // Calculate the minimum capacity based on public nodes (each node can generate 2 messages)
         // plus 100 as additional buffer
-        let minimum_capacity = (nodes.len() * 2) + 100;
+        let minimum_capacity = nodes.len().saturating_mul(2).saturating_add(100);
 
         let internal_discovery_updates_capacity = std::env::var("HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY")
             .ok()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
             .unwrap_or(2048)
             .max(minimum_capacity);
 
         debug!(
-            "Creating internal discovery updates channel with capacity: {} (minimum required: {})",
-            internal_discovery_updates_capacity, minimum_capacity
+            capacity = internal_discovery_updates_capacity,
+            minimum_required = minimum_capacity,
+            "Creating internal discovery updates channel"
         );
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
@@ -573,12 +575,13 @@ where
         let msg_protocol_bidirectional_channel_capacity =
             std::env::var("HOPR_INTERNAL_PROTOCOL_BIDIRECTIONAL_CHANNEL_CAPACITY")
                 .ok()
-                .and_then(|s| s.parse().ok())
+                .and_then(|s| s.trim().parse::<usize>().ok())
+                .filter(|&c| c > 0)
                 .unwrap_or(16_384);
 
         debug!(
-            "Creating protocol bidirectional channel with capacity: {}",
-            msg_protocol_bidirectional_channel_capacity
+            capacity = msg_protocol_bidirectional_channel_capacity,
+            "Creating protocol bidirectional channel"
         );
         let (tx_from_protocol, rx_from_protocol) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
@@ -602,20 +605,19 @@ where
 
         // -- network probing
         debug!(
-            "Creating probing channel with capacity: {} (same as protocol bidirectional)",
-            msg_protocol_bidirectional_channel_capacity
+            capacity = msg_protocol_bidirectional_channel_capacity,
+            note = "same as protocol bidirectional",
+            "Creating probing channel"
         );
         let (tx_from_probing, rx_from_probing) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
         let manual_ping_channel_capacity = std::env::var("HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY")
             .ok()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
             .unwrap_or(128);
-        debug!(
-            "Creating manual ping channel with capacity: {}",
-            manual_ping_channel_capacity
-        );
+        debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
@@ -1043,13 +1045,11 @@ fn build_mixer_cfg_from_env() -> MixerConfig {
         ),
         capacity: {
             let capacity = std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-                .map(|v| {
-                    v.trim()
-                        .parse::<usize>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
-                })
+                .ok()
+                .and_then(|s| s.trim().parse::<usize>().ok())
+                .filter(|&c| c > 0)
                 .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY);
-            debug!("Setting mixer capacity: {}", capacity);
+            debug!(capacity = capacity, "Setting mixer capacity");
             capacity
         },
         ..MixerConfig::default()

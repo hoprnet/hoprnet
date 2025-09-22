@@ -341,10 +341,11 @@ impl Default for HoprSocket {
     fn default() -> Self {
         let channel_capacity = std::env::var("HOPR_INTERNAL_RAW_SOCKET_LIKE_CHANNEL_CAPACITY")
             .ok()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
             .unwrap_or(16_384);
 
-        debug!("Creating HoprSocket channel with capacity: {}", channel_capacity);
+        debug!(capacity = channel_capacity, "Creating HoprSocket channel");
         let (tx, rx) = channel::<ApplicationDataIn>(channel_capacity);
         Self { rx, tx }
     }
@@ -709,17 +710,19 @@ impl Hopr {
 
         // Calculate the minimum capacity based on accounts (each account can generate 2 messages),
         // plus 100 as additional buffer
-        let minimum_capacity = (accounts.len() * 2) + 100;
+        let minimum_capacity = accounts.len().saturating_mul(2).saturating_add(100);
 
         let chain_discovery_events_capacity = std::env::var("HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY")
             .ok()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
             .unwrap_or(2048)
             .max(minimum_capacity);
 
         debug!(
-            "Creating chain discovery events channel with capacity: {} (minimum required: {})",
-            chain_discovery_events_capacity, minimum_capacity
+            capacity = chain_discovery_events_capacity,
+            minimum_required = minimum_capacity,
+            "Creating chain discovery events channel"
         );
         let (mut indexer_peer_update_tx, indexer_peer_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(chain_discovery_events_capacity);
@@ -957,12 +960,13 @@ impl Hopr {
 
         let ack_ticket_channel_capacity = std::env::var("HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY")
             .ok()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
             .unwrap_or(2048);
 
         debug!(
-            "Creating acknowledged ticket channel with capacity: {}",
-            ack_ticket_channel_capacity
+            capacity = ack_ticket_channel_capacity,
+            "Creating acknowledged ticket channel"
         );
         let (on_ack_tkt_tx, mut on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
         self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
@@ -990,12 +994,13 @@ impl Hopr {
 
         let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
             .ok()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
             .unwrap_or(256);
 
         debug!(
-            "Creating incoming session channel with capacity: {}",
-            incoming_session_channel_capacity
+            capacity = incoming_session_channel_capacity,
+            "Creating incoming session channel"
         );
         let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
 
