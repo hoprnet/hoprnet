@@ -150,8 +150,7 @@ impl PeerStatus {
     #[inline]
     pub fn is_ignored(&self) -> bool {
         let now = hopr_platform::time::current_time();
-        self.ignored_until
-            .is_some_and(|t| now <= t)
+        self.ignored_until.is_some_and(|t| now <= t)
     }
 }
 
