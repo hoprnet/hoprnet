@@ -15,8 +15,18 @@ crate-type = ["rlib"]
 default = []
 session-client = []
 session-server = []
+utils_session = [
+  "dep:base64",
+  "dep:bytesize",
+  "dep:dashmap",
+  "dep:futures-time",
+  "dep:human-bandwidth",
+  "dep:tokio",
+  "dep:tokio-stream",
+]
 transport-quic = ["hopr-transport/transport-quic"]
 runtime-tokio = [
+
   "hopr-chain-api/runtime-tokio",
   "hopr-chain-rpc/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
@@ -48,9 +58,14 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
+base64 = { workspace = true, optional = true }
+bytesize = { workspace = true, optional = true }
 const_format = { workspace = true }
+dashmap = { workspace = true, optional = true }
 either = { workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true, optional = true }
+human-bandwidth = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
@@ -59,6 +74,8 @@ serde_json = { workspace = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
 validator = { workspace = true }
 
 hopr-async-runtime = { workspace = true }

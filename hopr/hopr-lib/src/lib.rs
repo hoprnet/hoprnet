@@ -20,6 +20,8 @@ pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
 
+pub mod utils;
+
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
