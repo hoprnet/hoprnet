@@ -49,7 +49,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.32", default-features = false, features = [
+alloy = { version = "=1.0.34", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -57,7 +57,7 @@ alloy = { version = "=1.0.32", default-features = false, features = [
   "k256",
   "std",
 ] }
-anyhow = "1.0.99"
+anyhow = "1.0.100"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 async-compression = "0.4.30"
@@ -83,7 +83,7 @@ bytes = "1.10.1"
 cfg_eval = "0.1.2"
 cfg-if = "1.0.3"
 chrono = { version = "0.4.42", default-features = false }
-clap = { version = "4.5.47", features = ["derive", "env", "string"] }
+clap = { version = "4.5.48", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.7.0", features = ["async_tokio", "html_reports"] }
@@ -139,7 +139,7 @@ pcap-file = "2.0.0"
 petgraph = { version = "0.8.2", features = ["serde-1"] }
 pid = "4.0.0"
 pin-project = "1.1.10"
-primitive-types = { version = "0.13.1", features = ["serde"] }
+primitive-types = { version = "0.14.0", features = ["serde"] }
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones
@@ -171,11 +171,11 @@ sea-query-binder = { version = "0.7.0", default-features = false, features = [
 ] }
 semver = "1.0.27"
 serde = { version = "1.0.223", features = ["derive"] }
-serde_bytes = "0.11.18"
+serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
 serde_json = "1.0.145"
 serde_repr = "0.1.20"
-serde_with = { version = "3.14.0", features = ["base64"] }
+serde_with = { version = "3.14.1", features = ["base64"] }
 serde_yaml = { version = "0.9.33" } # using last version before the library was deprecated
 serial_test = "3.2.0"
 sha3 = "0.10.8"
