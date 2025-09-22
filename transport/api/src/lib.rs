@@ -37,6 +37,12 @@ use futures::{
 };
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
+
+#[cfg(feature = "prometheus")]
+pub use hopr_async_runtime::{monitored_channel, InstrumentedSender, InstrumentedReceiver};
+
+#[cfg(not(feature = "prometheus"))]
+pub use hopr_async_runtime::{monitored_channel, InstrumentedSender, InstrumentedReceiver};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -310,7 +316,10 @@ where
             "Creating internal discovery updates channel"
         );
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
-            futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
+            hopr_async_runtime::monitored_channel::<PeerDiscovery>(
+                internal_discovery_updates_capacity,
+                "discovery_updates"
+            );
 
         let network_clone = self.network.clone();
         let db_clone = self.db.clone();
@@ -584,7 +593,10 @@ where
             "Creating protocol bidirectional channel"
         );
         let (tx_from_protocol, rx_from_protocol) =
-            channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
+            hopr_async_runtime::monitored_channel::<(HoprPseudonym, ApplicationDataIn)>(
+                msg_protocol_bidirectional_channel_capacity,
+                "protocol_bidirectional"
+            );
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -610,7 +622,10 @@ where
             "Creating probing channel"
         );
         let (tx_from_probing, rx_from_probing) =
-            channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
+            hopr_async_runtime::monitored_channel::<(HoprPseudonym, ApplicationDataIn)>(
+                msg_protocol_bidirectional_channel_capacity,
+                "probing"
+            );
 
         let manual_ping_channel_capacity = std::env::var("HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY")
             .ok()
@@ -618,7 +633,10 @@ where
             .filter(|&c| c > 0)
             .unwrap_or(128);
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
-        let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
+        let (manual_ping_tx, manual_ping_rx) = hopr_async_runtime::monitored_channel::<(PeerId, PingQueryReplier)>(
+            manual_ping_channel_capacity,
+            "manual_ping"
+        );
 
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
         for (k, v) in probe
@@ -646,7 +664,7 @@ where
                 PingConfig {
                     timeout: self.cfg.probe.timeout,
                 },
-                manual_ping_tx,
+                manual_ping_tx.into_inner(),
             ))
             .expect("must set the ticket aggregation writer only once");
 

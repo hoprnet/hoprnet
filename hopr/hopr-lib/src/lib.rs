@@ -33,8 +33,7 @@ use std::{
 use async_lock::RwLock;
 use errors::{HoprLibError, HoprStatusError};
 use futures::{
-    FutureExt, SinkExt, Stream, StreamExt,
-    channel::mpsc::{Receiver, Sender, channel},
+    FutureExt, Stream, StreamExt,
     future::AbortHandle,
     stream::{self},
 };
@@ -333,8 +332,8 @@ where
 ///
 /// Provides a read and write stream for Hopr socket recognized data formats.
 pub struct HoprSocket {
-    rx: Receiver<ApplicationDataIn>,
-    tx: Sender<ApplicationDataIn>,
+    rx: hopr_transport::InstrumentedReceiver<ApplicationDataIn>,
+    tx: hopr_transport::InstrumentedSender<ApplicationDataIn>,
 }
 
 impl Default for HoprSocket {
@@ -346,7 +345,10 @@ impl Default for HoprSocket {
             .unwrap_or(16_384);
 
         debug!(capacity = channel_capacity, "Creating HoprSocket channel");
-        let (tx, rx) = channel::<ApplicationDataIn>(channel_capacity);
+        let (tx, rx) = hopr_transport::monitored_channel::<ApplicationDataIn>(
+            channel_capacity,
+            "hopr_socket"
+        );
         Self { rx, tx }
     }
 }
@@ -356,11 +358,11 @@ impl HoprSocket {
         Self::default()
     }
 
-    pub fn reader(self) -> Receiver<ApplicationDataIn> {
+    pub fn reader(self) -> hopr_transport::InstrumentedReceiver<ApplicationDataIn> {
         self.rx
     }
 
-    pub fn writer(&self) -> Sender<ApplicationDataIn> {
+    pub fn writer(&self) -> hopr_transport::InstrumentedSender<ApplicationDataIn> {
         self.tx.clone()
     }
 }
@@ -725,7 +727,10 @@ impl Hopr {
             "Creating chain discovery events channel"
         );
         let (mut indexer_peer_update_tx, indexer_peer_update_rx) =
-            futures::channel::mpsc::channel::<PeerDiscovery>(chain_discovery_events_capacity);
+            hopr_transport::monitored_channel::<PeerDiscovery>(
+                chain_discovery_events_capacity,
+                "chain_discovery_events"
+            );
 
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),
@@ -968,7 +973,10 @@ impl Hopr {
             capacity = ack_ticket_channel_capacity,
             "Creating acknowledged ticket channel"
         );
-        let (on_ack_tkt_tx, mut on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
+        let (on_ack_tkt_tx, mut on_ack_tkt_rx) = hopr_transport::monitored_channel::<AcknowledgedTicket>(
+            ack_ticket_channel_capacity,
+            "acknowledged_tickets"
+        );
         self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
         processes.insert(
@@ -1002,7 +1010,10 @@ impl Hopr {
             capacity = incoming_session_channel_capacity,
             "Creating incoming session channel"
         );
-        let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
+        let (session_tx, _session_rx) = hopr_transport::monitored_channel::<IncomingSession>(
+            incoming_session_channel_capacity,
+            "incoming_sessions"
+        );
 
         #[cfg(feature = "session-server")]
         {
@@ -1037,7 +1048,7 @@ impl Hopr {
 
         for (id, proc) in self
             .transport_api
-            .run(&self.me_chain, transport_output_tx, indexer_peer_update_rx, session_tx)
+            .run(&self.me_chain, transport_output_tx, indexer_peer_update_rx, session_tx.into_inner())
             .await?
             .into_iter()
         {

@@ -16,7 +16,7 @@ default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
 runtime-tokio = ["dep:tokio", "hopr-async-runtime/runtime-tokio"]
 hashbrown = ["dep:hashbrown"]
-prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static", "hopr-async-runtime/prometheus"]
 session-types = []
 
 [dependencies]

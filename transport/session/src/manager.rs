@@ -6,7 +6,7 @@ use std::{
 
 use futures::{
     FutureExt, SinkExt, StreamExt, TryStreamExt,
-    channel::mpsc::{Sender, UnboundedSender},
+    channel::mpsc::UnboundedSender,
     future::AbortHandle,
     pin_mut,
 };
@@ -410,7 +410,7 @@ pub struct SessionManagerConfig {
 pub struct SessionManager<S, T> {
     session_initiations: SessionInitiationCache,
     #[allow(clippy::type_complexity)]
-    session_notifiers: Arc<OnceLock<(T, Sender<(SessionId, ClosureReason)>)>>,
+    session_notifiers: Arc<OnceLock<(T, hopr_async_runtime::InstrumentedSender<(SessionId, ClosureReason)>)>>,
     sessions: moka::future::Cache<SessionId, SessionSlot>,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
@@ -502,7 +502,7 @@ where
             .set(msg_sender)
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
 
-        let (session_close_tx, session_close_rx) = futures::channel::mpsc::channel(self.cfg.maximum_sessions + 10);
+        let (session_close_tx, session_close_rx) = hopr_async_runtime::monitored_channel(self.cfg.maximum_sessions + 10, "session_close");
         self.session_notifiers
             .set((new_session_notifier, session_close_tx))
             .map_err(|_| SessionManagerError::AlreadyStarted)?;
@@ -1503,11 +1503,11 @@ mod tests {
         let mut ahs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, _) = hopr_async_runtime::monitored_channel(1024, "test_session_alice");
         ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_bob, new_session_rx_bob) = hopr_async_runtime::monitored_channel(1024, "test_session_bob");
         ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -1652,11 +1652,11 @@ mod tests {
         let mut ahs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, _) = hopr_async_runtime::monitored_channel(1024, "test_session_alice");
         ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_bob, new_session_rx_bob) = hopr_async_runtime::monitored_channel(1024, "test_session_bob");
         ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
@@ -1848,11 +1848,11 @@ mod tests {
         let mut jhs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, _) = hopr_async_runtime::monitored_channel(1024, "test_session_alice");
         jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_bob, _) = hopr_async_runtime::monitored_channel(1024, "test_session_bob");
         jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let result = alice_mgr
@@ -1964,11 +1964,11 @@ mod tests {
         let mut jhs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, _) = hopr_async_runtime::monitored_channel(1024, "test_session_alice");
         jhs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_bob, _) = hopr_async_runtime::monitored_channel(1024, "test_session_bob");
         jhs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let result = alice_mgr
@@ -2056,7 +2056,7 @@ mod tests {
             });
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, _) = hopr_async_runtime::monitored_channel(1024, "test_session_alice");
         alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
 
         let alice_session = alice_mgr
@@ -2109,11 +2109,11 @@ mod tests {
             .returning(|_, _| Box::pin(async { Ok(()) }));
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, _) = hopr_async_runtime::monitored_channel(1024, "test_session_alice");
         alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
 
         // Start Bob
-        let (new_session_tx_bob, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_bob, _) = hopr_async_runtime::monitored_channel(1024, "test_session_bob");
         bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?;
 
         let result = alice_mgr
@@ -2260,11 +2260,11 @@ mod tests {
         let mut ahs = Vec::new();
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, _) = hopr_async_runtime::monitored_channel(1024, "test_session_alice");
         ahs.extend(alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?);
 
         // Start Bob
-        let (new_session_tx_bob, new_session_rx_bob) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_bob, new_session_rx_bob) = hopr_async_runtime::monitored_channel(1024, "test_session_bob");
         ahs.extend(bob_mgr.start(mock_packet_planning(bob_transport), new_session_tx_bob)?);
 
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);

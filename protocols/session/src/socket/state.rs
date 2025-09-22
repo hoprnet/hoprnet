@@ -1,4 +1,3 @@
-use futures::channel::mpsc::Sender;
 
 use crate::{
     errors::SessionError,
@@ -18,7 +17,7 @@ pub struct SocketComponents<const C: usize> {
     /// Allows emitting control messages to the socket.
     ///
     /// It is a regular [`SessionMessage`] injected into the downstream.
-    pub ctl_tx: Sender<SessionMessage<C>>,
+    pub ctl_tx: hopr_async_runtime::InstrumentedSender<SessionMessage<C>>,
 }
 
 /// Abstraction of the [`SessionSocket`](super::SessionSocket) state.

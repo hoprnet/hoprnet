@@ -3,6 +3,12 @@
 
 pub use futures::future::AbortHandle;
 
+#[cfg(feature = "prometheus")]
+pub mod channel_metrics;
+
+#[cfg(feature = "prometheus")]
+pub use channel_metrics::{monitored_channel, InstrumentedSender, InstrumentedReceiver};
+
 // Both features could be enabled during testing; therefore, we only use tokio when it's
 // exclusively enabled.
 #[cfg(feature = "runtime-tokio")]

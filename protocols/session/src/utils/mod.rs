@@ -17,8 +17,7 @@ use crate::{
     protocol::{FrameId, Segment, SeqIndicator, SeqNum},
 };
 
-#[derive(Debug)]
-pub(crate) struct RingBufferProducer<T>(futures::channel::mpsc::Sender<T>);
+pub(crate) struct RingBufferProducer<T>(hopr_async_runtime::InstrumentedSender<T>);
 
 impl<T> Clone for RingBufferProducer<T> {
     fn clone(&self) -> Self {
@@ -51,7 +50,7 @@ pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
     capacity: usize,
 ) -> (RingBufferProducer<T>, RingBufferView<T>) {
     // The channel gets the same capacity as RB in case the task cannot keep up (due to locking)
-    let (rb_tx, rb_rx) = futures::channel::mpsc::channel(capacity);
+    let (rb_tx, rb_rx) = hopr_async_runtime::monitored_channel(capacity, "searchable_ringbuffer");
     let rb = Arc::new(parking_lot::FairMutex::new(AllocRingBuffer::new(capacity)));
 
     let rb_clone = rb.clone();

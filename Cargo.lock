@@ -4457,6 +4457,8 @@ name = "hopr-async-runtime"
 version = "0.3.0"
 dependencies = [
  "futures",
+ "hopr-metrics",
+ "lazy_static",
  "tokio",
 ]
 
@@ -5195,6 +5197,7 @@ dependencies = [
  "strum 0.27.2",
  "temp-env",
  "thiserror 2.0.16",
+ "tokio",
  "tracing",
  "uuid",
  "validator",

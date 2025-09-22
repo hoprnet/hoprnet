@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::{FutureExt, StreamExt, channel::mpsc::Sender};
+use futures::{FutureExt, StreamExt};
 use futures_time::stream::StreamExt as TimeStreamExt;
 use tracing::Instrument;
 
@@ -121,9 +121,9 @@ struct AcknowledgementStateContext<const C: usize> {
     rb_rx: RingBufferView<Segment>,
     incoming_frame_retries_tx: SkipDelaySender<RetriedFrameId>,
     outgoing_frame_retries_tx: SkipDelaySender<RetriedFrameId>,
-    ack_tx: futures::channel::mpsc::Sender<FrameId>,
+    ack_tx: hopr_async_runtime::InstrumentedSender<FrameId>,
     inspector: FrameInspector,
-    ctl_tx: Sender<SessionMessage<C>>,
+    ctl_tx: hopr_async_runtime::InstrumentedSender<SessionMessage<C>>,
 }
 
 #[cfg_attr(doc, aquamarine::aquamarine)]
@@ -250,7 +250,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let (rb_tx, rb_rx) = searchable_ringbuffer(self.cfg.lookbehind_segments);
 
         // Full frame acknowledgements get a special channel with fixed capacity
-        let (ack_tx, ack_rx) = futures::channel::mpsc::channel(2 * self.cfg.lookbehind_segments);
+        let (ack_tx, ack_rx) = hopr_async_runtime::monitored_channel(2 * self.cfg.lookbehind_segments, "ack_state");
 
         let context = self.context.insert(AcknowledgementStateContext {
             rb_tx,
@@ -626,7 +626,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -671,7 +671,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -731,7 +731,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -764,7 +764,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -800,7 +800,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -840,7 +840,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -909,7 +909,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
@@ -955,7 +955,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
@@ -998,7 +998,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let segments = segment(hopr_crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
 
@@ -1063,7 +1063,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(1024, "test_ack_state_ctl");
 
         let segments = segment(hopr_crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
 

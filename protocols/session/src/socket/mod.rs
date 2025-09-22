@@ -240,14 +240,14 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             .unwrap_or(2048);
 
         tracing::debug!(capacity = ctl_channel_capacity, "Creating session control channel");
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(ctl_channel_capacity);
+        let (ctl_tx, ctl_rx) = hopr_async_runtime::monitored_channel(ctl_channel_capacity, "session_control");
         state.run(SocketComponents {
             inspector: Some(inspector.clone()),
             ctl_tx,
         })?;
 
         // Pipeline IN: Data incoming from Upstream
-        let (segments_tx, segments_rx) = futures::channel::mpsc::channel(cfg.capacity);
+        let (segments_tx, segments_rx) = hopr_async_runtime::monitored_channel(cfg.capacity, "session_segments");
         let mut st_1 = state.clone();
         let upstream_frames_in = segments_tx
             .with(move |segment| {

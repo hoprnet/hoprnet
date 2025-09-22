@@ -19,6 +19,7 @@ runtime-tokio = [
   "dep:tokio",
 ]
 prometheus = [
+  "hopr-async-runtime/prometheus",
   "hopr-network-types/prometheus",
   "hopr-protocol-session/prometheus",
   "dep:hopr-metrics",

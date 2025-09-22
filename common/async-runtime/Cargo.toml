@@ -14,7 +14,13 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-tokio = ["dep:tokio"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
-tokio = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["time"] }
 futures = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+lazy_static = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
