@@ -89,6 +89,7 @@ hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
   "session-server",
+  "utils_session",
 ] }
 hoprd-api = { workspace = true }
 hopr-parallelize = { workspace = true }
