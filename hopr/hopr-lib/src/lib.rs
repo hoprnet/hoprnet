@@ -112,7 +112,6 @@ pub use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions};
 pub use hopr_path::channel_graph::GraphExportConfig;
 use hopr_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate};
-use hopr_platform::file::native::remove_dir_all;
 pub use hopr_primitive_types::prelude::*;
 pub use hopr_strategy::Strategy;
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
@@ -239,7 +238,7 @@ impl Hopr {
 
         if cfg.db.force_initialize {
             info!("Force cleaning up existing database");
-            remove_dir_all(db_path.as_path()).map_err(|e| {
+            hopr_platform::file::native::remove_dir_all(db_path.as_path()).map_err(|e| {
                 HoprLibError::GeneralError(format!(
                     "Failed to remove the existing DB directory at '{db_path:?}': {e}"
                 ))
