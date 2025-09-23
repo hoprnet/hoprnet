@@ -18,7 +18,7 @@ on:
       tag_name:
         type: string
         required: true
-        description: 'Git tag from which the release branch fork (v2.2.0)'
+        description: 'Git tag from which the release branch fork (v3.0.0)'
 
 concurrency:
   group: promote-release
