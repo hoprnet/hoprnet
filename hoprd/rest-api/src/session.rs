@@ -37,15 +37,6 @@ pub const HOPR_UDP_BUFFER_SIZE: usize = 16384;
 /// Size of the queue (back-pressure) for data incoming from a UDP stream.
 pub const HOPR_UDP_QUEUE_SIZE: usize = 8192;
 
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_CLIENTS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
-        "hopr_session_hoprd_clients",
-        "Number of clients connected at this Entry node",
-        &["type"]
-    ).unwrap();
-}
-
 // Imported for some IDEs to not treat the `json!` macro inside the `schema` macro as an error
 #[allow(unused_imports)]
 use serde_json::json;
