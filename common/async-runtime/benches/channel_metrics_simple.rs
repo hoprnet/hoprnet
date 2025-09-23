@@ -38,10 +38,10 @@
 //! ## Feature Configuration Support
 //!
 //! This benchmark works with all feature combinations:
-//! - ✅ `runtime-tokio` + `prometheus`
-//! - ✅ `runtime-tokio` (no prometheus)
-//! - ✅ `runtime-futures` + `prometheus`
-//! - ✅ `runtime-futures` (no prometheus)
+//! - `runtime-tokio` + `prometheus`
+//! - `runtime-tokio` (no prometheus)
+//! - `runtime-futures` + `prometheus`
+//! - `runtime-futures` (no prometheus)
 //!
 //! ## Interpreting Results
 //!
@@ -55,7 +55,7 @@
 //!
 //! ```
 //! Overhead % = (monitored_time - native_time) / native_time * 100
-//! 
+//!
 //! Example:
 //! - Monitored: 251.2 µs
 //! - Native: 241.1 µs  
@@ -77,21 +77,18 @@
 //! - **> 10% overhead**: Consider disabling monitoring for hot paths
 //! - **Creation overhead**: One-time cost, typically not critical
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hopr_async_runtime::monitored_channel;
-use std::time::Duration;
-use std::hint::black_box;
+use std::{hint::black_box, time::Duration};
 
-// Import necessary traits for both backends
-use futures::StreamExt;
-
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 // For futures backend when using Sink trait
 #[cfg(not(feature = "runtime-tokio"))]
 use futures::SinkExt;
-
 // For tokio backend when using Sink trait (no prometheus case)
 #[cfg(all(feature = "runtime-tokio", not(feature = "prometheus")))]
 use futures::SinkExt;
+// Import necessary traits for both backends
+use futures::StreamExt;
+use hopr_async_runtime::monitored_channel;
 
 // Benchmark constants
 const CHANNEL_SIZES: &[usize] = &[10, 100, 1000];
@@ -106,7 +103,7 @@ const MESSAGE_COUNTS: &[usize] = &[100, 1000];
 /// # Configuration Handling
 ///
 /// - **Tokio + Prometheus**: Uses `&self` for sender, native `.send()` method
-/// - **Tokio No Prometheus**: Uses `&mut self` for sender, Sink trait `.send()` method  
+/// - **Tokio No Prometheus**: Uses `&mut self` for sender, Sink trait `.send()` method
 /// - **Futures + Prometheus**: Uses `&mut self` for sender, native `.send()` method
 /// - **Futures No Prometheus**: Uses `&mut self` for sender, native `.send()` method
 ///
@@ -118,57 +115,57 @@ async fn bench_channel_simple(buffer_size: usize, message_count: usize) {
     #[cfg(all(feature = "runtime-tokio", feature = "prometheus"))]
     {
         let (sender, mut receiver) = monitored_channel::<usize>(buffer_size, "bench_channel");
-        
+
         // Spawn receiver task
         let receiver_handle = tokio::spawn(async move {
             for _ in 0..message_count {
                 receiver.next().await;
             }
         });
-        
+
         // Send messages - tokio backend with prometheus uses &self
         for i in 0..message_count {
             sender.send(black_box(i)).await.unwrap();
         }
-        
+
         receiver_handle.await.unwrap();
     }
-    
+
     #[cfg(all(feature = "runtime-tokio", not(feature = "prometheus")))]
     {
         let (mut sender, mut receiver) = monitored_channel::<usize>(buffer_size, "bench_channel");
-        
+
         // Spawn receiver task
         let receiver_handle = tokio::spawn(async move {
             for _ in 0..message_count {
                 receiver.next().await;
             }
         });
-        
+
         // Send messages - tokio backend without prometheus uses Sink trait (&mut self)
         for i in 0..message_count {
             sender.send(black_box(i)).await.unwrap();
         }
-        
+
         receiver_handle.await.unwrap();
     }
-    
+
     #[cfg(not(feature = "runtime-tokio"))]
     {
         let (mut sender, mut receiver) = monitored_channel::<usize>(buffer_size, "bench_channel");
-        
+
         // Spawn receiver task
         let receiver_handle = tokio::spawn(async move {
             for _ in 0..message_count {
                 receiver.next().await;
             }
         });
-        
+
         // Send messages - futures backend uses &mut self
         for i in 0..message_count {
             sender.send(black_box(i)).await.unwrap();
         }
-        
+
         receiver_handle.await.unwrap();
     }
 }
@@ -185,17 +182,17 @@ async fn bench_channel_simple(buffer_size: usize, message_count: usize) {
 #[cfg(feature = "runtime-tokio")]
 async fn bench_native_tokio(buffer_size: usize, message_count: usize) {
     let (sender, mut receiver) = tokio::sync::mpsc::channel::<usize>(buffer_size);
-    
+
     let receiver_handle = tokio::spawn(async move {
         for _ in 0..message_count {
             receiver.recv().await;
         }
     });
-    
+
     for i in 0..message_count {
         sender.send(black_box(i)).await.unwrap();
     }
-    
+
     receiver_handle.await.unwrap();
 }
 
@@ -206,22 +203,22 @@ async fn bench_native_tokio(buffer_size: usize, message_count: usize) {
 ///
 /// # Parameters
 ///
-/// - `buffer_size`: Channel buffer capacity  
+/// - `buffer_size`: Channel buffer capacity
 /// - `message_count`: Number of messages to send
 #[cfg(not(feature = "runtime-tokio"))]
 async fn bench_native_futures(buffer_size: usize, message_count: usize) {
     let (mut sender, mut receiver) = futures::channel::mpsc::channel::<usize>(buffer_size);
-    
+
     let receiver_handle = tokio::spawn(async move {
         for _ in 0..message_count {
             receiver.next().await;
         }
     });
-    
+
     for i in 0..message_count {
         sender.send(black_box(i)).await.unwrap();
     }
-    
+
     receiver_handle.await.unwrap();
 }
 
@@ -273,30 +270,30 @@ fn bench_native_creation_futures(buffer_size: usize) {
 /// simple_channel_send/monitored/buf_100_msgs_1000
 ///   time: [250.1 µs 251.2 µs 252.3 µs]
 ///   thrpt: [3.96 Melem/s 3.98 Melem/s 4.00 Melem/s]
-/// 
+///
 /// simple_channel_send/native/buf_100_msgs_1000  
 ///   time: [240.5 µs 241.1 µs 241.7 µs]
 ///   thrpt: [4.14 Melem/s 4.15 Melem/s 4.16 Melem/s]
 /// ```
-/// 
+///
 /// In this example: ~4% overhead (251.2µs vs 241.1µs)
 fn bench_channel_send(c: &mut Criterion) {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("simple_channel_send");
-    
+
     for &buffer_size in CHANNEL_SIZES {
         for &message_count in MESSAGE_COUNTS {
             group.throughput(Throughput::Elements(message_count as u64));
-            
+
             // Benchmark monitored channels
             group.bench_with_input(
                 BenchmarkId::new("monitored", format!("buf_{}_msgs_{}", buffer_size, message_count)),
                 &(buffer_size, message_count),
                 |b, &(buf, msgs)| {
                     b.to_async(&runtime).iter(|| bench_channel_simple(buf, msgs));
-                }
+                },
             );
-            
+
             // Benchmark native channels for comparison
             group.bench_with_input(
                 BenchmarkId::new("native", format!("buf_{}_msgs_{}", buffer_size, message_count)),
@@ -308,11 +305,11 @@ fn bench_channel_send(c: &mut Criterion) {
                         #[cfg(not(feature = "runtime-tokio"))]
                         bench_native_futures(buf, msgs).await;
                     });
-                }
+                },
             );
         }
     }
-    
+
     group.finish();
 }
 
@@ -337,40 +334,32 @@ fn bench_channel_send(c: &mut Criterion) {
 /// ```text
 /// simple_channel_creation/monitored/1000
 ///   time: [124.2 ns 125.1 ns 126.0 ns]
-/// 
+///
 /// simple_channel_creation/native/1000
 ///   time: [70.1 ns 70.8 ns 71.5 ns]
 /// ```
-/// 
+///
 /// In this example: ~77% creation overhead (125.1ns vs 70.8ns)
 fn bench_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("simple_channel_creation");
-    
+
     for &buffer_size in CHANNEL_SIZES {
         // Benchmark monitored channel creation
-        group.bench_with_input(
-            BenchmarkId::new("monitored", buffer_size),
-            &buffer_size,
-            |b, &buf| {
-                b.iter(|| bench_channel_creation(buf));
-            }
-        );
-        
+        group.bench_with_input(BenchmarkId::new("monitored", buffer_size), &buffer_size, |b, &buf| {
+            b.iter(|| bench_channel_creation(buf));
+        });
+
         // Benchmark native channel creation
-        group.bench_with_input(
-            BenchmarkId::new("native", buffer_size),
-            &buffer_size,
-            |b, &buf| {
-                b.iter(|| {
-                    #[cfg(feature = "runtime-tokio")]
-                    bench_native_creation_tokio(buf);
-                    #[cfg(not(feature = "runtime-tokio"))]
-                    bench_native_creation_futures(buf);
-                });
-            }
-        );
+        group.bench_with_input(BenchmarkId::new("native", buffer_size), &buffer_size, |b, &buf| {
+            b.iter(|| {
+                #[cfg(feature = "runtime-tokio")]
+                bench_native_creation_tokio(buf);
+                #[cfg(not(feature = "runtime-tokio"))]
+                bench_native_creation_futures(buf);
+            });
+        });
     }
-    
+
     group.finish();
 }
 

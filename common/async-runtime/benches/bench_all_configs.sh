@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 # Channel Metrics Benchmark Script
-# 
+#
 # This script runs the channel_metrics_simple benchmark across all supported feature configurations
 # to measure the performance impact of channel monitoring in hopr-async-runtime.
 #
 # Supported Configurations:
 # - tokio_prometheus: Tokio runtime with Prometheus metrics
 # - tokio_no_prometheus: Tokio runtime without metrics (zero overhead)
-# - futures_prometheus: Futures runtime with Prometheus metrics  
+# - futures_prometheus: Futures runtime with Prometheus metrics
 # - futures_no_prometheus: Futures runtime without metrics (zero overhead)
 #
 # Usage Examples:
@@ -40,7 +40,7 @@ NC='\033[0m' # No Color
 
 # Function to display help
 show_help() {
-	cat << EOF
+	cat <<EOF
 Usage: $SCRIPT_NAME [OPTIONS]
 
 Benchmark script for hopr-async-runtime channel metrics performance testing.
@@ -99,8 +99,6 @@ OUTPUT:
     Results are saved to $RESULTS_DIR/ with timestamps
     Each configuration generates a separate result file
 
-For more information, see benches/README.md
-
 EOF
 	exit 0
 }
@@ -115,66 +113,66 @@ error_exit() {
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
 	case $1 in
-		-h|--help)
-			show_help
-			;;
-		-c|--config)
-			SELECTED_CONFIG="$2"
-			RUN_ALL=false
-			shift 2
-			;;
-		-q|--quick)
-			QUICK_MODE=true
-			shift
-			;;
-		-v|--verbose)
-			VERBOSE=true
-			shift
-			;;
-		-o|--output)
-			RESULTS_DIR="$2"
-			shift 2
-			;;
-		--clean)
-			echo "Cleaning previous benchmark results..."
-			rm -rf "$RESULTS_DIR"
-			shift
-			;;
-		--compare)
-			if [ -d "$RESULTS_DIR" ]; then
-				echo -e "${BLUE}Previous benchmark results:${NC}"
-				ls -la "$RESULTS_DIR"/*.txt 2>/dev/null || echo "No previous results found"
-				exit 0
-			else
-				echo "No previous results found in $RESULTS_DIR"
-				exit 0
-			fi
-			;;
-		--baseline)
-			BASELINE_NAME="$2"
-			shift 2
-			;;
-		--vs-baseline)
-			VS_BASELINE="$2"
-			shift 2
-			;;
-		*)
-			error_exit "Unknown option: $1"
-			;;
+	-h | --help)
+		show_help
+		;;
+	-c | --config)
+		SELECTED_CONFIG="$2"
+		RUN_ALL=false
+		shift 2
+		;;
+	-q | --quick)
+		QUICK_MODE=true
+		shift
+		;;
+	-v | --verbose)
+		VERBOSE=true
+		shift
+		;;
+	-o | --output)
+		RESULTS_DIR="$2"
+		shift 2
+		;;
+	--clean)
+		echo "Cleaning previous benchmark results..."
+		rm -rf "$RESULTS_DIR"
+		shift
+		;;
+	--compare)
+		if [ -d "$RESULTS_DIR" ]; then
+			echo -e "${BLUE}Previous benchmark results:${NC}"
+			ls -la "$RESULTS_DIR"/*.txt 2>/dev/null || echo "No previous results found"
+			exit 0
+		else
+			echo "No previous results found in $RESULTS_DIR"
+			exit 0
+		fi
+		;;
+	--baseline)
+		BASELINE_NAME="$2"
+		shift 2
+		;;
+	--vs-baseline)
+		VS_BASELINE="$2"
+		shift 2
+		;;
+	*)
+		error_exit "Unknown option: $1"
+		;;
 	esac
 done
 
 # Validate selected configuration
 if [ "$RUN_ALL" = false ]; then
 	case $SELECTED_CONFIG in
-		tokio_prometheus|tokio_no_prometheus|futures_prometheus|futures_no_prometheus|all)
-			if [ "$SELECTED_CONFIG" = "all" ]; then
-				RUN_ALL=true
-			fi
-			;;
-		*)
-			error_exit "Invalid configuration: $SELECTED_CONFIG"
-			;;
+	tokio_prometheus | tokio_no_prometheus | futures_prometheus | futures_no_prometheus | all)
+		if [ "$SELECTED_CONFIG" = "all" ]; then
+			RUN_ALL=true
+		fi
+		;;
+	*)
+		error_exit "Invalid configuration: $SELECTED_CONFIG"
+		;;
 	esac
 fi
 
@@ -217,7 +215,7 @@ run_bench() {
 	if [ "$no_default" = "yes" ]; then
 		cmd="$cmd --no-default-features"
 	fi
-	
+
 	# Add benchmark flags
 	if [ "$BENCH_FLAGS" != "" ]; then
 		cmd="$cmd $BENCH_FLAGS"
@@ -238,21 +236,21 @@ run_bench() {
 run_config() {
 	local config=$1
 	case $config in
-		tokio_prometheus)
-			run_bench "tokio_with_prometheus" "runtime-tokio,prometheus" "no"
-			;;
-		tokio_no_prometheus)
-			run_bench "tokio_no_prometheus" "runtime-tokio" "yes"
-			;;
-		futures_prometheus)
-			run_bench "futures_with_prometheus" "runtime-futures,prometheus" "yes"
-			;;
-		futures_no_prometheus)
-			run_bench "futures_no_prometheus" "runtime-futures" "yes"
-			;;
-		*)
-			error_exit "Unknown configuration: $config"
-			;;
+	tokio_prometheus)
+		run_bench "tokio_with_prometheus" "runtime-tokio,prometheus" "no"
+		;;
+	tokio_no_prometheus)
+		run_bench "tokio_no_prometheus" "runtime-tokio" "yes"
+		;;
+	futures_prometheus)
+		run_bench "futures_with_prometheus" "runtime-futures,prometheus" "yes"
+		;;
+	futures_no_prometheus)
+		run_bench "futures_no_prometheus" "runtime-futures" "yes"
+		;;
+	*)
+		error_exit "Unknown configuration: $config"
+		;;
 	esac
 }
 
@@ -260,7 +258,7 @@ run_config() {
 if [ "$RUN_ALL" = true ]; then
 	echo -e "${GREEN}Running all configurations...${NC}"
 	echo ""
-	
+
 	# Configuration 1: Tokio with Prometheus (default setup)
 	run_bench "tokio_with_prometheus" "runtime-tokio,prometheus" "no"
 
@@ -291,18 +289,18 @@ if [ "$RUN_ALL" = true ]; then
 	CONFIGS_RUN="tokio_with_prometheus tokio_no_prometheus futures_with_prometheus futures_no_prometheus"
 else
 	case $SELECTED_CONFIG in
-		tokio_prometheus)
-			CONFIGS_RUN="tokio_with_prometheus"
-			;;
-		tokio_no_prometheus)
-			CONFIGS_RUN="tokio_no_prometheus"
-			;;
-		futures_prometheus)
-			CONFIGS_RUN="futures_with_prometheus"
-			;;
-		futures_no_prometheus)
-			CONFIGS_RUN="futures_no_prometheus"
-			;;
+	tokio_prometheus)
+		CONFIGS_RUN="tokio_with_prometheus"
+		;;
+	tokio_no_prometheus)
+		CONFIGS_RUN="tokio_no_prometheus"
+		;;
+	futures_prometheus)
+		CONFIGS_RUN="futures_with_prometheus"
+		;;
+	futures_no_prometheus)
+		CONFIGS_RUN="futures_no_prometheus"
+		;;
 	esac
 fi
 
@@ -314,9 +312,9 @@ for config in $CONFIGS_RUN; do
 	echo -e "${BLUE}$config:${NC}"
 	if [ -f "$RESULTS_DIR/${config}_${TIMESTAMP}.txt" ]; then
 		# Try to extract key metrics
-		grep -A2 "channel_send/monitored/buf_100_msgs_1000" "$RESULTS_DIR/${config}_${TIMESTAMP}.txt" 2>/dev/null || \
-		grep -A1 "channel_creation/monitored/100" "$RESULTS_DIR/${config}_${TIMESTAMP}.txt" 2>/dev/null || \
-		echo "  No standard metrics found - check full results file"
+		grep -A2 "channel_send/monitored/buf_100_msgs_1000" "$RESULTS_DIR/${config}_${TIMESTAMP}.txt" 2>/dev/null ||
+			grep -A1 "channel_creation/monitored/100" "$RESULTS_DIR/${config}_${TIMESTAMP}.txt" 2>/dev/null ||
+			echo "  No standard metrics found - check full results file"
 	else
 		echo "  Results file not found"
 	fi
@@ -356,6 +354,3 @@ if [ "$QUICK_MODE" = true ]; then
 	echo "For production measurements, run without -q/--quick flag"
 	echo ""
 fi
-
-echo -e "${GREEN}For more information, see benches/README.md${NC}"
-

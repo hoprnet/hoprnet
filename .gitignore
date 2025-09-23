@@ -217,3 +217,6 @@ deploy/nfpm/*.1.gz
 
 # pcap packet capture files
 **/*.pcap
+
+bench_results/
+bench_results_*.txt
