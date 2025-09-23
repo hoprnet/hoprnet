@@ -79,6 +79,8 @@ use hopr_transport_protocol::{
 pub use hopr_transport_session::MetricSessionCounterGuard;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
+
+pub use hopr_transport_session as session;
 pub use hopr_transport_session::{
     Capabilities as SessionCapabilities, Capability as SessionCapability, HoprSession, IncomingSession, SESSION_MTU,
     SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig,

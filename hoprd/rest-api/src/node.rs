@@ -40,8 +40,8 @@ pub(crate) struct NodeVersionResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let version = state.hopr.version();
+pub(super) async fn version() -> impl IntoResponse {
+    let version = hopr_lib::constants::APP_VERSION.to_string();
     (StatusCode::OK, Json(NodeVersionResponse { version })).into_response()
 }
 

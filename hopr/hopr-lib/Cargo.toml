@@ -118,7 +118,5 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 url = { workspace = true }
 
-hopr-crypto-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
