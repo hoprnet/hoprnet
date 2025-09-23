@@ -1,0 +1,129 @@
+    Finished `bench` profile [optimized + debuginfo] target(s) in 0.16s
+     Running benches/channel_metrics_simple.rs (/home/rbt/work/hopr/hoprnet/target/release/deps/channel_metrics_simple-b97a7072d62236da)
+Benchmarking simple_channel_send/monitored/buf_10_msgs_100
+Benchmarking simple_channel_send/monitored/buf_10_msgs_100: Warming up for 2.0000 s
+Benchmarking simple_channel_send/monitored/buf_10_msgs_100: Collecting 10 samples in estimated 5.0000 s (188k iterations)
+Benchmarking simple_channel_send/monitored/buf_10_msgs_100: Analyzing
+simple_channel_send/monitored/buf_10_msgs_100
+                        time:   [26.465 µs 26.530 µs 26.609 µs]
+                        thrpt:  [3.7582 Melem/s 3.7693 Melem/s 3.7786 Melem/s]
+                 change:
+                        time:   [−19.161% −16.922% −14.537%] (p = 0.00 < 0.05)
+                        thrpt:  [+17.010% +20.369% +23.703%]
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+Benchmarking simple_channel_send/native/buf_10_msgs_100
+Benchmarking simple_channel_send/native/buf_10_msgs_100: Warming up for 2.0000 s
+Benchmarking simple_channel_send/native/buf_10_msgs_100: Collecting 10 samples in estimated 5.0016 s (160k iterations)
+Benchmarking simple_channel_send/native/buf_10_msgs_100: Analyzing
+simple_channel_send/native/buf_10_msgs_100
+                        time:   [28.945 µs 30.093 µs 31.000 µs]
+                        thrpt:  [3.2258 Melem/s 3.3231 Melem/s 3.4548 Melem/s]
+                 change:
+                        time:   [−3.3483% +1.3881% +5.6278%] (p = 0.56 > 0.05)
+                        thrpt:  [−5.3280% −1.3691% +3.4643%]
+                        No change in performance detected.
+Benchmarking simple_channel_send/monitored/buf_10_msgs_1000
+Benchmarking simple_channel_send/monitored/buf_10_msgs_1000: Warming up for 2.0000 s
+Benchmarking simple_channel_send/monitored/buf_10_msgs_1000: Collecting 10 samples in estimated 5.0010 s (20k iterations)
+Benchmarking simple_channel_send/monitored/buf_10_msgs_1000: Analyzing
+simple_channel_send/monitored/buf_10_msgs_1000
+                        time:   [246.96 µs 248.68 µs 249.86 µs]
+                        thrpt:  [4.0022 Melem/s 4.0212 Melem/s 4.0492 Melem/s]
+                 change:
+                        time:   [−3.0779% −2.3839% −1.7008%] (p = 0.00 < 0.05)
+                        thrpt:  [+1.7302% +2.4421% +3.1756%]
+                        Performance has improved.
+Benchmarking simple_channel_send/native/buf_10_msgs_1000
+Benchmarking simple_channel_send/native/buf_10_msgs_1000: Warming up for 2.0000 s
+Benchmarking simple_channel_send/native/buf_10_msgs_1000: Collecting 10 samples in estimated 5.0100 s (17k iterations)
+Benchmarking simple_channel_send/native/buf_10_msgs_1000: Analyzing
+simple_channel_send/native/buf_10_msgs_1000
+                        time:   [286.98 µs 293.13 µs 300.44 µs]
+                        thrpt:  [3.3285 Melem/s 3.4114 Melem/s 3.4846 Melem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking simple_channel_send/monitored/buf_100_msgs_100
+Benchmarking simple_channel_send/monitored/buf_100_msgs_100: Warming up for 2.0000 s
+Benchmarking simple_channel_send/monitored/buf_100_msgs_100: Collecting 10 samples in estimated 5.0009 s (189k iterations)
+Benchmarking simple_channel_send/monitored/buf_100_msgs_100: Analyzing
+simple_channel_send/monitored/buf_100_msgs_100
+                        time:   [26.485 µs 26.540 µs 26.604 µs]
+                        thrpt:  [3.7588 Melem/s 3.7679 Melem/s 3.7758 Melem/s]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking simple_channel_send/native/buf_100_msgs_100
+Benchmarking simple_channel_send/native/buf_100_msgs_100: Warming up for 2.0000 s
+Benchmarking simple_channel_send/native/buf_100_msgs_100: Collecting 10 samples in estimated 5.0001 s (674k iterations)
+Benchmarking simple_channel_send/native/buf_100_msgs_100: Analyzing
+simple_channel_send/native/buf_100_msgs_100
+                        time:   [7.1873 µs 7.3667 µs 7.5417 µs]
+                        thrpt:  [13.260 Melem/s 13.575 Melem/s 13.913 Melem/s]
+Benchmarking simple_channel_send/monitored/buf_100_msgs_1000
+Benchmarking simple_channel_send/monitored/buf_100_msgs_1000: Warming up for 2.0000 s
+Benchmarking simple_channel_send/monitored/buf_100_msgs_1000: Collecting 10 samples in estimated 5.0125 s (20k iterations)
+Benchmarking simple_channel_send/monitored/buf_100_msgs_1000: Analyzing
+simple_channel_send/monitored/buf_100_msgs_1000
+                        time:   [244.43 µs 245.23 µs 246.23 µs]
+                        thrpt:  [4.0612 Melem/s 4.0777 Melem/s 4.0911 Melem/s]
+Benchmarking simple_channel_send/native/buf_100_msgs_1000
+Benchmarking simple_channel_send/native/buf_100_msgs_1000: Warming up for 2.0000 s
+Benchmarking simple_channel_send/native/buf_100_msgs_1000: Collecting 10 samples in estimated 5.0008 s (82k iterations)
+Benchmarking simple_channel_send/native/buf_100_msgs_1000: Analyzing
+simple_channel_send/native/buf_100_msgs_1000
+                        time:   [60.747 µs 60.933 µs 61.094 µs]
+                        thrpt:  [16.368 Melem/s 16.411 Melem/s 16.462 Melem/s]
+Benchmarking simple_channel_send/monitored/buf_1000_msgs_100
+Benchmarking simple_channel_send/monitored/buf_1000_msgs_100: Warming up for 2.0000 s
+Benchmarking simple_channel_send/monitored/buf_1000_msgs_100: Collecting 10 samples in estimated 5.0003 s (189k iterations)
+Benchmarking simple_channel_send/monitored/buf_1000_msgs_100: Analyzing
+simple_channel_send/monitored/buf_1000_msgs_100
+                        time:   [26.473 µs 26.561 µs 26.631 µs]
+                        thrpt:  [3.7551 Melem/s 3.7649 Melem/s 3.7775 Melem/s]
+Benchmarking simple_channel_send/native/buf_1000_msgs_100
+Benchmarking simple_channel_send/native/buf_1000_msgs_100: Warming up for 2.0000 s
+Benchmarking simple_channel_send/native/buf_1000_msgs_100: Collecting 10 samples in estimated 5.0003 s (691k iterations)
+Benchmarking simple_channel_send/native/buf_1000_msgs_100: Analyzing
+simple_channel_send/native/buf_1000_msgs_100
+                        time:   [7.2741 µs 7.4180 µs 7.5135 µs]
+                        thrpt:  [13.309 Melem/s 13.481 Melem/s 13.747 Melem/s]
+Benchmarking simple_channel_send/monitored/buf_1000_msgs_1000
+Benchmarking simple_channel_send/monitored/buf_1000_msgs_1000: Warming up for 2.0000 s
+Benchmarking simple_channel_send/monitored/buf_1000_msgs_1000: Collecting 10 samples in estimated 5.0109 s (20k iterations)
+Benchmarking simple_channel_send/monitored/buf_1000_msgs_1000: Analyzing
+simple_channel_send/monitored/buf_1000_msgs_1000
+                        time:   [244.30 µs 245.70 µs 247.43 µs]
+                        thrpt:  [4.0415 Melem/s 4.0699 Melem/s 4.0933 Melem/s]
+Benchmarking simple_channel_send/native/buf_1000_msgs_1000
+Benchmarking simple_channel_send/native/buf_1000_msgs_1000: Warming up for 2.0000 s
+Benchmarking simple_channel_send/native/buf_1000_msgs_1000: Collecting 10 samples in estimated 5.0010 s (91k iterations)
+Benchmarking simple_channel_send/native/buf_1000_msgs_1000: Analyzing
+simple_channel_send/native/buf_1000_msgs_1000
+                        time:   [54.218 µs 55.172 µs 55.855 µs]
+                        thrpt:  [17.904 Melem/s 18.125 Melem/s 18.444 Melem/s]
+
+Benchmarking simple_channel_creation/monitored/10
+Benchmarking simple_channel_creation/monitored/10: Warming up for 2.0000 s
+Benchmarking simple_channel_creation/monitored/10: Collecting 10 samples in estimated 5.0000 s (40M iterations)
+Benchmarking simple_channel_creation/monitored/10: Analyzing
+simple_channel_creation/monitored/10
+                        time:   [125.26 ns 125.46 ns 125.64 ns]
+Benchmarking simple_channel_creation/native/10
+Benchmarking simple_channel_creation/native/10: Warming up for 2.0000 s
+Benchmarking simple_channel_creation/native/10: Collecting 10 samples in estimated 5.0000 s (70M iterations)
+Benchmarking simple_channel_creation/native/10: Analyzing
+simple_channel_creation/native/10
+                        time:   [71.100 ns 71.208 ns 71.271 ns]
+Found 3 outliers among 10 measurements (30.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high mild
+  1 (10.00%) high severe
+Benchmarking simple_channel_creation/monitored/100
+Benchmarking simple_channel_creation/monitored/100: Warming up for 2.0000 s
+Benchmarking simple_channel_creation/monitored/100: Collecting 10 samples in estimated 5.0000 s (40M iterations)
+Benchmarking simple_channel_creation/monitored/100: Analyzing
+simple_channel_creation/monitored/100
+                        time:   [124.50 ns 124.61 ns 124.71 ns]
+Benchmarking simple_channel_creation/native/100
+Benchmarking simple_channel_creation/native/100: Warming up for 2.0000 s

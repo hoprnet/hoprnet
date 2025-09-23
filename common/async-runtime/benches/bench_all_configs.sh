@@ -1,7 +1,22 @@
 #!/usr/bin/env bash
 
-# Benchmark script to compare all channel configurations
-# This script runs benchmarks for different feature combinations to measure monitoring overhead
+# Channel Metrics Benchmark Script
+# 
+# This script runs the channel_metrics_simple benchmark across all supported feature configurations
+# to measure the performance impact of channel monitoring in hopr-async-runtime.
+#
+# Supported Configurations:
+# - tokio_prometheus: Tokio runtime with Prometheus metrics
+# - tokio_no_prometheus: Tokio runtime without metrics (zero overhead)
+# - futures_prometheus: Futures runtime with Prometheus metrics  
+# - futures_no_prometheus: Futures runtime without metrics (zero overhead)
+#
+# Usage Examples:
+#   ./bench_all_configs.sh                    # Run all configurations
+#   ./bench_all_configs.sh -c tokio_prometheus -q  # Quick test of one config
+#   ./bench_all_configs.sh --help             # Show detailed help
+#
+# Results are saved to bench_results/ directory with timestamps for comparison.
 
 set -e
 
