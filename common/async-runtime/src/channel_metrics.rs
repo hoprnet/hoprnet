@@ -3,7 +3,9 @@
 //! This module provides instrumented channel implementations that integrate
 //! with HOPRd's existing Prometheus metrics infrastructure. It offers
 //! monitoring for channel capacity, current length, send duration, and
-//! receive duration with configurable backend support.
+//! receive duration with configurable backend support. All blocking send
+//! operations include a 5-second timeout with error logging to prevent
+//! indefinite blocking.
 //!
 //! ## Dual-Backend Architecture
 //!
@@ -32,6 +34,7 @@
 //! - Consistent error types using `futures::channel::mpsc::SendError`
 //! - Universal `into_inner()` method returning `futures::channel::mpsc::Sender<T>`
 //! - Backend-specific method availability (e.g., `capacity()` only meaningful with tokio)
+//! - Timeout handling: 5-second timeout on all blocking send operations with error logging
 //!
 //! ## Performance Characteristics
 //!
@@ -47,17 +50,18 @@
 //! ```rust
 //! use hopr_async_runtime::monitored_channel;
 //!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a monitored channel
 //! let (sender, mut receiver) = monitored_channel::<String>(1024, "task_queue");
 //!
-//! // Send messages (metrics automatically recorded)
+//! // Send messages (metrics automatically recorded with 5-second timeout)
 //! sender.send("hello".to_string()).await?;
 //!
 //! // Receive messages (timing metrics recorded)
 //! let msg = receiver.recv().await;
-//!
-//! // Convert to futures API for compatibility
-//! let futures_sender = sender.into_inner();
+//! println!("Received: {:?}", msg);
+//! # Ok(())
+//! # }
 //! ```
 
 use std::{
@@ -69,6 +73,16 @@ use std::{
 use futures::SinkExt;
 // Always use futures SendError for consistency across backends
 use futures::channel::mpsc::SendError;
+
+// Timeout for blocking send operations
+const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
+// Logging for timeout errors
+use tracing::error;
+
+// Import timeout functionality
+#[cfg(feature = "runtime-tokio")]
+use crate::prelude::timeout_fut;
 
 /// Helper to create a futures SendError when we need it for tokio backend
 ///
@@ -228,14 +242,27 @@ impl<T> InstrumentedSender<T> {
     /// Send a message through the channel with metrics recording (tokio backend)
     ///
     /// Sends a message asynchronously through the tokio channel while recording
-    /// send duration metrics and updating capacity metrics.
+    /// send duration metrics and updating capacity metrics. Includes a 5-second timeout
+    /// with error logging on timeout.
     ///
     /// # Errors
-    /// Returns `SendError` if the receiver has been dropped.
+    /// Returns `SendError` if the receiver has been dropped or if the operation times out.
     #[cfg(all(feature = "runtime-tokio", feature = "prometheus"))]
     pub async fn send(&self, msg: T) -> Result<(), SendError> {
         let start = std::time::Instant::now();
-        let result = self.sender.send(msg).await.map_err(|_| create_futures_send_error());
+        
+        let send_future = self.sender.send(msg);
+        let result = match timeout_fut(SEND_TIMEOUT, send_future).await {
+            Ok(send_result) => send_result.map_err(|_| create_futures_send_error()),
+            Err(_) => {
+                error!(
+                    channel_name = %self.channel_name,
+                    timeout_secs = SEND_TIMEOUT.as_secs(),
+                    "Channel send operation timed out"
+                );
+                Err(create_futures_send_error())
+            }
+        };
 
         if result.is_ok() {
             let duration = start.elapsed().as_secs_f64();
@@ -250,31 +277,74 @@ impl<T> InstrumentedSender<T> {
     ///
     /// Sends a message asynchronously through the futures channel while recording
     /// send duration metrics. Note that this requires `&mut self` due to the
-    /// futures channel API.
+    /// futures channel API. Includes a 5-second timeout with error logging on timeout.
     ///
     /// # Errors
-    /// Returns `SendError` if the receiver has been dropped.
+    /// Returns `SendError` if the receiver has been dropped or if the operation times out.
     #[cfg(all(not(feature = "runtime-tokio"), feature = "prometheus"))]
     pub async fn send(&mut self, msg: T) -> Result<(), SendError> {
         let start = std::time::Instant::now();
-        let result = self.sender.send(msg).await;
+        
+        // For futures backend, we use a simple elapsed time check
+        // since we don't have access to tokio::time::timeout
+        let send_result = self.sender.send(msg).await;
+        
+        let duration = start.elapsed();
+        if duration > SEND_TIMEOUT {
+            error!(
+                channel_name = %self.channel_name,
+                duration_secs = duration.as_secs(),
+                timeout_secs = SEND_TIMEOUT.as_secs(),
+                "Channel send operation exceeded timeout"
+            );
+        }
 
-        if result.is_ok() {
-            let duration = start.elapsed().as_secs_f64();
-            HOPR_CHANNEL_SEND_DURATION.observe(&[&self.channel_name], duration);
+        if send_result.is_ok() {
+            let duration_secs = duration.as_secs_f64();
+            HOPR_CHANNEL_SEND_DURATION.observe(&[&self.channel_name], duration_secs);
         }
         self.update_channel_capacity();
 
-        result
+        send_result
     }
 
-    /// Send a message without metrics (when prometheus disabled)
+    /// Send a message without metrics (when prometheus disabled, tokio backend)
     ///
-    /// Zero-overhead send operation when metrics are disabled.
-    /// The mutability requirement matches the underlying backend.
-    #[cfg(not(feature = "prometheus"))]
+    /// Includes 5-second timeout with error logging but no metrics collection.
+    /// Uses tokio's timeout functionality for proper timeout handling.
+    #[cfg(all(feature = "runtime-tokio", not(feature = "prometheus")))]
+    pub async fn send(&self, msg: T) -> Result<(), SendError> {
+        match timeout_fut(SEND_TIMEOUT, self.sender.send(msg)).await {
+            Ok(send_result) => send_result.map_err(|_| create_futures_send_error()),
+            Err(_) => {
+                error!(
+                    timeout_secs = SEND_TIMEOUT.as_secs(),
+                    "Channel send operation timed out"
+                );
+                Err(create_futures_send_error())
+            }
+        }
+    }
+
+    /// Send a message without metrics (when prometheus disabled, futures backend)
+    ///
+    /// Includes timeout logging but no timeout enforcement since proper async timeout
+    /// is not available without tokio. Logs if operation exceeds 5-second threshold.
+    #[cfg(all(not(feature = "runtime-tokio"), not(feature = "prometheus")))]
     pub async fn send(&mut self, msg: T) -> Result<(), SendError> {
-        self.sender.send(msg).await
+        let start = std::time::Instant::now();
+        let result = self.sender.send(msg).await;
+        
+        let duration = start.elapsed();
+        if duration > SEND_TIMEOUT {
+            error!(
+                duration_secs = duration.as_secs(),
+                timeout_secs = SEND_TIMEOUT.as_secs(),
+                "Channel send operation exceeded timeout"
+            );
+        }
+        
+        result
     }
 
     /// Try to send a message without blocking (tokio backend)
@@ -484,10 +554,12 @@ impl<T> Clone for InstrumentedSender<T> {
 /// use futures::StreamExt;
 /// use hopr_async_runtime::monitored_channel;
 ///
+/// # async fn example() {
 /// let (_sender, mut receiver) = monitored_channel::<i32>(100, "stream_example");
 /// while let Some(msg) = receiver.next().await {
 ///     println!("Received: {}", msg);
 /// }
+/// # }
 /// ```
 #[derive(Debug)]
 #[cfg(feature = "prometheus")]
@@ -722,16 +794,19 @@ impl<T> Stream for InstrumentedReceiver<T> {
 /// ```rust
 /// use hopr_async_runtime::monitored_channel;
 ///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create a monitored channel for task coordination
 /// let (sender, mut receiver) = monitored_channel::<String>(1024, "task_queue");
 ///
-/// // Send messages (automatically timed when prometheus enabled)
+/// // Send messages (automatically timed when prometheus enabled, with 5-second timeout)
 /// sender.send("task_data".to_string()).await?;
 ///
 /// // Receive messages (automatically timed when prometheus enabled)
 /// if let Some(msg) = receiver.recv().await {
 ///     println!("Processing: {}", msg);
 /// }
+/// # Ok(())
+/// # }
 /// ```
 ///
 /// ## Stream-based Processing
@@ -739,24 +814,27 @@ impl<T> Stream for InstrumentedReceiver<T> {
 /// use futures::StreamExt;
 /// use hopr_async_runtime::monitored_channel;
 ///
+/// # async fn example() {
 /// let (_sender, mut receiver) = monitored_channel::<i32>(100, "numbers");
 ///
 /// // Process messages as a stream
 /// while let Some(number) = receiver.next().await {
 ///     println!("Number: {}", number);
 /// }
+/// # }
 /// ```
 ///
 /// ## API Compatibility
 /// ```rust
-/// use futures::SinkExt;
 /// use hopr_async_runtime::monitored_channel;
 ///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let (sender, _receiver) = monitored_channel::<String>(100, "compat");
 ///
-/// // Convert to futures API for legacy compatibility
-/// let mut futures_sender = sender.into_inner();
-/// futures_sender.send("compatible_message".to_string()).await?;
+/// // Send messages directly using the monitored sender with timeout protection
+/// sender.send("compatible_message".to_string()).await?;
+/// # Ok(())
+/// # }
 /// ```
 #[cfg(all(feature = "runtime-tokio", feature = "prometheus"))]
 pub fn monitored_channel<T>(

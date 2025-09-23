@@ -690,6 +690,9 @@ where
                     .session_notifiers
                     .get()
                     .map(|(_, notifier)| {
+                        #[cfg(not(feature = "prometheus"))]
+                        let mut notifier = notifier.clone();
+                        #[cfg(feature = "prometheus")]
                         let notifier = notifier.clone();
                         Box::new(move |session_id: SessionId, reason: ClosureReason| {
                             let _ = notifier
@@ -1015,11 +1018,19 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (mut new_session_notifier, close_session_notifier) = self
+        let (new_session_notifier, close_session_notifier) = self
             .session_notifiers
             .get()
             .cloned()
             .ok_or(SessionManagerError::NotStarted)?;
+        #[cfg(not(feature = "prometheus"))]
+        let mut new_session_notifier = new_session_notifier;
+        #[cfg(feature = "prometheus")]
+        let mut new_session_notifier = new_session_notifier;
+        #[cfg(not(feature = "prometheus"))]
+        let mut close_session_notifier = close_session_notifier;
+        #[cfg(feature = "prometheus")]
+        let close_session_notifier = close_session_notifier;
 
         // Reply routing uses SURBs only with the pseudonym of this Session's ID
         let reply_routing = DestinationRouting::Return(pseudonym.into());

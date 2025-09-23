@@ -9,6 +9,14 @@ pub mod channel_metrics;
 #[cfg(feature = "prometheus")]
 pub use channel_metrics::{InstrumentedReceiver, InstrumentedSender, monitored_channel};
 
+#[cfg(not(feature = "prometheus"))]
+pub use futures::channel::mpsc::{Receiver as InstrumentedReceiver, Sender as InstrumentedSender};
+
+#[cfg(not(feature = "prometheus"))]
+pub fn monitored_channel<T>(_capacity: usize, _name: &str) -> (InstrumentedSender<T>, InstrumentedReceiver<T>) {
+    futures::channel::mpsc::channel(_capacity)
+}
+
 // Both features could be enabled during testing; therefore, we only use tokio when it's
 // exclusively enabled.
 #[cfg(feature = "runtime-tokio")]

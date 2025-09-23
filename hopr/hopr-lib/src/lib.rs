@@ -33,7 +33,7 @@ use std::{
 use async_lock::RwLock;
 use errors::{HoprLibError, HoprStatusError};
 use futures::{
-    FutureExt, Stream, StreamExt,
+    FutureExt, SinkExt, Stream, StreamExt,
     future::AbortHandle,
     stream::{self},
 };

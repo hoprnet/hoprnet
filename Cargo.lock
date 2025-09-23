@@ -4460,6 +4460,7 @@ dependencies = [
  "hopr-metrics",
  "lazy_static",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
