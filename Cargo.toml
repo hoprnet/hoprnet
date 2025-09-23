@@ -8,6 +8,7 @@ members = [
   "chain/indexer",
   "chain/rpc",
   "chain/types",
+  "common/api",
   "common/async-runtime",
   "common/internal-types",
   "common/network-types",
@@ -48,7 +49,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.31", default-features = false, features = [
+alloy = { version = "=1.0.32", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -121,7 +122,6 @@ libp2p-identity = { version = "0.2.12", features = [
   "rand",
 ] }
 libp2p-stream = { version = "0.4.0-alpha" }
-mimalloc = "0.1.48"
 mockall = "0.13.1"
 mockito = "1.7.0"
 moka = { version = "0.12.10", features = ["future"] }
@@ -203,7 +203,24 @@ tokio-util = { version = "0.7.16", default-features = false, features = [
   "compat",
 ] }
 tokio-retry = "0.3.0"
+tokio-stream = { version = "0.1.17", features = ["net"] }
+tower-http = { version = "0.6.6", features = [
+  "validate-request",
+  "compression-full",
+  "cors",
+  "trace",
+  "sensitive-headers",
+] }
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
+oas3 = "0.19.0"
+urlencoding = "2.1.3"
+utoipa = { version = "5.4.0" }
+utoipa-scalar = { version = "0.3.0", features = ["axum"] }
+utoipa-swagger-ui = { version = "9.0.2", features = [
+  "axum",
+  "vendored",
+  "debug-embed",
+] }
 tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.20", features = [
   "env-filter",
@@ -217,7 +234,9 @@ uuid = { version = "1.18.1" }
 url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
+tikv-jemallocator = "0.6.0"
 
+hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { path = "ethereum/bindings", default-features = false }
 hopr-chain-actions = { path = "chain/actions", default-features = false }

@@ -16,6 +16,7 @@ default = [
   "telemetry",
   "explicit-path",
   "transport-quic",
+  "jemalloc-stats",
 ] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
@@ -47,6 +48,7 @@ capture = ["hopr-lib/capture"]
 prof = [
   "dep:console-subscriber",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
+jemalloc-stats = ["dep:tikv-jemalloc-ctl"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -56,7 +58,6 @@ clap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.11"
 lazy_static = { workspace = true, optional = true }
-mimalloc = { workspace = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -99,6 +100,12 @@ hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+test-log = { workspace = true }
+
+# Target-specific dependencies for memory allocators
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.6.0"
+tikv-jemalloc-ctl = { version = "0.6.0", features = ["stats"], optional = true }
 
 [build-dependencies]
 vergen-gix = { workspace = true, features = ["build"] }

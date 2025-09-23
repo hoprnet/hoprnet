@@ -33,7 +33,7 @@ use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
     FutureExt, SinkExt, StreamExt,
-    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
+    channel::mpsc::{SendError, Sender, channel},
 };
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
@@ -195,7 +195,7 @@ where
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>>,
+    smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
 }
 
 impl<T> HoprTransport<T>
@@ -278,15 +278,39 @@ where
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
-    pub async fn run(
+    pub async fn run<S1, S2>(
         &self,
         me_onchain: &ChainKeypair,
-        on_incoming_data: UnboundedSender<ApplicationDataIn>,
-        discovery_updates: UnboundedReceiver<PeerDiscovery>,
-        on_incoming_session: UnboundedSender<IncomingSession>,
-    ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>> {
+        on_incoming_data: S1,
+        discovery_updates: S2,
+        on_incoming_session: Sender<IncomingSession>,
+    ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>>
+    where
+        S1: futures::Sink<ApplicationDataIn, Error = SendError> + Send + 'static,
+        S2: futures::Stream<Item = PeerDiscovery> + Send + 'static,
+    {
+        info!("Loading initial peers from the storage");
+        let mut addresses: HashSet<Multiaddr> = HashSet::new();
+        let nodes = self.get_public_nodes().await?;
+
+        // Calculate the minimum capacity based on public nodes (each node can generate 2 messages)
+        // plus 100 as additional buffer
+        let minimum_capacity = nodes.len().saturating_mul(2).saturating_add(100);
+
+        let internal_discovery_updates_capacity = std::env::var("HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY")
+            .ok()
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
+            .unwrap_or(2048)
+            .max(minimum_capacity);
+
+        debug!(
+            capacity = internal_discovery_updates_capacity,
+            minimum_required = minimum_capacity,
+            "Creating internal discovery updates channel"
+        );
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
-            futures::channel::mpsc::unbounded::<PeerDiscovery>();
+            futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
 
         let network_clone = self.network.clone();
         let db_clone = self.db.clone();
@@ -379,10 +403,6 @@ where
                     }
                 });
 
-        info!("Loading initial peers from the storage");
-
-        let mut addresses: HashSet<Multiaddr> = HashSet::new();
-        let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
             if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
@@ -406,7 +426,7 @@ where
         let tkt_agg_writer = ticket_agg_proc.writer();
 
         let (external_msg_send, external_msg_rx) =
-            mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>(
+            channel::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>(
                 MAXIMUM_MSG_OUTGOING_BUFFER_SIZE,
             );
 
@@ -485,47 +505,59 @@ where
             mixing_channel_rx
                 .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
                 .map(Ok)
-                .forward(wire_msg_tx),
+                .forward(wire_msg_tx)
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = "mixer -> egress process",
+                        "long-running background task finished"
+                    )
+                }),
         );
 
         let (transport_events_tx, transport_events_rx) =
-            futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(1000);
+            futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(2048);
 
         let network_clone = self.network.clone();
-        spawn(transport_events_rx.for_each(move |event| {
-            let network = network_clone.clone();
+        spawn(
+            transport_events_rx
+                .for_each(move |event| {
+                    let network = network_clone.clone();
 
-            async move {
-                match event {
-                    hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
-                        if let Err(error) = network
-                            .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
-                            .await
-                        {
-                            tracing::error!(%peer, %error, "Failed to add incoming connection peer");
+                    async move {
+                        match event {
+                            hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
+                                if let Err(error) = network
+                                    .add(&peer, PeerOrigin::IncomingConnection, vec![multiaddr])
+                                    .await
+                                {
+                                    tracing::error!(%peer, %error, "Failed to add incoming connection peer");
+                                }
+                            }
+                            hopr_transport_p2p::DiscoveryEvent::FailedDial(peer) => {
+                                if let Err(error) = network
+                                    .update(&peer, Err(hopr_transport_network::network::UpdateFailure::DialFailure))
+                                    .await
+                                {
+                                    tracing::error!(%peer, %error, "Failed to update peer status after failed dial");
+                                }
+                            }
                         }
                     }
-                    hopr_transport_p2p::DiscoveryEvent::FailedDial(peer) => {
-                        if let Err(error) = network
-                            .update(&peer, Err(hopr_transport_network::network::UpdateFailure::DialFailure))
-                            .await
-                        {
-                            tracing::error!(%peer, %error, "Failed to update peer status after failed dial");
-                        }
-                    }
-                }
-            }
-            .inspect(|_| {
-                tracing::info!(
-                    task = "transport event notifier",
-                    "long-running background task finished"
-                )
-            })
-        }));
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = "transport events recording",
+                        "long-running background task finished"
+                    )
+                }),
+        );
 
         processes.insert(
             HoprTransportProcess::Medium,
-            spawn_as_abortable!(transport_layer.run(transport_events_tx)),
+            spawn_as_abortable!(transport_layer.run(transport_events_tx).inspect(|_| tracing::warn!(
+                task = %HoprTransportProcess::Medium,
+                "long-running background task finished"
+            ))),
         );
 
         // -- msg-ack protocol over the wire transport
@@ -540,7 +572,19 @@ where
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationDataIn)>();
+        let msg_protocol_bidirectional_channel_capacity =
+            std::env::var("HOPR_INTERNAL_PROTOCOL_BIDIRECTIONAL_CHANNEL_CAPACITY")
+                .ok()
+                .and_then(|s| s.trim().parse::<usize>().ok())
+                .filter(|&c| c > 0)
+                .unwrap_or(16_384);
+
+        debug!(
+            capacity = msg_protocol_bidirectional_channel_capacity,
+            "Creating protocol bidirectional channel"
+        );
+        let (tx_from_protocol, rx_from_protocol) =
+            channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -560,9 +604,21 @@ where
         }
 
         // -- network probing
-        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationDataIn)>();
+        debug!(
+            capacity = msg_protocol_bidirectional_channel_capacity,
+            note = "same as protocol bidirectional",
+            "Creating probing channel"
+        );
+        let (tx_from_probing, rx_from_probing) =
+            channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
-        let (manual_ping_tx, manual_ping_rx) = unbounded::<(PeerId, PingQueryReplier)>();
+        let manual_ping_channel_capacity = std::env::var("HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
+            .unwrap_or(128);
+        debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
+        let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
         for (k, v) in probe
@@ -616,8 +672,8 @@ where
         let smgr = self.smgr.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
-            spawn_as_abortable!(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx_from_probing, |(pseudonym, data)| {
+            spawn_as_abortable!(
+                StreamExt::filter_map(rx_from_probing, move |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {
                         match smgr.dispatch_message(pseudonym, data).await {
@@ -638,8 +694,11 @@ where
                 })
                 .map(Ok)
                 .forward(on_incoming_data)
-                .await;
-            }),
+                .inspect(|_| tracing::warn!(
+                    task = %HoprTransportProcess::SessionsManagement(0),
+                    "long-running background task finished"
+                ))
+            ),
         );
 
         Ok(processes)
@@ -984,13 +1043,15 @@ fn build_mixer_cfg_from_env() -> MixerConfig {
                 })
                 .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
         ),
-        capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-            .map(|v| {
-                v.trim()
-                    .parse::<usize>()
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
-            })
-            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
+        capacity: {
+            let capacity = std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
+                .ok()
+                .and_then(|s| s.trim().parse::<usize>().ok())
+                .filter(|&c| c > 0)
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY);
+            debug!(capacity = capacity, "Setting mixer capacity");
+            capacity
+        },
         ..MixerConfig::default()
     };
     debug!(?mixer_cfg, "Mixer configuration");

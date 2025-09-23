@@ -6,3 +6,23 @@
 
 [install]
 root = ".cargo"
+
+[env]
+# Jemalloc runtime configuration parameters
+# See: http://jemalloc.net/jemalloc.3.html#opt.abort_conf
+# abort_conf:true        - Abort on configuration errors (safer for production to fail early)
+# narenas:4              - Use 4 arenas (memory allocation regions) for reduced contention
+# tcache_max:65536       - Max size (64KB) for thread-local cache allocations
+# dirty_decay_ms:3000    - Release dirty pages after 3 seconds of inactivity
+# muzzy_decay_ms:6000    - Release muzzy pages after 6 seconds (more aggressive cleanup)
+# background_thread:true - Enable background thread for maintenance tasks
+# metadata_thp:auto      - Auto-detect transparent huge pages for metadata
+JEMALLOC_SYS_WITH_MALLOC_CONF = "abort_conf:true,narenas:4,tcache_max:65536,dirty_decay_ms:3000,muzzy_decay_ms:6000,background_thread:true,metadata_thp:auto"
+
+# C/C++ compiler flags for optimized builds and jemalloc working
+# -O3: Maximum optimization level for best performance
+# -ffunction-sections/-fdata-sections: Enable dead code elimination
+# -fPIC: Generate position-independent code for shared libraries
+CFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC"
+CPPFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC"
+LDFLAGS = "-O3 -ffunction-sections -fdata-sections -fPIC"
