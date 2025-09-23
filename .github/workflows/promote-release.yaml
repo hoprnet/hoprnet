@@ -38,21 +38,22 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          persist-credentials: false
+          fetch-depth: 0 # Fetch all history for all branches and tags
+          persist-credentials: true # required for gh cli to do push
           ref: master
 
       - name: Promote release
         id: promote_release
         run: |
-          git fetch --all --tags
-          # Checkout to tag revision
+          set -x
+          echo "Checkout to tag revision"
           if ! git tag -l ${{ github.event.inputs.tag_name }} | grep ${{ github.event.inputs.tag_name }}; then
             echo "Git tag ${{ github.event.inputs.tag_name }} does not exists"
             exit 1
           fi
-          # Create new branch or reuse an existing branch
+          echo "Create new branch or reuse an existing branch"
           release_name="${{ vars.BRANCH_MASTER_RELEASE_NAME }}"
-          echo "release_name=${release_name}"  >> $GITHUB_OUTPUT
+          echo "release_name=${release_name}" | tee -a $GITHUB_OUTPUT
           if git branch -al release/${release_name} | grep ${release_name}; then
             echo "Branch release/${release_name} already exists. Skipping promotion..."
             exit 0
