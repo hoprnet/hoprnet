@@ -55,10 +55,8 @@ hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
   "utils_session",
+  "utils_futures"
 ] }
-hopr-db-api = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 

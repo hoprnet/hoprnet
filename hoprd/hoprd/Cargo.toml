@@ -23,14 +23,11 @@ prometheus = [
   "dep:lazy_static",
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
-  "hopr-network-types/prometheus",
 ]
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
-  "hopr-network-types/runtime-tokio",
-  "hopr-async-runtime/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
 ]
 telemetry = [
@@ -90,14 +87,11 @@ hopr-lib = { workspace = true, features = [
   "session-client",
   "session-server",
   "utils_session",
+  "utils_parallel",
 ] }
 hoprd-api = { workspace = true }
-hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-network-types = { workspace = true }
-hopr-async-runtime = { workspace = true }
-hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

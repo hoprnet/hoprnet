@@ -6,10 +6,10 @@ use axum::{
     response::IntoResponse,
 };
 use futures::TryFutureExt;
-use hopr_crypto_types::types::Hash;
 use hopr_lib::{
     Address, AsUnixTimestamp, ChainActionsError, ChannelEntry, ChannelStatus, HoprBalance, ToHex,
     errors::{HoprLibError, HoprStatusError},
+    prelude::Hash,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};

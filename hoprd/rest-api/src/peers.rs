@@ -5,9 +5,8 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_lib::{
-    Address, HoprTransportError, Multiaddr, PeerId,
+    Address, HoprTransportError, Multiaddr,
     errors::{HoprLibError, HoprStatusError},
 };
 use serde::{Deserialize, Serialize};
@@ -73,14 +72,12 @@ pub(super) async fn show_peer_info(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr.peer_resolver().resolve_packet_key(&destination).await {
-        Ok(Some(offchain_key)) => Ok((
+    match hopr.resolve_to_peerid(&destination).await {
+        Ok(Some(peer)) => Ok((
             StatusCode::OK,
             Json(NodePeerInfoResponse {
-                announced: hopr
-                    .multiaddresses_announced_on_chain(&PeerId::from(offchain_key))
-                    .await,
-                observed: hopr.network_observed_multiaddresses(&PeerId::from(offchain_key)).await,
+                announced: hopr.multiaddresses_announced_on_chain(&peer).await,
+                observed: hopr.network_observed_multiaddresses(&peer).await,
             }),
         )),
         Ok(None) => Err(ApiErrorStatus::PeerNotFound),
@@ -132,8 +129,8 @@ pub(super) async fn ping_peer(
 
     let hopr = state.hopr.clone();
 
-    match hopr.peer_resolver().resolve_packet_key(&destination).await {
-        Ok(Some(offchain_key)) => match hopr.ping(&PeerId::from(offchain_key)).await {
+    match hopr.resolve_to_peerid(&destination).await {
+        Ok(Some(peer)) => match hopr.ping(&peer).await {
             Ok((latency, _status)) => {
                 let resp = Json(PingResponse { latency: latency / 2 });
                 Ok((StatusCode::OK, resp).into_response())
