@@ -4441,15 +4441,20 @@ dependencies = [
 
 [[package]]
 name = "hopr-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "futures",
+ "hopr-chain-types",
  "hopr-crypto-packet",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-network-types",
+ "hopr-platform",
  "hopr-primitive-types",
  "multiaddr",
+ "strum 0.27.2",
 ]
 
 [[package]]
@@ -4543,7 +4548,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "smart-default",
  "strum 0.27.2",
  "thiserror 2.0.16",
  "validator",
@@ -4822,7 +4826,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.18.2"
+version = "0.18.4"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -4869,7 +4873,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5065,7 +5069,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-protocol-session"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5122,7 +5126,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.15.1"
+version = "0.15.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
@@ -5158,7 +5162,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.13.2"
+version = "0.13.4"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5302,7 +5306,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -5392,7 +5396,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.13.1"
+version = "0.13.3"
 dependencies = [
  "anyhow",
  "arrayvec",

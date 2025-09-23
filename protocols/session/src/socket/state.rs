@@ -1,4 +1,4 @@
-use futures::channel::mpsc::UnboundedSender;
+use futures::channel::mpsc::Sender;
 
 use crate::{
     errors::SessionError,
@@ -18,7 +18,7 @@ pub struct SocketComponents<const C: usize> {
     /// Allows emitting control messages to the socket.
     ///
     /// It is a regular [`SessionMessage`] injected into the downstream.
-    pub ctl_tx: UnboundedSender<SessionMessage<C>>,
+    pub ctl_tx: Sender<SessionMessage<C>>,
 }
 
 /// Abstraction of the [`SessionSocket`](super::SessionSocket) state.

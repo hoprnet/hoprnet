@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-session"
-version = "1.0.0"
+version = "1.0.2"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementation of Session protocol according to HOPR RFC-0007"

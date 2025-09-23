@@ -260,7 +260,17 @@ where
             abort_reg,
         );
 
-        let (level_tx, level_rx) = futures::channel::mpsc::unbounded();
+        let balancer_level_capacity = std::env::var("HOPR_INTERNAL_SESSION_BALANCER_LEVEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
+            .unwrap_or(32_768);
+
+        tracing::debug!(
+            capacity = balancer_level_capacity,
+            "Creating session balancer level channel"
+        );
+        let (mut level_tx, level_rx) = futures::channel::mpsc::channel(balancer_level_capacity);
         hopr_async_runtime::prelude::spawn(
             async move {
                 pin_mut!(sampling_stream);
@@ -288,7 +298,9 @@ where
                     // Perform controller update (this internally samples the SurbFlowEstimator)
                     // and send an update about the current level to the outgoing stream
                     let level = self.update(current_cfg.surb_decay.as_ref());
-                    let _ = level_tx.unbounded_send(level);
+                    if let Err(error) = level_tx.try_send(level) {
+                        tracing::error!(%error, "cannot send balancer level update");
+                    }
 
                     // See if the setpoint has been updated at the controller as a result
                     // of the update step, because some controllers (such as the SimpleBalancerController)

@@ -180,51 +180,53 @@ impl Probe {
                 hopr_async_runtime::prelude::sleep(2 * interval_between_rounds).await;   // delay to allow network to stabilize
 
                 direct_neighbors
-                .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
-                    let db = db.clone();
-                    let cache_peer_routing = cache_peer_routing.clone();
-                    let active_probes = active_probes.clone();
-                    let push_to_network = Sender { downstream: push_to_network.clone() };
-                    let me = self.me;
+                    .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
+                        let db = db.clone();
+                        let cache_peer_routing = cache_peer_routing.clone();
+                        let active_probes = active_probes.clone();
+                        let push_to_network = Sender { downstream: push_to_network.clone() };
+                        let me = self.me;
 
-                    async move {
-                        let result = cache_peer_routing
-                            .try_get_with(peer, async move {
-                                // TODO: This is a CPU intensive operation, convert the probing mechanism to use OffchainPublicKey instead of PeerIDs!
-                                // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-                                let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-                                    .await
-                                    .context(format!("failed to convert {peer} to offchain public key"))?;
-                                let cp_address = db
-                                    .resolve_chain_key(&pubkey)
-                                    .await?
-                                    .ok_or_else(|| anyhow::anyhow!("Failed to resolve chain key for peer: {peer}"))?;
+                        async move {
+                            let result = cache_peer_routing
+                                .try_get_with(peer, async move {
+                                    // TODO: This is a CPU intensive operation, convert the probing mechanism to use OffchainPublicKey instead of PeerIDs!
+                                    // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                                    let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+                                        .await
+                                        .context(format!("failed to convert {peer} to offchain public key"))?;
+                                    let cp_address = db
+                                        .resolve_chain_key(&pubkey)
+                                        .await?
+                                        .ok_or_else(|| anyhow::anyhow!("Failed to resolve chain key for peer: {peer}"))?;
 
-                                Ok::<ResolvedTransportRouting, anyhow::Error>(ResolvedTransportRouting::Forward {
-                                    pseudonym: HoprPseudonym::random(),
-                                    forward_path: ValidatedPath::direct(pubkey, cp_address),
-                                    return_paths: vec![ValidatedPath::direct(me.0, me.1)],
+                                    Ok::<ResolvedTransportRouting, anyhow::Error>(ResolvedTransportRouting::Forward {
+                                        pseudonym: HoprPseudonym::random(),
+                                        forward_path: ValidatedPath::direct(pubkey, cp_address),
+                                        return_paths: vec![ValidatedPath::direct(me.0, me.1)],
+                                    })
                                 })
-                            })
-                            .await;
+                                .await;
 
-                        match result {
-                            Ok(ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths }) => {
-                                let nonce = NeighborProbe::random_nonce();
+                            match result {
+                                Ok(ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths }) => {
+                                    let nonce = NeighborProbe::random_nonce();
 
-                                let message = Message::Probe(nonce);
-                                let path = ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths };
-                                if push_to_network.send_message(path, message).await.is_ok() {
-                                    active_probes
-                                        .insert((pseudonym, nonce), (peer, current_time().as_unix_timestamp(), notifier))
-                                        .await;
-                                }
-                            },
-                            Ok(_) => tracing::error!(%peer, error = "logical error", "resolved transport routing is not forward"),
-                            Err(error) => tracing::error!(%peer, %error, "failed to resolve transport routing"),
-                        };
-                    }
-                }).await;
+                                    let message = Message::Probe(nonce);
+                                    let path = ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths };
+                                    if push_to_network.send_message(path, message).await.is_ok() {
+                                        active_probes
+                                            .insert((pseudonym, nonce), (peer, current_time().as_unix_timestamp(), notifier))
+                                            .await;
+                                    }
+                                },
+                                Ok(_) => tracing::error!(%peer, error = "logical error", "resolved transport routing is not forward"),
+                                Err(error) => tracing::error!(%peer, %error, "failed to resolve transport routing"),
+                            };
+                        }
+                    })
+                    .inspect(|_| tracing::warn!(task = "transport (probe - generate outgoing)", "long-running background task finished"))
+                    .await;
             })
         );
 
@@ -289,7 +291,7 @@ impl Probe {
                         }
                     }
                 }
-            }))
+            }).inspect(|_| tracing::warn!(task = "transport (probe - processing incoming)", "long-running background task finished")))
         );
 
         processes
@@ -494,7 +496,7 @@ mod tests {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-            let (tx, mut rx) = futures::channel::mpsc::unbounded::<std::result::Result<Duration, ProbeError>>();
+            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ProbeError>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
@@ -534,7 +536,7 @@ mod tests {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-            let (tx, mut rx) = futures::channel::mpsc::unbounded::<std::result::Result<Duration, ProbeError>>();
+            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ProbeError>>(128);
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {

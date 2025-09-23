@@ -8,7 +8,7 @@ use std::{
 
 use alloy::sol_types::SolEvent;
 use futures::{
-    StreamExt,
+    FutureExt, StreamExt,
     future::AbortHandle,
     stream::{self},
 };
@@ -254,109 +254,114 @@ where
 
         info!(next_block_to_process, "Indexer start point");
 
-        let indexing_abort_handle = hopr_async_runtime::spawn_as_abortable!(async move {
-            // Update the chain head once again
-            debug!("Updating chain head at indexer startup");
-            Self::update_chain_head(&rpc, chain_head.clone()).await;
+        let indexing_abort_handle = hopr_async_runtime::spawn_as_abortable!(
+            async move {
+                // Update the chain head once again
+                debug!("Updating chain head at indexer startup");
+                Self::update_chain_head(&rpc, chain_head.clone()).await;
 
-            #[cfg(all(feature = "prometheus", not(test)))]
-            {
-                METRIC_INDEXER_SYNC_SOURCE.set(&["fast-sync"], 0.0);
-                METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 1.0);
-            }
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_INDEXER_SYNC_SOURCE.set(&["fast-sync"], 0.0);
+                    METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 1.0);
+                }
 
-            let rpc_ref = &rpc;
+                let rpc_ref = &rpc;
 
-            let event_stream = rpc
-                .try_stream_logs(next_block_to_process, log_filters, is_synced.load(Ordering::Relaxed))
-                .expect("block stream should be constructible")
-                .then(|block| {
-                    let db = db.clone();
-                    let chain_head = chain_head.clone();
-                    let is_synced = is_synced.clone();
-                    let tx = tx.clone();
-                    let logs_handler = logs_handler.clone();
+                let event_stream = rpc
+                    .try_stream_logs(next_block_to_process, log_filters, is_synced.load(Ordering::Relaxed))
+                    .expect("block stream should be constructible")
+                    .then(|block| {
+                        let db = db.clone();
+                        let chain_head = chain_head.clone();
+                        let is_synced = is_synced.clone();
+                        let tx = tx.clone();
+                        let logs_handler = logs_handler.clone();
 
-                    async move {
-                        Self::calculate_sync_process(
-                            block.block_id,
-                            rpc_ref,
-                            db,
-                            chain_head.clone(),
-                            is_synced.clone(),
-                            next_block_to_process,
-                            tx.clone(),
-                            logs_handler.safe_address().into(),
-                            logs_handler.contract_addresses_map().channels.into(),
-                        )
-                        .await;
+                        async move {
+                            Self::calculate_sync_process(
+                                block.block_id,
+                                rpc_ref,
+                                db,
+                                chain_head.clone(),
+                                is_synced.clone(),
+                                next_block_to_process,
+                                tx.clone(),
+                                logs_handler.safe_address().into(),
+                                logs_handler.contract_addresses_map().channels.into(),
+                            )
+                            .await;
 
-                        block
-                    }
-                })
-                .filter_map(|block| {
-                    let db = db.clone();
-                    let logs_handler = logs_handler.clone();
+                            block
+                        }
+                    })
+                    .filter_map(|block| {
+                        let db = db.clone();
+                        let logs_handler = logs_handler.clone();
 
-                    async move {
-                        debug!(%block, "storing logs from block");
-                        let logs = block.logs.clone();
+                        async move {
+                            debug!(%block, "storing logs from block");
+                            let logs = block.logs.clone();
 
-                        // Filter out the token contract logs because we do not need to store these
-                        // in the database.
-                        let logs_vec = logs
-                            .into_iter()
-                            .filter(|log| log.address != logs_handler.contract_addresses_map().token)
-                            .collect();
+                            // Filter out the token contract logs because we do not need to store these
+                            // in the database.
+                            let logs_vec = logs
+                                .into_iter()
+                                .filter(|log| log.address != logs_handler.contract_addresses_map().token)
+                                .collect();
 
-                        match db.store_logs(logs_vec).await {
-                            Ok(store_results) => {
-                                if let Some(error) = store_results
-                                    .into_iter()
-                                    .filter(|r| r.is_err())
-                                    .map(|r| r.unwrap_err())
-                                    .next()
-                                {
-                                    error!(%block, %error, "failed to processed stored logs from block");
+                            match db.store_logs(logs_vec).await {
+                                Ok(store_results) => {
+                                    if let Some(error) = store_results
+                                        .into_iter()
+                                        .filter(|r| r.is_err())
+                                        .map(|r| r.unwrap_err())
+                                        .next()
+                                    {
+                                        error!(%block, %error, "failed to processed stored logs from block");
+                                        None
+                                    } else {
+                                        Some(block)
+                                    }
+                                }
+                                Err(error) => {
+                                    error!(%block, %error, "failed to store logs from block");
                                     None
-                                } else {
-                                    Some(block)
                                 }
                             }
-                            Err(error) => {
-                                error!(%block, %error, "failed to store logs from block");
-                                None
-                            }
+                        }
+                    })
+                    .filter_map(|block| {
+                        let db = db.clone();
+                        let logs_handler = logs_handler.clone();
+                        let is_synced = is_synced.clone();
+                        async move {
+                            Self::process_block(&db, &logs_handler, block, false, is_synced.load(Ordering::Relaxed))
+                                .await
+                        }
+                    })
+                    .flat_map(stream::iter);
+
+                futures::pin_mut!(event_stream);
+                while let Some(event) = event_stream.next().await {
+                    trace!(%event, "processing on-chain event");
+                    // Pass the events further only once we're fully synced
+                    if is_synced.load(Ordering::Relaxed) {
+                        if let Err(error) = tx_significant_events.try_send(event) {
+                            error!(%error, "failed to pass a significant chain event further");
                         }
                     }
-                })
-                .filter_map(|block| {
-                    let db = db.clone();
-                    let logs_handler = logs_handler.clone();
-                    let is_synced = is_synced.clone();
-                    async move {
-                        Self::process_block(&db, &logs_handler, block, false, is_synced.load(Ordering::Relaxed)).await
-                    }
-                })
-                .flat_map(stream::iter);
+                }
 
-            futures::pin_mut!(event_stream);
-            while let Some(event) = event_stream.next().await {
-                trace!(%event, "processing on-chain event");
-                // Pass the events further only once we're fully synced
-                if is_synced.load(Ordering::Relaxed) {
-                    if let Err(error) = tx_significant_events.try_send(event) {
-                        error!(%error, "failed to pass a significant chain event further");
-                    }
+                if panic_on_completion {
+                    panic!(
+                        "Indexer event stream has been terminated. This error may be caused by a failed RPC \
+                         connection."
+                    );
                 }
             }
-
-            if panic_on_completion {
-                panic!(
-                    "Indexer event stream has been terminated. This error may be caused by a failed RPC connection."
-                );
-            }
-        });
+            .inspect(|_| tracing::warn!(task = "indexer", "long-running background task finished"))
+        );
 
         if rx.next().await.is_some() {
             Ok(indexing_abort_handle)

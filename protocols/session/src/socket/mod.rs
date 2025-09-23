@@ -233,7 +233,14 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         let inspector = FrameInspector::new(cfg.capacity);
 
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let ctl_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_CTL_CHANNEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
+            .unwrap_or(2048);
+
+        tracing::debug!(capacity = ctl_channel_capacity, "Creating session control channel");
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(ctl_channel_capacity);
         state.run(SocketComponents {
             inspector: Some(inspector.clone()),
             ctl_tx,
