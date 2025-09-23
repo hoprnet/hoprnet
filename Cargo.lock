@@ -4461,6 +4461,7 @@ dependencies = [
 name = "hopr-async-runtime"
 version = "0.3.0"
 dependencies = [
+ "criterion",
  "futures",
  "hopr-metrics",
  "lazy_static",

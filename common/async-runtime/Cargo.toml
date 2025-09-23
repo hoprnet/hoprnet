@@ -25,4 +25,14 @@ lazy_static = { workspace = true, optional = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt", "macros", "time"] }
+tokio = { workspace = true, features = [
+  "rt",
+  "rt-multi-thread",
+  "macros",
+  "time",
+] }
+criterion = { workspace = true, features = ["async_tokio"] }
+
+[[bench]]
+name = "channel_metrics_simple"
+harness = false
