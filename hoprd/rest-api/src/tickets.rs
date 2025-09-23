@@ -5,7 +5,6 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-
 use hopr_lib::{
     HoprBalance, HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
     errors::{HoprLibError, HoprStatusError},

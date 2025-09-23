@@ -14,6 +14,37 @@ use crate::{
     types::HoprStartProtocol,
 };
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_hoprd_target_connections",
+        "Number of currently active HOPR session target connections on this Exit node",
+        &["type"]
+    ).unwrap();
+}
+
+#[cfg(feature = "prometheus")]
+pub struct MetricSessionCounterGuard {
+    _kind: &'static str,
+}
+
+#[cfg(feature = "prometheus")]
+impl MetricSessionCounterGuard {
+    pub fn new(kind: &'static str) -> Self {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_ACTIVE_TARGETS.increment(&[kind], 1.0);
+        Self { _kind: kind }
+    }
+}
+
+#[cfg(feature = "prometheus")]
+impl Drop for MetricSessionCounterGuard {
+    fn drop(&mut self) {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_ACTIVE_TARGETS.decrement(&[self._kind], 1.0);
+    }
+}
+
 /// Convenience function to copy data in both directions between a [`Session`](crate::HoprSession) and arbitrary
 /// async IO stream.
 /// This function is only available with Tokio and will panic with other runtimes.
@@ -40,7 +71,7 @@ where
         "session buffers"
     );
 
-    if let Some(abort_stream) = abort_stream {
+    let result = if let Some(abort_stream) = abort_stream {
         // We only allow aborting from the "stream" side, not from the "session side"
         // This is useful for UDP-like streams on the "stream" side, which cannot be terminated
         // by a signal from outside (e.g.: for TCP sockets such signal is socket closure).
@@ -57,7 +88,9 @@ where
         hopr_network_types::utils::copy_duplex(session, stream, (max_buffer, max_buffer))
             .await
             .map(|(a, b)| (a as usize, b as usize))
-    }
+    };
+
+    result
 }
 
 /// This function will use the given generator to generate an initial seeding key.

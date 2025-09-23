@@ -3,7 +3,6 @@ use axum::{extract::Request, middleware::Next, response::Response};
 use {
     hopr_lib::AsUnixTimestamp,
     hopr_metrics::metrics::{MultiCounter, MultiHistogram, SimpleGauge},
-    hopr_platform::time::native::current_time,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -54,7 +53,7 @@ pub(crate) async fn record(
     }
 
     // Set for any API call
-    METRIC_API_LAST_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
+    METRIC_API_LAST_TIME.set(std::time::SystemTime::now().as_unix_timestamp().as_secs_f64());
 
     response
 }

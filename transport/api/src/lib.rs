@@ -75,6 +75,8 @@ use hopr_transport_protocol::{
     errors::ProtocolError,
     processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
 };
+#[cfg(feature = "prometheus")]
+pub use hopr_transport_session::MetricSessionCounterGuard;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{

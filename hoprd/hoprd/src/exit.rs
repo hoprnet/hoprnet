@@ -3,21 +3,13 @@ use std::{net::SocketAddr, num::NonZeroUsize};
 use hopr_lib::{
     HoprOffchainKeypair, ServiceId,
     errors::HoprLibError,
+    exports::transport::MetricSessionCounterGuard,
     prelude::{ConnectedUdpStream, ForeignDataMode, UdpStreamParallelism},
     transfer_session,
 };
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 use crate::config::SessionIpForwardingConfig;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
-        "hopr_session_hoprd_target_connections",
-        "Number of currently active HOPR session target connections on this Exit node",
-        &["type"]
-    ).unwrap();
-}
 
 /// Implementation of [`hopr_lib::HoprSessionReactor`] that facilitates
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.
@@ -116,10 +108,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     "bridging the session to the UDP server"
                 );
 
-                tokio::task::spawn(async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
+                let _metric_counter_guard = MetricSessionCounterGuard::new("udp");
 
+                tokio::task::spawn(async move {
                     // The Session forwards the termination to the udp_bridge, terminating
                     // the UDP socket.
                     match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE, None).await {
@@ -137,9 +128,6 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                             "UDP server stream is closed"
                         ),
                     }
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.decrement(&["udp"], 1.0);
                 });
 
                 Ok(())
@@ -193,10 +181,9 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     %tcp_target,
                     "bridging the session to the TCP server"
                 );
-                tokio::task::spawn(async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
+                let _metric_counter_guard = MetricSessionCounterGuard::new("tcp");
 
+                tokio::task::spawn(async move {
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
@@ -212,9 +199,6 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                             "TCP server stream is closed"
                         ),
                     }
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.decrement(&["tcp"], 1.0);
                 });
 
                 Ok(())
@@ -223,8 +207,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 tracing::debug!(?session_id, "bridging the session to the loopback service");
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACTIVE_TARGETS.increment(&["loopback"], 1.0);
+                let _metric_counter_guard = MetricSessionCounterGuard::new("loopback");
 
                 // Uses 4 kB buffer for copying
                 match tokio::io::copy(&mut reader, &mut writer).await {
@@ -235,9 +218,6 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                         "server loopback session service ended with an error"
                     ),
                 }
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACTIVE_TARGETS.decrement(&["loopback"], 1.0);
 
                 Ok(())
             }

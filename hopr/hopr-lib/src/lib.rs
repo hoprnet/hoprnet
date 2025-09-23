@@ -20,10 +20,10 @@ pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
 
-/// Utility module with helper types and functionality over hopr-lib behavior
+/// Utility module with helper types and functionality over hopr-lib behavior.
 pub mod utils;
 
-/// Re-exports of libraries necessary for API and interface operations
+/// Re-exports of libraries necessary for API and interface operations.
 pub mod exports {
     pub mod crypto {
         pub use hopr_crypto_types as types;
@@ -32,12 +32,14 @@ pub mod exports {
     pub mod network {
         pub use hopr_network_types as types;
     }
+
+    pub use hopr_transport as transport;
 }
 
-/// Public traits for interactions with hopr-lib
+/// Public traits for interactions with this library.
 pub mod traits {}
 
-/// Export of relevant types for easier integration
+/// Export of relevant types for easier integration.
 pub mod prelude {
     pub use super::exports::{
         crypto::types::prelude::Hash,
@@ -1401,7 +1403,7 @@ impl Hopr {
     }
 
     pub async fn resolve_to_peerid(&self, address: &Address) -> errors::Result<Option<PeerId>> {
-        let maybe_offchain_key = self.db.resolve_packet_key(&address).await?;
+        let maybe_offchain_key = self.db.resolve_packet_key(address).await?;
 
         Ok(maybe_offchain_key.map(PeerId::from))
     }
