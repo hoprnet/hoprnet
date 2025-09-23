@@ -1,7 +1,11 @@
 use std::{net::SocketAddr, num::NonZeroUsize};
 
-use hopr_lib::{HoprOffchainKeypair, ServiceId, errors::HoprLibError, transfer_session};
-use hopr_network_types::{prelude::ForeignDataMode, udp::UdpStreamParallelism};
+use hopr_lib::{
+    HoprOffchainKeypair, ServiceId,
+    errors::HoprLibError,
+    prelude::{ConnectedUdpStream, ForeignDataMode, UdpStreamParallelism},
+    transfer_session,
+};
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 use crate::config::SessionIpForwardingConfig;
@@ -52,7 +56,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
         match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
                 let kp = self.keypair.clone();
-                let udp_target = hopr_parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp))
+                let udp_target = hopr_lib::utils::parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp))
                     .await
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
@@ -87,7 +91,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     )));
                 }
 
-                let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::builder()
+                let mut udp_bridge = ConnectedUdpStream::builder()
                     .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
@@ -142,7 +146,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
                 let kp = self.keypair.clone();
-                let tcp_target = hopr_parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp))
+                let tcp_target = hopr_lib::utils::parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp))
                     .await
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 

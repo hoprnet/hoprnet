@@ -20,7 +20,33 @@ pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
 
+/// Utility module with helper types and functionality over hopr-lib behavior
 pub mod utils;
+
+/// Re-exports of libraries necessary for API and interface operations
+pub mod exports {
+    pub mod crypto {
+        pub use hopr_crypto_types as types;
+    }
+
+    pub mod network {
+        pub use hopr_network_types as types;
+    }
+}
+
+/// Public traits for interactions with hopr-lib
+pub mod traits {}
+
+/// Export of relevant types for easier integration
+pub mod prelude {
+    pub use super::exports::{
+        crypto::types::prelude::Hash,
+        network::types::{
+            prelude::ForeignDataMode,
+            udp::{ConnectedUdpStream, UdpStreamParallelism},
+        },
+    };
+}
 
 use std::{
     collections::HashMap,
@@ -90,7 +116,7 @@ pub use hopr_transport::{
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
 use hopr_transport::{
-    ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair,
+    ChainKeypair, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair,
     PeerDiscovery, PeerStatus, execute_on_tick,
 };
 use tracing::{debug, error, info, trace, warn};
@@ -152,12 +178,12 @@ impl Display for HoprState {
 }
 
 pub struct OpenChannelResult {
-    pub tx_hash: Hash,
-    pub channel_id: Hash,
+    pub tx_hash: prelude::Hash,
+    pub channel_id: prelude::Hash,
 }
 
 pub struct CloseChannelResult {
-    pub tx_hash: Hash,
+    pub tx_hash: prelude::Hash,
     pub status: ChannelStatus,
 }
 
@@ -399,6 +425,10 @@ impl Hopr {
         me: &OffchainKeypair,
         me_onchain: &ChainKeypair,
     ) -> crate::errors::Result<Self> {
+        if hopr_crypto_random::is_rng_fixed() {
+            warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
+        }
+
         let multiaddress: Multiaddr = (&cfg.host).try_into()?;
 
         let db_path: PathBuf = [&cfg.db.data, "db"].iter().collect();
@@ -1145,8 +1175,8 @@ impl Hopr {
         match self.db.get_last_checksummed_log().await? {
             Some(log) => {
                 let checksum = match log.checksum {
-                    Some(checksum) => Hash::from_hex(checksum.as_str())?,
-                    None => Hash::default(),
+                    Some(checksum) => prelude::Hash::from_hex(checksum.as_str())?,
+                    None => prelude::Hash::default(),
                 };
                 Ok(IndexerStateInfo {
                     latest_log_block_number: log.block_number as u32,
@@ -1252,7 +1282,7 @@ impl Hopr {
     }
 
     /// Attempts to aggregate all tickets in the given channel
-    pub async fn aggregate_tickets(&self, channel: &Hash) -> errors::Result<()> {
+    pub async fn aggregate_tickets(&self, channel: &prelude::Hash) -> errors::Result<()> {
         Ok(self.transport_api.aggregate_tickets(channel).await?)
     }
 
@@ -1341,8 +1371,8 @@ impl Hopr {
     }
 
     // Ticket ========
-    /// Get all tickets in a channel specified by Hash
-    pub async fn tickets_in_channel(&self, channel: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
+    /// Get all tickets in a channel specified by [`prelude::Hash`]
+    pub async fn tickets_in_channel(&self, channel: &prelude::Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         Ok(self.transport_api.tickets_in_channel(channel).await?)
     }
 
@@ -1361,14 +1391,15 @@ impl Hopr {
         Ok(self.db.reset_ticket_statistics().await?)
     }
 
-    // DB ============
-    pub fn peer_resolver(&self) -> &impl HoprDbResolverOperations {
-        &self.db
-    }
-
     // Chain =========
     pub fn me_onchain(&self) -> Address {
         self.hopr_chain_api.me_onchain()
+    }
+
+    pub async fn resolve_to_peerid(&self, address: &Address) -> errors::Result<Option<PeerId>> {
+        let maybe_offchain_key = self.db.resolve_packet_key(&address).await?;
+
+        Ok(maybe_offchain_key.map(PeerId::from))
     }
 
     /// Get ticket price
@@ -1392,7 +1423,7 @@ impl Hopr {
 
     /// Get the channel entry from Hash.
     /// @returns the channel entry of those two nodes
-    pub async fn channel_from_hash(&self, channel_id: &Hash) -> errors::Result<Option<ChannelEntry>> {
+    pub async fn channel_from_hash(&self, channel_id: &prelude::Hash) -> errors::Result<Option<ChannelEntry>> {
         Ok(self.db.get_channel_by_id(None, channel_id).await?)
     }
 
@@ -1432,7 +1463,7 @@ impl Hopr {
     /// Withdraw on-chain assets to a given address
     /// @param recipient the account where the assets should be transferred to
     /// @param amount how many tokens to be transferred
-    pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> errors::Result<Hash> {
+    pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> errors::Result<prelude::Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let awaiter = self.hopr_chain_api.actions_ref().withdraw(recipient, amount).await?;
@@ -1443,7 +1474,7 @@ impl Hopr {
     /// Withdraw on-chain native assets to a given address
     /// @param recipient the account where the assets should be transferred to
     /// @param amount how many tokens to be transferred
-    pub async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> errors::Result<Hash> {
+    pub async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> errors::Result<prelude::Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let awaiter = self
@@ -1471,7 +1502,7 @@ impl Hopr {
         })?)
     }
 
-    pub async fn fund_channel(&self, channel_id: &Hash, amount: HoprBalance) -> errors::Result<Hash> {
+    pub async fn fund_channel(&self, channel_id: &prelude::Hash, amount: HoprBalance) -> errors::Result<prelude::Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let awaiter = self
@@ -1516,7 +1547,7 @@ impl Hopr {
 
     pub async fn close_channel_by_id(
         &self,
-        channel_id: Hash,
+        channel_id: prelude::Hash,
         redeem_before_close: bool,
     ) -> errors::Result<CloseChannelResult> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
@@ -1574,7 +1605,7 @@ impl Hopr {
 
     pub async fn redeem_tickets_in_channel<B: Into<HoprBalance>>(
         &self,
-        channel_id: &Hash,
+        channel_id: &prelude::Hash,
         min_value: B,
         only_aggregated: bool,
     ) -> errors::Result<usize> {

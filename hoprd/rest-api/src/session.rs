@@ -17,9 +17,11 @@ use hopr_lib::{
     Address, HoprSession, HoprSessionId, HoprTransportError, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities,
     SessionClientConfig, SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::HoprLibError,
-    utils::session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding},
+    utils::{
+        futures::AsyncReadStreamer,
+        session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding},
+    },
 };
-use hopr_network_types::utils::AsyncReadStreamer;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, error, info, trace};
