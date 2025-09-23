@@ -84,7 +84,7 @@ jobs:
           body-path: .github/files/${{ steps.template.outputs.pr_template }}
           branch: bot/close-${{ steps.template.outputs.current_version }}
           delete-branch: true
-          labels: release,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin
+          labels: release,binary:x86_64-linux,binary:aarch64-linux,binary:aarch64-darwin,binary:x86_64-darwin,build:hopr-pluto
           draft: true
           assignees: ${{ github.actor }}
           team-reviewers: "@hoprnet/hopr-development"

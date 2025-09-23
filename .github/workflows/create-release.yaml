@@ -176,5 +176,5 @@ jobs:
           content: |
             I'm thrilled to inform the new hoprd version v${{ steps.setup.outputs.current_version }} has been released.
             [Release Notes](https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }})
-            [Docker Hub](https://hub.docker.com/repository/docker/hoprnet/hoprd/tags)
+            [Docker Hub](https://hub.docker.com/r/hoprnet/hoprd)
 
