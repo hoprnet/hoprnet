@@ -307,7 +307,7 @@ pub async fn create_tcp_client_binding(
     // open a Session with the same parameters
     let target = target_spec
         .clone()
-        .into_target(IpProtocol::UDP)
+        .into_target(IpProtocol::TCP)
         .map_err(|e| BindError::UnknownFailure(e.to_string()))?;
 
     // Create a session pool if requested
