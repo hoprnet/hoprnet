@@ -55,14 +55,11 @@ hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
   "utils_session",
-  "utils_futures"
+  "utils_futures",
 ] }
 hopr-metrics = { workspace = true, optional = true }
-hopr-platform = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 oas3 = { workspace = true }
 test-log = { workspace = true }
-
-hopr-transport-session = { workspace = true }

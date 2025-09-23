@@ -20,7 +20,7 @@ pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
 };
 #[cfg(feature = "runtime-tokio")]
-pub use utils::transfer_session;
+pub use utils::{MetricSessionCounterGuard, transfer_session};
 
 /// Number of bytes that can be sent in a single Session protocol payload.
 ///
