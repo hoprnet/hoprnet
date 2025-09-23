@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use futures::{Stream, StreamExt};
-
 use hopr_chain_actions::action_state::{ActionState, IndexerActionTracker};
 use hopr_chain_api::SignificantChainEvent;
 use hopr_db_sql::{accounts::HoprDbAccountOperations, registry::HoprDbRegistryOperations};

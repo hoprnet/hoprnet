@@ -9,5 +9,3 @@ pub trait HoprSessionServer {
     /// Fully process a single HOPR session
     async fn process(&self, session: IncomingSession) -> Result<()>;
 }
-
-

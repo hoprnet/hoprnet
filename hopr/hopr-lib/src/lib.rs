@@ -56,8 +56,10 @@ pub mod exports {
 /// Export of relevant types for easier integration.
 pub mod prelude {
     pub use super::exports::{
-        crypto::keypair::key_pair::HoprKeys,
-        crypto::types::prelude::{ChainKeypair, Hash, OffchainKeypair},
+        crypto::{
+            keypair::key_pair::HoprKeys,
+            types::prelude::{ChainKeypair, Hash, OffchainKeypair},
+        },
         network::types::{
             prelude::ForeignDataMode,
             udp::{ConnectedUdpStream, UdpStreamParallelism},
@@ -66,8 +68,6 @@ pub mod prelude {
         types::primitive::prelude::Address,
     };
 }
-
-pub use async_trait::async_trait;
 
 use std::{
     collections::HashMap,
@@ -79,6 +79,7 @@ use std::{
 };
 
 use async_lock::RwLock;
+pub use async_trait::async_trait;
 use errors::{HoprLibError, HoprStatusError};
 use futures::{
     FutureExt, SinkExt, StreamExt,
