@@ -8,7 +8,6 @@ pub mod channel_metrics;
 
 #[cfg(feature = "prometheus")]
 pub use channel_metrics::{InstrumentedReceiver, InstrumentedSender, monitored_channel};
-
 #[cfg(not(feature = "prometheus"))]
 pub use futures::channel::mpsc::{Receiver as InstrumentedReceiver, Sender as InstrumentedSender};
 

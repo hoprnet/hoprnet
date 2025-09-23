@@ -270,11 +270,12 @@ where
             capacity = balancer_level_capacity,
             "Creating session balancer level channel"
         );
-        let (level_tx, level_rx) = hopr_async_runtime::monitored_channel(balancer_level_capacity, "balancer_level");
+
         #[cfg(not(feature = "prometheus"))]
-        let mut level_tx = level_tx;
+        let (mut level_tx, level_rx) = hopr_async_runtime::monitored_channel(balancer_level_capacity, "balancer_level");
         #[cfg(feature = "prometheus")]
-        let level_tx = level_tx;
+        let (level_tx, level_rx) = hopr_async_runtime::monitored_channel(balancer_level_capacity, "balancer_level");
+
         hopr_async_runtime::prelude::spawn(
             async move {
                 pin_mut!(sampling_stream);

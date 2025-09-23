@@ -87,7 +87,7 @@ scrape_configs:
 - `hopr_surb_balancer_surbs_rate`: Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss), keys: `session_id`
 - `hopr_surb_balancer_current_buffer_estimate`: Estimated number of SURBs in the buffer, keys: `session_id`
 - `hopr_surb_balancer_current_buffer_target`: Current target (setpoint) number of SURBs in the buffer, keys: `session_id`
-- `hopr_channel_capacity`: Maximum buffer size of mpsc channels, keys: `channel_name`
-- `hopr_channel_current_length`: Current number of queued messages in mpsc channels, keys: `channel_name`
+- `hopr_channel_max_capacity`: Maximum buffer size of mpsc channels, keys: `channel_name`
+- `hopr_channel_current_capacity`: Current buffer size of mpsc channels, keys: `channel_name`
 - `hopr_channel_send_duration_sec`: Time distribution for channel send operations in seconds, keys: `channel_name`, buckets: 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0
 - `hopr_channel_receive_duration_sec`: Time distribution for channel receive operations in seconds, keys: `channel_name`, buckets: 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0

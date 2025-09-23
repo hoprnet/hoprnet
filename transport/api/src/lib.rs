@@ -37,9 +37,6 @@ use futures::{
 };
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
-#[cfg(feature = "prometheus")]
-pub use hopr_async_runtime::{InstrumentedReceiver, InstrumentedSender, monitored_channel};
-#[cfg(not(feature = "prometheus"))]
 pub use hopr_async_runtime::{InstrumentedReceiver, InstrumentedSender, monitored_channel};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{

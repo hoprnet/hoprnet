@@ -1,65 +1,29 @@
 //! # Channel Monitoring Module
 //!
-//! This module provides instrumented channel implementations that integrate
-//! with HOPRd's existing Prometheus metrics infrastructure. It offers
-//! monitoring for channel capacity, current length, send duration, and
-//! receive duration with configurable backend support. All blocking send
-//! operations include a 5-second timeout with error logging to prevent
-//! indefinite blocking.
+//! Instrumented channel implementations for Prometheus metrics collection with dual-backend support.
 //!
-//! ## Dual-Backend Architecture
+//! ## Features
 //!
-//! The implementation supports two async backends with different capabilities:
-//!
-//! ### Tokio Backend (`runtime-tokio` feature)
-//! - **Primary backend**: `tokio::sync::mpsc`
-//! - **Accurate metrics**: Real-time capacity tracking via `sender.capacity()`
-//! - **Performance**: Optimized for tokio runtime environments
-//! - **Limitations**: Requires tokio runtime for operation
-//!
-//! ### Futures Backend (fallback)
-//! - **Fallback backend**: `futures::channel::mpsc`
-//! - **Best-effort metrics**: Capacity tracking unavailable (always reports 0)
-//! - **Compatibility**: Works with any async runtime
-//! - **Use case**: Non-tokio environments or when precise metrics not required
+//! - **Metrics**: Channel capacity, send/receive duration tracking
+//! - **Backends**: Tokio (accurate capacity) or futures (best-effort)
+//! - **Safety**: 5-second timeout on blocking sends with error logging
+//! - **Performance**: Zero overhead when Prometheus disabled
 //!
 //! ## Feature Flags
 //!
-//! - `prometheus`: Enables metrics collection (when disabled, zero-overhead passthrough)
-//! - `runtime-tokio`: Selects tokio backend for accurate metrics
+//! - `prometheus`: Enables metrics collection
+//! - `runtime-tokio`: Uses tokio backend for accurate capacity tracking
 //!
-//! ## API Compatibility
-//!
-//! The module provides a unified API across backends:
-//! - Consistent error types using `futures::channel::mpsc::SendError`
-//! - Universal `into_inner()` method returning `futures::channel::mpsc::Sender<T>`
-//! - Backend-specific method availability (e.g., `capacity()` only meaningful with tokio)
-//! - Timeout handling: 5-second timeout on all blocking send operations with error logging
-//!
-//! ## Performance Characteristics
-//!
-//! **With Prometheus enabled**:
-//! - Tokio: ~5-10% overhead for accurate capacity tracking
-//! - Futures: ~2-5% overhead for timing metrics only
-//!
-//! **With Prometheus disabled**:
-//! - Zero overhead: Direct passthrough to underlying channel implementation
-//!
-//! ## Usage Examples
+//! ## Usage
 //!
 //! ```rust
 //! use hopr_async_runtime::monitored_channel;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! // Create a monitored channel
 //! let (sender, mut receiver) = monitored_channel::<String>(1024, "task_queue");
 //!
-//! // Send messages (metrics automatically recorded with 5-second timeout)
 //! sender.send("hello".to_string()).await?;
-//!
-//! // Receive messages (timing metrics recorded)
 //! let msg = receiver.recv().await;
-//! println!("Received: {:?}", msg);
 //! # Ok(())
 //! # }
 //! ```
@@ -84,11 +48,7 @@ use tracing::error;
 #[cfg(feature = "runtime-tokio")]
 use crate::prelude::timeout_fut;
 
-/// Helper to create a futures SendError when we need it for tokio backend
-///
-/// This function creates a consistent SendError type for API compatibility.
-/// Since tokio and futures use different error types, we convert tokio errors
-/// to futures errors to maintain a unified error API.
+/// Create SendError for API compatibility between tokio and futures backends.
 #[cfg(feature = "runtime-tokio")]
 fn create_futures_send_error() -> SendError {
     let (mut tx, rx) = futures::channel::mpsc::channel::<()>(1);
@@ -196,29 +156,12 @@ lazy_static! {
     ).unwrap();
 }
 
-/// Instrumented sender that wraps mpsc::Sender with metrics collection
+/// Channel sender with automatic Prometheus metrics collection.
 ///
-/// This struct provides a unified interface for sending messages through channels
-/// while automatically collecting Prometheus metrics when the `prometheus` feature
-/// is enabled. The underlying implementation varies based on the async backend:
+/// Wraps `tokio::sync::mpsc::Sender` or `futures::channel::mpsc::Sender` based on features.
+/// Records send duration and capacity metrics when `prometheus` feature is enabled.
 ///
-/// - **Tokio backend**: Uses `tokio::sync::mpsc::Sender<T>` with accurate capacity metrics
-/// - **Futures backend**: Uses `futures::channel::mpsc::Sender<T>` with best-effort metrics
-///
-/// ## Metrics Collected
-///
-/// When `prometheus` feature is enabled:
-/// - **Send duration**: Histogram of time spent in send operations
-/// - **Channel capacity**: Current available buffer space (accurate with tokio backend)
-/// - **Max capacity**: Configured buffer size
-///
-/// ## API Differences by Backend
-///
-/// | Method | Tokio | Futures | Notes |
-/// |--------|-------|---------|-------|
-/// | `send()` | `&self` | `&mut self` | Mutability requirement differs |
-/// | `try_send()` | `&self` | `&mut self` | Same mutability pattern |
-/// | `capacity()` | Available via receiver | Always 0 | Tokio provides accurate tracking |
+/// **Note**: Tokio backend uses `&self` for sends, futures backend requires `&mut self`.
 #[derive(Debug)]
 #[cfg(feature = "prometheus")]
 pub struct InstrumentedSender<T> {
@@ -227,11 +170,7 @@ pub struct InstrumentedSender<T> {
     capacity: usize,
 }
 
-/// Non-instrumented sender when prometheus feature is disabled
-///
-/// When the `prometheus` feature is disabled, this becomes a zero-overhead
-/// wrapper around the underlying channel sender, providing the same API
-/// without any metrics collection.
+/// Zero-overhead sender wrapper when Prometheus is disabled.
 #[derive(Debug)]
 #[cfg(not(feature = "prometheus"))]
 pub struct InstrumentedSender<T> {
@@ -239,18 +178,14 @@ pub struct InstrumentedSender<T> {
 }
 
 impl<T> InstrumentedSender<T> {
-    /// Send a message through the channel with metrics recording (tokio backend)
-    ///
-    /// Sends a message asynchronously through the tokio channel while recording
-    /// send duration metrics and updating capacity metrics. Includes a 5-second timeout
-    /// with error logging on timeout.
+    /// Send a message with metrics and 5-second timeout (tokio backend).
     ///
     /// # Errors
-    /// Returns `SendError` if the receiver has been dropped or if the operation times out.
+    /// Returns `SendError` if receiver dropped or timeout exceeded.
     #[cfg(all(feature = "runtime-tokio", feature = "prometheus"))]
     pub async fn send(&self, msg: T) -> Result<(), SendError> {
         let start = std::time::Instant::now();
-        
+
         let send_future = self.sender.send(msg);
         let result = match timeout_fut(SEND_TIMEOUT, send_future).await {
             Ok(send_result) => send_result.map_err(|_| create_futures_send_error()),
@@ -273,22 +208,18 @@ impl<T> InstrumentedSender<T> {
         result
     }
 
-    /// Send a message through the channel with metrics recording (futures backend)
-    ///
-    /// Sends a message asynchronously through the futures channel while recording
-    /// send duration metrics. Note that this requires `&mut self` due to the
-    /// futures channel API. Includes a 5-second timeout with error logging on timeout.
+    /// Send a message with metrics and 5-second timeout (futures backend).
     ///
     /// # Errors
-    /// Returns `SendError` if the receiver has been dropped or if the operation times out.
+    /// Returns `SendError` if receiver dropped or timeout exceeded.
     #[cfg(all(not(feature = "runtime-tokio"), feature = "prometheus"))]
     pub async fn send(&mut self, msg: T) -> Result<(), SendError> {
         let start = std::time::Instant::now();
-        
+
         // For futures backend, we use a simple elapsed time check
         // since we don't have access to tokio::time::timeout
         let send_result = self.sender.send(msg).await;
-        
+
         let duration = start.elapsed();
         if duration > SEND_TIMEOUT {
             error!(
@@ -308,10 +239,7 @@ impl<T> InstrumentedSender<T> {
         send_result
     }
 
-    /// Send a message without metrics (when prometheus disabled, tokio backend)
-    ///
-    /// Includes 5-second timeout with error logging but no metrics collection.
-    /// Uses tokio's timeout functionality for proper timeout handling.
+    /// Send with 5-second timeout, no metrics (tokio backend).
     #[cfg(all(feature = "runtime-tokio", not(feature = "prometheus")))]
     pub async fn send(&self, msg: T) -> Result<(), SendError> {
         match timeout_fut(SEND_TIMEOUT, self.sender.send(msg)).await {
@@ -326,15 +254,12 @@ impl<T> InstrumentedSender<T> {
         }
     }
 
-    /// Send a message without metrics (when prometheus disabled, futures backend)
-    ///
-    /// Includes timeout logging but no timeout enforcement since proper async timeout
-    /// is not available without tokio. Logs if operation exceeds 5-second threshold.
+    /// Send with timeout logging, no metrics (futures backend).
     #[cfg(all(not(feature = "runtime-tokio"), not(feature = "prometheus")))]
     pub async fn send(&mut self, msg: T) -> Result<(), SendError> {
         let start = std::time::Instant::now();
         let result = self.sender.send(msg).await;
-        
+
         let duration = start.elapsed();
         if duration > SEND_TIMEOUT {
             error!(
@@ -343,11 +268,11 @@ impl<T> InstrumentedSender<T> {
                 "Channel send operation exceeded timeout"
             );
         }
-        
+
         result
     }
 
-    /// Try to send a message without blocking (tokio backend)
+    /// Non-blocking send (tokio backend).
     #[cfg(all(feature = "runtime-tokio", feature = "prometheus"))]
     pub fn try_send(&self, msg: T) -> Result<(), tokio::sync::mpsc::error::TrySendError<T>> {
         let result = self.sender.try_send(msg);
@@ -357,7 +282,7 @@ impl<T> InstrumentedSender<T> {
         result
     }
 
-    /// Try to send a message without blocking (futures backend)
+    /// Non-blocking send (futures backend).
     #[cfg(all(not(feature = "runtime-tokio"), feature = "prometheus"))]
     pub fn try_send(&mut self, msg: T) -> Result<(), futures::channel::mpsc::TrySendError<T>> {
         let result = self.sender.try_send(msg);
@@ -367,22 +292,19 @@ impl<T> InstrumentedSender<T> {
         result
     }
 
-    /// Try to send a message without blocking (no prometheus)
+    /// Non-blocking send (no metrics).
     #[cfg(all(feature = "runtime-tokio", not(feature = "prometheus")))]
     pub fn try_send(&self, msg: T) -> Result<(), tokio::sync::mpsc::error::TrySendError<T>> {
         self.sender.try_send(msg)
     }
 
-    /// Try to send a message without blocking (no prometheus)
+    /// Non-blocking send (no metrics).
     #[cfg(all(not(feature = "runtime-tokio"), not(feature = "prometheus")))]
     pub fn try_send(&mut self, msg: T) -> Result<(), futures::channel::mpsc::TrySendError<T>> {
         self.sender.try_send(msg)
     }
 
-    /// Check if the channel is closed
-    ///
-    /// Returns `true` if the receiver has been dropped and no more messages
-    /// can be sent through this channel.
+    /// Check if receiver dropped (channel closed).
     pub fn is_closed(&self) -> bool {
         #[cfg(feature = "runtime-tokio")]
         {
@@ -394,38 +316,25 @@ impl<T> InstrumentedSender<T> {
         }
     }
 
-    /// Check if the sender is ready to send (channel not full)
-    ///
-    /// Returns `true` if the channel is not closed. Note that this doesn't
-    /// guarantee the next send won't block if the buffer is full.
+    /// Check if channel is open (not closed).
     pub fn is_ready(&self) -> bool {
         !self.is_closed()
     }
 
-    /// Close the channel (tokio backend)
-    ///
-    /// Tokio channels automatically close when all senders are dropped.
-    /// This method is provided for API compatibility but is a no-op.
+    /// Close channel (tokio: no-op, channels close on drop).
     #[cfg(feature = "runtime-tokio")]
     pub fn close_channel(&mut self) {
         // tokio channels don't have a close_channel method
         // The channel closes when all senders are dropped
     }
 
-    /// Close the channel (futures backend)
-    ///
-    /// Explicitly closes the futures channel, preventing further sends.
-    /// Existing buffered messages can still be received.
+    /// Close channel explicitly (futures backend).
     #[cfg(not(feature = "runtime-tokio"))]
     pub fn close_channel(&mut self) {
         self.sender.close_channel()
     }
 
-    /// Update the channel capacity metric
-    ///
-    /// This internal method updates the current capacity metric based on the backend:
-    /// - **Tokio backend**: Reports accurate available buffer space
-    /// - **Futures backend**: Reports 0 (capacity tracking unavailable)
+    /// Update capacity metric (tokio: accurate, futures: 0).
     #[cfg(feature = "prometheus")]
     fn update_channel_capacity(&self) {
         #[cfg(feature = "runtime-tokio")]
@@ -526,38 +435,19 @@ impl<T> Clone for InstrumentedSender<T> {
     }
 }
 
-/// Instrumented receiver that wraps mpsc::Receiver with metrics collection
+/// Channel receiver with automatic Prometheus metrics collection.
 ///
-/// This struct provides a unified interface for receiving messages from channels
-/// while automatically collecting Prometheus metrics when the `prometheus` feature
-/// is enabled. The underlying implementation varies based on the async backend.
+/// Wraps `tokio::sync::mpsc::Receiver` or `futures::channel::mpsc::Receiver` based on features.
+/// Records receive duration and capacity metrics when `prometheus` feature is enabled.
 ///
-/// ## Metrics Collected
-///
-/// When `prometheus` feature is enabled:
-/// - **Receive duration**: Histogram of time spent in receive operations
-/// - **Channel capacity**: Updates current buffer space after receives (tokio only)
-///
-/// ## API Differences by Backend
-///
-/// | Method | Tokio | Futures | Notes |
-/// |--------|-------|---------|-------|
-/// | `recv()` | `recv()` | Use `Stream::next()` | Different async receive patterns |
-/// | `try_recv()` | `try_recv()` | `try_next()` | Different non-blocking methods |
-/// | `capacity()` | Accurate count | Always 0 | Real vs placeholder capacity |
-///
-/// ## Stream Implementation
-///
-/// Both backends implement `futures::Stream` for async iteration:
-///
+/// Implements `futures::Stream` for async iteration:
 /// ```rust
 /// use futures::StreamExt;
-/// use hopr_async_runtime::monitored_channel;
-///
+/// # use hopr_async_runtime::monitored_channel;
 /// # async fn example() {
-/// let (_sender, mut receiver) = monitored_channel::<i32>(100, "stream_example");
-/// while let Some(msg) = receiver.next().await {
-///     println!("Received: {}", msg);
+/// let (_tx, mut rx) = monitored_channel::<i32>(100, "example");
+/// while let Some(msg) = rx.next().await {
+///     // Process message
 /// }
 /// # }
 /// ```
@@ -568,11 +458,7 @@ pub struct InstrumentedReceiver<T> {
     channel_name: String,
 }
 
-/// Non-instrumented receiver when prometheus feature is disabled
-///
-/// When the `prometheus` feature is disabled, this becomes a zero-overhead
-/// wrapper around the underlying channel receiver, providing the same API
-/// without any metrics collection.
+/// Zero-overhead receiver wrapper when Prometheus is disabled.
 #[derive(Debug)]
 #[cfg(not(feature = "prometheus"))]
 pub struct InstrumentedReceiver<T> {
@@ -580,7 +466,7 @@ pub struct InstrumentedReceiver<T> {
 }
 
 impl<T> InstrumentedReceiver<T> {
-    /// Try to receive a message without blocking (tokio backend)
+    /// Non-blocking receive (tokio backend).
     #[cfg(all(feature = "runtime-tokio", feature = "prometheus"))]
     pub fn try_recv(&mut self) -> Result<T, tokio::sync::mpsc::error::TryRecvError> {
         let start = std::time::Instant::now();
@@ -595,7 +481,7 @@ impl<T> InstrumentedReceiver<T> {
         result
     }
 
-    /// Try to receive a message without blocking (futures backend)
+    /// Non-blocking receive (futures backend).
     #[cfg(all(not(feature = "runtime-tokio"), feature = "prometheus"))]
     pub fn try_next(&mut self) -> Result<Option<T>, futures::channel::mpsc::TryRecvError> {
         let start = std::time::Instant::now();
@@ -610,19 +496,19 @@ impl<T> InstrumentedReceiver<T> {
         result
     }
 
-    /// Try to receive a message without blocking (no prometheus)
+    /// Non-blocking receive (no metrics).
     #[cfg(all(feature = "runtime-tokio", not(feature = "prometheus")))]
     pub fn try_recv(&mut self) -> Result<T, tokio::sync::mpsc::error::TryRecvError> {
         self.receiver.try_recv()
     }
 
-    /// Try to receive a message without blocking (no prometheus)
+    /// Non-blocking receive (no metrics).
     #[cfg(all(not(feature = "runtime-tokio"), not(feature = "prometheus")))]
     pub fn try_next(&mut self) -> Result<Option<T>, futures::channel::mpsc::TryRecvError> {
         self.receiver.try_next()
     }
 
-    /// Receive a message (tokio backend)
+    /// Async receive with metrics (tokio backend).
     #[cfg(all(feature = "runtime-tokio", feature = "prometheus"))]
     pub async fn recv(&mut self) -> Option<T> {
         let start = std::time::Instant::now();
@@ -637,13 +523,13 @@ impl<T> InstrumentedReceiver<T> {
         result
     }
 
-    /// Receive a message (tokio backend, no prometheus)
+    /// Async receive without metrics (tokio backend).
     #[cfg(all(feature = "runtime-tokio", not(feature = "prometheus")))]
     pub async fn recv(&mut self) -> Option<T> {
         self.receiver.recv().await
     }
 
-    /// Close the receiver
+    /// Close receiver.
     pub fn close(&mut self) {
         #[cfg(feature = "runtime-tokio")]
         {
@@ -655,33 +541,20 @@ impl<T> InstrumentedReceiver<T> {
         }
     }
 
-    /// Get the current capacity of the channel queue (tokio backend only)
-    ///
-    /// Returns the number of available slots in the channel buffer.
-    /// This represents how many additional messages can be sent without blocking.
-    ///
-    /// # Accuracy
-    /// - **Tokio backend**: Provides accurate real-time capacity
-    /// - **Futures backend**: Always returns 0 (capacity tracking unavailable)
+    /// Get available channel capacity (tokio: accurate, futures: always 0).
     #[cfg(feature = "runtime-tokio")]
     pub fn capacity(&self) -> usize {
         self.receiver.capacity()
     }
 
-    /// Get the current capacity of the channel queue (futures backend)
-    ///
-    /// Futures channels don't provide capacity information, so this always
-    /// returns 0. This method exists for API compatibility.
+    /// Get capacity (always 0 for futures backend, exists for API compatibility).
     #[cfg(not(feature = "runtime-tokio"))]
     pub fn capacity(&self) -> usize {
         // futures backend doesn't provide this information
         0
     }
 
-    /// Update the current capacity metric
-    ///
-    /// Updates the current capacity metric after receiving a message.
-    /// The accuracy depends on the backend's capacity tracking capabilities.
+    /// Update capacity metric after receive.
     fn update_channel_capacity(&self) {
         HOPR_CHANNEL_CURRENT_CAPACITY.set(&[&self.channel_name], self.capacity() as f64);
     }
@@ -745,94 +618,33 @@ impl<T> Stream for InstrumentedReceiver<T> {
     }
 }
 
-/// Create a monitored mpsc channel with the given buffer size and channel name
+/// Create a monitored mpsc channel with metrics collection.
 ///
-/// This function creates an instrumented channel that automatically collects
-/// metrics when the `prometheus` feature is enabled. The underlying implementation
-/// and metric accuracy depend on the selected async backend.
+/// Creates an instrumented channel that collects Prometheus metrics when enabled.
+/// Uses `tokio::sync::mpsc` with `runtime-tokio` feature, otherwise `futures::channel::mpsc`.
 ///
-/// ## Feature Combinations
+/// ## Metrics (when `prometheus` enabled)
+/// - `hopr_channel_max_capacity`: Buffer size (gauge)
+/// - `hopr_channel_current_capacity`: Available space (gauge, accurate with tokio)
+/// - `hopr_channel_send_duration_sec`: Send timing (histogram)
+/// - `hopr_channel_receive_duration_sec`: Receive timing (histogram)
 ///
-/// | Features | Backend | Metrics | Capacity Tracking |
-/// |----------|---------|---------|-------------------|
-/// | `prometheus` + `runtime-tokio` | tokio::sync::mpsc | Full | Accurate |
-/// | `prometheus` only | futures::channel::mpsc | Timing only | Best-effort (0) |
-/// | Neither | Backend selected by `runtime-tokio` | None | N/A |
-///
-/// ## Metrics Collected
-///
-/// When `prometheus` feature is enabled:
-/// - **`hopr_channel_max_capacity`**: Configured buffer size (gauge)
-/// - **`hopr_channel_current_capacity`**: Available buffer space (gauge, accurate with tokio)
-/// - **`hopr_channel_send_duration_sec`**: Send operation timing (histogram)
-/// - **`hopr_channel_receive_duration_sec`**: Receive operation timing (histogram)
-///
-/// All metrics include a `channel_name` label for identification.
-///
-/// ## Performance Impact
-///
-/// - **Prometheus disabled**: Zero overhead, direct channel creation
-/// - **Prometheus + tokio**: ~5-10% overhead for capacity tracking
-/// - **Prometheus + futures**: ~2-5% overhead for timing only
-///
-/// ## Backend Selection
-///
-/// The backend is automatically selected based on feature flags:
-/// 1. If `runtime-tokio` is enabled: Uses `tokio::sync::mpsc`
-/// 2. Otherwise: Uses `futures::channel::mpsc`
-///
-/// # Arguments
-/// * `buffer_size` - The buffer size for the channel (must be > 0)
-/// * `channel_name` - A unique name for this channel used in metrics labels
-///
-/// # Returns
-/// A tuple of (InstrumentedSender, InstrumentedReceiver) providing a unified API
+/// ## Performance
+/// - Prometheus disabled: Zero overhead
+/// - With tokio: ~5-10% overhead
+/// - With futures: ~2-5% overhead
 ///
 /// # Examples
-///
-/// ## Basic Usage
 /// ```rust
 /// use hopr_async_runtime::monitored_channel;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// // Create a monitored channel for task coordination
-/// let (sender, mut receiver) = monitored_channel::<String>(1024, "task_queue");
+/// let (tx, mut rx) = monitored_channel::<String>(1024, "task_queue");
 ///
-/// // Send messages (automatically timed when prometheus enabled, with 5-second timeout)
-/// sender.send("task_data".to_string()).await?;
-///
-/// // Receive messages (automatically timed when prometheus enabled)
-/// if let Some(msg) = receiver.recv().await {
-///     println!("Processing: {}", msg);
+/// tx.send("data".to_string()).await?;
+/// if let Some(msg) = rx.recv().await {
+///     // Process message
 /// }
-/// # Ok(())
-/// # }
-/// ```
-///
-/// ## Stream-based Processing
-/// ```rust
-/// use futures::StreamExt;
-/// use hopr_async_runtime::monitored_channel;
-///
-/// # async fn example() {
-/// let (_sender, mut receiver) = monitored_channel::<i32>(100, "numbers");
-///
-/// // Process messages as a stream
-/// while let Some(number) = receiver.next().await {
-///     println!("Number: {}", number);
-/// }
-/// # }
-/// ```
-///
-/// ## API Compatibility
-/// ```rust
-/// use hopr_async_runtime::monitored_channel;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let (sender, _receiver) = monitored_channel::<String>(100, "compat");
-///
-/// // Send messages directly using the monitored sender with timeout protection
-/// sender.send("compatible_message".to_string()).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -860,7 +672,7 @@ pub fn monitored_channel<T>(
     )
 }
 
-/// Create a monitored mpsc channel (futures backend when prometheus enabled)
+/// Create monitored channel (futures backend with prometheus).
 #[cfg(all(not(feature = "runtime-tokio"), feature = "prometheus"))]
 pub fn monitored_channel<T>(
     buffer_size: usize,
@@ -885,7 +697,7 @@ pub fn monitored_channel<T>(
     )
 }
 
-/// Create a monitored mpsc channel (no-op when prometheus feature is disabled)
+/// Create channel without metrics (prometheus disabled).
 #[cfg(not(feature = "prometheus"))]
 pub fn monitored_channel<T>(
     buffer_size: usize,
@@ -903,14 +715,7 @@ pub fn monitored_channel<T>(
     }
 }
 
-/// Test module for channel metrics functionality
-///
-/// Tests cover both backends and feature combinations to ensure:
-/// - Basic channel functionality (send/receive)
-/// - Non-blocking operations (try_send/try_recv)
-/// - Channel lifecycle (creation, closure)
-/// - Capacity tracking accuracy (tokio backend)
-/// - API compatibility across backends
+/// Tests for channel metrics across both backends and feature combinations.
 #[cfg(test)]
 mod tests {
     #[cfg(not(feature = "runtime-tokio"))]

@@ -1018,15 +1018,12 @@ where
 
         let mut msg_sender = self.msg_sender.get().cloned().ok_or(SessionManagerError::NotStarted)?;
 
-        let (new_session_notifier, close_session_notifier) = self
+        let (mut new_session_notifier, close_session_notifier) = self
             .session_notifiers
             .get()
             .cloned()
             .ok_or(SessionManagerError::NotStarted)?;
-        #[cfg(not(feature = "prometheus"))]
-        let mut new_session_notifier = new_session_notifier;
-        #[cfg(feature = "prometheus")]
-        let mut new_session_notifier = new_session_notifier;
+
         #[cfg(not(feature = "prometheus"))]
         let mut close_session_notifier = close_session_notifier;
         #[cfg(feature = "prometheus")]
