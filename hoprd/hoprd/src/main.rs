@@ -6,7 +6,7 @@ use futures::{
     FutureExt, StreamExt,
     future::{AbortHandle, abortable},
 };
-use hopr_lib::{HoprKeys, HoprLibProcesses, IdentityRetrievalModes, ToHex, utils::session::ListenerJoinHandles};
+use hopr_lib::{HoprKeys, IdentityRetrievalModes, ToHex, state::HoprLibProcesses, utils::session::ListenerJoinHandles};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
