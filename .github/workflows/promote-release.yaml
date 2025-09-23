@@ -40,6 +40,7 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for all branches and tags
           persist-credentials: true # required for gh cli to do push
+          token: ${{ secrets.GH_RUNNER_TOKEN }} # Needs to use a different token than GITHUB_TOKEN to be able to push to protected branches
           ref: master
 
       - name: Promote release
