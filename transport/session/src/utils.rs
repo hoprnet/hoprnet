@@ -71,7 +71,7 @@ where
         "session buffers"
     );
 
-    let result = if let Some(abort_stream) = abort_stream {
+    if let Some(abort_stream) = abort_stream {
         // We only allow aborting from the "stream" side, not from the "session side"
         // This is useful for UDP-like streams on the "stream" side, which cannot be terminated
         // by a signal from outside (e.g.: for TCP sockets such signal is socket closure).
@@ -88,9 +88,7 @@ where
         hopr_network_types::utils::copy_duplex(session, stream, (max_buffer, max_buffer))
             .await
             .map(|(a, b)| (a as usize, b as usize))
-    };
-
-    result
+    }
 }
 
 /// This function will use the given generator to generate an initial seeding key.

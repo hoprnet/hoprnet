@@ -642,7 +642,7 @@ pub(crate) async fn create_client(
                 }
                 hopr_lib::utils::session::BindError::UnknownFailure(_) => (
                     StatusCode::UNPROCESSABLE_ENTITY,
-                    ApiErrorStatus::UnknownFailure(format!("failed to start UDP listener on {bind_host}: {e}")),
+                    ApiErrorStatus::UnknownFailure(format!("failed to start TCP listener on {bind_host}: {e}")),
                 ),
             })?
         }
