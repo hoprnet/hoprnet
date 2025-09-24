@@ -111,9 +111,9 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                     "bridging the session to the UDP server"
                 );
 
-                let _metric_counter_guard = MetricSessionCounterGuard::new("udp");
-
                 tokio::task::spawn(async move {
+                    let _metric_counter_guard = MetricSessionCounterGuard::new("udp");
+
                     // The Session forwards the termination to the udp_bridge, terminating
                     // the UDP socket.
                     match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE, None).await {
@@ -184,9 +184,10 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                     %tcp_target,
                     "bridging the session to the TCP server"
                 );
-                let _metric_counter_guard = MetricSessionCounterGuard::new("tcp");
 
                 tokio::task::spawn(async move {
+                    let _metric_counter_guard = MetricSessionCounterGuard::new("tcp");
+
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
