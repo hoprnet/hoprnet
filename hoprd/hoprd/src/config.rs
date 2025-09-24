@@ -242,11 +242,11 @@ impl HoprdConfig {
         // it means they have not been specified on the CLI and thus the
         // corresponding config value should be enabled.
         if cli_args.no_fast_sync == 0 {
-            cfg.hopr.chain.fast_sync = true
+            cfg.hopr.chain.fast_sync = false
         }
 
         if cli_args.no_keep_logs == 0 {
-            cfg.hopr.chain.keep_logs = true
+            cfg.hopr.chain.keep_logs = false
         }
 
         if cli_args.enable_logs_snapshot != 0 {
