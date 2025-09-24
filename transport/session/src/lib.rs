@@ -19,11 +19,10 @@ pub use manager::{DispatchResult, MIN_SURB_BUFFER_DURATION, SessionManager, Sess
 pub use types::{
     ByteCapabilities, HoprSession, HoprSessionConfig, IncomingSession, ServiceId, SessionId, SessionTarget,
 };
-#[cfg(feature = "runtime-tokio")]
-pub use utils::transfer_session;
-
 #[cfg(feature = "prometheus")]
 pub use utils::MetricSessionCounterGuard;
+#[cfg(feature = "runtime-tokio")]
+pub use utils::transfer_session;
 
 /// Number of bytes that can be sent in a single Session protocol payload.
 ///
