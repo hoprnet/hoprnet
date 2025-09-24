@@ -99,6 +99,28 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
     }
 }
 
+/// Check if a multiaddress contains a public/routable IP address
+fn is_public_address(addr: &Multiaddr) -> bool {
+    for protocol in addr.iter() {
+        match protocol {
+            Protocol::Ip4(ip) => {
+                // Filter out private, loopback, and local addresses
+                if ip.is_private() || ip.is_loopback() || ip.is_link_local() {
+                    return false;
+                }
+            }
+            Protocol::Ip6(ip) => {
+                // Filter out loopback, link-local, and unique local addresses
+                if ip.is_loopback() || ip.is_unicast_link_local() || ip.is_unique_local() {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
 impl HoprSwarm {
     pub async fn new<T>(
         identity: libp2p::identity::Keypair,
@@ -306,8 +328,13 @@ impl HoprSwarm {
                     SwarmEvent::NewExternalAddrOfPeer {
                         peer_id, address
                     } => {
-                        swarm.add_peer_address(peer_id, address.clone());
-                        trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "New peer stored in swarm")
+                        // Only store public/routable addresses
+                        if is_public_address(&address) {
+                            swarm.add_peer_address(peer_id, address.clone());
+                            trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Public peer address stored in swarm")
+                        } else {
+                            trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address ignored")
+                        }
                     },
                     _ => trace!(transport="libp2p", "Unsupported enum option detected")
                 }
