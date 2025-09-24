@@ -239,13 +239,12 @@ impl HoprdConfig {
         }
 
         // The --enable*/--no*/--disable* CLI flags are Count-based, therefore, if they equal to 0,
-        // it means they have not been specified on the CLI and thus the
-        // corresponding config value should be enabled.
-        if cli_args.no_fast_sync == 0 {
+        // it means they have not been specified on the CLI
+        if cli_args.no_fast_sync != 0 {
             cfg.hopr.chain.fast_sync = false
         }
 
-        if cli_args.no_keep_logs == 0 {
+        if cli_args.no_keep_logs != 0 {
             cfg.hopr.chain.keep_logs = false
         }
 
