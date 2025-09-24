@@ -179,7 +179,7 @@ jobs:
 
       - name: Setup Load Testing environment
         run: |
-          yarn install
+          yarn install --frozen-lockfile --production=false
           yarn run setup
         working-directory: "./k6"
 
