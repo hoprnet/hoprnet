@@ -124,52 +124,39 @@ async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'st
 #[rstest]
 #[cfg(feature = "runtime-tokio")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn test_open_channel(
-    #[future(awt)] cluster_fixture: &Vec<Hopr>,
-    random_int_pair: (usize, usize),
-) -> anyhow::Result<()> {
-    use hopr_lib::HoprBalance;
+async fn test_get_addresses(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
+    assert!(cluster_fixture[0].me_onchain() != Address::default());
+    Ok(())
+}
 
-    let (src, dst) = random_int_pair;
+#[rstest]
+#[cfg(feature = "runtime-tokio")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_get_infos(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
+    let node: &Hopr = &cluster_fixture[0];
 
-    assert_eq!((cluster_fixture[src].all_channels().await?).len(), 0);
+    assert!(node.network() != "");
+    assert!(node.get_safe_config().safe_address != Address::default());
+    Ok(())
+}
 
-    cluster_fixture[src]
-        .open_channel(&(cluster_fixture[dst].me_onchain()), HoprBalance::from_str("1 wxHOPR")?)
+#[rstest]
+#[cfg(feature = "runtime-tokio")]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_get_balance(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
+    use hopr_lib::{HoprBalance, XDaiBalance};
+
+    let node: &Hopr = &cluster_fixture[0];
+
+    let safe_native: XDaiBalance = node.get_safe_balance().await.expect("should get safe xdai balance");
+    let native: XDaiBalance = node.get_balance().await.expect("should get node xdai balance");
+    let safe_hopr: HoprBalance = node
+        .get_safe_hopr_balance()
         .await
-        .expect("failed to open channel");
+        .expect("should get safe hopr balance");
 
-    assert_eq!((cluster_fixture[src].all_channels().await?).len(), 1);
-
-    Ok(())
-}
-
-#[rstest]
-#[cfg(feature = "runtime-tokio")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn test_cluster_connectivity(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
-    use tokio::time::{Instant, sleep};
-
-    let start = Instant::now();
-    let timeout_duration = Duration::from_secs(30);
-
-    loop {
-        let results = futures::future::join_all(cluster_fixture.iter().map(|node| node.network_connected_peers()))
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .expect("failed to get connected peers");
-
-        if results.iter().all(|peers| peers.len() == SWARM_N - 1) {
-            break;
-        }
-
-        if start.elapsed() >= timeout_duration {
-            panic!("Timeout: not all nodes connected within 30s");
-        }
-
-        sleep(Duration::from_millis(200)).await;
-    }
+    let hopr: HoprBalance = node.get_balance().await.expect("should get node hopr balance");
+    let safe_allowance: HoprBalance = node.safe_allowance().await.expect("should get safe hopr allowance");
 
     Ok(())
 }
@@ -177,26 +164,11 @@ async fn test_cluster_connectivity(#[future(awt)] cluster_fixture: &Vec<Hopr>) -
 #[rstest]
 #[cfg(feature = "runtime-tokio")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn test_send_0_hop_without_open_channels(
-    #[future(awt)] cluster_fixture: &Vec<Hopr>,
-    random_int_pair: (usize, usize),
-) -> anyhow::Result<()> {
-    use hopr_lib::{DestinationRouting, Tag};
-    use hopr_primitive_types::bounded::BoundedSize;
+async fn test_get_channels(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
+    let node = &cluster_fixture[0];
 
-    let (src, dst) = random_int_pair;
-
-    cluster_fixture[src]
-        .send_message(
-            b"Hello, HOPR!".to_vec().into(),
-            DestinationRouting::forward_only(
-                cluster_fixture[dst].me_onchain(),
-                hopr_lib::RoutingOptions::Hops(BoundedSize::default()),
-            ),
-            Tag::Application(1024),
-        )
-        .await
-        .expect("failed to send 0-hop message");
+    let channels = node.channels_from(node.me_onchain()).await?;
+    assert!(channels.is_empty());
 
     Ok(())
 }
@@ -204,9 +176,9 @@ async fn test_send_0_hop_without_open_channels(
 #[rstest]
 #[cfg(feature = "runtime-tokio")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
+async fn test_open_and_close_sessions(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
     use hopr_lib::{SessionClientConfig, SessionTarget};
-    use hopr_transport_session::{Capabilities, Capability};
+    use hopr_transport_session::{Capabilities, Capability}; // TODO: should use hopr-lib instead
 
     let session = cluster_fixture[0]
         .connect_to(
@@ -224,29 +196,7 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -
         .await
         .expect("creating a session must succeed");
 
-    const BUF_LEN: usize = 16384;
-
-    let mut listener = ConnectedUdpStream::builder()
-        .with_buffer_size(BUF_LEN)
-        .with_queue_size(512)
-        .with_receiver_parallelism(UdpStreamParallelism::Auto)
-        .build(("127.0.0.1", 0))?;
-
-    let addr = *listener.bound_address();
-
-    let msg: [u8; 9183] = hopr_crypto_random::random_bytes();
-    let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
-
-    let w = sender.send_to(&msg[..8192], addr).await?;
-    assert_eq!(8192, w);
-
-    let w = sender.send_to(&msg[8192..], addr).await?;
-    assert_eq!(991, w);
-
-    let mut recv_msg = [0u8; 9183];
-    session.read_exact(&mut recv_msg).await?;
-
-    assert_eq!(recv_msg, msg);
+    // let sessions = cluster_fixture[0].list_sessions().await?; // TODO. Do once integrated into edgli
 
     Ok(())
 }
@@ -254,18 +204,18 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -
 #[rstest]
 #[cfg(feature = "runtime-tokio")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
-    use hopr_lib::{SessionClientConfig, SessionTarget};
-    use hopr_transport_session::{Capabilities, Capability};
+async fn test_update_session_config(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
+    use hopr_lib::SurbBalancerConfig;
 
-    // TODO: precondition: ensure that a channel exists between the src and relayer.
-    let session = cluster_fixture[0]
+    let node = &cluster_fixture[0];
+
+    let session = node
         .connect_to(
             &cluster_fixture[1].me_onchain(),
             SessionTarget::UdpStream(":0"),
             SessionClientConfig {
-                forward_path_options: hopr_lib::RoutingOptions::Hops(1_u32.try_into()?),
-                return_path_options: hopr_lib::RoutingOptions::Hops(1_u32.try_into()?),
+                forward_path_options: hopr_lib::RoutingOptions::Hops(0_u32.try_into()?),
+                return_path_options: hopr_lib::RoutingOptions::Hops(0_u32.try_into()?),
                 capabilities: Capabilities::from(Capability::Segmentation),
                 pseudonym: None,
                 surb_management: None,
@@ -275,29 +225,30 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -
         .await
         .expect("creating a session must succeed");
 
-    const BUF_LEN: usize = 16384;
+    let config = node
+        .get_session_surb_balancer_config(&session.id())
+        .await
+        .expect("should get session config");
 
-    let mut listener = ConnectedUdpStream::builder()
-        .with_buffer_size(BUF_LEN)
-        .with_queue_size(512)
-        .with_receiver_parallelism(UdpStreamParallelism::Auto)
-        .build(("127.0.0.1", 0))?;
+    assert_eq!(config, None);
 
-    let addr = *listener.bound_address();
+    let new_config = SurbBalancerConfig {
+        target_surb_buffer_size: 5_000,
+        max_surbs_per_sec: 2500,
+        surb_decay: Some((Duration::from_millis(200), 0.05)),
+    };
 
-    let msg: [u8; 9183] = hopr_crypto_random::random_bytes();
-    let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
+    node.update_session_surb_balancer_config(&session.id(), new_config.clone())
+        .await
+        .expect("should update session config");
 
-    let w = sender.send_to(&msg[..8192], addr).await?;
-    assert_eq!(8192, w);
-
-    let w = sender.send_to(&msg[8192..], addr).await?;
-    assert_eq!(991, w);
-
-    let mut recv_msg = [0u8; 9183];
-    session.read_exact(&mut recv_msg).await?;
-
-    assert_eq!(recv_msg, msg);
+    assert_eq!(
+        config = node
+            .get_session_surb_balancer_config(&session.id())
+            .await
+            .expect("should get session config"),
+        Some(new_config)
+    );
 
     Ok(())
 }
