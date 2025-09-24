@@ -101,24 +101,13 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
 
 /// Check if a multiaddress contains a public/routable IP address
 fn is_public_address(addr: &Multiaddr) -> bool {
-    for protocol in addr.iter() {
+    addr.all(|protocol| {
         match protocol {
-            Protocol::Ip4(ip) => {
-                // Filter out private, loopback, and local addresses
-                if ip.is_private() || ip.is_loopback() || ip.is_link_local() {
-                    return false;
-                }
-            }
-            Protocol::Ip6(ip) => {
-                // Filter out loopback, link-local, and unique local addresses
-                if ip.is_loopback() || ip.is_unicast_link_local() || ip.is_unique_local() {
-                    return false;
-                }
-            }
-            _ => {}
+            Protocol::Ip4(ip) => !ip.is_private() && !ip.is_loopback() && !ip.is_link_local()
+            Protocol::Ip6(ip) => !ip.is_loopback() && !ip.is_unicast_link_local() && !ip.is_unique_local()
+            _ => true
         }
-    }
-    true
+    })
 }
 
 impl HoprSwarm {
