@@ -111,6 +111,13 @@ jobs:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
+      - name: Checkout hoprd-test repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          repository: hoprnet/hoprd-test
+          ref: ${{ vars.K6_REPOSITORY_BRANCH_NAME || 'main' }}
+
       - name: Set environment variables
         id: vars
         run: |
@@ -153,13 +160,6 @@ jobs:
             echo "K6_SKIP_SCENARIO_UPLOAD=true" >> $GITHUB_ENV
             echo "K6_UPLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
           fi
-
-      - name: Checkout hoprd-test repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          repository: hoprnet/hoprd-test
-          ref: ${{ vars.K6_REPOSITORY_BRANCH_NAME || 'main' }}
 
       - name: Setup GCP
         id: gcp
