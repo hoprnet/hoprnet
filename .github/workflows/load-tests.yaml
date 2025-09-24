@@ -118,6 +118,15 @@ jobs:
           repository: hoprnet/hoprd-test
           ref: ${{ vars.K6_REPOSITORY_BRANCH_NAME || 'main' }}
 
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        with:
+          google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
+          login-gke: 'true'
+          project: hopr-staging
       - name: Set environment variables
         id: vars
         run: |
@@ -160,22 +169,10 @@ jobs:
             echo "K6_SKIP_SCENARIO_UPLOAD=true" >> $GITHUB_ENV
             echo "K6_UPLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
           fi
-
-      - name: Setup GCP
-        id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
-        with:
-          google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
-          login-artifact-registry: 'false'
-          install-sdk: 'true'
-          login-gke: 'true'
-          project: hopr-staging
-
-      - name: Get Hoprd Api token
-        id: token
-        run: |
-          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${K6_CLUSTER_NODES}" -r '.data[$entry]' | base64 -d)
-          echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_ENV
+          K6_CLUSTER_NODES=${{ github.event.inputs.cluster_nodes || inputs.cluster_nodes }}
+          echo "Getting hoprd API token for cluster $K6_CLUSTER_NODES"
+          HOPRD_API_TOKEN=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${K6_CLUSTER_NODES}" -r '.data[$entry]' | base64 -d)
+          echo "HOPRD_API_TOKEN=${HOPRD_API_TOKEN}" >> $GITHUB_ENV
 
       - name: Setup Load Testing environment
         run: |
