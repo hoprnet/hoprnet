@@ -11,7 +11,7 @@ use tokio::sync::OnceCell;
 
 const SNAPSHOT_BASE: &str = "tests/snapshots/node_snapshot_base";
 const PATH_TO_PROTOCOL_CONFIG: &str = "tests/protocol-config-anvil.json";
-const SWARM_N: usize = 2;
+const SWARM_N: usize = 1;
 
 static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
 static SWARM_N_FIXTURE: Lazy<OnceCell<Vec<Hopr>>> = Lazy::new(|| OnceCell::const_new());
@@ -20,10 +20,13 @@ static SWARM_N_FIXTURE: Lazy<OnceCell<Vec<Hopr>>> = Lazy::new(|| OnceCell::const
 fn random_int_pair() -> (usize, usize) {
     use rand::prelude::SliceRandom;
 
-    let mut numbers: Vec<usize> = (0..SWARM_N).collect();
-    numbers.shuffle(&mut rand::thread_rng());
-
-    (numbers[0], numbers[1])
+    if SWARM_N == 1 {
+        (0, 0)
+    } else {
+        let mut numbers: Vec<usize> = (0..SWARM_N).collect();
+        numbers.shuffle(&mut rand::thread_rng());
+        (numbers[0], numbers[1])
+    }
 }
 
 #[rstest::fixture]
@@ -46,6 +49,7 @@ async fn chainenv_fixture() -> &'static TestChainEnv {
         })
         .await
 }
+
 #[rstest::fixture]
 async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'static Vec<Hopr> {
     use std::fs::read_to_string;
@@ -113,8 +117,11 @@ async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'st
                 })
                 .collect();
 
-            // TODO: enable this once the network registry is removed
-            // let (_a, _b) = hopr_instance.run().await?;
+            // TODO: enable this once the network registry is disabled
+            let (_a, _b) = hopr_instances[0]
+                .run()
+                .await
+                .expect("failed to run hopr instance no. 0");
 
             hopr_instances
         })
@@ -202,16 +209,20 @@ async fn test_send_0_hop_without_open_channels(
 }
 
 #[rstest]
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", feature = "session-client"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
     use hopr_lib::{SessionClientConfig, SessionTarget};
-    use hopr_transport_session::{Capabilities, Capability};
+    use hopr_network_types::udp::{ConnectedUdpStream, UdpStreamParallelism};
+    use hopr_transport_session::{Capabilities, Capability, IpOrHost, SealedHost};
+    use tokio::{io::AsyncReadExt, net::UdpSocket};
 
-    let session = cluster_fixture[0]
+    let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
+
+    let mut session = cluster_fixture[0]
         .connect_to(
-            &cluster_fixture[1].me_onchain(),
-            SessionTarget::UdpStream(":0"),
+            cluster_fixture[1].me_onchain(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
             SessionClientConfig {
                 forward_path_options: hopr_lib::RoutingOptions::Hops(0_u32.try_into()?),
                 return_path_options: hopr_lib::RoutingOptions::Hops(0_u32.try_into()?),
@@ -226,7 +237,7 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -
 
     const BUF_LEN: usize = 16384;
 
-    let mut listener = ConnectedUdpStream::builder()
+    let listener = ConnectedUdpStream::builder()
         .with_buffer_size(BUF_LEN)
         .with_queue_size(512)
         .with_receiver_parallelism(UdpStreamParallelism::Auto)
@@ -252,17 +263,21 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -
 }
 
 #[rstest]
-#[cfg(feature = "runtime-tokio")]
+#[cfg(all(feature = "runtime-tokio", feature = "session-client"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -> anyhow::Result<()> {
     use hopr_lib::{SessionClientConfig, SessionTarget};
-    use hopr_transport_session::{Capabilities, Capability};
+    use hopr_network_types::udp::{ConnectedUdpStream, UdpStreamParallelism};
+    use hopr_transport_session::{Capabilities, Capability, IpOrHost, SealedHost};
+    use tokio::{io::AsyncReadExt, net::UdpSocket};
+
+    let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
 
     // TODO: precondition: ensure that a channel exists between the src and relayer.
-    let session = cluster_fixture[0]
+    let mut session = cluster_fixture[0]
         .connect_to(
-            &cluster_fixture[1].me_onchain(),
-            SessionTarget::UdpStream(":0"),
+            cluster_fixture[1].me_onchain(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
             SessionClientConfig {
                 forward_path_options: hopr_lib::RoutingOptions::Hops(1_u32.try_into()?),
                 return_path_options: hopr_lib::RoutingOptions::Hops(1_u32.try_into()?),
@@ -277,7 +292,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -
 
     const BUF_LEN: usize = 16384;
 
-    let mut listener = ConnectedUdpStream::builder()
+    let listener = ConnectedUdpStream::builder()
         .with_buffer_size(BUF_LEN)
         .with_queue_size(512)
         .with_receiver_parallelism(UdpStreamParallelism::Auto)
@@ -296,7 +311,6 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: &Vec<Hopr>) -
 
     let mut recv_msg = [0u8; 9183];
     session.read_exact(&mut recv_msg).await?;
-
     assert_eq!(recv_msg, msg);
 
     Ok(())

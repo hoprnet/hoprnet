@@ -392,8 +392,11 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         let tx_3 = CallItemBuilder::new(self.node_module.owner()).allow_failure(false);
         let multicall = self.provider.multicall().add_call(tx_1).add_call(tx_2).add_call(tx_3);
 
+        debug!("before aggregate3_value");
         let (node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) =
             multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
+        debug!("after aggregate3_value");
+
         let is_node_included_in_module =
             node_in_module_inclusion.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?;
         let is_module_enabled_in_safe =

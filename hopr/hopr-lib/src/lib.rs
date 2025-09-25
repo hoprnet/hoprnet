@@ -768,22 +768,26 @@ impl Hopr {
             let my_peer_id = self.me_peer_id();
             let my_version = crate::constants::APP_VERSION;
 
-            while !self
-                .db
-                .clone()
-                .is_allowed_in_network_registry(None, &my_ethereum_address)
-                .await
-                .unwrap_or(false)
-            {
-                info!(
-                    "Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.",
-                    my_ethereum_address.to_hex()
-                );
+            if !self.db.get_indexer_data(None).await?.nr_enabled {
+                info!("Network registry disabled. Continuing without onboarding checks.");
+            } else {
+                while !self
+                    .db
+                    .clone()
+                    .is_allowed_in_network_registry(None, &my_ethereum_address)
+                    .await
+                    .unwrap_or(false)
+                {
+                    info!(
+                        "Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.",
+                        my_ethereum_address.to_hex()
+                    );
 
-                sleep(ONBOARDING_INFORMATION_INTERVAL).await;
+                    sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
-                info!(peer_id = %my_peer_id, address = %my_ethereum_address.to_hex(), version = &my_version, "Node information");
-                info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
+                    info!(peer_id = %my_peer_id, address = %my_ethereum_address.to_hex(), version = &my_version, "Node information");
+                    info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
+                }
             }
         }
 
