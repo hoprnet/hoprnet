@@ -41,6 +41,16 @@ where
 
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
+    //
+    // NOTE: Private address filtering is implemented at multiple levels:
+    // 1. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
+    // 2. Discovery behavior filters PeerDiscovery::Announce events before storing addresses
+    // 3. libp2p's global_only transport wrapper could be added here but the above filtering
+    //    provides equivalent protection while maintaining compatibility with the existing code
+    //
+    // For local testing and smoke tests, use the `local-testing` feature flag to disable
+    // address filtering and allow localhost/private addresses:
+    // cargo build --features "runtime-tokio local-testing"
     #[cfg(feature = "runtime-tokio")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
@@ -100,14 +110,26 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
 }
 
 /// Check if a multiaddress contains a public/routable IP address
+/// 
+/// When the `local-testing` feature is enabled, this function always returns true
+/// to allow private addresses for local development and testing.
 pub fn is_public_address(addr: &Multiaddr) -> bool {
-    addr.iter().all(|protocol| match protocol {
-        Protocol::Ip4(ip) => !ip.is_unspecified() && !ip.is_private() && !ip.is_loopback() && !ip.is_link_local(),
-        Protocol::Ip6(ip) => {
-            !ip.is_unspecified() && !ip.is_loopback() && !ip.is_unicast_link_local() && !ip.is_unique_local()
-        }
-        _ => true,
-    })
+    #[cfg(feature = "local-testing")]
+    {
+        // Allow all addresses during local testing
+        let _ = addr; // Suppress unused variable warning
+        true
+    }
+    #[cfg(not(feature = "local-testing"))]
+    {
+        addr.iter().all(|protocol| match protocol {
+            Protocol::Ip4(ip) => !ip.is_unspecified() && !ip.is_private() && !ip.is_loopback() && !ip.is_link_local(),
+            Protocol::Ip6(ip) => {
+                !ip.is_unspecified() && !ip.is_loopback() && !ip.is_unicast_link_local() && !ip.is_unique_local()
+            }
+            _ => true,
+        })
+    }
 }
 
 impl HoprSwarm {
@@ -520,5 +542,17 @@ mod tests {
         assert!(is_public_address(
             &Multiaddr::from_str("/dns6/example.com/tcp/443").unwrap()
         ));
+    }
+
+    #[test]
+    #[cfg(feature = "local-testing")]
+    fn test_local_testing_allows_all_addresses() {
+        // When local-testing feature is enabled, all addresses should be considered "public"
+        assert!(is_public_address(&Multiaddr::from_str("/ip4/127.0.0.1").unwrap()));
+        assert!(is_public_address(&Multiaddr::from_str("/ip4/192.168.1.1").unwrap()));
+        assert!(is_public_address(&Multiaddr::from_str("/ip4/10.0.0.1").unwrap()));
+        assert!(is_public_address(&Multiaddr::from_str("/ip4/172.16.0.1").unwrap()));
+        assert!(is_public_address(&Multiaddr::from_str("/ip6/::1").unwrap()));
+        assert!(is_public_address(&Multiaddr::from_str("/ip6/fe80::1").unwrap()));
     }
 }

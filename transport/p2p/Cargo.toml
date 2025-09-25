@@ -10,6 +10,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+local-testing = []
 prometheus = [
   "dep:lazy_static",
   "dep:hopr-metrics",
