@@ -100,7 +100,7 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
 }
 
 /// Check if a multiaddress contains a public/routable IP address
-fn is_public_address(addr: &Multiaddr) -> bool {
+pub fn is_public_address(addr: &Multiaddr) -> bool {
     addr.iter().all(|protocol| match protocol {
         Protocol::Ip4(ip) => !ip.is_unspecified() && !ip.is_private() && !ip.is_loopback() && !ip.is_link_local(),
         Protocol::Ip6(ip) => {
