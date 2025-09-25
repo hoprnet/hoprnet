@@ -259,14 +259,23 @@
             }
           );
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
-          mkHoprdCandidate = cargoExtraArgs:
+          mkHoprdCandidate =
+            cargoExtraArgs:
             if buildPlatform.isLinux && buildPlatform.isx86_64 then
               rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-                hoprdBuildArgs // { inherit cargoExtraArgs; CARGO_PROFILE = "candidate"; }
+                hoprdBuildArgs
+                // {
+                  inherit cargoExtraArgs;
+                  CARGO_PROFILE = "candidate";
+                }
               )
             else
               rust-builder-local.callPackage ./nix/rust-package.nix (
-                hoprdBuildArgs // { inherit cargoExtraArgs; CARGO_PROFILE = "candidate"; }
+                hoprdBuildArgs
+                // {
+                  inherit cargoExtraArgs;
+                  CARGO_PROFILE = "candidate";
+                }
               );
           # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
           hoprd-bench =

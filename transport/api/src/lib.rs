@@ -63,7 +63,6 @@ use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network, PeerOrigin, PeerStatus};
 use hopr_transport_p2p::{
     HoprSwarm,
-    swarm::is_public_address,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
 use hopr_transport_probe::{
@@ -340,10 +339,7 @@ where
                                                     .map(|v| Vec::from_iter(v.get_multiaddr().into_iter()))
                                                     .unwrap_or_default()
                                             })
-                                            .unwrap_or_default()
-                                            .iter().filter(|ma| is_public_address(ma) )
-                                            .cloned()
-                                        .collect::<Vec<_>>();
+                                            .unwrap_or_default();
 
 
                                         if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, mas).await {
@@ -372,8 +368,6 @@ where
                                         .into_iter()
                                         .map(|ma| strip_p2p_protocol(&ma))
                                         .filter(|v| !v.is_empty())
-                                            .filter(is_public_address)
-
                                         .collect::<Vec<_>>();
 
                                     if ! mas.is_empty() {

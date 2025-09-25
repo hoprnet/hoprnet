@@ -42,10 +42,11 @@ where
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
     //
-    // NOTE: Private address filtering is implemented at multiple levels:
-    // 1. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
-    // 2. Discovery behavior filters PeerDiscovery::Announce events before storing addresses
-    // 3. libp2p's global_only transport wrapper could be added here but the above filtering provides equivalent
+    // NOTE: Private address filtering is implemented at multiple levels for defense-in-depth:
+    // 1. Discovery behavior filters PeerDiscovery::Allow and PeerDiscovery::Announce events
+    // 2. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
+    // 3. Network layer filters addresses in both add() and get() methods (primary protection)
+    // 4. libp2p's global_only transport wrapper could be added here but the above filtering provides equivalent
     //    protection while maintaining compatibility with the existing code
     //
     // For local testing and smoke tests, use the `local-testing` feature flag to disable

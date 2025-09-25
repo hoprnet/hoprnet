@@ -37,7 +37,10 @@ mixer-stream = ["dep:rust-stream-ext-concurrent"]
 mixer-channel = []
 capture = ["hopr-transport-protocol/capture"]
 # disables filtering of private ip addresses in the p2p layer and network layer
-local-testing = ["hopr-transport-p2p/local-testing", "hopr-transport-network/local-testing"]
+local-testing = [
+  "hopr-transport-p2p/local-testing",
+  "hopr-transport-network/local-testing",
+]
 
 [dependencies]
 async-trait = { workspace = true }

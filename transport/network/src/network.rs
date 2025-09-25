@@ -6,6 +6,7 @@ use std::{
 use futures::StreamExt;
 pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
 use hopr_platform::time::current_time;
+use hopr_transport_p2p::is_public_address;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
@@ -16,7 +17,6 @@ use {
 };
 
 use crate::{config::NetworkConfig, errors::Result};
-use hopr_transport_p2p::is_public_address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -128,11 +128,19 @@ where
     /// Add a new peer into the network.
     ///
     /// Each peer must have an origin specification.
+    /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out before storing
+    /// to prevent private addresses from entering the peer store. This filtering can be disabled
+    /// with the 'local-testing' feature flag.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn add(&self, peer: &PeerId, origin: PeerOrigin, mut addrs: Vec<Multiaddr>) -> Result<()> {
         if peer == &self.me {
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
+
+        // Filter out private addresses before storing
+        addrs = addrs.into_iter().filter(|addr| is_public_address(addr)).collect();
+
+        debug!(%peer, %origin, multiaddresses = ?addrs, "Filtered addresses, proceeding with public addresses only");
 
         if let Some(mut peer_status) = self.db.get_network_peer(peer).await? {
             debug!(%peer, %origin, multiaddresses = ?addrs, "Updating existing peer in the store");
@@ -173,9 +181,9 @@ where
     }
 
     /// Get peer information and status.
-    /// 
+    ///
     /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out from the returned
-    /// PeerStatus to prevent exposure through public APIs. This filtering can be disabled with 
+    /// PeerStatus to prevent exposure through public APIs. This filtering can be disabled with
     /// the 'local-testing' feature flag.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
@@ -183,7 +191,9 @@ where
             Ok(Some({
                 let mut ps = PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 2u32);
                 // Filter private addresses from self addresses before returning
-                ps.multiaddresses = self.me_addresses.iter()
+                ps.multiaddresses = self
+                    .me_addresses
+                    .iter()
                     .filter(|addr| is_public_address(addr))
                     .cloned()
                     .collect();
@@ -194,7 +204,9 @@ where
             match self.db.get_network_peer(peer).await? {
                 Some(mut peer_status) => {
                     // Filter out private addresses from multiaddresses before returning
-                    peer_status.multiaddresses = peer_status.multiaddresses.iter()
+                    peer_status.multiaddresses = peer_status
+                        .multiaddresses
+                        .iter()
                         .filter(|addr| is_public_address(addr))
                         .cloned()
                         .collect();
@@ -946,8 +958,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn network_get_should_filter_private_multiaddresses() -> anyhow::Result<()> {
-        use multiaddr::{Multiaddr, Protocol};
+    async fn network_add_should_filter_private_multiaddresses() -> anyhow::Result<()> {
+        use multiaddr::Multiaddr;
 
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -967,27 +979,78 @@ mod tests {
 
         let peers = Network::new(
             me,
-            mixed_addresses.clone(), // Set mixed addresses for self
+            vec![public_addr.clone()], // Set only public address for self
             Default::default(),
             hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
-        // Add peer with mixed addresses
+        // Add peer with mixed addresses - private addresses should be filtered out during add
         peers.add(&peer, PeerOrigin::NetworkRegistry, mixed_addresses).await?;
 
-        // Get the peer info - should only contain public addresses
+        // Get the peer info - should only contain public addresses since private ones were filtered during add
         let peer_status = peers.get(&peer).await?.context("peer should be present")?;
-        
-        // Verify only public addresses remain
-        assert_eq!(peer_status.multiaddresses.len(), 1, "Should only have 1 public address");
-        assert_eq!(peer_status.multiaddresses[0], public_addr, "Should only contain the public address");
 
-        // Test self peer filtering too
+        // Verify only public addresses remain in the database
+        assert_eq!(
+            peer_status.multiaddresses.len(),
+            1,
+            "Should only have 1 public address stored"
+        );
+        assert_eq!(
+            peer_status.multiaddresses[0], public_addr,
+            "Should only contain the public address"
+        );
+
+        // Test self peer filtering too (get method still filters self addresses as defensive measure)
         let self_status = peers.get(&me).await?.context("self peer should be present")?;
-        
+
         // Verify only public addresses remain for self
-        assert_eq!(self_status.multiaddresses.len(), 1, "Self should only have 1 public address");
-        assert_eq!(self_status.multiaddresses[0], public_addr, "Self should only contain the public address");
+        assert_eq!(
+            self_status.multiaddresses.len(),
+            1,
+            "Self should only have 1 public address"
+        );
+        assert_eq!(
+            self_status.multiaddresses[0], public_addr,
+            "Self should only contain the public address"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn network_get_should_filter_private_multiaddresses_as_defensive_measure() -> anyhow::Result<()> {
+        use multiaddr::Multiaddr;
+
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        // Create multiaddresses with both public and private addresses for self
+        let private_addr1: Multiaddr = "/ip4/192.168.1.100/tcp/9091".parse()?;
+        let public_addr: Multiaddr = "/ip4/8.8.8.8/tcp/9094".parse()?;
+
+        let mixed_self_addresses = vec![private_addr1.clone(), public_addr.clone()];
+
+        // Create network with mixed addresses for self (simulating if somehow private addresses get set)
+        let peers = Network::new(
+            me,
+            mixed_self_addresses,
+            Default::default(),
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+        );
+
+        // Test that get() method filters self addresses as a defensive measure
+        let self_status = peers.get(&me).await?.context("self peer should be present")?;
+
+        // Verify only public addresses remain for self
+        assert_eq!(
+            self_status.multiaddresses.len(),
+            1,
+            "Self should only have 1 public address"
+        );
+        assert_eq!(
+            self_status.multiaddresses[0], public_addr,
+            "Self should only contain the public address"
+        );
 
         Ok(())
     }
