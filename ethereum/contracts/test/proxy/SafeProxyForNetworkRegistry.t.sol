@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import "../../src/proxy/SafeProxyForNetworkRegistry.sol";
-import "forge-std/Test.sol";
+import { HoprSafeProxyForNetworkRegistry, IHoprNetworkRegistryRequirement } from "../../src/proxy/SafeProxyForNetworkRegistry.sol";
+import { Test } from "forge-std/Test.sol";
 
 contract HoprSafeProxyForNetworkRegistryTest is Test {
     HoprSafeProxyForNetworkRegistry public hoprSafeProxyForNetworkRegistry;
@@ -57,18 +57,18 @@ contract HoprSafeProxyForNetworkRegistryTest is Test {
         hoprSafeProxyForNetworkRegistry.updateStakeThreshold(newThreshold);
         assertEq(hoprSafeProxyForNetworkRegistry.stakeThreshold(), newThreshold);
     }
+
     /**
-     * @dev fail to calculate allowance when threshold is 0.
+     * @dev allowance should be zerowhen threshold is 0.
      * @notice This essentially disables "selfRegister" a node
      */
 
-    function testRevert_SetThresholdToZero(address stakingAccount, uint256 tokenBalance) public {
+    function test_SetThresholdToZero(address stakingAccount, uint256 tokenBalance) public {
         _helpeMockSafeRegistyAndTokenBalance(stakingAccount, DEFAULT_SNAPSHOT_BLOCK_NUMBER, tokenBalance);
 
         vm.prank(owner);
         hoprSafeProxyForNetworkRegistry.updateStakeThreshold(0);
-        vm.expectRevert(stdError.divisionError);
-        hoprSafeProxyForNetworkRegistry.maxAllowedRegistrations(stakingAccount);
+        assertEq(hoprSafeProxyForNetworkRegistry.maxAllowedRegistrations(stakingAccount), 0);
         vm.clearMockedCalls();
     }
 

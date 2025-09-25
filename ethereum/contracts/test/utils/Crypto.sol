@@ -2,10 +2,11 @@
 pragma solidity ^0.8;
 
 import { HoprCrypto } from "../../src/Crypto.sol";
-import { HoprChannels } from "../../src/Channels.sol";
+import { HoprChannels, HoprChannelsType } from "../../src/Channels.sol";
 import { SECP2561k } from "solcrypto/SECP2561k.sol";
 import { Test } from "forge-std/Test.sol";
 
+/// forge-lint:disable-next-item(mixed-case-variable)
 abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
     uint256 constant SECP256K1_HALF_FIELD_ORDER = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0;
 
@@ -36,11 +37,11 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
 
         HoprChannels.TicketData memory ticketData = HoprChannels.TicketData(
             channelId,
-            HoprChannels.Balance.wrap(uint96(args.amount)),
-            HoprChannels.TicketIndex.wrap(uint48(args.maxTicketIndex)),
-            HoprChannels.TicketIndexOffset.wrap(uint32(args.indexOffset)),
-            HoprChannels.ChannelEpoch.wrap(uint24(args.epoch)),
-            HoprChannels.WinProb.wrap(uint56(args.winProb))
+            HoprChannelsType.Balance.wrap(uint96(args.amount)),
+            HoprChannelsType.TicketIndex.wrap(uint48(args.maxTicketIndex)),
+            HoprChannelsType.TicketIndexOffset.wrap(uint32(args.indexOffset)),
+            HoprChannelsType.ChannelEpoch.wrap(uint24(args.epoch)),
+            HoprChannelsType.WinProb.wrap(uint56(args.winProb))
         );
 
         address challenge = HoprCrypto.scalarTimesBasepoint(args.porSecret);
@@ -99,6 +100,7 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         r_out = r;
     }
 
+    /// forge-lint: disable-next-line(mixed-case-function)
     function getVRFParameters(
         uint256 privKey,
         bytes memory dst,

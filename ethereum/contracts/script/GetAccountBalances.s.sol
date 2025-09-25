@@ -3,8 +3,7 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import { Script } from "forge-std/Script.sol";
 import { Test } from "forge-std/Test.sol";
-
-import "./utils/NetworkConfig.s.sol";
+import { NetworkConfig } from "./utils/NetworkConfig.s.sol";
 
 contract GetAccountBalancesScript is Script, Test, NetworkConfig {
     function run(address account) external returns (address wallet, uint256 nativeBalance, uint256 tokenBalance) {
