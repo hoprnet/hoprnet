@@ -6,7 +6,6 @@ use std::{
 };
 
 use hopr_lib::{Address, HostConfig, HostType, ProtocolsConfig, config::HoprLibConfig};
-use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
@@ -124,8 +123,8 @@ impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
             debug!(cfg_path, "fetching configuration from file");
-            let yaml_configuration =
-                read_to_string(cfg_path.as_str()).map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
+            let yaml_configuration = std::fs::read_to_string(cfg_path.as_str())
+                .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
             serde_yaml::from_str(&yaml_configuration)
                 .map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))?
         } else {
@@ -216,7 +215,7 @@ impl HoprdConfig {
 
         if let Some(protocol_config) = cli_args.protocol_config_path {
             cfg.hopr.chain.protocols = ProtocolsConfig::from_str(
-                &hopr_platform::file::native::read_to_string(&protocol_config)
+                &std::fs::read_to_string(&protocol_config)
                     .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?,
             )
             .map_err(crate::errors::HoprdError::ConfigError)?;
