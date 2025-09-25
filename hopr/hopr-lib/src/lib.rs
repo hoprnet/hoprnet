@@ -497,7 +497,6 @@ impl Hopr {
         // Once we are able to query the chain,
         // check if the ticket price is configured correctly.
         let network_min_ticket_price = self.hopr_chain_api.get_minimum_ticket_price().await?;
-
         let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
@@ -505,7 +504,6 @@ impl Hopr {
                  {configured_ticket_price:?} < {network_min_ticket_price}"
             ))));
         }
-
         // Once we are able to query the chain,
         // check if the winning probability is configured correctly.
         let network_min_win_prob = self.hopr_chain_api.get_minimum_winning_probability().await?;
@@ -520,7 +518,6 @@ impl Hopr {
                  probability: {configured_win_prob:?} < {network_min_win_prob}"
             ))));
         }
-
         // set safe and module addresses in the DB
         self.db
             .set_safe_info(
