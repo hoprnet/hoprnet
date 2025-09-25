@@ -49,6 +49,8 @@ prof = [
   "dep:console-subscriber",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 jemalloc-stats = ["dep:tikv-jemalloc-ctl"]
+# disables filtering of private ip addresses in the p2p layer
+local-testing = ["hopr-lib/local-testing"]
 
 [dependencies]
 anyhow = { workspace = true }

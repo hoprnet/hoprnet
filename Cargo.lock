@@ -5262,6 +5262,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-p2p",
  "lazy_static",
  "libp2p-identity",
  "mockall",

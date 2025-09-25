@@ -36,6 +36,8 @@ prometheus = [
   "hopr-strategy/prometheus",
 ]
 capture = ["hopr-transport/capture"]
+# disables filtering of private ip addresses in the p2p layer
+local-testing = ["hopr-transport/local-testing"]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [

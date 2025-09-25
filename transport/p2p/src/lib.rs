@@ -169,4 +169,4 @@ impl From<autonat::v2::server::Event> for HoprNetworkBehaviorEvent {
     }
 }
 
-pub use swarm::HoprSwarm;
+pub use swarm::{HoprSwarm, is_public_address};

@@ -259,14 +259,14 @@
             }
           );
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
-          hoprd-candidate =
+          mkHoprdCandidate = cargoExtraArgs:
             if buildPlatform.isLinux && buildPlatform.isx86_64 then
               rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-                hoprdBuildArgs // { CARGO_PROFILE = "candidate"; }
+                hoprdBuildArgs // { inherit cargoExtraArgs; CARGO_PROFILE = "candidate"; }
               )
             else
               rust-builder-local.callPackage ./nix/rust-package.nix (
-                hoprdBuildArgs // { CARGO_PROFILE = "candidate"; }
+                hoprdBuildArgs // { inherit cargoExtraArgs; CARGO_PROFILE = "candidate"; }
               );
           # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
           hoprd-bench =
@@ -746,7 +746,7 @@
               crane
               solcDefault
               ;
-            hoprd = hoprd-candidate;
+            hoprd = (mkHoprdCandidate "-F local-testing");
             hopli = hopli-candidate;
           };
           docsShell = import ./nix/devShell.nix {
@@ -957,7 +957,7 @@
               hopli-dev-docker
               hopli-profile-docker
               ;
-            inherit hoprd-candidate hopli-candidate;
+            inherit hopli-candidate;
             inherit hopr-test hopr-test-nightly;
             inherit anvil-docker pluto-docker;
             inherit smoke-tests docs;
@@ -976,6 +976,7 @@
             inherit hopli-x86_64-darwin;
             inherit hopli-aarch64-darwin;
             default = hoprd;
+            hoprd-candidate = (mkHoprdCandidate "-F local-testing");
           };
 
           devShells.default = devShell;

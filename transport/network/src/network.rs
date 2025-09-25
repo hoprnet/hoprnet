@@ -16,6 +16,7 @@ use {
 };
 
 use crate::{config::NetworkConfig, errors::Result};
+use hopr_transport_p2p::is_public_address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -172,16 +173,35 @@ where
     }
 
     /// Get peer information and status.
+    /// 
+    /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out from the returned
+    /// PeerStatus to prevent exposure through public APIs. This filtering can be disabled with 
+    /// the 'local-testing' feature flag.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         if peer == &self.me {
             Ok(Some({
                 let mut ps = PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 2u32);
-                ps.multiaddresses.clone_from(&self.me_addresses);
+                // Filter private addresses from self addresses before returning
+                ps.multiaddresses = self.me_addresses.iter()
+                    .filter(|addr| is_public_address(addr))
+                    .cloned()
+                    .collect();
                 ps
             }))
         } else {
-            Ok(self.db.get_network_peer(peer).await?)
+            // Get peer info from database and filter private addresses
+            match self.db.get_network_peer(peer).await? {
+                Some(mut peer_status) => {
+                    // Filter out private addresses from multiaddresses before returning
+                    peer_status.multiaddresses = peer_status.multiaddresses.iter()
+                        .filter(|addr| is_public_address(addr))
+                        .cloned()
+                        .collect();
+                    Ok(Some(peer_status))
+                }
+                None => Ok(None),
+            }
         }
     }
 
@@ -921,6 +941,53 @@ mod tests {
         }
 
         assert_eq!(peers.health().await, Health::Green);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn network_get_should_filter_private_multiaddresses() -> anyhow::Result<()> {
+        use multiaddr::{Multiaddr, Protocol};
+
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        // Create multiaddresses with both public and private addresses
+        let private_addr1: Multiaddr = "/ip4/192.168.1.100/tcp/9091".parse()?;
+        let private_addr2: Multiaddr = "/ip4/10.0.0.1/tcp/9092".parse()?;
+        let private_addr3: Multiaddr = "/ip4/127.0.0.1/tcp/9093".parse()?;
+        let public_addr: Multiaddr = "/ip4/8.8.8.8/tcp/9094".parse()?;
+
+        let mixed_addresses = vec![
+            private_addr1.clone(),
+            public_addr.clone(),
+            private_addr2.clone(),
+            private_addr3.clone(),
+        ];
+
+        let peers = Network::new(
+            me,
+            mixed_addresses.clone(), // Set mixed addresses for self
+            Default::default(),
+            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+        );
+
+        // Add peer with mixed addresses
+        peers.add(&peer, PeerOrigin::NetworkRegistry, mixed_addresses).await?;
+
+        // Get the peer info - should only contain public addresses
+        let peer_status = peers.get(&peer).await?.context("peer should be present")?;
+        
+        // Verify only public addresses remain
+        assert_eq!(peer_status.multiaddresses.len(), 1, "Should only have 1 public address");
+        assert_eq!(peer_status.multiaddresses[0], public_addr, "Should only contain the public address");
+
+        // Test self peer filtering too
+        let self_status = peers.get(&me).await?.context("self peer should be present")?;
+        
+        // Verify only public addresses remain for self
+        assert_eq!(self_status.multiaddresses.len(), 1, "Self should only have 1 public address");
+        assert_eq!(self_status.multiaddresses[0], public_addr, "Self should only contain the public address");
 
         Ok(())
     }
