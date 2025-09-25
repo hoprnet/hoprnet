@@ -45,8 +45,8 @@ where
     // NOTE: Private address filtering is implemented at multiple levels:
     // 1. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
     // 2. Discovery behavior filters PeerDiscovery::Announce events before storing addresses
-    // 3. libp2p's global_only transport wrapper could be added here but the above filtering
-    //    provides equivalent protection while maintaining compatibility with the existing code
+    // 3. libp2p's global_only transport wrapper could be added here but the above filtering provides equivalent
+    //    protection while maintaining compatibility with the existing code
     //
     // For local testing and smoke tests, use the `local-testing` feature flag to disable
     // address filtering and allow localhost/private addresses:
@@ -110,7 +110,7 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
 }
 
 /// Check if a multiaddress contains a public/routable IP address
-/// 
+///
 /// When the `local-testing` feature is enabled, this function always returns true
 /// to allow private addresses for local development and testing.
 pub fn is_public_address(addr: &Multiaddr) -> bool {
