@@ -2,16 +2,16 @@
   "networks": {
     "anvil-localhost": {
       "addresses": {
-        "announcements": "0xa5ba58edafa6b8c08eaeb9ff97a4b3a420f8db7e",
-        "channels": "0x3047c5ad6d80752d062909d299164478c17d9b17",
-        "module_implementation": "0xd8954a5517f2063b02f8a7ecc217960dfe1d7401",
-        "network_registry": "0x8c4c7942a75754ebe57c8baa2341d1f4922124c5",
-        "network_registry_proxy": "0xaf96c95a1c8cc59aeb16c2f032c4bd6581d044c1",
-        "node_safe_registry": "0xfd892b515b0e2b8f2ce8ba42af722bdc992ea2af",
-        "node_stake_v2_factory": "0x2fa758b58876b7a0e6ea4fc29a1680c351831993",
-        "ticket_price_oracle": "0x29d1dab3d3bf0b15f7a62b6c367b8039cd017667",
-        "token": "0x3ad5b36fb59b80709a79522e77541b37fcd22849",
-        "winning_probability_oracle": "0xd827674cd725ea259c9eeb3734a430478e823ab3"
+        "announcements": "0xaf96c95a1c8cc59aeb16c2f032c4bd6581d044c1",
+        "channels": "0xa5ba58edafa6b8c08eaeb9ff97a4b3a420f8db7e",
+        "module_implementation": "0xfd892b515b0e2b8f2ce8ba42af722bdc992ea2af",
+        "network_registry": "0x81c9a8b5c1fd9e4b5c134dab131ebc0b35d25994",
+        "network_registry_proxy": "0x8c4c7942a75754ebe57c8baa2341d1f4922124c5",
+        "node_safe_registry": "0x29d1dab3d3bf0b15f7a62b6c367b8039cd017667",
+        "node_stake_v2_factory": "0xd8954a5517f2063b02f8a7ecc217960dfe1d7401",
+        "ticket_price_oracle": "0xd827674cd725ea259c9eeb3734a430478e823ab3",
+        "token": "0x3047c5ad6d80752d062909d299164478c17d9b17",
+        "winning_probability_oracle": "0x3ad5b36fb59b80709a79522e77541b37fcd22849"
       },
       "chain": "anvil",
       "confirmations": 2,
