@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-sql"
-version = "0.18.1"
+version = "0.18.4"
 edition = "2021"
 description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"
@@ -33,6 +33,7 @@ lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
+parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
 sea-orm = { workspace = true }
 sea-query = { workspace = true, default-features = false, features = [

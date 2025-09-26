@@ -87,7 +87,7 @@
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
-              ./hopr/hopr-lib/data
+              ./hopr/chain-config/data
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
@@ -104,7 +104,7 @@
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
-              ./hopr/hopr-lib/data
+              ./hopr/chain-config/data
               ./hopr/hopr-lib/tests
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
@@ -324,7 +324,7 @@
             # lldb
             rust-bin.stable.latest.minimal
             valgrind
-            gnutar # Use to extract the pcap file from the docker container
+            gnutar # Used to extract the pcap file from the docker container
           ];
 
           dockerHoprdEntrypoint = pkgs.writeShellScriptBin "docker-entrypoint.sh" ''
@@ -582,6 +582,7 @@
               ${pkgs.skopeo}/bin/skopeo copy --insecure-policy \
                 --dest-registry-token="$GOOGLE_ACCESS_TOKEN" \
                 "docker-archive:$OCI_ARCHIVE" "docker://$IMAGE_TARGET"
+              echo "Uploaded image to $IMAGE_TARGET"
             '';
           hoprd-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-docker;

@@ -75,8 +75,7 @@ pub enum Strategy {
 /// Default HOPR node strategies (in order).
 ///
 /// ## Auto-redeem Strategy
-/// - redeem only aggregated tickets
-/// - redeem single tickets on channel close if worth at least 2 HOPR
+/// - redeem single tickets on channel close if worth at least 1 wxHOPR
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
         on_fail_continue: true,
@@ -95,7 +94,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: false,
                 redeem_all_on_close: true,
-                minimum_redeem_ticket_value: HoprBalance::from_str("0.09 wxHOPR").unwrap(),
+                minimum_redeem_ticket_value: HoprBalance::from_str("1 wxHOPR").unwrap(),
                 redeem_on_winning: true,
             }),
         ],

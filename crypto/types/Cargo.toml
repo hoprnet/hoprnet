@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-types"
-version = "0.7.0"
+version = "0.7.1"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
 
@@ -55,7 +55,6 @@ anyhow = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
-mimalloc = { workspace = true }
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
@@ -79,3 +78,7 @@ harness = false
 [[bench]]
 name = "vrf_bench"
 harness = false
+
+# Target-specific dependencies for memory allocators
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.6.0"
