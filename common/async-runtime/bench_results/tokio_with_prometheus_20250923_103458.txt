@@ -1,0 +1,8 @@
+error: unexpected argument '--sample-size' found
+
+  tip: a similar argument exists: '--examples'
+  tip: to pass '--sample-size' as a value, use '-- --sample-size'
+
+Usage: cargo bench --package [<SPEC>] --features <FEATURES> --examples [BENCHNAME] [-- [ARGS]...]
+
+For more information, try '--help'.

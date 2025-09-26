@@ -1,0 +1,5 @@
+   Compiling hopr-async-runtime v0.3.0 (/home/rbt/work/hopr/hoprnet/common/async-runtime)
+    Finished `bench` profile [optimized + debuginfo] target(s) in 18.92s
+     Running unittests src/lib.rs (/home/rbt/work/hopr/hoprnet/target/release/deps/hopr_async_runtime-4184a70a0f959d76)
+error: Unrecognized option: 'sample-size'
+error: bench failed, to rerun pass `-p hopr-async-runtime --lib`

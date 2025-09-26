@@ -110,8 +110,8 @@ impl PacketWriter for UdpPacketDump {
 /// Creates a queue that processes captured packets into a [`PacketWriter`].
 pub fn packet_capture_channel(
     writer: Box<dyn PacketWriter + Send>,
-) -> (futures::channel::mpsc::Sender<CapturedPacket>, AbortHandle) {
-    let (sender, receiver) = futures::channel::mpsc::channel(20_000);
+) -> (hopr_async_runtime::InstrumentedSender<CapturedPacket>, AbortHandle) {
+    let (sender, receiver) = hopr_async_runtime::monitored_channel(20_000, "packet_capture");
     let writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
     let ah = spawn_as_abortable!(async move {
         pin_mut!(receiver);

@@ -12,9 +12,27 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["runtime-tokio"]
 runtime-tokio = ["dep:tokio"]
+runtime-futures = []
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
-tokio = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["time", "sync"] }
 futures = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+lazy_static = { workspace = true, optional = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = [
+  "rt",
+  "rt-multi-thread",
+  "macros",
+  "time",
+] }
+criterion = { workspace = true, features = ["async_tokio"] }
+
+[[bench]]
+name = "channel_metrics_simple"
+harness = false

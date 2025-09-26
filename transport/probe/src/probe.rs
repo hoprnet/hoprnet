@@ -496,7 +496,10 @@ mod tests {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ProbeError>>(128);
+            let (tx, mut rx) = hopr_async_runtime::monitored_channel::<std::result::Result<Duration, ProbeError>>(
+                128,
+                "test_manual_probe",
+            );
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
@@ -536,7 +539,10 @@ mod tests {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-            let (tx, mut rx) = futures::channel::mpsc::channel::<std::result::Result<Duration, ProbeError>>(128);
+            let (tx, mut rx) = hopr_async_runtime::monitored_channel::<std::result::Result<Duration, ProbeError>>(
+                128,
+                "test_manual_probe",
+            );
             manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
             let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
