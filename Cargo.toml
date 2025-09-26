@@ -49,7 +49,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.35", default-features = false, features = [
+alloy = { version = "=1.0.36", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -60,7 +60,7 @@ alloy = { version = "=1.0.35", default-features = false, features = [
 anyhow = "1.0.100"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-async-compression = "0.4.30"
+async-compression = "0.4.31"
 async-channel = "2.5.0"
 async-lock = "3.4.1"
 async-signal = "0.2.13"
@@ -124,7 +124,7 @@ libp2p-identity = { version = "0.2.12", features = [
 libp2p-stream = { version = "0.4.0-alpha" }
 mockall = "0.13.1"
 mockito = "1.7.0"
-moka = { version = "0.12.10", features = ["future"] }
+moka = { version = "0.12.11", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num_enum = "0.7.4"
@@ -144,7 +144,7 @@ proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones
 rayon = "1.11.0"
-regex = "1.11.2"
+regex = "1.11.3"
 reqwest = { version = "0.12.23", features = ["json"] }
 ringbuffer = "0.16.0"
 rpassword = "7.4.0"
@@ -190,7 +190,7 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 strum = { version = "0.27.2", features = ["derive"] }
 subtle = "2.6.1"
 sysinfo = "0.37"
-tempfile = "3.22.0"
+tempfile = "3.23.0"
 test-log = { version = "0.2.18", features = ["trace"] }
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = [
