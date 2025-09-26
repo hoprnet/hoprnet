@@ -51,7 +51,9 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+          set -x
+          # Need to specify the condition to `inputs.source_branch` because when the workflow is triggered from "Promote Release" pipeline, the `github.event_name` is `workflow_dispatch`
+          if [[ "${{ github.event_name }}" == "pull_request_target" ]] || [[ -n "${{ inputs.source_branch }}" ]]; then
             echo "The workflow is triggered by other pipeline"
             echo "source_branch=${{ inputs.source_branch }}"  | tee -a $GITHUB_OUTPUT
             echo "release_type=${{ inputs.release_type }}"  | tee -a $GITHUB_OUTPUT

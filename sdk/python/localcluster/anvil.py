@@ -2,7 +2,7 @@ import json
 import shutil
 from enum import Enum, auto
 from pathlib import Path
-from subprocess import run
+from subprocess import STDOUT, Popen, run
 
 from .constants import PWD, logging
 
@@ -39,12 +39,15 @@ class Anvil:
             {"-sp" if self.use_staking_proxy else ""}
             """
 
-        run(
-            command.split(),
-            check=True,
-            capture_output=True,
-            cwd=PWD,
-        )
+        with open(self.log_file, "w") as f:
+            self.proc = Popen(
+                command.split(),
+                stdout=f,
+                stderr=STDOUT,
+                cwd=PWD,
+            )
+
+        logging.info(f"Anvil started with PID: {self.process_id}")
 
     def mirror_contracts(self, src_file: Path, dest_file: Path, src_network: str, dest_network: str):
         logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
@@ -71,3 +74,8 @@ class Anvil:
     def kill(self):
         logging.info("Stopping all local anvil servers running")
         run(f"make -s kill-anvil port={self.port}".split(), cwd=PWD, check=False)
+
+    @property
+    def process_id(self) -> str:
+        proc = getattr(self, "proc", None)
+        return str(proc.pid) if proc else "N/A"
