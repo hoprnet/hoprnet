@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -10,6 +10,7 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+local-testing = []
 prometheus = [
   "dep:lazy_static",
   "dep:hopr-metrics",

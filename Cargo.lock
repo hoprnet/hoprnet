@@ -5366,6 +5366,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-p2p",
  "lazy_static",
  "libp2p-identity",
  "mockall",
@@ -5383,7 +5384,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-trait",
