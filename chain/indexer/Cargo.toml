@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-indexer"
-version = "0.9.4"
+version = "0.9.5"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
