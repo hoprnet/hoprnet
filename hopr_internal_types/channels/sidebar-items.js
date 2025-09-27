@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ChannelChange","ChannelDirection","ChannelStatus","ChannelStatusDiscriminants"],"fn":["generate_channel_id"],"struct":["ChannelEntry","CorruptedChannelEntry","SrcDstPair"],"type":["ChannelId"]};

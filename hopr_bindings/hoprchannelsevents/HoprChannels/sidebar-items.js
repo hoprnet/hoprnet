@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["new"],"struct":["Balance","HoprChannelsInstance","TicketIndex","Timestamp"]};
