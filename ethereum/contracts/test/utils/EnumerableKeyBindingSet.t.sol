@@ -155,10 +155,14 @@ contract EnumerableKeyBindingSetTest is Test {
         // add values to target
         _helperCreateKeyBindingSet(bytes32Vals);
 
-        (bool tryResult, uint256 index, KeyBindingWithSignature memory tryBinding) = enumerableKeyBindingSetMock.tryGet(bytes32Vals[0]);
-        assertTrue(tryResult);
-        assertEq(index, 0);
-        assertTrue(_compareKeyBinding(tryBinding, enumerableKeyBindingSetMock.at(0)));
+        if (bytes32Vals.length == 0) {
+            return;
+        } else {
+            (bool tryResult, uint256 index, KeyBindingWithSignature memory tryBinding) = enumerableKeyBindingSetMock.tryGet(bytes32Vals[0]);
+            assertTrue(tryResult);
+            assertEq(index, 0);
+            assertTrue(_compareKeyBinding(tryBinding, enumerableKeyBindingSetMock.at(0)));
+        }
     }
 
     /**
