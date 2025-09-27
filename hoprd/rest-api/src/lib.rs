@@ -63,7 +63,7 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
-    pub hoprd_cfg: serde_json::Value,
+    pub hoprd_cfg: serde_yaml::Value,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub websocket_active_count: Arc<AtomicU16>,
@@ -174,7 +174,7 @@ impl Modify for SecurityAddon {
 /// Parameters needed to construct the Rest API via [`serve_api`].
 pub struct RestApiParameters {
     pub listener: TcpListener,
-    pub hoprd_cfg: serde_json::Value,
+    pub hoprd_cfg: serde_yaml::Value,
     pub cfg: crate::config::Api,
     pub hopr: Arc<hopr_lib::Hopr>,
     pub session_listener_sockets: ListenerJoinHandles,
@@ -205,7 +205,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
 
 #[allow(clippy::too_many_arguments)]
 async fn build_api(
-    hoprd_cfg: serde_json::Value,
+    hoprd_cfg: serde_yaml::Value,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     open_listeners: ListenerJoinHandles,
