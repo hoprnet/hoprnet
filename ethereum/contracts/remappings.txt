@@ -9,3 +9,4 @@ openzeppelin-contracts-upgradeable-5.4.0/=../../vendor/solidity/openzeppelin-con
 openzeppelin-foundry-upgrades-0.4.0=/=../../vendor/solidity/openzeppelin-foundry-upgrades-0.4.0/src/
 solcrypto=../../vendor/solidity/solcrypto/contracts/
 solady-0.1.24=../../vendor/solidity/solady-v0.1.24/src/
+@openzeppelin/=../../vendor/solidity/openzeppelin-contracts-upgradeable-5.4.0/lib/openzeppelin-contracts/
