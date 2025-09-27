@@ -57,8 +57,6 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
 
-    // when the contract has already been initialized
-    error AlreadyInitialized();
     // when a node is a member of the role
     error WithMembership();
     // Once module gets created, the ownership cannot be transferred
@@ -92,16 +90,12 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
             revert SafeMultisendSameAddress();
         }
 
-        // cannot setup again if it's been set up
-        if (owner() != address(0) || multisend != address(0)) {
-            revert AlreadyInitialized();
-        }
-
         // internally setTarget
         multisend = _multisend;
         _addChannelsAndTokenTarget(Target.wrap(uint256(_defaultTokenChannelsTarget)));
+
         // transfer ownership
-        _transferOwnership(_safe);
+        __Ownable_init_unchained(_safe);
         emit SetMultisendAddress(_multisend);
     }
 

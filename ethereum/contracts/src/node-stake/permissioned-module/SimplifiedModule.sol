@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import { Enum } from "safe-contracts-1.4.1/common/Enum.sol";
 import { IAvatar } from "../../interfaces/IAvatar.sol";
-import { UUPSUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/utils/UUPSUpgradeable.sol";
-import { OwnableUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/access/OwnableUpgradeable.sol";
+import { UUPSUpgradeable } from "openzeppelin-contracts-upgradeable-5.4.0/proxy/utils/UUPSUpgradeable.sol";
+import { OwnableUpgradeable } from "openzeppelin-contracts-upgradeable-5.4.0/access/OwnableUpgradeable.sol";
 
 abstract contract SimplifiedModuleEvents {
     // module emit event when execution is successful on avator

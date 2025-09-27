@@ -10,8 +10,10 @@ import { CapabilityPermissionsLibFixtureTest } from "../../utils/CapabilityLibra
 import { SafeSingletonFixtureTest } from "../../utils/SafeSingleton.sol";
 import { IAvatar } from "../../../src/interfaces/IAvatar.sol";
 import { HoprCrypto } from "../../../src/Crypto.sol";
-import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 import { SimplifiedModuleEvents } from "../../../src/node-stake/permissioned-module/SimplifiedModule.sol";
+import { Initializable } from "openzeppelin-contracts-upgradeable-5.4.0/proxy/utils/Initializable.sol";
+import { Create2 } from "openzeppelin-contracts-5.4.0/utils/Create2.sol";
+import { ERC1967Proxy } from "openzeppelin-contracts-5.4.0/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @dev This files tests both HoprNodeManagementModule and the CapabilityPermissions.sol
@@ -24,7 +26,6 @@ contract HoprNodeManagementModuleTest is
 {
     using stdStorage for StdStorage;
     using TargetUtils for Target;
-    using ClonesUpgradeable for address;
 
     HoprNodeManagementModule public moduleSingleton;
     HoprNodeManagementModule public moduleProxy;
@@ -51,7 +52,14 @@ contract HoprNodeManagementModuleTest is
         token = makeAddr("HoprToken");
 
         moduleSingleton = new HoprNodeManagementModule();
-        moduleProxy = HoprNodeManagementModule(address(moduleSingleton).cloneDeterministic(bytes32(hex"abcd")));
+        address moduleProxyAddress = Create2.deploy(0, bytes32(hex"abcd"), abi.encodePacked(
+            type(ERC1967Proxy).creationCode, 
+            abi.encode(
+                address(moduleSingleton),
+                hex""
+            )
+        ));
+        moduleProxy = HoprNodeManagementModule(moduleProxyAddress);
         defaultFunctionPermission = new CapabilityPermission[](TargetUtils.NUM_CAPABILITY_PERMISSIONS);
         defaultFunctionPermission = [
             CapabilityPermission.SPECIFIC_FALLBACK_ALLOW, // defaultRedeemTicketSafeFunctionPermisson
@@ -72,7 +80,7 @@ contract HoprNodeManagementModuleTest is
     function testRevert_CannotInitializeSingleton() public {
         emit log_named_address("capabilityLibraryLibAddress", capabilityLibraryLibAddress);
 
-        vm.expectRevert(bytes("Initializable: contract is already initialized"));
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
         HoprNodeManagementModule(moduleSingleton).initialize(abi.encode(address(1), address(2), address(3)));
         vm.clearMockedCalls();
     }
@@ -94,35 +102,40 @@ contract HoprNodeManagementModuleTest is
         vm.clearMockedCalls();
     }
 
-    // /**
-    // * @dev Anyone can initialize a proxy
-    // */
-    // function test_CanUpgradeImplementation() public {
-    //     HoprNodeManagementModule newImplementation = new HoprNodeManagementModule();
-    //     address _channels = 0x0101010101010101010101010101010101010101;
-    //     address _token = 0x1010101010101010101010101010101010101010;
-    //     vm.mockCall(
-    //         _channels,
-    //         abi.encodeWithSignature(
-    //             'TOKEN()'
-    //         ),
-    //         abi.encode(_token)
-    //     );
-    //     moduleProxy.initialize(abi.encode(address(1), multiaddr,
-    // bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
+    /**
+    * @dev Test upgrade the module proxy to a new implementation
+    */
+    function test_CanUpgradeImplementation() public {
+        HoprNodeManagementModule newImplementation = new HoprNodeManagementModule();
+        address _channels = 0x0101010101010101010101010101010101010101;
+        address _token = 0x1010101010101010101010101010101010101010;
+        vm.mockCall(
+            _channels,
+            abi.encodeWithSignature(
+                'TOKEN()'
+            ),
+            abi.encode(_token)
+        );
+        moduleProxy.initialize(abi.encode(address(1), multiaddr,
+        bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
 
-    //     // get implementation address from slot
-    //     bytes32 _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
-    //     bytes32 currentImplementation = vm.load(address(moduleProxy), _IMPLEMENTATION_SLOT);
-    //     assertEq(address(uint160(uint256(currentImplementation))), address(moduleSingleton));
-    //     vm.expectEmit(true, false, false, false, address(moduleProxy));
+        // get implementation address from slot
+        bytes32 _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+        bytes32 currentImplementation = vm.load(address(moduleProxy), _IMPLEMENTATION_SLOT);
+        assertEq(address(uint160(uint256(currentImplementation))), address(moduleSingleton));
 
-    //     vm.prank(moduleProxy.owner());
-    //     vm.expectEmit(true, false, false, false, address(moduleProxy));
-    //     emit Upgraded(address(newImplementation));
-    //     moduleProxy.upgradeTo(address(newImplementation));
-    //     vm.clearMockedCalls();
-    // }
+        vm.prank(moduleProxy.owner());
+        vm.expectEmit(true, false, false, false, address(moduleProxy));
+        emit Upgraded(address(newImplementation));
+
+        // upgrade to a new implementation
+        moduleProxy.upgradeToAndCall(address(newImplementation), hex"");
+
+        // get implementation address from slot
+        currentImplementation = vm.load(address(moduleProxy), _IMPLEMENTATION_SLOT);
+        assertEq(address(uint160(uint256(currentImplementation))), address(newImplementation));
+        vm.clearMockedCalls();
+    }
 
     function test_AddNode(address account) public {
         address owner = moduleProxy.owner();

@@ -11,6 +11,7 @@ import { SafeSuiteLibV141 } from "../../src/utils/SafeSuiteLibV141.sol";
 import { Enum, ISafe } from "../../src/utils/ISafe.sol";
 import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
 import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
+import { SafeProxyFactory } from "safe-contracts-1.4.1/proxies/SafeProxyFactory.sol";
 
 contract MaliciousModuleMock {
     function initialize(bytes calldata) public pure {
@@ -28,6 +29,9 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     address public module;
     address payable public safe;
 
+    bytes32 public constant DEFAULT_TARGET =
+        bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101");
+
     /**
      * Manually import events and errors
      */
@@ -43,6 +47,13 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         admin = vm.addr(102); // make make address(102) an admin
         moduleSingleton = new HoprNodeManagementModule();
         factory = new HoprNodeStakeFactory(address(moduleSingleton), admin);
+    }
+
+    modifier mockTokenChannel() {
+        address channels = 0x0101010101010101010101010101010101010101;
+        address token = 0x1010101010101010101010101010101010101010;
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
+        _;
     }
 
     /**
@@ -66,11 +77,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     /**
      * @dev Fail to clone a safe when there's not event one admin
      */
-    function testRevert_CloneSafeAndModuleWithFewOwner() public {
-        address channels = 0x0101010101010101010101010101010101010101;
-        address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
-
+    function testRevert_CloneSafeAndModuleWithFewOwner() public mockTokenChannel {
         uint256 nonce = 0;
         address[] memory admins = new address[](0);
 
@@ -78,17 +85,13 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         vm.expectRevert(HoprNodeStakeFactory.TooFewOwners.selector);
         (module, safe) = factory.clone(
             nonce,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            DEFAULT_TARGET,
             admins
         );
         vm.clearMockedCalls();
     }
 
-    function testRevert_CloneSafeAndModuleWithStakeFactoryAsOwner() public {
-        address channels = 0x0101010101010101010101010101010101010101;
-        address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
-
+    function testRevert_CloneSafeAndModuleWithStakeFactoryAsOwner() public mockTokenChannel {
         uint256 nonce = 0;
         address[] memory admins = new address[](2);
         admins[0] = vm.addr(103); // add another admin
@@ -98,7 +101,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         vm.expectRevert(HoprNodeStakeFactory.InvalidOwner.selector);
         (module, safe) = factory.clone(
             nonce,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            DEFAULT_TARGET,
             admins
         );
         vm.clearMockedCalls();
@@ -107,31 +110,28 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     /**
      * @dev Clone a safe and a module and they are wired
      */
-    function test_CloneSafeAndModule() public {
-        address channels = 0x0101010101010101010101010101010101010101;
-        address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
-
+    function test_CloneSafeAndModule() public mockTokenChannel {
         uint256 nonce = 0;
         address[] memory admins = new address[](10);
         for (uint256 i = 0; i < admins.length; i++) {
             admins[i] = vm.addr(200 + i);
         }
-        address expectedModuleAddress =
-            factory.predictModuleAddress(keccak256(abi.encodePacked(caller, nonce)));
-        address expectedSafeAddress = factory.predictSafeAddress(admins, nonce);
+        (address expectedSafeAddress, address expectedModuleAddress) = _helperPredictSafeAndModule(admins, caller, nonce);
 
         vm.startPrank(caller);
-        vm.expectEmit(true, true, false, false, address(factory));
+        vm.expectEmit(true, false, false, true, address(factory));
         emit NewHoprNodeStakeModule(expectedModuleAddress);
-        vm.expectEmit(true, true, false, false, address(factory));
+        vm.expectEmit(true, false, false, true, address(factory));
         emit NewHoprNodeStakeSafe(expectedSafeAddress);
 
         (module, safe) = factory.clone(
             nonce,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            DEFAULT_TARGET,
             admins
         );
+
+        assertEq(module, expectedModuleAddress, "module address mismatch");
+        assertEq(safe, expectedSafeAddress, "safe address mismatch");
 
         _ensureSafeAndModuleAreWired(module, payable(safe), admins);
 
@@ -143,11 +143,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
      * @dev Clone multiple safes and modules to ensure the nonce and salt works
      *      and the deployed addresses are unique
      */
-    function test_CloneMultipleSafesAndModules() public {
-        address channels = 0x0101010101010101010101010101010101010101;
-        address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
-
+    function test_CloneMultipleSafesAndModules() public mockTokenChannel {
         // Deploy first safe and module, with 3 admins
         uint256 nonce0 = 0;
         address[] memory admins0 = new address[](3);
@@ -156,7 +152,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         }
         (address module0, address payable safe0) = factory.clone(
             nonce0,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            DEFAULT_TARGET,
             admins0
         );
         _ensureSafeAndModuleAreWired(module0, payable(safe0), admins0);
@@ -167,58 +163,45 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         admins1[0] = vm.addr(400);
         (address module1, address payable safe1) = factory.clone(
             nonce1,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            DEFAULT_TARGET,
             admins1
         );
         _ensureSafeAndModuleAreWired(module1, payable(safe1), admins1);
-
-        // Test with multisend to create two safe-module pairs, from the second safe that's just deployed
-        vm.startPrank(admins1[0]);
-        uint256 nonce3 = 0;
-        address[] memory admins3 = new address[](3);
-        for (uint256 i = 0; i < admins3.length; i++) {
-            admins3[i] = vm.addr(500 + i);
-        }
-        uint256 nonce4 = 1;
-        address[] memory admins4 = new address[](2);
-        for (uint256 i = 0; i < admins4.length; i++) {
-            admins4[i] = vm.addr(600 + i);
-        }
-        bytes[] memory data = new bytes[](2);
-        data[0] = abi.encodeWithSelector(HoprNodeStakeFactory.clone.selector, nonce3, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"), admins3); // approve on token
-        data[1] = abi.encodeWithSelector(HoprNodeStakeFactory.clone.selector, nonce4, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"), admins4); // approve on token
-        uint256[] memory dataLengths = new uint256[](2);
-        dataLengths[0] = data[0].length;
-        dataLengths[1] = data[1].length;
-
-        // safe1 uses multisend to deploy another safe and module
-        bytes memory safeTxData = _helperBuildMultiSendTxForSafeModuleClone(address(factory), dataLengths, data);
-        address expectedModuleAddress3 =
-            factory.predictModuleAddress(keccak256(abi.encodePacked(address(safe1), nonce3)));
-        address expectedSafeAddress3 = factory.predictSafeAddress(admins3, nonce3);
-        address expectedModuleAddress4 =
-            factory.predictModuleAddress(keccak256(abi.encodePacked(address(safe1), nonce4)));
-        address expectedSafeAddress4 = factory.predictSafeAddress(admins4, nonce4);
-
-        vm.expectEmit(true, true, false, false, address(factory));
-        emit NewHoprNodeStakeModule(expectedModuleAddress3);
-        vm.expectEmit(true, true, false, false, address(factory));
-        emit NewHoprNodeStakeSafe(expectedSafeAddress3);
-        vm.expectEmit(true, true, false, false, address(factory));
-        emit NewHoprNodeStakeModule(expectedModuleAddress4);
-        vm.expectEmit(true, true, false, false, address(factory));
-        emit NewHoprNodeStakeSafe(expectedSafeAddress4);
-        // The first two Safe txns were used during the deployment of safe1
-        _helperSafeTxnToMultiSend(ISafe(safe1), 400, 2, safeTxData);
 
         vm.stopPrank();
         vm.clearMockedCalls();
     }
 
-    function testFuzz_InitializeModuleProxy(uint256 nonce, address safeAddr, address multisendAddr) public {
-        address channels = 0x0101010101010101010101010101010101010101;
-        address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
+    function test_CloneMultipleSafesAndModulesWithMultiSend() public mockTokenChannel {
+        // create a safe to call multisend
+        address safe1 = _helperDeployASafe(vm.addr(400));
+
+        // Test with multisend to create two safe-module pairs, from the previously deployed safe
+        vm.startPrank(vm.addr(400));
+        (
+            address expectedSafeAddress3,
+            address expectedModuleAddress3,
+            address expectedSafeAddress4,
+            address expectedModuleAddress4,
+            bytes memory safeTxData
+        ) = _helperMultiSendDeploy(safe1);
+
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress3);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeSafe(expectedSafeAddress3);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress4);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeSafe(expectedSafeAddress4);
+        // The first two Safe txns were used during the deployment of safe1
+        _helperSafeTxnToMultiSend(ISafe(safe1), 400, 0, safeTxData);
+
+        vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
+    function testFuzz_InitializeModuleProxy(uint256 nonce, address safeAddr, address multisendAddr) public mockTokenChannel {
         vm.assume(safeAddr != address(0));
         vm.assume(multisendAddr != address(0));
         vm.assume(multisendAddr != safeAddr);
@@ -229,7 +212,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         bytes memory moduleInitializer = abi.encodeWithSignature(
             "initialize(bytes)",
             abi.encode(
-                safeAddr, multisendAddr, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+                safeAddr, multisendAddr, DEFAULT_TARGET
             )
         );
 
@@ -299,13 +282,10 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         vm.clearMockedCalls();
     }
 
-    function testRevert_CloneButFailToInitializeTwice(uint256 nonce, address safeAddr, address multisendAddr) public {
+    function testRevert_CloneButFailToInitializeTwice(uint256 nonce, address safeAddr, address multisendAddr) public mockTokenChannel {
         vm.assume(safeAddr != address(0) && multisendAddr != address(0));
 
         bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
-        address channels = 0x0101010101010101010101010101010101010101;
-        address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
 
         // 1. Deploy node management module
         address moduleProxy = address(moduleSingleton).cloneDeterministic(salt);
@@ -314,7 +294,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         bytes memory moduleInitializer = abi.encodeWithSignature(
             "initialize(bytes)",
             abi.encode(
-                address(1), address(2), bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
+                address(1), address(2), DEFAULT_TARGET
             )
         );
         (bool result,) = moduleProxy.call(moduleInitializer);
@@ -330,11 +310,7 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         vm.clearMockedCalls();
     }
 
-    function testRevert_SafeSetupReuseNonce() public {
-        address channels = 0x0101010101010101010101010101010101010101;
-        address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
-        
+    function testRevert_SafeSetupReuseNonce() public mockTokenChannel {
         uint256 nonce = 0;
         address[] memory admins = new address[](10);
         for (uint256 i = 0; i < admins.length; i++) {
@@ -344,14 +320,14 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         vm.startPrank(admins[0]);
         factory.clone(
             nonce,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            DEFAULT_TARGET,
             admins
         );
 
-        vm.expectRevert(bytes("ERC1167: create2 failed"));
+        vm.expectRevert(bytes("Create2 call failed"));
         factory.clone(
             nonce,
-            bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101"),
+            DEFAULT_TARGET,
             admins
         );
         vm.clearMockedCalls();
@@ -430,5 +406,69 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
             payable(sender),
             abi.encodePacked(r, s, v)
         );
+    }
+
+    function _helperDeployASafe(address admin0) private returns (address safeProxyAddr) {
+        address[] memory admins = new address[](1);
+        (
+            address safeAddress,
+            address safeProxyFactoryAddress,
+            address compatibilityFallbackHandlerAddress,
+            address multiSendAddress
+        ) = factory.safeLibAddresses();
+        admins[0] = admin0;
+        bytes memory safeInitializer = abi.encodeWithSignature(
+            "setup(address[],uint256,address,bytes,address,address,uint256,address)",
+            admins,
+            1, // threshold
+            address(0),
+            hex"00",
+            compatibilityFallbackHandlerAddress,
+            address(0),
+            0,
+            address(0)
+        );
+
+        return address(SafeProxyFactory(safeProxyFactoryAddress).createProxyWithNonce(
+            safeAddress, safeInitializer, 0
+        ));
+    }
+
+    function _helperMultiSendDeploy(address callerSafe) private returns (
+        address expectedSafeAddress1,
+        address expectedModuleAddress1,
+        address expectedSafeAddress2,
+        address expectedModuleAddress2,
+        bytes memory safeTxData
+    ){
+        uint256 nonce1 = 7;
+        uint256 nonce2 = 8;
+        address[] memory admins1 = new address[](3);
+        admins1[0] = vm.addr(500);
+        admins1[1] = vm.addr(501);
+        admins1[2] = vm.addr(502);
+        address[] memory admins2 = new address[](2);
+        admins2[0] = vm.addr(600);
+        admins2[1] = vm.addr(601);
+    
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeWithSelector(HoprNodeStakeFactory.clone.selector, nonce1, DEFAULT_TARGET, admins1); // approve on token
+        data[1] = abi.encodeWithSelector(HoprNodeStakeFactory.clone.selector, nonce2, DEFAULT_TARGET, admins2); // approve on token
+        uint256[] memory dataLengths = new uint256[](2);
+        dataLengths[0] = data[0].length;
+        dataLengths[1] = data[1].length;
+
+        // safe1 uses multisend to deploy another safe and module
+        safeTxData = _helperBuildMultiSendTxForSafeModuleClone(address(factory), dataLengths, data);
+        (expectedSafeAddress1, expectedModuleAddress1) = _helperPredictSafeAndModule(admins1, callerSafe, nonce1);
+        (expectedSafeAddress2, expectedModuleAddress2) = _helperPredictSafeAndModule(admins2, callerSafe, nonce2);
+    }
+
+    function _helperPredictSafeAndModule(address[] memory admins, address caller, uint256 nonce) private view returns (
+        address expectedSafeAddress,
+        address expectedModuleAddress
+    ) {
+        expectedSafeAddress = factory.predictSafeAddress(admins, nonce);
+        expectedModuleAddress = factory.predictModuleAddress(caller, nonce, expectedSafeAddress, DEFAULT_TARGET);
     }
 }
