@@ -6,8 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, prelude::Hash};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -41,8 +40,8 @@ pub(crate) struct NodeVersionResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let version = state.hopr.version();
+pub(super) async fn version() -> impl IntoResponse {
+    let version = hopr_lib::constants::APP_VERSION.to_string();
     (StatusCode::OK, Json(NodeVersionResponse { version })).into_response()
 }
 
