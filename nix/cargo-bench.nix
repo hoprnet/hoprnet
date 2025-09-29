@@ -23,6 +23,5 @@ mkCargoDerivation (
     nativeBuildInputs = (args.nativeBuildInputs or [ ]);
 
     RUST_BACKTRACE = "full";
-    MIMALLOC_SHOW_STATS = 1;
   }
 )
