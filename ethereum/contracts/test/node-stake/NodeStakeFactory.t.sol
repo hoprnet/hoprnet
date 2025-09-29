@@ -16,6 +16,7 @@ import { SafeProxyFactory } from "safe-contracts-1.4.1/proxies/SafeProxyFactory.
 import { HoprToken } from "../../src/static/HoprToken.sol";
 import { ERC1820RegistryFixtureTest } from "../utils/ERC1820Registry.sol";
 import { IERC1820Registry } from "openzeppelin-contracts-5.4.0/interfaces/IERC1820Registry.sol";
+import { TargetUtils, Target } from "../../src/utils/TargetUtils.sol";
 
 contract MaliciousModuleMock {
     function initialize(bytes calldata) public pure {
@@ -25,14 +26,17 @@ contract MaliciousModuleMock {
 
 contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
     using ClonesUpgradeable for address;
+    using TargetUtils for Target;
 
     HoprNodeManagementModule public moduleSingleton;
     HoprNodeStakeFactory public factory;
+    HoprToken public hoprToken;
     address public caller;
     address public admin;
     address public module;
     address payable public safe;
 
+    address constant CHANNELS = 0x0101010101010101010101010101010101010101;
     bytes32 public constant DEFAULT_TARGET =
         bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101");
 
@@ -50,14 +54,21 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
 
         caller = vm.addr(101); // make make address(101) a caller
         admin = vm.addr(102); // make make address(102) an admin
+
+        hoprToken = new HoprToken();
         moduleSingleton = new HoprNodeManagementModule();
         factory = new HoprNodeStakeFactory(address(moduleSingleton), admin);
     }
 
     modifier mockTokenChannel() {
-        address channels = 0x0101010101010101010101010101010101010101;
-        address token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
+        vm.mockCall(CHANNELS, abi.encodeWithSignature("TOKEN()"), abi.encode(address(hoprToken)));
+    
+        (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
+        vm.prank(admin);
+        factory.updateHoprNetwork(HoprNodeStakeFactory.HoprNetwork({
+            tokenAddress: address(hoprToken),
+            defaultTokenAllowance: defaultAllowance
+        }));
         _;
     }
 
@@ -79,6 +90,23 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         assertGt(SafeSuiteLibV150.SAFE_ExtensibleFallbackHandler_ADDRESS.code.length, 0);
         // safe version matches
         assertEq(factory.safeVersion(), SafeSuiteLibV141.SAFE_VERSION);
+    }
+
+    function test_UpdateHoprNetwork() public {
+        HoprNodeStakeFactory.HoprNetwork memory newHoprNetwork = HoprNodeStakeFactory.HoprNetwork({
+            tokenAddress: address(hoprToken),
+            defaultTokenAllowance: 2000 ether
+        });
+
+        vm.prank(admin);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit HoprNodeStakeHoprNetworkUpdated(newHoprNetwork);
+        factory.updateHoprNetwork(newHoprNetwork);
+
+        (address token, uint256 allowance) = factory.defaultHoprNetwork();
+        assertEq(token, address(hoprToken), "wrong token address");
+        assertEq(allowance, newHoprNetwork.defaultTokenAllowance, "wrong allowance");
+        vm.clearMockedCalls();
     }
 
     /**
@@ -142,6 +170,14 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
 
         _ensureSafeAndModuleAreWired(module, payable(safe), admins);
 
+        // compare token allowance
+        assertEq(Target.wrap(uint256(DEFAULT_TARGET)).getTargetAddress(), CHANNELS, "wrong channels address");
+        (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
+        assertEq(
+            hoprToken.allowance(safe, CHANNELS),
+            defaultAllowance,
+            "wrong token allowance"
+        );
         vm.stopPrank();
         vm.clearMockedCalls();
     }
@@ -344,8 +380,6 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
      * @dev ensure the fallback handler is the can receive minting of ERC777 tokens
      */
     function test_FallbackHandler() public mockTokenChannel {
-        HoprToken hoprToken = new HoprToken();
-
         // create a safe with the factory
         address[] memory admins = new address[](10);
         for (uint256 i = 0; i < admins.length; i++) {

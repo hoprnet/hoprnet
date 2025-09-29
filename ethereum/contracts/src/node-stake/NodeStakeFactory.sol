@@ -11,6 +11,7 @@ import { Ownable2Step } from "openzeppelin-contracts-5.4.0/access/Ownable2Step.s
 import { Ownable } from "openzeppelin-contracts-5.4.0/access/Ownable2Step.sol";
 import { Create2 } from "openzeppelin-contracts-5.4.0/utils/Create2.sol";
 import { ERC1967Proxy } from "openzeppelin-contracts-5.4.0/proxy/ERC1967/ERC1967Proxy.sol";
+import { TargetUtils, Target } from "../utils/TargetUtils.sol";
 
 abstract contract HoprNodeStakeFactoryEvents {
     // Emit when a new module implementation is set
@@ -21,6 +22,8 @@ abstract contract HoprNodeStakeFactoryEvents {
     event NewHoprNodeStakeSafe(address instance);
     // Emit when a new safe library address is set
     event HoprNodeStakeSafeLibUpdated(HoprNodeStakeFactory.SafeLibAddress safeLibAddresses);
+    // Emit when a new default HOPR network is set
+    event HoprNodeStakeHoprNetworkUpdated(HoprNodeStakeFactory.HoprNetwork hoprNetwork);
 }
 
 /**
@@ -43,6 +46,8 @@ abstract contract HoprNodeStakeFactoryEvents {
  * The factory contract handles the deployment and initialization of these proxies.
  */
 contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
+    using TargetUtils for Target;
+
     // Error indicating that there are too few owners provided
     error TooFewOwners();
     // Error when providing the StakeFactory contract address as an owner
@@ -53,6 +58,11 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
         address safeProxyFactoryAddress;
         address fallbackHandlerAddress;
         address multiSendAddress;
+    }
+
+    struct HoprNetwork {
+        address tokenAddress;
+        uint256 defaultTokenAllowance;
     }
 
     // A sentinel address that serves as the start pointer of the owner linked list used in the OwnerManager of
@@ -79,6 +89,23 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
         multiSendAddress: SafeSuiteLibV141.SAFE_MultiSend_ADDRESS
     });
 
+    HoprNetwork public defaultHoprNetwork = HoprNetwork({
+        tokenAddress: 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1,   // wxHOPR token address on Gnosis chain
+        defaultTokenAllowance: 1000 ether
+    });
+
+    modifier validateAdmins(address[] memory admins) {
+        if (admins.length == 0) {
+            revert TooFewOwners();
+        }
+        for (uint256 i = 0; i < admins.length; ++i) {
+            if (admins[i] == address(this)) {
+                revert InvalidOwner();
+            }
+        }
+        _;
+    }
+
     /**
      * @dev Constructor function to initialize contract state.
      * Initializes the encoded address of the contract's approver and the approved hash signature.
@@ -95,6 +122,8 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
 
         // Set the initial Safe library addresses
         emit HoprNodeStakeSafeLibUpdated(safeLibAddresses);
+        // Set the initial HOPR network
+        emit HoprNodeStakeHoprNetworkUpdated(defaultHoprNetwork);
     }
 
     /**
@@ -121,10 +150,20 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
     }
 
     /**
+     * @dev Updates the default HOPR network configuration.
+     * Can only be called by the contract owner.
+     * @param _newHoprNetwork The new HOPR network configuration.
+     */
+    function updateHoprNetwork(HoprNetwork memory _newHoprNetwork) public onlyOwner {
+        _updateHoprNetwork(_newHoprNetwork);
+    }
+
+    /**
      * @dev Deploys a 1-of-n Safe proxy and a module proxy for HOPR node management.
      * The Safe proxy is initialized with the provided list of admin addresses, and the module proxy
      * is initialized with the Safe proxy address, MultiSend address, and default target.
      * Module proxy is an ERC1967Proxy that follows UUPS pattern.
+     * @notice This function has a compatible interface with the previous factory contract.
      * @param admins The list of owners for the Safe proxy. The multisig threshold is 1
      * @param nonce A nonce used to create a salt. Both the safe and module proxies share the same nonce.
      * @param defaultTarget The default target (refer to TargetUtils.sol) for the current HoprChannels (and HoprToken)
@@ -139,17 +178,32 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
         public
         returns (address, address payable)
     {
-        // 0. Validate inputs
-        // Ensure there is at least one provided admin in the array
-        if (admins.length == 0) {
-            revert TooFewOwners();
-        }
-        for (uint256 i = 0; i < admins.length; ++i) {
-            if (admins[i] == address(this)) {
-                revert InvalidOwner();
-            }
-        }
+        return _deploySafeAndModule(nonce, defaultTarget, msg.sender, defaultHoprNetwork.tokenAddress, defaultHoprNetwork.defaultTokenAllowance, admins);
+    }
 
+    /**
+     * @dev Internal function to deploy a 1-of-n Safe proxy and a module proxy for HOPR node management.
+     * The Safe proxy is initialized with the provided list of admin addresses, and the module proxy
+     * is initialized with the Safe proxy address, MultiSend address, and default target.
+     * Module proxy is an ERC1967Proxy that follows UUPS pattern.
+     * @param admins The list of owners for the Safe proxy. The multisig threshold is 1
+     * @param nonce A nonce used to create a salt. Both the safe and module proxies share the same nonce.
+     * @param defaultTarget The default target (refer to TargetUtils.sol) for the current HoprChannels (and HoprToken)
+     * contract.
+     * @return addresses of the deployed module proxy and safe proxy.
+     */
+    function _deploySafeAndModule(
+        uint256 nonce,
+        bytes32 defaultTarget,
+        address caller,
+        address tokenAddress,
+        uint256 approveAmount,
+        address[] memory admins
+    )
+        internal
+        validateAdmins(admins)
+        returns (address, address payable)
+    {
         // Temporarily replace one owner with the factory address
         assembly {
             let len := mload(admins)
@@ -158,63 +212,39 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
         }
 
         // 1. Prepare safe initializer data
-        bytes memory safeInitializer = abi.encodeWithSignature(
-            "setup(address[],uint256,address,bytes,address,address,uint256,address)",
-            admins,
-            1, // threshold
-            address(0),
-            hex"00",
-            safeLibAddresses.fallbackHandlerAddress,
-            address(0),
-            0,
-            address(0)
-        );
+        address payable safeProxyAddr = _deploySafe(admins, nonce);
 
-        // 2. Deploy Safe proxy
-        SafeProxy safeProxy = SafeProxyFactory(safeLibAddresses.safeProxyFactoryAddress).createProxyWithNonce(
-            safeLibAddresses.safeAddress, safeInitializer, nonce
-        );
-        address payable safeProxyAddr = payable(address(safeProxy));
+        // 2. Prepare module initializer data
+       address moduleProxy = _deployModule(safeProxyAddr, defaultTarget, caller, nonce);
 
-        // 3. Prepare module initializer data
-        // Add Safe and multisend to the module, then transfer ownership to the module
-        bytes memory moduleInitializer = abi.encodeWithSignature(
-            "initialize(bytes)",
-            abi.encode(address(safeProxy), safeLibAddresses.multiSendAddress, defaultTarget)
-        );
-
-        // Generate a unique salt using the sender's address and the provided nonce
-        /// forge-lint: disable-next-line(asm-keccak256)
-        bytes32 salt = keccak256(abi.encodePacked(msg.sender, nonce));
-
-        // 4. Deploy module proxy (ERC1967Proxy) with CREATE2
-        address moduleProxy = Create2.deploy(0, salt, abi.encodePacked(
-            type(ERC1967Proxy).creationCode, 
-            abi.encode(
-                moduleSingletonAddress,
-                moduleInitializer
-            )
-        ));
-
-        // set ERC777 token recipient implementer to the safe itself
-        bytes memory setInterfaceData = abi.encodeWithSignature(
-            "setInterfaceImplementer(address,bytes32,address)",
-            safeProxyAddr,
-            keccak256("ERC777TokensRecipient"),
-            safeProxyAddr
-        );
-        _prepareSafeTx(Safe(safeProxyAddr), ERC1820_ADDRESS, setInterfaceData);
-        // Enable the node management module
-        bytes memory enableModuleData = abi.encodeWithSignature("enableModule(address)", moduleProxy);
-        _prepareSafeTx(Safe(safeProxyAddr), enableModuleData);
-        // Renonce ownership from the safe
-        bytes memory swapOwnerData =
-            abi.encodeWithSignature("removeOwner(address,address,uint256)", admins[admins.length - 2], address(this), 1);
-        _prepareSafeTx(Safe(safeProxyAddr), swapOwnerData);
-
+        // 3. Send safe transactions
+        {
+            // - Nonce 0: set ERC777 token recipient implementer to the safe itself
+            bytes memory setInterfaceData = abi.encodeWithSignature(
+                "setInterfaceImplementer(address,bytes32,address)",
+                safeProxyAddr,
+                keccak256("ERC777TokensRecipient"),
+                safeProxyAddr
+            );
+            _prepareSafeTx(safeProxyAddr, ERC1820_ADDRESS, setInterfaceData);
+            // - Nonce 1: Enable the node management module
+            bytes memory enableModuleData = abi.encodeWithSignature("enableModule(address)", moduleProxy);
+            _prepareSafeTx(safeProxyAddr, enableModuleData);
+            // - Nonce 2: Approve the channels contract to spend HOPR tokens on behalf of the safe
+            bytes memory approveData = abi.encodeWithSignature(
+                "approve(address,uint256)",
+                Target.wrap(uint256(defaultTarget)).getTargetAddress(), // channelAddress obtained from the default target
+                approveAmount
+            );
+            _prepareSafeTx(safeProxyAddr, tokenAddress, approveData);
+            // - Nonce 3: Renounce ownership from the safe
+            bytes memory swapOwnerData =
+                abi.encodeWithSignature("removeOwner(address,address,uint256)", admins[admins.length - 2], address(this), 1);
+            _prepareSafeTx(safeProxyAddr, swapOwnerData);
+        }
 
         emit NewHoprNodeStakeModule(moduleProxy);
-        emit NewHoprNodeStakeSafe(address(safeProxy));
+        emit NewHoprNodeStakeSafe(safeProxyAddr);
         return (moduleProxy, safeProxyAddr);
     }
 
@@ -237,13 +267,22 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
     }
 
     /**
+     * @dev Updates the default HOPR network configuration and emits an event.
+     * @param _newHoprNetwork The new HOPR network configuration.
+     */
+    function _updateHoprNetwork(HoprNetwork memory _newHoprNetwork) private {
+        defaultHoprNetwork = _newHoprNetwork;
+        emit HoprNodeStakeHoprNetworkUpdated(defaultHoprNetwork);
+    }
+
+    /**
      * @dev Prepares and executes a transaction on the safe contract.
-     * @param safe The address of the safe contract.
+     * @param safeAddress The address of the safe contract.
      * @param data The data payload for the transaction.
      */
-    function _prepareSafeTx(Safe safe, bytes memory data) private {
-        safe.execTransaction(
-            address(safe),                  // to address
+    function _prepareSafeTx(address safeAddress, bytes memory data) private {
+        Safe(payable(safeAddress)).execTransaction(
+            safeAddress,                  // to address
             0,                              // value
             data,                           // data
             Enum.Operation.Call,            // operation
@@ -258,12 +297,12 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
 
     /**
      * @dev Prepares and executes a transaction on the safe contract.
-     * @param safe The address of the safe contract.
+     * @param safeAddress The address of the safe contract.
      * @param to The destination address of the transaction.
      * @param data The data payload for the transaction.
      */
-    function _prepareSafeTx(Safe safe, address to, bytes memory data) private {
-        safe.execTransaction(
+    function _prepareSafeTx(address safeAddress, address to, bytes memory data) private {
+        Safe(payable(safeAddress)).execTransaction(
             to,                             // to address
             0,                              // value
             data,                           // data
@@ -275,6 +314,64 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
             payable(address(msg.sender)),   // refundReceiver
             approvalHashSig                 // signature
         );
+    }
+
+    /**
+     * @dev Deploys a Safe proxy with the provided admin addresses and nonce.
+     * @param admins The list of owners for the Safe proxy. The multisig threshold is 1
+     * @param nonce A nonce used to create a salt.
+     * @return safeProxyAddr The address of the deployed Safe proxy.
+     */
+    function _deploySafe(address[] memory admins, uint256 nonce) private returns (address payable safeProxyAddr) {
+        bytes memory safeInitializer = abi.encodeWithSignature(
+            "setup(address[],uint256,address,bytes,address,address,uint256,address)",
+            admins,
+            1, // threshold
+            address(0),
+            hex"00",
+            safeLibAddresses.fallbackHandlerAddress,
+            address(0),
+            0,
+            address(0)
+        );
+
+        // Deploy Safe proxy
+        SafeProxy safeProxy = SafeProxyFactory(safeLibAddresses.safeProxyFactoryAddress).createProxyWithNonce(
+            safeLibAddresses.safeAddress, safeInitializer, nonce
+        );
+        safeProxyAddr = payable(address(safeProxy));
+    }
+
+    /**
+     * @dev Deploys a module proxy for HOPR node management using CREATE2.
+     * The module proxy is initialized with the Safe proxy address, MultiSend address, and default target.
+     * Module proxy is an ERC1967Proxy that follows UUPS pattern.
+     * @param safeProxyAddr The address of the Safe proxy that will be linked to the module.
+     * @param defaultTarget The default target (refer to TargetUtils.sol) for the current HoprChannels (and HoprToken)
+     * contract.
+     * @param caller The address of the deployer.
+     * @param nonce A nonce used to create a salt. Both the safe and module proxies share the same nonce.
+     * @return moduleProxy The address of the deployed module proxy.
+     */
+    function _deployModule(address safeProxyAddr, bytes32 defaultTarget, address caller, uint256 nonce) private returns (address moduleProxy) {
+         // Add Safe and multisend to the module, then transfer ownership to the module
+        bytes memory moduleInitializer = abi.encodeWithSignature(
+            "initialize(bytes)",
+            abi.encode(safeProxyAddr, safeLibAddresses.multiSendAddress, defaultTarget)
+        );
+
+        // Generate a unique salt using the sender's address and the provided nonce
+        /// forge-lint: disable-next-line(asm-keccak256)
+        bytes32 salt = keccak256(abi.encodePacked(caller, nonce));
+
+        // Deploy module proxy (ERC1967Proxy) with CREATE2
+        moduleProxy = Create2.deploy(0, salt, abi.encodePacked(
+            type(ERC1967Proxy).creationCode, 
+            abi.encode(
+                moduleSingletonAddress,
+                moduleInitializer
+            )
+        ));
     }
 
     /**
