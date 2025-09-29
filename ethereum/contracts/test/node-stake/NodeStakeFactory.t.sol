@@ -76,7 +76,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         // there's code in Safe MultiSendCallOnly
         assertGt(SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS.code.length, 0);
         // there's code in Safe ExtensibleFallbackHandler, v1.5.0
-        assertGt(SafeSuiteLibV150.SAFE_CompatibilityFallbackHandler_ADDRESS.code.length, 0);
+        assertGt(SafeSuiteLibV150.SAFE_ExtensibleFallbackHandler_ADDRESS.code.length, 0);
         // safe version matches
         assertEq(factory.safeVersion(), SafeSuiteLibV141.SAFE_VERSION);
     }
@@ -361,10 +361,14 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         // get interface implementer
         address implementer = IERC1820Registry(ERC1820_REGISTRY_ADDRESS).getInterfaceImplementer(safe, keccak256("ERC777TokensRecipient"));
         assertEq(implementer, safe, "safe is not the ERC777TokensRecipient implementer");
+
+        assertEq(hoprToken.balanceOf(safe), 0, "safe should not have any tokens");
         // mint some tokens to the safe
         vm.prank(address(this));
         hoprToken.grantRole(hoprToken.MINTER_ROLE(), address(this));
         hoprToken.mint(safe, 100000, "", "");
+
+        assertEq(hoprToken.balanceOf(safe), 100000, "safe should have 100000 tokens");
         vm.clearMockedCalls();
     }
 

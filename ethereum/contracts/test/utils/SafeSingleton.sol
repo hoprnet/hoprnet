@@ -49,6 +49,7 @@ abstract contract SafeSingletonFixtureTest is Test {
         deploySafeProxyFactory();
         // 3 handlers
         deployCompatibilityFallbackHandlerV150();
+        deployExtensibleFallbackHandlerV150();
         // 4 libraries
         deployCreateCall();
         deployMultiSend();
