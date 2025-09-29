@@ -18,6 +18,16 @@ impl HoprTester {
     ) -> Self {
         let instance = Hopr::new(
             hopr_lib::config::HoprLibConfig {
+                probe: hopr_lib::config::ProbeConfig {
+                    timeout: Duration::from_secs(2),
+                    max_parallel_probes: 10,
+                    recheck_threshold: Duration::from_secs(1),
+                    ..Default::default()
+                },
+                network_options: hopr_lib::config::NetworkConfig {
+                    ignore_timeframe: Duration::from_secs(0),
+                    ..Default::default()
+                },
                 chain: hopr_lib::config::Chain {
                     protocols: protocol_config,
                     provider: Some(anvil_endpoint.into()),
@@ -44,6 +54,10 @@ impl HoprTester {
                     )],
                     ..Default::default()
                 },
+                transport: hopr_lib::config::TransportConfig {
+                    prefer_local_addresses: true,
+                    announce_local_addresses: true,
+                },
                 ..Default::default()
             },
             &OffchainKeypair::random(),
@@ -58,7 +72,6 @@ impl HoprTester {
         &self.0
     }
 
-    // Add helper methods here
     pub async fn run(&self) -> anyhow::Result<()> {
         match self.0.run().await {
             Ok(_) => (),
