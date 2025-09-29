@@ -97,7 +97,7 @@ use hopr_chain_api::{
     wait_for_funds,
 };
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_crypto_types::prelude::{Hash, OffchainPublicKey};
 use hopr_db_sql::{
     accounts::HoprDbAccountOperations,
     channels::HoprDbChannelOperations,
@@ -130,12 +130,16 @@ use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_platform::time::native::current_time,
 };
-
+use hopr_api::chain::{AccountSelector, AnnouncementError, ChainEvents, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainWriteAccountOperations, ChainWriteChannelOperations, ChainWriteTicketOperations, ChannelSelector};
+use hopr_api::db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus, TicketSelector};
+use hopr_chain_types::ContractAddresses;
+use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE},
     traits::chain::{CloseChannelResult, OpenChannelResult},
 };
+use crate::state::HoprState;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -498,12 +502,14 @@ impl Hopr {
 
         self.state.store(state::HoprState::Indexing, Ordering::Relaxed);
 
-        // Get the accounts first to determine the minimum capacity needed
-        let accounts = self.db.get_accounts(None, true).await?;
-
         // Calculate the minimum capacity based on accounts (each account can generate 2 messages),
-        // plus 100 as additional buffer
-        let minimum_capacity = accounts.len().saturating_mul(2).saturating_add(100);
+        // plus 100 as an additional buffer
+        let minimum_capacity = self.hopr_chain_api.count_accounts(AccountSelector {
+            public_only: true,
+            ..Default::default()
+        }).await?
+        .saturating_mul(2)
+        .saturating_add(100);
 
         let chain_discovery_events_capacity = std::env::var("HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY")
             .ok()
@@ -529,7 +535,6 @@ impl Hopr {
         );
 
         let mut public_accounts = Vec::new();
-
         {
             // This has to happen before the indexing process starts to make sure that the pre-existing data is
             // properly populated into the transport mechanism before the synced data in the follow-up process.
@@ -651,7 +656,7 @@ impl Hopr {
                 // If the announcement fails, we keep going to prevent the node from retrying
                 // after restart.
                 // Functionality is limited, and users must check the logs for errors.
-                Err(e) => error!(error = %e, "Failed to transmit node announcement"),
+                Err(error) => error!(%error, "Failed to transmit node announcement"),
             }
         }
 
@@ -693,7 +698,6 @@ impl Hopr {
                 .filter(|status| futures::future::ready(status.quality >= min_quality_to_sync));
 
             while let Some(peer) = peer_stream.next().await {
-                // TODO: (dbmig) will become Node's DB instead
                 if let Some(key) = self.hopr_chain_api.packet_key_to_chain_key(&peer.id.0).await? {
                     // For nodes that had a good quality, we assign a perfect score
                     cg.update_node_score(&key, NodeScoreUpdate::Initialize(peer.last_seen_latency, 1.0));
@@ -1116,7 +1120,6 @@ impl Hopr {
 
     /// Reset the ticket metrics to zero
     pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
-        // TODO: (dbmig) will become Ticket DB instead
         Ok(self.node_db.reset_ticket_statistics().await?)
     }
 

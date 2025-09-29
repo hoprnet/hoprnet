@@ -18,24 +18,23 @@ use std::time::Duration;
 use async_trait::async_trait;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info};
-
+use hopr_api::chain::{ChainReadAccountOperations, ChainReadChannelOperations};
 use crate::{
     ChainActions,
     action_queue::PendingAction,
     errors::{
         ChainActionsError::{
             BalanceTooLow, ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
-            InvalidArguments, InvalidChannelStake, InvalidState, NotEnoughAllowance, PeerAccessDenied,
+            InvalidArguments, InvalidChannelStake, InvalidState, NotEnoughAllowance,
         },
         Result,
     },
-    redeem::TicketRedeemActions,
 };
+use crate::errors::ChainActionsError::ChainApiError;
 
 /// Gathers all channel-related on-chain actions.
 #[async_trait]
@@ -52,14 +51,14 @@ pub trait ChannelActions {
         &self,
         counterparty: Address,
         direction: ChannelDirection,
-        redeem_before_close: bool,
     ) -> Result<PendingAction>;
 }
 
 #[async_trait]
-impl<Db> ChannelActions for ChainActions<Db>
+impl<Db, R> ChannelActions for ChainActions<Db, R>
 where
-    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
+    R: ChainReadChannelOperations + ChainReadAccountOperations + Clone + Send + Sync + 'static,
+    Db: Send + Sync
 {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn open_channel(&self, destination: Address, amount: HoprBalance) -> Result<PendingAction> {
@@ -72,52 +71,41 @@ where
         }
 
         // Perform all checks
-        let db_clone = self.db.clone();
-        let self_addr = self.self_address();
-        self.db
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
-                    debug!(%allowance, "current staking safe allowance");
-                    if allowance < amount {
-                        return Err(NotEnoughAllowance);
-                    }
+        let allowance: HoprBalance = self.resolver.safe_allowance()
+            .await
+            .map_err(|e| ChainApiError(e.into()))?;
+        debug!(%allowance, "current staking safe allowance");
+        if allowance < amount {
+            return Err(NotEnoughAllowance);
+        }
 
-                    let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
-                    debug!(balance = %hopr_balance, "current Safe HOPR balance");
-                    if hopr_balance < amount {
-                        return Err(BalanceTooLow);
-                    }
+        let hopr_balance: HoprBalance = self.resolver.safe_balance()
+            .await
+            .map_err(|e| ChainApiError(e.into()))?;
+        debug!(balance = %hopr_balance, "current Safe HOPR balance");
+        if hopr_balance < amount {
+            return Err(BalanceTooLow);
+        }
 
-                    if HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) < amount {
-                        return Err(InvalidChannelStake);
-                    }
+        if HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) < amount {
+            return Err(InvalidChannelStake);
+        }
 
-                    if db_clone.get_indexer_data(Some(tx)).await?.nr_enabled
-                        && !db_clone.is_allowed_in_network_registry(Some(tx), &destination).await?
-                    {
-                        return Err(PeerAccessDenied);
-                    }
-
-                    let maybe_channel = db_clone
-                        .get_channel_by_parties(Some(tx), &self_addr, &destination, false)
-                        .await?;
-                    if let Some(channel) = maybe_channel {
-                        debug!(%channel, "already found existing channel");
-                        if channel.status != ChannelStatus::Closed {
-                            error!(
-                                %destination,
-                                "channel to destination is already opened or pending to close"
-                            );
-                            return Err(ChannelAlreadyExists);
-                        }
-                    }
-                    Ok(())
-                })
-            })
-            .await?;
+        let maybe_channel = self
+            .resolver
+            .channel_by_parties(&self.self_address(), &destination)
+            .await
+            .map_err(|e| ChainApiError(e.into()))?;
+        if let Some(channel) = maybe_channel {
+            debug!(%channel, "already found existing channel");
+            if channel.status != ChannelStatus::Closed {
+                error!(
+                    %destination,
+                    "channel to destination is already opened or pending to close"
+                );
+                return Err(ChannelAlreadyExists);
+            }
+        }
 
         info!(%destination, %amount, "initiating channel open");
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
@@ -129,31 +117,23 @@ where
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
-        let db_clone = self.db.clone();
-        let maybe_channel = self
-            .db
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
-                    debug!(%allowance, "current staking safe allowance");
-                    if allowance.lt(&amount) {
-                        return Err(NotEnoughAllowance);
-                    }
 
-                    let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
-                    debug!(balance = %hopr_balance, "current Safe HOPR balance");
-                    if hopr_balance.lt(&amount) {
-                        return Err(BalanceTooLow);
-                    }
+        let allowance: HoprBalance = self.resolver.safe_allowance().await
+            .map_err(|e| ChainApiError(e.into()))?;
+        debug!(%allowance, "current staking safe allowance");
+        if allowance.lt(&amount) {
+            return Err(NotEnoughAllowance);
+        }
 
-                    Ok(db_clone.get_channel_by_id(Some(tx), &channel_id).await?)
-                })
-            })
-            .await?;
+        let hopr_balance: HoprBalance = self.resolver.safe_balance().await
+            .map_err(|e| ChainApiError(e.into()))?;
+        debug!(balance = %hopr_balance, "current Safe HOPR balance");
+        if hopr_balance.lt(&amount) {
+            return Err(BalanceTooLow);
+        }
 
-        match maybe_channel {
+        match self.resolver.channel_by_id(&channel_id).await
+            .map_err(|e| ChainApiError(e.into()))? {
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
                     if channel.balance + amount > HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) {
@@ -175,18 +155,19 @@ where
         &self,
         counterparty: Address,
         direction: ChannelDirection,
-        redeem_before_close: bool,
     ) -> Result<PendingAction> {
         let maybe_channel = match direction {
             ChannelDirection::Incoming => {
-                self.db
-                    .get_channel_by_parties(None, &counterparty, &self.self_address(), false)
-                    .await?
+                self.resolver
+                    .channel_by_parties(&counterparty, &self.self_address())
+                    .await
+                    .map_err(|e| ChainApiError(e.into()))?
             }
             ChannelDirection::Outgoing => {
-                self.db
-                    .get_channel_by_parties(None, &self.self_address(), &counterparty, false)
-                    .await?
+                self.resolver
+                    .channel_by_parties(&self.self_address(), &counterparty)
+                    .await
+                    .map_err(|e| ChainApiError(e.into()))?
             }
         };
 
@@ -211,13 +192,6 @@ where
                         }
                     }
                     ChannelStatus::Open => {
-                        if redeem_before_close && direction == ChannelDirection::Incoming {
-                            // TODO: trigger aggregation
-                            // Do not await the redemption, just submit it to the queue
-                            let redeemed = self.redeem_tickets_in_channel(&channel, 0.into(), false).await?.len();
-                            info!(count = redeemed, %channel, "redeemed tickets before channel closing");
-                        }
-
                         info!(%channel, ?direction, "initiating channel closure");
                         self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                     }

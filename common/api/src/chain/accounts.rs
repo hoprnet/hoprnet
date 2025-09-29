@@ -66,6 +66,8 @@ pub struct AccountSelector {
     pub public_only: bool,
     /// Selects accounts bound with the given chain key.
     pub chain_key: Option<Address>,
+    /// Selects accounts bound with the given off-chain key.
+    pub offchain_key: Option<OffchainPublicKey>,
 }
 
 /// Chain operations that read on-chain node accounts.
@@ -102,4 +104,13 @@ pub trait ChainReadAccountOperations {
         &'a self,
         selector: AccountSelector,
     ) -> Result<BoxStream<'a, AccountEntry>, Self::Error>;
+
+    /// Counts the accounts with the given [`AccountSelector`].
+    ///
+    /// This is potentially done more effectively than counting more elements of
+    /// the stream returned by [`ChainReadAccountOperations::stream_accounts`].
+    async fn count_accounts(
+        &self,
+        selector: AccountSelector
+    ) -> Result<usize, Self::Error>;
 }

@@ -16,12 +16,11 @@ use futures::{FutureExt, StreamExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::spawn;
 use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::{api::tickets::HoprDbTicketOperations, info::HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, trace, warn};
-
+use hopr_api::db::HoprDbTicketOperations;
 use crate::{
     action_state::{ActionState, IndexerExpectation},
     errors::{
@@ -316,7 +315,7 @@ where
 #[derive(Debug, Clone)]
 pub struct ActionQueue<Db, S, TxExec>
 where
-    Db: HoprDbInfoOperations + HoprDbTicketOperations + Send + Sync,
+    Db: HoprDbTicketOperations + Send + Sync,
     S: ActionState + Send + Sync,
     TxExec: TransactionExecutor + Send + Sync,
 {
@@ -328,7 +327,7 @@ where
 
 impl<Db, S, TxExec> ActionQueue<Db, S, TxExec>
 where
-    Db: HoprDbInfoOperations + HoprDbTicketOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     S: ActionState + Send + Sync + 'static,
     TxExec: TransactionExecutor + Send + Sync + 'static,
 {
@@ -389,7 +388,7 @@ where
                         METRIC_COUNT_ACTIONS.increment(&[act_name, "success"]);
                     }
                     Err(err) => {
-                        // On error in Ticket redeem action, we also need to reset ack ticket state
+                        // On error in the Ticket redeem action, we also need to reset ack ticket state
                         if let Action::RedeemTicket(ack) = act {
                             error!(rror = %err, "marking the acknowledged ticket as untouched - redeem action failed");
 

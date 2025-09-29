@@ -411,6 +411,10 @@ impl ChainReadAccountOperations for HoprChain {
     ) -> std::result::Result<BoxStream<'a, AccountEntry>, Self::Error> {
         Ok(self.db.stream_accounts(selector.public_only).await?)
     }
+
+    async fn count_accounts(&self, selector: AccountSelector) -> std::result::Result<usize, Self::Error> {
+        Ok(self.db.stream_accounts(selector.public_only).await?.count().await)
+    }
 }
 
 impl ChainWriteAccountOperations for HoprChain {

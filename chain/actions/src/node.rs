@@ -12,14 +12,14 @@
 //! to the [ActionQueue](crate::action_queue::ActionQueue).
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::{keypairs::OffchainKeypair, prelude::Keypair};
-use hopr_db_sql::accounts::HoprDbAccountOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 use tracing::info;
-
+use hopr_api::chain::{AccountSelector, ChainReadAccountOperations};
 use crate::{
     ChainActions,
     action_queue::PendingAction,
@@ -28,6 +28,7 @@ use crate::{
         Result,
     },
 };
+use crate::errors::ChainActionsError::ChainApiError;
 
 /// Contains all on-chain calls specific to the HOPR node itself.
 #[async_trait]
@@ -47,9 +48,10 @@ pub trait NodeActions {
 }
 
 #[async_trait]
-impl<Db> NodeActions for ChainActions<Db>
+impl<Db, R> NodeActions for ChainActions<Db, R>
 where
-    Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug,
+    R: ChainReadAccountOperations + Clone + Send + Sync,
+    Db: Send + Sync
 {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn withdraw(&self, recipient: Address, amount: U256) -> Result<PendingAction> {
@@ -81,12 +83,23 @@ where
             Some(KeyBinding::new(self.self_address(), offchain_key)),
         )?;
 
-        if !self.db.get_accounts(None, true).await?.into_iter().any(|account| {
-            account.public_key.eq(offchain_key.public())
-                && account
-                    .get_multiaddr()
-                    .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress()))
-        }) {
+        let count_announced = self
+            .resolver
+            .stream_accounts(AccountSelector {
+            public_only: true,
+            offchain_key: Some(*offchain_key.public()),
+            ..Default::default()
+        })
+        .await
+        .map_err(|e| ChainApiError(e.into()))?
+        .filter(|account| futures::future::ready(account
+            .get_multiaddr()
+            .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress()))
+        ))
+        .count()
+        .await;
+
+        if count_announced == 0 {
             info!(%announcement_data, "initiating announcement");
             self.tx_sender.send(Action::Announce(announcement_data)).await
         } else {

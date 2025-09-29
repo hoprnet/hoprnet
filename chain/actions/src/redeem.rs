@@ -26,33 +26,26 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::{
-    api::{
-        info::DomainSeparator,
-        tickets::{HoprDbTicketOperations, TicketSelector},
-    },
-    channels::HoprDbChannelOperations,
-    prelude::HoprDbInfoOperations,
-};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-use tracing::{debug, error, info, warn};
-
+use tracing::{debug, error, info};
+use hopr_api::chain::{ChainMiscOperations, ChainReadChannelOperations};
+use hopr_api::db::{HoprDbTicketOperations, TicketSelector};
 use crate::{
     ChainActions,
     action_queue::PendingAction,
     errors::{
-        ChainActionsError::{ChannelDoesNotExist, InvalidState, OldTicket, WrongTicketState},
+        ChainActionsError::{ChannelDoesNotExist, OldTicket, WrongTicketState},
         Result,
     },
 };
+use crate::errors::ChainActionsError::{ChainApiError, NodeDbError};
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
     static ref EMPTY_TX_HASH: Hash = Hash::default();
 }
 
-/// Gathers all the ticket redemption-related on-chain calls.
+/// Gathers all the ticket-redemption-related on-chain calls.
 #[async_trait]
 pub trait TicketRedeemActions {
     /// Redeems all tickets based on the given [`TicketSelector`].
@@ -64,13 +57,17 @@ pub trait TicketRedeemActions {
 }
 
 #[async_trait]
-impl<Db> TicketRedeemActions for ChainActions<Db>
+impl<Db, R> TicketRedeemActions for ChainActions<Db, R>
 where
-    Db: HoprDbTicketOperations + Clone + Send + Sync + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Send + Sync + 'static,
+    R: ChainMiscOperations + ChainReadChannelOperations + Send + Sync + 'static,
 {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets(&self, selector: TicketSelector) -> Result<Vec<PendingAction>> {
-        let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector.clone()).await?;
+        let (count_redeemable_tickets, _) = self
+            .db
+            .get_tickets_value(selector.clone()).await
+            .map_err(|e| NodeDbError(e.into()))?;
 
         info!(
             count_redeemable_tickets, %selector,
@@ -83,11 +80,11 @@ where
         }
 
         let channel_dst = self
-            .db
-            .get_indexer_data(None)
-            .await?
-            .domain_separator(DomainSeparator::Channel)
-            .ok_or(InvalidState("missing channel dst".into()))?;
+            .resolver
+            .domain_separators()
+            .await
+            .map_err(|e| ChainApiError(e.into()))?
+            .channel;
 
         let selector_id = selector.to_string();
 
@@ -95,7 +92,8 @@ where
         let redeem_stream = self
             .db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
-            .await?
+            .await
+            .map_err(|e| NodeDbError(e.into()))?
             .collect::<Vec<_>>()
             .await;
 
@@ -130,9 +128,10 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
         if let Some(channel) = self
-            .db
-            .get_channel_by_id(None, &ack_ticket.verified_ticket().channel_id)
-            .await?
+            .resolver
+            .channel_by_id(&ack_ticket.verified_ticket().channel_id)
+            .await
+            .map_err(|e| ChainApiError(e.into()))?
         {
             // Check if not trying to redeem a ticket that cannot be redeemed.
             // Such tickets are automatically cleaned up (neglected) after successful redemption.
@@ -150,17 +149,18 @@ where
             let maybe_ticket = self
                 .db
                 .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
-                .await?
+                .await
+                .map_err(|e| NodeDbError(e.into()))?
                 .next()
                 .await;
 
             if let Some(ticket) = maybe_ticket {
                 let channel_dst = self
-                    .db
-                    .get_indexer_data(None)
-                    .await?
-                    .domain_separator(DomainSeparator::Channel)
-                    .ok_or(InvalidState("missing channel dst".into()))?;
+                    .resolver
+                    .domain_separators()
+                    .await
+                    .map_err(|e| ChainApiError(e.into()))?
+                    .channel;
 
                 let redeemable = ticket.into_redeemable(&self.chain_key, &channel_dst)?;
 
