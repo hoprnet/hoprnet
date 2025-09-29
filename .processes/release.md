@@ -20,7 +20,6 @@ The purpose of this document is to streamline the releases of hoprd.
     - [Publish DappNode](#publish-dappnode)
       - [Prerequisites](#prerequisites)
     - [Promote release](#promote-release)
-    - [Merge Back](#merge-back)
 
 ## Release Types
 
@@ -208,13 +207,3 @@ The process of promoting the named release consists of creating or updating a gi
 1. Execute the manual workflow named [Promote Release](https://github.com/hoprnet/hoprnet/actions/workflows/promote-release.yaml) specifying the name of the release and the tag you want to bind it
 2. Create a release page in the wiki (Notion) at: https://www.notion.so/Testnets-e53255f7003f4c8eae2f1b6644a676e0
    You may use previous testnet pages as templates. Ensure all started nodes are documented.
-
-### Merge Back
-
-The process of merge back consists of bringing all the changes made in the release branch back to the master branch.
-
-1. Execute the script `./scripts/merge-back.sh <release_name>`
-2. The workspace should be clean
-3. The release name is the name from which it will take the changes `release/<release_name>`
-4. If there are unresolvable conflicts the script will stop and you will need to continue manually
-5. The github cli should be installed to create the PR.

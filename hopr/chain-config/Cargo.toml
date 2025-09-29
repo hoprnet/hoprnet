@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-config"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the network and protocols configuration and exposing it to other components"
