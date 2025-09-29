@@ -262,9 +262,14 @@ where
 
         let balancer_level_capacity = std::env::var("HOPR_INTERNAL_SESSION_BALANCER_LEVEL_CAPACITY")
             .ok()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
             .unwrap_or(32_768);
 
+        tracing::debug!(
+            capacity = balancer_level_capacity,
+            "Creating session balancer level channel"
+        );
         let (mut level_tx, level_rx) = futures::channel::mpsc::channel(balancer_level_capacity);
         hopr_async_runtime::prelude::spawn(
             async move {

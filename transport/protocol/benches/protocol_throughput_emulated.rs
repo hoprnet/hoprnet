@@ -68,7 +68,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let processes = hopr_transport_protocol::run_msg_ack_protocol(
                             cfg,
                             dbs[TESTED_PEER_ID].clone(),
-                            None,
                             (wire_msg_send_tx, wire_msg_recv_rx),
                             (api_recv_tx, api_send_rx),
                         )
