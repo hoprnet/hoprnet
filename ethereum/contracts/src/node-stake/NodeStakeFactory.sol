@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { SafeSuiteLibV141 } from "../utils/SafeSuiteLibV141.sol";
+import { SafeSuiteLibV150 } from "../utils/SafeSuiteLibV150.sol";
 import { SafeProxy } from "safe-contracts-1.4.1/proxies/SafeProxy.sol";
 import { SafeProxyFactory } from "safe-contracts-1.4.1/proxies/SafeProxyFactory.sol";
 import { Safe } from "safe-contracts-1.4.1/Safe.sol";
@@ -50,13 +51,16 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
     struct SafeLibAddress {
         address safeAddress;
         address safeProxyFactoryAddress;
-        address compatibilityFallbackHandlerAddress;
+        address fallbackHandlerAddress;
         address multiSendAddress;
     }
 
     // A sentinel address that serves as the start pointer of the owner linked list used in the OwnerManager of
     // safe-contracts
     address internal constant SENTINEL_OWNERS = address(0x1);
+
+    // The address of the ERC1820 registry contract
+    address internal constant ERC1820_ADDRESS = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
 
     // Encoded address of the contract's approver, used for EIP-1271 signature verification
     bytes32 internal immutable r;
@@ -71,7 +75,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
     SafeLibAddress public safeLibAddresses = SafeLibAddress({
         safeAddress: SafeSuiteLibV141.SAFE_Safe_ADDRESS,
         safeProxyFactoryAddress: SafeSuiteLibV141.SAFE_SafeProxyFactory_ADDRESS,
-        compatibilityFallbackHandlerAddress: SafeSuiteLibV141.SAFE_CompatibilityFallbackHandler_ADDRESS,
+        fallbackHandlerAddress: SafeSuiteLibV150.SAFE_ExtensibleFallbackHandler_ADDRESS,
         multiSendAddress: SafeSuiteLibV141.SAFE_MultiSend_ADDRESS
     });
 
@@ -160,7 +164,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
             1, // threshold
             address(0),
             hex"00",
-            safeLibAddresses.compatibilityFallbackHandlerAddress,
+            safeLibAddresses.fallbackHandlerAddress,
             address(0),
             0,
             address(0)
@@ -192,6 +196,14 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
             )
         ));
 
+        // set ERC777 token recipient implementer to the safe itself
+        bytes memory setInterfaceData = abi.encodeWithSignature(
+            "setInterfaceImplementer(address,bytes32,address)",
+            safeProxyAddr,
+            keccak256("ERC777TokensRecipient"),
+            safeProxyAddr
+        );
+        _prepareSafeTx(Safe(safeProxyAddr), ERC1820_ADDRESS, setInterfaceData);
         // Enable the node management module
         bytes memory enableModuleData = abi.encodeWithSignature("enableModule(address)", moduleProxy);
         _prepareSafeTx(Safe(safeProxyAddr), enableModuleData);
@@ -199,6 +211,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
         bytes memory swapOwnerData =
             abi.encodeWithSignature("removeOwner(address,address,uint256)", admins[admins.length - 2], address(this), 1);
         _prepareSafeTx(Safe(safeProxyAddr), swapOwnerData);
+
 
         emit NewHoprNodeStakeModule(moduleProxy);
         emit NewHoprNodeStakeSafe(address(safeProxy));
@@ -231,6 +244,27 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
     function _prepareSafeTx(Safe safe, bytes memory data) private {
         safe.execTransaction(
             address(safe),                  // to address
+            0,                              // value
+            data,                           // data
+            Enum.Operation.Call,            // operation
+            0,                              // safeTxGas
+            0,                              // baseGas
+            0,                              // gasPrice
+            address(0),                     // gasToken
+            payable(address(msg.sender)),   // refundReceiver
+            approvalHashSig                 // signature
+        );
+    }
+
+    /**
+     * @dev Prepares and executes a transaction on the safe contract.
+     * @param safe The address of the safe contract.
+     * @param to The destination address of the transaction.
+     * @param data The data payload for the transaction.
+     */
+    function _prepareSafeTx(Safe safe, address to, bytes memory data) private {
+        safe.execTransaction(
+            to,                             // to address
             0,                              // value
             data,                           // data
             Enum.Operation.Call,            // operation
@@ -312,7 +346,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
             1, // threshold
             address(0),
             hex"00",
-            safeLibAddresses.compatibilityFallbackHandlerAddress,
+            safeLibAddresses.fallbackHandlerAddress,
             address(0),
             0,
             address(0)

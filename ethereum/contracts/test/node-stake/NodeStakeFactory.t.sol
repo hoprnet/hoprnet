@@ -8,10 +8,14 @@ import { HoprCapabilityPermissions } from "../../src/node-stake/permissioned-mod
 import { HoprNodeStakeFactory, HoprNodeStakeFactoryEvents } from "../../src/node-stake/NodeStakeFactory.sol";
 import { Safe } from "safe-contracts-1.4.1/Safe.sol";
 import { SafeSuiteLibV141 } from "../../src/utils/SafeSuiteLibV141.sol";
+import { SafeSuiteLibV150 } from "../../src/utils/SafeSuiteLibV150.sol";
 import { Enum, ISafe } from "../../src/utils/ISafe.sol";
 import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
 import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 import { SafeProxyFactory } from "safe-contracts-1.4.1/proxies/SafeProxyFactory.sol";
+import { HoprToken } from "../../src/static/HoprToken.sol";
+import { ERC1820RegistryFixtureTest } from "../utils/ERC1820Registry.sol";
+import { IERC1820Registry } from "openzeppelin-contracts-5.4.0/interfaces/IERC1820Registry.sol";
 
 contract MaliciousModuleMock {
     function initialize(bytes calldata) public pure {
@@ -19,7 +23,7 @@ contract MaliciousModuleMock {
     }
 }
 
-contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
+contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
     using ClonesUpgradeable for address;
 
     HoprNodeManagementModule public moduleSingleton;
@@ -38,8 +42,9 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event SetMultisendAddress(address indexed multisendAddress);
 
-    function setUp() public override(SafeSingletonFixtureTest) {
-        super.setUp();
+    function setUp() public override(ERC1820RegistryFixtureTest, SafeSingletonFixtureTest) {
+        ERC1820RegistryFixtureTest.setUp();
+        SafeSingletonFixtureTest.setUp();
         // deploy safe suites
         deployEntireSafeSuite();
 
@@ -62,14 +67,16 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     function test_SafeSuiteSetup() public {
         // there's code in Singleton contract
         assertTrue(hasSingletonContract());
+        // there's code in ERC1820 contract
+        assertTrue(hasErc1820Registry());
         // there's code in Safe Singleton
         assertGt(SafeSuiteLibV141.SAFE_Safe_ADDRESS.code.length, 0);
         // there's code in Safe Proxy Factory
         assertGt(SafeSuiteLibV141.SAFE_SafeProxyFactory_ADDRESS.code.length, 0);
         // there's code in Safe MultiSendCallOnly
         assertGt(SafeSuiteLibV141.SAFE_MultiSendCallOnly_ADDRESS.code.length, 0);
-        // there's code in Safe CompatibilityFallbackHandler
-        assertGt(SafeSuiteLibV141.SAFE_CompatibilityFallbackHandler_ADDRESS.code.length, 0);
+        // there's code in Safe ExtensibleFallbackHandler, v1.5.0
+        assertGt(SafeSuiteLibV150.SAFE_CompatibilityFallbackHandler_ADDRESS.code.length, 0);
         // safe version matches
         assertEq(factory.safeVersion(), SafeSuiteLibV141.SAFE_VERSION);
     }
@@ -334,6 +341,34 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
     }
 
     /**
+     * @dev ensure the fallback handler is the can receive minting of ERC777 tokens
+     */
+    function test_FallbackHandler() public mockTokenChannel {
+        HoprToken hoprToken = new HoprToken();
+
+        // create a safe with the factory
+        address[] memory admins = new address[](10);
+        for (uint256 i = 0; i < admins.length; i++) {
+            admins[i] = vm.addr(230 + i);
+        }
+        uint256 nonce = 12345;
+        (module, safe) = factory.clone(
+            nonce,
+            DEFAULT_TARGET,
+            admins
+        );
+
+        // get interface implementer
+        address implementer = IERC1820Registry(ERC1820_REGISTRY_ADDRESS).getInterfaceImplementer(safe, keccak256("ERC777TokensRecipient"));
+        assertEq(implementer, safe, "safe is not the ERC777TokensRecipient implementer");
+        // mint some tokens to the safe
+        vm.prank(address(this));
+        hoprToken.grantRole(hoprToken.MINTER_ROLE(), address(this));
+        hoprToken.mint(safe, 100000, "", "");
+        vm.clearMockedCalls();
+    }
+
+    /**
      * @dev internal function to ensure the safe and module are properly wired after cloning
      */
     function _ensureSafeAndModuleAreWired(address moduleAddr, address payable safeAddr, address[] memory admins) internal view {
@@ -464,11 +499,11 @@ contract HoprNodeStakeFactoryTest is Test, SafeSingletonFixtureTest, HoprNodeSta
         (expectedSafeAddress2, expectedModuleAddress2) = _helperPredictSafeAndModule(admins2, callerSafe, nonce2);
     }
 
-    function _helperPredictSafeAndModule(address[] memory admins, address caller, uint256 nonce) private view returns (
+    function _helperPredictSafeAndModule(address[] memory admins, address txCaller, uint256 nonce) private view returns (
         address expectedSafeAddress,
         address expectedModuleAddress
     ) {
         expectedSafeAddress = factory.predictSafeAddress(admins, nonce);
-        expectedModuleAddress = factory.predictModuleAddress(caller, nonce, expectedSafeAddress, DEFAULT_TARGET);
+        expectedModuleAddress = factory.predictModuleAddress(txCaller, nonce, expectedSafeAddress, DEFAULT_TARGET);
     }
 }
