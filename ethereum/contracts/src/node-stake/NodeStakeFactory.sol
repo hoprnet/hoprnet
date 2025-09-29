@@ -12,6 +12,9 @@ import { Ownable } from "openzeppelin-contracts-5.4.0/access/Ownable2Step.sol";
 import { Create2 } from "openzeppelin-contracts-5.4.0/utils/Create2.sol";
 import { ERC1967Proxy } from "openzeppelin-contracts-5.4.0/proxy/ERC1967/ERC1967Proxy.sol";
 import { TargetUtils, Target } from "../utils/TargetUtils.sol";
+import { IERC777Recipient } from "openzeppelin-contracts-5.4.0/interfaces/IERC777Recipient.sol";
+import { IERC1820Registry } from "openzeppelin-contracts-5.4.0/interfaces/IERC1820Registry.sol";
+import { IERC20, SafeERC20 } from "openzeppelin-contracts-5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 abstract contract HoprNodeStakeFactoryEvents {
     // Emit when a new module implementation is set
@@ -45,13 +48,19 @@ abstract contract HoprNodeStakeFactoryEvents {
  * @dev This contract is responsible for deploying a 1-of-n Safe proxy and a module proxy for HOPR node management.
  * The factory contract handles the deployment and initialization of these proxies.
  */
-contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
+contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC777Recipient {
     using TargetUtils for Target;
+    using SafeERC20 for IERC20;
 
     // Error indicating that there are too few owners provided
     error TooFewOwners();
     // Error when providing the StakeFactory contract address as an owner
     error InvalidOwner();
+    // Error when receiving tokens from an unauthorized token contract
+    error UnauthorizedToken();
+    // Error when the contract is not the token recipient
+    error NotTokenRecipient();
+
 
     struct SafeLibAddress {
         address safeAddress;
@@ -68,16 +77,17 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
     // A sentinel address that serves as the start pointer of the owner linked list used in the OwnerManager of
     // safe-contracts
     address internal constant SENTINEL_OWNERS = address(0x1);
-
     // The address of the ERC1820 registry contract
     address internal constant ERC1820_ADDRESS = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
+    // required by ERC1820 spec
+    IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
+    // required by ERC777 spec
+    bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
 
     // Encoded address of the contract's approver, used for EIP-1271 signature verification
     bytes32 internal immutable r;
-
     // The singleton contract address of the HOPR node management module, as defined in the `HoprNodeManagementModule`
     address public moduleSingletonAddress;
-
     // Signature of the approved hash used for EIP-1271 signature verification
     bytes internal approvalHashSig;
 
@@ -113,17 +123,60 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step {
     constructor(address _moduleSingletonAddress, address initialOwner) Ownable(initialOwner) {
         // Encode the contract's address to be used in EIP-1271 signature verification
         r = bytes32(uint256(uint160(address(this))));
-
         // Encode the EIP-1271 contract signature for approval hash verification
         approvalHashSig = abi.encodePacked(abi.encode(r, bytes32(0)), bytes1(hex"01"));
-
         // Set the module singleton address
         _updateModuleSingletonAddress(_moduleSingletonAddress);
+        // Register as an ERC777 token recipient
+        _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
 
         // Set the initial Safe library addresses
         emit HoprNodeStakeSafeLibUpdated(safeLibAddresses);
         // Set the initial HOPR network
         emit HoprNodeStakeHoprNetworkUpdated(defaultHoprNetwork);
+    }
+
+    /**
+     * @dev Allows the contract owner to reclaim ERC20 tokens sent to the contract.
+     * @param token The address of the ERC20 token contract.
+     */
+    function reclaimErc20(address token) external onlyOwner {
+        IERC20(token).safeTransfer(owner(), IERC20(token).balanceOf(address(this)));
+    }
+
+    /**
+     * @dev Handles the receipt of ERC777 tokens.
+     * This function is called by the token contract when tokens are sent to this contract.
+     * It deploys a Safe and a module proxy, and transfers the received tokens to the Safe.
+     * @param from The address which sent the tokens.
+     * @param to The address which received the tokens (should be this contract).
+     * @param amount The amount of tokens received.
+     * @param userData Additional data sent with the transfer, expected to contain caller, nonce, defaultTarget, and admins.
+     */
+    function tokensReceived(
+        address, // operator not needed
+        address from,
+        address to,
+        uint256 amount,
+        bytes calldata userData,
+        bytes calldata // operatorData not needed
+    )
+        external
+        override
+    {
+        // Ensure that the tokens are sent to this contract
+        require(to == address(this), NotTokenRecipient());
+        // Ensure that the token sender is the default HOPR token
+        require(msg.sender == defaultHoprNetwork.tokenAddress, UnauthorizedToken());
+
+        // Decode userData to extract caller, nonce, defaultTarget, and admins
+        (uint256 nonce, bytes32 defaultTarget, address[] memory admins) = abi.decode(userData, (uint256, bytes32, address[]));
+
+        // Deploy Safe and module proxies
+        (, address payable safeProxy) = _deploySafeAndModule(nonce, defaultTarget, from, defaultHoprNetwork.tokenAddress, defaultHoprNetwork.defaultTokenAllowance, admins);
+
+        // Transfer the received tokens to the Safe proxy
+        IERC20(defaultHoprNetwork.tokenAddress).safeTransfer(safeProxy, amount);
     }
 
     /**

@@ -58,6 +58,10 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         hoprToken = new HoprToken();
         moduleSingleton = new HoprNodeManagementModule();
         factory = new HoprNodeStakeFactory(address(moduleSingleton), admin);
+
+        // grant minter role to the test contract itself
+        vm.prank(address(this));
+        hoprToken.grantRole(hoprToken.MINTER_ROLE(), address(this));
     }
 
     modifier mockTokenChannel() {
@@ -182,6 +186,42 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         vm.clearMockedCalls();
     }
 
+    function test_OneClickDeploySafeWithFundToken() public mockTokenChannel {
+        // prepare admins
+        address[] memory admins = new address[](3);
+        for (uint256 i = 0; i < admins.length; i++) {
+            admins[i] = vm.addr(300 + i);
+        }
+        uint256 nonce = 13;
+        uint256 amount = 5000 ether;
+        // mint some tokens to caller
+        vm.prank(address(this));
+        hoprToken.mint(caller, amount, "", "");
+        assertEq(hoprToken.balanceOf(caller), amount, "caller should have some tokens");
+
+        // prepare userData
+        bytes memory userData = abi.encode(nonce, DEFAULT_TARGET, admins);
+
+        // calculate expected safe and module address
+        (address expectedSafeAddress, address expectedModuleAddress) = _helperPredictSafeAndModule(admins, caller, nonce);
+
+        vm.startPrank(caller);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeSafe(expectedSafeAddress);
+
+        // deploy safe and module, and fund the safe with tokens, all in one transaction
+        hoprToken.send(address(factory), amount, userData);
+
+        // safe should receive all the token
+        assertEq(hoprToken.balanceOf(expectedSafeAddress), amount, "safe should receive all the tokens");
+        assertEq(hoprToken.balanceOf(caller), 0, "caller should not have any tokens");
+        // channel could transfer some tokens from the safe
+        (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
+        assertEq(hoprToken.allowance(expectedSafeAddress, CHANNELS), defaultAllowance, "wrong token allowance");
+    }
+
     /**
      * @dev Clone multiple safes and modules to ensure the nonce and salt works
      *      and the deployed addresses are unique
@@ -191,7 +231,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         uint256 nonce0 = 0;
         address[] memory admins0 = new address[](3);
         for (uint256 i = 0; i < admins0.length; i++) {
-            admins0[i] = vm.addr(300 + i);
+            admins0[i] = vm.addr(350 + i);
         }
         (address module0, address payable safe0) = factory.clone(
             nonce0,
@@ -398,8 +438,6 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
 
         assertEq(hoprToken.balanceOf(safe), 0, "safe should not have any tokens");
         // mint some tokens to the safe
-        vm.prank(address(this));
-        hoprToken.grantRole(hoprToken.MINTER_ROLE(), address(this));
         hoprToken.mint(safe, 100000, "", "");
 
         assertEq(hoprToken.balanceOf(safe), 100000, "safe should have 100000 tokens");
