@@ -22,7 +22,7 @@ use hopr_bindings::{
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::constants::{ETH_VALUE_FOR_MULTICALL3_DEPLOYER, MULTICALL3_DEPLOY_CODE, MULTICALL3_DEPLOYER};
 

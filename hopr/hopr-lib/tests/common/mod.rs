@@ -15,6 +15,9 @@ use hopr_primitive_types::prelude::*;
 use tokio::time::sleep;
 use tracing::info;
 
+pub mod fixtures;
+pub mod hopr_tester;
+
 /// Used for testing. Creates RPC client to the local Anvil instance.
 #[allow(dead_code)]
 #[cfg(not(target_arch = "wasm32"))]
@@ -89,7 +92,11 @@ pub async fn deploy_test_environment(
         .expect("failed to deploy");
 
     // Mint some tokens
-    let _ = hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1_000_000_u128)).await;
+    let _ = hopr_chain_types::utils::mint_tokens(
+        contract_instances.token.clone(),
+        U256::from(100_000_000_000_000_000_000_u128),
+    )
+    .await;
 
     sleep((1 + finality) * block_time).await;
 

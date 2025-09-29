@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = []
+default = ["runtime-tokio"]
 session-client = []
 session-server = []
 transport-quic = ["hopr-transport/transport-quic"]
