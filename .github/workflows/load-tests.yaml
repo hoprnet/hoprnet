@@ -45,6 +45,7 @@ on:
         type: choice
         options:
           - core-rotsee
+          - gnosisvpn-staging
           - core-dufour
           - ctdapp-rotsee
           - demo-rotsee
