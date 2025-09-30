@@ -29,7 +29,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use hopr_api::{
     chain::{
         ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainWriteChannelOperations,
@@ -52,12 +52,12 @@ use crate::{
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_OPENS: hopr_metrics::metrics::SimpleCounter =
-        hopr_metrics::metrics::SimpleCounter::new("hopr_strategy_promiscuous_opened_channels_count", "Count of open channel decisions").unwrap();
-    static ref METRIC_COUNT_CLOSURES: hopr_metrics::metrics::SimpleCounter =
-        hopr_metrics::metrics::SimpleCounter::new("hopr_strategy_promiscuous_closed_channels_count", "Count of close channel decisions").unwrap();
-    static ref METRIC_MAX_AUTO_CHANNELS: hopr_metrics::metrics::SimpleGauge =
-        hopr_metrics::metrics::SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
+    static ref METRIC_COUNT_OPENS: hopr_metrics::SimpleCounter =
+        hopr_metrics::SimpleCounter::new("hopr_strategy_promiscuous_opened_channels_count", "Count of open channel decisions").unwrap();
+    static ref METRIC_COUNT_CLOSURES: hopr_metrics::SimpleCounter =
+        hopr_metrics::SimpleCounter::new("hopr_strategy_promiscuous_closed_channels_count", "Count of close channel decisions").unwrap();
+    static ref METRIC_MAX_AUTO_CHANNELS: hopr_metrics::SimpleGauge =
+        hopr_metrics::SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
 }
 
 /// A decision made by the Promiscuous strategy on each tick,
@@ -307,7 +307,8 @@ where
             peers_with_quality: self
                 .db
                 .get_network_peers(PeerSelector::default(), false)
-                .await?
+                .await
+                .map_err(|e| StrategyError::Other(e.into()))?
                 .inspect(|status| {
                     if status.quality > 0.0 {
                         num_online_peers += 1;
@@ -347,15 +348,6 @@ where
             })
             .await
             .map_err(|e| StrategyError::Other(e.into()))?
-            .filter_map(|c| {
-                futures::future::ready(match c {
-                    Ok(channel) => Some(channel),
-                    Err(error) => {
-                        error!(%error, "failed to get channel");
-                        None
-                    }
-                })
-            })
             .collect::<Vec<_>>()
             .await;
         debug!(
@@ -520,7 +512,13 @@ impl<Db, A> Display for PromiscuousStrategy<Db, A> {
 impl<Db, A> SingularStrategy for PromiscuousStrategy<Db, A>
 where
     Db: HoprDbPeersOperations + Clone + Send + Sync,
-    A: ChainReadAccountOperations + ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync,
+    A: ChainReadAccountOperations
+        + ChainReadChannelOperations
+        + ChainKeyOperations
+        + ChainWriteChannelOperations
+        + Clone
+        + Send
+        + Sync,
 {
     async fn on_tick(&self) -> Result<()> {
         let safe_balance: HoprBalance = self
@@ -544,11 +542,7 @@ where
         debug!(%tick_decision, "collected channel decision");
 
         for channel_to_close in tick_decision.get_to_close() {
-            match self
-                .hopr_chain_actions
-                .close_channel(&channel_to_close.get_id(), ChannelDirection::Outgoing)
-                .await
-            {
+            match self.hopr_chain_actions.close_channel(&channel_to_close.get_id()).await {
                 Ok(_) => {
                     // Intentionally do not await result of the channel transaction
                     debug!(destination = %channel_to_close.destination, "issued channel closing");

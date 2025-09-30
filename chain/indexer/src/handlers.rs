@@ -800,11 +800,7 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["network_registry"]);
 
-        match event {
-            _ => {
-                debug!("on_network_registry_event - not implemented for event: {:?}", event);
-            } // Not important to at the moment
-        };
+        debug!("on_network_registry_event - not implemented for event: {:?}", event);
 
         Ok(None)
     }

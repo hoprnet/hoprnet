@@ -4,7 +4,6 @@ use async_lock::RwLock;
 use futures::{Stream, StreamExt, stream};
 use hopr_chain_api::SignificantChainEvent;
 use hopr_db_node::HoprNodeDb;
-use hopr_db_sql::accounts::HoprDbAccountOperations;
 use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
 use hopr_strategy::strategy::MultiStrategy;
 use tracing::info;

@@ -109,22 +109,19 @@ pub const ACK_OUT_BUFFER_SIZE: usize = 1_000_000;
 pub const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
-
-#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     // packet
-    static ref METRIC_PACKET_COUNT: MultiCounter = MultiCounter::new(
+    static ref METRIC_PACKET_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_packets_count",
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
-    static ref METRIC_PACKET_COUNT_PER_PEER: MultiCounter = MultiCounter::new(
+    static ref METRIC_PACKET_COUNT_PER_PEER:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_packets_per_peer_count",
         "Number of processed packets to/from distinct peers",
         &["peer", "direction"]
     ).unwrap();
-    static ref METRIC_REPLAYED_PACKET_COUNT: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_REPLAYED_PACKET_COUNT:  hopr_metrics::SimpleCounter =  hopr_metrics::SimpleCounter::new(
         "hopr_replayed_packet_count",
         "The total count of replayed packets during the packet processing pipeline run",
     ).unwrap();
@@ -184,13 +181,7 @@ pub async fn run_msg_ack_protocol<Db, R>(
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
     Db: HoprDbProtocolOperations + Clone + Send + Sync + 'static,
-    R: ChainReadChannelOperations
-        + ChainKeyOperations
-        + ChainValues
-        + Clone
-        + Send
-        + Sync
-        + 'static,
+    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Clone + Send + Sync + 'static,
 {
     let me = packet_cfg.packet_keypair.clone();
 

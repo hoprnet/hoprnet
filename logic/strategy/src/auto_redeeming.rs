@@ -10,22 +10,28 @@ use std::{
 };
 
 use async_trait::async_trait;
-use hopr_api::chain::ChainWriteTicketOperations;
+use futures::StreamExt;
+use hopr_api::{
+    chain::{ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
+    db::TicketSelector,
+};
 use hopr_internal_types::{prelude::*, tickets::AcknowledgedTicket};
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleCounter;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, info};
 use validator::Validate;
 
-use crate::{Strategy, errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy};
+use crate::{
+    Strategy,
+    errors::{StrategyError, StrategyError::CriteriaNotSatisfied},
+    strategy::SingularStrategy,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_AUTO_REDEEMS: SimpleCounter =
-        SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
+    static ref METRIC_COUNT_AUTO_REDEEMS:  hopr_metrics::SimpleCounter =
+         hopr_metrics::SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
 }
 
 fn just_true() -> bool {
@@ -91,19 +97,19 @@ pub struct AutoRedeemingStrategy<A> {
     cfg: AutoRedeemingStrategyConfig,
 }
 
-impl<A: ChainWriteTicketOperations> Debug for AutoRedeemingStrategy<A> {
+impl<A> Debug for AutoRedeemingStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: ChainWriteTicketOperations> Display for AutoRedeemingStrategy<A> {
+impl<A> Display for AutoRedeemingStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: ChainWriteTicketOperations> AutoRedeemingStrategy<A> {
+impl<A> AutoRedeemingStrategy<A> {
     pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A) -> Self {
         Self {
             cfg,
@@ -115,16 +121,43 @@ impl<A: ChainWriteTicketOperations> AutoRedeemingStrategy<A> {
 #[async_trait]
 impl<A> SingularStrategy for AutoRedeemingStrategy<A>
 where
-    A: ChainWriteTicketOperations + Send + Sync,
+    A: ChainWriteTicketOperations + ChainReadChannelOperations + Send + Sync,
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {
         if !self.cfg.redeem_on_winning {
             debug!("trying to redeem all tickets in all channels");
 
+            let all_channels = self
+                .hopr_chain_actions
+                .stream_channels(ChannelSelector {
+                    direction: vec![ChannelDirection::Incoming],
+                    allowed_states: vec![
+                        ChannelStatusDiscriminants::Open,
+                        ChannelStatusDiscriminants::PendingToClose,
+                    ],
+                    ..Default::default()
+                })
+                .await
+                .map_err(|e| StrategyError::Other(e.into()))?
+                .collect::<Vec<_>>()
+                .await;
+
+            if all_channels.is_empty() {
+                return Err(CriteriaNotSatisfied);
+            }
+
+            let mut selector = TicketSelector::from(all_channels.first().unwrap())
+                .with_amount(self.cfg.minimum_redeem_ticket_value..)
+                .with_aggregated_only(self.cfg.redeem_only_aggregated);
+            for channel in all_channels.iter().skip(1) {
+                selector = selector.also_on_channel_entry(channel);
+            }
+
             let count = self
                 .hopr_chain_actions
-                .redeem_all_tickets(self.cfg.minimum_redeem_ticket_value, self.cfg.redeem_only_aggregated)
-                .await?
+                .redeem_tickets_via_selector(selector)
+                .await
+                .map_err(|e| StrategyError::Other(e.into()))?
                 .len();
             if count > 0 {
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -146,23 +179,33 @@ where
             && ((!self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated())
                 && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value))
         {
-            info!(%ack, "redeeming");
-
-            #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_COUNT_AUTO_REDEEMS.increment();
-
-            let rxs = self
+            if let Some(channel) = self
                 .hopr_chain_actions
-                .redeem_tickets_with_counterparty(
-                    ack.ticket.verified_issuer(),
-                    self.cfg.minimum_redeem_ticket_value,
-                    self.cfg.redeem_only_aggregated,
-                )
-                .await?;
+                .channel_by_id(&ack.verified_ticket().channel_id)
+                .await
+                .map_err(|e| StrategyError::Other(e.into()))?
+            {
+                info!(%ack, "redeeming");
 
-            std::mem::drop(rxs); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_COUNT_AUTO_REDEEMS.increment();
 
-            Ok(())
+                let rxs = self
+                    .hopr_chain_actions
+                    .redeem_tickets_via_selector(
+                        TicketSelector::from(channel)
+                            .with_amount(self.cfg.minimum_redeem_ticket_value..)
+                            .with_aggregated_only(self.cfg.redeem_only_aggregated),
+                    )
+                    .await
+                    .map_err(|e| StrategyError::Other(e.into()))?;
+
+                std::mem::drop(rxs); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+
+                Ok(())
+            } else {
+                Err(CriteriaNotSatisfied)
+            }
         } else {
             Err(CriteriaNotSatisfied)
         }
@@ -187,12 +230,13 @@ where
 
             let count = self
                 .hopr_chain_actions
-                .redeem_tickets_in_channel(
-                    channel,
-                    self.cfg.minimum_redeem_ticket_value,
-                    self.cfg.redeem_only_aggregated,
+                .redeem_tickets_via_selector(
+                    TicketSelector::from(channel)
+                        .with_amount(self.cfg.minimum_redeem_ticket_value..)
+                        .with_aggregated_only(self.cfg.redeem_only_aggregated),
                 )
-                .await?
+                .await
+                .map_err(|e| StrategyError::Other(e.into()))?
                 .len();
 
             #[cfg(all(feature = "prometheus", not(test)))]
@@ -221,18 +265,10 @@ mod tests {
     use async_trait::async_trait;
     use futures::{FutureExt, future::ok};
     use hex_literal::hex;
-    use hopr_chain_actions::{
-        action_queue::{ActionConfirmation, PendingAction},
-        redeem::TicketRedeemActions,
-    };
     use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::{Randomizable, random_bytes};
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::{
-        api::{info::DomainSeparator, tickets::TicketSelector},
-        db::HoprDb,
-        info::HoprDbInfoOperations,
-    };
+    use hopr_db_sql::info::HoprDbInfoOperations;
     use mockall::mock;
 
     use super::*;

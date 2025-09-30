@@ -1,15 +1,23 @@
-use std::{net::SocketAddr, num::NonZeroUsize};
+use std::{net::SocketAddr, num::NonZeroUsize, ops::Deref};
 
 use hopr_lib::{
     HoprOffchainKeypair, ServiceId,
     errors::HoprLibError,
-    exports::transport::MetricSessionCounterGuard,
     prelude::{ConnectedUdpStream, ForeignDataMode, UdpStreamParallelism},
     transfer_session,
 };
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 use crate::config::SessionIpForwardingConfig;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_hoprd_target_connections",
+        "Number of currently active HOPR session target connections on this Exit node",
+        &["type"]
+    ).unwrap();
+}
 
 /// Implementation of [`hopr_lib::HoprSessionReactor`] that facilitates
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.
@@ -45,7 +53,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
     #[tracing::instrument(level = "debug", skip(self, session))]
     async fn process(
         &self,
-        mut session: hopr_lib::exports::transport::session::IncomingSession,
+        mut session: hopr_lib::exports::transport::IncomingSession,
     ) -> hopr_lib::errors::Result<()> {
         let session_id = *session.session.id();
         match session.target {
@@ -112,7 +120,8 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 );
 
                 tokio::task::spawn(async move {
-                    let _metric_counter_guard = MetricSessionCounterGuard::new("udp");
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    let _g = hopr_metrics::MultiGaugeGuard::new(METRIC_ACTIVE_TARGETS.deref(), &["udp"], 1.0);
 
                     // The Session forwards the termination to the udp_bridge, terminating
                     // the UDP socket.
@@ -186,7 +195,8 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 );
 
                 tokio::task::spawn(async move {
-                    let _metric_counter_guard = MetricSessionCounterGuard::new("tcp");
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    let _g = hopr_metrics::MultiGaugeGuard::new(METRIC_ACTIVE_TARGETS.deref(), &["tcp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
@@ -211,7 +221,8 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 tracing::debug!(?session_id, "bridging the session to the loopback service");
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
-                let _metric_counter_guard = MetricSessionCounterGuard::new("loopback");
+                #[cfg(all(feature = "prometheus", not(test)))]
+                let _g = hopr_metrics::MultiGaugeGuard::new(METRIC_ACTIVE_TARGETS.deref(), &["udp"], 1.0);
 
                 // Uses 4 kB buffer for copying
                 match tokio::io::copy(&mut reader, &mut writer).await {

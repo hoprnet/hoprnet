@@ -75,6 +75,5 @@ pub trait ChainWriteChannelOperations {
     async fn close_channel<'a>(
         &'a self,
         channel_id: &'a ChannelId,
-        direction: ChannelDirection,
     ) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>;
 }

@@ -4,8 +4,7 @@ use crate::{ApiError, ApiErrorStatus};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
-    hopr_metrics::metrics::gather_all_metrics()
-        .map_err(|_| ApiErrorStatus::UnknownFailure("Failed to gather metrics".into()))
+    hopr_metrics::gather_all_metrics().map_err(|_| ApiErrorStatus::UnknownFailure("Failed to gather metrics".into()))
 }
 
 #[cfg(any(not(feature = "prometheus"), test))]

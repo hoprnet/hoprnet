@@ -35,7 +35,7 @@ use futures::{
 };
 use helpers::PathPlanner;
 use hopr_api::{
-    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainValues},
+    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbPeersOperations, HoprDbProtocolOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
@@ -129,14 +129,7 @@ pub struct HoprTransport<Db, R> {
 impl<Db, R> HoprTransport<Db, R>
 where
     Db: HoprDbTicketOperations + HoprDbPeersOperations + HoprDbProtocolOperations + Clone + Send + Sync + 'static,
-    R: ChainReadChannelOperations
-        + ChainReadTicketOperations
-        + ChainKeyOperations
-        + ChainValues
-        + Clone
-        + Send
-        + Sync
-        + 'static,
+    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Clone + Send + Sync + 'static,
 {
     pub fn new(
         me: &OffchainKeypair,
@@ -228,12 +221,10 @@ where
         S2: futures::Stream<Item = PeerDiscovery> + Send + 'static,
     {
         info!("Loading initial peers from the storage");
-        let mut addresses: HashSet<Multiaddr> = HashSet::new();
-        let nodes = self.get_public_nodes().await?;
 
         // Calculate the minimum capacity based on public nodes (each node can generate 2 messages)
         // plus 100 as additional buffer
-        let minimum_capacity = nodes.len().saturating_mul(2).saturating_add(100);
+        let minimum_capacity = public_nodes.len().saturating_mul(2).saturating_add(100);
 
         let internal_discovery_updates_capacity = std::env::var("HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY")
             .ok()
@@ -730,9 +721,11 @@ where
             if channel.destination == self.me_address {
                 Ok(Some(
                     self.db
-                        .get_tickets((&channel).into())
+                        .stream_tickets(Some((&channel).into()))
                         .await
-                        .map_err(|e| HoprTransportError::Other(e.into()))?,
+                        .map_err(|e| HoprTransportError::Other(e.into()))?
+                        .collect()
+                        .await,
                 ))
             } else {
                 Ok(None)
@@ -746,12 +739,12 @@ where
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
         Ok(self
             .db
-            .get_all_tickets()
+            .stream_tickets(None)
             .await
             .map_err(|e| HoprTransportError::Other(e.into()))?
-            .into_iter()
             .map(|v| v.ticket.leak())
-            .collect())
+            .collect()
+            .await)
     }
 }
 

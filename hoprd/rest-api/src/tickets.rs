@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    HoprBalance, HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
+    HoprBalance, Ticket, TicketStatistics, ToHex,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };

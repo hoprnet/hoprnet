@@ -75,7 +75,9 @@
 //! println!("{:?}", gathered_metrics);
 //! ```
 
+mod guard;
 /// Contains definitions of metric types.
-pub mod metrics;
+mod metrics;
 
-pub use crate::metrics::*;
+pub use guard::*;
+pub use metrics::*;

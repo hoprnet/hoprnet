@@ -1,3 +1,4 @@
+pub use hopr_chain_actions::errors::ChainActionsError;
 use hopr_primitive_types::prelude::GeneralError;
 use thiserror::Error;
 

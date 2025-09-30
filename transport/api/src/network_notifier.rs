@@ -4,8 +4,6 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use hopr_api::{chain::ChainKeyOperations, db::HoprDbPeersOperations};
 use hopr_crypto_types::types::OffchainPublicKey;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 use hopr_path::channel_graph::ChannelGraph;
 use hopr_transport_network::network::{Network, UpdateFailure};
 use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
@@ -13,13 +11,13 @@ use tracing::{debug, error};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TIME_TO_PING: SimpleHistogram =
-        SimpleHistogram::new(
+    static ref METRIC_TIME_TO_PING:  hopr_metrics::SimpleHistogram =
+         hopr_metrics::SimpleHistogram::new(
             "hopr_ping_time_sec",
             "Measures total time it takes to ping a single node (seconds)",
             vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
         ).unwrap();
-    static ref METRIC_PROBE_COUNT: MultiCounter = MultiCounter::new(
+    static ref METRIC_PROBE_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
             "hopr_probe_count",
             "Total number of pings by result",
             &["success"]

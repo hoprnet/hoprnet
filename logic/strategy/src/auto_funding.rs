@@ -23,8 +23,8 @@ use crate::{
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_AUTO_FUNDINGS: hopr_metrics::metrics::SimpleCounter =
-        hopr_metrics::metrics::SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
+    static ref METRIC_COUNT_AUTO_FUNDINGS: hopr_metrics::SimpleCounter =
+        hopr_metrics::SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
 }
 
 /// Configuration for `AutoFundingStrategy`
@@ -96,9 +96,10 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_AUTO_FUNDINGS.increment();
 
+                let channel_id = channel.get_id();
                 let rx = self
                     .hopr_chain_actions
-                    .fund_channel(&channel.get_id(), self.cfg.funding_amount)
+                    .fund_channel(&channel_id, self.cfg.funding_amount)
                     .await
                     .map_err(|e| StrategyError::Other(e.into()))?;
 

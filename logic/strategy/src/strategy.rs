@@ -42,8 +42,8 @@ use crate::{
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_ENABLED_STRATEGIES: hopr_metrics::metrics::MultiGauge =
-        hopr_metrics::metrics::MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
+    static ref METRIC_ENABLED_STRATEGIES: hopr_metrics::MultiGauge =
+        hopr_metrics::MultiGauge::new("hopr_strategy_enabled_strategies", "List of enabled strategies", &["strategy"]).unwrap();
 }
 
 /// Basic single strategy.

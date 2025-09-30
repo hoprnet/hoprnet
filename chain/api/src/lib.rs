@@ -52,8 +52,10 @@ use hopr_chain_types::ContractAddresses;
 pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
+pub use hopr_db_sql::info::IndexerStateInfo;
 use hopr_db_sql::{
     HoprIndexerDb, HoprIndexerDbConfig,
+    logs::HoprDbLogOperations,
     prelude::{
         HoprDbAccountOperations, HoprDbChannelOperations, HoprDbCorruptedChannelOperations, HoprDbInfoOperations,
     },
@@ -62,7 +64,7 @@ pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::{
     account::AccountEntry,
     channels::{ChannelId, CorruptedChannelEntry},
-    prelude::{AcknowledgedTicket, ChannelDirection, ChannelStatus, generate_channel_id},
+    prelude::{AcknowledgedTicket, ChannelStatus, generate_channel_id},
     tickets::WinningProbability,
 };
 use hopr_primitive_types::prelude::*;
@@ -295,6 +297,25 @@ impl HoprChain {
 
     fn rpc(&self) -> &RpcOperations<DefaultHttpRequestor> {
         &self.rpc_operations
+    }
+
+    pub async fn get_indexer_state(&self) -> errors::Result<IndexerStateInfo> {
+        let indexer_state_info = self.db.get_indexer_state_info(None).await?;
+
+        match self.db.get_last_checksummed_log().await? {
+            Some(log) => {
+                let checksum = match log.checksum {
+                    Some(checksum) => Hash::from_hex(checksum.as_str())?,
+                    None => Hash::default(),
+                };
+                Ok(IndexerStateInfo {
+                    latest_log_block_number: log.block_number as u32,
+                    latest_log_checksum: checksum,
+                    ..indexer_state_info
+                })
+            }
+            None => Ok(indexer_state_info),
+        }
     }
 }
 
@@ -544,7 +565,6 @@ impl ChainWriteChannelOperations for HoprChain {
     async fn close_channel<'a>(
         &'a self,
         channel_id: &'a ChannelId,
-        direction: ChannelDirection,
     ) -> std::result::Result<BoxFuture<'a, std::result::Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>
     {
         // TODO: (dbmig) make sure the ChainActions::close_channel() accepts ChannelEntry directly
@@ -553,7 +573,7 @@ impl ChainWriteChannelOperations for HoprChain {
             .get_channel_by_id(None, channel_id)
             .await?
             .ok_or(HoprChainError::Api("channel not found".into()))?;
-        let (_, counterparty) = channel
+        let (direction, counterparty) = channel
             .orientation(&self.me_onchain())
             .ok_or(HoprChainError::Api("channel not own".into()))?;
 

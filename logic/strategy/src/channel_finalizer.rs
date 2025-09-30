@@ -18,7 +18,7 @@ use crate::{Strategy, errors, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: hopr_metrics::metrics::SimpleCounter = hopr_metrics::metrics::SimpleCounter::new(
+    static ref METRIC_COUNT_CLOSURE_FINALIZATIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
         "hopr_strategy_closure_auto_finalization_count",
         "Count of channels where closure finalizing was initiated automatically"
     )
@@ -92,31 +92,22 @@ where
 
         let chain_actions = self.hopr_chain_actions.clone();
         outgoing_channels
-            .filter_map(|maybe_channel| {
-                futures::future::ready(match maybe_channel {
-                    Ok(channel) => {
-                        if matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
-                            && channel.closure_time_passed(current_time())
-                        {
-                            Some(channel)
-                        } else {
-                            None
-                        }
-                    }
-                    Err(error) => {
-                        error!(%error, "error processing channel");
+            .filter_map(|channel| {
+                futures::future::ready(
+                    if matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
+                        && channel.closure_time_passed(current_time())
+                    {
+                        Some(channel)
+                    } else {
                         None
-                    }
-                })
+                    },
+                )
             })
             .for_each(move |channel| {
                 let chain_actions = chain_actions.clone();
                 async move {
                     info!(%channel, "channel closure finalizer: finalizing closure");
-                    match chain_actions
-                        .close_channel(&channel.get_id(), ChannelDirection::Outgoing)
-                        .await
-                    {
+                    match chain_actions.close_channel(&channel.get_id()).await {
                         Ok(_) => {
                             // Currently, we're not interested in awaiting the Close transactions to confirmation
                             debug!(%channel, "channel closure finalizer: finalizing closure");

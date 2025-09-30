@@ -6,14 +6,11 @@ use std::{
 use futures::StreamExt;
 use hopr_api::db::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
 use hopr_platform::time::current_time;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_primitive_types::prelude::*;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
-#[cfg(all(feature = "prometheus", not(test)))]
-use {
-    hopr_metrics::metrics::{MultiGauge, SimpleGauge},
-    hopr_primitive_types::prelude::*,
-};
 
 use crate::{
     config::NetworkConfig,
@@ -22,15 +19,15 @@ use crate::{
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_NETWORK_HEALTH: SimpleGauge =
-        SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
-    static ref METRIC_PEERS_BY_QUALITY: MultiGauge =
-        MultiGauge::new("hopr_peers_by_quality", "Number different peer types by quality",
+    static ref METRIC_NETWORK_HEALTH:  hopr_metrics::SimpleGauge =
+         hopr_metrics::SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
+    static ref METRIC_PEERS_BY_QUALITY:  hopr_metrics::MultiGauge =
+         hopr_metrics::MultiGauge::new("hopr_peers_by_quality", "Number different peer types by quality",
             &["type", "quality"],
         ).unwrap();
-    static ref METRIC_PEER_COUNT: SimpleGauge =
-        SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
-    static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN: SimpleGauge = SimpleGauge::new(
+    static ref METRIC_PEER_COUNT:  hopr_metrics::SimpleGauge =
+         hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
+    static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_time_to_green_sec",
         "Time it takes for a node to transition to the GREEN network state"
     ).unwrap();
