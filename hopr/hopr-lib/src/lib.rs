@@ -403,16 +403,6 @@ impl Hopr {
             .unwrap_or(self.chain_cfg.chain.default_provider.clone())
     }
 
-    pub async fn wait_for_funds(&self) -> errors::Result<()> {
-        Ok(wait_for_funds(
-            self.me_onchain(),
-            *MIN_NATIVE_BALANCE,
-            Duration::from_secs(200),
-            self.hopr_chain_api.rpc(),
-        )
-        .await?)
-    }
-
     #[inline]
     fn is_public(&self) -> bool {
         self.cfg.chain.announce
@@ -438,10 +428,14 @@ impl Hopr {
             "Cannot start the hopr node multiple times".into(),
         )?;
 
-        info!(
-            address = %self.me_onchain(), minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
-            "Node is not started, please fund this node",
-        );
+        wait_for_funds(
+            self.me_onchain(),
+            *MIN_NATIVE_BALANCE,
+            *SUGGESTED_NATIVE_BALANCE,
+            Duration::from_secs(200),
+            self.hopr_chain_api.rpc(),
+        )
+        .await?;
 
         let mut processes: HashMap<state::HoprLibProcesses, AbortHandle> = HashMap::new();
 
