@@ -2,67 +2,67 @@
   "networks": {
     "anvil-localhost": {
       "addresses": {
-        "announcements": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-        "channels": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-        "module_implementation": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-        "network_registry": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-        "network_registry_proxy": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-        "node_safe_registry": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-        "node_stake_v2_factory": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-        "ticket_price_oracle": "0x59b670e9fA9D0A427751Af201D676719a970857b",
-        "token": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-        "winning_probability_oracle": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
+        "announcements": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
+        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+        "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+        "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+        "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+        "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
       },
       "environment_type": "local",
-      "indexer_start_block_number": 1
+      "indexer_start_block_number": 5
     },
     "anvil-localhost2": {
       "addresses": {
-        "announcements": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-        "channels": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-        "module_implementation": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-        "network_registry": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-        "network_registry_proxy": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-        "node_safe_registry": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-        "node_stake_v2_factory": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-        "ticket_price_oracle": "0x59b670e9fA9D0A427751Af201D676719a970857b",
-        "token": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-        "winning_probability_oracle": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
+        "announcements": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
+        "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
+        "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+        "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
+        "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+        "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+        "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+        "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+        "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
+        "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
       },
       "environment_type": "local",
-      "indexer_start_block_number": 1
+      "indexer_start_block_number": 5
     },
     "rotsee": {
       "addresses": {
         "announcements": "0xf1c143B1bA20C7606d56aA2FA94502D25744b982",
         "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
-        "module_implementation": "0xc51a5616689ed23800a7948f1A67a7635aDC2141",
+        "module_implementation": "0x5d6aD492888472f585De6B2aCeD217eD3Db87aE7",
         "network_registry": "0x15a315E1320cFF0de84671c0139042EE320CE38d",
-        "network_registry_proxy": "0x4d1A65716CBa81b7B9b34aE6aDC67c8eAfb0af20",
+        "network_registry_proxy": "0xb167f8C83A5e7fFb4b0Ad978274498961D3b2Ca2",
         "node_safe_registry": "0x4F7C7dE3BA2B29ED8B2448dF2213cA43f94E45c0",
-        "node_stake_v2_factory": "0xFb22ecEe9Fb5b91C096d34649892ECC509912684",
-        "ticket_price_oracle": "0x624af123A0149670848FA95e972b35FFeE6A48Fb",
-        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+        "node_stake_v2_factory": "0x439f5457FF58CEE941F7d946CB919c52EA30cfB3",
+        "ticket_price_oracle": "0x4Dd10eA363323935B933778F5d869D87747c7B44",
+        "token": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
         "winning_probability_oracle": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1"
       },
       "environment_type": "staging",
       "indexer_start_block_number": 29521261
     },
     "debug-staging": {
+      "indexer_start_block_number": 29690235,
+      "environment_type": "staging",
       "addresses": {
         "announcements": "0xD78BCa8452B8Ea281a659f380E0eF710C64EB85b",
         "channels": "0xc060582564b12335cD804339842F5509dbF6F74d",
-        "module_implementation": "0xe8d914Ef66b4FF086C6fbCb1E0ea97c0A9D2f3de",
         "network_registry": "0xf08E27C3A09627D605bFd164459f7caF18D1d25f",
-        "network_registry_proxy": "0x9bCBA0C73FC68B445fA398F98B8a1650deA81cE3",
-        "node_safe_registry": "0x0bf6bd25ac47FE9D41A99B135Cb439B89138F05a",
+        "network_registry_proxy": "0x0D1a8f1b13FD1d64696c5E03dd45Cd139e40dE0c",
+        "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
         "node_stake_v2_factory": "0x5F5b459db681996292Ad58cc10e88027033149B8",
-        "ticket_price_oracle": "0xCFFE25CaF9B1cca3Cc4B54842a4E0E520a05Ae17",
-        "token": "0x02e1009fd222917Ee7bdfdBF8AE1e56c4ae3F6f3",
-        "winning_probability_oracle": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1"
-      },
-      "environment_type": "staging",
-      "indexer_start_block_number": 29690235
+        "node_safe_registry": "0x0bf6bd25ac47FE9D41A99B135Cb439B89138F05a",
+        "module_implementation": "0xe8d914Ef66b4FF086C6fbCb1E0ea97c0A9D2f3de",
+        "ticket_price_oracle": "0x281a91FeA199a3bAB5D7d5f05833B257E2fd7741",
+        "winning_probability_oracle": "0x02e1009fd222917Ee7bdfdBF8AE1e56c4ae3F6f3"
+      }
     },
     "monte_rosa": {
       "environment_type": "production",
