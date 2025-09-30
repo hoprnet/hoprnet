@@ -173,6 +173,7 @@ fn satisfies(version: &str, allowed_versions: &str) -> Result<bool> {
 
 impl ChainNetworkConfig {
     /// Returns the network details, returns an error if network is not supported
+    /// Performs a version check as part of the validation.
     pub fn new(
         id: &str,
         version: &str,
@@ -218,6 +219,49 @@ impl ChainNetworkConfig {
             Ok(false) => Err(HoprConfigError::UnsupportedNetwork(id.into()).to_string()),
             Err(e) => Err(e.to_string()),
         }
+    }
+
+    /// Returns the network details, returns an error if network is not supported
+    pub fn new_no_version_check(
+        id: &str,
+        maybe_custom_provider: Option<&str>,
+        max_rpc_requests_per_sec: Option<u32>,
+        protocol_config: &mut ProtocolsConfig,
+    ) -> std::result::Result<Self, String> {
+        let network = protocol_config
+            .networks
+            .get_mut(id)
+            .ok_or(format!("Could not find network {id} in protocol config"))?;
+
+        let chain = protocol_config
+            .chains
+            .get_mut(&network.chain)
+            .ok_or(format!("Invalid chain {} for network {id}", network.chain))?;
+
+        if let Some(custom_provider) = maybe_custom_provider {
+            chain.default_provider = custom_provider.into();
+        }
+
+        Ok(ChainNetworkConfig {
+            announcements: network.addresses.announcements.to_owned(),
+            chain: chain.to_owned(),
+            channel_contract_deploy_block: network.indexer_start_block_number,
+            channels: network.addresses.channels.to_owned(),
+            confirmations: network.confirmations,
+            environment_type: network.environment_type,
+            id: network.chain.to_owned(),
+            module_implementation: network.addresses.module_implementation.to_owned(),
+            network_registry: network.addresses.network_registry.to_owned(),
+            network_registry_proxy: network.addresses.network_registry_proxy.to_owned(),
+            node_safe_registry: network.addresses.node_safe_registry.to_owned(),
+            node_stake_v2_factory: network.addresses.node_stake_v2_factory.to_owned(),
+            ticket_price_oracle: network.addresses.ticket_price_oracle.to_owned(),
+            winning_probability_oracle: network.addresses.winning_probability_oracle.to_owned(),
+            token: network.addresses.token.to_owned(),
+            tx_polling_interval: network.tx_polling_interval,
+            max_block_range: network.max_block_range,
+            max_requests_per_sec: max_rpc_requests_per_sec.or(chain.max_rpc_requests_per_sec),
+        })
     }
 }
 

@@ -14,6 +14,37 @@ use crate::{
     types::HoprStartProtocol,
 };
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
+        "hopr_session_hoprd_target_connections",
+        "Number of currently active HOPR session target connections on this Exit node",
+        &["type"]
+    ).unwrap();
+}
+
+#[cfg(feature = "prometheus")]
+pub struct MetricSessionCounterGuard {
+    _kind: &'static str,
+}
+
+#[cfg(feature = "prometheus")]
+impl MetricSessionCounterGuard {
+    pub fn new(kind: &'static str) -> Self {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_ACTIVE_TARGETS.increment(&[kind], 1.0);
+        Self { _kind: kind }
+    }
+}
+
+#[cfg(feature = "prometheus")]
+impl Drop for MetricSessionCounterGuard {
+    fn drop(&mut self) {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        METRIC_ACTIVE_TARGETS.decrement(&[self._kind], 1.0);
+    }
+}
+
 /// Convenience function to copy data in both directions between a [`Session`](crate::HoprSession) and arbitrary
 /// async IO stream.
 /// This function is only available with Tokio and will panic with other runtimes.
