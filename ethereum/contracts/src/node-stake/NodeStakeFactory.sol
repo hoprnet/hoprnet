@@ -375,12 +375,16 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
                 approveAmount
             );
             _prepareSafeTx(safeProxyAddr, tokenAddress, approveData);
+            assembly {
+                let len := mload(admins)
+                mstore(admins, sub(len, 1))
+            }
             // - Nonce 3: Add the caller as a node in the module
-            bytes memory addNodeData = abi.encodeWithSignature("addNodes(address[])", admins);
+            bytes memory addNodeData = abi.encodeWithSignature("includeNodes(address[])", admins);
             _prepareSafeTx(safeProxyAddr, moduleProxy, addNodeData);
             // - Nonce 4: Renounce ownership from the safe
             bytes memory swapOwnerData =
-                abi.encodeWithSignature("removeOwner(address,address,uint256)", admins[admins.length - 2], address(this), 1);
+                abi.encodeWithSignature("removeOwner(address,address,uint256)", admins[admins.length - 1], address(this), 1);
             _prepareSafeTx(safeProxyAddr, swapOwnerData);
         }
 

@@ -141,6 +141,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
         return role.members[nodeAddress];
     }
 
+
     /**
      * @dev Add a node to be able to execute this module, to the target
      * @notice Payable function to allow nodes to send ETH along to fund the node with the transaction
@@ -220,6 +221,36 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
         HoprCapabilityPermissions.scopeTargetSend(role, nodeDefaultTarget);
         // scope granular capabilities to send native tokens to itself
         HoprCapabilityPermissions.scopeSendCapability(role, nodeAddress, nodeAddress, GranularPermission.ALLOW);
+    }
+
+
+    /**
+     * @dev Include multiple nodes as members, set their default SEND permissions
+     * @notice Payable function to allow nodes to send ETH along to fund the nodes with the transaction
+     * The value sent will be equally split among the nodes
+     * @param nodeAddresses array of addresses of nodes
+     */
+    function includeNodes(address[] calldata nodeAddresses) external onlyOwner payable {
+        uint256 len = nodeAddresses.length;
+        uint256 totalValue = msg.value;
+        if (len == 0) {
+            revert LengthIsZero();
+        }
+        uint256 valuePerNode = totalValue / len;
+        for (uint256 i = 0; i < len; i++) {
+            // add a node as a member
+            _addNode(nodeAddresses[i]);
+            // scope default capabilities
+            uint256 sendTargetBytes = uint256(uint160(nodeAddresses[i])) << 96 | 0x010203000000000000000000;
+            HoprCapabilityPermissions.scopeTargetSend(role, Target.wrap(sendTargetBytes));
+            // scope granular capabilities to send native tokens to itself
+            HoprCapabilityPermissions.scopeSendCapability(role, nodeAddresses[i], nodeAddresses[i], GranularPermission.ALLOW);
+            // fund the node with the transaction value
+            if (valuePerNode > 0) {
+                (bool success, ) = nodeAddresses[i].call{ value: valuePerNode, gas: 0 }('');
+                require(success, FailedToSendEthToNode());
+            }
+        }
     }
 
     /**
@@ -410,7 +441,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     function _addChannelsAndTokenTarget(Target defaultTarget) private {
         // get channels andtokens contract
         address hoprChannelsAddress = defaultTarget.getTargetAddress();
-        address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).TOKEN());
+        address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
 
         // add default scope for Channels TargetType, with the build target for hoprChannels address
         HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget.forceWriteTargetAddress(hoprChannelsAddress));

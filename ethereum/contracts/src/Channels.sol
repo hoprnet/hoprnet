@@ -197,7 +197,7 @@ contract HoprChannels is
     // ERC-777 tokensReceived hook, fundChannel
     uint256 public immutable ERC777_HOOK_FUND_CHANNEL_SIZE = abi.encodePacked(address(0), address(0)).length;
     // Token that will be used for all interactions.
-    IERC20 public immutable TOKEN;
+    IERC20 public immutable token;
     // Notice period before fund from an outgoing channel can be pulled out.
     Timestamp public immutable NOTICE_PERIOD_CHANNEL_CLOSURE; // in seconds
 
@@ -280,7 +280,7 @@ contract HoprChannels is
 
         setNodeSafeRegistry(_safeRegistry);
 
-        TOKEN = IERC20(_token);
+        token = IERC20(_token);
         NOTICE_PERIOD_CHANNEL_CLOSURE = _noticePeriodChannelClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
 
@@ -473,7 +473,7 @@ contract HoprChannels is
 
         if (earningChannel.status == ChannelStatus.CLOSED) {
             // The other channel does not exist, so we need to transfer funds directly
-            if (TOKEN.transfer(msg.sender, Balance.unwrap(redeemable.data.amount)) != true) {
+            if (token.transfer(msg.sender, Balance.unwrap(redeemable.data.amount)) != true) {
                 revert TokenTransferFailed();
             }
         } else {
@@ -584,7 +584,7 @@ contract HoprChannels is
         emit ChannelClosed(channelId, _channelState(channelId));
 
         if (balance > 0) {
-            if (TOKEN.transfer(source, balance) != true) {
+            if (token.transfer(source, balance) != true) {
                 revert TokenTransferFailed();
             }
         }
@@ -642,7 +642,7 @@ contract HoprChannels is
         emit ChannelClosed(channelId, _channelState(channelId));
 
         if (balance > 0) {
-            if (TOKEN.transfer(msg.sender, balance) != true) {
+            if (token.transfer(msg.sender, balance) != true) {
                 revert TokenTransferFailed();
             }
         }
@@ -678,7 +678,7 @@ contract HoprChannels is
         override
     {
         // don't accept any other tokens ;-)
-        if (msg.sender != address(TOKEN)) {
+        if (msg.sender != address(token)) {
             revert WrongToken();
         }
 
@@ -771,7 +771,7 @@ contract HoprChannels is
         _fundChannelInternal(selfAddress, account, amount);
 
         // pull tokens from Safe and handle result
-        if (TOKEN.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
+        if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
             // sth. went wrong, we need to revert here
             revert TokenTransferFailed();
         }
@@ -786,7 +786,7 @@ contract HoprChannels is
         _fundChannelInternal(msg.sender, account, amount);
 
         // pull tokens from funder and handle result
-        if (TOKEN.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
+        if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
             // sth. went wrong, we need to revert here
             revert TokenTransferFailed();
         }

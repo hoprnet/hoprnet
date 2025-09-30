@@ -116,7 +116,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             HoprChannelsType.Timestamp.unwrap(hoprChannels.NOTICE_PERIOD_CHANNEL_CLOSURE()),
             HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD)
         );
-        assertEq(address(hoprChannels.TOKEN()), address(hoprToken));
+        assertEq(address(hoprChannels.token()), address(hoprToken));
 
         hoprChannels._storeChannel(src, dest, balance, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.OPEN);
 

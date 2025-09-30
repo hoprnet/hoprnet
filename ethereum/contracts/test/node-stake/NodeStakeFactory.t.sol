@@ -70,7 +70,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
     }
 
     modifier mockTokenChannel() {
-        vm.mockCall(CHANNELS, abi.encodeWithSignature("TOKEN()"), abi.encode(address(hoprToken)));
+        vm.mockCall(CHANNELS, abi.encodeWithSignature("token()"), abi.encode(address(hoprToken)));
     
         (, uint256 defaultAllowance, bytes32 defaultAnnouncement) = factory.defaultHoprNetwork();
         vm.prank(admin);
