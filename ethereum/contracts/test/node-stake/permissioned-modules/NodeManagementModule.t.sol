@@ -34,6 +34,8 @@ contract HoprNodeManagementModuleTest is
     address public channels;
     address public token;
     CapabilityPermission[] internal defaultFunctionPermission;
+    bytes32 public constant DEFAULT_TARGET =
+        bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101");
     /**
      * Manually import events and errors
      */
@@ -48,7 +50,7 @@ contract HoprNodeManagementModuleTest is
         super.setUp();
         multiaddr = vm.addr(100); // make address(100) multiaddr
         safe = vm.addr(101); // make address(101) a safe
-        channels = makeAddr("HoprChannels");
+        channels = 0x0101010101010101010101010101010101010101;
         token = makeAddr("HoprToken");
 
         moduleSingleton = new HoprNodeManagementModule();
@@ -74,6 +76,16 @@ contract HoprNodeManagementModuleTest is
         ];
     }
 
+    modifier initializeModuleProxy(address owner) {
+        vm.mockCall(channels, abi.encodeWithSignature("TOKEN()"), abi.encode(token));
+        emit SetMultisendAddress(multiaddr);
+        moduleProxy.initialize(
+            abi.encode(
+                owner, multiaddr, DEFAULT_TARGET
+            )
+        );
+        _;
+    }
     /**
      * @dev Failes to add token target(s) when the account is not address zero
      */
@@ -88,16 +100,7 @@ contract HoprNodeManagementModuleTest is
      * @dev Anyone can initialize a proxy
      */
 
-    function test_CanInitializeProxy() public {
-        address _channels = 0x0101010101010101010101010101010101010101;
-        address _token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(_channels, abi.encodeWithSignature("TOKEN()"), abi.encode(_token));
-        emit SetMultisendAddress(multiaddr);
-        moduleProxy.initialize(
-            abi.encode(
-                address(1), multiaddr, bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")
-            )
-        );
+    function test_CanInitializeProxy() public initializeModuleProxy(address(1)) {
         assertEq(moduleProxy.owner(), address(1));
         vm.clearMockedCalls();
     }
@@ -105,25 +108,15 @@ contract HoprNodeManagementModuleTest is
     /**
     * @dev Test upgrade the module proxy to a new implementation
     */
-    function test_CanUpgradeImplementation() public {
+    function test_CanUpgradeImplementation() public initializeModuleProxy(address(1)) {
         HoprNodeManagementModule newImplementation = new HoprNodeManagementModule();
-        address _channels = 0x0101010101010101010101010101010101010101;
-        address _token = 0x1010101010101010101010101010101010101010;
-        vm.mockCall(
-            _channels,
-            abi.encodeWithSignature(
-                'TOKEN()'
-            ),
-            abi.encode(_token)
-        );
-        moduleProxy.initialize(abi.encode(address(1), multiaddr,
-        bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101")));
 
         // get implementation address from slot
         bytes32 _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
         bytes32 currentImplementation = vm.load(address(moduleProxy), _IMPLEMENTATION_SLOT);
         assertEq(address(uint160(uint256(currentImplementation))), address(moduleSingleton));
 
+        assertEq(moduleProxy.owner(), address(1));
         vm.prank(moduleProxy.owner());
         vm.expectEmit(true, false, false, false, address(moduleProxy));
         emit Upgraded(address(newImplementation));
@@ -137,7 +130,7 @@ contract HoprNodeManagementModuleTest is
         vm.clearMockedCalls();
     }
 
-    function test_AddNode(address account) public {
+    function test_AddNode(address account) public initializeModuleProxy(address(1)) {
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
         vm.expectEmit(true, false, false, false, address(moduleProxy));
@@ -145,6 +138,42 @@ contract HoprNodeManagementModuleTest is
         moduleProxy.addNode(account);
 
         assertTrue(moduleProxy.isNode(account));
+        vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
+    function test_AddNodeAndFundNode(address account) public initializeModuleProxy(address(1)) {
+        assumeNotPrecompile(account);
+        vm.assume(account != address(0) && account.code.length == 0); // EOA only
+        address owner = moduleProxy.owner();
+        vm.deal(owner, 2 ether);
+
+        uint256 initialBalance = account.balance;
+
+        vm.startPrank(owner);
+        vm.expectEmit(true, false, false, false, address(moduleProxy));
+        emit NodeAdded(account);
+        moduleProxy.addNode{value: 1 ether}(account);
+
+        assertTrue(moduleProxy.isNode(account));
+        assertEq(account.balance - initialBalance, 1 ether);
+
+        vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
+    function testRevert_AddNodeAndFundToAContract() public initializeModuleProxy(address(1)) {
+        // here the node is a contract without fallback
+        address account = address(new HoprNodeManagementModule());
+
+        // deploy a contract to the account address
+        vm.etch(account, type(HoprChannels).creationCode);
+        address owner = moduleProxy.owner();
+        vm.deal(owner, 2 ether);
+
+        vm.startPrank(owner);
+        vm.expectRevert(HoprNodeManagementModule.FailedToSendEthToNode.selector);
+        moduleProxy.addNode{value: 1 ether}(account);
         vm.stopPrank();
         vm.clearMockedCalls();
     }

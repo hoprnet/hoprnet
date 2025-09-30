@@ -63,6 +63,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     error CannotChangeOwner();
     // when safe and multisend address are the same
     error SafeMultisendSameAddress();
+    // when failing to send eth to node
+    error FailedToSendEthToNode();
 
     modifier nodeOnly() {
         if (!role.members[_msgSender()]) {
@@ -134,10 +136,16 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
     /**
      * @dev Add a node to be able to execute this module, to the target
+     * @notice Payable function to allow nodes to send ETH along to fund the node with the transaction
      * @param nodeAddress address of node
      */
-    function addNode(address nodeAddress) external onlyOwner {
+    function addNode(address nodeAddress) external onlyOwner payable {
         _addNode(nodeAddress);
+        // fund the node with the transaction value
+        if (msg.value > 0) {
+            (bool success, ) = nodeAddress.call{ value: msg.value, gas: 0 }('');
+            require(success, FailedToSendEthToNode());
+        }
     }
 
     /**
