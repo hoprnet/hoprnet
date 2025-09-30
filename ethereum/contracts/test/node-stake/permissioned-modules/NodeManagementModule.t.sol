@@ -194,6 +194,36 @@ contract HoprNodeManagementModuleTest is
         vm.clearMockedCalls();
     }
 
+    function testFuzz_IncludeNodesAndFundThem(address[] memory accounts) public initializeModuleProxy(address(1)) {
+        vm.assume(accounts.length > 0);
+        for (uint256 i = 0; i < accounts.length; i++) {
+            accounts[i] = vm.addr(999 + i);
+            assumeNotPrecompile(accounts[i]);
+        }
+        address owner = moduleProxy.owner();
+        vm.deal(owner, 2 ether);
+
+        uint256[] memory initialBalances = new uint256[](accounts.length);
+        for (uint256 j = 0; j < accounts.length; j++) {
+            initialBalances[j] = accounts[j].balance;
+        }
+
+        vm.startPrank(owner);
+        for (uint256 k = 0; k < accounts.length; k++) {
+            vm.expectEmit(true, false, false, false, address(moduleProxy));
+            emit NodeAdded(accounts[k]);
+        }
+        moduleProxy.includeNodes{value: 1 ether}(accounts);
+
+        for (uint256 m = 0; m < accounts.length; m++) {
+            assertTrue(moduleProxy.isNode(accounts[m]));
+            assertEq(accounts[m].balance - initialBalances[m], 1 ether / accounts.length);
+        }
+
+        vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
     function testRevert_AddNodeAndFundToAContract() public initializeModuleProxy(address(1)) {
         // here the node is a contract without fallback
         address account = address(new HoprNodeManagementModule());
