@@ -60,7 +60,8 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
     error UnauthorizedToken();
     // Error when the contract is not the token recipient
     error NotTokenRecipient();
-
+    // Error when an invalid function selector is provided in userData
+    error InvalidFunctionSelector();
 
     struct SafeLibAddress {
         address safeAddress;
@@ -83,6 +84,10 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
     IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
+    // function selector from bytes4(keccak256("_deploySafeAndModule(uint256,bytes32,address,address,uint256,address[])")))
+    bytes4 public constant DEPLOYSAFEMODULE_FUNCTION_SELECTOR = 0xdd24c144;
+    // function selector from bytes4(keccak256("_deploySafeAndModuleAndIncludeNodes(uint256,bytes32,address,address,uint256,address[])")))
+    bytes4 public constant DEPLOYSAFEANDMODULEANDINCLUDENODES_SELECTOR = 0x0105b97d;
 
     // Encoded address of the contract's approver, used for EIP-1271 signature verification
     bytes32 internal immutable r;
@@ -170,10 +175,20 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
         require(msg.sender == defaultHoprNetwork.tokenAddress, UnauthorizedToken());
 
         // Decode userData to extract caller, nonce, defaultTarget, and admins
-        (uint256 nonce, bytes32 defaultTarget, address[] memory admins) = abi.decode(userData, (uint256, bytes32, address[]));
+        (bytes4 functionSelector, uint256 nonce, bytes32 defaultTarget, address[] memory admins) = abi.decode(userData, (bytes4, uint256, bytes32, address[]));
 
-        // Deploy Safe and module proxies
-        (, address payable safeProxy) = _deploySafeAndModule(nonce, defaultTarget, from, defaultHoprNetwork.tokenAddress, defaultHoprNetwork.defaultTokenAllowance, admins);
+        address payable safeProxy;
+        // Ensure the function selector matches the expected value for this operation
+        if (functionSelector == DEPLOYSAFEMODULE_FUNCTION_SELECTOR) {
+            // Deploy Safe and module proxies
+            (, safeProxy) = _deploySafeAndModule(nonce, defaultTarget, from, defaultHoprNetwork.tokenAddress, defaultHoprNetwork.defaultTokenAllowance, admins);
+        } else if (functionSelector == DEPLOYSAFEANDMODULEANDINCLUDENODES_SELECTOR) {
+            // Deploy Safe and module proxies using the clone function
+            (, safeProxy) = _deploySafeAndModuleAndIncludeNodes(nonce, defaultTarget, from, defaultHoprNetwork.tokenAddress, defaultHoprNetwork.defaultTokenAllowance, admins);
+        } else {
+            revert InvalidFunctionSelector();
+
+        }
 
         // Transfer the received tokens to the Safe proxy
         IERC20(defaultHoprNetwork.tokenAddress).safeTransfer(safeProxy, amount);
@@ -209,6 +224,15 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
      */
     function updateHoprNetwork(HoprNetwork memory _newHoprNetwork) public onlyOwner {
         _updateHoprNetwork(_newHoprNetwork);
+    }
+
+    /**
+     * @dev Updates the ERC1820 implementer for the contract.
+     * Can only be called by the contract owner.
+     * @param _newImplementer The new implementer address to be set in the ERC1820 registry.
+     */
+    function updateErc1820Implementer(address _newImplementer) public onlyOwner {
+        _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, _newImplementer);
     }
 
     /**
@@ -291,6 +315,66 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
             );
             _prepareSafeTx(safeProxyAddr, tokenAddress, approveData);
             // - Nonce 3: Renounce ownership from the safe
+            bytes memory swapOwnerData =
+                abi.encodeWithSignature("removeOwner(address,address,uint256)", admins[admins.length - 2], address(this), 1);
+            _prepareSafeTx(safeProxyAddr, swapOwnerData);
+        }
+
+        emit NewHoprNodeStakeModule(moduleProxy);
+        emit NewHoprNodeStakeSafe(safeProxyAddr);
+        return (moduleProxy, safeProxyAddr);
+    }
+
+
+    function _deploySafeAndModuleAndIncludeNodes(
+        uint256 nonce,
+        bytes32 defaultTarget,
+        address caller,
+        address tokenAddress,
+        uint256 approveAmount,
+        address[] memory admins
+    )
+        internal
+        validateAdmins(admins)
+        returns (address, address payable)
+    {
+        // Temporarily replace one owner with the factory address
+        assembly {
+            let len := mload(admins)
+            mstore(admins, add(len, 1))
+            mstore(add(admins, mul(0x20, add(len, 1))), address())
+        }
+
+        // 1. Prepare safe initializer data
+        address payable safeProxyAddr = _deploySafe(admins, nonce);
+
+        // 2. Prepare module initializer data
+       address moduleProxy = _deployModule(safeProxyAddr, defaultTarget, caller, nonce);
+
+        // 3. Send safe transactions
+        {
+            // - Nonce 0: set ERC777 token recipient implementer to the safe itself
+            bytes memory setInterfaceData = abi.encodeWithSignature(
+                "setInterfaceImplementer(address,bytes32,address)",
+                safeProxyAddr,
+                keccak256("ERC777TokensRecipient"),
+                safeProxyAddr
+            );
+            _prepareSafeTx(safeProxyAddr, ERC1820_ADDRESS, setInterfaceData);
+            // - Nonce 1: Enable the node management module
+            bytes memory enableModuleData = abi.encodeWithSignature("enableModule(address)", moduleProxy);
+            _prepareSafeTx(safeProxyAddr, enableModuleData);
+            // - Nonce 2: Approve the channels contract to spend HOPR tokens on behalf of the safe
+            bytes memory approveData = abi.encodeWithSignature(
+                "approve(address,uint256)",
+                Target.wrap(uint256(defaultTarget)).getTargetAddress(), // channelAddress obtained from the default target
+                approveAmount
+            );
+            _prepareSafeTx(safeProxyAddr, tokenAddress, approveData);
+            // - Nonce 3: Add the caller as a node in the module
+            bytes memory addNodeData = abi.encodeWithSignature("addNodes(address[])", admins);
+            _prepareSafeTx(safeProxyAddr, moduleProxy, addNodeData);
+            // - Nonce 4: Renounce ownership from the safe
             bytes memory swapOwnerData =
                 abi.encodeWithSignature("removeOwner(address,address,uint256)", admins[admins.length - 2], address(this), 1);
             _prepareSafeTx(safeProxyAddr, swapOwnerData);

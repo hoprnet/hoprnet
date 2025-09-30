@@ -65,6 +65,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     error SafeMultisendSameAddress();
     // when failing to send eth to node
     error FailedToSendEthToNode();
+    // when length of array is zero
+    error LengthIsZero();
 
     modifier nodeOnly() {
         if (!role.members[_msgSender()]) {
@@ -145,6 +147,29 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
         if (msg.value > 0) {
             (bool success, ) = nodeAddress.call{ value: msg.value, gas: 0 }('');
             require(success, FailedToSendEthToNode());
+        }
+    }
+
+    /**
+     * @dev Add multiple nodes to be able to execute this module, to the target
+     * @notice Payable function to allow nodes to send ETH along to fund the nodes with the transaction
+     * The value sent will be equally split among the nodes
+     * @param nodeAddresses array of addresses of nodes
+     */
+    function addNodes(address[] calldata nodeAddresses) external onlyOwner payable {
+        uint256 len = nodeAddresses.length;
+        uint256 totalValue = msg.value;
+        if (len == 0) {
+            revert LengthIsZero();
+        }
+        uint256 valuePerNode = totalValue / len;
+        for (uint256 i = 0; i < len; i++) {
+            _addNode(nodeAddresses[i]);
+            // fund the node with the transaction value
+            if (valuePerNode > 0) {
+                (bool success, ) = nodeAddresses[i].call{ value: valuePerNode, gas: 0 }('');
+                require(success, FailedToSendEthToNode());
+            }
         }
     }
 

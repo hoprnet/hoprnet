@@ -39,6 +39,8 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
     address constant CHANNELS = 0x0101010101010101010101010101010101010101;
     bytes32 public constant DEFAULT_TARGET =
         bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101");
+    bytes4 public deploySafeAndModuleSelector = bytes4(keccak256("_deploySafeAndModule(uint256,bytes32,address,address,uint256,address[])"));
+    bytes4 public deploySafeAndModuleAndIncludeNodesSelector = bytes4(keccak256("_deploySafeAndModuleAndIncludeNodes(uint256,bytes32,address,address,uint256,address[])"));
 
     /**
      * Manually import events and errors
@@ -186,6 +188,9 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         vm.clearMockedCalls();
     }
 
+    /**
+     * @dev Clone a safe and a module, and fund the safe with tokens, all in one transaction
+     */
     function test_OneClickDeploySafeWithFundToken() public mockTokenChannel {
         // prepare admins
         address[] memory admins = new address[](3);
@@ -200,7 +205,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         assertEq(hoprToken.balanceOf(caller), amount, "caller should have some tokens");
 
         // prepare userData
-        bytes memory userData = abi.encode(nonce, DEFAULT_TARGET, admins);
+        bytes memory userData = abi.encode(factory.DEPLOYSAFEMODULE_FUNCTION_SELECTOR(), nonce, DEFAULT_TARGET, admins);
 
         // calculate expected safe and module address
         (address expectedSafeAddress, address expectedModuleAddress) = _helperPredictSafeAndModule(admins, caller, nonce);
@@ -220,6 +225,51 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         // channel could transfer some tokens from the safe
         (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
         assertEq(hoprToken.allowance(expectedSafeAddress, CHANNELS), defaultAllowance, "wrong token allowance");
+        vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
+    function test_OneClickDeploySafeWithFundTokenAndIncludeNodes() public mockTokenChannel {
+        // prepare admins
+        address[] memory admins = new address[](2);
+        admins[0] = vm.addr(700);
+        admins[1] = vm.addr(701);
+        uint256 nonce = 14;
+        uint256 amount = 8000 ether;
+        // mint some tokens to caller
+        vm.prank(address(this));
+        hoprToken.mint(caller, amount, "", "");
+        assertEq(hoprToken.balanceOf(caller), amount, "caller should have some tokens");
+
+        // prepare userData
+        bytes memory userData = abi.encode(factory.DEPLOYSAFEANDMODULEANDINCLUDENODES_SELECTOR(), nonce, DEFAULT_TARGET, admins);
+
+        // calculate expected safe and module address
+        (address expectedSafeAddress, address expectedModuleAddress) = _helperPredictSafeAndModule(admins, caller, nonce);
+
+        vm.startPrank(caller);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeSafe(expectedSafeAddress);
+
+        // deploy safe and module, and fund the safe with tokens, all in one transaction
+        hoprToken.send(address(factory), amount, userData);
+
+        // safe should receive all the token
+        assertEq(hoprToken.balanceOf(expectedSafeAddress), amount, "safe should receive all the tokens");
+        assertEq(hoprToken.balanceOf(caller), 0, "caller should not have any tokens");
+        // channel could transfer some tokens from the safe
+        (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
+        assertEq(hoprToken.allowance(expectedSafeAddress, CHANNELS), defaultAllowance, "wrong token allowance");
+
+        // check admins are nodes being included in the module
+        for (uint256 i = 0; i < admins.length; i++) {
+            (bool success, bytes memory retdata) = expectedModuleAddress.call(abi.encodeWithSignature("isNode(address)", admins[i]));
+            assertTrue(success && abi.decode(retdata, (bool)), "admin should be included in the module");
+        }
+        vm.stopPrank();
+        vm.clearMockedCalls();
     }
 
     /**

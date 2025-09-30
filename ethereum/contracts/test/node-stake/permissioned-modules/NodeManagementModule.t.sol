@@ -130,7 +130,7 @@ contract HoprNodeManagementModuleTest is
         vm.clearMockedCalls();
     }
 
-    function test_AddNode(address account) public initializeModuleProxy(address(1)) {
+    function testFuzz_AddNode(address account) public initializeModuleProxy(address(1)) {
         address owner = moduleProxy.owner();
         vm.startPrank(owner);
         vm.expectEmit(true, false, false, false, address(moduleProxy));
@@ -142,7 +142,7 @@ contract HoprNodeManagementModuleTest is
         vm.clearMockedCalls();
     }
 
-    function test_AddNodeAndFundNode(address account) public initializeModuleProxy(address(1)) {
+    function testFuzz_AddNodeAndFundNode(address account) public initializeModuleProxy(address(1)) {
         assumeNotPrecompile(account);
         vm.assume(account != address(0) && account.code.length == 0); // EOA only
         address owner = moduleProxy.owner();
@@ -157,6 +157,36 @@ contract HoprNodeManagementModuleTest is
 
         assertTrue(moduleProxy.isNode(account));
         assertEq(account.balance - initialBalance, 1 ether);
+
+        vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
+    function testFuzz_AddNodesAndFundThem(address[] memory accounts) public initializeModuleProxy(address(1)) {
+        vm.assume(accounts.length > 0);
+        for (uint256 i = 0; i < accounts.length; i++) {
+            accounts[i] = vm.addr(999 + i);
+            assumeNotPrecompile(accounts[i]);
+        }
+        address owner = moduleProxy.owner();
+        vm.deal(owner, 2 ether);
+
+        uint256[] memory initialBalances = new uint256[](accounts.length);
+        for (uint256 j = 0; j < accounts.length; j++) {
+            initialBalances[j] = accounts[j].balance;
+        }
+
+        vm.startPrank(owner);
+        for (uint256 k = 0; k < accounts.length; k++) {
+            vm.expectEmit(true, false, false, false, address(moduleProxy));
+            emit NodeAdded(accounts[k]);
+        }
+        moduleProxy.addNodes{value: 1 ether}(accounts);
+
+        for (uint256 m = 0; m < accounts.length; m++) {
+            assertTrue(moduleProxy.isNode(accounts[m]));
+            assertEq(accounts[m].balance - initialBalances[m], 1 ether / accounts.length);
+        }
 
         vm.stopPrank();
         vm.clearMockedCalls();
