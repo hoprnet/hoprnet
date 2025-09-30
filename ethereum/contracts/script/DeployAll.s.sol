@@ -52,6 +52,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         vm.startBroadcast(deployerPrivateKey);
 
         // 3. Deploy
+        // 3.0. Announcements
+        _deployHoprAnnouncements();
+
         // 3.1 HoprNodeManagementModule singleton
         _deployHoprNodeManagementModule();
 
@@ -90,9 +93,6 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // 3.9. WinningProbabilityOracle, with a default value of 1.0
         _deployHoprWinningProbabilityOracle(deployerAddress, WinProb.wrap(type(uint56).max));
-
-        // 3.10. Announcements
-        _deployHoprAnnouncements();
 
         // 4. update indexerStartBlockNumber
         // if both HoprChannels and HoprNetworkRegistry contracts are deployed, update the startup block number for
@@ -133,7 +133,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             // deploy HoprNodeStakeFactory contract
             currentNetworkDetail.addresses.nodeStakeV2FactoryAddress =
                 deployCode("NodeStakeFactory.sol:HoprNodeStakeFactory", abi.encode(
-                    currentNetworkDetail.addresses.moduleImplementationAddress, deployerAddress
+                    currentNetworkDetail.addresses.moduleImplementationAddress, 
+                    currentNetworkDetail.addresses.announcements,
+                    deployerAddress
                 ));
         }
     }

@@ -73,6 +73,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
     struct HoprNetwork {
         address tokenAddress;
         uint256 defaultTokenAllowance;
+        bytes32 defaultAnnouncementTarget;
     }
 
     // A sentinel address that serves as the start pointer of the owner linked list used in the OwnerManager of
@@ -106,7 +107,8 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
 
     HoprNetwork public defaultHoprNetwork = HoprNetwork({
         tokenAddress: 0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1,   // wxHOPR token address on Gnosis chain
-        defaultTokenAllowance: 1000 ether
+        defaultTokenAllowance: 1000 ether,
+        defaultAnnouncementTarget: bytes32(0)
     });
 
     modifier validateAdmins(address[] memory admins) {
@@ -125,7 +127,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
      * @dev Constructor function to initialize contract state.
      * Initializes the encoded address of the contract's approver and the approved hash signature.
      */
-    constructor(address _moduleSingletonAddress, address initialOwner) Ownable(initialOwner) {
+    constructor(address _moduleSingletonAddress, address _announcementAddress, address initialOwner) Ownable(initialOwner) {
         // Encode the contract's address to be used in EIP-1271 signature verification
         r = bytes32(uint256(uint160(address(this))));
         // Encode the EIP-1271 contract signature for approval hash verification
@@ -134,6 +136,8 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
         _updateModuleSingletonAddress(_moduleSingletonAddress);
         // Register as an ERC777 token recipient
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
+        // Set the initial announcement target
+        defaultHoprNetwork.defaultAnnouncementTarget = bytes32(uint256(uint160(_announcementAddress))) << 96 | bytes32(uint256(0x010003000000000000000000));
 
         // Set the initial Safe library addresses
         emit HoprNodeStakeSafeLibUpdated(safeLibAddresses);
@@ -494,7 +498,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
          // Add Safe and multisend to the module, then transfer ownership to the module
         bytes memory moduleInitializer = abi.encodeWithSignature(
             "initialize(bytes)",
-            abi.encode(safeProxyAddr, safeLibAddresses.multiSendAddress, defaultTarget)
+            abi.encode(safeProxyAddr, safeLibAddresses.multiSendAddress, defaultHoprNetwork.defaultAnnouncementTarget, defaultTarget)
         );
 
         // Generate a unique salt using the sender's address and the provided nonce
@@ -529,7 +533,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
                 moduleSingletonAddress,
                 abi.encodeWithSignature(
                     "initialize(bytes)",
-                    abi.encode(safe, safeLibAddresses.multiSendAddress, defaultTarget)
+                    abi.encode(safe, safeLibAddresses.multiSendAddress, defaultHoprNetwork.defaultAnnouncementTarget, defaultTarget)
                 )
             )
         ));

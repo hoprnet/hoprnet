@@ -36,6 +36,8 @@ contract HoprNodeManagementModuleTest is
     CapabilityPermission[] internal defaultFunctionPermission;
     bytes32 public constant DEFAULT_TARGET =
         bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101");
+    bytes32 public constant ANNOUNCEMENT_TARGET =
+        bytes32(hex"0202020202020202020202020202020202020202010003000000000000000000");
     /**
      * Manually import events and errors
      */
@@ -81,7 +83,7 @@ contract HoprNodeManagementModuleTest is
         emit SetMultisendAddress(multiaddr);
         moduleProxy.initialize(
             abi.encode(
-                owner, multiaddr, DEFAULT_TARGET
+                owner, multiaddr, ANNOUNCEMENT_TARGET, DEFAULT_TARGET
             )
         );
         _;

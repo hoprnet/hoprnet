@@ -81,8 +81,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     }
 
     function initialize(bytes memory initParams) public initializer {
-        (address _safe, address _multisend, bytes32 _defaultTokenChannelsTarget) =
-            abi.decode(initParams, (address, address, bytes32));
+        (address _safe, address _multisend, bytes32 _defaultAnnouncementTarget, bytes32 _defaultTokenChannelsTarget) =
+            abi.decode(initParams, (address, address, bytes32, bytes32));
 
         // cannot accept a zero address as Safe or multisend contract
         if (_safe == address(0) || _multisend == address(0)) {
@@ -96,6 +96,11 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
         // internally setTarget
         multisend = _multisend;
+
+        // scope announcement targets as token with few restrictions
+        if (_defaultAnnouncementTarget != bytes32(0)) {
+            HoprCapabilityPermissions.scopeTargetToken(role, Target.wrap(uint256(_defaultAnnouncementTarget)));
+        }
         _addChannelsAndTokenTarget(Target.wrap(uint256(_defaultTokenChannelsTarget)));
 
         // transfer ownership

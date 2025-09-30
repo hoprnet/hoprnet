@@ -37,6 +37,9 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
     address payable public safe;
 
     address constant CHANNELS = 0x0101010101010101010101010101010101010101;
+    address constant ANNOUNCEMENT = 0x0202020202020202020202020202020202020202;
+    bytes32 public constant ANNOUNCEMENT_TARGET =
+        bytes32(hex"0202020202020202020202020202020202020202010101010101010101010000");
     bytes32 public constant DEFAULT_TARGET =
         bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101");
     bytes4 public deploySafeAndModuleSelector = bytes4(keccak256("_deploySafeAndModule(uint256,bytes32,address,address,uint256,address[])"));
@@ -59,7 +62,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
 
         hoprToken = new HoprToken();
         moduleSingleton = new HoprNodeManagementModule();
-        factory = new HoprNodeStakeFactory(address(moduleSingleton), admin);
+        factory = new HoprNodeStakeFactory(address(moduleSingleton), ANNOUNCEMENT, admin);
 
         // grant minter role to the test contract itself
         vm.prank(address(this));
@@ -69,10 +72,11 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
     modifier mockTokenChannel() {
         vm.mockCall(CHANNELS, abi.encodeWithSignature("TOKEN()"), abi.encode(address(hoprToken)));
     
-        (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
+        (, uint256 defaultAllowance, bytes32 defaultAnnouncement) = factory.defaultHoprNetwork();
         vm.prank(admin);
         factory.updateHoprNetwork(HoprNodeStakeFactory.HoprNetwork({
             tokenAddress: address(hoprToken),
+            defaultAnnouncementTarget: defaultAnnouncement,
             defaultTokenAllowance: defaultAllowance
         }));
         _;
@@ -101,7 +105,8 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
     function test_UpdateHoprNetwork() public {
         HoprNodeStakeFactory.HoprNetwork memory newHoprNetwork = HoprNodeStakeFactory.HoprNetwork({
             tokenAddress: address(hoprToken),
-            defaultTokenAllowance: 2000 ether
+            defaultTokenAllowance: 2000 ether,
+            defaultAnnouncementTarget: bytes32(uint256(uint160(ANNOUNCEMENT))) << 96 | bytes32(uint256(0x010103030303030303030000))
         });
 
         vm.prank(admin);
@@ -109,9 +114,10 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         emit HoprNodeStakeHoprNetworkUpdated(newHoprNetwork);
         factory.updateHoprNetwork(newHoprNetwork);
 
-        (address token, uint256 allowance) = factory.defaultHoprNetwork();
+        (address token, uint256 allowance, bytes32 announcement) = factory.defaultHoprNetwork();
         assertEq(token, address(hoprToken), "wrong token address");
         assertEq(allowance, newHoprNetwork.defaultTokenAllowance, "wrong allowance");
+        assertEq(announcement, newHoprNetwork.defaultAnnouncementTarget, "wrong announcement");
         vm.clearMockedCalls();
     }
 
@@ -178,7 +184,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
 
         // compare token allowance
         assertEq(Target.wrap(uint256(DEFAULT_TARGET)).getTargetAddress(), CHANNELS, "wrong channels address");
-        (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
+        (, uint256 defaultAllowance, ) = factory.defaultHoprNetwork();
         assertEq(
             hoprToken.allowance(safe, CHANNELS),
             defaultAllowance,
@@ -223,7 +229,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         assertEq(hoprToken.balanceOf(expectedSafeAddress), amount, "safe should receive all the tokens");
         assertEq(hoprToken.balanceOf(caller), 0, "caller should not have any tokens");
         // channel could transfer some tokens from the safe
-        (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
+        (, uint256 defaultAllowance, ) = factory.defaultHoprNetwork();
         assertEq(hoprToken.allowance(expectedSafeAddress, CHANNELS), defaultAllowance, "wrong token allowance");
         vm.stopPrank();
         vm.clearMockedCalls();
@@ -261,7 +267,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         assertEq(hoprToken.balanceOf(expectedSafeAddress), amount, "safe should receive all the tokens");
         assertEq(hoprToken.balanceOf(caller), 0, "caller should not have any tokens");
         // channel could transfer some tokens from the safe
-        (, uint256 defaultAllowance) = factory.defaultHoprNetwork();
+        (, uint256 defaultAllowance, ) = factory.defaultHoprNetwork();
         assertEq(hoprToken.allowance(expectedSafeAddress, CHANNELS), defaultAllowance, "wrong token allowance");
 
         // check admins are nodes being included in the module
@@ -346,7 +352,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         bytes memory moduleInitializer = abi.encodeWithSignature(
             "initialize(bytes)",
             abi.encode(
-                safeAddr, multisendAddr, DEFAULT_TARGET
+                safeAddr, multisendAddr, ANNOUNCEMENT_TARGET, DEFAULT_TARGET
             )
         );
 
@@ -428,7 +434,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         bytes memory moduleInitializer = abi.encodeWithSignature(
             "initialize(bytes)",
             abi.encode(
-                address(1), address(2), DEFAULT_TARGET
+                address(1), address(2), ANNOUNCEMENT_TARGET, DEFAULT_TARGET
             )
         );
         (bool result,) = moduleProxy.call(moduleInitializer);
