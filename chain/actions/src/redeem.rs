@@ -368,7 +368,7 @@ mod tests {
                 .redeem_tickets(
                     TicketSelector::from(&channel_from_bob)
                         .also_on_channel_entry(&channel_from_charlie)
-                        .with_amount(HoprBalance::new_base(PRICE_PER_PACKET * 5)..),
+                        .with_amount(HoprBalance::from(PRICE_PER_PACKET * 5)..),
                 )
                 .await?
                 .into_iter(),

@@ -33,11 +33,8 @@ use crate::{
 /// Contains all on-chain calls specific to the HOPR node itself.
 #[async_trait]
 pub trait NodeActions {
-    /// Withdraws the specified `amount` of tokens to the given `recipient`.
-    async fn withdraw(&self, recipient: Address, amount: U256) -> Result<PendingAction>;
-
-    /// Withdraws the specified `amount` of native coins to the given `recipient`.
-    async fn withdraw_native(&self, recipient: Address, amount: U256) -> Result<PendingAction>;
+    /// Withdraws the specified `amount` of tokens or native coins to the given `recipient`.
+    async fn withdraw<C: Currency + Send>(&self, recipient: Address, amount: Balance<C>) -> Result<PendingAction>;
 
     /// Announces node on-chain with key binding.
     /// The operation should also check if such an announcement has not been already made on-chain.
@@ -50,22 +47,21 @@ pub trait NodeActions {
 #[async_trait]
 impl<Db: Sync> NodeActions for ChainActions<Db> {
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn withdraw(&self, recipient: Address, amount: U256) -> Result<PendingAction> {
+    async fn withdraw<C: Currency + Send>(&self, recipient: Address, amount: Balance<C>) -> Result<PendingAction> {
         if !amount.is_zero() {
-            info!(%amount, %recipient, "initiating withdrawal");
-            self.tx_sender.send(Action::Withdraw(recipient, amount.into())).await
-        } else {
-            Err(InvalidArguments("cannot withdraw zero amount".into()))
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn withdraw_native(&self, recipient: Address, amount: U256) -> Result<PendingAction> {
-        if !amount.is_zero() {
-            info!(%amount, %recipient, "initiating native withdrawal");
-            self.tx_sender
-                .send(Action::WithdrawNative(recipient, amount.into()))
-                .await
+            if C::is::<XDai>() {
+                info!(%amount, %recipient, "initiating native withdrawal");
+                self.tx_sender
+                    .send(Action::WithdrawNative(recipient, amount.amount().into()))
+                    .await
+            } else if C::is::<WxHOPR>() {
+                info!(%amount, %recipient, "initiating token withdrawal");
+                self.tx_sender
+                    .send(Action::Withdraw(recipient, amount.amount().into()))
+                    .await
+            } else {
+                Err(InvalidArguments("invalid currency".into()))
+            }
         } else {
             Err(InvalidArguments("cannot withdraw zero amount".into()))
         }

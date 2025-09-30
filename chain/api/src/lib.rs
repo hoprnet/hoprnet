@@ -468,23 +468,12 @@ impl ChainWriteAccountOperations for HoprChain {
         balance: Balance<C>,
         recipient: &Address,
     ) -> std::result::Result<BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>, Self::Error> {
-        if C::is::<XDai>() {
-            Ok(self
-                .actions_ref()
-                .withdraw_native(*recipient, balance.amount())
-                .await?
-                .map(|r| r.map(|c| c.tx_hash).map_err(HoprChainError::from))
-                .boxed())
-        } else if C::is::<WxHOPR>() {
-            Ok(self
-                .actions_ref()
-                .withdraw(*recipient, balance.amount())
-                .await?
-                .map(|r| r.map(|c| c.tx_hash).map_err(HoprChainError::from))
-                .boxed())
-        } else {
-            return Err(HoprChainError::Api("unsupported currency".into()));
-        }
+        Ok(self
+            .actions_ref()
+            .withdraw(*recipient, balance)
+            .await?
+            .map(|r| r.map(|c| c.tx_hash).map_err(HoprChainError::from))
+            .boxed())
     }
 
     async fn register_safe(
