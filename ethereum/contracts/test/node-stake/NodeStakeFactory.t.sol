@@ -205,7 +205,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         assertEq(hoprToken.balanceOf(caller), amount, "caller should have some tokens");
 
         // prepare userData
-        bytes memory userData = abi.encode(factory.DEPLOYSAFEMODULE_FUNCTION_SELECTOR(), nonce, DEFAULT_TARGET, admins);
+        bytes memory userData = abi.encode(factory.DEPLOYSAFEMODULE_FUNCTION_IDENTIFIER(), nonce, DEFAULT_TARGET, admins);
 
         // calculate expected safe and module address
         (address expectedSafeAddress, address expectedModuleAddress) = _helperPredictSafeAndModule(admins, caller, nonce);
@@ -242,7 +242,8 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         assertEq(hoprToken.balanceOf(caller), amount, "caller should have some tokens");
 
         // prepare userData
-        bytes memory userData = abi.encode(factory.DEPLOYSAFEANDMODULEANDINCLUDENODES_SELECTOR(), nonce, DEFAULT_TARGET, admins);
+        bytes memory userData = abi.encode(factory.DEPLOYSAFEANDMODULEANDINCLUDENODES_IDENTIFIER(), nonce, DEFAULT_TARGET, admins);
+        emit log_bytes(userData);
 
         // calculate expected safe and module address
         (address expectedSafeAddress, address expectedModuleAddress) = _helperPredictSafeAndModule(admins, caller, nonce);

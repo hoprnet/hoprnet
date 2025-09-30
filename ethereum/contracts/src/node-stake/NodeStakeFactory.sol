@@ -84,10 +84,10 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
     IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
-    // function selector from bytes4(keccak256("_deploySafeAndModule(uint256,bytes32,address,address,uint256,address[])")))
-    bytes4 public constant DEPLOYSAFEMODULE_FUNCTION_SELECTOR = 0xdd24c144;
-    // function selector from bytes4(keccak256("_deploySafeAndModuleAndIncludeNodes(uint256,bytes32,address,address,uint256,address[])")))
-    bytes4 public constant DEPLOYSAFEANDMODULEANDINCLUDENODES_SELECTOR = 0x0105b97d;
+    // function identifier from keccak256("_deploySafeAndModule(uint256,bytes32,address,address,uint256,address[])"))
+    bytes32 public constant DEPLOYSAFEMODULE_FUNCTION_IDENTIFIER = 0xdd24c144db91d1bc600aac99393baf8f8c664ba461188f057e37f2c37b962b45;
+    // function identifier from (keccak256("_deploySafeAndModuleAndIncludeNodes(uint256,bytes32,address,address,uint256,address[])"))
+    bytes32 public constant DEPLOYSAFEANDMODULEANDINCLUDENODES_IDENTIFIER = 0x0105b97dcdf19d454ebe36f91ed516c2b90ee79f4a46af96a0138c1f5403c1cc;
 
     // Encoded address of the contract's approver, used for EIP-1271 signature verification
     bytes32 internal immutable r;
@@ -175,14 +175,14 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
         require(msg.sender == defaultHoprNetwork.tokenAddress, UnauthorizedToken());
 
         // Decode userData to extract caller, nonce, defaultTarget, and admins
-        (bytes4 functionSelector, uint256 nonce, bytes32 defaultTarget, address[] memory admins) = abi.decode(userData, (bytes4, uint256, bytes32, address[]));
+        (bytes32 functionIdentifier, uint256 nonce, bytes32 defaultTarget, address[] memory admins) = abi.decode(userData, (bytes32, uint256, bytes32, address[]));
 
         address payable safeProxy;
         // Ensure the function selector matches the expected value for this operation
-        if (functionSelector == DEPLOYSAFEMODULE_FUNCTION_SELECTOR) {
+        if (functionIdentifier == DEPLOYSAFEMODULE_FUNCTION_IDENTIFIER) {
             // Deploy Safe and module proxies
             (, safeProxy) = _deploySafeAndModule(nonce, defaultTarget, from, defaultHoprNetwork.tokenAddress, defaultHoprNetwork.defaultTokenAllowance, admins);
-        } else if (functionSelector == DEPLOYSAFEANDMODULEANDINCLUDENODES_SELECTOR) {
+        } else if (functionIdentifier == DEPLOYSAFEANDMODULEANDINCLUDENODES_IDENTIFIER) {
             // Deploy Safe and module proxies using the clone function
             (, safeProxy) = _deploySafeAndModuleAndIncludeNodes(nonce, defaultTarget, from, defaultHoprNetwork.tokenAddress, defaultHoprNetwork.defaultTokenAllowance, admins);
         } else {
