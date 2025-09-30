@@ -13,6 +13,7 @@ use std::{
 use async_channel::{Receiver, Sender, bounded};
 use async_trait::async_trait;
 use futures::{FutureExt, StreamExt, future::Either, pin_mut};
+use hopr_api::db::HoprDbTicketOperations;
 use hopr_async_runtime::prelude::spawn;
 use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
 use hopr_crypto_types::types::Hash;
@@ -20,7 +21,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, trace, warn};
-use hopr_api::db::HoprDbTicketOperations;
+
 use crate::{
     action_state::{ActionState, IndexerExpectation},
     errors::{

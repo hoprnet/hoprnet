@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-indexer"
-version = "0.9.5"
+version = "0.10.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -51,6 +51,7 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-bindings = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
@@ -73,3 +74,4 @@ tokio = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }

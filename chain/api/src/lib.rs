@@ -4,7 +4,7 @@ pub mod config;
 pub mod errors;
 pub mod executors;
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::Path, sync::Arc, time::Duration};
 
 use alloy::{
     rpc::{client::ClientBuilder, types::TransactionRequest},
@@ -16,17 +16,16 @@ use alloy::{
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use futures::{
-    FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
+    FutureExt, Stream, StreamExt,
     future::{AbortHandle, BoxFuture},
     stream::BoxStream,
 };
 use hopr_api::{
     Multiaddr,
     chain::{
-        AccountSelector, AnnouncementError, ChainEvents, ChainKeyOperations, ChainMiscOperations,
-        ChainReadAccountOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainReceipt,
-        ChainWriteAccountOperations, ChainWriteChannelOperations, ChainWriteTicketOperations, ChannelSelector,
-        DomainSeparators,
+        AccountSelector, AnnouncementError, ChainEvents, ChainKeyOperations, ChainReadAccountOperations,
+        ChainReadChannelOperations, ChainReceipt, ChainValues, ChainWriteAccountOperations,
+        ChainWriteChannelOperations, ChainWriteTicketOperations, ChannelSelector, DomainSeparators,
     },
     db::TicketSelector,
 };
@@ -52,18 +51,18 @@ use hopr_chain_rpc::{
 use hopr_chain_types::ContractAddresses;
 pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::prelude::*;
+use hopr_db_node::HoprNodeDb;
 use hopr_db_sql::{
-    HoprDbAllOperations, HoprIndexerDb, HoprIndexerDbConfig,
+    HoprIndexerDb, HoprIndexerDbConfig,
     prelude::{
-        ChainOrPacketKey, HoprDbAccountOperations, HoprDbChannelOperations, HoprDbCorruptedChannelOperations,
-        HoprDbInfoOperations,
+        HoprDbAccountOperations, HoprDbChannelOperations, HoprDbCorruptedChannelOperations, HoprDbInfoOperations,
     },
 };
 pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::{
     account::AccountEntry,
     channels::{ChannelId, CorruptedChannelEntry},
-    prelude::{AcknowledgedTicket, ChannelDirection, ChannelStatus, RedeemableTicket, generate_channel_id},
+    prelude::{AcknowledgedTicket, ChannelDirection, ChannelStatus, generate_channel_id},
     tickets::WinningProbability,
 };
 use hopr_primitive_types::prelude::*;
@@ -132,7 +131,7 @@ type ActionQueueType<T> = ActionQueue<
 /// some functionality (e.g. the [ChainActions] as a referentially used)
 /// object. This behavior will be refactored and hidden behind a trait
 /// in the future implementations.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HoprChain {
     me_onchain: ChainKeypair,
     safe_address: Address,
@@ -141,8 +140,9 @@ pub struct HoprChain {
     indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
     indexer_events_rx: Arc<std::sync::Mutex<Option<async_channel::Receiver<SignificantChainEvent>>>>,
     db: HoprIndexerDb,
-    hopr_chain_actions: ChainActions<HoprIndexerDb>,
-    action_queue: ActionQueueType<HoprIndexerDb>,
+    node_db: HoprNodeDb,
+    hopr_chain_actions: ChainActions<HoprNodeDb>,
+    action_queue: ActionQueueType<HoprNodeDb>,
     action_state: Arc<IndexerActionTracker>,
     rpc_operations: RpcOperations<DefaultHttpRequestor>,
 }
@@ -151,6 +151,7 @@ impl HoprChain {
     #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
     pub fn new(
         me_onchain: ChainKeypair,
+        node_db: HoprNodeDb,
         chain_config: ChainNetworkConfig,
         module_address: Address,
         contract_addresses: ContractAddresses,
@@ -158,7 +159,7 @@ impl HoprChain {
         indexer_cfg: IndexerConfig,
     ) -> Result<Self> {
         let db = futures::executor::block_on(HoprIndexerDb::new(
-            "path".into(),
+            Path::new("data"),
             me_onchain.clone(),
             HoprIndexerDbConfig::default(),
         ))?;
@@ -214,7 +215,7 @@ impl HoprChain {
 
         // Build the Action Queue
         let action_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             IndexerActionTracker::default(),
             ethereum_tx_executor,
             action_queue_cfg,
@@ -224,7 +225,7 @@ impl HoprChain {
         let action_sender = action_queue.new_sender();
 
         // Instantiate Chain Actions
-        let hopr_chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
+        let hopr_chain_actions = ChainActions::new(&me_onchain, db.clone(), node_db.clone(), action_sender);
 
         let (indexer_events_tx, indexer_events_rx) = async_channel::unbounded::<SignificantChainEvent>();
 
@@ -236,6 +237,7 @@ impl HoprChain {
             indexer_events_tx,
             indexer_events_rx: Arc::new(std::sync::Mutex::new(Some(indexer_events_rx))),
             db,
+            node_db,
             hopr_chain_actions,
             action_queue,
             action_state,
@@ -266,6 +268,7 @@ impl HoprChain {
                     self.safe_address,
                     self.me_onchain.clone(),
                     self.db.clone(),
+                    self.node_db.clone(),
                     self.rpc_operations.clone(),
                 ),
                 self.db.clone(),
@@ -282,20 +285,12 @@ impl HoprChain {
         self.me_onchain.public().to_address()
     }
 
-    fn action_state(&self) -> Arc<IndexerActionTracker> {
-        self.action_state.clone()
-    }
-
     pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
         Ok(self.db.get_all_corrupted_channels(None).await?)
     }
 
-    fn actions_ref(&self) -> &ChainActions<HoprIndexerDb> {
+    fn actions_ref(&self) -> &ChainActions<HoprNodeDb> {
         &self.hopr_chain_actions
-    }
-
-    fn actions_mut_ref(&mut self) -> &mut ChainActions<HoprIndexerDb> {
-        &mut self.hopr_chain_actions
     }
 
     fn rpc(&self) -> &RpcOperations<DefaultHttpRequestor> {
@@ -303,6 +298,7 @@ impl HoprChain {
     }
 }
 
+#[async_trait::async_trait]
 impl ChainReadAccountOperations for HoprChain {
     type Error = HoprChainError;
 
@@ -343,24 +339,29 @@ impl ChainReadAccountOperations for HoprChain {
     }
 
     async fn safe_allowance<C: Currency>(&self) -> std::result::Result<Balance<C>, Self::Error> {
-        Ok(self
-            .rpc_operations
-            .get_hopr_allowance(self.safe_address, self.contract_addresses.channels)
-            .await?)
+        let amount = if C::is::<XDai>() {
+            return Err(HoprChainError::Api("unsupported currency".into()));
+        } else {
+            self.rpc_operations
+                .get_hopr_allowance(self.safe_address, self.contract_addresses.channels)
+                .await?
+                .amount()
+        };
+        Ok(Balance::<C>::from(amount))
     }
 
     async fn find_account_by_address(
         &self,
-        address: Address,
+        address: &Address,
     ) -> std::result::Result<Option<AccountEntry>, Self::Error> {
-        Ok(self.db.get_account(None, address).await?)
+        Ok(self.db.get_account(None, *address).await?)
     }
 
     async fn find_account_by_packet_key(
         &self,
         packet_key: &OffchainPublicKey,
     ) -> std::result::Result<Option<AccountEntry>, Self::Error> {
-        Ok(self.db.get_account(None, packet_key).await?)
+        Ok(self.db.get_account(None, *packet_key).await?)
     }
 
     async fn check_node_safe_module_status(&self) -> std::result::Result<bool, Self::Error> {
@@ -417,6 +418,7 @@ impl ChainReadAccountOperations for HoprChain {
     }
 }
 
+#[async_trait::async_trait]
 impl ChainWriteAccountOperations for HoprChain {
     type Error = HoprChainError;
 
@@ -440,15 +442,25 @@ impl ChainWriteAccountOperations for HoprChain {
             .boxed())
     }
 
-    async fn withdraw<C: Currency>(
+    async fn withdraw<C: Currency + Send>(
         &self,
         balance: Balance<C>,
         recipient: &Address,
     ) -> std::result::Result<BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>, Self::Error> {
         if C::is::<XDai>() {
-            Ok(self.actions_ref().withdraw_native(*recipient, balance.amount())?)
+            Ok(self
+                .actions_ref()
+                .withdraw_native(*recipient, balance.amount())
+                .await?
+                .map(|r| r.map(|c| c.tx_hash).map_err(HoprChainError::from))
+                .boxed())
         } else if C::is::<WxHOPR>() {
-            Ok(self.actions_ref().withdraw(*recipient, balance.amount())?)
+            Ok(self
+                .actions_ref()
+                .withdraw(*recipient, balance.amount())
+                .await?
+                .map(|r| r.map(|c| c.tx_hash).map_err(HoprChainError::from))
+                .boxed())
         } else {
             return Err(HoprChainError::Api("unsupported currency".into()));
         }
@@ -467,6 +479,7 @@ impl ChainWriteAccountOperations for HoprChain {
     }
 }
 
+#[async_trait::async_trait]
 impl ChainReadChannelOperations for HoprChain {
     type Error = HoprChainError;
 
@@ -491,38 +504,35 @@ impl ChainReadChannelOperations for HoprChain {
             .stream_channels(selector.counterparty, &selector.direction, &selector.allowed_states)
             .await?)
     }
-
-    async fn channel_closure_notice_period(&self) -> std::result::Result<Duration, Self::Error> {
-        Ok(self.rpc_operations.get_channel_closure_notice_period().await?)
-    }
 }
 
+#[async_trait::async_trait]
 impl ChainWriteChannelOperations for HoprChain {
     type Error = HoprChainError;
 
-    async fn open_channel(
-        &self,
-        dst: &Address,
+    async fn open_channel<'a>(
+        &'a self,
+        dst: &'a Address,
         amount: HoprBalance,
-    ) -> std::result::Result<BoxFuture<'_, std::result::Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error>
+    ) -> std::result::Result<BoxFuture<'a, std::result::Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error>
     {
         let me = self.me_onchain();
         Ok(self
             .actions_ref()
             .open_channel(*dst, amount)
             .await?
-            .map(|res| {
+            .map(move |res| {
                 res.map(|c| (c.tx_hash, generate_channel_id(&me, dst)))
                     .map_err(HoprChainError::from)
             })
             .boxed())
     }
 
-    async fn fund_channel(
-        &self,
-        channel_id: &ChannelId,
+    async fn fund_channel<'a>(
+        &'a self,
+        channel_id: &'a ChannelId,
         amount: HoprBalance,
-    ) -> std::result::Result<BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>, Self::Error> {
+    ) -> std::result::Result<BoxFuture<'a, std::result::Result<ChainReceipt, Self::Error>>, Self::Error> {
         Ok(self
             .actions_ref()
             .fund_channel(*channel_id, amount)
@@ -531,11 +541,11 @@ impl ChainWriteChannelOperations for HoprChain {
             .boxed())
     }
 
-    async fn close_channel(
-        &self,
-        channel_id: &ChannelId,
+    async fn close_channel<'a>(
+        &'a self,
+        channel_id: &'a ChannelId,
         direction: ChannelDirection,
-    ) -> std::result::Result<BoxFuture<'_, std::result::Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>
+    ) -> std::result::Result<BoxFuture<'a, std::result::Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>
     {
         // TODO: (dbmig) make sure the ChainActions::close_channel() accepts ChannelEntry directly
         let channel = self
@@ -549,7 +559,7 @@ impl ChainWriteChannelOperations for HoprChain {
 
         Ok(self
             .actions_ref()
-            .close_channel(counterparty, direction, false)
+            .close_channel(counterparty, direction)
             .await?
             .map(|res| {
                 res.and_then(|c| {
@@ -567,6 +577,7 @@ impl ChainWriteChannelOperations for HoprChain {
     }
 }
 
+#[async_trait::async_trait]
 impl ChainKeyOperations for HoprChain {
     type Error = HoprChainError;
     type Mapper = hopr_db_sql::CacheKeyMapper;
@@ -596,7 +607,8 @@ impl ChainKeyOperations for HoprChain {
     }
 }
 
-impl ChainMiscOperations for HoprChain {
+#[async_trait::async_trait]
+impl ChainValues for HoprChain {
     type Error = HoprChainError;
 
     async fn domain_separators(&self) -> std::result::Result<DomainSeparators, Self::Error> {
@@ -613,10 +625,6 @@ impl ChainMiscOperations for HoprChain {
                 .ok_or(HoprChainError::Api("missing channel dst".into()))?,
         })
     }
-}
-
-impl ChainReadTicketOperations for HoprChain {
-    type Error = HoprChainError;
 
     async fn minimum_incoming_ticket_win_prob(&self) -> std::result::Result<WinningProbability, Self::Error> {
         let indexer_data = self.db.get_indexer_data(None).await?;
@@ -629,8 +637,13 @@ impl ChainReadTicketOperations for HoprChain {
             .ticket_price
             .ok_or(HoprChainError::Api("missing ticket price".into()))?)
     }
+
+    async fn channel_closure_notice_period(&self) -> std::result::Result<Duration, Self::Error> {
+        Ok(self.rpc_operations.get_channel_closure_notice_period().await?)
+    }
 }
 
+#[async_trait::async_trait]
 impl ChainWriteTicketOperations for HoprChain {
     type Error = HoprChainError;
 
@@ -684,6 +697,7 @@ impl ChainEvents for HoprChain {
                     } else {
                         debug!(count = resolved.len(), %event, "resolved indexer expectations");
                     }
+                    event
                 }
             }))
         } else {

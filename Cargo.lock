@@ -4494,6 +4494,8 @@ dependencies = [
  "hopr-chain-types",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-node",
+ "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -4524,6 +4526,7 @@ dependencies = [
  "hopr-chain-rpc",
  "hopr-chain-types",
  "hopr-crypto-types",
+ "hopr-db-node",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-primitive-types",
@@ -4557,7 +4560,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-indexer"
-version = "0.9.5"
+version = "0.10.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4570,6 +4573,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex-literal",
+ "hopr-api",
  "hopr-async-runtime",
  "hopr-bindings",
  "hopr-chain-rpc",
@@ -4577,6 +4581,7 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-entity",
+ "hopr-db-node",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",

@@ -1,6 +1,6 @@
 use futures::{Sink, SinkExt};
 use hopr_api::{
-    chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations},
+    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbProtocolOperations, IncomingPacket, IncomingPacketError, OutgoingPacket},
 };
 pub use hopr_crypto_packet::errors::PacketError;
@@ -48,7 +48,7 @@ pub struct PacketProcessor<Db, R> {
 impl<Db, R> PacketWrapping for PacketProcessor<Db, R>
 where
     Db: HoprDbProtocolOperations + Send + Sync + Clone,
-    R: ChainReadChannelOperations + ChainReadTicketOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync,
+    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
 {
     type Error = Db::Error;
     type Input = ApplicationDataOut;
@@ -76,7 +76,7 @@ where
 impl<Db, R> PacketUnwrapping for PacketProcessor<Db, R>
 where
     Db: HoprDbProtocolOperations + Send + Sync + Clone,
-    R: ChainReadChannelOperations + ChainReadTicketOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync,
+    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
 {
     type Error = Db::Error;
     type Packet = IncomingPacket;
@@ -103,7 +103,7 @@ where
 impl<Db, R> PacketProcessor<Db, R>
 where
     Db: HoprDbProtocolOperations + Send + Sync + Clone,
-    R: ChainReadChannelOperations + ChainReadTicketOperations + ChainKeyOperations + ChainMiscOperations + Send + Sync,
+    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
 {
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Db, resolver: R, cfg: PacketInteractionConfig) -> Self {

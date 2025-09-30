@@ -36,6 +36,9 @@ pub enum ChainActionsError {
     #[error("safe does not have enough allowance to fund channel")]
     NotEnoughAllowance,
 
+    #[error("domain separator is missing")]
+    MissingDomainSeparator,
+
     #[error("on-chain submission of transaction failed: {0}")]
     TransactionSubmissionFailed(String),
 
@@ -51,11 +54,11 @@ pub enum ChainActionsError {
     #[error("indexer expectation has been unregistered")]
     ExpectationUnregistered,
 
-    #[error("chain api error: {0}")]
-    ChainApiError(Box<dyn std::error::Error + Send + Sync>),
-
     #[error("node db error: {0}")]
     NodeDbError(Box<dyn std::error::Error + Send + Sync>),
+
+    #[error(transparent)]
+    IndexDbError(#[from] hopr_db_sql::errors::DbSqlError),
 
     #[error(transparent)]
     RpcError(#[from] RpcError),

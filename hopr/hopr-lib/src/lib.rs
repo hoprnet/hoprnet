@@ -88,6 +88,14 @@ use futures::{
     pin_mut,
     stream::{self},
 };
+use hopr_api::{
+    chain::{
+        AccountSelector, AnnouncementError, ChainEvents, ChainKeyOperations, ChainReadAccountOperations,
+        ChainReadChannelOperations, ChainWriteAccountOperations,
+        ChainWriteChannelOperations, ChainWriteTicketOperations, ChannelSelector,
+    },
+    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus, TicketSelector},
+};
 use hopr_async_runtime::prelude::{sleep, spawn};
 pub use hopr_chain_api::config::{
     Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
@@ -96,8 +104,10 @@ use hopr_chain_api::{
     HoprChain, HoprChainProcess, SignificantChainEvent, config::ChainNetworkConfig, errors::HoprChainError,
     wait_for_funds,
 };
+use hopr_chain_types::ContractAddresses;
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_crypto_types::prelude::{Hash, OffchainPublicKey};
+use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_db_sql::{
     accounts::HoprDbAccountOperations,
     channels::HoprDbChannelOperations,
@@ -130,16 +140,13 @@ use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_platform::time::native::current_time,
 };
-use hopr_api::chain::{AccountSelector, AnnouncementError, ChainEvents, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainWriteAccountOperations, ChainWriteChannelOperations, ChainWriteTicketOperations, ChannelSelector};
-use hopr_api::db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus, TicketSelector};
-use hopr_chain_types::ContractAddresses;
-use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
+use hopr_api::chain::ChainValues;
 use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE},
+    state::HoprState,
     traits::chain::{CloseChannelResult, OpenChannelResult},
 };
-use crate::state::HoprState;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -301,6 +308,7 @@ impl Hopr {
 
         let hopr_hopr_chain_api = hopr_chain_api::HoprChain::new(
             me_onchain.clone(),
+            db.clone(),
             resolved_environment.clone(),
             cfg.safe_module.module_address,
             ContractAddresses {
@@ -504,12 +512,15 @@ impl Hopr {
 
         // Calculate the minimum capacity based on accounts (each account can generate 2 messages),
         // plus 100 as an additional buffer
-        let minimum_capacity = self.hopr_chain_api.count_accounts(AccountSelector {
-            public_only: true,
-            ..Default::default()
-        }).await?
-        .saturating_mul(2)
-        .saturating_add(100);
+        let minimum_capacity = self
+            .hopr_chain_api
+            .count_accounts(AccountSelector {
+                public_only: true,
+                ..Default::default()
+            })
+            .await?
+            .saturating_mul(2)
+            .saturating_add(100);
 
         let chain_discovery_events_capacity = std::env::var("HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY")
             .ok()

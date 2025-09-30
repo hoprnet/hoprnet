@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{FutureExt, StreamExt, TryFutureExt, stream::BoxStream};
+use futures::{StreamExt, TryFutureExt, stream::BoxStream};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_entity::{
     account, announcement,
@@ -12,8 +12,8 @@ use hopr_primitive_types::{
 };
 use multiaddr::Multiaddr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder,
-    QuerySelect, Related, Set, sea_query::Expr,
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
+    Set, sea_query::Expr,
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
 use tracing::instrument;

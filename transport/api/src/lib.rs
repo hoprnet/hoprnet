@@ -35,7 +35,7 @@ use futures::{
 };
 use helpers::PathPlanner;
 use hopr_api::{
-    chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations},
+    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainReadTicketOperations, ChainValues},
     db::{HoprDbPeersOperations, HoprDbProtocolOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
@@ -132,7 +132,7 @@ where
     R: ChainReadChannelOperations
         + ChainReadTicketOperations
         + ChainKeyOperations
-        + ChainMiscOperations
+        + ChainValues
         + Clone
         + Send
         + Sync

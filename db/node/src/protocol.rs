@@ -2,7 +2,7 @@ use std::ops::{Mul, Sub};
 
 use async_trait::async_trait;
 use hopr_api::{
-    chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations},
+    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::*,
 };
 use hopr_crypto_packet::{errors::PacketError, prelude::*};
@@ -50,12 +50,7 @@ impl HoprNodeDb {
         outgoing_ticket_price: HoprBalance,
     ) -> Result<HoprForwardedPacket, NodeDbError>
     where
-        R: ChainReadChannelOperations
-            + ChainKeyOperations
-            + ChainReadTicketOperations
-            + ChainMiscOperations
-            + Send
-            + Sync,
+        R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     {
         let previous_hop_addr = resolver
             .packet_key_to_chain_key(&fwd.previous_hop)
@@ -201,7 +196,7 @@ impl HoprNodeDb {
         resolver: &R,
     ) -> Result<ResolvedAcknowledgement, NodeDbError>
     where
-        R: ChainReadChannelOperations + ChainMiscOperations + Send + Sync,
+        R: ChainReadChannelOperations + ChainValues + Send + Sync,
     {
         let ack_half_key = *ack.ack_key_share();
         let challenge = hopr_parallelize::cpu::spawn_blocking(move || ack_half_key.to_challenge()).await?;
@@ -272,7 +267,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
     #[instrument(level = "trace", skip(self, ack, resolver), err(Debug), ret)]
     async fn handle_acknowledgement<R>(&self, ack: VerifiedAcknowledgement, resolver: &R) -> Result<(), NodeDbError>
     where
-        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync,
+        R: ChainReadChannelOperations + ChainValues + Send + Sync,
     {
         let result = self.find_ticket_to_acknowledge(&ack, resolver).await?;
         match &result {
@@ -366,7 +361,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         resolver: &R,
     ) -> Result<OutgoingPacket, NodeDbError>
     where
-        R: ChainKeyOperations + ChainMiscOperations + Send + Sync,
+        R: ChainKeyOperations + ChainValues + Send + Sync,
     {
         let next_peer = resolver
             .packet_key_to_chain_key(&destination)
@@ -437,12 +432,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         resolver: &R,
     ) -> Result<OutgoingPacket, NodeDbError>
     where
-        R: ChainReadChannelOperations
-            + ChainKeyOperations
-            + ChainMiscOperations
-            + ChainReadTicketOperations
-            + Send
-            + Sync,
+        R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -573,12 +563,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         resolver: &R,
     ) -> Result<IncomingPacket, IncomingPacketError<NodeDbError>>
     where
-        R: ChainReadChannelOperations
-            + ChainKeyOperations
-            + ChainReadTicketOperations
-            + ChainMiscOperations
-            + Send
-            + Sync,
+        R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     {
         let offchain_keypair = pkt_keypair.clone();
         let caches = self.caches.clone();
@@ -722,7 +707,7 @@ async fn determine_network_config<R>(
     resolver: &R,
 ) -> Result<(WinningProbability, HoprBalance), NodeDbError>
 where
-    R: ChainReadTicketOperations,
+    R: ChainValues,
 {
     // This operation hits the cache unless the new value is fetched for the first time
     // NOTE: as opposed to the winning probability, the ticket price does not have

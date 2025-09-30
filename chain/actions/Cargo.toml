@@ -17,10 +17,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-chain-rpc/runtime-tokio",
 ]
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-chain-rpc/prometheus",
-]
+prometheus = ["dep:hopr-metrics", "hopr-chain-rpc/prometheus"]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
@@ -46,6 +43,7 @@ hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-api = { workspace = true }
+hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
@@ -59,3 +57,4 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }

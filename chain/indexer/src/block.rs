@@ -16,7 +16,7 @@ use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
 use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations, logs::HoprDbLogOperations};
+use hopr_db_sql::{HoprIndexerDb, info::HoprDbInfoOperations, logs::HoprDbLogOperations};
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, trace};
 
@@ -67,15 +67,14 @@ lazy_static::lazy_static! {
 /// 5. store relevant data into the DB
 /// 6. pass the processing on to the business logic
 #[derive(Debug, Clone)]
-pub struct Indexer<T, U, Db>
+pub struct Indexer<T, U>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
     U: ChainLogHandler + Send + 'static,
-    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
     db_processor: Option<U>,
-    db: Db,
+    db: HoprIndexerDb,
     cfg: IndexerConfig,
     egress: async_channel::Sender<SignificantChainEvent>,
     // If true (default), the indexer will panic if the event stream is terminated.
@@ -83,16 +82,15 @@ where
     panic_on_completion: bool,
 }
 
-impl<T, U, Db> Indexer<T, U, Db>
+impl<T, U> Indexer<T, U>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
     U: ChainLogHandler + Send + Sync + 'static,
-    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
         rpc: T,
         db_processor: U,
-        db: Db,
+        db: HoprIndexerDb,
         cfg: IndexerConfig,
         egress: async_channel::Sender<SignificantChainEvent>,
     ) -> Self {
@@ -116,7 +114,6 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
@@ -488,14 +485,13 @@ where
     /// A `Result` containing an optional vector of significant chain events if the operation succeeds or an error if it
     /// fails.
     async fn process_block_by_id(
-        db: &Db,
+        db: &HoprIndexerDb,
         logs_handler: &U,
         block_id: u64,
         is_synced: bool,
     ) -> crate::errors::Result<Option<Vec<SignificantChainEvent>>>
     where
         U: ChainLogHandler + 'static,
-        Db: HoprDbLogOperations + 'static,
     {
         let logs = db.get_logs(Some(block_id), Some(0)).await?;
         let mut block = BlockWithLogs {
@@ -534,7 +530,7 @@ where
     ///
     /// An optional vector of significant chain events if the operation succeeds.
     async fn process_block(
-        db: &Db,
+        db: &HoprIndexerDb,
         logs_handler: &U,
         block: BlockWithLogs,
         fetch_checksum_from_db: bool,
@@ -542,7 +538,6 @@ where
     ) -> Option<Vec<SignificantChainEvent>>
     where
         U: ChainLogHandler + 'static,
-        Db: HoprDbLogOperations + 'static,
     {
         let block_id = block.block_id;
         let log_count = block.logs.len();
@@ -660,7 +655,7 @@ where
     async fn calculate_sync_process(
         current_block: u64,
         rpc: &T,
-        db: Db,
+        db: HoprIndexerDb,
         chain_head: Arc<AtomicU64>,
         is_synced: Arc<AtomicBool>,
         next_block_to_process: u64,
@@ -669,7 +664,6 @@ where
         channels_address: Option<Address>,
     ) where
         T: HoprIndexerRpcOperations + 'static,
-        Db: HoprDbInfoOperations + Clone + Send + Sync + 'static,
     {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -829,7 +823,7 @@ mod tests {
         keypairs::{Keypair, OffchainKeypair},
         prelude::ChainKeypair,
     };
-    use hopr_db_sql::{HoprIndexerDb, accounts::HoprDbAccountOperations, db::HoprDb};
+    use hopr_db_sql::{HoprIndexerDb, accounts::HoprDbAccountOperations};
     use hopr_internal_types::account::{AccountEntry, AccountType};
     use hopr_primitive_types::prelude::*;
     use mockall::mock;

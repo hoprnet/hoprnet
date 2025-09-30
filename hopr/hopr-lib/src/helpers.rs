@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
-use futures::{stream, Stream, StreamExt};
-use tracing::info;
+use futures::{Stream, StreamExt, stream};
 use hopr_chain_api::SignificantChainEvent;
 use hopr_db_node::HoprNodeDb;
-use hopr_db_sql::{accounts::HoprDbAccountOperations};
+use hopr_db_sql::accounts::HoprDbAccountOperations;
 use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
 use hopr_strategy::strategy::MultiStrategy;
+use tracing::info;
 
 use crate::{
     exports::{chain::types::chain_events::ChainEventType, transport::PeerDiscovery},

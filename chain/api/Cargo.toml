@@ -51,6 +51,7 @@ hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-sql = { workspace = true }
+hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 

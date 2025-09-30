@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use futures::{Sink, SinkExt, StreamExt, TryStreamExt, channel::mpsc::UnboundedSender, pin_mut};
+use futures::{Sink, SinkExt, StreamExt, TryStreamExt, pin_mut};
 use hopr_api::db::TicketSelector;
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_entity::ticket;

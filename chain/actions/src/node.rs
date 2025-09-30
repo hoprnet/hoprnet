@@ -15,11 +15,12 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::{keypairs::OffchainKeypair, prelude::Keypair};
+use hopr_db_sql::prelude::HoprDbAccountOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 use tracing::info;
-use hopr_api::chain::{AccountSelector, ChainReadAccountOperations};
+
 use crate::{
     ChainActions,
     action_queue::PendingAction,
@@ -28,7 +29,6 @@ use crate::{
         Result,
     },
 };
-use crate::errors::ChainActionsError::ChainApiError;
 
 /// Contains all on-chain calls specific to the HOPR node itself.
 #[async_trait]
@@ -48,11 +48,7 @@ pub trait NodeActions {
 }
 
 #[async_trait]
-impl<Db, R> NodeActions for ChainActions<Db, R>
-where
-    R: ChainReadAccountOperations + Clone + Send + Sync,
-    Db: Send + Sync
-{
+impl<Db: Sync> NodeActions for ChainActions<Db> {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn withdraw(&self, recipient: Address, amount: U256) -> Result<PendingAction> {
         if !amount.is_zero() {
@@ -84,20 +80,19 @@ where
         )?;
 
         let count_announced = self
-            .resolver
-            .stream_accounts(AccountSelector {
-            public_only: true,
-            offchain_key: Some(*offchain_key.public()),
-            ..Default::default()
-        })
-        .await
-        .map_err(|e| ChainApiError(e.into()))?
-        .filter(|account| futures::future::ready(account
-            .get_multiaddr()
-            .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress()))
-        ))
-        .count()
-        .await;
+            .index_db
+            .stream_accounts(true)
+            .await?
+            .filter(|account| {
+                futures::future::ready(
+                    &account.public_key == offchain_key.public()
+                        && account
+                            .get_multiaddr()
+                            .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress())),
+                )
+            })
+            .count()
+            .await;
 
         if count_announced == 0 {
             info!(%announcement_data, "initiating announcement");
@@ -126,8 +121,9 @@ mod tests {
     };
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_node::HoprNodeDb;
     use hopr_db_sql::{
-        accounts::HoprDbAccountOperations, api::info::DomainSeparator, db::HoprDb, info::HoprDbInfoOperations,
+        HoprIndexerDb, accounts::HoprDbAccountOperations, info::HoprDbInfoOperations, prelude::DomainSeparator,
     };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -154,7 +150,8 @@ mod tests {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009")?;
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await?;
 
@@ -188,13 +185,13 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
         let tx_res = actions.announce(&[announce_multiaddr], &ALICE_OFFCHAIN).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
@@ -211,7 +208,8 @@ mod tests {
     async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() -> anyhow::Result<()> {
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009")?;
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await?;
 
@@ -230,14 +228,14 @@ mod tests {
         .await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
         let tx_sender = tx_queue.new_sender();
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
         let res = actions.announce(&[announce_multiaddr], &ALICE_OFFCHAIN).await;
         assert!(
@@ -253,7 +251,8 @@ mod tests {
         let stake = HoprBalance::from(10_u32);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await?;
 
@@ -267,15 +266,15 @@ mod tests {
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker.expect_register_expectation().never();
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let tx_res = actions.withdraw(*BOB, stake).await?.await?;
+        let tx_res = actions.withdraw(*BOB, stake.amount()).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -292,25 +291,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_withdraw_zero_amount() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
             .await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions
-                    .withdraw(*BOB, HoprBalance::zero())
-                    .await
-                    .err()
-                    .expect("must be error"),
+                actions.withdraw(*BOB, 0_32.into()).await.err().expect("must be error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow to withdraw 0"

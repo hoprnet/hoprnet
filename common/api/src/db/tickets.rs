@@ -107,6 +107,11 @@ impl TicketSelector {
         ret
     }
 
+    /// Convenience version on [`TicketSelector::also_on_channel`] that accepts a [`ChannelEntry`].
+    pub fn also_on_channel_entry(self, entry: &ChannelEntry) -> Self {
+        self.also_on_channel(entry.get_id(), entry.channel_epoch)
+    }
+
     /// Sets the selector to match only tickets on the given `channel_id` and `epoch`.
     ///
     /// This nullifies any prior calls to [`TicketSelector::also_on_channel`].

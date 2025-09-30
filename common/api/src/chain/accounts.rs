@@ -44,7 +44,7 @@ pub trait ChainWriteAccountOperations {
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>>;
 
     /// Withdraws native or token currency.
-    async fn withdraw<C: Currency>(
+    async fn withdraw<C: Currency + Send>(
         &self,
         balance: Balance<C>,
         recipient: &Address,
@@ -109,8 +109,5 @@ pub trait ChainReadAccountOperations {
     ///
     /// This is potentially done more effectively than counting more elements of
     /// the stream returned by [`ChainReadAccountOperations::stream_accounts`].
-    async fn count_accounts(
-        &self,
-        selector: AccountSelector
-    ) -> Result<usize, Self::Error>;
+    async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error>;
 }

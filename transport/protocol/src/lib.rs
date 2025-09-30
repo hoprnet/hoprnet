@@ -77,7 +77,7 @@ use std::{collections::HashMap, time::Duration};
 
 use futures::{FutureExt, SinkExt, StreamExt};
 use hopr_api::{
-    chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations},
+    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbProtocolOperations, IncomingPacket},
 };
 use hopr_async_runtime::spawn_as_abortable;
@@ -186,8 +186,7 @@ where
     Db: HoprDbProtocolOperations + Clone + Send + Sync + 'static,
     R: ChainReadChannelOperations
         + ChainKeyOperations
-        + ChainReadTicketOperations
-        + ChainMiscOperations
+        + ChainValues
         + Clone
         + Send
         + Sync

@@ -4,7 +4,6 @@ use std::{
     time::Duration,
 };
 
-use hopr_crypto_packet::KeyIdMapper;
 use hopr_crypto_types::{keypairs::Keypair, prelude::ChainKeypair};
 use hopr_db_entity::prelude::{Account, Announcement};
 use hopr_primitive_types::primitives::Address;

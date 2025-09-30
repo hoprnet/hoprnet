@@ -1,5 +1,3 @@
-use std::convert::Infallible;
-
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
@@ -7,7 +5,7 @@ use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelud
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
-use sea_query::{Condition, ExprTrait, SimpleExpr};
+use sea_query::Condition;
 use tracing::instrument;
 
 use crate::{
