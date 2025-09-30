@@ -98,7 +98,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
                     warn!("still unfunded, trying again soon");
                 }
             }
-            Err(e) => error!(error = %e, "failed to fetch balance from the chain"),
+            Err(error) => error!(%error, "failed to fetch balance from the chain"),
         }
 
         sleep(current_delay).await;

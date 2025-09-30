@@ -256,6 +256,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         processes.push(HoprdProcesses::RestApi(abort_handle));
     }
 
+    node.wait_for_funds().await?;
     let (_hopr_socket, hopr_processes) = node
         .run(HoprServerIpForwardingReactor::new(
             hopr_keys.packet_key.clone(),
