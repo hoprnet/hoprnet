@@ -8,7 +8,6 @@ use std::{
 use anyhow::Context;
 use clap::Parser;
 use migration::MigrationTrait;
-// use sea_orm::sqlx::migrate::Migration;
 
 async fn execute_sea_orm_cli_command<I, T>(itr: I) -> anyhow::Result<()>
 where
@@ -79,11 +78,14 @@ fn main() -> anyhow::Result<()> {
         db_migration_package_path.join("Cargo.toml").to_str().unwrap()
     );
 
-    let codegen_path = Path::new(&cargo_manifest_dir)
-        .join("src/codegen/sqlite")
-        .into_os_string()
-        .into_string()
-        .map_err(|e| anyhow::anyhow!(e.to_str().unwrap_or("illegible error").to_string()))?;
+    // Always generate to OUT_DIR for both Nix and regular builds
+    let out_dir = env::var("OUT_DIR").context("OUT_DIR environment variable should be set")?;
+    let codegen_path = Path::new(&out_dir).join("codegen").join("sqlite");
+
+    // Ensure the codegen directory exists
+    std::fs::create_dir_all(&codegen_path).context("Failed to create codegen directory in OUT_DIR")?;
+
+    let codegen_path_str = codegen_path.to_string_lossy().to_string();
 
     let tmp_db = temp_dir().join("tmp_migration.db");
 
@@ -124,7 +126,7 @@ fn main() -> anyhow::Result<()> {
         "generate",
         "entity",
         "-o",
-        &codegen_path,
+        &codegen_path_str,
         "-u",
         format!(
             "sqlite://{}?mode=rwc",
@@ -135,6 +137,25 @@ fn main() -> anyhow::Result<()> {
         )
         .as_str(),
     ]))?;
+
+    // Generate a mod.rs file that re-exports all the generated entities
+    let mod_rs_path = codegen_path.join("mod.rs");
+    let mut mod_content = String::new();
+
+    // Read the generated files and create module declarations
+    if let Ok(entries) = std::fs::read_dir(&codegen_path) {
+        for entry in entries.flatten() {
+            if let Some(file_name) = entry.file_name().to_str() {
+                if file_name.ends_with(".rs") && file_name != "mod.rs" {
+                    let module_name = file_name.trim_end_matches(".rs");
+                    mod_content.push_str(&format!("pub mod {};\n", module_name));
+                    mod_content.push_str(&format!("pub use {}::*;\n", module_name));
+                }
+            }
+        }
+    }
+
+    std::fs::write(&mod_rs_path, mod_content).context("Failed to write mod.rs file")?;
 
     Ok(())
 }
