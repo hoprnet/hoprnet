@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use hopr_db_entity::{network_eligibility, network_registry};
+use hopr_db_entity::{chain_info, network_eligibility, network_registry};
 use hopr_primitive_types::prelude::{Address, ToHex};
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set};
 use sea_query::OnConflict;
 
 use crate::{
-    HoprDbGeneralModelOperations, OptTx,
+    HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID,
     db::HoprDb,
     errors::{DbSqlError, Result},
 };
@@ -83,13 +83,23 @@ impl HoprDbRegistryOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbSqlError>(
-                        network_registry::Entity::find()
-                            .filter(network_registry::Column::ChainAddress.eq(address.to_hex()))
-                            .one(tx.as_ref())
-                            .await?
-                            .is_some(),
-                    )
+                    let is_registry_enabled = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .map(|v| v.network_registry_enabled)
+                        .unwrap_or(false);
+
+                    if is_registry_enabled {
+                        Ok::<_, DbSqlError>(
+                            network_registry::Entity::find()
+                                .filter(network_registry::Column::ChainAddress.eq(address.to_hex()))
+                                .one(tx.as_ref())
+                                .await?
+                                .is_some(),
+                        )
+                    } else {
+                        Ok(true)
+                    }
                 })
             })
             .await
