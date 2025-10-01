@@ -52,6 +52,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     address public multisend;
     // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
     Role internal role;
+    // to indicate that this is a NodeManagementModule, to be compatible with v3.x network
+    bool public isHoprNodeManagementModule = true;
 
     event SetMultisendAddress(address indexed multisendAddress);
     event NodeAdded(address indexed node);
