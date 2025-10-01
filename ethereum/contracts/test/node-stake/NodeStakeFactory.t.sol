@@ -582,7 +582,6 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
             address safeAddress,
             address safeProxyFactoryAddress,
             address compatibilityFallbackHandlerAddress,
-            address multiSendAddress
         ) = factory.safeLibAddresses();
         admins[0] = admin0;
         bytes memory safeInitializer = abi.encodeWithSignature(

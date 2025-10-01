@@ -38,6 +38,7 @@ contract HoprNodeManagementModuleTest is
         bytes32(hex"0101010101010101010101010101010101010101010101010101010101010101");
     bytes32 public constant ANNOUNCEMENT_TARGET =
         bytes32(hex"0202020202020202020202020202020202020202010003000000000000000000");
+    bytes32 public constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
     /**
      * Manually import events and errors
      */
@@ -114,8 +115,7 @@ contract HoprNodeManagementModuleTest is
         HoprNodeManagementModule newImplementation = new HoprNodeManagementModule();
 
         // get implementation address from slot
-        bytes32 _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
-        bytes32 currentImplementation = vm.load(address(moduleProxy), _IMPLEMENTATION_SLOT);
+        bytes32 currentImplementation = vm.load(address(moduleProxy), IMPLEMENTATION_SLOT);
         assertEq(address(uint160(uint256(currentImplementation))), address(moduleSingleton));
 
         assertEq(moduleProxy.owner(), address(1));
@@ -127,7 +127,7 @@ contract HoprNodeManagementModuleTest is
         moduleProxy.upgradeToAndCall(address(newImplementation), hex"");
 
         // get implementation address from slot
-        currentImplementation = vm.load(address(moduleProxy), _IMPLEMENTATION_SLOT);
+        currentImplementation = vm.load(address(moduleProxy), IMPLEMENTATION_SLOT);
         assertEq(address(uint160(uint256(currentImplementation))), address(newImplementation));
         vm.clearMockedCalls();
     }

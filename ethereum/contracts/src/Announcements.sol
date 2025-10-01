@@ -205,7 +205,6 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
 
     function getKeyIdWithOffchainKey(bytes32 ed25519_pub_key) external view returns (bool, KeyId) {
         (bool success, uint256 possibleKeyId, ) = _keyBindings.tryGet(ed25519_pub_key);
-
         return (success, KeyId.wrap(uint32(possibleKeyId)));
     }
 

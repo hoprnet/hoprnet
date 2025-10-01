@@ -532,6 +532,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
         view
         returns (address predicted)
     {
+        // forge-lint: disable-start(asm-keccak256)
         bytes32 bytecodeHash = keccak256(abi.encodePacked(
             type(ERC1967Proxy).creationCode, 
             abi.encode(
@@ -562,6 +563,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
         view
         returns (address predicted)
     {
+        // forge-lint: disable-start(asm-keccak256)
         bytes32 salt = keccak256(abi.encodePacked(caller, nonce));
         return predictModuleAddress(salt, safe, defaultTarget);
     }

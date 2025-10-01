@@ -95,4 +95,13 @@ ignore = [
   "src/static/HoprWrapperProxy.sol",
   "src/static/stake/mocks/ERC777Mock.sol",
   "src/static/stake/mocks/ERC677Mock.sol",
+  # Temporarily ignore the unfinished migration contracts
+  "src/node-stake/migration/NodeSafeMigration.sol",
+  "test/node-stake/NodeSafeMigration.t.sol"
+]
+
+exclude_lints = [
+  "unwrapped-modifier-logic",
+  "unsafe-typecast",
+  "unsafe-cheatcode",
 ]
