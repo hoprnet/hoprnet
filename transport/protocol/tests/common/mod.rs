@@ -1,17 +1,24 @@
-use std::str::FromStr;
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
+
 use anyhow::Context;
 use async_trait::async_trait;
 use bimap::BiHashMap;
-use futures::{SinkExt, StreamExt};
-use futures::stream::BoxStream;
+use futures::{SinkExt, StreamExt, stream::BoxStream};
 use hex_literal::hex;
+use hopr_api::chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues, ChannelSelector, DomainSeparators};
 use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
 };
-use hopr_db_sql::{accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, info::HoprDbInfoOperations, HoprIndexerDb};
+use hopr_db_node::HoprNodeDb;
+use hopr_db_sql::{
+    HoprIndexerDb,
+    accounts::HoprDbAccountOperations,
+    channels::HoprDbChannelOperations,
+    info::HoprDbInfoOperations,
+    prelude::{DbSqlError, DomainSeparator},
+};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
@@ -23,9 +30,6 @@ use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 use tokio::time::timeout;
 use tracing::debug;
-use hopr_api::chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues, ChannelSelector, DomainSeparators};
-use hopr_db_node::HoprNodeDb;
-use hopr_db_sql::prelude::{DbSqlError, DomainSeparator};
 
 lazy_static! {
     pub static ref PEERS: Vec<OffchainKeypair> = [
@@ -72,11 +76,12 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
 }
 
 pub async fn create_dbs(amount: usize) -> anyhow::Result<(Vec<HoprNodeDb>, Vec<HoprIndexerDb>)> {
-    let indexer_dbs = futures::future::join_all((0..amount).map(|i| HoprIndexerDb::new_in_memory(PEERS_CHAIN[i].clone())))
-        .await
-        .into_iter()
-        .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
-        .collect::<anyhow::Result<Vec<HoprIndexerDb>>>()?;
+    let indexer_dbs =
+        futures::future::join_all((0..amount).map(|i| HoprIndexerDb::new_in_memory(PEERS_CHAIN[i].clone())))
+            .await
+            .into_iter()
+            .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
+            .collect::<anyhow::Result<Vec<HoprIndexerDb>>>()?;
 
     let node_dbs = futures::future::join_all((0..amount).map(|i| HoprNodeDb::new_in_memory(PEERS_CHAIN[i].clone())))
         .await
@@ -95,7 +100,9 @@ pub async fn create_minimal_topology(dbs: &mut [HoprIndexerDb]) -> anyhow::Resul
             .set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
 
-        dbs[index].update_ticket_price(None, (*DEFAULT_PRICE_PER_PACKET).into()).await?;
+        dbs[index]
+            .update_ticket_price(None, (*DEFAULT_PRICE_PER_PACKET).into())
+            .await?;
 
         // Link all the node keys and chain keys from the simulated announcements
         for i in 0..PEERS.len() {
@@ -176,7 +183,7 @@ impl ChainValues for IndexerDbChainWrapper {
         Ok(DomainSeparators {
             ledger: Hash::default(),
             safe_registry: Hash::default(),
-            channel: data.channels_dst.unwrap()
+            channel: data.channels_dst.unwrap(),
         })
     }
 
@@ -203,18 +210,15 @@ impl ChainKeyOperations for IndexerDbChainWrapper {
             .iter()
             .enumerate()
             .find(|(_, a)| &a.public().to_address() == chain)
-            .map(|(i, _)| *PEERS[i].public())
-        )
+            .map(|(i, _)| *PEERS[i].public()))
     }
 
     async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
-        Ok(
-            PEERS
-                .iter()
-                .enumerate()
-                .find(|(_, k)| k.public() == packet)
-                .map(|(i, _)| PEERS_CHAIN[i].public().to_address())
-        )
+        Ok(PEERS
+            .iter()
+            .enumerate()
+            .find(|(_, k)| k.public() == packet)
+            .map(|(i, _)| PEERS_CHAIN[i].public().to_address()))
     }
 
     fn key_id_mapper_ref(&self) -> &Self::Mapper {
@@ -367,18 +371,15 @@ impl PathAddressResolver for TestResolver {
             .iter()
             .enumerate()
             .find(|(_, a)| &a.public().to_address() == address)
-            .map(|(i, _)| *PEERS[i].public())
-        )
+            .map(|(i, _)| *PEERS[i].public()))
     }
 
     async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError> {
-        Ok(
-            PEERS
-                .iter()
-                .enumerate()
-                .find(|(_, k)| k.public() == key)
-                .map(|(i, _)| PEERS_CHAIN[i].public().to_address())
-        )
+        Ok(PEERS
+            .iter()
+            .enumerate()
+            .find(|(_, k)| k.public() == key)
+            .map(|(i, _)| PEERS_CHAIN[i].public().to_address()))
     }
 }
 

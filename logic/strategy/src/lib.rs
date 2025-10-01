@@ -3,7 +3,6 @@
 //! during node runtime.
 //!
 //! - [passive strategy](crate::strategy::MultiStrategy)
-//! - [promiscuous strategy](crate::promiscuous)
 //! - [auto funding strategy](crate::auto_funding)
 //! - [auto redeeming strategy](crate::auto_redeeming)
 //! - [multiple strategy chains](crate::strategy)
@@ -29,9 +28,6 @@
 //!   allow_recursive: true
 //!   execution_interval: 60
 //!   strategies:
-//!     - !Promiscuous
-//!       max_channels: 50
-//!       new_channel_stake: 20
 //!     - !AutoFunding
 //!       funding_amount: 20
 //! ```
@@ -44,22 +40,19 @@ use strum::{Display, EnumString, VariantNames};
 
 use crate::{
     Strategy::AutoRedeeming, auto_funding::AutoFundingStrategyConfig, auto_redeeming::AutoRedeemingStrategyConfig,
-    channel_finalizer::ClosureFinalizerStrategyConfig, promiscuous::PromiscuousStrategyConfig,
-    strategy::MultiStrategyConfig,
+    channel_finalizer::ClosureFinalizerStrategyConfig, strategy::MultiStrategyConfig,
 };
 
 pub mod auto_funding;
 pub mod auto_redeeming;
 mod channel_finalizer;
 pub mod errors;
-pub mod promiscuous;
 pub mod strategy;
 
 /// Lists all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum Strategy {
-    Promiscuous(PromiscuousStrategyConfig),
     AutoRedeeming(AutoRedeemingStrategyConfig),
     AutoFunding(AutoFundingStrategyConfig),
     ClosureFinalizer(ClosureFinalizerStrategyConfig),
@@ -81,11 +74,6 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             // min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
             // funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             // }),
-            // Aggregating(AggregatingStrategyConfig {
-            //    aggregation_threshold: Some(100),
-            //    unrealized_balance_ratio: Some(0.9),
-            //    aggregate_on_channel_close: true,
-            //}),
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_all_on_close: true,
                 minimum_redeem_ticket_value: HoprBalance::from_str("1 wxHOPR").unwrap(),

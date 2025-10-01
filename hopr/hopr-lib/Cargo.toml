@@ -104,8 +104,8 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 url = { workspace = true }
 
-hopr-chain-actions = { workspace = true, features = ["runtime-tokio"]}
-hopr-chain-rpc = {workspace = true, features = ["runtime-tokio"]}
-hopr-chain-indexer = {workspace = true, features = ["runtime-tokio"]}
+hopr-chain-actions = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-indexer = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }

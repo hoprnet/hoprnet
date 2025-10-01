@@ -6,6 +6,7 @@ use alloy::primitives::{B256, U256};
 use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
+use hopr_api::db::{HoprDbTicketOperations, TicketSelector};
 use hopr_async_runtime::{AbortHandle, prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
@@ -27,15 +28,14 @@ use hopr_chain_rpc::{
 };
 use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType, utils::create_anvil};
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::prelude::*;
+use hopr_db_node::HoprNodeDb;
+use hopr_db_sql::{logs::HoprDbLogOperations, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use tokio::fs;
 use tracing::info;
-use hopr_api::db::{HoprDbTicketOperations, TicketSelector};
-use hopr_db_node::HoprNodeDb;
-use hopr_db_sql::logs::HoprDbLogOperations;
+
 use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
@@ -94,7 +94,8 @@ async fn start_node_chain_logic(
     let index_db = HoprIndexerDb::new_in_memory(chain_key.clone()).await?;
     let node_db = HoprNodeDb::new_in_memory(chain_key.clone()).await?;
     let self_db = index_db.clone();
-    index_db.begin_transaction()
+    index_db
+        .begin_transaction()
         .await?
         .perform(|tx| {
             Box::pin(async move {
@@ -390,7 +391,10 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     assert_eq!(
         Some(alice_node.chain_key.public().to_address()),
-        bob_node.index_db.resolve_chain_key(alice_node.offchain_key.public()).await?,
+        bob_node
+            .index_db
+            .resolve_chain_key(alice_node.offchain_key.public())
+            .await?,
         "bob must resolve alice's chain key correctly"
     );
 
@@ -405,7 +409,10 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     assert_eq!(
         Some(bob_node.chain_key.public().to_address()),
-        alice_node.index_db.resolve_chain_key(bob_node.offchain_key.public()).await?,
+        alice_node
+            .index_db
+            .resolve_chain_key(bob_node.offchain_key.public())
+            .await?,
         "alice must resolve bob's chain key correctly"
     );
 

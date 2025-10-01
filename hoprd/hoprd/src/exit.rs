@@ -121,7 +121,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
 
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    let _g = hopr_metrics::MultiGaugeGuard::new(&*METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
+                    let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
 
                     // The Session forwards the termination to the udp_bridge, terminating
                     // the UDP socket.
@@ -196,7 +196,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
 
                 tokio::task::spawn(async move {
                     #[cfg(all(feature = "prometheus", not(test)))]
-                    let _g = hopr_metrics::MultiGaugeGuard::new(&*METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
+                    let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["tcp"], 1.0);
 
                     match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
@@ -222,7 +222,7 @@ impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReac
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
                 #[cfg(all(feature = "prometheus", not(test)))]
-                let _g = hopr_metrics::MultiGaugeGuard::new(&*METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
+                let _g = hopr_metrics::MultiGaugeGuard::new(&METRIC_ACTIVE_TARGETS, &["udp"], 1.0);
 
                 // Uses 4 kB buffer for copying
                 match tokio::io::copy(&mut reader, &mut writer).await {

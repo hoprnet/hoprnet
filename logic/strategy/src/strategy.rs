@@ -21,12 +21,9 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_api::{
-    chain::{
-        ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainWriteChannelOperations,
-        ChainWriteTicketOperations,
-    },
-    db::HoprDbPeersOperations,
+use hopr_api::chain::{
+    ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainWriteChannelOperations,
+    ChainWriteTicketOperations,
 };
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -37,7 +34,7 @@ use validator::Validate;
 
 use crate::{
     Strategy, auto_funding::AutoFundingStrategy, auto_redeeming::AutoRedeemingStrategy,
-    channel_finalizer::ClosureFinalizerStrategy, errors::Result, promiscuous::PromiscuousStrategy,
+    channel_finalizer::ClosureFinalizerStrategy, errors::Result,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -136,9 +133,8 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<Db, A>(cfg: MultiStrategyConfig, db: Db, hopr_chain_actions: A) -> Self
+    pub fn new<A>(cfg: MultiStrategyConfig, hopr_chain_actions: A) -> Self
     where
-        Db: HoprDbPeersOperations + Clone + Send + Sync + 'static,
         A: ChainReadChannelOperations
             + ChainWriteChannelOperations
             + ChainReadAccountOperations
@@ -158,11 +154,6 @@ impl MultiStrategy {
 
         for strategy in cfg.strategies.iter() {
             match strategy {
-                Strategy::Promiscuous(sub_cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
-                    sub_cfg.clone(),
-                    db.clone(),
-                    hopr_chain_actions.clone(),
-                ))),
                 Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
                     *sub_cfg,
                     hopr_chain_actions.clone(),
@@ -179,7 +170,7 @@ impl MultiStrategy {
                         let mut cfg_clone = sub_cfg.clone();
                         cfg_clone.allow_recursive = false; // Do not allow more levels of recursion
 
-                        strategies.push(Box::new(Self::new(cfg_clone, db.clone(), hopr_chain_actions.clone())))
+                        strategies.push(Box::new(Self::new(cfg_clone, hopr_chain_actions.clone())))
                     } else {
                         error!("recursive multi-strategy not allowed and skipped")
                     }

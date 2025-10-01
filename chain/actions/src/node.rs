@@ -302,7 +302,11 @@ mod tests {
 
         assert!(
             matches!(
-                actions.withdraw::<WxHOPR>(*BOB, 0_32.into()).await.err().expect("must be error"),
+                actions
+                    .withdraw::<WxHOPR>(*BOB, 0_32.into())
+                    .await
+                    .err()
+                    .expect("must be error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow to withdraw 0"

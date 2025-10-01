@@ -50,7 +50,7 @@ hopr-transport-protocol = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true }
-hopr-db-node = {workspace = true, features = ["runtime-tokio"]}
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-types = { workspace = true }
 mockall = { workspace = true }

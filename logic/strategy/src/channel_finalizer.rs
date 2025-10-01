@@ -69,7 +69,7 @@ impl<A> Display for ClosureFinalizerStrategy<A> {
 #[async_trait]
 impl<A> SingularStrategy for ClosureFinalizerStrategy<A>
 where
-    A: ChainReadChannelOperations + ChainWriteChannelOperations +  Send + Sync,
+    A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync,
 {
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
@@ -108,7 +108,6 @@ where
             }
         }
 
-
         debug!("channel closure finalizer: initiated closure finalization done");
         Ok(())
     }
@@ -116,15 +115,20 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use std::{ops::Add, time::SystemTime};
-    use futures::{FutureExt, future::ok, stream::BoxStream, future::BoxFuture};
+
+    use futures::{
+        FutureExt,
+        future::{BoxFuture, ok},
+        stream::BoxStream,
+    };
     use hex_literal::hex;
     use hopr_api::chain::ChainReceipt;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
+
+    use super::*;
     use crate::errors::StrategyError;
 
     lazy_static! {
@@ -164,21 +168,30 @@ mod tests {
     impl ChainWriteChannelOperations for MockChainActions {
         type Error = StrategyError;
 
-        async fn open_channel<'a>(&'a self, _: &'a Address, _: HoprBalance) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
+        async fn open_channel<'a>(
+            &'a self,
+            _: &'a Address,
+            _: HoprBalance,
+        ) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
             unimplemented!()
         }
 
-        async fn fund_channel<'a>(&'a self, _: &'a ChannelId, _: HoprBalance) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        async fn fund_channel<'a>(
+            &'a self,
+            _: &'a ChannelId,
+            _: HoprBalance,
+        ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
             unimplemented!()
         }
 
-        async fn close_channel<'a>(&'a self, channel_id: &'a ChannelId) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
+        async fn close_channel<'a>(
+            &'a self,
+            channel_id: &'a ChannelId,
+        ) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
             assert_eq!(self.1, *channel_id);
             Ok(ok((ChannelStatus::Closed, ChainReceipt::default())).boxed())
         }
     }
-
-
 
     #[tokio::test]
     async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
@@ -217,7 +230,10 @@ mod tests {
             0.into(),
         );
 
-        let actions = MockChainActions(vec![c_open, c_pending, c_pending_elapsed, c_pending_overdue], c_pending_elapsed.get_id());
+        let actions = MockChainActions(
+            vec![c_open, c_pending, c_pending_elapsed, c_pending_overdue],
+            c_pending_elapsed.get_id(),
+        );
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 

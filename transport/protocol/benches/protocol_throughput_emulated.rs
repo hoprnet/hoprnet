@@ -12,6 +12,7 @@ use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig};
 use libp2p::PeerId;
+
 use crate::common::IndexerDbChainWrapper;
 
 const SAMPLE_SIZE: usize = 50;

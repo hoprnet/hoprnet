@@ -334,11 +334,7 @@ impl Hopr {
             my_multiaddresses,
         );
 
-        let multi_strategy = Arc::new(MultiStrategy::new(
-            cfg.strategy.clone(),
-            db.clone(),
-            hopr_hopr_chain_api.clone(),
-        ));
+        let multi_strategy = Arc::new(MultiStrategy::new(cfg.strategy.clone(), hopr_hopr_chain_api.clone()));
         debug!(
             strategies = tracing::field::debug(&multi_strategy),
             "Initialized strategies"

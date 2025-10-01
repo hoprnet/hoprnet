@@ -115,12 +115,15 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use futures::{FutureExt, future::ok, future::BoxFuture};
+    use futures::{
+        FutureExt,
+        future::{BoxFuture, ok},
+    };
     use hex_literal::hex;
     use hopr_api::chain::{ChainReceipt, ChainWriteChannelOperations};
     use hopr_crypto_types::types::Hash;
+
+    use super::*;
     use crate::{
         auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
         strategy::SingularStrategy,
@@ -140,22 +143,32 @@ mod tests {
     impl ChainWriteChannelOperations for MockChannelActions {
         type Error = StrategyError;
 
-        async fn open_channel<'a>(&'a self, _: &'a Address, _: HoprBalance) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
+        async fn open_channel<'a>(
+            &'a self,
+            _: &'a Address,
+            _: HoprBalance,
+        ) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
             unimplemented!()
         }
 
-        async fn fund_channel<'a>(&'a self, channel_id: &'a ChannelId, amount: HoprBalance) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        async fn fund_channel<'a>(
+            &'a self,
+            channel_id: &'a ChannelId,
+            amount: HoprBalance,
+        ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
             assert_eq!(&self.0, channel_id);
             assert_eq!(self.1, amount);
 
             Ok(ok(ChainReceipt::default()).boxed())
         }
 
-        async fn close_channel<'a>(&'a self, _: &'a ChannelId) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
+        async fn close_channel<'a>(
+            &'a self,
+            _: &'a ChannelId,
+        ) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
             unimplemented!()
         }
     }
-
 
     #[tokio::test]
     async fn test_auto_funding_strategy() -> anyhow::Result<()> {
@@ -188,7 +201,6 @@ mod tests {
             ChannelStatus::PendingToClose(std::time::SystemTime::now()),
             0_u32.into(),
         );
-
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,

@@ -1117,10 +1117,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_api::db::HoprDbTicketOperations;
     use hopr_chain_rpc::HoprIndexerRpcOperations;
-    use hopr_chain_types::{
-        ContractAddresses,
-        chain_events::ChainEventType,
-    };
+    use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
     use hopr_crypto_types::prelude::*;
     use hopr_db_node::HoprNodeDb;
     use hopr_db_sql::{

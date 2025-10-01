@@ -137,8 +137,8 @@ where
                 return Err(CriteriaNotSatisfied);
             }
 
-            let mut selector = TicketSelector::from(all_channels.first().unwrap())
-                .with_amount(self.cfg.minimum_redeem_ticket_value..);
+            let mut selector =
+                TicketSelector::from(all_channels.first().unwrap()).with_amount(self.cfg.minimum_redeem_ticket_value..);
             for channel in all_channels.iter().skip(1) {
                 selector = selector.also_on_channel_entry(channel);
             }
@@ -165,8 +165,7 @@ where
     }
 
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value)
-        {
+        if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
             if let Some(channel) = self
                 .hopr_chain_actions
                 .channel_by_id(&ack.verified_ticket().channel_id)
@@ -181,8 +180,7 @@ where
                 let rxs = self
                     .hopr_chain_actions
                     .redeem_tickets_via_selector(
-                        TicketSelector::from(channel)
-                            .with_amount(self.cfg.minimum_redeem_ticket_value..),
+                        TicketSelector::from(channel).with_amount(self.cfg.minimum_redeem_ticket_value..),
                     )
                     .await
                     .map_err(|e| StrategyError::Other(e.into()))?;
@@ -218,8 +216,7 @@ where
             let count = self
                 .hopr_chain_actions
                 .redeem_tickets_via_selector(
-                    TicketSelector::from(channel)
-                        .with_amount(self.cfg.minimum_redeem_ticket_value..),
+                    TicketSelector::from(channel).with_amount(self.cfg.minimum_redeem_ticket_value..),
                 )
                 .await
                 .map_err(|e| StrategyError::Other(e.into()))?
@@ -243,17 +240,22 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::{
         ops::Add,
         time::{Duration, SystemTime},
     };
 
-    use futures::{FutureExt, future::ok, future::BoxFuture, stream::BoxStream};
+    use futures::{
+        FutureExt,
+        future::{BoxFuture, ok},
+        stream::BoxStream,
+    };
     use hex_literal::hex;
-    use hopr_crypto_random::{Randomizable};
-    use hopr_crypto_types::prelude::*;
     use hopr_api::chain::ChainReceipt;
+    use hopr_crypto_random::Randomizable;
+    use hopr_crypto_types::prelude::*;
+
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
@@ -284,11 +286,17 @@ mod tests {
     impl ChainWriteTicketOperations for MockChainActions {
         type Error = StrategyError;
 
-        async fn redeem_ticket(&self, _: AcknowledgedTicket) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        async fn redeem_ticket(
+            &self,
+            _: AcknowledgedTicket,
+        ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
             unimplemented!()
         }
 
-        async fn redeem_tickets_via_selector(&self, selector: TicketSelector) -> Result<Vec<BoxFuture<'_, Result<ChainReceipt, Self::Error>>>, Self::Error> {
+        async fn redeem_tickets_via_selector(
+            &self,
+            selector: TicketSelector,
+        ) -> Result<Vec<BoxFuture<'_, Result<ChainReceipt, Self::Error>>>, Self::Error> {
             assert_eq!(selector.channel_identifiers, self.1.channel_identifiers);
             assert_eq!(selector.amount, self.1.amount);
             Ok(vec![futures::future::ready(Ok(ChainReceipt::default())).boxed()])
@@ -337,16 +345,13 @@ mod tests {
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
-
-
     #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem() -> anyhow::Result<()> {
         let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
 
         let actions = MockChainActions(
             vec![CHANNEL_1.clone()],
-            TicketSelector::from(CHANNEL_1.clone())
-                .with_amount(HoprBalance::zero()..)
+            TicketSelector::from(CHANNEL_1.clone()).with_amount(HoprBalance::zero()..),
         );
 
         let cfg = AutoRedeemingStrategyConfig {
@@ -367,10 +372,10 @@ mod tests {
         let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
 
         let actions = MockChainActions(
-            vec![CHANNEL_1.clone(),CHANNEL_2.clone()],
+            vec![CHANNEL_1.clone(), CHANNEL_2.clone()],
             TicketSelector::from(CHANNEL_1.clone())
                 .also_on_channel_entry(&*CHANNEL_2)
-                .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
+                .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..),
         );
 
         let cfg = AutoRedeemingStrategyConfig {
@@ -461,7 +466,6 @@ mod tests {
 
         Ok(())
     }
-
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem_multiple_tickets_in_channel() -> anyhow::Result<()> {
