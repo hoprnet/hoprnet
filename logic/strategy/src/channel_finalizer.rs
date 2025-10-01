@@ -50,10 +50,7 @@ pub struct ClosureFinalizerStrategy<A> {
     hopr_chain_actions: A,
 }
 
-impl<A> ClosureFinalizerStrategy<A>
-where
-    A: ChainReadChannelOperations + ChainWriteChannelOperations,
-{
+impl<A> ClosureFinalizerStrategy<A> {
     /// Constructs the strategy.
     pub fn new(cfg: ClosureFinalizerStrategyConfig, hopr_chain_actions: A) -> Self {
         Self {
@@ -63,10 +60,7 @@ where
     }
 }
 
-impl<A> Display for ClosureFinalizerStrategy<A>
-where
-    A: ChainReadChannelOperations + ChainWriteChannelOperations,
-{
+impl<A> Display for ClosureFinalizerStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::ClosureFinalizer(self.cfg))
     }
@@ -75,12 +69,12 @@ where
 #[async_trait]
 impl<A> SingularStrategy for ClosureFinalizerStrategy<A>
 where
-    A: ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync,
+    A: ChainReadChannelOperations + ChainWriteChannelOperations +  Send + Sync,
 {
     async fn on_tick(&self) -> errors::Result<()> {
         let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
 
-        let outgoing_channels = self
+        let mut outgoing_channels = self
             .hopr_chain_actions
             .stream_channels(ChannelSelector {
                 direction: vec![ChannelDirection::Outgoing],
@@ -88,10 +82,7 @@ where
                 ..Default::default()
             })
             .await
-            .map_err(|e| errors::StrategyError::Other(e.into()))?;
-
-        let chain_actions = self.hopr_chain_actions.clone();
-        outgoing_channels
+            .map_err(|e| errors::StrategyError::Other(e.into()))?
             .filter_map(|channel| {
                 futures::future::ready(
                     if matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
@@ -102,23 +93,21 @@ where
                         None
                     },
                 )
-            })
-            .for_each(move |channel| {
-                let chain_actions = chain_actions.clone();
-                async move {
-                    info!(%channel, "channel closure finalizer: finalizing closure");
-                    match chain_actions.close_channel(&channel.get_id()).await {
-                        Ok(_) => {
-                            // Currently, we're not interested in awaiting the Close transactions to confirmation
-                            debug!(%channel, "channel closure finalizer: finalizing closure");
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_COUNT_CLOSURE_FINALIZATIONS.increment();
-                        }
-                        Err(e) => error!(%channel, error = %e, "channel closure finalizer: failed to finalize closure"),
-                    }
+            });
+
+        while let Some(channel) = outgoing_channels.next().await {
+            info!(%channel, "channel closure finalizer: finalizing closure");
+            match self.hopr_chain_actions.close_channel(&channel.get_id()).await {
+                Ok(_) => {
+                    // Currently, we're not interested in awaiting the Close transactions to confirmation
+                    debug!(%channel, "channel closure finalizer: finalizing closure");
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    METRIC_COUNT_CLOSURE_FINALIZATIONS.increment();
                 }
-            })
-            .await;
+                Err(e) => error!(%channel, error = %e, "channel closure finalizer: failed to finalize closure"),
+            }
+        }
+
 
         debug!("channel closure finalizer: initiated closure finalization done");
         Ok(())
@@ -127,18 +116,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{ops::Add, time::SystemTime};
+    use super::*;
 
-    use futures::{FutureExt, future::ok};
+    use std::{ops::Add, time::SystemTime};
+    use futures::{FutureExt, future::ok, stream::BoxStream, future::BoxFuture};
     use hex_literal::hex;
-    use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
-    use hopr_crypto_random::random_bytes;
+    use hopr_api::chain::ChainReceipt;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
-    use mockall::mock;
-
-    use super::*;
+    use crate::errors::StrategyError;
 
     lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
@@ -152,34 +139,49 @@ mod tests {
         static ref EUGENE: Address = hex!("0c1da65d269f89b05e3775bf8fcd21a138e8cbeb").into();
     }
 
-    mock! {
-        ChannelAct { }
-        #[async_trait]
-        impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn close_channel(
-                &self,
-                counterparty: Address,
-                direction: ChannelDirection,
-                redeem_before_close: bool,
-            ) -> hopr_chain_actions::errors::Result<PendingAction>;
+    // Due to async-trait and lifetimes, we cannot use mockall
+    struct MockChainActions(Vec<ChannelEntry>, Hash);
+
+    #[async_trait::async_trait]
+    impl ChainReadChannelOperations for MockChainActions {
+        type Error = StrategyError;
+
+        async fn channel_by_parties(&self, _: &Address, _: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+            unimplemented!()
+        }
+
+        async fn channel_by_id(&self, _: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+            unimplemented!()
+        }
+
+        async fn stream_channels<'a>(&'a self, _: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+            // TODO: validate the selector
+            Ok(futures::stream::iter(self.0.iter().cloned()).boxed())
         }
     }
 
-    fn mock_action_confirmation_closure(channel: ChannelEntry) -> ActionConfirmation {
-        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
-        ActionConfirmation {
-            tx_hash: random_hash,
-            event: Some(ChainEventType::ChannelClosureInitiated(channel)),
-            action: Action::CloseChannel(channel, ChannelDirection::Outgoing),
+    #[async_trait::async_trait]
+    impl ChainWriteChannelOperations for MockChainActions {
+        type Error = StrategyError;
+
+        async fn open_channel<'a>(&'a self, _: &'a Address, _: HoprBalance) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
+            unimplemented!()
+        }
+
+        async fn fund_channel<'a>(&'a self, _: &'a ChannelId, _: HoprBalance) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
+            unimplemented!()
+        }
+
+        async fn close_channel<'a>(&'a self, channel_id: &'a ChannelId) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
+            assert_eq!(self.1, *channel_id);
+            Ok(ok((ChannelStatus::Closed, ChainReceipt::default())).boxed())
         }
     }
+
+
 
     #[tokio::test]
     async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-
         let max_closure_overdue = Duration::from_secs(600);
 
         // Should leave this channel opened
@@ -215,29 +217,11 @@ mod tests {
             0.into(),
         );
 
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.upsert_channel(Some(tx), c_open).await?;
-                    db_clone.upsert_channel(Some(tx), c_pending).await?;
-                    db_clone.upsert_channel(Some(tx), c_pending_elapsed).await?;
-                    db_clone.upsert_channel(Some(tx), c_pending_overdue).await
-                })
-            })
-            .await?;
-
-        let mut actions = MockChannelAct::new();
-        actions
-            .expect_close_channel()
-            .once()
-            .withf(|addr, dir, _| DAVE.eq(addr) && ChannelDirection::Outgoing.eq(dir))
-            .return_once(move |_, _, _| Ok(ok(mock_action_confirmation_closure(c_pending_elapsed)).boxed()));
+        let actions = MockChainActions(vec![c_open, c_pending, c_pending_elapsed, c_pending_overdue], c_pending_elapsed.get_id());
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 
-        let strat = ClosureFinalizerStrategy::new(cfg, db.clone(), actions);
+        let strat = ClosureFinalizerStrategy::new(cfg, actions);
         strat.on_tick().await?;
 
         Ok(())

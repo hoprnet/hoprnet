@@ -61,12 +61,14 @@ hopr-transport-identity = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+bimap = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
+test-log = { workspace = true }
 hopr-protocol-session = { workspace = true, features = ["session-types"] }
 hopr-protocol-start = { workspace = true }
 hopr-transport-session = { workspace = true }

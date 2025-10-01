@@ -660,7 +660,6 @@ impl ChainWriteTicketOperations for HoprChain {
         &self,
         ticket: AcknowledgedTicket,
     ) -> std::result::Result<BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>, Self::Error> {
-        // TODO: (dbmig) the BeingRedeemed marking logic should be moved here
         Ok(self
             .actions_ref()
             .redeem_ticket(ticket)
@@ -673,7 +672,6 @@ impl ChainWriteTicketOperations for HoprChain {
         &self,
         selector: TicketSelector,
     ) -> std::result::Result<Vec<BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>>, Self::Error> {
-        // TODO: (dbmig) the BeingRedeemed marking logic should be moved here
         Ok(self
             .actions_ref()
             .redeem_tickets(selector)

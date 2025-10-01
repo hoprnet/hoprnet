@@ -16,7 +16,6 @@ use sqlx::{
 };
 use tracing::log::LevelFilter;
 use validator::Validate;
-
 use crate::{
     HoprDbAllOperations,
     cache::{CacheKeyMapper, HoprIndexerDbCaches},

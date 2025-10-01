@@ -9,7 +9,7 @@ pub enum NodeDbError {
     #[error("cannot find a surb: {0}")]
     NoSurbAvailable(String),
 
-    #[error("ticket validation error for {:?}: {}", 0.0, 0.1)]
+    #[error("ticket validation error for {}: {}", .0.0, .0.1)]
     TicketValidationError(Box<(Ticket, String)>),
 
     #[error("failed to process acknowledgement: {0}")]

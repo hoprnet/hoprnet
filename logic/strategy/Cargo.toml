@@ -24,11 +24,10 @@ prometheus = [
 ]
 
 [dependencies]
-async-lock = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 rand = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
 smart-default = { workspace = true }
@@ -51,6 +50,7 @@ hopr-transport-protocol = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true }
+hopr-db-node = {workspace = true, features = ["runtime-tokio"]}
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-types = { workspace = true }
 mockall = { workspace = true }

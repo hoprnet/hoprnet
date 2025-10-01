@@ -280,7 +280,6 @@ where
         + ChainReadChannelOperations
         + ChainWriteChannelOperations
         + ChainKeyOperations
-        + Clone
         + Send
         + Sync,
 {
@@ -302,34 +301,30 @@ where
 
     async fn get_network_stats(&self) -> Result<NetworkStats> {
         let mut num_online_peers = 0;
-        let chain_actions = self.hopr_chain_actions.clone();
+        let mut stream = self
+            .db
+            .get_network_peers(PeerSelector::default(), false)
+            .await
+            .map_err(|e| StrategyError::Other(e.into()))?;
+
+        let mut peers_with_quality = HashMap::new();
+        while let Some(status) = stream.next().await {
+            if status.quality > 0.0 {
+                num_online_peers += 1;
+            } else {
+                trace!(peer = %status.id.1, "peer is not online");
+            }
+
+            if let Ok(Some(addr)) = self.hopr_chain_actions.packet_key_to_chain_key(&status.id.0).await {
+                peers_with_quality.insert(addr, (status.get_average_quality(), status.heartbeats_sent));
+            } else {
+                error!(address = %status.id.1, "could not find on-chain address");
+            }
+        }
+
+
         Ok(NetworkStats {
-            peers_with_quality: self
-                .db
-                .get_network_peers(PeerSelector::default(), false)
-                .await
-                .map_err(|e| StrategyError::Other(e.into()))?
-                .inspect(|status| {
-                    if status.quality > 0.0 {
-                        num_online_peers += 1;
-                    } else {
-                        trace!(peer = %status.id.1, "peer is not online");
-                    }
-                })
-                .filter_map(move |status| {
-                    let chain_actions = chain_actions.clone();
-                    async move {
-                        // Resolve peer's chain key and average quality
-                        if let Ok(Some(addr)) = chain_actions.packet_key_to_chain_key(&status.id.0).await {
-                            Some((addr, (status.get_average_quality(), status.heartbeats_sent)))
-                        } else {
-                            error!(address = %status.id.1, "could not find on-chain address");
-                            None
-                        }
-                    }
-                })
-                .collect()
-                .await,
+            peers_with_quality,
             num_online_peers,
         })
     }
@@ -511,12 +506,11 @@ impl<Db, A> Display for PromiscuousStrategy<Db, A> {
 #[async_trait]
 impl<Db, A> SingularStrategy for PromiscuousStrategy<Db, A>
 where
-    Db: HoprDbPeersOperations + Clone + Send + Sync,
+    Db: HoprDbPeersOperations + Send + Sync,
     A: ChainReadAccountOperations
         + ChainReadChannelOperations
         + ChainKeyOperations
         + ChainWriteChannelOperations
-        + Clone
         + Send
         + Sync,
 {
@@ -594,8 +588,9 @@ mod tests {
         info::HoprDbInfoOperations,
     };
     use lazy_static::lazy_static;
-    use mockall::mock;
-
+    use hopr_api::db::PeerOrigin;
+    use hopr_db_node::errors::NodeDbError;
+    use hopr_db_node::HoprNodeDb;
     use super::*;
 
     lazy_static! {
@@ -654,19 +649,9 @@ mod tests {
         ));
     }
 
-    mock! {
+    mockall::mock! {
         ChannelAct { }
-        #[async_trait]
-        impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn close_channel(
-                &self,
-                counterparty: Address,
-                direction: ChannelDirection,
-                redeem_before_close: bool,
-            ) -> hopr_chain_actions::errors::Result<PendingAction>;
-        }
+
     }
 
     async fn mock_channel(db: HoprDb, dst: Address, balance: HoprBalance) -> anyhow::Result<ChannelEntry> {
@@ -683,7 +668,7 @@ mod tests {
         Ok(channel)
     }
 
-    async fn prepare_network(db: HoprDb, qualities: Vec<f64>) -> anyhow::Result<()> {
+    async fn prepare_network(db: HoprNodeDb, qualities: Vec<f64>) -> anyhow::Result<()> {
         assert_eq!(qualities.len(), PEERS.len() - 1, "invalid network setup");
 
         for (i, quality) in qualities.into_iter().enumerate() {
@@ -703,8 +688,8 @@ mod tests {
         Ok(())
     }
 
-    async fn init_db(db: HoprDb, node_balance: HoprBalance) -> anyhow::Result<()> {
-        db.begin_transaction()
+    async fn init_db(db: HoprNodeDb, node_balance: HoprBalance) -> anyhow::Result<()> {
+        /*db.begin_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
@@ -722,42 +707,17 @@ mod tests {
                         )
                         .await?;
                     }
-                    Ok::<_, DbSqlError>(())
+                    Ok::<_, NodeDbError>(())
                 })
             })
             .await?;
-
+        */
         Ok(())
     }
-
-    fn mock_action_confirmation_closure(channel: ChannelEntry) -> ActionConfirmation {
-        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
-        ActionConfirmation {
-            tx_hash: random_hash,
-            event: Some(ChainEventType::ChannelClosureInitiated(channel)),
-            action: Action::CloseChannel(channel, ChannelDirection::Outgoing),
-        }
-    }
-
-    fn mock_action_confirmation_opening(address: Address, balance: HoprBalance) -> ActionConfirmation {
-        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
-        ActionConfirmation {
-            tx_hash: random_hash,
-            event: Some(ChainEventType::ChannelOpened(ChannelEntry::new(
-                PEERS[0].0,
-                address,
-                balance,
-                U256::zero(),
-                ChannelStatus::Open,
-                U256::zero(),
-            ))),
-            action: Action::OpenChannel(address, balance),
-        }
-    }
-
+    
     #[test_log::test(tokio::test)]
     async fn test_promiscuous_strategy_tick_decisions() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 

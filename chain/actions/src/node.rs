@@ -270,7 +270,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let tx_res = actions.withdraw(*BOB, stake.amount()).await?.await?;
+        let tx_res = actions.withdraw(*BOB, stake).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -302,7 +302,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions.withdraw(*BOB, 0_32.into()).await.err().expect("must be error"),
+                actions.withdraw::<WxHOPR>(*BOB, 0_32.into()).await.err().expect("must be error"),
                 ChainActionsError::InvalidArguments(_)
             ),
             "should not allow to withdraw 0"

@@ -12,6 +12,7 @@ use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig};
 use libp2p::PeerId;
+use crate::common::IndexerDbChainWrapper;
 
 const SAMPLE_SIZE: usize = 50;
 
@@ -35,17 +36,18 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                 let packets = random_packets_of_count(*bytes / PAYLOAD_SIZE);
 
                 let runtime = tokio::runtime::Runtime::new().expect("tokio runtime must be constructible");
-                let dbs = runtime.block_on(async {
-                    let mut dbs = create_dbs(PEER_COUNT).await.expect("DBs must be constructible");
-                    create_minimal_topology(&mut dbs)
+                let (node_dbs, index_dbs) = runtime.block_on(async {
+                    let (node_dbs, mut index_dbs) = create_dbs(PEER_COUNT).await.expect("DBs must be constructible");
+                    create_minimal_topology(&mut index_dbs)
                         .await
                         .expect("topology must be constructible");
-                    dbs
+                    (node_dbs, index_dbs)
                 });
 
                 b.to_async(runtime).iter(|| {
                     let packets = packets.clone();
-                    let dbs = dbs.clone();
+                    let node_dbs = node_dbs.clone();
+                    let index_dbs = index_dbs.clone();
 
                     async move {
                         let (wire_msg_send_tx, wire_msg_send_rx) =
@@ -67,7 +69,8 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let processes = hopr_transport_protocol::run_msg_ack_protocol(
                             cfg,
-                            dbs[TESTED_PEER_ID].clone(),
+                            node_dbs[TESTED_PEER_ID].clone(),
+                            IndexerDbChainWrapper(index_dbs[TESTED_PEER_ID].clone()),
                             (wire_msg_send_tx, wire_msg_recv_rx),
                             (api_recv_tx, api_send_rx),
                         )

@@ -115,16 +115,12 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
-    use futures::{FutureExt, future::ok};
-    use hex_literal::hex;
-    use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
-    use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::types::Hash;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
-    use mockall::mock;
+    use super::*;
 
+    use futures::{FutureExt, future::ok, future::BoxFuture};
+    use hex_literal::hex;
+    use hopr_api::chain::{ChainReceipt, ChainWriteChannelOperations};
+    use hopr_crypto_types::types::Hash;
     use crate::{
         auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
         strategy::SingularStrategy,
@@ -137,29 +133,29 @@ mod tests {
         static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();
     }
 
-    mock! {
-        ChannelAct { }
-        #[async_trait]
-        impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn close_channel(
-                &self,
-                counterparty: Address,
-                direction: ChannelDirection,
-                redeem_before_close: bool,
-            ) -> hopr_chain_actions::errors::Result<PendingAction>;
+    // Due to async-trait and lifetimes, we cannot use mockall
+    struct MockChannelActions(Hash, HoprBalance);
+
+    #[async_trait::async_trait]
+    impl ChainWriteChannelOperations for MockChannelActions {
+        type Error = StrategyError;
+
+        async fn open_channel<'a>(&'a self, _: &'a Address, _: HoprBalance) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
+            unimplemented!()
+        }
+
+        async fn fund_channel<'a>(&'a self, channel_id: &'a ChannelId, amount: HoprBalance) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
+            assert_eq!(&self.0, channel_id);
+            assert_eq!(self.1, amount);
+
+            Ok(ok(ChainReceipt::default()).boxed())
+        }
+
+        async fn close_channel<'a>(&'a self, _: &'a ChannelId) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
+            unimplemented!()
         }
     }
 
-    fn mock_action_confirmation(channel: ChannelEntry, balance: HoprBalance) -> ActionConfirmation {
-        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
-        ActionConfirmation {
-            tx_hash: random_hash,
-            event: Some(ChainEventType::ChannelBalanceIncreased(channel, balance)),
-            action: Action::FundChannel(channel, balance),
-        }
-    }
 
     #[tokio::test]
     async fn test_auto_funding_strategy() -> anyhow::Result<()> {
@@ -193,20 +189,13 @@ mod tests {
             0_u32.into(),
         );
 
-        let mut actions = MockChannelAct::new();
-        let fund_amount_c = fund_amount;
-        actions
-            .expect_fund_channel()
-            .times(1)
-            .withf(move |h, balance| c2.get_id().eq(h) && fund_amount_c.eq(balance))
-            .return_once(move |_, _| Ok(ok(mock_action_confirmation(c2, fund_amount)).boxed()));
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,
             funding_amount: fund_amount,
         };
 
-        let afs = AutoFundingStrategy::new(cfg, actions);
+        let afs = AutoFundingStrategy::new(cfg, MockChannelActions(c1.get_id(), fund_amount));
         afs.on_own_channel_changed(
             &c1,
             ChannelDirection::Outgoing,

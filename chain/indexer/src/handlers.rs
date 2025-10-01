@@ -1119,12 +1119,12 @@ mod tests {
     use hopr_chain_rpc::HoprIndexerRpcOperations;
     use hopr_chain_types::{
         ContractAddresses,
-        chain_events::{ChainEventType, NetworkRegistryStatus},
+        chain_events::ChainEventType,
     };
     use hopr_crypto_types::prelude::*;
     use hopr_db_node::HoprNodeDb;
     use hopr_db_sql::{
-        HoprDbAllOperations, HoprDbGeneralModelOperations, HoprIndexerDb,
+        HoprDbGeneralModelOperations, HoprIndexerDb,
         accounts::{ChainOrPacketKey, HoprDbAccountOperations},
         channels::HoprDbChannelOperations,
         corrupted_channels::HoprDbCorruptedChannelOperations,
