@@ -1,59 +1,61 @@
 mod common;
 
-use common::fixtures::{SWARM_N, cluster_fixture, random_int, random_int_pair, random_int_triple};
-use common::hopr_tester::HoprTester;
+use std::{ops::Mul, time::Duration};
+
+use common::{
+    fixtures::{cluster_fixture, random_int, random_int_pair, random_int_triple},
+    hopr_tester::HoprTester,
+};
 use hopr_lib::{DestinationRouting, HoprBalance, RoutingOptions, Tag};
 use hopr_primitive_types::bounded::BoundedVec;
-
 use rstest::rstest;
-use std::ops::Mul;
-use std::time::Duration;
-use tracing::info;
+use serial_test::serial;
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
+// #[rstest]
+// #[tokio::test]
+// async fn test_cluster_connectivity(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
+//     use tokio::time::{Instant, sleep};
+
+//     let start = Instant::now();
+//     let timeout_duration = Duration::from_secs(120);
+
+//     loop {
+//         let results = futures::future::join_all(
+//             cluster_fixture
+//                 .iter()
+//                 .map(|node| node.inner().network_connected_peers()),
+//         )
+//         .await
+//         .into_iter()
+//         .collect::<Result<Vec<_>, _>>()
+//         .expect("failed to get connected peers");
+
+//         // log connected peers for each node
+//         for (i, peers) in results.iter().enumerate() {
+//             info!("Node {} connected peers: {:?}", i, peers);
+//         }
+
+//         if results.iter().all(|peers| peers.len() == SWARM_N - 1) {
+//             break;
+//         }
+
+//         if start.elapsed() >= timeout_duration {
+//             panic!(
+//                 "Timeout: not all nodes connected within {:?} seconds",
+//                 timeout_duration.as_secs()
+//             );
+//         }
+
+//         sleep(Duration::from_secs(1)).await;
+//     }
+
+//     Ok(())
+// }
+
 #[rstest]
-#[tokio::test]
-async fn test_cluster_connectivity(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
-    use tokio::time::{Instant, sleep};
-
-    let start = Instant::now();
-    let timeout_duration = Duration::from_secs(120);
-
-    loop {
-        let results = futures::future::join_all(
-            cluster_fixture
-                .iter()
-                .map(|node| node.inner().network_connected_peers()),
-        )
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .expect("failed to get connected peers");
-
-        // log connected peers for each node
-        for (i, peers) in results.iter().enumerate() {
-            info!("Node {} connected peers: {:?}", i, peers);
-        }
-
-        if results.iter().all(|peers| peers.len() == SWARM_N - 1) {
-            break;
-        }
-
-        if start.elapsed() >= timeout_duration {
-            panic!(
-                "Timeout: not all nodes connected within {:?} seconds",
-                timeout_duration.as_secs()
-            );
-        }
-
-        sleep(Duration::from_secs(1)).await;
-    }
-
-    Ok(())
-}
-
-#[rstest]
+#[serial]
 #[tokio::test]
 async fn test_get_balance(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
     use hopr_lib::{HoprBalance, WxHOPR, XDai, XDaiBalance};
@@ -84,6 +86,7 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> a
 }
 
 #[rstest]
+#[serial]
 #[tokio::test]
 async fn test_ping_peer_inside_cluster(
     #[future(awt)] cluster_fixture: &Vec<HoprTester>,
@@ -103,6 +106,7 @@ async fn test_ping_peer_inside_cluster(
 }
 
 #[rstest]
+#[serial]
 #[tokio::test]
 async fn test_ping_self_should_fail(
     #[future(awt)] cluster_fixture: &Vec<HoprTester>,
@@ -118,6 +122,7 @@ async fn test_ping_self_should_fail(
 }
 
 #[rstest]
+#[serial]
 #[tokio::test]
 async fn test_open_close_channel(
     #[future(awt)] cluster_fixture: &Vec<HoprTester>,
@@ -138,7 +143,10 @@ async fn test_open_close_channel(
 
     let channel = cluster_fixture[src]
         .inner()
-        .open_channel(&(cluster_fixture[dst].address()), FUNDING_AMOUNT.into())
+        .open_channel(
+            &(cluster_fixture[dst].address()),
+            FUNDING_AMOUNT.parse::<HoprBalance>()?,
+        )
         .await
         .expect("failed to open channel");
 
@@ -171,13 +179,14 @@ async fn test_open_close_channel(
 }
 
 #[rstest]
+#[serial]
 #[tokio::test]
 async fn test_channel_funding_should_be_visible_in_channel_stake(
     #[future(awt)] cluster_fixture: &Vec<HoprTester>,
     random_int_pair: (usize, usize),
 ) -> anyhow::Result<()> {
     let (src, dst) = random_int_pair;
-    let funding_amount: HoprBalance = FUNDING_AMOUNT.parse()?;
+    let funding_amount = FUNDING_AMOUNT.parse::<HoprBalance>()?;
 
     let channel = cluster_fixture[src]
         .inner()
@@ -201,8 +210,9 @@ async fn test_channel_funding_should_be_visible_in_channel_stake(
 }
 
 #[rstest]
-#[cfg(feature = "runtime-tokio")]
+#[serial]
 #[tokio::test]
+#[cfg(feature = "runtime-tokio")]
 async fn test_send_0_hop_without_open_channels(
     #[future(awt)] cluster_fixture: &Vec<HoprTester>,
     random_int_pair: (usize, usize),
@@ -225,12 +235,13 @@ async fn test_send_0_hop_without_open_channels(
 }
 
 #[rstest]
+#[serial]
 #[tokio::test]
 async fn test_reset_ticket_statistics(
     #[future(awt)] cluster_fixture: &Vec<HoprTester>,
     random_int_triple: (usize, usize, usize),
 ) -> anyhow::Result<()> {
-    let funding_amount: HoprBalance = FUNDING_AMOUNT.parse()?;
+    let funding_amount = FUNDING_AMOUNT.parse::<HoprBalance>()?;
 
     let (src, mid, dst) = random_int_triple;
 
@@ -281,9 +292,12 @@ async fn test_reset_ticket_statistics(
 }
 
 #[rstest]
-#[cfg(feature = "session-client")]
+#[serial]
 #[tokio::test]
+#[cfg(feature = "session-client")]
 async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
+    use std::str::FromStr;
+
     use hopr_lib::{RoutingOptions, SessionClientConfig, SessionTarget};
     use hopr_network_types::udp::{ConnectedUdpStream, UdpStreamParallelism};
     use hopr_transport_session::{Capabilities, Capability, IpOrHost, SealedHost};
@@ -336,8 +350,9 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<HoprTest
 }
 
 #[rstest]
-#[cfg(feature = "session-client")]
+#[serial]
 #[tokio::test]
+#[cfg(feature = "session-client")]
 async fn test_create_1_hop_session(
     #[future(awt)] cluster_fixture: &Vec<HoprTester>,
     random_int_triple: (usize, usize, usize),
@@ -353,7 +368,10 @@ async fn test_create_1_hop_session(
 
     cluster_fixture[src]
         .inner()
-        .open_channel(&(cluster_fixture[mid].address()), FUNDING_AMOUNT.into())
+        .open_channel(
+            &(cluster_fixture[mid].address()),
+            FUNDING_AMOUNT.parse::<HoprBalance>()?,
+        )
         .await
         .expect("failed to open channel");
 

@@ -1,12 +1,13 @@
-use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, hopr_tester::HoprTester, onboard_node};
+use std::{str::FromStr, time::Duration};
 
 use alloy::primitives::U256;
-
 use hopr_lib::Address;
 use once_cell::sync::Lazy;
 use serde_json::json;
-use std::{str::FromStr, time::Duration};
-use tokio::sync::OnceCell;
+use tokio::{sync::OnceCell, time::sleep};
+use tracing::info;
+
+use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, hopr_tester::HoprTester, onboard_node};
 
 static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
 static SWARM_N_FIXTURE: Lazy<OnceCell<Vec<HoprTester>>> = Lazy::new(|| OnceCell::const_new());
@@ -14,7 +15,6 @@ static SWARM_N_FIXTURE: Lazy<OnceCell<Vec<HoprTester>>> = Lazy::new(|| OnceCell:
 pub const SNAPSHOT_BASE: &str = "/tmp/hopr-tests/snapshots";
 pub const PATH_TO_PROTOCOL_CONFIG: &str = "tests/protocol-config-anvil.json";
 pub const SWARM_N: usize = 3;
-pub const LOAD_FROM_FILES: bool = false; // TODO: need to port this to auto-detection
 
 #[rstest::fixture]
 pub fn random_int() -> usize {
@@ -57,6 +57,15 @@ pub async fn chainenv_fixture() -> &'static TestChainEnv {
         .get_or_init(|| async {
             env_logger::init();
 
+            match std::process::Command::new("pkill").arg("-f").arg("anvil").output() {
+                Ok(_) => {
+                    info!("Killed existing anvil instances");
+                }
+                Err(_) => {
+                    info!("No existing anvil instances found");
+                }
+            };
+
             let requestor_base = SnapshotRequestor::new(SNAPSHOT_BASE)
                 .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
                 .load(false)
@@ -71,8 +80,10 @@ pub async fn chainenv_fixture() -> &'static TestChainEnv {
 
 #[rstest::fixture]
 pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'static Vec<HoprTester> {
-    use hopr_lib::ProtocolsConfig;
     use std::fs::read_to_string;
+
+    use hopr_lib::ProtocolsConfig;
+
     if !(2..=9).contains(&SWARM_N) {
         panic!("SWARM_N must be between 2 and 9");
     }
@@ -90,7 +101,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
 
             // Setup SWARM_N safes
             let mut safes = Vec::with_capacity(SWARM_N);
-            if LOAD_FROM_FILES {
+            if std::path::Path::new("/tmp/hopr-tests/load_addresses").exists() {
                 // read safe address and module from file /tmp/hopr-tests/node_i/safe_addresses.json
                 for i in 0..SWARM_N {
                     let addresses: serde_json::Value = serde_json::from_str(
@@ -135,11 +146,12 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
                         "module": safe.module_address.to_string(),
                     });
                     std::fs::create_dir_all(format!("/tmp/hopr-tests/node_{i}")).expect("failed to create directory");
-                    std::fs::write(
+                    let _ = std::fs::write(
                         format!("/tmp/hopr-tests/node_{i}/safe_addresses.json"),
                         serde_json::to_string_pretty(&safe_addresses).unwrap(),
-                    )
-                    .expect("failed to write safe addresses to file");
+                    );
+                    let _ = std::fs::write(format!("/tmp/hopr-tests/load_addresses"), "")
+                        .expect("failed to write safe addresses to file");
                     safes.push(safe);
                 }
             }
@@ -180,8 +192,30 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
 
             // Run all nodes in parallel
             futures::future::join_all(hopr_instances.iter().map(|instance| instance.run())).await;
+            // Wait for full mesh connectivity
+
+            futures::future::join_all(hopr_instances.iter().map(|instance| wait_for_connectivity(instance))).await;
 
             hopr_instances
         })
         .await
+}
+
+async fn wait_for_connectivity(node: &HoprTester) {
+    info!("Waiting for full connectivity");
+    loop {
+        let peers = node
+            .inner()
+            .network_connected_peers()
+            .await
+            .expect("failed to get connected peers");
+
+        // log connected peers for each node
+        info!("Node {} connected peers: {:?}", node.address(), peers);
+
+        if peers.len() == SWARM_N - 1 {
+            break;
+        }
+        sleep(Duration::from_secs(1)).await;
+    }
 }

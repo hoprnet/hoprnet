@@ -1,9 +1,12 @@
-use crate::common::NodeSafeConfig;
-
-use hopr_crypto_types::keypairs::ChainKeypair;
-use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
-use hopr_lib::{Address, Balance, ChannelEntry, ChannelStatus, Currency, Hopr, HoprBalance, PeerId, prelude};
 use std::time::Duration;
+
+use hopr_crypto_types::{
+    keypairs::ChainKeypair,
+    prelude::{Keypair, OffchainKeypair},
+};
+use hopr_lib::{Address, Balance, ChannelEntry, ChannelStatus, Currency, Hopr, HoprBalance, PeerId, prelude};
+
+use crate::common::NodeSafeConfig;
 
 pub struct HoprTester(Hopr);
 
@@ -102,7 +105,7 @@ impl HoprTester {
     }
 
     pub fn address(&self) -> Address {
-        self.0.me_onchain().clone()
+        self.0.me_onchain()
     }
 
     pub fn peer_id(&self) -> PeerId {
@@ -115,6 +118,7 @@ impl HoprTester {
             Err(_) => None,
         }
     }
+
     pub async fn outgoing_channels_by_status(&self, status: Option<ChannelStatus>) -> Option<Vec<ChannelEntry>> {
         match self.0.channels_from(&self.address()).await {
             Ok(channels) => Some(
