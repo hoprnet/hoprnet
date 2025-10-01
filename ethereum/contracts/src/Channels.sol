@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
 import { Multicall } from "openzeppelin-contracts/utils/Multicall.sol";
 import { IERC1820Registry } from "openzeppelin-contracts/utils/introspection/IERC1820Registry.sol";
