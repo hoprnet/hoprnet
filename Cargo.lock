@@ -4609,6 +4609,7 @@ name = "hopr-chain-api"
 version = "0.7.1"
 dependencies = [
  "alloy",
+ "anyhow",
  "async-channel 2.5.0",
  "async-trait",
  "futures",
