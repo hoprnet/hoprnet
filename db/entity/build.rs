@@ -149,7 +149,6 @@ fn main() -> anyhow::Result<()> {
                 if file_name.ends_with(".rs") && file_name != "mod.rs" {
                     let module_name = file_name.trim_end_matches(".rs");
                     mod_content.push_str(&format!("pub mod {};\n", module_name));
-                    mod_content.push_str(&format!("pub use {}::*;\n", module_name));
                 }
             }
         }
