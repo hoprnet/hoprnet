@@ -488,8 +488,7 @@ impl HoprDbAccountOperations for HoprIndexerDb {
 
 impl HoprIndexerDb {
     pub async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>> {
-        self
-            .translate_key(None, *onchain_key)
+        self.translate_key(None, *onchain_key)
             .await?
             .map(|k| k.try_into())
             .inspect(|v: &std::result::Result<OffchainPublicKey, _>| {
@@ -506,8 +505,7 @@ impl HoprIndexerDb {
     }
 
     pub async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Result<Option<Address>> {
-        self
-            .translate_key(None, *offchain_key)
+        self.translate_key(None, *offchain_key)
             .await?
             .map(|k| k.try_into())
             .transpose()

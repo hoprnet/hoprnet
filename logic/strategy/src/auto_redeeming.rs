@@ -245,11 +245,7 @@ mod tests {
         time::{Duration, SystemTime},
     };
 
-    use futures::{
-        FutureExt,
-        future::{BoxFuture, ok},
-        stream::BoxStream,
-    };
+    use futures::{FutureExt, future::BoxFuture, stream::BoxStream};
     use hex_literal::hex;
     use hopr_api::chain::ChainReceipt;
     use hopr_crypto_random::Randomizable;
@@ -396,16 +392,10 @@ mod tests {
         let ack_ticket_below = generate_random_ack_ticket(1, 1, 4)?;
         let ack_ticket_at = generate_random_ack_ticket(1, 1, 5)?;
 
-        let mut actions = MockChainActions::new();
-        actions
-            .expect_redeem_tickets_with_counterparty()
-            .once()
-            .with(
-                mockall::predicate::eq(ack_ticket_at.ticket.verified_issuer().clone()),
-                mockall::predicate::eq(HoprBalance::from(*PRICE_PER_PACKET * 5)),
-                mockall::predicate::eq(false),
-            )
-            .return_once(move |_, _, _| Ok(vec![ok(Hash::default()).boxed()]));
+        let actions = MockChainActions(
+            vec![CHANNEL_1.clone()],
+            TicketSelector::from(CHANNEL_1.clone()).with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..),
+        );
 
         let cfg = AutoRedeemingStrategyConfig {
             minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
@@ -433,19 +423,10 @@ mod tests {
             4.into(),
         );
 
-        // Make the ticket worth exactly the threshold
-        let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
-
-        let mut actions = MockChainActions::new();
-        actions
-            .expect_redeem_tickets_in_channel()
-            .once()
-            .with(
-                mockall::predicate::eq(channel),
-                mockall::predicate::eq(HoprBalance::from(*PRICE_PER_PACKET * 5)),
-                mockall::predicate::eq(true),
-            )
-            .return_once(move |_, _, _| Ok(vec![ok(Hash::default()).boxed()]));
+        let actions = MockChainActions(
+            vec![CHANNEL_1.clone()],
+            TicketSelector::from(CHANNEL_1.clone()).with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..),
+        );
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_all_on_close: true,
@@ -469,19 +450,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem_multiple_tickets_in_channel() -> anyhow::Result<()> {
-        let ack_ticket_0 = generate_random_ack_ticket(0, 1, 5)?;
         let ack_ticket_1 = generate_random_ack_ticket(0, 2, 5)?;
 
-        let mut actions = MockChainActions::new();
-        actions
-            .expect_redeem_tickets_with_counterparty()
-            .once()
-            .with(
-                mockall::predicate::eq(ack_ticket_1.ticket.verified_issuer().clone()),
-                mockall::predicate::eq(HoprBalance::from(0)),
-                mockall::predicate::eq(false),
-            )
-            .return_once(move |_, _, _| Ok(Hash::default()));
+        let actions = MockChainActions(
+            vec![CHANNEL_1.clone()],
+            TicketSelector::from(CHANNEL_1.clone()).with_amount(HoprBalance::zero()..),
+        );
 
         let cfg = AutoRedeemingStrategyConfig {
             minimum_redeem_ticket_value: 0.into(),
