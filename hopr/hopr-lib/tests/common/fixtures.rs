@@ -4,49 +4,46 @@ use alloy::primitives::U256;
 use hopr_lib::Address;
 use once_cell::sync::Lazy;
 use serde_json::json;
-use tokio::{sync::OnceCell, time::sleep};
+use tokio::{
+    sync::{Mutex, OnceCell},
+    time::sleep,
+};
 use tracing::info;
 
 use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, hopr_tester::HoprTester, onboard_node};
 
+/// A guard that holds a reference to the cluster and ensures exclusive access
+pub struct ClusterGuard {
+    pub cluster: &'static Vec<HoprTester>,
+    _lock: tokio::sync::MutexGuard<'static, ()>,
+}
+
+impl std::ops::Deref for ClusterGuard {
+    type Target = Vec<HoprTester>;
+
+    fn deref(&self) -> &Self::Target {
+        self.cluster
+    }
+}
+
 static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
 static SWARM_N_FIXTURE: Lazy<OnceCell<Vec<HoprTester>>> = Lazy::new(|| OnceCell::const_new());
+static CLUSTER_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 pub const SNAPSHOT_BASE: &str = "/tmp/hopr-tests/snapshots";
 pub const PATH_TO_PROTOCOL_CONFIG: &str = "tests/protocol-config-anvil.json";
 pub const SWARM_N: usize = 3;
 
-#[rstest::fixture]
-pub fn random_int() -> usize {
-    use rand::prelude::SliceRandom;
+pub fn random_ints<const N: usize>() -> [usize; N] {
+    use rand::seq::index::sample;
+    assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
+    let indices = sample(&mut rand::thread_rng(), SWARM_N, N);
+    let mut arr = [0; N];
 
-    let mut numbers: Vec<usize> = (0..SWARM_N).collect();
-    numbers.shuffle(&mut rand::thread_rng());
-    numbers[0]
-}
-
-#[rstest::fixture]
-pub fn random_int_pair() -> (usize, usize) {
-    use rand::prelude::SliceRandom;
-
-    let mut numbers: Vec<usize> = (0..SWARM_N).collect();
-    numbers.shuffle(&mut rand::thread_rng());
-    let [a, b, ..] = numbers[..] else {
-        panic!("Not enough numbers for pair")
-    };
-    (a, b)
-}
-
-#[rstest::fixture]
-pub fn random_int_triple() -> (usize, usize, usize) {
-    use rand::prelude::SliceRandom;
-
-    let mut numbers: Vec<usize> = (0..SWARM_N).collect();
-    numbers.shuffle(&mut rand::thread_rng());
-    let [a, b, c, ..] = numbers[..] else {
-        panic!("Not enough numbers for triple")
-    };
-    (a, b, c)
+    for (i, idx) in indices.iter().enumerate() {
+        arr[i] = idx;
+    }
+    arr
 }
 
 #[rstest::fixture]
@@ -79,16 +76,19 @@ pub async fn chainenv_fixture() -> &'static TestChainEnv {
 }
 
 #[rstest::fixture]
-pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> &'static Vec<HoprTester> {
+pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> ClusterGuard {
     use std::fs::read_to_string;
 
     use hopr_lib::ProtocolsConfig;
 
-    if !(2..=9).contains(&SWARM_N) {
-        panic!("SWARM_N must be between 2 and 9");
+    if !(3..=9).contains(&SWARM_N) {
+        panic!("SWARM_N must be between 3 and 9");
     }
 
-    SWARM_N_FIXTURE
+    // Acquire the mutex lock to ensure exclusive access to the cluster
+    let lock = CLUSTER_MUTEX.lock().await;
+
+    let cluster = SWARM_N_FIXTURE
         .get_or_init(|| async {
             let protocol_config = ProtocolsConfig::from_str(
                 &read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
@@ -198,7 +198,9 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
 
             hopr_instances
         })
-        .await
+        .await;
+
+    ClusterGuard { cluster, _lock: lock }
 }
 
 async fn wait_for_connectivity(node: &HoprTester) {

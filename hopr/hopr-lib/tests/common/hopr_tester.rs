@@ -119,15 +119,9 @@ impl HoprTester {
         }
     }
 
-    pub async fn outgoing_channels_by_status(&self, status: Option<ChannelStatus>) -> Option<Vec<ChannelEntry>> {
+    pub async fn outgoing_channels_by_status(&self, status: ChannelStatus) -> Option<Vec<ChannelEntry>> {
         match self.0.channels_from(&self.address()).await {
-            Ok(channels) => Some(
-                channels
-                    .iter()
-                    .filter(|c| status.map_or(true, |s| c.status == s))
-                    .cloned()
-                    .collect(),
-            ),
+            Ok(channels) => Some(channels.iter().filter(|c| c.status == status).cloned().collect()),
             Err(_) => None,
         }
     }

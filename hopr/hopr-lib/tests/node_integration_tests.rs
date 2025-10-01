@@ -3,61 +3,16 @@ mod common;
 use std::{ops::Mul, time::Duration};
 
 use common::{
-    fixtures::{cluster_fixture, random_int, random_int_pair, random_int_triple},
+    fixtures::{ClusterGuard, cluster_fixture, random_ints},
     hopr_tester::HoprTester,
 };
-use hopr_lib::{DestinationRouting, HoprBalance, RoutingOptions, Tag};
-use hopr_primitive_types::bounded::BoundedVec;
 use rstest::rstest;
-use serial_test::serial;
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
-// #[rstest]
-// #[tokio::test]
-// async fn test_cluster_connectivity(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
-//     use tokio::time::{Instant, sleep};
-
-//     let start = Instant::now();
-//     let timeout_duration = Duration::from_secs(120);
-
-//     loop {
-//         let results = futures::future::join_all(
-//             cluster_fixture
-//                 .iter()
-//                 .map(|node| node.inner().network_connected_peers()),
-//         )
-//         .await
-//         .into_iter()
-//         .collect::<Result<Vec<_>, _>>()
-//         .expect("failed to get connected peers");
-
-//         // log connected peers for each node
-//         for (i, peers) in results.iter().enumerate() {
-//             info!("Node {} connected peers: {:?}", i, peers);
-//         }
-
-//         if results.iter().all(|peers| peers.len() == SWARM_N - 1) {
-//             break;
-//         }
-
-//         if start.elapsed() >= timeout_duration {
-//             panic!(
-//                 "Timeout: not all nodes connected within {:?} seconds",
-//                 timeout_duration.as_secs()
-//             );
-//         }
-
-//         sleep(Duration::from_secs(1)).await;
-//     }
-
-//     Ok(())
-// }
-
 #[rstest]
-#[serial]
 #[tokio::test]
-async fn test_get_balance(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
+async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{HoprBalance, WxHOPR, XDai, XDaiBalance};
 
     let node: &HoprTester = &cluster_fixture[0];
@@ -76,42 +31,33 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> a
         .expect("should get node hopr balance");
     let safe_allowance = node.safe_allowance().await.expect("should get safe hopr allowance");
 
-    assert!(safe_native != XDaiBalance::zero());
-    assert!(native != XDaiBalance::zero());
-    assert!(safe_hopr != HoprBalance::zero());
-    assert!(hopr == HoprBalance::zero());
-    assert!(safe_allowance != HoprBalance::zero());
+    assert_ne!(safe_native, XDaiBalance::zero());
+    assert_ne!(native, XDaiBalance::zero());
+    assert_ne!(safe_hopr, HoprBalance::zero());
+    assert_eq!(hopr, HoprBalance::zero());
+    assert_ne!(safe_allowance, HoprBalance::zero());
 
     Ok(())
 }
 
 #[rstest]
-#[serial]
 #[tokio::test]
-async fn test_ping_peer_inside_cluster(
-    #[future(awt)] cluster_fixture: &Vec<HoprTester>,
-    random_int_pair: (usize, usize),
-) -> anyhow::Result<()> {
-    let (src, dst) = random_int_pair;
+async fn test_ping_peer_inside_cluster(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [src, dst] = random_ints::<2>();
 
-    let (duration, _) = cluster_fixture[src]
+    cluster_fixture[src]
         .inner()
         .ping(&cluster_fixture[dst].peer_id())
         .await
         .expect("failed to ping peer");
 
-    assert!(duration > Duration::ZERO);
-
     Ok(())
 }
 
 #[rstest]
-#[serial]
 #[tokio::test]
-async fn test_ping_self_should_fail(
-    #[future(awt)] cluster_fixture: &Vec<HoprTester>,
-    random_int: usize,
-) -> anyhow::Result<()> {
+async fn test_ping_self_should_fail(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [random_int] = random_ints::<1>();
     let res = cluster_fixture[random_int]
         .inner()
         .ping(&cluster_fixture[random_int].peer_id())
@@ -122,20 +68,16 @@ async fn test_ping_self_should_fail(
 }
 
 #[rstest]
-#[serial]
 #[tokio::test]
-async fn test_open_close_channel(
-    #[future(awt)] cluster_fixture: &Vec<HoprTester>,
-    random_int_pair: (usize, usize),
-) -> anyhow::Result<()> {
-    use hopr_lib::ChannelStatus;
+async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    use hopr_lib::{ChannelStatus, HoprBalance};
     use tokio::time::sleep;
 
-    let (src, dst) = random_int_pair;
+    let [src, dst] = random_ints::<2>();
 
     assert!(
         cluster_fixture[src]
-            .outgoing_channels_by_status(Some(ChannelStatus::Open))
+            .outgoing_channels_by_status(ChannelStatus::Open)
             .await
             .expect("failed to get channels from src node")
             .is_empty()
@@ -152,7 +94,7 @@ async fn test_open_close_channel(
 
     assert_eq!(
         cluster_fixture[src]
-            .outgoing_channels_by_status(Some(ChannelStatus::Open))
+            .outgoing_channels_by_status(ChannelStatus::Open)
             .await
             .expect("failed to get channels from src node")
             .len(),
@@ -167,25 +109,27 @@ async fn test_open_close_channel(
 
     sleep(Duration::from_secs(2)).await;
 
-    assert!(
-        cluster_fixture[src]
-            .outgoing_channels_by_status(Some(ChannelStatus::Open))
-            .await
-            .expect("failed to get channels from src node")
-            .is_empty()
-    );
+    match cluster_fixture[src]
+        .channel_from_hash(&channel.channel_id)
+        .await
+        .expect("failed to get channel from id")
+        .status
+    {
+        ChannelStatus::PendingToClose(_) => (),
+        _ => panic!("channel should be in PendingToClose state"),
+    }
 
     Ok(())
 }
 
 #[rstest]
-#[serial]
 #[tokio::test]
 async fn test_channel_funding_should_be_visible_in_channel_stake(
-    #[future(awt)] cluster_fixture: &Vec<HoprTester>,
-    random_int_pair: (usize, usize),
+    #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let (src, dst) = random_int_pair;
+    use hopr_lib::HoprBalance;
+
+    let [src, dst] = random_ints::<2>();
     let funding_amount = FUNDING_AMOUNT.parse::<HoprBalance>()?;
 
     let channel = cluster_fixture[src]
@@ -210,16 +154,12 @@ async fn test_channel_funding_should_be_visible_in_channel_stake(
 }
 
 #[rstest]
-#[serial]
 #[tokio::test]
 #[cfg(feature = "runtime-tokio")]
-async fn test_send_0_hop_without_open_channels(
-    #[future(awt)] cluster_fixture: &Vec<HoprTester>,
-    random_int_pair: (usize, usize),
-) -> anyhow::Result<()> {
+async fn test_send_0_hop_without_open_channels(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{DestinationRouting, RoutingOptions, Tag};
 
-    let (src, dst) = random_int_pair;
+    let [src, dst] = random_ints::<2>();
 
     cluster_fixture[src]
         .inner()
@@ -235,15 +175,14 @@ async fn test_send_0_hop_without_open_channels(
 }
 
 #[rstest]
-#[serial]
 #[tokio::test]
-async fn test_reset_ticket_statistics(
-    #[future(awt)] cluster_fixture: &Vec<HoprTester>,
-    random_int_triple: (usize, usize, usize),
-) -> anyhow::Result<()> {
+async fn test_reset_ticket_statistics(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    use hopr_lib::{DestinationRouting, HoprBalance, RoutingOptions, Tag};
+    use hopr_primitive_types::bounded::BoundedVec;
+
     let funding_amount = FUNDING_AMOUNT.parse::<HoprBalance>()?;
 
-    let (src, mid, dst) = random_int_triple;
+    let [src, mid, dst] = random_ints::<3>();
 
     let _ = cluster_fixture[src]
         .inner()
@@ -287,28 +226,32 @@ async fn test_reset_ticket_statistics(
         .expect("failed to get ticket statistics");
 
     assert_ne!(stats_before, stats_after);
+    assert_eq!(stats_after.winning_count, 0);
 
     Ok(())
 }
 
 #[rstest]
-#[serial]
 #[tokio::test]
 #[cfg(feature = "session-client")]
 async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
     use std::str::FromStr;
 
-    use hopr_lib::{RoutingOptions, SessionClientConfig, SessionTarget};
-    use hopr_network_types::udp::{ConnectedUdpStream, UdpStreamParallelism};
+    use futures::AsyncReadExt;
+    use hopr_lib::{
+        RoutingOptions, SessionClientConfig, SessionTarget,
+        prelude::{ConnectedUdpStream, UdpStreamParallelism},
+    };
     use hopr_transport_session::{Capabilities, Capability, IpOrHost, SealedHost};
-    use tokio::{io::AsyncReadExt, net::UdpSocket};
+    use tokio::net::UdpSocket;
+    let [src, dst] = random_ints::<2>();
 
     let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
 
-    let mut session = cluster_fixture[0]
+    let mut session = cluster_fixture[src]
         .inner()
         .connect_to(
-            cluster_fixture[1].address(),
+            cluster_fixture[dst].address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
             SessionClientConfig {
                 forward_path_options: RoutingOptions::Hops(0_u32.try_into()?),
@@ -350,19 +293,10 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<HoprTest
 }
 
 #[rstest]
-#[serial]
 #[tokio::test]
 #[cfg(feature = "session-client")]
-async fn test_create_1_hop_session(
-    #[future(awt)] cluster_fixture: &Vec<HoprTester>,
-    random_int_triple: (usize, usize, usize),
-) -> anyhow::Result<()> {
-    use hopr_lib::{SessionClientConfig, SessionTarget};
-    use hopr_network_types::udp::{ConnectedUdpStream, UdpStreamParallelism};
-    use hopr_transport_session::{Capabilities, Capability, IpOrHost, SealedHost};
-    use tokio::{io::AsyncReadExt, net::UdpSocket};
-
-    let (src, mid, dst) = random_int_triple;
+async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
+    let [src, mid, dst] = random_ints::<3>();
 
     let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
 

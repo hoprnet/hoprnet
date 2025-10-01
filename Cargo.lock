@@ -5044,7 +5044,6 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
- "serial_test",
  "smart-default",
  "strum 0.27.2",
  "test-log",
