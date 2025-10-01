@@ -39,6 +39,21 @@ capture = ["hopr-transport/capture"]
 # disables filtering of private ip addresses in the p2p layer
 local-testing = ["hopr-transport/local-testing"]
 
+# === utility features ===
+utils_session = [ # utility session functionality for advanced interaction with hopr-lib
+  "dep:base64",
+  "dep:bytesize",
+  "dep:dashmap",
+  "dep:futures-time",
+  "dep:human-bandwidth",
+  "dep:tokio",
+  "dep:tokio-stream",
+]
+utils_futures = [] # utility futures for async adapters
+utils_parallel = [ # utility parallelization functionality
+
+]
+
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
   "essentials",
@@ -50,9 +65,14 @@ async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
+base64 = { workspace = true, optional = true }
+bytesize = { workspace = true, optional = true }
 const_format = { workspace = true }
+dashmap = { workspace = true, optional = true }
 either = { workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true, optional = true }
+human-bandwidth = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
@@ -61,6 +81,8 @@ serde_json = { workspace = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
 validator = { workspace = true }
 
 hopr-async-runtime = { workspace = true }
@@ -70,6 +92,7 @@ hopr-chain-indexer = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-api = { workspace = true }
 hopr-db-sql = { workspace = true }
@@ -93,7 +116,5 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 url = { workspace = true }
 
-hopr-crypto-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }

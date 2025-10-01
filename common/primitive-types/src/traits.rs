@@ -66,7 +66,7 @@ impl<T: BytesRepresentable> ToHex for T {
     }
 
     fn from_hex(str: &str) -> Result<Self> {
-        if !str.is_empty() && str.len() % 2 == 0 {
+        if !str.is_empty() && str.len().is_multiple_of(2) {
             let data = if &str[..2] == "0x" || &str[..2] == "0X" {
                 &str[2..]
             } else {

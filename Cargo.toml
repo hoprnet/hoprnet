@@ -49,7 +49,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.32", default-features = false, features = [
+alloy = { version = "=1.0.37", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -57,10 +57,10 @@ alloy = { version = "=1.0.32", default-features = false, features = [
   "k256",
   "std",
 ] }
-anyhow = "1.0.99"
+anyhow = "1.0.100"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-async-compression = "0.4.30"
+async-compression = "0.4.32"
 async-channel = "2.5.0"
 async-lock = "3.4.1"
 async-signal = "0.2.13"
@@ -69,8 +69,8 @@ async-tar = "0.5.0"
 async-trait = "0.1.89"
 asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
-axum = { version = "0.8.4", features = ["ws", "http2"] }
-axum-extra = { version = "0.10.1", features = ["query"] }
+axum = { version = "0.8.6", features = ["ws", "http2"] }
+axum-extra = { version = "0.10.3", features = ["query"] }
 backon = { version = "1.5.2", default-features = false }
 base64 = "0.22.1"
 bigdecimal = "0.4.8"
@@ -83,7 +83,7 @@ bytes = "1.10.1"
 cfg_eval = "0.1.2"
 cfg-if = "1.0.3"
 chrono = { version = "0.4.42", default-features = false }
-clap = { version = "4.5.47", features = ["derive", "env", "string"] }
+clap = { version = "4.5.48", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.7.0", features = ["async_tokio", "html_reports"] }
@@ -124,7 +124,7 @@ libp2p-identity = { version = "0.2.12", features = [
 libp2p-stream = { version = "0.4.0-alpha" }
 mockall = "0.13.1"
 mockito = "1.7.0"
-moka = { version = "0.12.10", features = ["future"] }
+moka = { version = "0.12.11", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num_enum = "0.7.4"
@@ -136,15 +136,15 @@ temp-env = "0.3.6"
 parameterized = "2.0.0"
 parking_lot = "0.12.4"
 pcap-file = "2.0.0"
-petgraph = { version = "0.8.2", features = ["serde-1"] }
+petgraph = { version = "0.8.3", features = ["serde-1"] }
 pid = "4.0.0"
 pin-project = "1.1.10"
-primitive-types = { version = "0.13.1", features = ["serde"] }
+primitive-types = { version = "0.14.0", features = ["serde"] }
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones
 rayon = "1.11.0"
-regex = "1.11.2"
+regex = "1.11.3"
 reqwest = { version = "0.12.23", features = ["json"] }
 ringbuffer = "0.16.0"
 rpassword = "7.4.0"
@@ -170,12 +170,12 @@ sea-query-binder = { version = "0.7.0", default-features = false, features = [
   "sqlx-sqlite",
 ] }
 semver = "1.0.27"
-serde = { version = "1.0.223", features = ["derive"] }
-serde_bytes = "0.11.18"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
 serde_json = "1.0.145"
 serde_repr = "0.1.20"
-serde_with = { version = "3.14.0", features = ["base64"] }
+serde_with = { version = "3.14.1", features = ["base64"] }
 serde_yaml = { version = "0.9.33" } # using last version before the library was deprecated
 serial_test = "3.2.0"
 sha3 = "0.10.8"
@@ -190,9 +190,9 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 strum = { version = "0.27.2", features = ["derive"] }
 subtle = "2.6.1"
 sysinfo = "0.37"
-tempfile = "3.22.0"
+tempfile = "3.23.0"
 test-log = { version = "0.2.18", features = ["trace"] }
-thiserror = "2.0.16"
+thiserror = "2.0.17"
 tokio = { version = "1.47.1", features = [
   "rt-multi-thread",
   "macros",

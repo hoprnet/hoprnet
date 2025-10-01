@@ -23,6 +23,8 @@ pub mod network_notifier;
 /// Objects used and possibly exported by the crate for re-use for transport functionality
 pub mod proxy;
 
+pub mod socket;
+
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, OnceLock},
@@ -33,7 +35,7 @@ use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
     FutureExt, SinkExt, StreamExt,
-    channel::mpsc::{SendError, Sender, channel},
+    channel::mpsc::{Sender, channel},
 };
 use helpers::PathPlanner;
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
@@ -75,6 +77,9 @@ use hopr_transport_protocol::{
     errors::ProtocolError,
     processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
 };
+pub use hopr_transport_session as session;
+#[cfg(feature = "prometheus")]
+pub use hopr_transport_session::MetricSessionCounterGuard;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
@@ -96,7 +101,10 @@ pub use crate::{
     config::HoprTransportConfig,
     helpers::{PeerEligibility, TicketStatistics},
 };
-use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, helpers::run_packet_planner};
+use crate::{
+    constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, helpers::run_packet_planner,
+    socket::HoprSocket,
+};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
@@ -278,16 +286,23 @@ where
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
-    pub async fn run<S1, S2>(
+    pub async fn run<S>(
         &self,
         me_onchain: &ChainKeypair,
-        on_incoming_data: S1,
-        discovery_updates: S2,
+        discovery_updates: S,
         on_incoming_session: Sender<IncomingSession>,
-    ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>>
+    ) -> crate::errors::Result<(
+        HoprSocket<
+            futures::channel::mpsc::Receiver<ApplicationDataIn>,
+            futures::channel::mpsc::Sender<(
+                hopr_protocol_app::prelude::ApplicationDataOut,
+                hopr_transport_session::DestinationRouting,
+            )>,
+        >,
+        HashMap<HoprTransportProcess, AbortHandle>,
+    )>
     where
-        S1: futures::Sink<ApplicationDataIn, Error = SendError> + Send + 'static,
-        S2: futures::Stream<Item = PeerDiscovery> + Send + 'static,
+        S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
     {
         info!("Loading initial peers from the storage");
         let mut addresses: HashSet<Multiaddr> = HashSet::new();
@@ -580,6 +595,42 @@ where
                 .filter(|&c| c > 0)
                 .unwrap_or(16_384);
 
+        let (on_incoming_data_tx, on_incoming_data_rx) =
+            channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
+
+        let (bridge_tx, bridge_rx) =
+            channel::<(ApplicationDataOut, DestinationRouting)>(msg_protocol_bidirectional_channel_capacity);
+
+        let pp = self.path_planner.clone();
+        spawn(
+            bridge_rx
+                .filter_map(move |(data, routing)| {
+                    let pp = pp.clone();
+
+                    async move {
+                        pp.resolve_routing(data.data.total_len(), usize::MAX, routing)
+                            .await
+                            .map(|(routing, _size)| {
+                                let (tx, _rx) = futures::channel::oneshot::channel::<
+                                    std::result::Result<(), hopr_crypto_packet::errors::PacketError>,
+                                >();
+                                (data, routing, tx.into())
+                            })
+                            .ok()
+                    }
+                })
+                .map(Ok)
+                .forward(external_msg_send.clone())
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = "transport -> bridge -> protocol",
+                        "long-running background task finished"
+                    )
+                }),
+        );
+
+        let hopr_socket: crate::socket::HoprSocket<_, _> = (on_incoming_data_rx, bridge_tx).into();
+
         debug!(
             capacity = msg_protocol_bidirectional_channel_capacity,
             "Creating protocol bidirectional channel"
@@ -694,7 +745,7 @@ where
                     }
                 })
                 .map(Ok)
-                .forward(on_incoming_data)
+                .forward(on_incoming_data_tx)
                 .inspect(|_| tracing::warn!(
                     task = %HoprTransportProcess::SessionsManagement(0),
                     "long-running background task finished"
@@ -702,7 +753,7 @@ where
             ),
         );
 
-        Ok(processes)
+        Ok((hopr_socket, processes))
     }
 
     pub fn ticket_aggregator(&self) -> Arc<dyn TicketAggregatorTrait + Send + Sync + 'static> {

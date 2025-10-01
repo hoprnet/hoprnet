@@ -246,7 +246,7 @@ impl SnapshotDownloader {
 
                     // Progress reporting, only per 1MB or at the end
                     let progress = (received_bytes as f64 / total_bytes as f64) * 100.0;
-                    if received_bytes % (1024 * 1024) == 0 || received_bytes == total_bytes {
+                    if received_bytes.is_multiple_of(1024 * 1024) || received_bytes == total_bytes {
                         debug!(
                             progress = format!("{:.1}%", progress),
                             %received_bytes, %total_bytes, "Logs snapshot download progress"

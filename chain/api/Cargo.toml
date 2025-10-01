@@ -24,6 +24,9 @@ prometheus = [
   "hopr-db-sql/prometheus",
 ]
 
+[build-dependencies]
+anyhow = { workspace = true }
+
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
   "essentials",

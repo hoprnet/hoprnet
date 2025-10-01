@@ -1801,6 +1801,8 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
+        db.set_network_registry_enabled(None, true).await?;
+
         let encoded_data = ().abi_encode();
 
         let registered_log = SerializableLog {
@@ -1850,6 +1852,8 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
+        db.set_network_registry_enabled(None, true).await?;
+
         let registered_log = SerializableLog {
             address: handlers.addresses.network_registry,
             topics: vec![
@@ -1897,6 +1901,8 @@ mod tests {
             inner: Arc::new(rpc_operations),
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
+
+        db.set_network_registry_enabled(None, true).await?;
 
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
             .await?;
@@ -1948,6 +1954,8 @@ mod tests {
             inner: Arc::new(rpc_operations),
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
+
+        db.set_network_registry_enabled(None, true).await?;
 
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
             .await?;
