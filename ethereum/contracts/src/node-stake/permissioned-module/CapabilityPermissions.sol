@@ -485,6 +485,9 @@ library HoprCapabilityPermissions {
 
     /**
      * @dev Revokes the target address from the Role by setting its clearance and target type to None.
+     * @notice After removing a target, if the target contains some custom permissions,
+     * the customized granular permissions are not automatically removed.
+     * When the target gets added again to the module, all the previously added custom permissions are retained.
      * @param role The storage reference to the Role struct.
      * @param targetAddress The address of the target to be revoked.
      */
@@ -652,6 +655,7 @@ library HoprCapabilityPermissions {
     // ======================================================
 
     function getChannelId(address source, address destination) internal pure returns (bytes32) {
+        // forge-lint: disable-next-line(asm-keccak256)
         return keccak256(abi.encodePacked(source, destination));
     }
 
