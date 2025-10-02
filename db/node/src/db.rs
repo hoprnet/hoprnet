@@ -200,6 +200,10 @@ impl HoprNodeDb {
             .invalidate(&(channel.get_id(), channel.channel_epoch))
             .await;
     }
+
+    pub fn config(&self) -> &HoprNodeDbConfig {
+        &self.cfg
+    }
 }
 
 #[cfg(test)]

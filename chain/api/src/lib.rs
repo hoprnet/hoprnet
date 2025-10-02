@@ -175,7 +175,11 @@ impl HoprChain {
         let db = futures::executor::block_on(HoprIndexerDb::new(
             PathBuf::from_iter([data_dir_path, "index_db"]).as_path(),
             me_onchain.clone(),
-            HoprIndexerDbConfig::default(),
+            HoprIndexerDbConfig {
+                create_if_missing: node_db.config().create_if_missing,
+                force_create: node_db.config().force_create,
+                log_slow_queries: node_db.config().log_slow_queries,
+            },
         ))?;
 
         // TODO: extract this from the global config type

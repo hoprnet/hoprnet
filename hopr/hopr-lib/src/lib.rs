@@ -221,7 +221,7 @@ impl Hopr {
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
                 .unwrap_or_else(|| HoprNodeDbConfig::default().surb_distress_threshold),
         };
-        let db = futures::executor::block_on(HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
+        let node_db = futures::executor::block_on(HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 
         if let Some(provider) = &cfg.chain.provider {
             info!(provider, "Creating chain components using the custom provider");
@@ -252,9 +252,9 @@ impl Hopr {
         )));
 
         // TODO (4.0): replace this with new implementation that follows the chain traits from the hopr-api crate
-        let hopr_hopr_chain_api = hopr_chain_api::HoprChain::new(
+        let hopr_chain_api = hopr_chain_api::HoprChain::new(
             me_onchain.clone(),
-            db.clone(),
+            node_db.clone(),
             &cfg.db.data,
             resolved_environment.clone(),
             cfg.safe_module.module_address,
@@ -290,13 +290,13 @@ impl Hopr {
                 probe: cfg.probe,
                 session: cfg.session,
             },
-            db.clone(),
-            hopr_hopr_chain_api.clone(),
+            node_db.clone(),
+            hopr_chain_api.clone(),
             channel_graph.clone(),
             my_multiaddresses,
         );
 
-        let multi_strategy = Arc::new(MultiStrategy::new(cfg.strategy.clone(), hopr_hopr_chain_api.clone()));
+        let multi_strategy = Arc::new(MultiStrategy::new(cfg.strategy.clone(), hopr_chain_api.clone()));
         debug!(
             strategies = tracing::field::debug(&multi_strategy),
             "Initialized strategies"
@@ -316,7 +316,7 @@ impl Hopr {
             );
 
             // Calling get_ticket_statistics will initialize the respective metrics on tickets
-            if let Err(e) = futures::executor::block_on(db.get_ticket_statistics(None)) {
+            if let Err(e) = futures::executor::block_on(node_db.get_ticket_statistics(None)) {
                 error!(error = %e, "Failed to initialize ticket statistics metrics");
             }
         }
@@ -326,8 +326,8 @@ impl Hopr {
             cfg,
             state: Arc::new(state::AtomicHoprState::new(state::HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
-            hopr_chain_api: hopr_hopr_chain_api,
-            node_db: db,
+            hopr_chain_api,
+            node_db,
             chain_cfg: resolved_environment,
             channel_graph,
             multistrategy: multi_strategy,
