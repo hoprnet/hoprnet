@@ -26,7 +26,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hickory-resolver/tokio",
 ]
-prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
 arrayvec = { workspace = true }
@@ -34,8 +34,9 @@ cfg-if = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
 hickory-resolver = { workspace = true }
-lazy_static = { workspace = true, optional = true }
+lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
+multiaddr = { workspace = true }
 pin-project = { workspace = true }
 pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
@@ -58,13 +59,14 @@ hopr-path = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-lazy_static = { workspace = true }
 parameterized = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 test-log = { workspace = true }
+serial_test = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]

@@ -33,6 +33,7 @@ pub mod traits;
 pub mod state;
 
 /// Re-exports of libraries necessary for API and interface operations.
+#[doc(hidden)]
 pub mod exports {
     pub mod chain {
         pub use hopr_chain_types as types;
@@ -54,6 +55,7 @@ pub mod exports {
 }
 
 /// Export of relevant types for easier integration.
+#[doc(hidden)]
 pub mod prelude {
     pub use super::exports::{
         crypto::{

@@ -50,7 +50,7 @@ hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
-hopr-parallelize = { workspace = true }
+hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
