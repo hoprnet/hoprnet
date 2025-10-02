@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -43,6 +43,7 @@ hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-protocol = { workspace = true }
+hopr-network-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

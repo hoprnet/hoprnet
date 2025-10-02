@@ -356,6 +356,7 @@ where
                                             })
                                             .unwrap_or_default();
 
+
                                         if let Err(e) = network.add(&peer_id, PeerOrigin::NetworkRegistry, mas).await {
                                             error!(peer = %peer_id, error = %e, "Failed to allow locally (already allowed on-chain)");
                                             return None;

@@ -5078,11 +5078,13 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
+ "multiaddr",
  "parameterized",
  "pcap-file",
  "pin-project",
  "serde",
  "serde_bytes",
+ "serial_test",
  "socket2 0.6.0",
  "strum 0.27.2",
  "test-log",
@@ -5363,6 +5365,7 @@ dependencies = [
  "hopr-db-api",
  "hopr-db-sql",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
@@ -5382,7 +5385,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5392,6 +5395,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-network-types",
  "hopr-platform",
  "hopr-transport-identity",
  "hopr-transport-probe",
@@ -5633,7 +5637,6 @@ dependencies = [
  "strum 0.27.2",
  "test-log",
  "tokio",
- "tokio-stream",
  "tower 0.5.2",
  "tower-http",
  "tracing",

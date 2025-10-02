@@ -5,6 +5,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use futures::stream::{BoxStream, Stream, StreamExt};
+use hopr_network_types::addr::is_public_address;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
@@ -210,10 +211,12 @@ impl NetworkBehaviour for Behaviour {
                     let multiaddresses = self.bootstrap_peers.get(&peer);
                     if let Some(multiaddresses) = multiaddresses {
                         for address in multiaddresses {
-                            self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
-                                peer_id: peer,
-                                address: address.clone(),
-                            });
+                            if is_public_address(address) {
+                                self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
+                                    peer_id: peer,
+                                    address: address.clone(),
+                                });
+                            }
                         }
                     }
 
@@ -234,16 +237,30 @@ impl NetworkBehaviour for Behaviour {
                 }
                 PeerDiscovery::Announce(peer, multiaddresses) => {
                     if peer != self.me {
+                        let multiaddress_count = multiaddresses.len();
                         tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");
 
-                        for multiaddress in &multiaddresses {
+                        // Filter out private addresses before adding to pending events and peer store
+                        let public_addresses: HashSet<_> = multiaddresses.into_iter()
+                            .filter(is_public_address)
+                            .collect();
+
+                        let filtered_count = multiaddress_count - public_addresses.len();
+                        if filtered_count > 0 {
+                            tracing::debug!(%peer, filtered_private_addresses = filtered_count, total_addresses = multiaddress_count, "Filtered out private addresses from announcement");
+                        }
+
+                        for multiaddress in &public_addresses {
                             self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
                                 peer_id: peer,
                                 address: multiaddress.clone(),
                             });
                         }
 
-                        self.bootstrap_peers.insert(peer, multiaddresses.clone());
+                        // Only store public addresses in bootstrap_peers
+                        if !public_addresses.is_empty() {
+                            self.bootstrap_peers.insert(peer, public_addresses.into_iter().collect::<Vec::<_>>());
+                        }
                     }
                 }
             },
