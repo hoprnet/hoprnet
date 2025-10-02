@@ -26,7 +26,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 
     // Matches Ed25519-based peer IDs and channel IDs (Keccak256 hashes)
-    static ref ID_REGEX: regex::Regex = regex::Regex::new(r"(0x[0-9A-Fa-f]{64})|(12D3KooW[A-Za-z0-9]{44})|(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,5})").unwrap();
+    static ref ID_REGEX: regex::Regex = regex::Regex::new(r"(0x[0-9A-Fa-f]{40})|(0x[0-9A-Fa-f]{64})|(12D3KooW[A-Za-z0-9]{44})|(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,5})").unwrap();
 }
 
 /// Custom prometheus recording middleware

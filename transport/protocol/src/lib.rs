@@ -116,11 +116,6 @@ lazy_static::lazy_static! {
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
-    static ref METRIC_PACKET_COUNT_PER_PEER: MultiCounter = MultiCounter::new(
-        "hopr_packets_per_peer_count",
-        "Number of processed packets to/from distinct peers",
-        &["peer", "direction"]
-    ).unwrap();
     static ref METRIC_REPLAYED_PACKET_COUNT: SimpleCounter = SimpleCounter::new(
         "hopr_replayed_packet_count",
         "The total count of replayed packets during the packet processing pipeline run",
@@ -197,7 +192,6 @@ where
     {
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
-        lazy_static::initialize(&METRIC_PACKET_COUNT_PER_PEER);
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
         lazy_static::initialize(&METRIC_REJECTED_TICKETS_COUNT);
     }
@@ -357,7 +351,6 @@ where
                             Ok(v) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
-                                    METRIC_PACKET_COUNT_PER_PEER.increment(&[&v.next_hop.to_string(), "out"]);
                                     METRIC_PACKET_COUNT.increment(&["sent"]);
                                 }
                                 finalizer.finalize(Ok(()));
@@ -576,7 +569,6 @@ where
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
-                                METRIC_PACKET_COUNT_PER_PEER.increment(&[&previous_hop.to_string(), "in"]);
                                 METRIC_PACKET_COUNT.increment(&["received"]);
                             }
 
