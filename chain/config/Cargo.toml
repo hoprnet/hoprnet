@@ -15,6 +15,9 @@ crate-type = ["rlib"]
 [features]
 default = []
 
+[build-dependencies]
+anyhow = { workspace = true }
+
 [dependencies]
 semver = { workspace = true }
 serde = { workspace = true }

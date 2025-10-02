@@ -4609,12 +4609,12 @@ name = "hopr-chain-api"
 version = "0.7.1"
 dependencies = [
  "alloy",
- "anyhow",
  "async-channel 2.5.0",
  "async-trait",
  "futures",
  "hopr-async-runtime",
  "hopr-chain-actions",
+ "hopr-chain-config",
  "hopr-chain-indexer",
  "hopr-chain-rpc",
  "hopr-chain-types",
@@ -4639,6 +4639,7 @@ dependencies = [
 name = "hopr-chain-config"
 version = "1.1.0"
 dependencies = [
+ "anyhow",
  "hopr-chain-types",
  "hopr-primitive-types",
  "semver 1.0.27",
