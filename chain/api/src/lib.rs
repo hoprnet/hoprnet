@@ -81,9 +81,15 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
 pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     address: Address,
     min_balance: XDaiBalance,
+    suggested_balance: XDaiBalance,
     max_delay: Duration,
     rpc: &Rpc,
 ) -> Result<()> {
+    info!(
+        %address, suggested_minimum_balance = %suggested_balance,
+        "Node about to start, checking for funds",
+    );
+
     let multiplier = 1.05;
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
@@ -98,7 +104,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
                     warn!("still unfunded, trying again soon");
                 }
             }
-            Err(e) => error!(error = %e, "failed to fetch balance from the chain"),
+            Err(error) => error!(%error, "failed to fetch balance from the chain"),
         }
 
         sleep(current_delay).await;

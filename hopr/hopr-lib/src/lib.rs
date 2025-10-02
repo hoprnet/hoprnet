@@ -64,7 +64,7 @@ pub mod prelude {
             prelude::ForeignDataMode,
             udp::{ConnectedUdpStream, UdpStreamParallelism},
         },
-        transport::OffchainPublicKey,
+        transport::{OffchainPublicKey, socket::HoprSocket},
         types::primitive::prelude::Address,
     };
 }
@@ -81,11 +81,7 @@ use std::{
 use async_lock::RwLock;
 pub use async_trait::async_trait;
 use errors::{HoprLibError, HoprStatusError};
-use futures::{
-    FutureExt, SinkExt, StreamExt,
-    channel::mpsc::{Receiver, Sender, channel},
-    future::AbortHandle,
-};
+use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::channel, future::AbortHandle};
 use hopr_async_runtime::prelude::{sleep, spawn};
 pub use hopr_chain_actions::errors::ChainActionsError;
 use hopr_chain_actions::{channels::ChannelActions, node::NodeActions, redeem::TicketRedeemActions};
@@ -158,42 +154,6 @@ lazy_static::lazy_static! {
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
-}
-
-/// Represents the socket behavior of the hopr-lib spawned [`Hopr`] object.
-///
-/// Provides a read and write stream for Hopr socket recognized data formats.
-pub struct HoprSocket {
-    rx: Receiver<ApplicationDataIn>,
-    tx: Sender<ApplicationDataIn>,
-}
-
-impl Default for HoprSocket {
-    fn default() -> Self {
-        let channel_capacity = std::env::var("HOPR_INTERNAL_RAW_SOCKET_LIKE_CHANNEL_CAPACITY")
-            .ok()
-            .and_then(|s| s.trim().parse::<usize>().ok())
-            .filter(|&c| c > 0)
-            .unwrap_or(16_384);
-
-        debug!(capacity = channel_capacity, "Creating HoprSocket channel");
-        let (tx, rx) = channel::<ApplicationDataIn>(channel_capacity);
-        Self { rx, tx }
-    }
-}
-
-impl HoprSocket {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn reader(self) -> Receiver<ApplicationDataIn> {
-        self.rx
-    }
-
-    pub fn writer(&self) -> Sender<ApplicationDataIn> {
-        self.tx.clone()
-    }
 }
 
 /// HOPR main object providing the entire HOPR node functionality
@@ -454,26 +414,31 @@ impl Hopr {
     >(
         &self,
         #[cfg(feature = "session-server")] serve_handler: T,
-    ) -> errors::Result<(HoprSocket, HashMap<state::HoprLibProcesses, AbortHandle>)> {
+    ) -> errors::Result<(
+        hopr_transport::socket::HoprSocket<
+            futures::channel::mpsc::Receiver<ApplicationDataIn>,
+            futures::channel::mpsc::Sender<(
+                hopr_transport::ApplicationDataOut,
+                hopr_network_types::types::DestinationRouting,
+            )>,
+        >,
+        HashMap<state::HoprLibProcesses, AbortHandle>,
+    )> {
         self.error_if_not_in_state(
             state::HoprState::Uninitialized,
             "Cannot start the hopr node multiple times".into(),
         )?;
 
-        info!(
-            address = %self.me_onchain(), minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
-            "Node is not started, please fund this node",
-        );
-
-        let mut processes: HashMap<state::HoprLibProcesses, AbortHandle> = HashMap::new();
-
         wait_for_funds(
             self.me_onchain(),
             *MIN_NATIVE_BALANCE,
+            *SUGGESTED_NATIVE_BALANCE,
             Duration::from_secs(200),
             self.hopr_chain_api.rpc(),
         )
         .await?;
+
+        let mut processes: HashMap<state::HoprLibProcesses, AbortHandle> = HashMap::new();
 
         info!("Starting the node...");
 
@@ -779,9 +744,6 @@ impl Hopr {
             );
         }
 
-        let socket = HoprSocket::new();
-        let transport_output_tx = socket.writer();
-
         // notifier on acknowledged ticket reception
         let multi_strategy_ack_ticket = self.multistrategy.clone();
 
@@ -862,12 +824,11 @@ impl Hopr {
             );
         }
 
-        for (id, proc) in self
+        let (hopr_socket, transport_processes) = self
             .transport_api
-            .run(&self.me_chain, transport_output_tx, indexer_peer_update_rx, session_tx)
-            .await?
-            .into_iter()
-        {
+            .run(&self.me_chain, indexer_peer_update_rx, session_tx)
+            .await?;
+        for (id, proc) in transport_processes.into_iter() {
             processes.insert(id.into(), proc);
         }
 
@@ -949,7 +910,7 @@ impl Hopr {
             1.0,
         );
 
-        Ok((socket, processes))
+        Ok((hopr_socket, processes))
     }
 
     // p2p transport =========
