@@ -29,23 +29,23 @@ use crate::{
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_INDEXER_CURRENT_BLOCK: hopr_metrics::metrics::SimpleGauge =
-        hopr_metrics::metrics::SimpleGauge::new(
+    static ref METRIC_INDEXER_CURRENT_BLOCK: hopr_metrics::SimpleGauge =
+        hopr_metrics::SimpleGauge::new(
             "hopr_indexer_block_number",
             "Current last processed block number by the indexer",
     ).unwrap();
-    static ref METRIC_INDEXER_CHECKSUM: hopr_metrics::metrics::SimpleGauge =
-        hopr_metrics::metrics::SimpleGauge::new(
+    static ref METRIC_INDEXER_CHECKSUM: hopr_metrics::SimpleGauge =
+        hopr_metrics::SimpleGauge::new(
             "hopr_indexer_checksum",
             "Contains an unsigned integer that represents the low 32-bits of the Indexer checksum"
     ).unwrap();
-    static ref METRIC_INDEXER_SYNC_PROGRESS: hopr_metrics::metrics::SimpleGauge =
-        hopr_metrics::metrics::SimpleGauge::new(
+    static ref METRIC_INDEXER_SYNC_PROGRESS: hopr_metrics::SimpleGauge =
+        hopr_metrics::SimpleGauge::new(
             "hopr_indexer_sync_progress",
             "Sync progress of the historical data by the indexer",
     ).unwrap();
-    static ref METRIC_INDEXER_SYNC_SOURCE: hopr_metrics::metrics::MultiGauge =
-        hopr_metrics::metrics::MultiGauge::new(
+    static ref METRIC_INDEXER_SYNC_SOURCE: hopr_metrics::MultiGauge =
+        hopr_metrics::MultiGauge::new(
             "hopr_indexer_data_source",
             "Current data source of the Indexer",
             &["source"],

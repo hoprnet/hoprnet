@@ -3,7 +3,7 @@ use std::{borrow::Cow, fs::File};
 use futures::{StreamExt, pin_mut};
 use hopr_api::db::IncomingPacket;
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
-use hopr_crypto_packet::prelude::{PacketSignal, PacketSignals};
+use hopr_crypto_packet::prelude::PacketSignals;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::VerifiedAcknowledgement;
 use pcap_file::{
@@ -313,6 +313,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
 mod tests {
     use futures::{SinkExt, pin_mut};
     use hex_literal::hex;
+    use hopr_crypto_packet::prelude::PacketSignal;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         prelude::{ChainKeypair, Keypair, OffchainKeypair, SimplePseudonym},

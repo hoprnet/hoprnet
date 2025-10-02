@@ -46,7 +46,6 @@ use hopr_chain_rpc::{
     HoprRpcOperations,
     client::DefaultRetryPolicy,
     rpc::{RpcOperations, RpcOperationsConfig},
-    transport::ReqwestClient,
 };
 use hopr_chain_types::ContractAddresses;
 pub use hopr_chain_types::chain_events::SignificantChainEvent;
@@ -72,7 +71,11 @@ use tracing::{debug, error, info, trace, warn};
 
 use crate::errors::{HoprChainError, Result};
 
+#[cfg(feature = "runtime-tokio")]
 pub type DefaultHttpRequestor = hopr_chain_rpc::transport::ReqwestClient;
+
+#[cfg(not(feature = "runtime-tokio"))]
+compile_error!("The `runtime-tokio` feature must be enabled");
 
 /// Waits until the given address is funded.
 ///
@@ -112,7 +115,7 @@ pub async fn wait_for_funds<R: ChainReadAccountOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
-fn build_transport_client(url: &str) -> Result<Http<ReqwestClient>> {
+fn build_transport_client(url: &str) -> Result<Http<DefaultHttpRequestor>> {
     let parsed_url = url::Url::parse(url).unwrap_or_else(|_| panic!("failed to parse URL: {url}"));
     Ok(ReqwestTransport::new(parsed_url))
 }
