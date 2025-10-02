@@ -435,13 +435,13 @@ impl ResolvedTransportRouting {
 
 #[cfg(test)]
 mod tests {
-    use std::net::SocketAddr;
-
-    use anyhow::anyhow;
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+    #[cfg(feature = "runtime-tokio")]
+    use {anyhow::anyhow, std::net::SocketAddr};
 
     use super::*;
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
         match IpOrHost::Dns("localhost".to_string(), 1000)
@@ -456,6 +456,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;
