@@ -562,19 +562,15 @@ impl ChainWriteChannelOperations for HoprChain {
         channel_id: &'a ChannelId,
     ) -> std::result::Result<BoxFuture<'a, std::result::Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>
     {
-        // TODO: (dbmig) make sure the ChainActions::close_channel() accepts ChannelEntry directly
         let channel = self
             .db
             .get_channel_by_id(None, channel_id)
             .await?
             .ok_or(HoprChainError::Api("channel not found".into()))?;
-        let (direction, counterparty) = channel
-            .orientation(&self.me_onchain())
-            .ok_or(HoprChainError::Api("channel not own".into()))?;
 
         Ok(self
             .actions_ref()
-            .close_channel(counterparty, direction)
+            .close_channel(channel)
             .await?
             .map(|res| {
                 res.and_then(|c| {

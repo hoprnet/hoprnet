@@ -47,7 +47,7 @@ pub trait ChannelActions {
 
     /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that
     /// channel, in case the `direction` is [`ChannelDirection::Incoming`].
-    async fn close_channel(&self, counterparty: Address, direction: ChannelDirection) -> Result<PendingAction>;
+    async fn close_channel(&self, channel_entry: ChannelEntry) -> Result<PendingAction>;
 }
 
 #[async_trait]
@@ -134,45 +134,31 @@ impl<Db: Sync> ChannelActions for ChainActions<Db> {
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn close_channel(&self, counterparty: Address, direction: ChannelDirection) -> Result<PendingAction> {
-        let maybe_channel = match direction {
-            ChannelDirection::Incoming => {
-                self.index_db
-                    .get_channel_by_parties(None, &counterparty, &self.self_address(), false)
-                    .await?
-            }
-            ChannelDirection::Outgoing => {
-                self.index_db
-                    .get_channel_by_parties(None, &self.self_address(), &counterparty, false)
-                    .await?
-            }
-        };
+    async fn close_channel(&self, channel: ChannelEntry) -> Result<PendingAction> {
+        let direction = channel.direction(&self.me).ok_or(ChannelDoesNotExist)?; // Cannot close channel that is not own
 
-        match maybe_channel {
-            Some(channel) => match channel.status {
-                ChannelStatus::Closed => Err(ChannelAlreadyClosed),
-                ChannelStatus::PendingToClose(_) => {
-                    let remaining_closure_time = channel.remaining_closure_time(current_time());
-                    info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
-                    match remaining_closure_time {
-                        Some(Duration::ZERO) => {
-                            info!(%channel, %direction, "initiating finalization of channel closure");
-                            self.tx_sender.send(Action::CloseChannel(channel, direction)).await
-                        }
-                        _ => Err(ClosureTimeHasNotElapsed(
-                            channel
-                                .remaining_closure_time(current_time())
-                                .expect("impossible: closure time has not passed but no remaining closure time")
-                                .as_secs(),
-                        )),
+        match channel.status {
+            ChannelStatus::Closed => Err(ChannelAlreadyClosed),
+            ChannelStatus::PendingToClose(_) => {
+                let remaining_closure_time = channel.remaining_closure_time(current_time());
+                info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
+                match remaining_closure_time {
+                    Some(Duration::ZERO) => {
+                        info!(%channel, %direction, "initiating finalization of channel closure");
+                        self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                     }
+                    _ => Err(ClosureTimeHasNotElapsed(
+                        channel
+                            .remaining_closure_time(current_time())
+                            .expect("impossible: closure time has not passed but no remaining closure time")
+                            .as_secs(),
+                    )),
                 }
-                ChannelStatus::Open => {
-                    info!(%channel, ?direction, "initiating channel closure");
-                    self.tx_sender.send(Action::CloseChannel(channel, direction)).await
-                }
-            },
-            None => Err(ChannelDoesNotExist),
+            }
+            ChannelStatus::Open => {
+                info!(%channel, ?direction, "initiating channel closure");
+                self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+            }
         }
     }
 }
@@ -701,7 +687,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let tx_res = actions.close_channel(*BOB, ChannelDirection::Outgoing).await?.await?;
+        let tx_res = actions.close_channel(channel.clone()).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -718,7 +704,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let tx_res = actions.close_channel(*BOB, ChannelDirection::Outgoing).await?.await?;
+        let tx_res = actions.close_channel(channel.clone()).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -771,7 +757,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let tx_res = actions.close_channel(*BOB, ChannelDirection::Incoming).await?.await?;
+        let tx_res = actions.close_channel(channel.clone()).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -814,7 +800,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing)
+                    .close_channel(channel.clone())
                     .await
                     .err()
                     .expect("should be an error"),
@@ -826,7 +812,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_should_not_close_nonexistent_channel() -> anyhow::Result<()> {
+    async fn test_should_not_close_foreign_channel() -> anyhow::Result<()> {
+        let channel = ChannelEntry::new(
+            Address::from([0x01; 20]),
+            Address::from([0x02; 20]),
+            10_u32.into(),
+            U256::zero(),
+            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
+            U256::zero(),
+        );
+
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), None).await?;
@@ -841,11 +836,7 @@ mod tests {
 
         assert!(
             matches!(
-                actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing)
-                    .await
-                    .err()
-                    .expect("should be an error"),
+                actions.close_channel(channel).await.err().expect("should be an error"),
                 ChainActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
@@ -874,7 +865,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing)
+                    .close_channel(channel.clone())
                     .await
                     .err()
                     .expect("should be an error"),

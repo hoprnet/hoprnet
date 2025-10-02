@@ -151,9 +151,6 @@ impl HoprNodeDb {
         let caches = Arc::new(NodeDbCaches::default());
         caches.invalidate_all();
 
-        // TODO: (dbmig) initialize key-id mapper via the HoprChain
-        // Initialize KeyId mapping for accounts
-
         Ok(Self {
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
             tickets_db,

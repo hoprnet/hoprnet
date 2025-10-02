@@ -790,10 +790,29 @@ impl Hopr {
         // redeemed but on-chain state does not align with that. This implies there was a problem
         // right when the transaction was sent on-chain. In such cases, we simply let it retry and
         // handle errors appropriately.
-        // TODO: (dbmig) dissolve this here
-        // if let Err(e) = self.db.fix_channels_next_ticket_state().await {
-        //    error!(error = %e, "failed to fix channels ticket states");
-        //}
+        let mut channels = self
+            .hopr_chain_api
+            .stream_channels(ChannelSelector {
+                direction: vec![ChannelDirection::Incoming],
+                ..Default::default()
+            })
+            .await?;
+
+        while let Some(channel) = channels.next().await {
+            self.node_db
+                .update_ticket_states_and_fetch(
+                    TicketSelector::from(&channel)
+                        .with_state(AcknowledgedTicketStatus::BeingRedeemed)
+                        .with_index_range(channel.ticket_index.as_u64()..),
+                    AcknowledgedTicketStatus::Untouched,
+                )
+                .await?
+                .for_each(|ticket| {
+                    info!(%ticket, "fixed next out-of-sync ticket");
+                    futures::future::ready(())
+                })
+                .await;
+        }
 
         // NOTE: strategy ticks must start after the chain is synced, otherwise
         // the strategy would react to historical data and drain through the native

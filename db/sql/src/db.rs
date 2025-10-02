@@ -18,7 +18,6 @@ use tracing::log::LevelFilter;
 use validator::Validate;
 
 use crate::{
-    HoprDbAllOperations,
     cache::{CacheKeyMapper, HoprIndexerDbCaches},
     errors::{DbSqlError, Result},
     prelude::model_to_account_entry,
@@ -250,8 +249,6 @@ impl HoprIndexerDb {
         &self.caches.key_id_mapper
     }
 }
-
-impl HoprDbAllOperations for HoprIndexerDb {}
 
 #[cfg(test)]
 mod tests {

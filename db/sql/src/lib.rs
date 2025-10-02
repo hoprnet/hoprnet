@@ -18,17 +18,10 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 pub use cache::CacheKeyMapper;
 pub use db::{HoprIndexerDb, HoprIndexerDbConfig};
+use errors::{DbSqlError, Result};
 use futures::future::BoxFuture;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
-
-use crate::{
-    accounts::HoprDbAccountOperations,
-    channels::HoprDbChannelOperations,
-    corrupted_channels::HoprDbCorruptedChannelOperations,
-    errors::{DbSqlError, Result},
-    info::HoprDbInfoOperations,
-};
 
 /// Primary key used in tables that contain only a single row.
 pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
@@ -251,16 +244,6 @@ impl HoprDbGeneralModelOperations for HoprIndexerDb {
 
         Ok(())
     }
-}
-
-/// Convenience trait that contain all HOPR DB operations crates.
-pub trait HoprDbAllOperations:
-    HoprDbGeneralModelOperations
-    + HoprDbAccountOperations
-    + HoprDbChannelOperations
-    + HoprDbCorruptedChannelOperations
-    + HoprDbInfoOperations
-{
 }
 
 #[doc(hidden)]

@@ -31,7 +31,6 @@ impl TryFrom<CachedValue> for IndexerData {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
-// TODO: (dbmig) move this into the implementation of ChainKeyOperations
 #[derive(Debug, Clone)]
 pub struct CacheKeyMapper(
     std::sync::Arc<DashMap<KeyIdent<4>, OffchainPublicKey>>,
