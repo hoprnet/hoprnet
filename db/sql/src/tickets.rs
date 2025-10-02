@@ -374,7 +374,6 @@ impl HoprDbTicketOperations for HoprDb {
 
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
-                                    let channel = channel_id.to_string();
                                     METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                                         &[&mark_as.to_string()],
                                         (_current_value + marked_value.amount()).as_u128() as f64,
@@ -521,9 +520,6 @@ impl HoprDbTicketOperations for HoprDb {
     async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics> {
         let res = match channel_id {
             None => {
-                #[cfg(all(feature = "prometheus", not(test)))]
-                let mut per_channel_unredeemed = std::collections::HashMap::new();
-
                 self.nest_transaction_in_db(None, TargetDb::Tickets)
                     .await?
                     .perform(|tx| {
@@ -533,22 +529,13 @@ impl HoprDbTicketOperations for HoprDb {
                                 .await?
                                 .try_fold(U256::zero(), |amount, x| {
                                     let unredeemed_value = U256::from_be_bytes(x.amount);
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    per_channel_unredeemed
-                                        .entry(x.channel_id)
-                                        .and_modify(|v| *v += unredeemed_value)
-                                        .or_insert(unredeemed_value);
-
                                     futures::future::ok(amount + unredeemed_value)
                                 })
                                 .await?;
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            for (channel_id, unredeemed_value) in per_channel_unredeemed {
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS
-                                    .set(&["unredeemed"], unredeemed_value.as_u128() as f64);
-                            }
+                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                                .set(&["unredeemed"], unredeemed_value.as_u128() as f64);
 
                             let mut all_stats = ticket_statistics::Entity::find()
                                 .all(tx.as_ref())
@@ -562,23 +549,22 @@ impl HoprDbTicketOperations for HoprDb {
                                     let rejected_value = HoprBalance::from_be_bytes(stats.rejected_value);
                                     acc.rejected_value += rejected_value;
                                     acc.winning_tickets += stats.winning_tickets as u128;
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    {
-                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS
-                                            .set(&["neglected"], neglected_value.amount().as_u128() as f64);
-
-                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS
-                                            .set(&["redeemed"], redeemed_value.amount().as_u128() as f64);
-
-                                        METRIC_HOPR_TICKETS_INCOMING_STATISTICS
-                                            .set(&["rejected"], rejected_value.amount().as_u128() as f64);
-                                    }
-
                                     acc
                                 });
 
                             all_stats.unredeemed_value = unredeemed_value.into();
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            {
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                                    .set(&["neglected"], all_stats.neglected_value.amount().as_u128() as f64);
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                                    .set(&["redeemed"], all_stats.redeemed_value.amount().as_u128() as f64);
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                                    .set(&["rejected"], all_stats.rejected_value.amount().as_u128() as f64);
+                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS
+                                    .set(&["winning_tickets"], all_stats.winning_tickets as f64);
+                            }
 
                             Ok::<_, DbSqlError>(all_stats)
                         })
@@ -627,22 +613,15 @@ impl HoprDbTicketOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    let rows = ticket_statistics::Entity::find().all(tx.as_ref()).await?;
-
                     // delete statistics for the found rows
                     let deleted = ticket_statistics::Entity::delete_many().exec(tx.as_ref()).await?;
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     {
                         if deleted.rows_affected > 0 {
-                            for row in rows {
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&["neglected"], 0.0_f64);
-
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&["redeemed"], 0.0_f64);
-
-                                METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&["rejected"], 0.0_f64);
-                            }
+                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&["neglected"], 0.0_f64);
+                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&["redeemed"], 0.0_f64);
+                            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(&["rejected"], 0.0_f64);
                         }
                     }
 

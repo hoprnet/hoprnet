@@ -25,7 +25,10 @@ lazy_static::lazy_static! {
         "The unix timestamp in seconds at which any API endpoint was last fetched"
     ).unwrap();
 
-    // Matches Ed25519-based peer IDs and channel IDs (Keccak256 hashes)
+    // Matches Ethereum addresses which contains 40 hex characters prefixed by '0x'
+    // Matches ChannelsIds which contains 64 hex characters prefixed by '0x'
+    // Matches PeerIds which contains 12D3KooW followed by 44 base58 characters
+    // Matches IPv4 addresses with ports in format x.x.x.x/port
     static ref ID_REGEX: regex::Regex = regex::Regex::new(r"(0x[0-9A-Fa-f]{40})|(0x[0-9A-Fa-f]{64})|(12D3KooW[A-Za-z0-9]{44})|(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,5})").unwrap();
 }
 

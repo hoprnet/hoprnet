@@ -18,19 +18,17 @@ type BoxIoSink<T> = Box<dyn Sink<T, Error = std::io::Error> + Send + Unpin>;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_UDP_INGRESS_LEN: hopr_metrics::MultiHistogram =
-        hopr_metrics::MultiHistogram::new(
+    static ref METRIC_UDP_INGRESS_LEN: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
             "hopr_udp_ingress_packet_len",
-            "UDP packet lengths on ingress per counterparty",
-            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0],
-            &[]
+            "UDP packet lengths on ingress",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0]
     ).unwrap();
-    static ref METRIC_UDP_EGRESS_LEN: hopr_metrics::MultiHistogram =
-        hopr_metrics::MultiHistogram::new(
+    static ref METRIC_UDP_EGRESS_LEN: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
             "hopr_udp_egress_packet_len",
-            "UDP packet lengths on egress per counterparty",
-            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0],
-            &[]
+            "UDP packet lengths on egress",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0]
     ).unwrap();
 }
 
