@@ -218,7 +218,8 @@ where
                 .db
                 .get_network_peer(peer)
                 .await
-                .map_err(|e| NetworkingError::DbChainError(e.into()))? {
+                .map_err(|e| NetworkingError::DbChainError(e.into()))?
+            {
                 Some(mut peer_status) => {
                     // Filter out private addresses from multiaddresses before returning
                     peer_status.multiaddresses = peer_status

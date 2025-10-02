@@ -270,35 +270,43 @@ where
             futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
 
         let me_peerid = self.me_peerid;
-        let discovery_updates =
-            futures_concurrency::stream::StreamExt::merge(discovery_updates, internal_discovery_update_rx).filter_map(
-                move |event| {
-                    async move {
-                        match event {
-                            PeerDiscovery::Announce(peer, multiaddresses) => {
-                                debug!(peer = %peer, ?multiaddresses, "Processing peer discovery event: Announce");
-                                if peer != me_peerid {
-                                    // decapsulate the `p2p/<peer_id>` to remove duplicities
-                                    let mas = multiaddresses
-                                        .into_iter()
-                                        .map(|ma| strip_p2p_protocol(&ma))
-                                        .filter(|v| !v.is_empty())
-                                        .collect::<Vec<_>>();
+        let network = self.network.clone();
+        let discovery_updates = futures_concurrency::stream::StreamExt::merge(
+            discovery_updates,
+            internal_discovery_update_rx,
+        )
+        .filter_map(move |event| {
+            let network = network.clone();
+            async move {
+                match event {
+                    PeerDiscovery::Announce(peer, multiaddresses) => {
+                        debug!(%peer, ?multiaddresses, "processing peer discovery event: Announce");
+                        if peer != me_peerid {
+                            // decapsulate the `p2p/<peer_id>` to remove duplicities
+                            let mas = multiaddresses
+                                .into_iter()
+                                .map(|ma| strip_p2p_protocol(&ma))
+                                .filter(|v| !v.is_empty())
+                                .collect::<Vec<_>>();
 
-                                    if !mas.is_empty() {
-                                        Some(PeerDiscovery::Announce(peer, mas))
-                                    } else {
-                                        None
-                                    }
-                                } else {
+                            if !mas.is_empty() {
+                                if let Err(error) = network.add(&peer, PeerOrigin::NetworkRegistry, mas.clone()).await {
+                                    error!(%peer, %error, "failed to add peer to the network");
                                     None
+                                } else {
+                                    Some(PeerDiscovery::Announce(peer, mas))
                                 }
+                            } else {
+                                None
                             }
-                            _ => None,
+                        } else {
+                            None
                         }
                     }
-                },
-            );
+                    _ => None,
+                }
+            }
+        });
 
         info!(
             public_nodes = public_nodes.len(),

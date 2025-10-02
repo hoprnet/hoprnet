@@ -2,6 +2,7 @@ use std::{net::Ipv4Addr, num::NonZeroU8};
 
 use futures::{Sink, SinkExt, Stream, StreamExt, select};
 use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::is_public_address;
 use hopr_transport_identity::{
     Multiaddr, PeerId,
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
@@ -14,7 +15,7 @@ use libp2p::{
     swarm::{NetworkInfo, SwarmEvent, dial_opts::DialOpts},
 };
 use tracing::{debug, error, info, trace, warn};
-use hopr_network_types::prelude::is_public_address;
+
 use crate::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Result};
 
 #[cfg(all(feature = "prometheus", not(test)))]
