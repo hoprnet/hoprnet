@@ -79,9 +79,15 @@ pub type DefaultHttpRequestor = hopr_chain_rpc::transport::ReqwestClient;
 /// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
 pub async fn wait_for_funds<R: ChainReadAccountOperations>(
     min_balance: XDaiBalance,
+    suggested_balance: XDaiBalance,
     max_delay: Duration,
     resolver: &R,
 ) -> Result<()> {
+    info!(
+        %address, suggested_minimum_balance = %suggested_balance,
+        "Node about to start, checking for funds",
+    );
+
     let multiplier = 1.05;
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
