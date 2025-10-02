@@ -1224,6 +1224,8 @@ impl Hopr {
 
         let min_value = min_value.into();
         let chain_api = self.hopr_chain_api.clone();
+
+        // Does not need to be done concurrently, because we do not await each channel's redemption
         self.hopr_chain_api
             .stream_channels(ChannelSelector {
                 counterparty: None,
@@ -1234,7 +1236,7 @@ impl Hopr {
                 ],
             })
             .await?
-            .for_each_concurrent(20, |channel| {
+            .for_each(|channel| {
                 let chain_api = chain_api.clone();
                 async move {
                     match chain_api
@@ -1273,7 +1275,7 @@ impl Hopr {
 
     pub async fn redeem_tickets_in_channel<B: Into<HoprBalance>>(
         &self,
-        channel_id: &prelude::Hash,
+        channel_id: &Hash,
         min_value: B,
         only_aggregated: bool,
     ) -> errors::Result<usize> {

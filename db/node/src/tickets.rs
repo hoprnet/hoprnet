@@ -14,8 +14,10 @@ use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, TransactionTrait};
-use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set, TransactionTrait,
+};
+use sea_query::{Condition, Expr, IntoCondition, Order, SimpleExpr};
 use tracing::{debug, error, info, trace};
 
 use crate::{db::HoprNodeDb, errors::NodeDbError};
@@ -166,6 +168,9 @@ impl HoprDbTicketOperations for HoprNodeDb {
         };
 
         Ok(qry
+            .order_by(ticket::Column::ChannelId, Order::Asc)
+            .order_by(ticket::Column::ChannelEpoch, Order::Asc)
+            .order_by(ticket::Column::Index, Order::Asc)
             .stream(&self.tickets_db)
             .await?
             .and_then(|model| {
@@ -313,6 +318,9 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(Box::pin(stream! {
             match ticket::Entity::find()
                 .filter(selector)
+                .order_by(ticket::Column::ChannelId, Order::Asc)
+                .order_by(ticket::Column::ChannelEpoch, Order::Asc)
+                .order_by(ticket::Column::Index, Order::Asc)
                 .stream(&self.tickets_db)
                 .await {
                 Ok(mut stream) => {

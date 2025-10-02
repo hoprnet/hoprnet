@@ -275,60 +275,6 @@ class TestIntegrationWithSwarm:
 
         await assert_channel_statuses(swarm7[src].api)
 
-    # generate a 1-hop route with a node using strategies in the middle
-    @pytest.mark.asyncio
-    @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
-    @pytest.mark.parametrize(
-        "src, mid, dest",
-        [
-            random_non_looping_routes_from((barebone_nodes(), 1), (default_nodes(), 1), (barebone_nodes(), 1))
-            for _ in range(PARAMETERIZED_SAMPLE_SIZE)
-        ],
-    )
-    async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming(
-        self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
-    ):
-        ticket_count = int(TICKET_AGGREGATION_THRESHOLD)
-
-        ticket_price = await get_ticket_price(swarm7[src])
-        aggregated_ticket_price = TICKET_AGGREGATION_THRESHOLD * ticket_price
-
-        # Create a channel from src to mid, mid to dest does not need a channel
-        async with create_bidirectional_channels_for_route(
-            [swarm7[src], swarm7[mid], swarm7[dest]], ticket_count * ticket_price, ticket_price
-        ):
-            statistics_before = await swarm7[mid].api.get_tickets_statistics()
-            assert statistics_before is not None
-
-            await basic_send_and_receive_packets_over_single_route(
-                ticket_count,
-                [swarm7[src], swarm7[mid], swarm7[dest]],
-            )
-
-            # monitor that the node aggregates and redeems tickets until the aggregated value is reached
-            async def check_aggregate_and_redeem_tickets(node: Node):
-                while True:
-                    statistics_now = await node.api.get_tickets_statistics()
-                    assert statistics_now is not None
-
-                    redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
-                    logging.debug(
-                        f"redeemed_value diff: {redeemed_value_diff} |"
-                        + f"before: {statistics_before.redeemed_value} |"
-                        + f"now: {statistics_now.redeemed_value} |"
-                        + f"target: {aggregated_ticket_price}"
-                    )
-
-                    # break out of the loop if the aggregated value is reached
-                    if redeemed_value_diff >= aggregated_ticket_price:
-                        break
-                    else:
-                        await asyncio.sleep(0.1)
-
-            await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid]), 60.0)
-
-        await assert_channel_statuses(swarm7[src].api)
-
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_native_withdraw(self, peer, swarm7: dict[str, Node]):

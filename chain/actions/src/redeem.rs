@@ -64,6 +64,12 @@ where
 {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets(&self, selector: TicketSelector) -> Result<Vec<PendingAction>> {
+        // Add safeguard so that we do not accidentally try to redeem tickets which
+        // are already in progress of some sort.
+        // Note that the caller is still responsible for taking care of the ticket index range
+        // not being less than the next ticket index on the corresponding channel entry.
+        let selector = selector.with_state(AcknowledgedTicketStatus::Untouched);
+
         let (count_redeemable_tickets, _) = self
             .node_db
             .get_tickets_value(selector.clone())
@@ -87,16 +93,10 @@ where
             .channels_dst
             .ok_or(ChainActionsError::MissingDomainSeparator)?;
 
-        // Add safeguard so that we do not accidentally try to redeem tickets which
-        // are already in progress of some sort.
-        // Note that the caller is still responsible for taking care of the ticket index range
-        // not being less than the next ticket index on the corresponding channel entry.
-        let selector = selector.with_state(AcknowledgedTicketStatus::Untouched);
-
         let selector_id = selector.to_string();
 
         // Collect here, so we don't hold-up the stream open for too long
-        let redeem_stream = self
+        let mut tickets_to_redeem = self
             .node_db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await
@@ -104,8 +104,11 @@ where
             .collect::<Vec<_>>()
             .await;
 
+        // Make sure the tickets to be redeemed are sorted by index
+        tickets_to_redeem.sort();
+
         let mut receivers: Vec<PendingAction> = vec![];
-        for ack_ticket in redeem_stream {
+        for ack_ticket in tickets_to_redeem {
             let ticket_id = ack_ticket.to_string();
 
             if let Ok(redeemable) = ack_ticket.into_redeemable(&self.chain_key, &channel_dst) {
