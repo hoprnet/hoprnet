@@ -1,6 +1,5 @@
 //! Crate containing the API object for chain operations used by the HOPRd node.
 
-pub mod config;
 pub mod errors;
 pub mod executors;
 
@@ -13,7 +12,6 @@ use alloy::{
         layers::RetryBackoffLayer,
     },
 };
-use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use futures::{FutureExt, future::AbortHandle};
 use hopr_async_runtime::{prelude::sleep, spawn_as_abortable};
@@ -23,6 +21,7 @@ use hopr_chain_actions::{
     action_state::IndexerActionTracker,
     payload::SafePayloadGenerator,
 };
+pub use hopr_chain_config as config;
 use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
 use hopr_chain_rpc::{
     HoprRpcOperations,
@@ -161,7 +160,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         me_onchain: ChainKeypair,
         db: T,
         // --
-        chain_config: ChainNetworkConfig,
+        chain_config: config::ChainNetworkConfig,
         module_address: Address,
         // --
         contract_addresses: ContractAddresses,

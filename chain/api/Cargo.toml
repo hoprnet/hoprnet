@@ -24,9 +24,6 @@ prometheus = [
   "hopr-db-sql/prometheus",
 ]
 
-[build-dependencies]
-anyhow = { workspace = true }
-
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
   "essentials",
@@ -47,6 +44,7 @@ url = { workspace = true }
 validator = { workspace = true }
 
 hopr-chain-actions = { workspace = true }
+hopr-chain-config = { workspace = true }
 hopr-chain-indexer = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
