@@ -42,7 +42,7 @@ where
                 async move {
                     match event.event_type {
                         ChainEventType::Announcement{peer, multiaddresses, ..} => {
-                            Some(vec![PeerDiscovery::Announce(peer, multiaddresses), PeerDiscovery::Allow(peer)])
+                            Some(vec![PeerDiscovery::Announce(peer, multiaddresses)])
                         }
                         ChainEventType::ChannelOpened(channel) |
                         ChainEventType::ChannelClosureInitiated(channel) |

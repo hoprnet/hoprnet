@@ -81,7 +81,7 @@ use std::{
 use async_lock::RwLock;
 pub use async_trait::async_trait;
 use errors::{HoprLibError, HoprStatusError};
-use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::channel, future::AbortHandle};
+use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::AbortHandle};
 use hopr_api::{
     chain::{
         AccountSelector, AnnouncementError, ChainEvents, ChainKeyOperations, ChainReadAccountOperations,
@@ -491,7 +491,7 @@ impl Hopr {
             minimum_required = minimum_capacity,
             "Creating chain discovery events channel"
         );
-        let (mut indexer_peer_update_tx, indexer_peer_update_rx) =
+        let (indexer_peer_update_tx, indexer_peer_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(chain_discovery_events_capacity);
 
         let indexer_event_pipeline = helpers::chain_events_to_transport_events(
@@ -501,46 +501,6 @@ impl Hopr {
             self.channel_graph.clone(),
             self.node_db.clone(),
         );
-
-        let mut public_accounts = Vec::new();
-        {
-            // This has to happen before the indexing process starts to make sure that the pre-existing data is
-            // properly populated into the transport mechanism before the synced data in the follow-up process.
-            info!("Syncing peer announcements and network registry updates from previous runs");
-            let mut accounts = self
-                .hopr_chain_api
-                .stream_accounts(AccountSelector {
-                    public_only: true,
-                    ..Default::default()
-                })
-                .await?;
-            while let Some(account) = accounts.next().await {
-                match &account.entry_type {
-                    AccountType::NotAnnounced => {}
-                    AccountType::Announced { multiaddr, .. } => {
-                        indexer_peer_update_tx
-                            .send(PeerDiscovery::Announce(
-                                account.public_key.into(),
-                                vec![multiaddr.clone()],
-                            ))
-                            .await
-                            .map_err(|e| {
-                                HoprLibError::GeneralError(format!("Failed to send peer discovery announcement: {e}"))
-                            })?;
-
-                        indexer_peer_update_tx
-                            .send(PeerDiscovery::Allow(account.public_key.into()))
-                            .await
-                            .map_err(|e| {
-                                HoprLibError::GeneralError(format!(
-                                    "Failed to send peer discovery network registry event: {e}"
-                                ))
-                            })?;
-                    }
-                }
-                public_accounts.push(account);
-            }
-        }
 
         spawn(async move {
             let result = indexer_event_pipeline
@@ -756,10 +716,8 @@ impl Hopr {
             );
         }
 
-        let (hopr_socket, transport_processes) = self
-            .transport_api
-            .run(public_accounts, indexer_peer_update_rx, session_tx)
-            .await?;
+        info!("Starting transport");
+        let (hopr_socket, transport_processes) = self.transport_api.run(indexer_peer_update_rx, session_tx).await?;
         for (id, proc) in transport_processes.into_iter() {
             processes.insert(id.into(), proc);
         }

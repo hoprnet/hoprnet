@@ -37,7 +37,7 @@ use futures::{
 };
 use helpers::PathPlanner;
 use hopr_api::{
-    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
+    chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbPeersOperations, HoprDbProtocolOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
@@ -134,7 +134,14 @@ pub struct HoprTransport<Db, R> {
 impl<Db, R> HoprTransport<Db, R>
 where
     Db: HoprDbTicketOperations + HoprDbPeersOperations + HoprDbProtocolOperations + Clone + Send + Sync + 'static,
-    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Clone + Send + Sync + 'static,
+    R: ChainReadChannelOperations
+        + ChainReadAccountOperations
+        + ChainKeyOperations
+        + ChainValues
+        + Clone
+        + Send
+        + Sync
+        + 'static,
 {
     pub fn new(
         me: &OffchainKeypair,
@@ -216,7 +223,6 @@ where
     #[allow(clippy::too_many_arguments)]
     pub async fn run<S>(
         &self,
-        public_nodes: Vec<AccountEntry>,
         discovery_updates: S,
         on_incoming_session: Sender<IncomingSession>,
     ) -> crate::errors::Result<(
@@ -232,7 +238,17 @@ where
     where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
     {
-        info!("Loading initial peers from the storage");
+        info!("Loading initial peers from the chain");
+        let public_nodes = self
+            .resolver
+            .stream_accounts(AccountSelector {
+                public_only: true,
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| HoprTransportError::Other(e.into()))?
+            .collect::<Vec<_>>()
+            .await;
 
         // Calculate the minimum capacity based on public nodes (each node can generate 2 messages)
         // plus 100 as additional buffer
@@ -259,9 +275,6 @@ where
                 move |event| {
                     async move {
                         match event {
-                            PeerDiscovery::Allow(peer_id) | PeerDiscovery::Ban(peer_id) => {
-                                debug!(%peer_id, "processed peer discovery event as a no-op")
-                            }
                             PeerDiscovery::Announce(peer, multiaddresses) => {
                                 debug!(peer = %peer, ?multiaddresses, "Processing peer discovery event: Announce");
                                 if peer != me_peerid {
@@ -273,18 +286,24 @@ where
                                         .collect::<Vec<_>>();
 
                                     if !mas.is_empty() {
-                                        return Some(PeerDiscovery::Announce(peer, mas));
+                                        Some(PeerDiscovery::Announce(peer, mas))
+                                    } else {
+                                        None
                                     }
+                                } else {
+                                    None
                                 }
                             }
+                            _ => None,
                         }
-
-                        None
                     }
                 },
             );
 
-        info!("Loading initial peers from the storage");
+        info!(
+            public_nodes = public_nodes.len(),
+            "Initializing swarm with peers from chain"
+        );
 
         let mut addresses: HashSet<Multiaddr> = HashSet::new();
         for node_entry in public_nodes {
@@ -297,11 +316,6 @@ where
 
                 internal_discovery_update_tx
                     .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
-                    .await
-                    .map_err(|e| HoprTransportError::Api(e.to_string()))?;
-
-                internal_discovery_update_tx
-                    .send(PeerDiscovery::Allow(peer))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
             }

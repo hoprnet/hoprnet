@@ -652,9 +652,8 @@ impl ChainValues for HoprChain {
 
     async fn minimum_ticket_price(&self) -> std::result::Result<HoprBalance, Self::Error> {
         let indexer_data = self.db.get_indexer_data(None).await?;
-        Ok(indexer_data
-            .ticket_price
-            .ok_or(HoprChainError::Api("missing ticket price".into()))?)
+        // The default minimum ticket price is 0
+        Ok(indexer_data.ticket_price.unwrap_or_default())
     }
 
     async fn channel_closure_notice_period(&self) -> std::result::Result<Duration, Self::Error> {
