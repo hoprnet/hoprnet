@@ -28,11 +28,6 @@ lazy_static::lazy_static! {
         "Number of channels per direction",
         &["direction"]
     ).unwrap();
-    static ref METRIC_CHANNEL_BALANCES: MultiGauge = MultiGauge::new(
-        "hopr_channel_balances",
-        "Balances on channels per counterparty",
-        &["direction"]
-    ).unwrap();
 }
 
 /// Structure that adds additional data to a `ChannelEntry`, which
@@ -301,36 +296,18 @@ impl ChannelGraph {
                     ChannelDirection::Outgoing => match channel.status {
                         ChannelStatus::Closed => {
                             METRIC_NUMBER_OF_CHANNELS.decrement(&["out"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(&["out"], 0.0);
                         }
                         ChannelStatus::Open => {
                             METRIC_NUMBER_OF_CHANNELS.increment(&["out"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(
-                                &["out"],
-                                channel
-                                    .balance
-                                    .amount_in_base_units()
-                                    .parse::<f64>()
-                                    .unwrap_or(f64::INFINITY),
-                            );
                         }
                         ChannelStatus::PendingToClose(_) => {}
                     },
                     ChannelDirection::Incoming => match channel.status {
                         ChannelStatus::Closed => {
                             METRIC_NUMBER_OF_CHANNELS.decrement(&["in"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(&["in"], 0.0);
                         }
                         ChannelStatus::Open => {
                             METRIC_NUMBER_OF_CHANNELS.increment(&["in"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(
-                                &["in"],
-                                channel
-                                    .balance
-                                    .amount_in_base_units()
-                                    .parse::<f64>()
-                                    .unwrap_or(f64::INFINITY),
-                            );
                         }
                         ChannelStatus::PendingToClose(_) => {}
                     },
