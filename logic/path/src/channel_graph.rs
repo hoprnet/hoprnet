@@ -16,10 +16,7 @@ use petgraph::{
 };
 use tracing::{debug, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge,
-    hopr_primitive_types::traits::ToHex,
-};
+use {hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
