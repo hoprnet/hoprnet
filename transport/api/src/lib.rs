@@ -469,14 +469,9 @@ where
                     let pp = pp.clone();
 
                     async move {
-                        pp.resolve_routing(data.data.total_len(), usize::MAX, routing)
+                        pp.resolve_routing(data.data.total_len(), 1, routing)
                             .await
-                            .map(|(routing, _size)| {
-                                let (tx, _rx) = futures::channel::oneshot::channel::<
-                                    std::result::Result<(), hopr_crypto_packet::errors::PacketError>,
-                                >();
-                                (data, routing, tx.into())
-                            })
+                            .map(|(routing, _size)| (data, routing))
                             .ok()
                     }
                 })

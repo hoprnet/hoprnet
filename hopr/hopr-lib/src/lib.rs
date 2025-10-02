@@ -406,7 +406,13 @@ impl Hopr {
             "Node is not started, please fund this node",
         );
 
-        wait_for_funds(*MIN_NATIVE_BALANCE, Duration::from_secs(200), &self.hopr_chain_api).await?;
+        wait_for_funds(
+            *MIN_NATIVE_BALANCE,
+            *SUGGESTED_NATIVE_BALANCE,
+            Duration::from_secs(200),
+            &self.hopr_chain_api,
+        )
+        .await?;
 
         let mut processes: HashMap<state::HoprLibProcesses, AbortHandle> = HashMap::new();
 

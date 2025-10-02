@@ -84,7 +84,7 @@ pub async fn wait_for_funds<R: ChainReadAccountOperations>(
     resolver: &R,
 ) -> Result<()> {
     info!(
-        %address, suggested_minimum_balance = %suggested_balance,
+        suggested_minimum_balance = %suggested_balance,
         "Node about to start, checking for funds",
     );
 
