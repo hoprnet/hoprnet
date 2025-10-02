@@ -14,7 +14,7 @@ use libp2p::{
     swarm::{NetworkInfo, SwarmEvent, dial_opts::DialOpts},
 };
 use tracing::{debug, error, info, trace, warn};
-
+use hopr_network_types::prelude::is_public_address;
 use crate::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Result};
 
 #[cfg(all(feature = "prometheus", not(test)))]

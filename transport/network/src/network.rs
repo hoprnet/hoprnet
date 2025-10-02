@@ -1021,7 +1021,7 @@ mod tests {
             me,
             vec![public_addr.clone()], // Set only public address for self
             Default::default(),
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         // Add peer with mixed addresses - private addresses should be filtered out during add
@@ -1076,7 +1076,7 @@ mod tests {
             me,
             mixed_self_addresses,
             Default::default(),
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         // Test that get() method filters self addresses as a defensive measure
