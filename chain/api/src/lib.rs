@@ -319,7 +319,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_indexer_data(None).await?.ticket_price)
     }
 
-    pub async fn nr_enabled(&self) -> errors::Result<bool> {
+    pub async fn is_network_registry_allowed(&self) -> errors::Result<bool> {
         Ok(self.db.get_indexer_data(None).await?.nr_enabled)
     }
 

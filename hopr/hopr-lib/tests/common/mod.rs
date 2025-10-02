@@ -81,7 +81,7 @@ pub async fn deploy_test_environment(
     finality: u32,
 ) -> TestChainEnv {
     let anvil: AnvilInstance = create_anvil(Some(block_time));
-    info!("Anvil started at {}", anvil.endpoint_url());
+    info!(url=%anvil.endpoint_url(), "Anvil started");
 
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
