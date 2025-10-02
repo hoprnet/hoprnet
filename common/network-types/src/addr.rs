@@ -27,7 +27,7 @@ pub fn is_public(ip_addr: IpAddr) -> bool {
 
 #[inline]
 fn is_allowed_for_transport(ip_addr: IpAddr) -> bool {
-    return ALLOW_PRIVATE_ADDRESSES.load(std::sync::atomic::Ordering::SeqCst) || is_public(ip_addr);
+    ALLOW_PRIVATE_ADDRESSES.load(std::sync::atomic::Ordering::SeqCst) || is_public(ip_addr)
 }
 
 /// Check if a multiaddress contains a public/routable IP address.

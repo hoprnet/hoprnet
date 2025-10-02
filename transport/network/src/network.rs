@@ -140,7 +140,7 @@ where
         }
 
         // Filter out private addresses before storing
-        addrs = addrs.into_iter().filter(|addr| is_public_address(addr)).collect();
+        addrs = addrs.into_iter().filter(is_public_address).collect();
 
         debug!(%peer, %origin, multiaddresses = ?addrs, "Filtered addresses, proceeding with public addresses only");
 
