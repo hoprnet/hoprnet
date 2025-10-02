@@ -102,8 +102,6 @@ impl PartialEq for TicketSelector {
     }
 }
 
-impl Eq for TicketSelector {}
-
 impl TicketSelector {
     /// Create a new ticket selector given the `channel_id` and `epoch`.
     pub fn new<T: Into<U256>>(channel_id: Hash, epoch: T) -> Self {

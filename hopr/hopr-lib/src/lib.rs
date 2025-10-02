@@ -184,7 +184,7 @@ impl Hopr {
 
         let multiaddress: Multiaddr = (&cfg.host).try_into()?;
 
-        let db_path: PathBuf = [&cfg.db.data, "db"].iter().collect();
+        let db_path: PathBuf = [&cfg.db.data, "node_db"].iter().collect();
         info!(path = ?db_path, "Initiating DB");
 
         if cfg.db.force_initialize {
@@ -251,9 +251,11 @@ impl Hopr {
             ChannelGraphConfig::default(),
         )));
 
+        // TODO (4.0): replace this with new implementation that follows the chain traits from the hopr-api crate
         let hopr_hopr_chain_api = hopr_chain_api::HoprChain::new(
             me_onchain.clone(),
             db.clone(),
+            &cfg.db.data,
             resolved_environment.clone(),
             cfg.safe_module.module_address,
             ContractAddresses {
@@ -349,7 +351,7 @@ impl Hopr {
     }
 
     pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        Ok(self.hopr_chain_api.safe_balance().await?)
+        Ok(self.hopr_chain_api.node_balance().await?)
     }
 
     pub async fn get_safe_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {

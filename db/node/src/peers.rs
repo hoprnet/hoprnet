@@ -281,7 +281,7 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
             origin: PeerOrigin::from_repr(value.origin as u8)
                 .ok_or_else(|| Self::Error::LogicalError("invalid origin".into()))?,
             last_seen: value.last_seen.into(),
-            last_seen_latency: Duration::from_millis(value.last_seen_latency as u64),
+            last_seen_latency: Duration::from_millis(value.last_seen_latency.max(0) as u64),
             heartbeats_sent: value.heartbeats_sent.unwrap_or_default() as u64,
             heartbeats_succeeded: value.heartbeats_successful.unwrap_or_default() as u64,
             backoff: value.backoff.unwrap_or(1.0f64),

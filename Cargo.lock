@@ -4840,7 +4840,6 @@ dependencies = [
  "ringbuffer",
  "sea-orm",
  "sea-query",
- "sea-query-binder",
  "smart-default",
  "sqlx",
  "thiserror 2.0.17",

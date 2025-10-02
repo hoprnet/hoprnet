@@ -4,7 +4,7 @@ pub mod config;
 pub mod errors;
 pub mod executors;
 
-use std::{collections::HashMap, path::Path, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
 use alloy::{
     rpc::{client::ClientBuilder, types::TransactionRequest},
@@ -165,6 +165,7 @@ impl HoprChain {
     pub fn new(
         me_onchain: ChainKeypair,
         node_db: HoprNodeDb,
+        data_dir_path: &str,
         chain_config: ChainNetworkConfig,
         module_address: Address,
         contract_addresses: ContractAddresses,
@@ -172,7 +173,7 @@ impl HoprChain {
         indexer_cfg: IndexerConfig,
     ) -> Result<Self> {
         let db = futures::executor::block_on(HoprIndexerDb::new(
-            Path::new("data"),
+            PathBuf::from_iter([data_dir_path, "index_db"]).as_path(),
             me_onchain.clone(),
             HoprIndexerDbConfig::default(),
         ))?;
