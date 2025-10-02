@@ -10,14 +10,14 @@ lazy_static::lazy_static! {
     static ref METRIC_COUNT_API_CALLS: MultiCounter = MultiCounter::new(
         "hopr_http_api_call_count",
         "Number of different REST API calls and their statuses",
-        &["endpoint", "method", "status"]
+        &["path", "method", "status"]
     )
     .unwrap();
     static ref METRIC_COUNT_API_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
         "hopr_http_api_call_timing_sec",
         "Timing of different REST API calls in seconds",
         vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0],
-        &["endpoint", "method"]
+        &["path", "method"]
     )
     .unwrap();
     static ref METRIC_API_LAST_TIME: SimpleGauge = SimpleGauge::new(

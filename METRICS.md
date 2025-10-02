@@ -51,8 +51,8 @@ scrape_configs:
 - `hopr_strategy_auto_redeem_redeem_count`: Count of initiated automatic redemptions
 - `hopr_strategy_aggregating_aggregation_count`: Count of initiated automatic aggregations
 - `hopr_transport_p2p_opened_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
-- `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `endpoint`, `method`, `status`
-- `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `endpoint`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
+- `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `path`, `method`, `status`
+- `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `path`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
 - `hopr_http_api_last_used_time`: The unix timestamp in seconds at which any API endpoint was last fetched
 - `hopr_start_time`: The unix timestamp in seconds at which the process was started
 - `hopr_lib_version`: Executed version of hopr-lib, keys: `version`
@@ -67,7 +67,7 @@ scrape_configs:
 - `hopr_indexer_data_source`: Current data source of the Indexer, keys: `source`
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
 - `hopr_indexer_contract_log_count`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`
-- `hopr_tickets_incoming_statistics`: Ticket statistics for channels with incoming tickets, keys: `channel`, `statistic`
+- `hopr_tickets_incoming_statistics`: Ticket statistics with incoming tickets, keys: `statistic`
 - `hopr_session_num_active_sessions`: Number of currently active HOPR sessions
 - `hopr_session_received_error_count`: Number of HOPR session errors received from an Exit node, keys: `kind`
 - `hopr_session_sent_error_count`: Number of HOPR session errors sent to an Entry node, keys: `kind`
