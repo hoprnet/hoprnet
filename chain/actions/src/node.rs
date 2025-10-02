@@ -303,7 +303,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .withdraw::<WxHOPR>(*BOB, 0_32.into())
+                    .withdraw::<WxHOPR>(*BOB, 0_u32.into())
                     .await
                     .err()
                     .expect("must be error"),

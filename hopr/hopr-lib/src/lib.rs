@@ -1270,8 +1270,9 @@ impl Hopr {
             "Node is not ready for on-chain operations".into(),
         )?;
 
-        let mut channels = self
-            .hopr_chain_api
+        let min_value = min_value.into();
+        let chain_api = self.hopr_chain_api.clone();
+        self.hopr_chain_api
             .stream_channels(ChannelSelector {
                 counterparty: None,
                 direction: vec![ChannelDirection::Incoming],
@@ -1280,19 +1281,26 @@ impl Hopr {
                     ChannelStatusDiscriminants::PendingToClose,
                 ],
             })
-            .await?;
-
-        let min_value = min_value.into();
-        while let Some(channel) = channels.next().await {
-            let _ = self
-                .hopr_chain_api
-                .redeem_tickets_via_selector(
-                    TicketSelector::from(channel)
-                        .with_amount(min_value..)
-                        .with_aggregated_only(only_aggregated),
-                )
-                .await?;
-        }
+            .await?
+            .for_each_concurrent(20, |channel| {
+                let chain_api = chain_api.clone();
+                async move {
+                    match chain_api
+                        .redeem_tickets_via_selector(
+                            TicketSelector::from(&channel)
+                                .with_amount(min_value..)
+                                .with_aggregated_only(only_aggregated)
+                                .with_index_range(channel.ticket_index.as_u64()..)
+                                .with_state(AcknowledgedTicketStatus::Untouched),
+                        )
+                        .await
+                    {
+                        Ok(awaiters) => info!(count = awaiters.len(), %channel, "redeemed tickets in channel"),
+                        Err(error) => error!(%error, %channel, "failed to redeem tickets"),
+                    }
+                }
+            })
+            .await;
 
         Ok(())
     }
@@ -1330,7 +1338,9 @@ impl Hopr {
             .redeem_tickets_via_selector(
                 TicketSelector::from(channel)
                     .with_amount(min_value.into()..)
-                    .with_aggregated_only(only_aggregated),
+                    .with_aggregated_only(only_aggregated)
+                    .with_index_range(channel.ticket_index.as_u64()..)
+                    .with_state(AcknowledgedTicketStatus::Untouched),
             )
             .await?;
 

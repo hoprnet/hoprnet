@@ -64,7 +64,7 @@ pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::{
     account::AccountEntry,
     channels::{ChannelId, CorruptedChannelEntry},
-    prelude::{AcknowledgedTicket, ChannelStatus, generate_channel_id},
+    prelude::{AcknowledgedTicket, AcknowledgedTicketStatus, ChannelStatus, generate_channel_id},
     tickets::WinningProbability,
 };
 use hopr_primitive_types::prelude::*;
@@ -674,7 +674,7 @@ impl ChainWriteTicketOperations for HoprChain {
     ) -> std::result::Result<Vec<BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>>, Self::Error> {
         Ok(self
             .actions_ref()
-            .redeem_tickets(selector)
+            .redeem_tickets(selector.with_state(AcknowledgedTicketStatus::Untouched))
             .await?
             .into_iter()
             .map(|r| r.map(|c| c.map(|ac| ac.tx_hash).map_err(HoprChainError::from)).boxed())

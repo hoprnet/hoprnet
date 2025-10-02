@@ -117,11 +117,6 @@ where
 mod tests {
     use std::{ops::Add, time::SystemTime};
 
-    use futures::{
-        FutureExt,
-        future::{BoxFuture, ok},
-        stream::BoxStream,
-    };
     use hex_literal::hex;
     use hopr_api::chain::ChainReceipt;
     use hopr_crypto_types::prelude::*;
@@ -129,7 +124,7 @@ mod tests {
     use lazy_static::lazy_static;
 
     use super::*;
-    use crate::errors::StrategyError;
+    use crate::tests::{MockChainActions, MockTestActions};
 
     lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
@@ -141,56 +136,6 @@ mod tests {
         static ref CHARLIE: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
         static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();
         static ref EUGENE: Address = hex!("0c1da65d269f89b05e3775bf8fcd21a138e8cbeb").into();
-    }
-
-    // Due to async-trait and lifetimes, we cannot use mockall
-    struct MockChainActions(Vec<ChannelEntry>, Hash);
-
-    #[async_trait::async_trait]
-    impl ChainReadChannelOperations for MockChainActions {
-        type Error = StrategyError;
-
-        async fn channel_by_parties(&self, _: &Address, _: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
-            unimplemented!()
-        }
-
-        async fn channel_by_id(&self, _: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
-            unimplemented!()
-        }
-
-        async fn stream_channels<'a>(&'a self, _: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
-            // TODO: validate the selector
-            Ok(futures::stream::iter(self.0.iter().cloned()).boxed())
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl ChainWriteChannelOperations for MockChainActions {
-        type Error = StrategyError;
-
-        async fn open_channel<'a>(
-            &'a self,
-            _: &'a Address,
-            _: HoprBalance,
-        ) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
-            unimplemented!()
-        }
-
-        async fn fund_channel<'a>(
-            &'a self,
-            _: &'a ChannelId,
-            _: HoprBalance,
-        ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
-            unimplemented!()
-        }
-
-        async fn close_channel<'a>(
-            &'a self,
-            channel_id: &'a ChannelId,
-        ) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
-            assert_eq!(self.1, *channel_id);
-            Ok(ok((ChannelStatus::Closed, ChainReceipt::default())).boxed())
-        }
     }
 
     #[tokio::test]
@@ -230,14 +175,26 @@ mod tests {
             0.into(),
         );
 
-        let actions = MockChainActions(
-            vec![c_open, c_pending, c_pending_elapsed, c_pending_overdue],
-            c_pending_elapsed.get_id(),
-        );
+        let mut mock = MockTestActions::new();
+        mock.expect_stream_channels()
+            .once()
+            .with(mockall::predicate::eq(ChannelSelector {
+                direction: vec![ChannelDirection::Outgoing],
+                allowed_states: vec![ChannelStatusDiscriminants::PendingToClose],
+                ..Default::default()
+            }))
+            .return_once(move |_| {
+                futures::stream::iter([c_open, c_pending, c_pending_overdue, c_pending_elapsed]).boxed()
+            });
+
+        mock.expect_close_channel()
+            .once()
+            .with(mockall::predicate::eq(c_pending_elapsed.get_id()))
+            .return_once(|_| Ok((ChannelStatus::Closed, ChainReceipt::default())));
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 
-        let strat = ClosureFinalizerStrategy::new(cfg, actions);
+        let strat = ClosureFinalizerStrategy::new(cfg, MockChainActions(mock.into()));
         strat.on_tick().await?;
 
         Ok(())

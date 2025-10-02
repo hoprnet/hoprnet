@@ -37,7 +37,7 @@
 //! #### Example use in Rust
 //!
 //! ```rust
-//! use hopr_metrics::metrics::*;
+//! use hopr_metrics::*;
 //!
 //! let metric_counter = SimpleCounter::new("test_counter", "Some testing counter").unwrap();
 //!

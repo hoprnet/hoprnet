@@ -21,10 +21,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_api::chain::{
-    ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainWriteChannelOperations,
-    ChainWriteTicketOperations,
-};
+use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChainWriteTicketOperations};
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -137,8 +134,6 @@ impl MultiStrategy {
     where
         A: ChainReadChannelOperations
             + ChainWriteChannelOperations
-            + ChainReadAccountOperations
-            + ChainKeyOperations
             + ChainWriteTicketOperations
             + Clone
             + Send

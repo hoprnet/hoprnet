@@ -87,6 +87,12 @@ where
             .channels_dst
             .ok_or(ChainActionsError::MissingDomainSeparator)?;
 
+        // Add safeguard so that we do not accidentally try to redeem tickets which
+        // are already in progress of some sort.
+        // Note that the caller is still responsible for taking care of the ticket index range
+        // not being less than the next ticket index on the corresponding channel entry.
+        let selector = selector.with_state(AcknowledgedTicketStatus::Untouched);
+
         let selector_id = selector.to_string();
 
         // Collect here, so we don't hold-up the stream open for too long
@@ -467,15 +473,13 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        tokio::task::spawn(async move {
-            tx_queue.start().await;
-        });
+        tokio::task::spawn(tx_queue.start());
 
         let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
-                .redeem_tickets(TicketSelector::from(&channel_from_bob))
+                .redeem_tickets(TicketSelector::from(&channel_from_bob).with_index_range(1..))
                 .await?
                 .into_iter(),
         )
@@ -568,9 +572,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        tokio::task::spawn(async move {
-            tx_queue.start().await;
-        });
+        tokio::task::spawn(tx_queue.start());
 
         let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
