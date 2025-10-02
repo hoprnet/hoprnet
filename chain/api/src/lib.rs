@@ -550,7 +550,7 @@ impl ChainWriteChannelOperations for HoprChain {
             .open_channel(*dst, amount)
             .await?
             .map(move |res| {
-                res.map(|c| (c.tx_hash, generate_channel_id(&me, dst)))
+                res.map(|c| (generate_channel_id(&me, dst), c.tx_hash))
                     .map_err(HoprChainError::from)
             })
             .boxed())
