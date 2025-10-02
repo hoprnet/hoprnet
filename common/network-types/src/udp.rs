@@ -440,7 +440,7 @@ impl ConnectedUdpStream {
                         let addr = counterparty_rx.get_or_init(|| read_addr.into());
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_UDP_INGRESS_LEN.observe(&[], read as f64);
+                        METRIC_UDP_INGRESS_LEN.observe(read as f64);
 
                         // If the data is from a counterparty, or we accept anything, pass it
                         if read_addr.eq(addr) || foreign_data_mode == ForeignDataMode::Accept {
@@ -555,7 +555,7 @@ impl ConnectedUdpStream {
                             trace!(socket_id, bytes = data.len(), ?target, "sent bytes to");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_UDP_EGRESS_LEN.observe(&[], data.len() as f64);
+                            METRIC_UDP_EGRESS_LEN.observe(data.len() as f64);
                         } else {
                             error!(
                                 ?socket_id,
