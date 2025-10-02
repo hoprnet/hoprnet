@@ -10,9 +10,8 @@ use std::{
     time::Duration,
 };
 
-use async_channel::{Receiver, Sender, bounded};
 use async_trait::async_trait;
-use futures::{FutureExt, StreamExt, future::Either, pin_mut};
+use futures::{FutureExt, SinkExt, StreamExt, future::Either, pin_mut};
 use hopr_api::db::HoprDbTicketOperations;
 use hopr_async_runtime::prelude::spawn;
 use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
@@ -101,14 +100,14 @@ type ActionFinisher = futures::channel::oneshot::Sender<Result<ActionConfirmatio
 
 /// Sends a future Ethereum transaction into the `ActionQueue`.
 #[derive(Debug, Clone)]
-pub struct ActionSender(Sender<(Action, ActionFinisher)>);
+pub struct ActionSender(futures::channel::mpsc::Sender<(Action, ActionFinisher)>);
 
 impl ActionSender {
     /// Delivers the future action into the `ActionQueue` for processing.
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn send(&self, action: Action) -> Result<PendingAction> {
         let completer = futures::channel::oneshot::channel();
-        let sender = self.0.clone();
+        let mut sender = self.0.clone();
 
         sender
             .send((action, completer.0))
@@ -308,6 +307,8 @@ where
     }
 }
 
+type QueueReceiver = futures::channel::mpsc::Receiver<(Action, ActionFinisher)>;
+
 /// A queue of [Actions](Action) to be executed.
 ///
 /// This queue awaits new Actions to arrive, translates them into Ethereum
@@ -321,8 +322,8 @@ where
     TxExec: TransactionExecutor + Send + Sync,
 {
     db: Db,
-    queue_send: Sender<(Action, ActionFinisher)>,
-    queue_recv: Receiver<(Action, ActionFinisher)>,
+    queue_send: futures::channel::mpsc::Sender<(Action, ActionFinisher)>,
+    queue_recv: Arc<std::sync::Mutex<Option<QueueReceiver>>>,
     ctx: ExecutionContext<S, TxExec>,
 }
 
@@ -337,7 +338,7 @@ where
 
     /// Creates a new instance with the given [TransactionExecutor] and [ActionState] implementations.
     pub fn new(db: Db, action_state: S, tx_exec: TxExec, cfg: ActionQueueConfig) -> Self {
-        let (queue_send, queue_recv) = bounded(Self::ACTION_QUEUE_SIZE);
+        let (queue_send, queue_recv) = futures::channel::mpsc::channel(Self::ACTION_QUEUE_SIZE);
         Self {
             db,
             ctx: ExecutionContext {
@@ -346,7 +347,7 @@ where
                 cfg,
             },
             queue_send,
-            queue_recv,
+            queue_recv: Arc::new(std::sync::Mutex::new(queue_recv.into())),
         }
     }
 
@@ -365,7 +366,13 @@ where
     /// The method will panic if the Channel Domain Separator is not yet populated in the DB.
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn start(self) {
-        let queue_recv = self.queue_recv.clone();
+        let queue_recv = self
+            .queue_recv
+            .lock()
+            .ok()
+            .and_then(|mut lock| lock.take())
+            .expect("impossible state: queue receiver has been already started");
+
         pin_mut!(queue_recv);
         while let Some((act, tx_finisher)) = queue_recv.next().await {
             // Some minimum separation to avoid batching txs

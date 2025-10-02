@@ -4479,7 +4479,6 @@ version = "0.10.0"
 dependencies = [
  "alloy",
  "anyhow",
- "async-channel 2.5.0",
  "async-lock 3.4.1",
  "async-trait",
  "futures",
@@ -4511,11 +4510,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "alloy",
  "anyhow",
- "async-channel 2.5.0",
  "async-trait",
  "futures",
  "hopr-api",
@@ -4563,7 +4561,6 @@ version = "0.10.0"
 dependencies = [
  "alloy",
  "anyhow",
- "async-channel 2.5.0",
  "async-compression",
  "async-lock 3.4.1",
  "async-tar",
@@ -4916,7 +4913,6 @@ version = "3.1.0"
 dependencies = [
  "alloy",
  "anyhow",
- "async-channel 2.5.0",
  "async-lock 3.4.1",
  "async-trait",
  "atomic_enum",
@@ -5157,11 +5153,8 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-types",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-node",
- "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-platform",
@@ -5175,7 +5168,6 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum 0.27.2",
- "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tracing",

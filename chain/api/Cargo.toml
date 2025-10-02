@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-api"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR chain interface"
 edition = "2021"
@@ -32,7 +32,6 @@ alloy = { workspace = true, default-features = false, features = [
   "essentials",
   "json-rpc",
 ] }
-async-channel = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 semver = { workspace = true }

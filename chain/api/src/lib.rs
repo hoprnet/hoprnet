@@ -126,6 +126,8 @@ pub enum HoprChainProcess {
     OutgoingOnchainActionQueue,
 }
 
+const ON_CHAIN_SIG_EVENT_QUEUE_SIZE: usize = 10_000;
+
 type ActionQueueType<T> = ActionQueue<
     T,
     IndexerActionTracker,
@@ -148,8 +150,8 @@ pub struct HoprChain {
     safe_address: Address,
     contract_addresses: ContractAddresses,
     indexer_cfg: IndexerConfig,
-    indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
-    indexer_events_rx: Arc<std::sync::Mutex<Option<async_channel::Receiver<SignificantChainEvent>>>>,
+    indexer_events_tx: futures::channel::mpsc::Sender<SignificantChainEvent>,
+    indexer_events_rx: Arc<std::sync::Mutex<Option<futures::channel::mpsc::Receiver<SignificantChainEvent>>>>,
     db: HoprIndexerDb,
     node_db: HoprNodeDb,
     hopr_chain_actions: ChainActions<HoprNodeDb>,
@@ -238,7 +240,9 @@ impl HoprChain {
         // Instantiate Chain Actions
         let hopr_chain_actions = ChainActions::new(&me_onchain, db.clone(), node_db.clone(), action_sender);
 
-        let (indexer_events_tx, indexer_events_rx) = async_channel::unbounded::<SignificantChainEvent>();
+        // The channel can be bounded, since it is used only after the historical on-chain sync has been completed.
+        let (indexer_events_tx, indexer_events_rx) =
+            futures::channel::mpsc::channel::<SignificantChainEvent>(ON_CHAIN_SIG_EVENT_QUEUE_SIZE);
 
         Ok(Self {
             me_onchain,

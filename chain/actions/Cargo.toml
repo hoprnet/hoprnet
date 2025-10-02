@@ -25,7 +25,6 @@ alloy = { workspace = true, default-features = false, features = [
   "json-rpc",
   "node-bindings",
 ] }
-async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }

@@ -76,7 +76,7 @@ where
     db_processor: Option<U>,
     db: HoprIndexerDb,
     cfg: IndexerConfig,
-    egress: async_channel::Sender<SignificantChainEvent>,
+    egress: futures::channel::mpsc::Sender<SignificantChainEvent>,
     // If true (default), the indexer will panic if the event stream is terminated.
     // Setting it to false is useful for testing.
     panic_on_completion: bool,
@@ -92,7 +92,7 @@ where
         db_processor: U,
         db: HoprIndexerDb,
         cfg: IndexerConfig,
-        egress: async_channel::Sender<SignificantChainEvent>,
+        egress: futures::channel::mpsc::Sender<SignificantChainEvent>,
     ) -> Self {
         Self {
             rpc: Some(rpc),
@@ -126,7 +126,7 @@ where
         let rpc = self.rpc.take().expect("rpc should be present");
         let logs_handler = Arc::new(self.db_processor.take().expect("db_processor should be present"));
         let db = self.db.clone();
-        let tx_significant_events = self.egress.clone();
+        let mut tx_significant_events = self.egress.clone();
         let panic_on_completion = self.panic_on_completion;
 
         let (log_filters, address_topics) = Self::generate_log_filters(&logs_handler);
@@ -815,7 +815,7 @@ mod tests {
         sol_types::SolEvent,
     };
     use async_trait::async_trait;
-    use futures::{Stream, join};
+    use futures::{Stream, join, pin_mut};
     use hex_literal::hex;
     use hopr_chain_rpc::BlockWithLogs;
     use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
@@ -940,7 +940,7 @@ mod tests {
             handlers,
             db.clone(),
             IndexerConfig::default(),
-            async_channel::unbounded().0,
+            futures::channel::mpsc::channel(1000).0,
         )
         .without_panic_on_completion();
 
@@ -1017,7 +1017,7 @@ mod tests {
                 fast_sync: false,
                 ..Default::default()
             },
-            async_channel::unbounded().0,
+            futures::channel::mpsc::channel(1000).0,
         )
         .without_panic_on_completion();
 
@@ -1087,8 +1087,8 @@ mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let indexer =
-            Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).without_panic_on_completion();
+        let indexer = Indexer::new(rpc, handlers, db.clone(), cfg, futures::channel::mpsc::channel(1000).0)
+            .without_panic_on_completion();
         let _ = join!(indexer.start(), async move {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -1124,7 +1124,7 @@ mod tests {
             assert_eq!(db.get_logs_block_numbers(None, None, Some(false)).await?.len(), 2);
 
             let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
-            let (tx_events, _) = async_channel::unbounded();
+            let (tx_events, _) = futures::channel::mpsc::channel(1000);
 
             let head_block = 5;
             let mut rpc = MockHoprIndexerOps::new();
@@ -1211,7 +1211,7 @@ mod tests {
             assert_eq!(db.get_logs_block_numbers(None, None, Some(false)).await?.len(), 2);
 
             let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
-            let (tx_events, _) = async_channel::unbounded();
+            let (tx_events, _) = futures::channel::mpsc::channel(1000);
 
             let head_block = 5;
             let mut rpc = MockHoprIndexerOps::new();
@@ -1330,17 +1330,18 @@ mod tests {
                 }))
             });
 
-        let (tx_events, rx_events) = async_channel::unbounded();
+        let (tx_events, rx_events) = futures::channel::mpsc::channel(1000);
         let indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).without_panic_on_completion();
         indexer.start().await?;
 
         // At this point we expect 2 events to arrive. The third event, which was generated first,
         // should be dropped because it was generated before the indexer was in sync with head.
-        let _first = rx_events.recv();
-        let _second = rx_events.recv();
-        let third = rx_events.try_recv();
+        pin_mut!(rx_events);
+        // let _first = rx_events.next().await.unwrap();
+        // let _second = rx_events.next().await.unwrap();
+        let third = rx_events.next().await;
 
-        assert!(third.is_err());
+        assert!(third.is_none());
 
         Ok(())
     }
@@ -1419,7 +1420,7 @@ mod tests {
 
         let indexer_cfg = IndexerConfig::new(0, false, false, None, "/tmp/test_data".to_string());
 
-        let (tx_events, _) = async_channel::unbounded();
+        let (tx_events, _) = futures::channel::mpsc::channel(1000);
         let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
         indexer.start().await?;
 

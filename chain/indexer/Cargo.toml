@@ -30,7 +30,6 @@ alloy = { workspace = true, default-features = false, features = [
   "json-rpc",
   "node-bindings",
 ] }
-async-channel = { workspace = true }
 async-compression = { workspace = true, features = [
   "xz-parallel",
   "futures-io",

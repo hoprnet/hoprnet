@@ -149,12 +149,11 @@ async fn start_node_chain_logic(
     }));
 
     // Action state tracking
-    let (sce_tx, sce_rx) = async_channel::unbounded();
+    let (sce_tx, sce_rx) = futures::channel::mpsc::channel(10_000);
     node_tasks.push(spawn_as_abortable!(async move {
-        let rx = sce_rx.clone();
-        pin_mut!(rx);
+        pin_mut!(sce_rx);
 
-        while let Some(sce) = rx.next().await {
+        while let Some(sce) = sce_rx.next().await {
             let _ = action_state.match_and_resolve(&sce).await;
             // debug!("{:?}: expectations resolved {:?}", sce, res);
         }
@@ -895,7 +894,13 @@ async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> 
         rpc.clone(),
     );
 
-    let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, async_channel::unbounded().0);
+    let indexer = Indexer::new(
+        rpc,
+        handlers,
+        db.clone(),
+        indexer_cfg,
+        futures::channel::mpsc::channel(1000).0,
+    );
 
     // Verify database is initially empty (as expected for snapshot test)
     let initial_logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
@@ -985,7 +990,13 @@ async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> 
         rpc.clone(),
     );
 
-    let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, async_channel::unbounded().0);
+    let indexer = Indexer::new(
+        rpc,
+        handlers,
+        db.clone(),
+        indexer_cfg,
+        futures::channel::mpsc::channel(1000).0,
+    );
 
     // Verify database is initially empty (as expected for snapshot test)
     let initial_logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
