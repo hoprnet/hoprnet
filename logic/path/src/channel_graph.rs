@@ -31,7 +31,7 @@ lazy_static::lazy_static! {
     static ref METRIC_CHANNEL_BALANCES: MultiGauge = MultiGauge::new(
         "hopr_channel_balances",
         "Balances on channels per counterparty",
-        &["counterparty", "direction"]
+        &["direction"]
     ).unwrap();
 }
 
@@ -301,12 +301,12 @@ impl ChannelGraph {
                     ChannelDirection::Outgoing => match channel.status {
                         ChannelStatus::Closed => {
                             METRIC_NUMBER_OF_CHANNELS.decrement(&["out"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(&[channel.destination.to_hex().as_str(), "out"], 0.0);
+                            METRIC_CHANNEL_BALANCES.set(&["out"], 0.0);
                         }
                         ChannelStatus::Open => {
                             METRIC_NUMBER_OF_CHANNELS.increment(&["out"], 1.0);
                             METRIC_CHANNEL_BALANCES.set(
-                                &[channel.destination.to_hex().as_str(), "out"],
+                                &["out"],
                                 channel
                                     .balance
                                     .amount_in_base_units()
@@ -319,12 +319,12 @@ impl ChannelGraph {
                     ChannelDirection::Incoming => match channel.status {
                         ChannelStatus::Closed => {
                             METRIC_NUMBER_OF_CHANNELS.decrement(&["in"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(&[channel.source.to_hex().as_str(), "in"], 0.0);
+                            METRIC_CHANNEL_BALANCES.set(&["in"], 0.0);
                         }
                         ChannelStatus::Open => {
                             METRIC_NUMBER_OF_CHANNELS.increment(&["in"], 1.0);
                             METRIC_CHANNEL_BALANCES.set(
-                                &[channel.source.to_hex().as_str(), "in"],
+                                &["in"],
                                 channel
                                     .balance
                                     .amount_in_base_units()
