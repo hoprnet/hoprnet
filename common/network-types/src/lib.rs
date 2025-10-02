@@ -20,9 +20,7 @@ pub mod addr;
 pub mod prelude {
     pub use libp2p_identity::PeerId;
 
-    pub use crate::types::*;
     #[cfg(feature = "runtime-tokio")]
     pub use crate::udp::*;
-
-    pub use crate::addr::*;
+    pub use crate::{addr::*, types::*};
 }

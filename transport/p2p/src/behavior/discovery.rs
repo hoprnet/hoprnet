@@ -237,17 +237,17 @@ impl NetworkBehaviour for Behaviour {
                 }
                 PeerDiscovery::Announce(peer, multiaddresses) => {
                     if peer != self.me {
+                        let multiaddress_count = multiaddresses.len();
                         tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");
 
                         // Filter out private addresses before adding to pending events and peer store
-                        let public_addresses: HashSet<_> = multiaddresses.iter()
-                            .filter(|addr| is_public_address(addr))
-                            .cloned()
+                        let public_addresses: HashSet<_> = multiaddresses.into_iter()
+                            .filter(is_public_address)
                             .collect();
 
-                        let filtered_count = multiaddresses.len() - public_addresses.len();
+                        let filtered_count = multiaddress_count - public_addresses.len();
                         if filtered_count > 0 {
-                            tracing::debug!(%peer, filtered_private_addresses = filtered_count, total_addresses = multiaddresses.len(), "Filtered out private addresses from announcement");
+                            tracing::debug!(%peer, filtered_private_addresses = filtered_count, total_addresses = multiaddress_count, "Filtered out private addresses from announcement");
                         }
 
                         for multiaddress in &public_addresses {
