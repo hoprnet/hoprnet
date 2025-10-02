@@ -77,8 +77,8 @@ scrape_configs:
 - `hopr_session_hoprd_target_connections`: Number of currently active HOPR session target connections from this Exit node, keys: `type`
 - `hopr_tickets_incoming_win_probability`: Observes the winning probabilities on incoming tickets, buckets: 0.0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15, 0.25, 0.3, 0.5
 - `hopr_session_time_to_finish_frame`: Measures time in milliseconds it takes a frame to be reassembled, buckets: 1.0, 2.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 150.0, 200.0, 250.0, 300.0, 400.0, 500.0
-- `hopr_udp_ingress_packet_len`: UDP packet lengths on ingress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
-- `hopr_udp_egress_packet_len`: UDP packet lengths on egress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
+- `hopr_udp_ingress_packet_len`: UDP packet lengths on ingress, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
+- `hopr_udp_egress_packet_len`: UDP packet lengths on egress, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
 - `hopr_session_inner_sizes`: Sizes of data chunks fed from inner session to HOPR protocol, keys: `session_id`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0
 - `hopr_surb_balancer_target_error_estimate`: Target error estimation by the SURB balancer, keys: `session_id`
 - `hopr_surb_balancer_control_output`: Control output of the SURB balancer, keys: `session_id`

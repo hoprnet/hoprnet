@@ -23,14 +23,14 @@ lazy_static::lazy_static! {
             "hopr_udp_ingress_packet_len",
             "UDP packet lengths on ingress per counterparty",
             vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0],
-            &["counterparty"]
+            &[]
     ).unwrap();
     static ref METRIC_UDP_EGRESS_LEN: hopr_metrics::MultiHistogram =
         hopr_metrics::MultiHistogram::new(
             "hopr_udp_egress_packet_len",
             "UDP packet lengths on egress per counterparty",
             vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0],
-            &["counterparty"]
+            &[]
     ).unwrap();
 }
 
@@ -442,7 +442,7 @@ impl ConnectedUdpStream {
                         let addr = counterparty_rx.get_or_init(|| read_addr.into());
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_UDP_INGRESS_LEN.observe(&[addr.as_str()], read as f64);
+                        METRIC_UDP_INGRESS_LEN.observe(&[], read as f64);
 
                         // If the data is from a counterparty, or we accept anything, pass it
                         if read_addr.eq(addr) || foreign_data_mode == ForeignDataMode::Accept {
@@ -557,7 +557,7 @@ impl ConnectedUdpStream {
                             trace!(socket_id, bytes = data.len(), ?target, "sent bytes to");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_UDP_EGRESS_LEN.observe(&[target.as_str()], data.len() as f64);
+                            METRIC_UDP_EGRESS_LEN.observe(&[], data.len() as f64);
                         } else {
                             error!(
                                 ?socket_id,
