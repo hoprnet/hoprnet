@@ -5,6 +5,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use futures::stream::{BoxStream, Stream, StreamExt};
+use hopr_network_types::addr::is_public_address;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
@@ -14,8 +15,6 @@ use libp2p::{
         dummy::ConnectionHandler,
     },
 };
-
-use crate::swarm::is_public_address;
 
 #[derive(Debug)]
 pub enum DiscoveryInput {

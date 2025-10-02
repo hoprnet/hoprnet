@@ -647,6 +647,7 @@
               uv run --frozen -m pytest tests/
             '';
             doCheck = true;
+            HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES = "true"; # Allow local private IPs in smoke tests
           };
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
@@ -755,7 +756,7 @@
               crane
               solcDefault
               ;
-            hoprd = (mkHoprdCandidate "-F local-testing");
+            hoprd = (mkHoprdCandidate "");
             hopli = hopli-candidate;
           };
           docsShell = import ./nix/devShell.nix {
@@ -985,7 +986,7 @@
             inherit hopli-x86_64-darwin;
             inherit hopli-aarch64-darwin;
             default = hoprd;
-            hoprd-candidate = (mkHoprdCandidate "-F local-testing");
+            hoprd-candidate = (mkHoprdCandidate "");
           };
 
           devShells.default = devShell;

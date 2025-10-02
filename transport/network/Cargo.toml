@@ -12,7 +12,6 @@ crate-type = ["rlib"]
 default = ["compat-ping"]
 compat-ping = []
 prometheus = ["dep:hopr-metrics"]
-local-testing = ["hopr-transport-p2p/local-testing"]
 
 [dependencies]
 futures = { workspace = true }
@@ -33,7 +32,7 @@ hopr-crypto-random = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
-hopr-transport-p2p = { workspace = true }
+hopr-network-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

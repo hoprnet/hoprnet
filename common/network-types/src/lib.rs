@@ -14,6 +14,8 @@ pub mod utils;
 #[cfg(feature = "capture")]
 pub mod capture;
 
+pub mod addr;
+
 #[doc(hidden)]
 pub mod prelude {
     pub use libp2p_identity::PeerId;

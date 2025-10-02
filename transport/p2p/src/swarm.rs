@@ -4,6 +4,7 @@ use futures::{Sink, SinkExt, Stream, StreamExt, select};
 use hopr_internal_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
+use hopr_network_types::addr::is_public_address;
 use hopr_transport_identity::{
     Multiaddr, PeerId,
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
@@ -48,10 +49,6 @@ where
     // 3. Network layer filters addresses in both add() and get() methods (primary protection)
     // 4. libp2p's global_only transport wrapper could be added here but the above filtering provides equivalent
     //    protection while maintaining compatibility with the existing code
-    //
-    // For local testing and smoke tests, use the `local-testing` feature flag to disable
-    // address filtering and allow localhost/private addresses:
-    // cargo build --features "runtime-tokio local-testing"
     #[cfg(feature = "runtime-tokio")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
@@ -107,29 +104,6 @@ impl std::fmt::Debug for HoprSwarm {
 impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
     fn from(value: HoprSwarm) -> Self {
         value.swarm
-    }
-}
-
-/// Check if a multiaddress contains a public/routable IP address
-///
-/// When the `local-testing` feature is enabled, this function always returns true
-/// to allow private addresses for local development and testing.
-pub fn is_public_address(addr: &Multiaddr) -> bool {
-    #[cfg(feature = "local-testing")]
-    {
-        // Allow all addresses during local testing
-        let _ = addr; // Suppress unused variable warning
-        true
-    }
-    #[cfg(not(feature = "local-testing"))]
-    {
-        addr.iter().all(|protocol| match protocol {
-            Protocol::Ip4(ip) => !ip.is_unspecified() && !ip.is_private() && !ip.is_loopback() && !ip.is_link_local(),
-            Protocol::Ip6(ip) => {
-                !ip.is_unspecified() && !ip.is_loopback() && !ip.is_unicast_link_local() && !ip.is_unique_local()
-            }
-            _ => true,
-        })
     }
 }
 
@@ -406,154 +380,3 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
 
 pub type TicketAggregationRequestType = OutboundRequestId;
 pub type TicketAggregationResponseType = ResponseChannel<std::result::Result<Ticket, String>>;
-
-#[cfg(test)]
-mod tests {
-    use std::str::FromStr;
-
-    use super::*;
-
-    #[test]
-    fn test_is_public_address_ipv4() {
-        // IPv4 public addresses - should return true
-        assert!(is_public_address(&Multiaddr::from_str("/ip4/8.8.8.8").unwrap()));
-        assert!(is_public_address(&Multiaddr::from_str("/ip4/1.1.1.1").unwrap()));
-        assert!(is_public_address(&Multiaddr::from_str("/ip4/104.16.0.0").unwrap()));
-
-        // IPv4 private addresses - should return false
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/192.168.0.1").unwrap()));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/192.168.1.254").unwrap()));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/10.0.0.1").unwrap()));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/10.1.0.1").unwrap()));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/10.255.255.255").unwrap()));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/172.16.0.0").unwrap()));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/172.31.255.255").unwrap()));
-
-        // IPv4 loopback - should return false
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/127.0.0.1").unwrap()));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip4/127.255.255.255").unwrap()
-        ));
-
-        // IPv4 link-local - should return false
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/169.254.1.1").unwrap()));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip4/169.254.254.254").unwrap()
-        ));
-
-        // IPv4 unspecified - should return false
-        assert!(!is_public_address(&Multiaddr::from_str("/ip4/0.0.0.0").unwrap()));
-    }
-
-    #[test]
-    fn test_is_public_address_ipv6() {
-        // IPv6 public addresses - should return true
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip6/2001:4860:4860::8888").unwrap()
-        ));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip6/2606:4700:4700::1111").unwrap()
-        ));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip6/2a00:1450:4001:830::200e").unwrap()
-        ));
-
-        // IPv6 loopback - should return false
-        assert!(!is_public_address(&Multiaddr::from_str("/ip6/::1").unwrap()));
-
-        // IPv6 unique-local - should return false
-        assert!(!is_public_address(&Multiaddr::from_str("/ip6/fc00::1").unwrap()));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip6/fd00::1").unwrap()));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip6/fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff").unwrap()
-        ));
-
-        // IPv6 link-local - should return false
-        assert!(!is_public_address(&Multiaddr::from_str("/ip6/fe80::1").unwrap()));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip6/fe80::dead:beef:cafe:babe").unwrap()
-        ));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip6/febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff").unwrap()
-        ));
-
-        // IPv6 unspecified - should return false
-        assert!(!is_public_address(&Multiaddr::from_str("/ip6/::").unwrap()));
-    }
-
-    #[test]
-    fn test_is_public_address_with_protocols() {
-        // Public addresses with additional protocols - should return true
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip4/8.8.8.8/tcp/4001").unwrap()
-        ));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip4/1.1.1.1/udp/30303").unwrap()
-        ));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip4/8.8.8.8/tcp/4001/p2p/12D3KooWEyoppNCUx8Yx66oV9fJnriXwCcXwDDUA2kj6vnc6iDEp")
-                .unwrap()
-        ));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip6/2001:4860:4860::8888/tcp/4001").unwrap()
-        ));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip6/2001:4860:4860::8888/udp/30303").unwrap()
-        ));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/ip6/2606:4700:4700::1111/tcp/443/wss").unwrap()
-        ));
-
-        // Private/special addresses with additional protocols - should return false
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip4/192.168.0.1/tcp/4001").unwrap()
-        ));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip4/127.0.0.1/tcp/8080").unwrap()
-        ));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip4/10.0.0.1/tcp/8080").unwrap()
-        ));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip4/10.1.0.1/tcp/8080").unwrap()
-        ));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip4/169.254.1.1/udp/5060").unwrap()
-        ));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip4/0.0.0.0/tcp/3000").unwrap()
-        ));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip6/::1/tcp/4001").unwrap()));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip6/fe80::1/udp/30303").unwrap()
-        ));
-        assert!(!is_public_address(
-            &Multiaddr::from_str("/ip6/fc00::1/tcp/443").unwrap()
-        ));
-        assert!(!is_public_address(&Multiaddr::from_str("/ip6/::/tcp/8080").unwrap()));
-    }
-
-    #[test]
-    fn test_is_public_address_mixed_protocols() {
-        // Test with DNS and other protocols (no IP) - should return true (non-IP protocols default to true)
-        assert!(is_public_address(&Multiaddr::from_str("/dns/example.com").unwrap()));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/dns4/example.com/tcp/443").unwrap()
-        ));
-        assert!(is_public_address(
-            &Multiaddr::from_str("/dns6/example.com/tcp/443").unwrap()
-        ));
-    }
-
-    #[test]
-    #[cfg(feature = "local-testing")]
-    fn test_local_testing_allows_all_addresses() {
-        // When local-testing feature is enabled, all addresses should be considered "public"
-        assert!(is_public_address(&Multiaddr::from_str("/ip4/127.0.0.1").unwrap()));
-        assert!(is_public_address(&Multiaddr::from_str("/ip4/192.168.1.1").unwrap()));
-        assert!(is_public_address(&Multiaddr::from_str("/ip4/10.0.0.1").unwrap()));
-        assert!(is_public_address(&Multiaddr::from_str("/ip4/172.16.0.1").unwrap()));
-        assert!(is_public_address(&Multiaddr::from_str("/ip6/::1").unwrap()));
-        assert!(is_public_address(&Multiaddr::from_str("/ip6/fe80::1").unwrap()));
-    }
-}

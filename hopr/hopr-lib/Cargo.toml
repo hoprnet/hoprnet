@@ -36,8 +36,6 @@ prometheus = [
   "hopr-strategy/prometheus",
 ]
 capture = ["hopr-transport/capture"]
-# disables filtering of private ip addresses in the p2p layer
-local-testing = ["hopr-transport/local-testing"]
 
 # === utility features ===
 utils_session = [ # utility session functionality for advanced interaction with hopr-lib

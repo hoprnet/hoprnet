@@ -5,8 +5,8 @@ use std::{
 
 use futures::StreamExt;
 pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
+use hopr_network_types::addr::is_public_address;
 use hopr_platform::time::current_time;
-use hopr_transport_p2p::is_public_address;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
@@ -128,9 +128,11 @@ where
     /// Add a new peer into the network.
     ///
     /// Each peer must have an origin specification.
+    ///
     /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out before storing
     /// to prevent private addresses from entering the peer store. This filtering can be disabled
-    /// with the 'local-testing' feature flag.
+    /// by setting the `HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES` env variable
+    /// to `true`.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn add(&self, peer: &PeerId, origin: PeerOrigin, mut addrs: Vec<Multiaddr>) -> Result<()> {
         if peer == &self.me {
@@ -183,8 +185,9 @@ where
     /// Get peer information and status.
     ///
     /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out from the returned
-    /// PeerStatus to prevent exposure through public APIs. This filtering can be disabled with
-    /// the 'local-testing' feature flag.
+    /// PeerStatus to prevent exposure through public APIs. This filtering can be disabled by
+    /// setting the `HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES` env variable
+    /// to `true`.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         if peer == &self.me {
@@ -958,6 +961,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // untestable without a feature flag
     async fn network_add_should_filter_private_multiaddresses() -> anyhow::Result<()> {
         use multiaddr::Multiaddr;
 
@@ -1019,6 +1023,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // untestable without a feature flag
     async fn network_get_should_filter_private_multiaddresses_as_defensive_measure() -> anyhow::Result<()> {
         use multiaddr::Multiaddr;
 

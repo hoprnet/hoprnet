@@ -10,7 +10,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-local-testing = []
 prometheus = [
   "dep:lazy_static",
   "dep:hopr-metrics",
@@ -44,6 +43,7 @@ hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-protocol = { workspace = true }
+hopr-network-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
