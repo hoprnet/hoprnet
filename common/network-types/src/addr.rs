@@ -44,22 +44,20 @@ pub fn is_public_address(addr: &Multiaddr) -> bool {
 }
 
 #[cfg(test)]
-#[inline]
-fn override_allow_private_addresses(value: bool) {
-    ALLOW_PRIVATE_ADDRESSES.store(value, std::sync::atomic::Ordering::SeqCst);
-}
-
-#[cfg(test)]
-#[inline]
-fn get_allow_private_addresses() -> bool {
-    ALLOW_PRIVATE_ADDRESSES.load(std::sync::atomic::Ordering::SeqCst)
-}
-
-#[cfg(test)]
 mod tests {
     use std::str::FromStr;
 
     use super::*;
+
+    #[inline]
+    fn override_allow_private_addresses(value: bool) {
+        ALLOW_PRIVATE_ADDRESSES.store(value, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[inline]
+    fn get_allow_private_addresses() -> bool {
+        ALLOW_PRIVATE_ADDRESSES.load(std::sync::atomic::Ordering::SeqCst)
+    }
 
     #[test]
     #[serial_test::serial] // must be serial to avoid random race conditions on atomic bool on parallel execution

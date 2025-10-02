@@ -240,7 +240,7 @@ impl NetworkBehaviour for Behaviour {
                         tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");
 
                         // Filter out private addresses before adding to pending events and peer store
-                        let public_addresses: Vec<_> = multiaddresses.iter()
+                        let public_addresses: HashSet<_> = multiaddresses.iter()
                             .filter(|addr| is_public_address(addr))
                             .cloned()
                             .collect();
@@ -259,7 +259,7 @@ impl NetworkBehaviour for Behaviour {
 
                         // Only store public addresses in bootstrap_peers
                         if !public_addresses.is_empty() {
-                            self.bootstrap_peers.insert(peer, public_addresses);
+                            self.bootstrap_peers.insert(peer, public_addresses.into_iter().collect::<Vec::<_>>());
                         }
                     }
                 }

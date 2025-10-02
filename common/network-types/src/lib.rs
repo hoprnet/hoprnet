@@ -23,4 +23,6 @@ pub mod prelude {
     pub use crate::types::*;
     #[cfg(feature = "runtime-tokio")]
     pub use crate::udp::*;
+
+    pub use crate::addr::*;
 }
