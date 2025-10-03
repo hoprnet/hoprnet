@@ -70,65 +70,56 @@ impl TicketManager {
         spawn(async move {
             pin_mut!(ticket_notifier);
             while let Some(ticket_to_insert) = rx.next().await {
-                let ticket_inserted = match db_clone.begin_with_config(None, None).await {
-                    Ok(transaction) => {
-                        let _quard = mutex_clone.lock().await;
-                        let ticket_to_insert_clone = ticket_to_insert.clone();
-                        if let Err(error) = transaction
-                            .transaction(|tx| {
-                                Box::pin(async move {
-                                    // Insertion of a new acknowledged ticket
-                                    let channel_id = ticket_to_insert_clone.verified_ticket().channel_id.to_hex();
+                let ticket_to_insert_clone = ticket_to_insert.clone();
+                let tx_result = {
+                    let _quard = mutex_clone.lock().await;
+                    db_clone
+                        .transaction(|tx| {
+                            Box::pin(async move {
+                                // Insertion of a new acknowledged ticket
+                                let channel_id = ticket_to_insert_clone.verified_ticket().channel_id.to_hex();
 
-                                    hopr_db_entity::ticket::ActiveModel::from(ticket_to_insert_clone)
-                                        .insert(tx)
-                                        .await?;
-
-                                    // Update the ticket winning count in the statistics
-                                    if let Some(model) = hopr_db_entity::ticket_statistics::Entity::find()
-                                        .filter(
-                                            hopr_db_entity::ticket_statistics::Column::ChannelId.eq(channel_id.clone()),
-                                        )
-                                        .one(tx)
-                                        .await?
-                                    {
-                                        let winning_tickets = model.winning_tickets + 1;
-                                        let mut active_model = model.into_active_model();
-                                        active_model.winning_tickets = sea_orm::Set(winning_tickets);
-                                        active_model
-                                    } else {
-                                        hopr_db_entity::ticket_statistics::ActiveModel {
-                                            channel_id: sea_orm::Set(channel_id),
-                                            winning_tickets: sea_orm::Set(1),
-                                            ..Default::default()
-                                        }
-                                    }
-                                    .save(tx)
+                                hopr_db_entity::ticket::ActiveModel::from(ticket_to_insert_clone)
+                                    .insert(tx)
                                     .await?;
-                                    Ok::<_, sea_orm::DbErr>(())
-                                })
+
+                                // Update the ticket winning count in the statistics
+                                let model = if let Some(model) = hopr_db_entity::ticket_statistics::Entity::find()
+                                    .filter(hopr_db_entity::ticket_statistics::Column::ChannelId.eq(channel_id.clone()))
+                                    .one(tx)
+                                    .await?
+                                {
+                                    let winning_tickets = model.winning_tickets + 1;
+                                    let mut active_model = model.into_active_model();
+                                    active_model.winning_tickets = sea_orm::Set(winning_tickets);
+                                    active_model
+                                } else {
+                                    hopr_db_entity::ticket_statistics::ActiveModel {
+                                        channel_id: sea_orm::Set(channel_id),
+                                        winning_tickets: sea_orm::Set(1),
+                                        ..Default::default()
+                                    }
+                                };
+
+                                model.save(tx).await?;
+                                Ok::<_, sea_orm::DbErr>(())
                             })
-                            .await
-                        {
-                            error!(%error, "failed to insert the winning ticket and update the ticket stats");
-                            false
-                        } else {
-                            debug!(acknowledged_ticket = %ticket_to_insert, "ticket persisted into the ticket db");
-                            true
+                        })
+                        .await
+                };
+
+                match tx_result {
+                    Ok(_) => {
+                        debug!(acknowledged_ticket = %ticket_to_insert, "ticket persisted into the ticket db");
+                        // Notify about the ticket once successfully inserted into the Tickets DB
+                        if let Err(error) = ticket_notifier.send(ticket_to_insert).await {
+                            error!(%error, "failed to notify the ticket notifier about the winning ticket");
                         }
                     }
                     Err(error) => {
-                        error!(%error, "failed to create a transaction for ticket insertion");
-                        false
+                        error!(%error, "failed to insert the winning ticket and update the ticket stats");
                     }
                 };
-
-                // Notify about the ticket once successfully inserted into the Tickets DB
-                if ticket_inserted {
-                    if let Err(error) = ticket_notifier.send(ticket_to_insert).await {
-                        error!(%error, "failed to notify the ticket notifier about the winning ticket");
-                    }
-                }
             }
 
             tracing::info!(task = "ticket processing", "long-running background task finished")

@@ -333,8 +333,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
                         {
                             let _g = self.ticket_manager.mutex.lock();
-                            if let Err(e) = active_ticket.update(&self.tickets_db).await {
-                                error!(error = %e,"failed to update ticket in the db");
+                            if let Err(error) = active_ticket.update(&self.tickets_db).await {
+                                error!(%error, "failed to update ticket in the db");
                             }
                         }
 
@@ -344,13 +344,13 @@ impl HoprDbTicketOperations for HoprNodeDb {
                                 ticket.status = new_state;
                                 yield ticket
                             },
-                            Err(e) => {
-                                tracing::error!(error = %e, "failed to decode ticket from the db");
+                            Err(error) => {
+                                tracing::error!(%error, "failed to decode ticket from the db");
                             }
                         }
                     }
                 },
-                Err(e) => tracing::error!(error = %e, "failed open ticket db stream")
+                Err(error) => tracing::error!(%error, "failed open ticket db stream")
             }
         }))
     }
@@ -473,6 +473,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     .await
             }
         };
+        debug!(stats = ?res, "retrieved ticket statistics");
         Ok(res?)
     }
 
