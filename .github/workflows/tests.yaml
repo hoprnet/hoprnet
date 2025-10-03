@@ -46,13 +46,6 @@ jobs:
       - name: Run unit tests
         run: nix build -L .#hopr-test
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./target/llvm-cov-target/lcov.info
-          fail_ci_if_error: true
-
   tests-unit-nightly:
     name: Unit Tests Nightly
     runs-on: self-hosted-hoprnet-bigger
@@ -85,6 +78,13 @@ jobs:
       - name: Run unit tests nightly
         run: |
           nix build -L .#hopr-test-nightly
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./target/llvm-cov-target/lcov.info
+          fail_ci_if_error: true
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger
