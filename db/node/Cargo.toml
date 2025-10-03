@@ -59,7 +59,6 @@ hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
-
 [dev-dependencies]
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
@@ -71,3 +70,6 @@ tokio = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-random = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["hopr-db-migration"]

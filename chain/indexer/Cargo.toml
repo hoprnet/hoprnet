@@ -21,7 +21,6 @@ runtime-tokio = [
 prometheus = [
   "dep:hopr-metrics",
   "hopr-chain-rpc/prometheus",
-  "hopr-db-sql/prometheus",
 ]
 
 [dependencies]

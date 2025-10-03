@@ -256,9 +256,9 @@ impl Hopr {
         // TODO (4.0): replace this with new implementation that follows the chain traits from the hopr-api crate
         let hopr_chain_api = hopr_chain_api::HoprChain::new(
             me_onchain.clone(),
+            resolved_environment.clone(),
             node_db.clone(),
             &cfg.db.data,
-            resolved_environment.clone(),
             cfg.safe_module.module_address,
             ContractAddresses {
                 announcements: resolved_environment.announcements,
