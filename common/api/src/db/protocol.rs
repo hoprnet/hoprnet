@@ -9,7 +9,7 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_primitive_types::balance::HoprBalance;
 
-use crate::chain::{ChainKeyOperations, ChainMiscOperations, ChainReadChannelOperations, ChainReadTicketOperations};
+use crate::chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues};
 
 /// Contains a SURB found in the SURB ring buffer via [`HoprDbProtocolOperations::find_surb`].
 #[derive(Debug)]
@@ -73,7 +73,7 @@ pub trait HoprDbProtocolOperations {
         chain_resolver: &R,
     ) -> Result<(), Self::Error>
     where
-        R: ChainReadChannelOperations + ChainReadTicketOperations + ChainMiscOperations + Send + Sync;
+        R: ChainReadChannelOperations + ChainValues + Send + Sync;
 
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<FoundSurb, Self::Error>;
@@ -89,7 +89,7 @@ pub trait HoprDbProtocolOperations {
         resolver: &R,
     ) -> Result<OutgoingPacket, Self::Error>
     where
-        R: ChainKeyOperations + ChainMiscOperations + Send + Sync;
+        R: ChainKeyOperations + ChainValues + Send + Sync;
 
     /// Process the data into an outgoing packet
     async fn to_send<R>(
@@ -102,12 +102,7 @@ pub trait HoprDbProtocolOperations {
         resolver: &R,
     ) -> Result<OutgoingPacket, Self::Error>
     where
-        R: ChainReadChannelOperations
-            + ChainReadTicketOperations
-            + ChainKeyOperations
-            + ChainMiscOperations
-            + Send
-            + Sync;
+        R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync;
 
     /// Process the incoming packet into data
     #[allow(clippy::wrong_self_convention)]
@@ -121,12 +116,7 @@ pub trait HoprDbProtocolOperations {
         resolver: &R,
     ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>
     where
-        R: ChainReadChannelOperations
-            + ChainReadTicketOperations
-            + ChainKeyOperations
-            + ChainMiscOperations
-            + Send
-            + Sync;
+        R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync;
 }
 
 /// Contains some miscellaneous information about a received packet.

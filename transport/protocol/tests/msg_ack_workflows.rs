@@ -4,8 +4,7 @@ use common::{random_packets_of_count, send_relay_receive_channel_of_n_peers};
 use serial_test::serial;
 
 #[serial]
-#[tokio::test]
-// #[tracing_test::traced_test]
+#[test_log::test(tokio::test)]
 async fn test_packet_relayer_workflow_3_peers() -> anyhow::Result<()> {
     let packets = random_packets_of_count(5);
 
@@ -13,8 +12,7 @@ async fn test_packet_relayer_workflow_3_peers() -> anyhow::Result<()> {
 }
 
 #[serial]
-#[tokio::test]
-// #[tracing_test::traced_test]
+#[test_log::test(tokio::test)]
 async fn test_packet_relayer_workflow_5_peers() -> anyhow::Result<()> {
     let packets = random_packets_of_count(5);
 

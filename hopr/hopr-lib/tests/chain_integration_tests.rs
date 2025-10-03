@@ -6,6 +6,7 @@ use alloy::primitives::{B256, U256};
 use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
+use hopr_api::db::{HoprDbTicketOperations, TicketSelector};
 use hopr_async_runtime::{AbortHandle, prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
@@ -27,7 +28,8 @@ use hopr_chain_rpc::{
 };
 use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType, utils::create_anvil};
 use hopr_crypto_types::prelude::*;
-use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
+use hopr_db_node::HoprNodeDb;
+use hopr_db_sql::{logs::HoprDbLogOperations, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
@@ -59,7 +61,7 @@ async fn generate_the_first_ack_ticket(
         .build_signed(counterparty, &domain_separator)?
         .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?);
 
-    myself.db.upsert_ticket(None, ack_ticket).await?;
+    myself.node_db.upsert_ticket(ack_ticket).await?;
 
     Ok(())
 }
@@ -69,9 +71,10 @@ type TestRpc = RpcOperations<DefaultHttpRequestor>;
 struct ChainNode {
     chain_key: ChainKeypair,
     offchain_key: OffchainKeypair,
-    db: HoprDb,
-    actions: ChainActions<HoprDb>,
-    _indexer: Indexer<TestRpc, ContractEventHandlers<TestRpc, HoprDb>, HoprDb>,
+    index_db: HoprIndexerDb,
+    node_db: HoprNodeDb,
+    actions: ChainActions<HoprNodeDb>,
+    _indexer: Indexer<TestRpc, ContractEventHandlers<TestRpc, HoprNodeDb>>,
     node_tasks: Vec<AbortHandle>,
 }
 
@@ -88,9 +91,11 @@ async fn start_node_chain_logic(
     indexer_cfg: IndexerConfig,
 ) -> anyhow::Result<ChainNode> {
     // DB
-    let db = HoprDb::new_in_memory(chain_key.clone()).await?;
-    let self_db = db.clone();
-    db.begin_transaction()
+    let index_db = HoprIndexerDb::new_in_memory(chain_key.clone()).await?;
+    let node_db = HoprNodeDb::new_in_memory(chain_key.clone()).await?;
+    let self_db = index_db.clone();
+    index_db
+        .begin_transaction()
         .await?
         .perform(|tx| {
             Box::pin(async move {
@@ -133,9 +138,9 @@ async fn start_node_chain_logic(
     );
 
     // Actions
-    let action_queue = ActionQueue::new(db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
+    let action_queue = ActionQueue::new(node_db.clone(), IndexerActionTracker::default(), tx_exec, actions_cfg);
     let action_state = action_queue.action_state();
-    let actions = ChainActions::new(chain_key, db.clone(), action_queue.new_sender());
+    let actions = ChainActions::new(chain_key, index_db.clone(), node_db.clone(), action_queue.new_sender());
 
     let mut node_tasks = Vec::new();
 
@@ -144,12 +149,11 @@ async fn start_node_chain_logic(
     }));
 
     // Action state tracking
-    let (sce_tx, sce_rx) = async_channel::unbounded();
+    let (sce_tx, sce_rx) = futures::channel::mpsc::channel(10_000);
     node_tasks.push(spawn_as_abortable!(async move {
-        let rx = sce_rx.clone();
-        pin_mut!(rx);
+        pin_mut!(sce_rx);
 
-        while let Some(sce) = rx.next().await {
+        while let Some(sce) = sce_rx.next().await {
             let _ = action_state.match_and_resolve(&sce).await;
             // debug!("{:?}: expectations resolved {:?}", sce, res);
         }
@@ -160,18 +164,20 @@ async fn start_node_chain_logic(
         chain_env.contract_addresses,
         safe_cfg.safe_address,
         chain_key.clone(),
-        db.clone(),
+        index_db.clone(),
+        node_db.clone(),
         rpc_ops_in.clone(),
     );
 
-    let indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);
+    let indexer = Indexer::new(rpc_ops_in, chain_log_handler, index_db.clone(), indexer_cfg, sce_tx);
     let _indexer = indexer.clone();
     indexer.start().await?;
 
     Ok(ChainNode {
         offchain_key: offchain_key.clone(),
         chain_key: chain_key.clone(),
-        db,
+        index_db,
+        node_db,
         actions,
         _indexer,
         node_tasks,
@@ -384,14 +390,17 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     assert_eq!(
         Some(alice_node.chain_key.public().to_address()),
-        bob_node.db.resolve_chain_key(alice_node.offchain_key.public()).await?,
+        bob_node
+            .index_db
+            .resolve_chain_key(alice_node.offchain_key.public())
+            .await?,
         "bob must resolve alice's chain key correctly"
     );
 
     assert_eq!(
         Some(*alice_node.offchain_key.public()),
         bob_node
-            .db
+            .index_db
             .resolve_packet_key(&alice_node.chain_key.public().to_address())
             .await?,
         "bob must resolve alice's offchain key correctly"
@@ -399,14 +408,17 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     assert_eq!(
         Some(bob_node.chain_key.public().to_address()),
-        alice_node.db.resolve_chain_key(bob_node.offchain_key.public()).await?,
+        alice_node
+            .index_db
+            .resolve_chain_key(bob_node.offchain_key.public())
+            .await?,
         "alice must resolve bob's chain key correctly"
     );
 
     assert_eq!(
         Some(*bob_node.offchain_key.public()),
         alice_node
-            .db
+            .index_db
             .resolve_packet_key(&bob_node.chain_key.public().to_address())
             .await?,
         "alice must resolve bob's offchain key correctly"
@@ -426,7 +438,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     sleep(Duration::from_millis(100)).await;
 
     let channel_alice_bob = alice_node
-        .db
+        .index_db
         .get_channel_by_id(
             None,
             &generate_channel_id(
@@ -484,7 +496,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     // After the funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
-        .db
+        .index_db
         .get_channel_by_id(
             None,
             &generate_channel_id(
@@ -497,7 +509,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should contain a channel to Bob");
 
     let channel_alice_bob_seen_by_bob = bob_node
-        .db
+        .index_db
         .get_channel_by_id(
             None,
             &generate_channel_id(
@@ -548,7 +560,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     sleep(Duration::from_millis(1000)).await;
 
     let channel_bob_alice = alice_node
-        .db
+        .index_db
         .get_channel_by_id(
             None,
             &generate_channel_id(
@@ -566,17 +578,19 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, domain_separator).await?;
 
     let bob_ack_tickets = bob_node
-        .db
-        .get_tickets(channel_alice_bob_seen_by_bob.into())
+        .node_db
+        .stream_tickets(Some(channel_alice_bob_seen_by_bob.into()))
         .await
-        .expect("get ack ticket call on Alice's db must not fail");
+        .expect("get ack ticket call on Alice's db must not fail")
+        .collect::<Vec<_>>()
+        .await;
 
     assert_eq!(1, bob_ack_tickets.len(), "Bob must have a single acknowledged ticket");
     info!("--> successfully created acknowledged winning ticket by Alice for Bob");
 
     let channel_alice_bob_balance_before_redeem = channel_alice_bob.balance;
     let channel_alice_bob = alice_node
-        .db
+        .index_db
         .get_channel_by_id(
             None,
             &generate_channel_id(
@@ -625,7 +639,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let confirmations = futures::future::try_join_all(
         bob_node
             .actions
-            .redeem_tickets_with_counterparty(&alice_chain_key.public().to_address(), 0.into(), false)
+            .redeem_tickets(TicketSelector::from(&channel_alice_bob))
             .await
             .expect("should submit redeem action"),
     )
@@ -657,10 +671,12 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     sleep(Duration::from_millis(1000)).await;
 
     let bob_ack_tickets = alice_node
-        .db
-        .get_tickets(channel_bob_alice.into())
+        .node_db
+        .stream_tickets(Some(channel_bob_alice.into()))
         .await
-        .expect("get ack ticket call on Alice's db must not fail");
+        .expect("get ack ticket call on Alice's db must not fail")
+        .collect::<Vec<_>>()
+        .await;
 
     assert_eq!(
         0,
@@ -669,7 +685,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     );
 
     let channel_bob_alice = alice_node
-        .db
+        .index_db
         .get_channel_by_id(
             None,
             &generate_channel_id(
@@ -682,7 +698,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should contain a channel from Alice");
 
     let channel_alice_bob = alice_node
-        .db
+        .index_db
         .get_channel_by_id(
             None,
             &generate_channel_id(
@@ -743,7 +759,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     // Close channel
     let confirmation = alice_node
         .actions
-        .close_channel(bob_chain_key.public().to_address(), ChannelDirection::Outgoing, true)
+        .close_channel(channel_alice_bob.clone())
         .await
         .expect("should submit channel close tx")
         .await
@@ -752,7 +768,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     match confirmation.event {
         Some(ChainEventType::ChannelClosureInitiated(channel)) => {
             let closing_channel_in_db = alice_node
-                .db
+                .index_db
                 .get_channel_by_id(
                     None,
                     &generate_channel_id(
@@ -776,7 +792,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     sleep(Duration::from_millis(1000)).await;
 
     let channel_alice_bob = alice_node
-        .db
+        .index_db
         .get_channel_by_id(
             None,
             &generate_channel_id(
@@ -796,12 +812,12 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     info!("--> successfully initiated channel closure for Alice -> Bob");
 
     let alice_checksum = alice_node
-        .db
+        .index_db
         .get_last_checksummed_log()
         .await?
         .ok_or_else(|| anyhow::anyhow!("alice must have a checksum"))?;
     let bob_checksum = bob_node
-        .db
+        .index_db
         .get_last_checksummed_log()
         .await?
         .ok_or_else(|| anyhow::anyhow!("bob must have a checksum"))?;
@@ -828,7 +844,13 @@ async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> 
     fs::create_dir_all(&data_directory).await?;
 
     let chain_key = ChainKeypair::random();
-    let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
+    let db = HoprIndexerDb::new(
+        &data_directory.join("db"),
+        chain_key.clone(),
+        HoprIndexerDbConfig::default(),
+    )
+    .await?;
+    let node_db = HoprNodeDb::new_in_memory(chain_key.clone()).await?;
 
     // Verify snapshot file exists
     let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.xz");
@@ -868,10 +890,17 @@ async fn integration_test_indexer_logs_snapshot_by_file() -> anyhow::Result<()> 
         chain_key.public().to_address(),
         chain_key.clone(),
         db.clone(),
+        node_db.clone(),
         rpc.clone(),
     );
 
-    let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, async_channel::unbounded().0);
+    let indexer = Indexer::new(
+        rpc,
+        handlers,
+        db.clone(),
+        indexer_cfg,
+        futures::channel::mpsc::channel(1000).0,
+    );
 
     // Verify database is initially empty (as expected for snapshot test)
     let initial_logs_count = db.get_logs_count(None, None).await.unwrap_or(0);
@@ -903,7 +932,13 @@ async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> 
     fs::create_dir_all(&data_directory).await?;
 
     let chain_key = ChainKeypair::random();
-    let db = HoprDb::new(&data_directory.join("db"), chain_key.clone(), HoprDbConfig::default()).await?;
+    let db = HoprIndexerDb::new(
+        &data_directory.join("db"),
+        chain_key.clone(),
+        HoprIndexerDbConfig::default(),
+    )
+    .await?;
+    let node_db = HoprNodeDb::new_in_memory(chain_key.clone()).await?;
 
     // Verify snapshot file exists
     let snapshot_file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/log-snapshots/logs-snapshot.tar.xz");
@@ -951,10 +986,17 @@ async fn integration_test_indexer_logs_snapshot_by_http() -> anyhow::Result<()> 
         chain_key.public().to_address(),
         chain_key.clone(),
         db.clone(),
+        node_db.clone(),
         rpc.clone(),
     );
 
-    let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, async_channel::unbounded().0);
+    let indexer = Indexer::new(
+        rpc,
+        handlers,
+        db.clone(),
+        indexer_cfg,
+        futures::channel::mpsc::channel(1000).0,
+    );
 
     // Verify database is initially empty (as expected for snapshot test)
     let initial_logs_count = db.get_logs_count(None, None).await.unwrap_or(0);

@@ -81,6 +81,27 @@ impl Display for TicketSelector {
     }
 }
 
+fn approx_cmp_bounds(b1: Bound<WinningProbability>, b2: Bound<WinningProbability>) -> bool {
+    match (b1, b2) {
+        (Bound::Unbounded, Bound::Unbounded) => true,
+        (Bound::Included(a), Bound::Included(b)) => b.approx_eq(&a),
+        (Bound::Excluded(a), Bound::Excluded(b)) => b.approx_eq(&a),
+        _ => false,
+    }
+}
+
+impl PartialEq for TicketSelector {
+    fn eq(&self, other: &Self) -> bool {
+        self.channel_identifiers == other.channel_identifiers
+            && self.index == other.index
+            && self.state == other.state
+            && self.only_aggregated == other.only_aggregated
+            && self.amount == other.amount
+            && approx_cmp_bounds(self.win_prob.0, other.win_prob.0)
+            && approx_cmp_bounds(self.win_prob.1, other.win_prob.1)
+    }
+}
+
 impl TicketSelector {
     /// Create a new ticket selector given the `channel_id` and `epoch`.
     pub fn new<T: Into<U256>>(channel_id: Hash, epoch: T) -> Self {
@@ -100,6 +121,7 @@ impl TicketSelector {
     /// This also nullifies any prior effect of any prior calls to [`TicketSelector::with_index`] or
     /// [`TicketSelector::with_index_range`]
     /// as ticket indices cannot be matched over multiple channels.
+    #[must_use]
     pub fn also_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
         let mut ret = self.clone();
         ret.index = TicketIndexSelector::None;
@@ -107,9 +129,16 @@ impl TicketSelector {
         ret
     }
 
+    /// Convenience version on [`TicketSelector::also_on_channel`] that accepts a [`ChannelEntry`].
+    #[must_use]
+    pub fn also_on_channel_entry(self, entry: &ChannelEntry) -> Self {
+        self.also_on_channel(entry.get_id(), entry.channel_epoch)
+    }
+
     /// Sets the selector to match only tickets on the given `channel_id` and `epoch`.
     ///
     /// This nullifies any prior calls to [`TicketSelector::also_on_channel`].
+    #[must_use]
     pub fn just_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
         let mut ret = self.clone();
         ret.channel_identifiers = vec![(channel_id, epoch.into())];
@@ -137,6 +166,7 @@ impl TicketSelector {
     /// This method can be called multiple times to select multiple tickets.
     /// If [`TicketSelector::with_index_range`] was previously called, it will be replaced.
     /// If [`TicketSelector::also_on_channel`] was previously called, its effect will be nullified.
+    #[must_use]
     pub fn with_index(mut self, index: u64) -> Self {
         self.channel_identifiers.truncate(1);
         self.index = match self.index {
@@ -155,6 +185,7 @@ impl TicketSelector {
     /// Returns this instance with a ticket index upper bound set.
     /// If [`TicketSelector::with_index`] was previously called, it will be replaced.
     /// If [`TicketSelector::also_on_channel`] was previously called, its effect will be nullified.
+    #[must_use]
     pub fn with_index_range<T: RangeBounds<u64>>(mut self, index_bound: T) -> Self {
         self.channel_identifiers.truncate(1);
         self.index = TicketIndexSelector::Range((index_bound.start_bound().cloned(), index_bound.end_bound().cloned()));
@@ -162,30 +193,35 @@ impl TicketSelector {
     }
 
     /// Returns this instance with a ticket state set.
+    #[must_use]
     pub fn with_state(mut self, state: AcknowledgedTicketStatus) -> Self {
         self.state = Some(state);
         self
     }
 
     /// Returns this instance without a ticket state set.
+    #[must_use]
     pub fn with_no_state(mut self) -> Self {
         self.state = None;
         self
     }
 
     /// Returns this instance with `only_aggregated` flag value.
+    #[must_use]
     pub fn with_aggregated_only(mut self, only_aggregated: bool) -> Self {
         self.only_aggregated = only_aggregated;
         self
     }
 
     /// Returns this instance with a winning probability range bounds set.
+    #[must_use]
     pub fn with_winning_probability<T: RangeBounds<WinningProbability>>(mut self, range: T) -> Self {
         self.win_prob = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }
 
     /// Returns this instance with the ticket amount range bounds set.
+    #[must_use]
     pub fn with_amount<T: RangeBounds<HoprBalance>>(mut self, range: T) -> Self {
         self.amount = (range.start_bound().cloned(), range.end_bound().cloned());
         self

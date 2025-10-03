@@ -11,9 +11,6 @@ pub enum CoreEthereumIndexerError {
     DbApiError(#[from] hopr_db_sql::errors::DbSqlError),
 
     #[error(transparent)]
-    DbError(#[from] hopr_db_sql::api::errors::DbError),
-
-    #[error(transparent)]
     DbEntityError(#[from] hopr_db_entity::errors::DbEntityError),
 
     #[error(transparent)]
@@ -57,6 +54,9 @@ pub enum CoreEthereumIndexerError {
 
     #[error(transparent)]
     RpcError(#[from] hopr_chain_rpc::errors::RpcError),
+
+    #[error("node db error: {0}")]
+    NodeDbError(Box<dyn std::error::Error + Send + Sync + 'static>),
 
     #[error("Snapshot error: {0}")]
     SnapshotError(String),
