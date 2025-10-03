@@ -63,7 +63,7 @@ pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::{
     account::AccountEntry,
     channels::{ChannelId, CorruptedChannelEntry},
-    prelude::{AcknowledgedTicket, AcknowledgedTicketStatus, ChannelStatus, generate_channel_id},
+    prelude::{AcknowledgedTicket, AcknowledgedTicketStatus, ChannelStatus},
     tickets::WinningProbability,
 };
 use hopr_primitive_types::prelude::*;
@@ -547,10 +547,10 @@ impl ChainWriteChannelOperations for HoprChain {
         let me = self.me_onchain();
         Ok(self
             .actions_ref()
-            .open_channel(*dst, amount)
+            .open_channel(dst, amount)
             .await?
             .map(move |res| {
-                res.map(|c| (generate_channel_id(&me, dst), c.tx_hash))
+                res.map(|c| (ChannelId::from((&me, dst)), c.tx_hash))
                     .map_err(HoprChainError::from)
             })
             .boxed())
@@ -563,7 +563,7 @@ impl ChainWriteChannelOperations for HoprChain {
     ) -> std::result::Result<BoxFuture<'a, std::result::Result<ChainReceipt, Self::Error>>, Self::Error> {
         Ok(self
             .actions_ref()
-            .fund_channel(*channel_id, amount)
+            .fund_channel(channel_id, amount)
             .await?
             .map(|res| res.map(|c| c.tx_hash).map_err(HoprChainError::from))
             .boxed())

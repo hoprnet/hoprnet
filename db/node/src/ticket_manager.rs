@@ -160,7 +160,7 @@ impl TicketManager {
 
         self.caches
             .unrealized_value
-            .insert((channel, epoch.into()), unrealized_value + value)
+            .insert((channel, epoch), unrealized_value + value)
             .await;
 
         Ok(())
@@ -274,14 +274,12 @@ mod tests {
     async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(BOB.clone()).await?;
 
-        let channel = ChannelEntry::new(
-            BOB.public().to_address(),
-            ALICE.public().to_address(),
-            u32::MAX.into(),
-            1.into(),
-            ChannelStatus::Open,
-            4_u32.into(),
-        );
+        let channel = ChannelBuilder::new(&*BOB, &*ALICE)
+            .with_stake(u32::MAX)
+            .with_ticket_index(1)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(4)
+            .build();
 
         assert_eq!(
             HoprBalance::zero(),

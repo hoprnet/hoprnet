@@ -17,7 +17,6 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use hopr_chain_types::actions::Action;
-use hopr_crypto_types::types::Hash;
 use hopr_db_sql::prelude::{HoprDbChannelOperations, HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
@@ -40,10 +39,10 @@ use crate::{
 #[async_trait]
 pub trait ChannelActions {
     /// Opens a channel to the given `destination` with the given `amount` staked.
-    async fn open_channel(&self, destination: Address, amount: HoprBalance) -> Result<PendingAction>;
+    async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> Result<PendingAction>;
 
     /// Funds the given channel with the given `amount`
-    async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> Result<PendingAction>;
+    async fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> Result<PendingAction>;
 
     /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that
     /// channel, in case the `direction` is [`ChannelDirection::Incoming`].
@@ -53,8 +52,8 @@ pub trait ChannelActions {
 #[async_trait]
 impl<Db: Sync> ChannelActions for ChainActions<Db> {
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn open_channel(&self, destination: Address, amount: HoprBalance) -> Result<PendingAction> {
-        if self.self_address() == destination {
+    async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> Result<PendingAction> {
+        if &self.self_address() == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
         }
 
@@ -81,7 +80,7 @@ impl<Db: Sync> ChannelActions for ChainActions<Db> {
 
         let maybe_channel = self
             .index_db
-            .get_channel_by_parties(None, &self.self_address(), &destination, false)
+            .get_channel_by_parties(None, &self.self_address(), destination, false)
             .await?;
         if let Some(channel) = maybe_channel {
             debug!(%channel, "already found existing channel");
@@ -95,11 +94,11 @@ impl<Db: Sync> ChannelActions for ChainActions<Db> {
         }
 
         info!(%destination, %amount, "initiating channel open");
-        self.tx_sender.send(Action::OpenChannel(destination, amount)).await
+        self.tx_sender.send(Action::OpenChannel(*destination, amount)).await
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> Result<PendingAction> {
+    async fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> Result<PendingAction> {
         if amount.is_zero() {
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
@@ -116,7 +115,7 @@ impl<Db: Sync> ChannelActions for ChainActions<Db> {
             return Err(BalanceTooLow);
         }
 
-        match self.index_db.get_channel_by_id(None, &channel_id).await? {
+        match self.index_db.get_channel_by_id(None, channel_id).await? {
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
                     if channel.balance + amount > HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) {
@@ -252,7 +251,12 @@ mod tests {
             .withf(move |dst, balance| BOB.eq(dst) && stake.eq(balance))
             .returning(move |_, _| Ok(random_hash));
 
-        let new_channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let new_channel = ChannelBuilder::new(*ALICE, *BOB)
+            .with_balance(stake)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker
@@ -273,7 +277,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let tx_res = actions.open_channel(*BOB, stake).await?.await?;
+        let tx_res = actions.open_channel(&*BOB, stake).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -292,7 +296,12 @@ mod tests {
     async fn test_should_not_open_channel_again() -> anyhow::Result<()> {
         let stake = 10_u32.into();
 
-        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel = ChannelBuilder::new(*ALICE, *BOB)
+            .with_balance(stake)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -310,7 +319,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .open_channel(*BOB, stake)
+                    .open_channel(&*BOB, stake)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -342,7 +351,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .open_channel(*ALICE, stake)
+                    .open_channel(&*ALICE, stake)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -371,7 +380,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .open_channel(*BOB, (ChannelEntry::MAX_CHANNEL_BALANCE + 1).into())
+                    .open_channel(&*BOB, (ChannelEntry::MAX_CHANNEL_BALANCE + 1).into())
                     .await
                     .err()
                     .expect("should be an error"),
@@ -402,7 +411,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .open_channel(*BOB, stake)
+                    .open_channel(&*BOB, stake)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -433,7 +442,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .open_channel(*BOB, stake)
+                    .open_channel(&*BOB, stake)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -448,7 +457,12 @@ mod tests {
     async fn test_fund_channel() -> anyhow::Result<()> {
         let stake = 10_u32.into();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
-        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel = ChannelBuilder::new(*ALICE, *BOB)
+            .with_balance(stake)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -497,14 +511,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_fund_channel_should_not_over_fund() -> anyhow::Result<()> {
-        let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE),
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::zero(),
-        );
+        let channel = ChannelBuilder::new(*ALICE, *BOB)
+            .with_stake(ChannelEntry::MAX_CHANNEL_BALANCE)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -535,7 +547,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_fund_nonexistent_channel() -> anyhow::Result<()> {
-        let channel_id = generate_channel_id(&ALICE, &BOB);
+        let channel_id: ChannelId = (&*ALICE, &*BOB).into();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -553,7 +565,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .fund_channel(channel_id, stake)
+                    .fund_channel(&channel_id, stake)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -566,7 +578,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_fund_if_not_enough_allowance() -> anyhow::Result<()> {
-        let channel_id = generate_channel_id(&ALICE, &BOB);
+        let channel_id: ChannelId = (&*ALICE, &*BOB).into();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -584,7 +596,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .fund_channel(channel_id, stake)
+                    .fund_channel(&channel_id, stake)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -597,7 +609,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_fund_if_not_enough_balance() -> anyhow::Result<()> {
-        let channel_id = generate_channel_id(&ALICE, &BOB);
+        let channel_id: ChannelId = (&*ALICE, &*BOB).into();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -615,7 +627,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .fund_channel(channel_id, stake)
+                    .fund_channel(&channel_id, stake)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -631,7 +643,12 @@ mod tests {
         let stake = 10_u32.into();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let mut channel = ChannelBuilder::new(*ALICE, *BOB)
+            .with_balance(stake)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -723,7 +740,12 @@ mod tests {
         let stake = 10_u32.into();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel = ChannelBuilder::new(*BOB, *ALICE)
+            .with_balance(stake)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -775,14 +797,14 @@ mod tests {
     async fn test_should_not_close_when_closure_time_did_not_elapse() -> anyhow::Result<()> {
         let stake = 10_u32.into();
 
-        let channel = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            stake,
-            U256::zero(),
-            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
-            U256::zero(),
-        );
+        let channel = ChannelBuilder::new(*ALICE, *BOB)
+            .with_balance(stake)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::PendingToClose(
+                SystemTime::now().add(Duration::from_secs(100)),
+            ))
+            .with_epoch(1)
+            .build();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -813,14 +835,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_close_foreign_channel() -> anyhow::Result<()> {
-        let channel = ChannelEntry::new(
-            Address::from([0x01; 20]),
-            Address::from([0x02; 20]),
-            10_u32.into(),
-            U256::zero(),
-            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
-            U256::zero(),
-        );
+        let channel = ChannelBuilder::new(Address::from([0x01; 20]), Address::from([0x02; 20]))
+            .with_stake(10)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::PendingToClose(
+                SystemTime::now().add(Duration::from_secs(100)),
+            ))
+            .with_epoch(1)
+            .build();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -846,8 +868,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_close_closed_channel() -> anyhow::Result<()> {
-        let stake = 10_u32.into();
-        let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
+        let stake = 10_u32;
+        let channel = ChannelBuilder::new(*ALICE, *BOB)
+            .with_stake(stake)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Closed)
+            .with_epoch(1)
+            .build();
 
         let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
         let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;

@@ -144,7 +144,7 @@ where
         {
             // Check if not trying to redeem a ticket that cannot be redeemed.
             // Such tickets are automatically cleaned up (neglected) after successful redemption.
-            if ack_ticket.verified_ticket().index < channel.ticket_index.as_u64() {
+            if ack_ticket.verified_ticket().index < channel.ticket_index {
                 return Err(OldTicket);
             }
 
@@ -257,14 +257,13 @@ mod tests {
                         .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
                         .await?;
 
-                    let channel = ChannelEntry::new(
-                        ckp.public().to_address(),
-                        ALICE.public().to_address(),
-                        0.into(),
-                        U256::zero(),
-                        ChannelStatus::Open,
-                        channel_epoch.into(),
-                    );
+                    let channel = ChannelBuilder::new(&ckp, &*ALICE)
+                        .with_stake(0)
+                        .with_ticket_index(0)
+                        .with_status(ChannelStatus::Open)
+                        .with_epoch(channel_epoch)
+                        .build();
+
                     db_clone.upsert_channel(Some(tx), channel).await?;
                     Ok::<_, DbSqlError>(channel)
                 })

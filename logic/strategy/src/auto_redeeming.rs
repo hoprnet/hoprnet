@@ -138,7 +138,7 @@ where
                     async move {
                         let selector = TicketSelector::from(&channel)
                             .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                            .with_index_range(channel.ticket_index.as_u64()..)
+                            .with_index_range(channel.ticket_index..)
                             .with_state(AcknowledgedTicketStatus::Untouched);
 
                         match chain_actions_clone
@@ -180,7 +180,7 @@ where
             {
                 info!(%ack, "redeeming");
 
-                if ack.ticket.verified_ticket().index < channel.ticket_index.as_u64() {
+                if ack.ticket.verified_ticket().index < channel.ticket_index {
                     error!(%ack, "acknowledged ticket is older than channel ticket index");
                     return Err(CriteriaNotSatisfied);
                 }
@@ -193,7 +193,7 @@ where
                     .redeem_tickets_via_selector(
                         TicketSelector::from(channel)
                             .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                            .with_index_range(channel.ticket_index.as_u64()..=ack.ticket.verified_ticket().index)
+                            .with_index_range(channel.ticket_index..=ack.ticket.verified_ticket().index)
                             .with_state(AcknowledgedTicketStatus::Untouched),
                     )
                     .await
@@ -232,7 +232,7 @@ where
                 .redeem_tickets_via_selector(
                     TicketSelector::from(channel)
                         .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                        .with_index_range(channel.ticket_index.as_u64()..)
+                        .with_index_range(channel.ticket_index..)
                         .with_state(AcknowledgedTicketStatus::Untouched),
                 )
                 .await
@@ -276,22 +276,25 @@ mod tests {
         static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).expect("lazy static keypair should be constructible");
         static ref PRICE_PER_PACKET: HoprBalance = 10000000000000000_u128.into(); // 0.01 HOPR
 
-        static ref CHANNEL_1: ChannelEntry = ChannelEntry::new(
-            BOB.public().to_address(),
-            ALICE.public().to_address(),
-            *PRICE_PER_PACKET * 10,
-            0.into(),
-            ChannelStatus::Open,
-            4.into()
-        );
-        static ref CHANNEL_2: ChannelEntry = ChannelEntry::new(
-            BOB.public().to_address(),
-            CHARLIE.public().to_address(),
-            *PRICE_PER_PACKET * 11,
-            1.into(),
-            ChannelStatus::Open,
-            4.into()
-        );
+        static ref CHANNEL_1: ChannelEntry = ChannelBuilder::new(
+            &*BOB,
+            &*ALICE
+        )
+        .with_balance(*PRICE_PER_PACKET * 5)
+        .with_ticket_index(0)
+        .with_status(ChannelStatus::Open)
+        .with_epoch(4)
+        .build();
+
+        static ref CHANNEL_2: ChannelEntry = ChannelBuilder::new(
+            &*BOB,
+            &*CHARLIE
+        )
+        .with_balance(*PRICE_PER_PACKET * 11)
+        .with_ticket_index(1)
+        .with_status(ChannelStatus::Open)
+        .with_epoch(4)
+        .build();
     }
 
     fn generate_random_ack_ticket(
@@ -374,7 +377,7 @@ mod tests {
             .with(mockall::predicate::eq(
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             ))
             .returning(|_| vec![ChainReceipt::default()]);
@@ -384,7 +387,7 @@ mod tests {
             .with(mockall::predicate::eq(
                 TicketSelector::from(CHANNEL_2.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_2.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_2.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             ))
             .returning(|_| vec![ChainReceipt::default()]);
@@ -418,7 +421,7 @@ mod tests {
             .with(mockall::predicate::eq(
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_at.ticket.verified_ticket().index)
+                    .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_at.ticket.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             ))
             .return_once(|_| vec![ChainReceipt::default()]);
@@ -440,14 +443,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_should_redeem_singular_ticket_on_close() -> anyhow::Result<()> {
-        let channel = ChannelEntry::new(
-            BOB.public().to_address(),
-            ALICE.public().to_address(),
-            10.into(),
-            0.into(),
-            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
-            4.into(),
-        );
+        let channel = ChannelBuilder::new(&*BOB, &*ALICE)
+            .with_stake(10)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::PendingToClose(
+                SystemTime::now().add(Duration::from_secs(100)),
+            ))
+            .with_epoch(4)
+            .build();
 
         let mut mock = MockTestActions::new();
         mock.expect_redeem_with_selector()
@@ -455,7 +458,7 @@ mod tests {
             .with(mockall::predicate::eq(
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             ))
             .return_once(|_| vec![ChainReceipt::default()]);
@@ -495,7 +498,7 @@ mod tests {
             .with(mockall::predicate::eq(
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::zero()..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_1.ticket.verified_ticket().index)
+                    .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_1.ticket.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             ))
             .return_once(|_| vec![ChainReceipt::default()]);

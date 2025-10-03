@@ -99,7 +99,7 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
                 let channel_id = channel.get_id();
                 let rx = self
                     .hopr_chain_actions
-                    .fund_channel(&channel_id, self.cfg.funding_amount)
+                    .fund_channel(channel_id, self.cfg.funding_amount)
                     .await
                     .map_err(|e| StrategyError::Other(e.into()))?;
 
@@ -137,32 +137,26 @@ mod tests {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
 
-        let c1 = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            10_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c1 = ChannelBuilder::new(*ALICE, *BOB)
+            .with_stake(10)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
-        let c2 = ChannelEntry::new(
-            *BOB,
-            *CHRIS,
-            5_u32.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let c2 = ChannelBuilder::new(*BOB, *CHRIS)
+            .with_stake(5)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
-        let c3 = ChannelEntry::new(
-            *CHRIS,
-            *DAVE,
-            5_u32.into(),
-            0_u32.into(),
-            ChannelStatus::PendingToClose(std::time::SystemTime::now()),
-            0_u32.into(),
-        );
+        let c3 = ChannelBuilder::new(*CHRIS, *DAVE)
+            .with_stake(5)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::PendingToClose(std::time::SystemTime::now()))
+            .with_epoch(1)
+            .build();
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,
@@ -172,7 +166,10 @@ mod tests {
         let mut mock = MockTestActions::new();
         mock.expect_fund_channel()
             .once()
-            .with(mockall::predicate::eq(c2.get_id()), mockall::predicate::eq(fund_amount))
+            .with(
+                mockall::predicate::eq(*c2.get_id()),
+                mockall::predicate::eq(fund_amount),
+            )
             .return_once(|_, _| Ok(ChainReceipt::default()));
 
         let afs = AutoFundingStrategy::new(cfg, MockChainActions(mock.into()));

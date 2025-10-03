@@ -16,17 +16,15 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
     let source = ChainKeypair::random();
     let dest = ChainKeypair::random();
 
-    let channel = ChannelEntry::new(
-        source.public().to_address(),
-        dest.public().to_address(),
-        HoprBalance::new_base(1000),
-        1_u32.into(),
-        ChannelStatus::Open,
-        1_u32.into(),
-    );
+    let channel = ChannelBuilder::new(&source, &dest)
+        .with_balance(HoprBalance::new_base(1000))
+        .with_ticket_index(1)
+        .with_status(ChannelStatus::Open)
+        .with_epoch(1)
+        .build();
 
     let ticket = TicketBuilder::default()
-        .addresses(source.public().to_address(), dest.public().to_address())
+        .addresses(&source, &dest)
         .balance(HoprBalance::new_base(100))
         .index(1)
         .index_offset(1)

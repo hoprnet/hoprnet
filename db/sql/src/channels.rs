@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
-use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelude::Channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -63,13 +62,13 @@ impl ChannelEditor {
 pub trait HoprDbChannelOperations {
     /// Retrieves channel by its channel ID hash.
     ///
-    /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
-    async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>>;
+    /// See [`ChannelId`] on how to generate a channel ID hash from source and destination [Addresses](Address).
+    async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &ChannelId) -> Result<Option<ChannelEntry>>;
 
     /// Start changes to channel entry.
     /// If the channel with the given ID exists, the [ChannelEditor] is returned.
     /// Use [`HoprDbChannelOperations::finish_channel_update`] to commit edits to the DB when done.
-    async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>>;
+    async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &ChannelId) -> Result<Option<ChannelEditor>>;
 
     /// Commits changes of the channel to the database.
     /// Returns the updated channel, or on deletion, the deleted channel entry.
@@ -121,7 +120,7 @@ pub trait HoprDbChannelOperations {
 
 #[async_trait]
 impl HoprDbChannelOperations for HoprIndexerDb {
-    async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>> {
+    async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &ChannelId) -> Result<Option<ChannelEntry>> {
         let id_hex = id.to_hex();
         self.nest_transaction(tx)
             .await?
@@ -143,7 +142,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
             .await
     }
 
-    async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>> {
+    async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &ChannelId) -> Result<Option<ChannelEditor>> {
         let id_hex = id.to_hex();
         self.nest_transaction(tx)
             .await?
@@ -388,10 +387,7 @@ mod tests {
     use anyhow::Context;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
-    use hopr_internal_types::{
-        channels::ChannelStatus,
-        prelude::{ChannelDirection, ChannelEntry},
-    };
+    use hopr_internal_types::{channels::ChannelStatus, prelude::ChannelDirection};
     use hopr_primitive_types::prelude::Address;
 
     use super::*;
@@ -401,18 +397,16 @@ mod tests {
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
         let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let ce = ChannelEntry::new(
-            Address::default(),
-            Address::default(),
-            0.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let ce = ChannelBuilder::new([0u8; 20], [1u8; 20])
+            .with_stake(0)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
-            .get_channel_by_id(None, &ce.get_id())
+            .get_channel_by_id(None, ce.get_id())
             .await?
             .expect("channel must be present");
 
@@ -428,7 +422,12 @@ mod tests {
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
 
-        let ce = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into());
+        let ce = ChannelBuilder::new(a, b)
+            .with_stake(0)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
@@ -462,14 +461,12 @@ mod tests {
 
         let expected_destination = Address::default();
 
-        let ce = ChannelEntry::new(
-            Address::default(),
-            expected_destination,
-            0.into(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let ce = ChannelBuilder::new(Address::default(), expected_destination)
+            .with_stake(0)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
@@ -491,23 +488,19 @@ mod tests {
 
         let db = HoprIndexerDb::new_in_memory(ckp).await?;
 
-        let ce_1 = ChannelEntry::new(
-            addr_1,
-            addr_2,
-            0.into(),
-            1_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let ce_1 = ChannelBuilder::new(addr_1, addr_2)
+            .with_stake(0)
+            .with_ticket_index(1)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
-        let ce_2 = ChannelEntry::new(
-            addr_2,
-            addr_1,
-            0.into(),
-            2_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let ce_2 = ChannelBuilder::new(addr_2, addr_1)
+            .with_stake(0)
+            .with_ticket_index(2)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let db_clone = db.clone();
         db.begin_transaction()

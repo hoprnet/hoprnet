@@ -178,5 +178,5 @@ impl std::fmt::Debug for OutgoingPacket {
 pub enum ResolvedAcknowledgement {
     Sending(VerifiedAcknowledgement),
     RelayingWin(AcknowledgedTicket),
-    RelayingLoss(Hash),
+    RelayingLoss(ChannelId),
 }

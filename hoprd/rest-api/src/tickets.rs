@@ -6,9 +6,8 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    HoprBalance, Ticket, TicketStatistics, ToHex,
+    ChannelId, HoprBalance, Ticket, TicketStatistics, ToHex,
     errors::{HoprLibError, HoprStatusError},
-    prelude::Hash,
 };
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
@@ -31,7 +30,7 @@ use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 pub(crate) struct ChannelTicket {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
-    channel_id: Hash,
+    channel_id: ChannelId,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "1.0 wxHOPR")]
     amount: HoprBalance,
@@ -106,7 +105,7 @@ pub(super) async fn show_channel_tickets(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
+    match ChannelId::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.tickets_in_channel(&channel_id).await {
             Ok(Some(_tickets)) => {
                 let tickets: Vec<ChannelTicket> = vec![];
@@ -300,7 +299,7 @@ pub(super) async fn redeem_tickets_in_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
+    match ChannelId::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, 0, false).await {
             Ok(count) if count > 0 => (StatusCode::NO_CONTENT, "").into_response(),
             Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),

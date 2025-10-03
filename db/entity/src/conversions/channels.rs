@@ -1,11 +1,8 @@
 use hopr_internal_types::{
     channels::{ChannelId, ChannelStatus, CorruptedChannelEntry},
-    prelude::ChannelEntry,
+    prelude::{ChannelBuilder, ChannelEntry},
 };
-use hopr_primitive_types::{
-    balance::HoprBalance,
-    prelude::{IntoEndian, ToHex, U256},
-};
+use hopr_primitive_types::prelude::{Address, IntoEndian, ToHex, U256};
 use sea_orm::Set;
 
 use crate::{channel, corrupted_channel, errors::DbEntityError};
@@ -48,14 +45,22 @@ impl TryFrom<&channel::Model> for ChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
-        Ok(ChannelEntry::new(
-            value.source.parse()?,
-            value.destination.parse()?,
-            HoprBalance::from(U256::from_be_bytes(&value.balance)),
-            U256::from_be_bytes(&value.ticket_index),
-            value.try_into()?,
-            U256::from_be_bytes(&value.epoch),
-        ))
+        Ok(
+            ChannelBuilder::new(value.source.parse::<Address>()?, value.destination.parse::<Address>()?)
+                .with_stake(U256::from_be_bytes(&value.balance))
+                .with_ticket_index(u64::from_be_bytes(
+                    value.ticket_index[0..size_of::<u64>()]
+                        .try_into()
+                        .map_err(|_| DbEntityError::ConversionError("invalid ticket index".into()))?,
+                ))
+                .with_epoch(u32::from_be_bytes(
+                    value.epoch[0..size_of::<u32>()]
+                        .try_into()
+                        .map_err(|_| DbEntityError::ConversionError("invalid epoch".into()))?,
+                ))
+                .with_status(value.try_into()?)
+                .build(),
+        )
     }
 }
 
@@ -74,7 +79,7 @@ impl From<ChannelEntry> for channel::ActiveModel {
             source: Set(value.source.to_hex()),
             destination: Set(value.destination.to_hex()),
             balance: Set(value.balance.amount().to_be_bytes().into()),
-            epoch: Set(value.channel_epoch.to_be_bytes().into()),
+            epoch: Set(value.epoch.to_be_bytes().into()),
             ticket_index: Set(value.ticket_index.to_be_bytes().into()),
             ..Default::default()
         };

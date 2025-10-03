@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use futures::TryStreamExt;
-use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{corrupted_channel, prelude::CorruptedChannel};
 use hopr_internal_types::{channels::CorruptedChannelEntry, prelude::*};
 use hopr_primitive_types::prelude::*;
@@ -16,11 +15,11 @@ use crate::{
 pub trait HoprDbCorruptedChannelOperations {
     /// Retrieves corrupted channel by its channel ID hash.
     ///
-    /// See [generate_channel_id] on how to generate a channel ID hash from source and destination [Addresses](Address).
+    /// See [`ChannelId`] on how to generate a channel ID hash from source and destination [Addresses](Address).
     async fn get_corrupted_channel_by_id<'a>(
         &'a self,
         tx: OptTx<'a>,
-        id: &Hash,
+        id: &ChannelId,
     ) -> Result<Option<CorruptedChannelEntry>>;
 
     /// Retrieves all corrupted channels information from the DB.
@@ -35,7 +34,7 @@ impl HoprDbCorruptedChannelOperations for HoprIndexerDb {
     async fn get_corrupted_channel_by_id<'a>(
         &'a self,
         tx: OptTx<'a>,
-        id: &Hash,
+        id: &ChannelId,
     ) -> Result<Option<CorruptedChannelEntry>> {
         let id_hex = id.to_hex();
         self.nest_transaction(tx)
@@ -112,7 +111,7 @@ mod tests {
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
         let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let channel_id = Hash::from(random_bytes());
+        let channel_id: ChannelId = Hash::from(random_bytes()).into();
 
         db.upsert_corrupted_channel(None, channel_id).await?;
 
@@ -129,7 +128,7 @@ mod tests {
     #[tokio::test]
     async fn test_insert_duplicates_should_not_insert() -> anyhow::Result<()> {
         let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
-        let channel_id = Hash::from(random_bytes());
+        let channel_id: ChannelId = Hash::from(random_bytes()).into();
 
         db.upsert_corrupted_channel(None, channel_id)
             .await

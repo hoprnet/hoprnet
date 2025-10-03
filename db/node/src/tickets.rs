@@ -10,7 +10,6 @@ use async_stream::stream;
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_api::db::*;
-use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -133,7 +132,7 @@ impl IntoCondition for WrappedTicketSelector {
 
 pub(crate) async fn find_stats_for_channel(
     tx: &sea_orm::DatabaseTransaction,
-    channel_id: &Hash,
+    channel_id: &ChannelId,
 ) -> Result<ticket_statistics::Model, NodeDbError> {
     if let Some(model) = ticket_statistics::Entity::find()
         .filter(ticket_statistics::Column::ChannelId.eq(channel_id.to_hex()))
@@ -192,7 +191,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                 Box::pin(async move {
                     let mut total_marked_count = 0;
                     for (channel_id, epoch) in selector.channel_identifiers.iter() {
-                        let channel_selector = selector.clone().just_on_channel(*channel_id, epoch);
+                        let channel_selector = selector.clone().just_on_channel(*channel_id, *epoch);
 
                         // Get the number of tickets and their value just for this channel
                         let (marked_count, marked_value) =
@@ -376,7 +375,10 @@ impl HoprDbTicketOperations for HoprNodeDb {
             .await?)
     }
 
-    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics, NodeDbError> {
+    async fn get_ticket_statistics(
+        &self,
+        channel_id: Option<&ChannelId>,
+    ) -> Result<ChannelTicketStatistics, NodeDbError> {
         let res = match channel_id {
             None => {
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -448,6 +450,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                     .await
             }
             Some(channel) => {
+                let channel = *channel;
                 self.tickets_db
                     .transaction(|tx| {
                         Box::pin(async move {
@@ -513,7 +516,11 @@ impl HoprDbTicketOperations for HoprNodeDb {
         self.get_tickets_value_int(&self.tickets_db, selector).await
     }
 
-    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64, NodeDbError> {
+    async fn compare_and_set_outgoing_ticket_index(
+        &self,
+        channel_id: &ChannelId,
+        index: u64,
+    ) -> Result<u64, NodeDbError> {
         let old_value = self
             .get_outgoing_ticket_index(channel_id)
             .await?
@@ -525,7 +532,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn reset_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, NodeDbError> {
+    async fn reset_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, NodeDbError> {
         let old_value = self
             .get_outgoing_ticket_index(channel_id)
             .await?
@@ -537,7 +544,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, NodeDbError> {
+    async fn increment_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, NodeDbError> {
         let old_value = self
             .get_outgoing_ticket_index(channel_id)
             .await?
@@ -548,18 +555,19 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>, NodeDbError> {
+    async fn get_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<Arc<AtomicU64>, NodeDbError> {
         let tkt_manager = self.ticket_manager.clone();
 
         Ok(self
             .caches
             .ticket_index
-            .try_get_with(channel_id, async move {
+            .try_get_with_by_ref(channel_id, async move {
                 let maybe_index = outgoing_ticket_index::Entity::find()
                     .filter(outgoing_ticket_index::Column::ChannelId.eq(channel_id.to_hex()))
                     .one(&tkt_manager.tickets_db)
                     .await?;
 
+                let channel_id_hex = channel_id.to_hex();
                 Ok(Arc::new(AtomicU64::new(match maybe_index {
                     Some(model) => U256::from_be_bytes(model.index).as_u64(),
                     None => {
@@ -567,7 +575,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                             .write_transaction(|tx| {
                                 Box::pin(async move {
                                     outgoing_ticket_index::ActiveModel {
-                                        channel_id: Set(channel_id.to_hex()),
+                                        channel_id: Set(channel_id_hex),
                                         ..Default::default()
                                     }
                                     .insert(tx)
@@ -591,7 +599,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
         let mut updated = 0;
         for index_model in outgoing_indices {
-            let channel_id = Hash::from_hex(&index_model.channel_id).map_err(NodeDbError::from)?;
+            let channel_id = ChannelId::from_hex(&index_model.channel_id).map_err(NodeDbError::from)?;
             let db_index = U256::from_be_bytes(&index_model.index).as_u64();
             if let Some(cached_index) = self.caches.ticket_index.get(&channel_id).await {
                 // Note that the persisted value is always lagging behind the cache,
@@ -700,7 +708,7 @@ mod tests {
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be valid");
-        static ref CHANNEL_ID: Hash = generate_channel_id(BOB.public().as_ref(), ALICE.public().as_ref());
+        static ref CHANNEL_ID: ChannelId = ChannelId::from_addrs(&*BOB, &*ALICE);
     }
 
     lazy_static::lazy_static! {
@@ -799,7 +807,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
+            db.get_ticket_statistics(Some(&*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
@@ -823,7 +831,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
+            db.get_ticket_statistics(Some(&*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
@@ -881,7 +889,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
+            db.get_ticket_statistics(Some(&*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
@@ -902,7 +910,7 @@ mod tests {
 
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
+            db.get_ticket_statistics(Some(&*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
@@ -920,7 +928,7 @@ mod tests {
         assert_eq!(HoprBalance::zero(), stats.rejected_value);
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
+            db.get_ticket_statistics(Some(&*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
@@ -930,7 +938,7 @@ mod tests {
         assert_eq!(ticket.verified_ticket().amount, stats.rejected_value);
         assert_eq!(
             stats,
-            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
+            db.get_ticket_statistics(Some(&*CHANNEL_ID)).await?,
             "per channel stats must be same"
         );
 
@@ -1004,9 +1012,9 @@ mod tests {
     async fn test_ticket_index_should_be_zero_if_not_yet_present() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let hash = Hash::default();
+        let hash = ChannelId::default();
 
-        let idx = db.get_outgoing_ticket_index(hash).await?;
+        let idx = db.get_outgoing_ticket_index(&hash).await?;
         assert_eq!(0, idx.load(Ordering::SeqCst), "initial index must be zero");
 
         let r = hopr_db_entity::outgoing_ticket_index::Entity::find()
@@ -1036,7 +1044,7 @@ mod tests {
     async fn test_ticket_stats_must_be_zero_for_non_existing_channel() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let stats = db.get_ticket_statistics(Some(*CHANNEL_ID)).await?;
+        let stats = db.get_ticket_statistics(Some(&*CHANNEL_ID)).await?;
 
         assert_eq!(stats, ChannelTicketStatistics::default());
 
@@ -1047,7 +1055,7 @@ mod tests {
     async fn test_ticket_stats_must_be_zero_when_no_tickets() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let stats = db.get_ticket_statistics(Some(*CHANNEL_ID)).await?;
+        let stats = db.get_ticket_statistics(Some(&*CHANNEL_ID)).await?;
 
         assert_eq!(
             ChannelTicketStatistics::default(),
@@ -1068,8 +1076,8 @@ mod tests {
     async fn test_ticket_stats_must_be_different_per_channel() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let channel_1 = generate_channel_id(BOB.public().as_ref(), ALICE.public().as_ref());
-        let channel_2 = generate_channel_id(ALICE.public().as_ref(), BOB.public().as_ref());
+        let channel_1 = ChannelId::from_addrs(&*BOB, &*ALICE);
+        let channel_2 = ChannelId::from_addrs(&*ALICE, &*BOB);
 
         let t1 = generate_random_ack_ticket(&BOB, &ALICE, 1, 1, 1.0)?;
         let t2 = generate_random_ack_ticket(&ALICE, &BOB, 1, 1, 1.0)?;
@@ -1079,9 +1087,9 @@ mod tests {
         db.upsert_ticket(t1).await?;
         db.upsert_ticket(t2).await?;
 
-        let stats_1 = db.get_ticket_statistics(Some(channel_1)).await?;
+        let stats_1 = db.get_ticket_statistics(Some(&channel_1)).await?;
 
-        let stats_2 = db.get_ticket_statistics(Some(channel_2)).await?;
+        let stats_2 = db.get_ticket_statistics(Some(&channel_2)).await?;
 
         assert_eq!(value, stats_1.unredeemed_value);
         assert_eq!(value, stats_2.unredeemed_value);
@@ -1094,9 +1102,9 @@ mod tests {
         db.mark_tickets_as(TicketSelector::new(channel_1, CHANNEL_EPOCH), TicketMarker::Neglected)
             .await?;
 
-        let stats_1 = db.get_ticket_statistics(Some(channel_1)).await?;
+        let stats_1 = db.get_ticket_statistics(Some(&channel_1)).await?;
 
-        let stats_2 = db.get_ticket_statistics(Some(channel_2)).await?;
+        let stats_2 = db.get_ticket_statistics(Some(&channel_2)).await?;
 
         assert_eq!(HoprBalance::zero(), stats_1.unredeemed_value);
         assert_eq!(value, stats_1.neglected_value);
@@ -1110,18 +1118,18 @@ mod tests {
     async fn test_ticket_index_compare_and_set_and_increment() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let hash = Hash::default();
+        let hash = ChannelId::default();
 
-        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 1).await?;
+        let old_idx = db.compare_and_set_outgoing_ticket_index(&hash, 1).await?;
         assert_eq!(0, old_idx, "old value must be 0");
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.increment_outgoing_ticket_index(hash).await?;
+        let old_idx = db.increment_outgoing_ticket_index(&hash).await?;
         assert_eq!(1, old_idx, "old value must be 1");
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
         assert_eq!(2, new_idx, "new value must be 2");
 
         Ok(())
@@ -1131,21 +1139,21 @@ mod tests {
     async fn test_ticket_index_compare_and_set_must_not_decrease() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let hash = Hash::default();
+        let hash = ChannelId::default();
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "value must be 0");
 
-        db.compare_and_set_outgoing_ticket_index(hash, 1).await?;
+        db.compare_and_set_outgoing_ticket_index(&hash, 1).await?;
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 0).await?;
+        let old_idx = db.compare_and_set_outgoing_ticket_index(&hash, 0).await?;
         assert_eq!(1, old_idx, "old value must be 1");
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.compare_and_set_outgoing_ticket_index(hash, 1).await?;
+        let old_idx = db.compare_and_set_outgoing_ticket_index(&hash, 1).await?;
         assert_eq!(1, old_idx, "old value must be 1");
         assert_eq!(1, new_idx, "new value must be 1");
 
@@ -1156,20 +1164,20 @@ mod tests {
     async fn test_ticket_index_reset() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let hash = Hash::default();
+        let hash = ChannelId::default();
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "value must be 0");
 
-        db.compare_and_set_outgoing_ticket_index(hash, 1).await?;
+        db.compare_and_set_outgoing_ticket_index(&hash, 1).await?;
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
-        let old_idx = db.reset_outgoing_ticket_index(hash).await?;
+        let old_idx = db.reset_outgoing_ticket_index(&hash).await?;
         assert_eq!(1, old_idx, "old value must be 1");
 
-        let new_idx = db.get_outgoing_ticket_index(hash).await?.load(Ordering::SeqCst);
+        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "new value must be 0");
         Ok(())
     }
@@ -1178,11 +1186,11 @@ mod tests {
     async fn test_persist_ticket_indices() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let hash_1 = Hash::default();
-        let hash_2 = Hash::from(hopr_crypto_random::random_bytes());
+        let hash_1 = ChannelId::default();
+        let hash_2: ChannelId = Hash::from(hopr_crypto_random::random_bytes()).into();
 
-        db.get_outgoing_ticket_index(hash_1).await?;
-        db.compare_and_set_outgoing_ticket_index(hash_2, 10).await?;
+        db.get_outgoing_ticket_index(&hash_1).await?;
+        db.compare_and_set_outgoing_ticket_index(&hash_2, 10).await?;
 
         let persisted = db.persist_outgoing_ticket_indices().await?;
         assert_eq!(1, persisted);
@@ -1201,8 +1209,8 @@ mod tests {
         assert_eq!(0, U256::from_be_bytes(&idx_1.index).as_u64(), "index must be 0");
         assert_eq!(10, U256::from_be_bytes(&idx_2.index).as_u64(), "index must be 10");
 
-        db.compare_and_set_outgoing_ticket_index(hash_1, 3).await?;
-        db.increment_outgoing_ticket_index(hash_2).await?;
+        db.compare_and_set_outgoing_ticket_index(&hash_1, 3).await?;
+        db.increment_outgoing_ticket_index(&hash_2).await?;
 
         let persisted = db.persist_outgoing_ticket_indices().await?;
         assert_eq!(2, persisted);

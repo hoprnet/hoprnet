@@ -8,11 +8,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, instrument};
 
-use crate::{
-    errors,
-    errors::CoreTypesError,
-    prelude::{CoreTypesError::InvalidInputData, generate_channel_id},
-};
+use crate::{channels::ChannelId, errors, errors::CoreTypesError, prelude::CoreTypesError::InvalidInputData};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -264,7 +260,7 @@ pub(crate) fn check_ticket_win(
 /// and [TicketBuilder::build_verified].
 #[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct TicketBuilder {
-    channel_id: Option<Hash>,
+    channel_id: Option<ChannelId>,
     amount: Option<U256>,
     balance: Option<HoprBalance>,
     #[default = 0]
@@ -296,7 +292,7 @@ impl TicketBuilder {
     /// This, [TicketBuilder::channel_id] or [TicketBuilder::addresses] must be set.
     #[must_use]
     pub fn direction(mut self, source: &Address, destination: &Address) -> Self {
-        self.channel_id = Some(generate_channel_id(source, destination));
+        self.channel_id = Some((source, destination).into());
         self
     }
 
@@ -304,14 +300,14 @@ impl TicketBuilder {
     /// This, [TicketBuilder::channel_id] or [TicketBuilder::direction] must be set.
     #[must_use]
     pub fn addresses<T: Into<Address>, U: Into<Address>>(mut self, source: T, destination: U) -> Self {
-        self.channel_id = Some(generate_channel_id(&source.into(), &destination.into()));
+        self.channel_id = Some(ChannelId::from_addrs(source, destination));
         self
     }
 
     /// Sets the channel id.
     /// This, [TicketBuilder::addresses] or [TicketBuilder::direction] must be set.
     #[must_use]
-    pub fn channel_id(mut self, channel_id: Hash) -> Self {
+    pub fn channel_id(mut self, channel_id: ChannelId) -> Self {
         self.channel_id = Some(channel_id);
         self
     }
@@ -512,8 +508,9 @@ impl From<Ticket> for TicketBuilder {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ticket {
     /// Channel ID.
-    /// See [generate_channel_id] for how this value is generated.
-    pub channel_id: Hash,
+    ///
+    /// See [`ChannelId`] for how this value is generated.
+    pub channel_id: ChannelId,
     /// Amount of HOPR tokens this ticket is worth.
     /// Always between 0 and 2^92.
     pub amount: HoprBalance, // 92 bits
@@ -706,7 +703,7 @@ impl TryFrom<&[u8]> for Ticket {
 
             // Validate the boundaries of the parsed values
             TicketBuilder::default()
-                .channel_id(channel_id)
+                .channel_id(channel_id.into())
                 .amount(U256::from_big_endian(&amount))
                 .index(u64::from_be_bytes(index))
                 .index_offset(u32::from_be_bytes(index_offset))
@@ -1119,6 +1116,8 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 
 #[cfg(test)]
 pub mod tests {
+    use std::ops::Deref;
+
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
@@ -1233,10 +1232,7 @@ pub mod tests {
         assert_eq!(0, ticket.index);
         assert_eq!(0.0, ticket.win_prob().as_f64());
         assert_eq!(0, ticket.channel_epoch);
-        assert_eq!(
-            generate_channel_id(&ALICE.public().to_address(), &BOB.public().to_address()),
-            ticket.channel_id
-        );
+        assert_eq!(ChannelId::from_addrs(ALICE.deref(), BOB.deref()), ticket.channel_id);
         Ok(())
     }
 

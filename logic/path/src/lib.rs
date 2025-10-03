@@ -424,7 +424,12 @@ pub(crate) mod tests {
     }
 
     pub fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
-        ChannelEntry::new(src, dst, 1.into(), 1u32.into(), status, 1u32.into())
+        ChannelBuilder::new(src, dst)
+            .with_stake(1)
+            .with_ticket_index(1)
+            .with_status(status)
+            .with_epoch(1)
+            .build()
     }
 
     fn create_graph_and_resolver_entries(me: Address) -> (ChannelGraph, Vec<(OffchainPublicKey, Address)>) {

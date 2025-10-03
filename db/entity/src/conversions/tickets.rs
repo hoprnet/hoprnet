@@ -12,7 +12,7 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
         let response = Response::try_from(value.response.as_ref())?;
 
         let mut ticket = TicketBuilder::default()
-            .channel_id(Hash::from_hex(&value.channel_id)?)
+            .channel_id(ChannelId::from_hex(&value.channel_id)?)
             .amount(U256::from_be_bytes(&value.amount))
             .index(U256::from_be_bytes(&value.index).as_u64())
             .index_offset(value.index_offset as u32)

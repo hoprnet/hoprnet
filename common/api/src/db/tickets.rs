@@ -6,7 +6,6 @@ use std::{
 };
 
 use futures::stream::BoxStream;
-use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -40,7 +39,7 @@ impl Display for TicketIndexSelector {
 #[derive(Clone, Debug)]
 pub struct TicketSelector {
     /// Channel ID and Epoch pairs.
-    pub channel_identifiers: Vec<(Hash, U256)>,
+    pub channel_identifiers: Vec<(ChannelId, u32)>,
     /// If given, will select ticket(s) with the given indices
     /// in the given channel and epoch.
     ///
@@ -104,9 +103,9 @@ impl PartialEq for TicketSelector {
 
 impl TicketSelector {
     /// Create a new ticket selector given the `channel_id` and `epoch`.
-    pub fn new<T: Into<U256>>(channel_id: Hash, epoch: T) -> Self {
+    pub fn new(channel_id: ChannelId, epoch: u32) -> Self {
         Self {
-            channel_identifiers: vec![(channel_id, epoch.into())],
+            channel_identifiers: vec![(channel_id, epoch)],
             index: TicketIndexSelector::None,
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
@@ -122,26 +121,26 @@ impl TicketSelector {
     /// [`TicketSelector::with_index_range`]
     /// as ticket indices cannot be matched over multiple channels.
     #[must_use]
-    pub fn also_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
+    pub fn also_on_channel(self, channel_id: ChannelId, epoch: u32) -> Self {
         let mut ret = self.clone();
         ret.index = TicketIndexSelector::None;
-        ret.channel_identifiers.push((channel_id, epoch.into()));
+        ret.channel_identifiers.push((channel_id, epoch));
         ret
     }
 
     /// Convenience version on [`TicketSelector::also_on_channel`] that accepts a [`ChannelEntry`].
     #[must_use]
     pub fn also_on_channel_entry(self, entry: &ChannelEntry) -> Self {
-        self.also_on_channel(entry.get_id(), entry.channel_epoch)
+        self.also_on_channel(*entry.get_id(), entry.epoch)
     }
 
     /// Sets the selector to match only tickets on the given `channel_id` and `epoch`.
     ///
     /// This nullifies any prior calls to [`TicketSelector::also_on_channel`].
     #[must_use]
-    pub fn just_on_channel<T: Into<U256>>(self, channel_id: Hash, epoch: T) -> Self {
+    pub fn just_on_channel(self, channel_id: ChannelId, epoch: u32) -> Self {
         let mut ret = self.clone();
-        ret.channel_identifiers = vec![(channel_id, epoch.into())];
+        ret.channel_identifiers = vec![(channel_id, epoch)];
         ret
     }
 
@@ -233,7 +232,7 @@ impl From<&AcknowledgedTicket> for TicketSelector {
         Self {
             channel_identifiers: vec![(
                 value.verified_ticket().channel_id,
-                value.verified_ticket().channel_epoch.into(),
+                value.verified_ticket().channel_epoch,
             )],
             index: TicketIndexSelector::Single(value.verified_ticket().index),
             win_prob: (Bound::Unbounded, Bound::Unbounded),
@@ -249,7 +248,7 @@ impl From<&RedeemableTicket> for TicketSelector {
         Self {
             channel_identifiers: vec![(
                 value.verified_ticket().channel_id,
-                value.verified_ticket().channel_epoch.into(),
+                value.verified_ticket().channel_epoch,
             )],
             index: TicketIndexSelector::Single(value.verified_ticket().index),
             win_prob: (Bound::Unbounded, Bound::Unbounded),
@@ -263,7 +262,7 @@ impl From<&RedeemableTicket> for TicketSelector {
 impl From<&ChannelEntry> for TicketSelector {
     fn from(value: &ChannelEntry) -> Self {
         Self {
-            channel_identifiers: vec![(value.get_id(), value.channel_epoch)],
+            channel_identifiers: vec![(*value.get_id(), value.epoch)],
             index: TicketIndexSelector::None,
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
@@ -334,7 +333,10 @@ pub trait HoprDbTicketOperations {
     /// Retrieves the ticket statistics for the given channel.
     ///
     /// If no channel is given, it retrieves aggregate ticket statistics for all channels.
-    async fn get_ticket_statistics(&self, channel_id: Option<Hash>) -> Result<ChannelTicketStatistics, Self::Error>;
+    async fn get_ticket_statistics(
+        &self,
+        channel_id: Option<&ChannelId>,
+    ) -> Result<ChannelTicketStatistics, Self::Error>;
 
     /// Resets the ticket statistics about neglected, rejected, and redeemed tickets.
     async fn reset_ticket_statistics(&self) -> Result<(), Self::Error>;
@@ -350,24 +352,28 @@ pub trait HoprDbTicketOperations {
     /// Returns the old value.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: Hash, index: u64) -> Result<u64, Self::Error>;
+    async fn compare_and_set_outgoing_ticket_index(
+        &self,
+        channel_id: &ChannelId,
+        index: u64,
+    ) -> Result<u64, Self::Error>;
 
     /// Resets the outgoing ticket index to 0 for the given channel id.
     ///
     /// Returns the old value before reset.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn reset_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, Self::Error>;
+    async fn reset_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, Self::Error>;
 
     /// Increments the outgoing ticket index in the given channel ID and returns the value before incrementing.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0 and incremented.
-    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, Self::Error>;
+    async fn increment_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, Self::Error>;
 
     /// Gets the current outgoing ticket index for the given channel id.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>, Self::Error>;
+    async fn get_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<Arc<AtomicU64>, Self::Error>;
 
     /// Compares outgoing ticket indices in the cache with the stored values
     /// and updates the stored value where changed.

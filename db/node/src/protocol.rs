@@ -85,7 +85,7 @@ impl HoprNodeDb {
             })?;
 
         // Check: is the ticket in the packet really for the given channel?
-        if !fwd.outgoing.ticket.channel_id.eq(&incoming_channel.get_id()) {
+        if !fwd.outgoing.ticket.channel_id.eq(incoming_channel.get_id()) {
             return Err(NodeDbError::LogicalError("invalid ticket for channel".into()));
         }
 
@@ -221,8 +221,7 @@ impl HoprNodeDb {
                     .map_err(|e| NodeDbError::Other(e.into()))?;
 
                 // Issuer's channel must have an epoch matching with the unacknowledged ticket
-                if maybe_channel_with_issuer
-                    .is_some_and(|c| c.channel_epoch.as_u32() == unacknowledged.verified_ticket().channel_epoch)
+                if maybe_channel_with_issuer.is_some_and(|c| c.epoch == unacknowledged.verified_ticket().channel_epoch)
                 {
                     let domain_separator = resolver
                         .domain_separators()
@@ -771,7 +770,7 @@ impl HoprNodeDb {
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
             .index_offset(1) // unaggregated always have index_offset == 1
             .win_prob(winning_prob)
-            .channel_epoch(channel.channel_epoch.as_u32());
+            .channel_epoch(channel.epoch);
 
         Ok(ticket_builder)
     }

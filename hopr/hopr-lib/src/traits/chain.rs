@@ -1,8 +1,10 @@
+use hopr_internal_types::channels::ChannelId;
+
 use crate::prelude::Hash;
 
 pub struct OpenChannelResult {
     pub tx_hash: Hash,
-    pub channel_id: Hash,
+    pub channel_id: ChannelId,
 }
 
 pub struct CloseChannelResult {

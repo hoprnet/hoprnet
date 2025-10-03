@@ -428,7 +428,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let initial_channel_funds = HoprBalance::from(1);
     let confirmation = alice_node
         .actions
-        .open_channel(bob_chain_key.public().to_address(), initial_channel_funds)
+        .open_channel(&bob_chain_key.public().to_address(), initial_channel_funds)
         .await
         .expect("should submit channel open tx")
         .await
@@ -439,13 +439,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let channel_alice_bob = alice_node
         .index_db
-        .get_channel_by_id(
-            None,
-            &generate_channel_id(
-                &alice_chain_key.public().to_address(),
-                &bob_chain_key.public().to_address(),
-            ),
-        )
+        .get_channel_by_id(None, &ChannelId::from_addrs(&alice_chain_key, &bob_chain_key))
         .await
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
@@ -497,26 +491,14 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     // After the funding, read channel_alice_bob again and compare its balance
     let channel_alice_bob = alice_node
         .index_db
-        .get_channel_by_id(
-            None,
-            &generate_channel_id(
-                &alice_chain_key.public().to_address(),
-                &bob_chain_key.public().to_address(),
-            ),
-        )
+        .get_channel_by_id(None, &ChannelId::from_addrs(&alice_chain_key, &bob_chain_key))
         .await
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
 
     let channel_alice_bob_seen_by_bob = bob_node
         .index_db
-        .get_channel_by_id(
-            None,
-            &generate_channel_id(
-                &alice_chain_key.public().to_address(),
-                &bob_chain_key.public().to_address(),
-            ),
-        )
+        .get_channel_by_id(None, &ChannelId::from_addrs(&alice_chain_key, &bob_chain_key))
         .await
         .expect("db call should not fail")
         .expect("should contain a channel from Alice");
@@ -536,7 +518,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let confirmation = bob_node
         .actions
-        .open_channel(alice_chain_key.public().to_address(), incoming_funding_amount)
+        .open_channel(&alice_chain_key.public().to_address(), incoming_funding_amount)
         .await
         .expect("should submit incoming channel open tx")
         .await
@@ -546,10 +528,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         Some(ChainEventType::ChannelOpened(channel)) => {
             assert_eq!(
                 channel.get_id(),
-                generate_channel_id(
-                    &bob_chain_key.public().to_address(),
-                    &alice_chain_key.public().to_address(),
-                ),
+                &ChannelId::from_addrs(&bob_chain_key, &alice_chain_key,),
                 "channel in the DB must match the confirmed action"
             );
             info!("--> successfully opened channel Bob -> Alice: {channel}");
@@ -561,13 +540,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let channel_bob_alice = alice_node
         .index_db
-        .get_channel_by_id(
-            None,
-            &generate_channel_id(
-                &bob_chain_key.public().to_address(),
-                &alice_chain_key.public().to_address(),
-            ),
-        )
+        .get_channel_by_id(None, &ChannelId::from_addrs(&bob_chain_key, &alice_chain_key))
         .await
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
@@ -591,13 +564,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let channel_alice_bob_balance_before_redeem = channel_alice_bob.balance;
     let channel_alice_bob = alice_node
         .index_db
-        .get_channel_by_id(
-            None,
-            &generate_channel_id(
-                &alice_chain_key.public().to_address(),
-                &bob_chain_key.public().to_address(),
-            ),
-        )
+        .get_channel_by_id(None, &ChannelId::from_addrs(&alice_chain_key, &bob_chain_key))
         .await
         .expect("db call should not fail")
         .expect("should contain a channel from Bob");
@@ -658,7 +625,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             let ack_ticket = ack_ticket.clone().expect("event must contain ack ticket");
             assert_eq!(
                 ack_ticket.verified_ticket().channel_id,
-                channel_alice_bob.get_id(),
+                *channel_alice_bob.get_id(),
                 "channel id on ticket must match"
             );
             assert_eq!(0, ack_ticket.verified_ticket().index, "ticket index must match");
@@ -686,26 +653,14 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let channel_bob_alice = alice_node
         .index_db
-        .get_channel_by_id(
-            None,
-            &generate_channel_id(
-                &bob_chain_key.public().to_address(),
-                &alice_chain_key.public().to_address(),
-            ),
-        )
+        .get_channel_by_id(None, &ChannelId::from_addrs(&bob_chain_key, &alice_chain_key))
         .await
         .expect("db call should not fail")
         .expect("should contain a channel from Alice");
 
     let channel_alice_bob = alice_node
         .index_db
-        .get_channel_by_id(
-            None,
-            &generate_channel_id(
-                &alice_chain_key.public().to_address(),
-                &bob_chain_key.public().to_address(),
-            ),
-        )
+        .get_channel_by_id(None, &ChannelId::from_addrs(&alice_chain_key, &bob_chain_key))
         .await
         .expect("db call should not fail")
         .expect("should contain a channel from Alice");
@@ -769,13 +724,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         Some(ChainEventType::ChannelClosureInitiated(channel)) => {
             let closing_channel_in_db = alice_node
                 .index_db
-                .get_channel_by_id(
-                    None,
-                    &generate_channel_id(
-                        &alice_chain_key.public().to_address(),
-                        &bob_chain_key.public().to_address(),
-                    ),
-                )
+                .get_channel_by_id(None, &ChannelId::from_addrs(&alice_chain_key, &bob_chain_key))
                 .await
                 .expect("db call should not fail")
                 .expect("should contain a channel to Bob");
@@ -793,13 +742,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let channel_alice_bob = alice_node
         .index_db
-        .get_channel_by_id(
-            None,
-            &generate_channel_id(
-                &alice_chain_key.public().to_address(),
-                &bob_chain_key.public().to_address(),
-            ),
-        )
+        .get_channel_by_id(None, &ChannelId::from_addrs(&alice_chain_key, &bob_chain_key))
         .await
         .expect("must get channel")
         .expect("channel to bob must exist");

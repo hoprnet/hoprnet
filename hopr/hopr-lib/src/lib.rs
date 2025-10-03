@@ -99,7 +99,6 @@ pub use hopr_chain_api::config::{
 use hopr_chain_api::{HoprChain, HoprChainProcess, config::ChainNetworkConfig, errors::HoprChainError, wait_for_funds};
 use hopr_chain_types::ContractAddresses;
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-use hopr_crypto_types::prelude::Hash;
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 pub use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions};
@@ -765,7 +764,7 @@ impl Hopr {
                 .update_ticket_states_and_fetch(
                     TicketSelector::from(&channel)
                         .with_state(AcknowledgedTicketStatus::BeingRedeemed)
-                        .with_index_range(channel.ticket_index.as_u64()..),
+                        .with_index_range(channel.ticket_index..),
                     AcknowledgedTicketStatus::Untouched,
                 )
                 .await?
@@ -1016,8 +1015,8 @@ impl Hopr {
     }
 
     // Ticket ========
-    /// Get all tickets in a channel specified by [`prelude::Hash`]
-    pub async fn tickets_in_channel(&self, channel: &prelude::Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
+    /// Get all tickets in a channel specified by [`ChannelId`]
+    pub async fn tickets_in_channel(&self, channel: &ChannelId) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         Ok(self.transport_api.tickets_in_channel(channel).await?)
     }
 
@@ -1071,7 +1070,7 @@ impl Hopr {
 
     /// Get the channel entry from Hash.
     /// @returns the channel entry of those two nodes
-    pub async fn channel_from_hash(&self, channel_id: &Hash) -> errors::Result<Option<ChannelEntry>> {
+    pub async fn channel_from_hash(&self, channel_id: &ChannelId) -> errors::Result<Option<ChannelEntry>> {
         Ok(self.hopr_chain_api.channel_by_id(channel_id).await?)
     }
 
@@ -1186,7 +1185,7 @@ impl Hopr {
         Ok(OpenChannelResult { tx_hash, channel_id })
     }
 
-    pub async fn fund_channel(&self, channel_id: &prelude::Hash, amount: HoprBalance) -> errors::Result<prelude::Hash> {
+    pub async fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> errors::Result<prelude::Hash> {
         self.error_if_not_in_state(
             state::HoprState::Running,
             "Node is not ready for on-chain operations".into(),
@@ -1244,7 +1243,7 @@ impl Hopr {
                             TicketSelector::from(&channel)
                                 .with_amount(min_value..)
                                 .with_aggregated_only(only_aggregated)
-                                .with_index_range(channel.ticket_index.as_u64()..)
+                                .with_index_range(channel.ticket_index..)
                                 .with_state(AcknowledgedTicketStatus::Untouched),
                         )
                         .await
@@ -1265,17 +1264,13 @@ impl Hopr {
         min_value: B,
         only_aggregated: bool,
     ) -> errors::Result<usize> {
-        self.redeem_tickets_in_channel(
-            &generate_channel_id(counterparty, &self.me_onchain()),
-            min_value,
-            only_aggregated,
-        )
-        .await
+        self.redeem_tickets_in_channel(&((counterparty, &self.me_onchain()).into()), min_value, only_aggregated)
+            .await
     }
 
     pub async fn redeem_tickets_in_channel<B: Into<HoprBalance>>(
         &self,
-        channel_id: &Hash,
+        channel_id: &ChannelId,
         min_value: B,
         only_aggregated: bool,
     ) -> errors::Result<usize> {
@@ -1293,7 +1288,7 @@ impl Hopr {
                 TicketSelector::from(channel)
                     .with_amount(min_value.into()..)
                     .with_aggregated_only(only_aggregated)
-                    .with_index_range(channel.ticket_index.as_u64()..)
+                    .with_index_range(channel.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             )
             .await?;

@@ -7,7 +7,7 @@ use axum::{
 };
 use futures::TryFutureExt;
 use hopr_lib::{
-    Address, AsUnixTimestamp, ChannelEntry, ChannelStatus, HoprBalance, ToHex,
+    Address, AsUnixTimestamp, ChannelEntry, ChannelId, ChannelStatus, HoprBalance, ToHex,
     errors::{HoprLibError, HoprStatusError},
     prelude::Hash,
 };
@@ -29,7 +29,7 @@ use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address
 pub(crate) struct NodeChannel {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
-    id: Hash,
+    id: ChannelId,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")]
     peer_address: Address,
@@ -58,7 +58,7 @@ pub(crate) struct NodeChannel {
 pub(crate) struct ChannelInfoResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
-    channel_id: Hash,
+    channel_id: ChannelId,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6")]
     source: Address,
@@ -72,7 +72,7 @@ pub(crate) struct ChannelInfoResponse {
     #[schema(value_type = String, example = "Open")]
     status: ChannelStatus,
     #[schema(example = 0)]
-    ticket_index: u32,
+    ticket_index: u64,
     #[schema(example = 1)]
     channel_epoch: u32,
     #[schema(example = 0)]
@@ -112,13 +112,13 @@ pub(crate) struct NodeChannelsResponse {
 
 async fn query_topology_info(channel: ChannelEntry) -> Result<ChannelInfoResponse, HoprLibError> {
     Ok(ChannelInfoResponse {
-        channel_id: channel.get_id(),
+        channel_id: *channel.get_id(),
         source: channel.source,
         destination: channel.destination,
         balance: channel.balance,
         status: channel.status,
-        ticket_index: channel.ticket_index.as_u32(),
-        channel_epoch: channel.channel_epoch.as_u32(),
+        ticket_index: channel.ticket_index,
+        channel_epoch: channel.epoch,
         closure_time: channel
             .closure_time_at()
             .map(|ct| ct.as_unix_timestamp().as_secs())
@@ -205,7 +205,7 @@ pub(super) async fn list_channels(
                         .into_iter()
                         .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
                         .map(|c| NodeChannel {
-                            id: c.get_id(),
+                            id: *c.get_id(),
                             peer_address: c.source,
                             status: c.status,
                             balance: c.balance,
@@ -215,7 +215,7 @@ pub(super) async fn list_channels(
                         .into_iter()
                         .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
                         .map(|c| NodeChannel {
-                            id: c.get_id(),
+                            id: *c.get_id(),
                             peer_address: c.destination,
                             status: c.status,
                             balance: c.balance,
@@ -262,7 +262,7 @@ pub(crate) struct OpenChannelResponse {
     /// ID of the new channel.
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
-    channel_id: Hash,
+    channel_id: ChannelId,
     /// Receipt of the channel open transaction.
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "0x5181ac24759b8e01b3c932e4636c3852f386d17517a8dfc640a5ba6f2258f29c")]
@@ -360,7 +360,7 @@ pub(super) async fn show_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
+    match ChannelId::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
             Ok(Some(channel)) => {
                 let info = query_topology_info(channel).await;
@@ -427,7 +427,7 @@ pub(super) async fn close_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
+    match ChannelId::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.close_channel_by_id(&channel_id).await {
             Ok(receipt) => (
                 StatusCode::OK,
@@ -513,7 +513,7 @@ pub(super) async fn fund_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match Hash::from_hex(channel_id.as_str()) {
+    match ChannelId::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.fund_channel(&channel_id, fund_req.amount).await {
             Ok(hash) => (StatusCode::OK, Json(FundChannelResponse { hash })).into_response(),
             Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(

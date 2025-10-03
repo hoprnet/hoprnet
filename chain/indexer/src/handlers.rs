@@ -233,7 +233,7 @@ where
 
         match event {
             HoprChannelsEvents::ChannelBalanceDecreased(balance_decreased) => {
-                let channel_id = balance_decreased.channelId.0.into();
+                let channel_id = Hash::from(balance_decreased.channelId.0).into();
 
                 let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -285,7 +285,7 @@ where
                 }
             }
             HoprChannelsEvents::ChannelBalanceIncreased(balance_increased) => {
-                let channel_id = balance_increased.channelId.0.into();
+                let channel_id = Hash::from(balance_increased.channelId.0).into();
 
                 let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -347,7 +347,7 @@ where
                 }
             }
             HoprChannelsEvents::ChannelClosed(channel_closed) => {
-                let channel_id = channel_closed.channelId.0.into();
+                let channel_id = Hash::from(channel_closed.channelId.0).into();
 
                 let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -364,7 +364,7 @@ where
                 );
 
                 if let Some(channel_edits) = maybe_channel {
-                    let channel_id = channel_edits.entry().get_id();
+                    let channel_id = *channel_edits.entry().get_id();
                     let orientation = channel_edits.entry().orientation(&self.chain_key.public().to_address());
 
                     // If the channel is our own (incoming or outgoing) reset its fields
@@ -396,7 +396,7 @@ where
                             ChannelDirection::Outgoing => {
                                 // On outgoing channels, reset the current_ticket_index to zero
                                 self.node_db
-                                    .reset_outgoing_ticket_index(channel_id)
+                                    .reset_outgoing_ticket_index(&channel_id)
                                     .await
                                     .map_err(|e| NodeDbError(e.into()))?;
                             }
@@ -426,7 +426,7 @@ where
             HoprChannelsEvents::ChannelOpened(channel_opened) => {
                 let source: Address = channel_opened.source.into();
                 let destination: Address = channel_opened.destination.into();
-                let channel_id = generate_channel_id(&source, &destination);
+                let channel_id: ChannelId = (&source, &destination).into();
 
                 let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -453,7 +453,7 @@ where
 
                     trace!(%source, %destination, %channel_id, "on_channel_reopened_event");
 
-                    let current_epoch = channel_edits.entry().channel_epoch;
+                    let current_epoch = channel_edits.entry().epoch;
 
                     // cleanup tickets from previous epochs on channel re-opening
                     if source == self.chain_key.public().to_address()
@@ -465,7 +465,7 @@ where
                             .map_err(|e| NodeDbError(e.into()))?;
 
                         self.node_db
-                            .reset_outgoing_ticket_index(channel_id)
+                            .reset_outgoing_ticket_index(&channel_id)
                             .await
                             .map_err(|e| NodeDbError(e.into()))?;
                     }
@@ -486,14 +486,12 @@ where
                 } else {
                     trace!(%source, %destination, %channel_id, "on_channel_opened_event");
 
-                    let new_channel = ChannelEntry::new(
-                        source,
-                        destination,
-                        0_u32.into(),
-                        0_u32.into(),
-                        ChannelStatus::Open,
-                        1_u32.into(),
-                    );
+                    let new_channel = ChannelBuilder::new(source, destination)
+                        .with_stake(0)
+                        .with_ticket_index(0)
+                        .with_status(ChannelStatus::Open)
+                        .with_epoch(1)
+                        .build();
 
                     self.index_db.upsert_channel(tx.into(), new_channel).await?;
                     new_channel
@@ -502,7 +500,7 @@ where
                 Ok(Some(ChainEventType::ChannelOpened(channel)))
             }
             HoprChannelsEvents::TicketRedeemed(ticket_redeemed) => {
-                let channel_id = ticket_redeemed.channelId.0.into();
+                let channel_id = Hash::from(ticket_redeemed.channelId.0).into();
 
                 let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -643,7 +641,7 @@ where
                 }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiated(closure_initiated) => {
-                let channel_id = closure_initiated.channelId.0.into();
+                let channel_id = Hash::from(closure_initiated.channelId.0).into();
 
                 let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
@@ -891,7 +889,7 @@ where
                     let mut selector: Option<TicketSelector> = None;
                     for channel in self.index_db.get_incoming_channels(tx.into()).await? {
                         selector = selector
-                            .map(|s| s.also_on_channel(channel.get_id(), channel.channel_epoch))
+                            .map(|s| s.also_on_channel(*channel.get_id(), channel.epoch))
                             .or_else(|| Some(TicketSelector::from(channel)));
                     }
                     // Reject unredeemed tickets on all the channels with win prob lower than the new one
@@ -1755,14 +1753,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *SELF_CHAIN_ADDRESS,
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            0.into(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(*SELF_CHAIN_ADDRESS, *COUNTERPARTY_CHAIN_ADDRESS)
+            .with_stake(0)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(0)
+            .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -1873,14 +1869,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *SELF_CHAIN_ADDRESS,
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1)),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(*SELF_CHAIN_ADDRESS, *COUNTERPARTY_CHAIN_ADDRESS)
+            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -1939,14 +1933,12 @@ mod tests {
 
         let starting_balance = HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1));
 
-        let channel = ChannelEntry::new(
-            *SELF_CHAIN_ADDRESS,
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            starting_balance,
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(*SELF_CHAIN_ADDRESS, *COUNTERPARTY_CHAIN_ADDRESS)
+            .with_balance(starting_balance)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -1980,7 +1972,7 @@ mod tests {
         );
 
         assert_eq!(closed_channel.status, ChannelStatus::Closed);
-        assert_eq!(closed_channel.ticket_index, 0u64.into());
+        assert_eq!(closed_channel.ticket_index, 0u64);
         assert_eq!(
             0,
             node_db
@@ -2007,14 +1999,15 @@ mod tests {
 
         let starting_balance = HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1));
 
-        let channel = ChannelEntry::new(
-            Address::new(&hex!("B7397C218766eBe6A1A634df523A1a7e412e67eA")),
-            Address::new(&hex!("D4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1")),
-            starting_balance,
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(
+            hex!("B7397C218766eBe6A1A634df523A1a7e412e67eA"),
+            hex!("D4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1"),
+        )
+        .with_balance(starting_balance)
+        .with_ticket_index(0)
+        .with_status(ChannelStatus::Open)
+        .with_epoch(1)
+        .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -2061,7 +2054,7 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
+        let channel_id: ChannelId = (&*SELF_CHAIN_ADDRESS, &*COUNTERPARTY_CHAIN_ADDRESS).into();
 
         let encoded_data = ().abi_encode();
 
@@ -2094,8 +2087,8 @@ mod tests {
         );
 
         assert_eq!(channel.status, ChannelStatus::Open);
-        assert_eq!(channel.channel_epoch, 1u64.into());
-        assert_eq!(channel.ticket_index, 0u64.into());
+        assert_eq!(channel.epoch, 1);
+        assert_eq!(channel.ticket_index, 0);
         assert_eq!(
             0,
             node_db
@@ -2118,14 +2111,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *SELF_CHAIN_ADDRESS,
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            HoprBalance::zero(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Closed,
-            3.into(),
-        );
+        let channel = ChannelBuilder::new(*SELF_CHAIN_ADDRESS, *COUNTERPARTY_CHAIN_ADDRESS)
+            .with_stake(0)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Closed)
+            .with_epoch(3)
+            .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -2160,8 +2151,8 @@ mod tests {
         );
 
         assert_eq!(channel.status, ChannelStatus::Open);
-        assert_eq!(channel.channel_epoch, 4u64.into());
-        assert_eq!(channel.ticket_index, 0u64.into());
+        assert_eq!(channel.epoch, 4);
+        assert_eq!(channel.ticket_index, 0);
 
         assert_eq!(
             0,
@@ -2185,14 +2176,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *SELF_CHAIN_ADDRESS,
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            0.into(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            3.into(),
-        );
+        let channel = ChannelBuilder::new(*SELF_CHAIN_ADDRESS, *COUNTERPARTY_CHAIN_ADDRESS)
+            .with_stake(0)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(3)
+            .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -2240,7 +2229,7 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
+        let channel_id: ChannelId = (&*SELF_CHAIN_ADDRESS, &*COUNTERPARTY_CHAIN_ADDRESS).into();
 
         // Attempt to increase balance
         let solidity_balance: HoprBalance = primitive_types::U256::from((1u128 << 96) - 1).into();
@@ -2279,7 +2268,7 @@ mod tests {
         index: u64,
         win_prob: f64,
     ) -> anyhow::Result<AcknowledgedTicket> {
-        let channel_id = generate_channel_id(&signer.into(), &destination.into());
+        let channel_id = ChannelId::from_addrs(signer, destination);
 
         let channel_epoch = 1u64;
         let domain_separator = Hash::default();
@@ -2314,14 +2303,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            *SELF_CHAIN_ADDRESS,
-            HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1)),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(*COUNTERPARTY_CHAIN_ADDRESS, *SELF_CHAIN_ADDRESS)
+            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
@@ -2384,7 +2371,8 @@ mod tests {
         );
 
         assert_eq!(
-            channel.ticket_index, next_ticket_index,
+            channel.ticket_index,
+            next_ticket_index.as_u64(),
             "channel entry must contain next ticket index"
         );
 
@@ -2433,14 +2421,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            *SELF_CHAIN_ADDRESS,
-            primitive_types::U256::from((1u128 << 96) - 1).into(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(*COUNTERPARTY_CHAIN_ADDRESS, *SELF_CHAIN_ADDRESS)
+            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
@@ -2503,7 +2489,8 @@ mod tests {
         );
 
         assert_eq!(
-            channel.ticket_index, next_ticket_index,
+            channel.ticket_index,
+            next_ticket_index.as_u64(),
             "channel entry must contain next ticket index"
         );
 
@@ -2550,14 +2537,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *SELF_CHAIN_ADDRESS,
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            primitive_types::U256::from((1u128 << 96) - 1).into(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(*SELF_CHAIN_ADDRESS, *COUNTERPARTY_CHAIN_ADDRESS)
+            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
@@ -2592,7 +2577,8 @@ mod tests {
         );
 
         assert_eq!(
-            channel.ticket_index, next_ticket_index,
+            channel.ticket_index,
+            next_ticket_index.as_u64(),
             "channel entry must contain next ticket index"
         );
 
@@ -2628,14 +2614,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            *SELF_CHAIN_ADDRESS,
-            primitive_types::U256::from((1u128 << 96) - 1).into(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(*COUNTERPARTY_CHAIN_ADDRESS, *SELF_CHAIN_ADDRESS)
+            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -2669,7 +2653,8 @@ mod tests {
         );
 
         assert_eq!(
-            channel.ticket_index, next_ticket_index,
+            channel.ticket_index,
+            next_ticket_index.as_u64(),
             "channel entry must contain next ticket index"
         );
         Ok(())
@@ -2687,14 +2672,15 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
+        let channel = ChannelBuilder::new(
             Address::from(hopr_crypto_random::random_bytes()),
             Address::from(hopr_crypto_random::random_bytes()),
-            primitive_types::U256::from((1u128 << 96) - 1).into(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        )
+        .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+        .with_ticket_index(0)
+        .with_status(ChannelStatus::Open)
+        .with_epoch(1)
+        .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -2728,7 +2714,8 @@ mod tests {
         );
 
         assert_eq!(
-            channel.ticket_index, next_ticket_index,
+            channel.ticket_index,
+            next_ticket_index.as_u64(),
             "channel entry must contain next ticket index"
         );
         Ok(())
@@ -2746,14 +2733,12 @@ mod tests {
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
-        let channel = ChannelEntry::new(
-            *SELF_CHAIN_ADDRESS,
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            primitive_types::U256::from((1u128 << 96) - 1).into(),
-            primitive_types::U256::zero(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel = ChannelBuilder::new(*SELF_CHAIN_ADDRESS, *COUNTERPARTY_CHAIN_ADDRESS)
+            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, channel).await?;
 
@@ -2981,14 +2966,12 @@ mod tests {
         let new_minimum = 0.5;
         let ticket_win_probs = [0.1, 1.0, 0.3, 0.2];
 
-        let channel_1 = ChannelEntry::new(
-            *COUNTERPARTY_CHAIN_ADDRESS,
-            *SELF_CHAIN_ADDRESS,
-            primitive_types::U256::from((1u128 << 96) - 1).into(),
-            3_u32.into(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel_1 = ChannelBuilder::new(*COUNTERPARTY_CHAIN_ADDRESS, *SELF_CHAIN_ADDRESS)
+            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_ticket_index(3)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, channel_1).await?;
 
@@ -3008,14 +2991,12 @@ mod tests {
         // ---
 
         let other_counterparty = ChainKeypair::random();
-        let channel_2 = ChannelEntry::new(
-            other_counterparty.public().to_address(),
-            *SELF_CHAIN_ADDRESS,
-            primitive_types::U256::from((1u128 << 96) - 1).into(),
-            3_u32.into(),
-            ChannelStatus::Open,
-            primitive_types::U256::one(),
-        );
+        let channel_2 = ChannelBuilder::new(&other_counterparty, *SELF_CHAIN_ADDRESS)
+            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_ticket_index(3)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
 
         db.upsert_channel(None, channel_2).await?;
 

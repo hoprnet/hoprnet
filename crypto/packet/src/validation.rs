@@ -59,12 +59,12 @@ pub fn validate_unacknowledged_ticket(
     }
 
     // The ticket's channelEpoch MUST match the current channel's epoch
-    if !channel.channel_epoch.eq(&inner_ticket.channel_epoch.into()) {
+    if !channel.epoch.eq(&inner_ticket.channel_epoch) {
         return Err(TicketValidationError {
             reason: format!(
                 "ticket was created for a different channel iteration {} != {} of channel {}",
                 inner_ticket.channel_epoch,
-                channel.channel_epoch,
+                channel.epoch,
                 channel.get_id()
             ),
             ticket: inner_ticket.clone().into(),
@@ -122,14 +122,12 @@ mod tests {
     }
 
     fn create_channel_entry() -> ChannelEntry {
-        ChannelEntry::new(
-            SENDER_PRIV_KEY.public().to_address(),
-            TARGET_PRIV_KEY.public().to_address(),
-            100.into(),
-            U256::zero(),
-            ChannelStatus::Open,
-            U256::one(),
-        )
+        ChannelBuilder::new(&*SENDER_PRIV_KEY, &*TARGET_PRIV_KEY)
+            .with_balance(100.into())
+            .with_epoch(1)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .build()
     }
 
     #[tokio::test]
@@ -242,7 +240,7 @@ mod tests {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
         channel.balance = 0.into();
-        channel.channel_epoch = U256::from(ticket.channel_epoch);
+        channel.epoch = ticket.channel_epoch;
 
         let ret =
             validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());

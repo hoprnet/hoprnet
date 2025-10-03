@@ -348,7 +348,7 @@ mod tests {
 
         let ticket = TicketBuilder::default()
             .amount(10)
-            .channel_id(Hash::create(&[b"test"]))
+            .channel_id(Hash::create(&[b"test"]).into())
             .eth_challenge(EthereumChallenge::default())
             .win_prob(WinningProbability::try_from_f64(0.5)?)
             .channel_epoch(1)

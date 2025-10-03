@@ -333,7 +333,12 @@ mod tests {
     };
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: HoprBalance) -> ChannelEntry {
-        ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
+        ChannelBuilder::new(src, dst)
+            .with_balance(stake)
+            .with_ticket_index(0)
+            .with_status(status)
+            .with_epoch(1)
+            .build()
     }
 
     async fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {

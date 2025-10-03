@@ -65,14 +65,12 @@ lazy_static! {
 }
 
 fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
-    ChannelEntry::new(
-        from,
-        to,
-        (U256::from(1234u64) * U256::from(*DEFAULT_PRICE_PER_PACKET)).into(),
-        U256::zero(),
-        ChannelStatus::Open,
-        U256::zero(),
-    )
+    ChannelBuilder::new(from, to)
+        .with_stake(U256::from(*DEFAULT_PRICE_PER_PACKET) * 1234)
+        .with_ticket_index(0)
+        .with_status(ChannelStatus::Open)
+        .with_epoch(1)
+        .build()
 }
 
 pub async fn create_dbs(amount: usize) -> anyhow::Result<(Vec<HoprNodeDb>, Vec<HoprIndexerDb>)> {
@@ -397,14 +395,13 @@ pub async fn resolve_mock_path(
     let mut cg = ChannelGraph::new(me, Default::default());
     let mut last_addr = cg.my_address();
     for (_, addr) in peers_addrs.iter() {
-        let c = ChannelEntry::new(
-            last_addr,
-            *addr,
-            1000.into(),
-            0u32.into(),
-            ChannelStatus::Open,
-            0u32.into(),
-        );
+        let c = ChannelBuilder::new(last_addr, *addr)
+            .with_stake(1000)
+            .with_ticket_index(0)
+            .with_status(ChannelStatus::Open)
+            .with_epoch(1)
+            .build();
+
         cg.update_channel(c);
         last_addr = *addr;
     }

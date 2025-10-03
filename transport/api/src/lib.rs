@@ -776,7 +776,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
+    pub async fn tickets_in_channel(&self, channel_id: &ChannelId) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
         if let Some(channel) = self
             .resolver
             .channel_by_id(channel_id)
