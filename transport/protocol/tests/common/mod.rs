@@ -1,17 +1,23 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
 use async_trait::async_trait;
-use futures::{SinkExt, StreamExt};
+use bimap::BiHashMap;
+use futures::{SinkExt, StreamExt, stream::BoxStream};
 use hex_literal::hex;
+use hopr_api::chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues, ChannelSelector, DomainSeparators};
 use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
 };
-use hopr_db_api::{info::DomainSeparator, resolver::HoprDbResolverOperations};
+use hopr_db_node::HoprNodeDb;
 use hopr_db_sql::{
-    accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
+    HoprIndexerDb,
+    accounts::HoprDbAccountOperations,
+    channels::HoprDbChannelOperations,
+    info::HoprDbInfoOperations,
+    prelude::{DbSqlError, DomainSeparator},
 };
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
@@ -19,10 +25,7 @@ use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_gra
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::{
-    DEFAULT_PRICE_PER_PACKET,
-    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-};
+use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig};
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 use tokio::time::timeout;
@@ -39,9 +42,10 @@ lazy_static! {
     .iter()
     .map(|private| OffchainKeypair::from_secret(private).expect("lazy static keypair should be valid"))
     .collect();
-}
 
-lazy_static! {
+    /// Fixed price per packet to 0.01 HOPR
+    pub static ref DEFAULT_PRICE_PER_PACKET: U256 = 10000000000000000u128.into();
+
     pub static ref PEERS_CHAIN: Vec<ChainKeypair> = [
         hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056"),
         hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b"),
@@ -52,6 +56,12 @@ lazy_static! {
     .iter()
     .map(|private| ChainKeypair::from_secret(private).expect("lazy static keypair should be valid"))
     .collect();
+
+    static ref MAPPER: bimap::BiHashMap<KeyIdent, OffchainPublicKey> = PEERS
+        .iter()
+        .enumerate()
+        .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
+        .collect::<BiHashMap<_, _>>();
 }
 
 fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
@@ -65,15 +75,24 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
     )
 }
 
-pub async fn create_dbs(amount: usize) -> anyhow::Result<Vec<HoprDb>> {
-    futures::future::join_all((0..amount).map(|i| HoprDb::new_in_memory(PEERS_CHAIN[i].clone())))
+pub async fn create_dbs(amount: usize) -> anyhow::Result<(Vec<HoprNodeDb>, Vec<HoprIndexerDb>)> {
+    let indexer_dbs =
+        futures::future::join_all((0..amount).map(|i| HoprIndexerDb::new_in_memory(PEERS_CHAIN[i].clone())))
+            .await
+            .into_iter()
+            .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
+            .collect::<anyhow::Result<Vec<HoprIndexerDb>>>()?;
+
+    let node_dbs = futures::future::join_all((0..amount).map(|i| HoprNodeDb::new_in_memory(PEERS_CHAIN[i].clone())))
         .await
         .into_iter()
         .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
-        .collect::<anyhow::Result<Vec<HoprDb>>>()
+        .collect::<anyhow::Result<Vec<HoprNodeDb>>>()?;
+
+    Ok((node_dbs, indexer_dbs))
 }
 
-pub async fn create_minimal_topology(dbs: &mut [HoprDb]) -> anyhow::Result<()> {
+pub async fn create_minimal_topology(dbs: &mut [HoprIndexerDb]) -> anyhow::Result<()> {
     let mut previous_channel: Option<ChannelEntry> = None;
 
     for index in 0..dbs.len() {
@@ -81,7 +100,9 @@ pub async fn create_minimal_topology(dbs: &mut [HoprDb]) -> anyhow::Result<()> {
             .set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
 
-        dbs[index].update_ticket_price(None, 100.into()).await?;
+        dbs[index]
+            .update_ticket_price(None, (*DEFAULT_PRICE_PER_PACKET).into())
+            .await?;
 
         // Link all the node keys and chain keys from the simulated announcements
         for i in 0..PEERS.len() {
@@ -132,6 +153,79 @@ pub async fn create_minimal_topology(dbs: &mut [HoprDb]) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[derive(Clone)]
+pub struct IndexerDbChainWrapper(pub HoprIndexerDb);
+
+#[async_trait::async_trait]
+impl ChainReadChannelOperations for IndexerDbChainWrapper {
+    type Error = DbSqlError;
+
+    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+        self.0.get_channel_by_parties(None, src, dst, false).await
+    }
+
+    async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+        self.0.get_channel_by_id(None, channel_id).await
+    }
+
+    async fn stream_channels<'a>(&'a self, _: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+        // Not necessary for tests
+        unimplemented!()
+    }
+}
+
+#[async_trait::async_trait]
+impl ChainValues for IndexerDbChainWrapper {
+    type Error = DbSqlError;
+
+    async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
+        let data = self.0.get_indexer_data(None).await?;
+        Ok(DomainSeparators {
+            ledger: Hash::default(),
+            safe_registry: Hash::default(),
+            channel: data.channels_dst.unwrap(),
+        })
+    }
+
+    async fn minimum_incoming_ticket_win_prob(&self) -> Result<WinningProbability, Self::Error> {
+        Ok(WinningProbability::ALWAYS)
+    }
+
+    async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
+        Ok((*DEFAULT_PRICE_PER_PACKET).into())
+    }
+
+    async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
+        Ok(Duration::from_secs(10))
+    }
+}
+
+#[async_trait::async_trait]
+impl ChainKeyOperations for IndexerDbChainWrapper {
+    type Error = DbSqlError;
+    type Mapper = bimap::BiHashMap<KeyIdent, OffchainPublicKey>;
+
+    async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
+        Ok(PEERS_CHAIN
+            .iter()
+            .enumerate()
+            .find(|(_, a)| &a.public().to_address() == chain)
+            .map(|(i, _)| *PEERS[i].public()))
+    }
+
+    async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
+        Ok(PEERS
+            .iter()
+            .enumerate()
+            .find(|(_, k)| k.public() == packet)
+            .map(|(i, _)| PEERS_CHAIN[i].public().to_address()))
+    }
+
+    fn key_id_mapper_ref(&self) -> &Self::Mapper {
+        &MAPPER
+    }
+}
+
 #[allow(dead_code)]
 pub type WireChannels = (
     futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
@@ -140,7 +234,7 @@ pub type WireChannels = (
 
 #[allow(dead_code)]
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>,
+    futures::channel::mpsc::UnboundedSender<(ApplicationDataOut, ResolvedTransportRouting)>,
     futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationDataIn)>,
 );
 
@@ -155,9 +249,9 @@ pub async fn peer_setup_for(
 
     assert!(peer_count <= PEERS.len());
     assert!(peer_count >= 3);
-    let mut dbs = create_dbs(peer_count).await?;
+    let (node_dbs, mut indexer_dbs) = create_dbs(peer_count).await?;
 
-    create_minimal_topology(&mut dbs).await?;
+    create_minimal_topology(&mut indexer_dbs).await?;
 
     // Begin tests
     for i in 0..peer_count {
@@ -178,7 +272,7 @@ pub async fn peer_setup_for(
     let mut logical_channels = Vec::new();
     let mut ticket_channels = Vec::new();
 
-    for (i, db) in dbs.into_iter().enumerate().collect::<Vec<(usize, HoprDb)>>() {
+    for (i, (node_db, indexer_db)) in node_dbs.into_iter().zip(indexer_dbs.into_iter()).enumerate() {
         let (received_ack_tickets_tx, received_ack_tickets_rx) =
             futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
 
@@ -187,21 +281,22 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting, PacketSendFinalizer)>();
+            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let opk: &OffchainKeypair = &PEERS[i];
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: opk.clone(),
             outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS),
-            outgoing_ticket_price: Some(100.into()),
+            outgoing_ticket_price: Some((*DEFAULT_PRICE_PER_PACKET).into()),
         };
 
-        db.start_ticket_processing(Some(received_ack_tickets_tx))?;
+        node_db.start_ticket_processing(Some(received_ack_tickets_tx))?;
 
         hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
-            db,
+            node_db,
+            IndexerDbChainWrapper(indexer_db),
             (mixer_channel_tx, wire_msg_send_rx),
             (api_recv_tx, api_send_rx),
         )
@@ -267,37 +362,24 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
     futures::future::pending::<()>().await;
 }
 
-struct TestResolver(Vec<(OffchainPublicKey, Address)>);
-
-#[async_trait]
-impl HoprDbResolverOperations for TestResolver {
-    async fn resolve_packet_key(
-        &self,
-        onchain_key: &Address,
-    ) -> hopr_db_api::errors::Result<Option<OffchainPublicKey>> {
-        Ok(self.0.iter().find(|(_, addr)| addr.eq(onchain_key)).map(|(pk, _)| *pk))
-    }
-
-    async fn resolve_chain_key(
-        &self,
-        offchain_key: &OffchainPublicKey,
-    ) -> hopr_db_api::errors::Result<Option<Address>> {
-        Ok(self.0.iter().find(|(pk, _)| pk.eq(offchain_key)).map(|(_, addr)| *addr))
-    }
-}
+struct TestResolver;
 
 #[async_trait]
 impl PathAddressResolver for TestResolver {
     async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError> {
-        self.resolve_packet_key(address)
-            .await
-            .map_err(|_| PathError::InvalidPeer(address.to_hex()))
+        Ok(PEERS_CHAIN
+            .iter()
+            .enumerate()
+            .find(|(_, a)| &a.public().to_address() == address)
+            .map(|(i, _)| *PEERS[i].public()))
     }
 
     async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError> {
-        self.resolve_chain_key(key)
-            .await
-            .map_err(|_| PathError::InvalidPeer(key.to_hex()))
+        Ok(PEERS
+            .iter()
+            .enumerate()
+            .find(|(_, k)| k.public() == key)
+            .map(|(i, _)| PEERS_CHAIN[i].public().to_address()))
     }
 }
 
@@ -327,7 +409,7 @@ pub async fn resolve_mock_path(
         last_addr = *addr;
     }
 
-    Ok(ValidatedPath::new(me, ChainPath::new(peers_onchain)?, &cg, &TestResolver(peers_addrs)).await?)
+    Ok(ValidatedPath::new(me, ChainPath::new(peers_onchain)?, &cg, &TestResolver).await?)
 }
 
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
@@ -385,17 +467,11 @@ pub async fn send_relay_receive_channel_of_n_peers(
             return_paths: vec![],
         };
 
-        let awaiter = sender
+        sender
             .send_packet(ApplicationDataOut::with_no_packet_info(test_msg.clone()), routing)
             .await?;
 
-        if awaiter
-            .consume_and_wait(std::time::Duration::from_millis(500))
-            .await
-            .is_ok()
-        {
-            sent_packet_count += 1;
-        }
+        sent_packet_count += 1;
     }
 
     assert_eq!(

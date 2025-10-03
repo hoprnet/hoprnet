@@ -1,26 +1,23 @@
 use axum::{extract::Request, middleware::Next, response::Response};
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    hopr_lib::AsUnixTimestamp,
-    hopr_metrics::metrics::{MultiCounter, MultiHistogram, SimpleGauge},
-};
+use hopr_lib::AsUnixTimestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_API_CALLS: MultiCounter = MultiCounter::new(
+    static ref METRIC_COUNT_API_CALLS:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_http_api_call_count",
         "Number of different REST API calls and their statuses",
         &["endpoint", "method", "status"]
     )
     .unwrap();
-    static ref METRIC_COUNT_API_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
+    static ref METRIC_COUNT_API_CALLS_TIMING:  hopr_metrics::MultiHistogram =  hopr_metrics::MultiHistogram::new(
         "hopr_http_api_call_timing_sec",
         "Timing of different REST API calls in seconds",
         vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0],
         &["endpoint", "method"]
     )
     .unwrap();
-    static ref METRIC_API_LAST_TIME: SimpleGauge = SimpleGauge::new(
+    static ref METRIC_API_LAST_TIME:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_http_api_last_used_time",
         "The unix timestamp in seconds at which any API endpoint was last fetched"
     ).unwrap();

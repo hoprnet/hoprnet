@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-indexer"
-version = "0.9.5"
+version = "0.10.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -30,7 +30,6 @@ alloy = { workspace = true, default-features = false, features = [
   "json-rpc",
   "node-bindings",
 ] }
-async-channel = { workspace = true }
 async-compression = { workspace = true, features = [
   "xz-parallel",
   "futures-io",
@@ -51,12 +50,12 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-bindings = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
 hopr-db-entity = { workspace = true }
 hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
@@ -74,3 +73,4 @@ tokio = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }

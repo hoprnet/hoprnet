@@ -21,17 +21,11 @@ pub enum ChainActionsError {
     #[error("multiaddress has been already announced on-chain")]
     AlreadyAnnounced,
 
-    #[error("network registry does not allow accessing this peer")]
-    PeerAccessDenied,
-
     #[error("acknowledged {0} is in a wrong state for the operation")]
     WrongTicketState(String),
 
     #[error("given ticket has a superseded ticket index")]
     OldTicket,
-
-    #[error("ticket is not a win")]
-    NotAWinningTicket,
 
     #[error("balance is too low to perform the operation")]
     BalanceTooLow,
@@ -41,6 +35,9 @@ pub enum ChainActionsError {
 
     #[error("safe does not have enough allowance to fund channel")]
     NotEnoughAllowance,
+
+    #[error("domain separator is missing")]
+    MissingDomainSeparator,
 
     #[error("on-chain submission of transaction failed: {0}")]
     TransactionSubmissionFailed(String),
@@ -57,14 +54,11 @@ pub enum ChainActionsError {
     #[error("indexer expectation has been unregistered")]
     ExpectationUnregistered,
 
-    #[error("no channel domain_separator tag found")]
-    MissingDomainSeparator,
+    #[error("node db error: {0}")]
+    NodeDbError(Box<dyn std::error::Error + Send + Sync>),
 
     #[error(transparent)]
-    DbBackendError(#[from] hopr_db_sql::errors::DbSqlError),
-
-    #[error(transparent)]
-    DbError(#[from] hopr_db_sql::api::errors::DbError),
+    IndexDbError(#[from] hopr_db_sql::errors::DbSqlError),
 
     #[error(transparent)]
     RpcError(#[from] RpcError),

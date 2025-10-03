@@ -3,10 +3,8 @@
 //! during node runtime.
 //!
 //! - [passive strategy](crate::strategy::MultiStrategy)
-//! - [promiscuous strategy](crate::promiscuous)
 //! - [auto funding strategy](crate::auto_funding)
 //! - [auto redeeming strategy](crate::auto_redeeming)
-//! - [aggregating strategy](crate::aggregating)
 //! - [multiple strategy chains](crate::strategy)
 //!
 //! HOPRd can be configured to use any of the above strategies.
@@ -30,13 +28,8 @@
 //!   allow_recursive: true
 //!   execution_interval: 60
 //!   strategies:
-//!     - !Promiscuous
-//!       max_channels: 50
-//!       new_channel_stake: 20
 //!     - !AutoFunding
 //!       funding_amount: 20
-//!     - !Aggregating:
-//!       aggregation_threshold: 1000
 //! ```
 
 use std::str::FromStr;
@@ -46,25 +39,20 @@ use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
 use crate::{
-    Strategy::AutoRedeeming, aggregating::AggregatingStrategyConfig, auto_funding::AutoFundingStrategyConfig,
-    auto_redeeming::AutoRedeemingStrategyConfig, channel_finalizer::ClosureFinalizerStrategyConfig,
-    promiscuous::PromiscuousStrategyConfig, strategy::MultiStrategyConfig,
+    Strategy::AutoRedeeming, auto_funding::AutoFundingStrategyConfig, auto_redeeming::AutoRedeemingStrategyConfig,
+    channel_finalizer::ClosureFinalizerStrategyConfig, strategy::MultiStrategyConfig,
 };
 
-pub mod aggregating;
 pub mod auto_funding;
 pub mod auto_redeeming;
 mod channel_finalizer;
 pub mod errors;
-pub mod promiscuous;
 pub mod strategy;
 
 /// Lists all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum Strategy {
-    Promiscuous(PromiscuousStrategyConfig),
-    Aggregating(AggregatingStrategyConfig),
     AutoRedeeming(AutoRedeemingStrategyConfig),
     AutoFunding(AutoFundingStrategyConfig),
     ClosureFinalizer(ClosureFinalizerStrategyConfig),
@@ -86,13 +74,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             // min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
             // funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             // }),
-            // Aggregating(AggregatingStrategyConfig {
-            //    aggregation_threshold: Some(100),
-            //    unrealized_balance_ratio: Some(0.9),
-            //    aggregate_on_channel_close: true,
-            //}),
             AutoRedeeming(AutoRedeemingStrategyConfig {
-                redeem_only_aggregated: false,
                 redeem_all_on_close: true,
                 minimum_redeem_ticket_value: HoprBalance::from_str("1 wxHOPR").unwrap(),
                 redeem_on_winning: true,
@@ -109,3 +91,112 @@ impl Default for Strategy {
 
 /// An alias for the strategy configuration type.
 pub type StrategyConfig = MultiStrategyConfig;
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use futures::{FutureExt, Stream, StreamExt, future::BoxFuture, stream::BoxStream};
+    use hopr_api::{
+        chain::{
+            ChainReadChannelOperations, ChainReceipt, ChainWriteChannelOperations, ChainWriteTicketOperations,
+            ChannelSelector,
+        },
+        db::TicketSelector,
+    };
+    use hopr_internal_types::{
+        channels::{ChannelEntry, ChannelId, ChannelStatus},
+        prelude::AcknowledgedTicket,
+    };
+    use hopr_primitive_types::{balance::HoprBalance, prelude::Address};
+
+    use crate::errors::StrategyError;
+
+    // Mock helper needs to be created, because ChainWriteTicketOperations and ChainReadChannelOperations
+    // cannot be mocked directly due to impossible lifetimes.
+    #[mockall::automock]
+    pub trait TestActions {
+        fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> Result<ChainReceipt, StrategyError>;
+        fn close_channel(&self, channel_id: &ChannelId) -> Result<(ChannelStatus, ChainReceipt), StrategyError>;
+        fn redeem_with_selector(&self, selector: TicketSelector) -> Vec<ChainReceipt>;
+        fn stream_channels(&self, selector: ChannelSelector) -> impl Stream<Item = ChannelEntry> + Send;
+        fn channel_by_id(&self, channel_id: &ChannelId) -> Option<ChannelEntry>;
+    }
+
+    pub struct MockChainActions<T>(pub std::sync::Arc<T>);
+
+    impl<T> Clone for MockChainActions<T> {
+        fn clone(&self) -> Self {
+            Self(self.0.clone())
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl<T: TestActions + Send + Sync> ChainReadChannelOperations for MockChainActions<T> {
+        type Error = StrategyError;
+
+        async fn channel_by_parties(&self, _: &Address, _: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+            unimplemented!()
+        }
+
+        async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+            Ok(self.0.channel_by_id(channel_id))
+        }
+
+        async fn stream_channels<'a>(
+            &'a self,
+            selector: ChannelSelector,
+        ) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+            Ok(self.0.stream_channels(selector).boxed())
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl<T: TestActions + Send + Sync> ChainWriteChannelOperations for MockChainActions<T> {
+        type Error = StrategyError;
+
+        async fn open_channel<'a>(
+            &'a self,
+            _: &'a Address,
+            _: HoprBalance,
+        ) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
+            unimplemented!()
+        }
+
+        async fn fund_channel<'a>(
+            &'a self,
+            channel_id: &'a ChannelId,
+            amount: HoprBalance,
+        ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
+            Ok(futures::future::ready(self.0.fund_channel(channel_id, amount)).boxed())
+        }
+
+        async fn close_channel<'a>(
+            &'a self,
+            channel_id: &'a ChannelId,
+        ) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
+            Ok(futures::future::ready(self.0.close_channel(channel_id)).boxed())
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl<T: TestActions + Send + Sync> ChainWriteTicketOperations for MockChainActions<T> {
+        type Error = StrategyError;
+
+        async fn redeem_ticket(
+            &self,
+            _: AcknowledgedTicket,
+        ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
+            unimplemented!()
+        }
+
+        async fn redeem_tickets_via_selector(
+            &self,
+            selector: TicketSelector,
+        ) -> Result<Vec<BoxFuture<'_, Result<ChainReceipt, Self::Error>>>, Self::Error> {
+            let receipts = self.0.redeem_with_selector(selector);
+            Ok(receipts
+                .into_iter()
+                .map(|r| futures::future::ready(Ok(r)).boxed())
+                .collect())
+        }
+    }
+}
