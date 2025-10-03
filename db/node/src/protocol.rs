@@ -283,7 +283,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                     let verified_ticket = ack_ticket.ticket.verified_ticket();
                     let channel = verified_ticket.channel_id.to_string();
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                        &[&channel, "unredeemed"],
+                        &["unredeemed"],
                         self.ticket_manager
                             .unrealized_value(TicketSelector::new(
                                 verified_ticket.channel_id,
@@ -293,8 +293,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                             .amount()
                             .as_u128() as f64,
                     );
-                    crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS
-                        .increment(&[&channel, "winning_count"], 1.0f64);
+                    crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["winning_count"], 1.0f64);
                 }
             }
             ResolvedAcknowledgement::RelayingLoss(_channel) => {
@@ -302,8 +301,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                 {
                     METRIC_RECEIVED_ACKS.increment(&["true"]);
                     METRIC_TICKETS_COUNT.increment(&["losing"]);
-                    crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS
-                        .increment(&[&_channel.to_string(), "losing_count"], 1.0f64);
+                    crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["losing_count"], 1.0f64);
                 }
             }
             ResolvedAcknowledgement::Sending(_) => {

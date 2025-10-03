@@ -16,7 +16,7 @@ use petgraph::{
 };
 use tracing::{debug, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
-use {hopr_internal_types::channels::ChannelDirection, hopr_primitive_types::traits::ToHex};
+use {hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -24,11 +24,6 @@ lazy_static::lazy_static! {
         "hopr_channels_count",
         "Number of channels per direction",
         &["direction"]
-    ).unwrap();
-    static ref METRIC_CHANNEL_BALANCES:  hopr_metrics::MultiGauge =  hopr_metrics::MultiGauge::new(
-        "hopr_channel_balances",
-        "Balances on channels per counterparty",
-        &["counterparty", "direction"]
     ).unwrap();
 }
 
@@ -298,36 +293,18 @@ impl ChannelGraph {
                     ChannelDirection::Outgoing => match channel.status {
                         ChannelStatus::Closed => {
                             METRIC_NUMBER_OF_CHANNELS.decrement(&["out"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(&[channel.destination.to_hex().as_str(), "out"], 0.0);
                         }
                         ChannelStatus::Open => {
                             METRIC_NUMBER_OF_CHANNELS.increment(&["out"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(
-                                &[channel.destination.to_hex().as_str(), "out"],
-                                channel
-                                    .balance
-                                    .amount_in_base_units()
-                                    .parse::<f64>()
-                                    .unwrap_or(f64::INFINITY),
-                            );
                         }
                         ChannelStatus::PendingToClose(_) => {}
                     },
                     ChannelDirection::Incoming => match channel.status {
                         ChannelStatus::Closed => {
                             METRIC_NUMBER_OF_CHANNELS.decrement(&["in"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(&[channel.source.to_hex().as_str(), "in"], 0.0);
                         }
                         ChannelStatus::Open => {
                             METRIC_NUMBER_OF_CHANNELS.increment(&["in"], 1.0);
-                            METRIC_CHANNEL_BALANCES.set(
-                                &[channel.source.to_hex().as_str(), "in"],
-                                channel
-                                    .balance
-                                    .amount_in_base_units()
-                                    .parse::<f64>()
-                                    .unwrap_or(f64::INFINITY),
-                            );
                         }
                         ChannelStatus::PendingToClose(_) => {}
                     },
