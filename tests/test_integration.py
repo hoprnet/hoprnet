@@ -185,6 +185,7 @@ class TestIntegrationWithSwarm:
                 [swarm7[src], swarm7[mid], swarm7[dest]],
             )
 
+        # Ticket becomes neglected after the channel closure
         assert count_metrics(await swarm7[mid].api.metrics()) != 0
 
         await swarm7[mid].api.reset_tickets_statistics()

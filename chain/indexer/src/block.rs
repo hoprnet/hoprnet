@@ -1320,7 +1320,7 @@ mod tests {
         // Generate the expected events to be able to process the blocks
         handlers
             .expect_collect_log_event()
-            .times(1)
+            .times(3)
             .withf(move |l, _| block_numbers.contains(&l.block_number))
             .returning(|l, _| {
                 let block_number = l.block_number;
@@ -1337,11 +1337,19 @@ mod tests {
         // At this point we expect 2 events to arrive. The third event, which was generated first,
         // should be dropped because it was generated before the indexer was in sync with head.
         pin_mut!(rx_events);
-        // let _first = rx_events.next().await.unwrap();
-        // let _second = rx_events.next().await.unwrap();
-        let third = rx_events.next().await;
+        tokio::time::timeout(std::time::Duration::from_millis(100), rx_events.next())
+            .await?
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_millis(100), rx_events.next())
+            .await?
+            .unwrap();
 
-        assert!(third.is_none());
+        // Must time out
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), rx_events.next())
+                .await
+                .is_err()
+        );
 
         Ok(())
     }
