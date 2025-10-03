@@ -281,7 +281,6 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                     METRIC_TICKETS_COUNT.increment(&["winning"]);
 
                     let verified_ticket = ack_ticket.ticket.verified_ticket();
-                    let channel = verified_ticket.channel_id.to_string();
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                         &["unredeemed"],
                         self.ticket_manager
