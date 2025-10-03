@@ -75,6 +75,8 @@ pub enum ChannelDirection {
 /// ## Example
 /// ```rust
 /// # use hopr_primitive_types::prelude::*;
+/// # use hopr_internal_types::prelude::*;
+/// # use hopr_crypto_types::prelude::*;
 /// let source = Address::new(&[0; 20]);
 /// let destination = Address::new(&[1; 20]);
 /// let id: ChannelId = (source, destination).into();
@@ -165,6 +167,7 @@ impl ChannelBuilder {
     /// The remaining members of [`ChannelEntry`] are set as follows (unless modified by the builder):
     /// ```rust
     /// # use hopr_primitive_types::prelude::*;
+    /// # use hopr_internal_types::prelude::*;
     ///
     /// let entry = ChannelBuilder::new(Address::new(&[0; 20]), Address::new(&[1; 20])).build();
     ///

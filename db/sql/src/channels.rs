@@ -39,14 +39,14 @@ impl ChannelEditor {
     }
 
     /// Change the ticket index.
-    pub fn change_ticket_index(mut self, index: impl Into<U256>) -> Self {
-        self.model.ticket_index = Set(index.into().to_be_bytes().to_vec());
+    pub fn change_ticket_index(mut self, index: u64) -> Self {
+        self.model.ticket_index = Set(index.to_be_bytes().to_vec());
         self
     }
 
     /// Change the channel epoch.
-    pub fn change_epoch(mut self, epoch: impl Into<U256>) -> Self {
-        self.model.epoch = Set(epoch.into().to_be_bytes().to_vec());
+    pub fn change_epoch(mut self, epoch: u32) -> Self {
+        self.model.epoch = Set(epoch.to_be_bytes().to_vec());
         self
     }
 
@@ -459,7 +459,7 @@ mod tests {
     async fn test_channel_get_for_destination_that_exists_should_be_returned() -> anyhow::Result<()> {
         let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let expected_destination = Address::default();
+        let expected_destination: Address = [1u8; 20].into();
 
         let ce = ChannelBuilder::new(Address::default(), expected_destination)
             .with_stake(0)
@@ -470,7 +470,7 @@ mod tests {
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
-            .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
+            .get_channels_via(None, ChannelDirection::Incoming, &expected_destination)
             .await?
             .first()
             .cloned();

@@ -475,7 +475,7 @@ where
                         .finish_channel_update(
                             tx.into(),
                             channel_edits
-                                .change_ticket_index(0_u32)
+                                .change_ticket_index(0)
                                 .change_epoch(current_epoch.add(1))
                                 .change_status(ChannelStatus::Open),
                         )
@@ -613,9 +613,7 @@ where
                         .index_db
                         .finish_channel_update(
                             tx.into(),
-                            channel_edits.change_ticket_index(U256::from_be_bytes(
-                                ticket_redeemed.newTicketIndex.to_be_bytes::<6>(),
-                            )),
+                            channel_edits.change_ticket_index(ticket_redeemed.newTicketIndex.to::<u64>()),
                         )
                         .await?
                         .ok_or(CoreEthereumIndexerError::ProcessError(format!(
@@ -1762,7 +1760,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let solidity_balance: HoprBalance = primitive_types::U256::from((1u128 << 96) - 1).into();
+        let solidity_balance: HoprBalance = ChannelEntry::MAX_CHANNEL_BALANCE.into();
         let diff = solidity_balance - channel.balance;
 
         let encoded_data = (solidity_balance.amount().to_be_bytes()).abi_encode();
@@ -1870,7 +1868,7 @@ mod tests {
         let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelBuilder::new(*SELF_CHAIN_ADDRESS, *COUNTERPARTY_CHAIN_ADDRESS)
-            .with_stake(primitive_types::U256::from((1u128 << 96) - 1))
+            .with_stake(ChannelEntry::MAX_CHANNEL_BALANCE)
             .with_ticket_index(0)
             .with_status(ChannelStatus::Open)
             .with_epoch(1)
@@ -1878,7 +1876,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let solidity_balance: HoprBalance = primitive_types::U256::from((1u128 << 96) - 2).into();
+        let solidity_balance: HoprBalance = (ChannelEntry::MAX_CHANNEL_BALANCE - 1).into();
         let diff = channel.balance - solidity_balance;
 
         // let encoded_data = (solidity_balance).abi_encode();
@@ -2232,7 +2230,7 @@ mod tests {
         let channel_id: ChannelId = (&*SELF_CHAIN_ADDRESS, &*COUNTERPARTY_CHAIN_ADDRESS).into();
 
         // Attempt to increase balance
-        let solidity_balance: HoprBalance = primitive_types::U256::from((1u128 << 96) - 1).into();
+        let solidity_balance: HoprBalance = ChannelEntry::MAX_CHANNEL_BALANCE.into();
 
         let encoded_data = (solidity_balance.amount().to_be_bytes()).abi_encode();
 

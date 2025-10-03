@@ -425,7 +425,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_ticket_redeem_in_channel() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 

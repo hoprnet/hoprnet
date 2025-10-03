@@ -14,7 +14,11 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
         let mut ticket = TicketBuilder::default()
             .channel_id(ChannelId::from_hex(&value.channel_id)?)
             .amount(U256::from_be_bytes(&value.amount))
-            .index(U256::from_be_bytes(&value.index).as_u64())
+            .index(u64::from_be_bytes(
+                value.index[0..size_of::<u64>()]
+                    .try_into()
+                    .map_err(|_| DbEntityError::ConversionError("invalid index".into()))?,
+            ))
             .index_offset(value.index_offset as u32)
             .win_prob(
                 value
@@ -23,7 +27,11 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
                     .try_into()
                     .map_err(|_| DbEntityError::ConversionError("invalid winning probability".into()))?,
             )
-            .channel_epoch(U256::from_be_bytes(&value.channel_epoch).as_u32())
+            .channel_epoch(u32::from_be_bytes(
+                value.channel_epoch[0..size_of::<u32>()]
+                    .try_into()
+                    .map_err(|_| DbEntityError::ConversionError("invalid channel epoch".into()))?,
+            ))
             .challenge(response.to_challenge()?)
             .signature(
                 value
@@ -65,7 +73,7 @@ impl From<AcknowledgedTicket> for ticket::ActiveModel {
             index: Set(value.verified_ticket().index.to_be_bytes().to_vec()),
             index_offset: Set(value.verified_ticket().index_offset as i32),
             winning_probability: Set(value.verified_ticket().encoded_win_prob.to_vec()),
-            channel_epoch: Set(U256::from(value.verified_ticket().channel_epoch).to_be_bytes().to_vec()),
+            channel_epoch: Set(value.verified_ticket().channel_epoch.to_be_bytes().to_vec()),
             signature: Set(value.verified_ticket().signature.unwrap().as_ref().to_vec()),
             response: Set(value.response.as_ref().to_vec()),
             state: Set(value.status as i8),
