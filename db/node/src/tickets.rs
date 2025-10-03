@@ -367,7 +367,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                 Box::pin(async move {
                     ticket::Entity::update_many()
                         .filter(selector)
-                        .col_expr(ticket::Column::State, Expr::value(new_state as u8))
+                        .col_expr(ticket::Column::State, Expr::value(new_state as i8))
                         .exec(tx)
                         .await
                         .map(|update| update.rows_affected as usize)
