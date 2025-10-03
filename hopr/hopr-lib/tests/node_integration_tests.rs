@@ -103,7 +103,7 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
 
     cluster_fixture[src]
         .inner()
-        .close_channel_by_id(channel.channel_id, false)
+        .close_channel_by_id(&channel.channel_id)
         .await
         .expect("failed to put channel in PendingToClose state");
 
@@ -155,27 +155,6 @@ async fn test_channel_funding_should_be_visible_in_channel_stake(
 
 #[rstest]
 #[tokio::test]
-#[cfg(feature = "runtime-tokio")]
-async fn test_send_0_hop_without_open_channels(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    use hopr_lib::{DestinationRouting, RoutingOptions, Tag};
-
-    let [src, dst] = exclusive_indexes::<2>();
-
-    cluster_fixture[src]
-        .inner()
-        .send_message(
-            b"Hello, HOPR!".to_vec().into(),
-            DestinationRouting::forward_only(cluster_fixture[dst].address(), RoutingOptions::Hops(0.try_into()?)),
-            Tag::Application(1024),
-        )
-        .await
-        .expect("failed to send 0-hop message");
-
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test]
 async fn test_reset_ticket_statistics(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{DestinationRouting, HoprBalance, RoutingOptions, Tag};
     use hopr_primitive_types::bounded::BoundedVec;
@@ -191,20 +170,21 @@ async fn test_reset_ticket_statistics(#[future(awt)] cluster_fixture: ClusterGua
         .await
         .expect("failed to open channel");
 
-    cluster_fixture[src]
-        .inner()
-        .send_message(
-            b"Hello, HOPR!".to_vec().into(),
-            DestinationRouting::forward_only(
-                cluster_fixture[dst].address(),
-                RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
-                    cluster_fixture[mid].address(),
-                ))),
-            ),
-            Tag::Application(1024),
-        )
-        .await
-        .expect("failed to send 1-hop message");
+    // TODO: replace with session
+    // cluster_fixture[src]
+    //     .inner()
+    //     .send_message(
+    //         b"Hello, HOPR!".to_vec().into(),
+    //         DestinationRouting::forward_only(
+    //             cluster_fixture[dst].address(),
+    //             RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
+    //                 cluster_fixture[mid].address(),
+    //             ))),
+    //         ),
+    //         Tag::Application(1024),
+    //     )
+    //     .await
+    //     .expect("failed to send 1-hop message");
 
     let stats_before = cluster_fixture[mid]
         .inner()

@@ -141,7 +141,7 @@ where
             // Sequentially executing the following transactions:
             // 1. Fund the deployer wallet
             provider.send_transaction(tx.clone()).await?.watch().await?;
-            // 2. Use the fundedd deployer wallet to deploy ERC1820Registry with a signed txn
+            // 2. Use the funded deployer wallet to deploy ERC1820Registry with a signed txn
             provider
                 .send_raw_transaction(&ERC_1820_REGISTRY_DEPLOY_CODE)
                 .await?
@@ -161,7 +161,7 @@ where
                 // Sequentially executing the following transactions:
                 // 1. Fund the deployer wallet
                 provider.send_transaction(tx.clone()).await?.watch().await?;
-                // 2. Use the fundedd deployer wallet to deploy Multicall3 with a signed txn
+                // 2. Use the funded deployer wallet to deploy Multicall3 with a signed txn
                 provider
                     .send_raw_transaction(&MULTICALL3_DEPLOY_CODE)
                     .await?

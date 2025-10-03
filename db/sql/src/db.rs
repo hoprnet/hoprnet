@@ -85,7 +85,6 @@ impl HoprIndexerDb {
         fs::create_dir_all(directory)
             .map_err(|_e| DbSqlError::Construction(format!("cannot create main database directory {directory:?}")))?;
 
-        info!("Opening database at {:?}", directory);
         let index = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
@@ -97,8 +96,8 @@ impl HoprIndexerDb {
         )
         .await?;
 
-        info!("Creating index RW DB connection pool");
-        let index_ro = Self::create_pool(
+        #[cfg(feature = "sqlite")]
+        let index_ro: sqlx::Pool<sqlx::Sqlite> = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
             PoolOptions::new(),
