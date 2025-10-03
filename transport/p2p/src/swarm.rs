@@ -2,9 +2,7 @@ use std::{net::Ipv4Addr, num::NonZeroU8};
 
 use futures::{Sink, SinkExt, Stream, StreamExt, select};
 use hopr_internal_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleGauge;
-use hopr_network_types::addr::is_public_address;
+use hopr_network_types::prelude::is_public_address;
 use hopr_transport_identity::{
     Multiaddr, PeerId,
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
@@ -22,7 +20,7 @@ use crate::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Re
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT: SimpleGauge = SimpleGauge::new(
+    static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_transport_p2p_opened_connection_count",
         "Number of currently open connections"
     ).unwrap();

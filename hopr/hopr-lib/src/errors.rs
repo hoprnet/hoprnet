@@ -1,3 +1,4 @@
+pub use hopr_chain_api::errors::{ChainActionsError, HoprChainError};
 use thiserror::Error;
 
 use crate::state::HoprState;
@@ -22,16 +23,10 @@ pub enum HoprLibError {
     StatusError(#[from] HoprStatusError),
 
     #[error(transparent)]
-    DatabaseBackendError(#[from] hopr_db_sql::errors::DbSqlError),
-
-    #[error(transparent)]
-    DbError(#[from] hopr_db_sql::api::errors::DbError),
+    DbError(#[from] hopr_db_node::errors::NodeDbError),
 
     #[error(transparent)]
     TransportError(#[from] hopr_transport::errors::HoprTransportError),
-
-    #[error(transparent)]
-    ChainError(#[from] hopr_chain_actions::errors::ChainActionsError),
 
     #[error(transparent)]
     ChainApi(#[from] hopr_chain_api::errors::HoprChainError),

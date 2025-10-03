@@ -16,8 +16,7 @@ use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
 use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
-use hopr_db_api::logs::HoprDbLogOperations;
-use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations};
+use hopr_db_sql::{HoprIndexerDb, info::HoprDbInfoOperations, logs::HoprDbLogOperations};
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, trace};
 
@@ -30,23 +29,23 @@ use crate::{
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_INDEXER_CURRENT_BLOCK: hopr_metrics::metrics::SimpleGauge =
-        hopr_metrics::metrics::SimpleGauge::new(
+    static ref METRIC_INDEXER_CURRENT_BLOCK: hopr_metrics::SimpleGauge =
+        hopr_metrics::SimpleGauge::new(
             "hopr_indexer_block_number",
             "Current last processed block number by the indexer",
     ).unwrap();
-    static ref METRIC_INDEXER_CHECKSUM: hopr_metrics::metrics::SimpleGauge =
-        hopr_metrics::metrics::SimpleGauge::new(
+    static ref METRIC_INDEXER_CHECKSUM: hopr_metrics::SimpleGauge =
+        hopr_metrics::SimpleGauge::new(
             "hopr_indexer_checksum",
             "Contains an unsigned integer that represents the low 32-bits of the Indexer checksum"
     ).unwrap();
-    static ref METRIC_INDEXER_SYNC_PROGRESS: hopr_metrics::metrics::SimpleGauge =
-        hopr_metrics::metrics::SimpleGauge::new(
+    static ref METRIC_INDEXER_SYNC_PROGRESS: hopr_metrics::SimpleGauge =
+        hopr_metrics::SimpleGauge::new(
             "hopr_indexer_sync_progress",
             "Sync progress of the historical data by the indexer",
     ).unwrap();
-    static ref METRIC_INDEXER_SYNC_SOURCE: hopr_metrics::metrics::MultiGauge =
-        hopr_metrics::metrics::MultiGauge::new(
+    static ref METRIC_INDEXER_SYNC_SOURCE: hopr_metrics::MultiGauge =
+        hopr_metrics::MultiGauge::new(
             "hopr_indexer_data_source",
             "Current data source of the Indexer",
             &["source"],
@@ -68,34 +67,32 @@ lazy_static::lazy_static! {
 /// 5. store relevant data into the DB
 /// 6. pass the processing on to the business logic
 #[derive(Debug, Clone)]
-pub struct Indexer<T, U, Db>
+pub struct Indexer<T, U>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
     U: ChainLogHandler + Send + 'static,
-    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
     db_processor: Option<U>,
-    db: Db,
+    db: HoprIndexerDb,
     cfg: IndexerConfig,
-    egress: async_channel::Sender<SignificantChainEvent>,
+    egress: futures::channel::mpsc::Sender<SignificantChainEvent>,
     // If true (default), the indexer will panic if the event stream is terminated.
     // Setting it to false is useful for testing.
     panic_on_completion: bool,
 }
 
-impl<T, U, Db> Indexer<T, U, Db>
+impl<T, U> Indexer<T, U>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
     U: ChainLogHandler + Send + Sync + 'static,
-    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
         rpc: T,
         db_processor: U,
-        db: Db,
+        db: HoprIndexerDb,
         cfg: IndexerConfig,
-        egress: async_channel::Sender<SignificantChainEvent>,
+        egress: futures::channel::mpsc::Sender<SignificantChainEvent>,
     ) -> Self {
         Self {
             rpc: Some(rpc),
@@ -117,7 +114,6 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
@@ -130,7 +126,7 @@ where
         let rpc = self.rpc.take().expect("rpc should be present");
         let logs_handler = Arc::new(self.db_processor.take().expect("db_processor should be present"));
         let db = self.db.clone();
-        let tx_significant_events = self.egress.clone();
+        let mut tx_significant_events = self.egress.clone();
         let panic_on_completion = self.panic_on_completion;
 
         let (log_filters, address_topics) = Self::generate_log_filters(&logs_handler);
@@ -489,14 +485,13 @@ where
     /// A `Result` containing an optional vector of significant chain events if the operation succeeds or an error if it
     /// fails.
     async fn process_block_by_id(
-        db: &Db,
+        db: &HoprIndexerDb,
         logs_handler: &U,
         block_id: u64,
         is_synced: bool,
     ) -> crate::errors::Result<Option<Vec<SignificantChainEvent>>>
     where
         U: ChainLogHandler + 'static,
-        Db: HoprDbLogOperations + 'static,
     {
         let logs = db.get_logs(Some(block_id), Some(0)).await?;
         let mut block = BlockWithLogs {
@@ -535,7 +530,7 @@ where
     ///
     /// An optional vector of significant chain events if the operation succeeds.
     async fn process_block(
-        db: &Db,
+        db: &HoprIndexerDb,
         logs_handler: &U,
         block: BlockWithLogs,
         fetch_checksum_from_db: bool,
@@ -543,7 +538,6 @@ where
     ) -> Option<Vec<SignificantChainEvent>>
     where
         U: ChainLogHandler + 'static,
-        Db: HoprDbLogOperations + 'static,
     {
         let block_id = block.block_id;
         let log_count = block.logs.len();
@@ -661,7 +655,7 @@ where
     async fn calculate_sync_process(
         current_block: u64,
         rpc: &T,
-        db: Db,
+        db: HoprIndexerDb,
         chain_head: Arc<AtomicU64>,
         is_synced: Arc<AtomicBool>,
         next_block_to_process: u64,
@@ -670,7 +664,6 @@ where
         channels_address: Option<Address>,
     ) where
         T: HoprIndexerRpcOperations + 'static,
-        Db: HoprDbInfoOperations + Clone + Send + Sync + 'static,
     {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -822,7 +815,7 @@ mod tests {
         sol_types::SolEvent,
     };
     use async_trait::async_trait;
-    use futures::{Stream, join};
+    use futures::{Stream, join, pin_mut};
     use hex_literal::hex;
     use hopr_chain_rpc::BlockWithLogs;
     use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
@@ -830,7 +823,7 @@ mod tests {
         keypairs::{Keypair, OffchainKeypair},
         prelude::ChainKeypair,
     };
-    use hopr_db_sql::{accounts::HoprDbAccountOperations, db::HoprDb};
+    use hopr_db_sql::{HoprIndexerDb, accounts::HoprDbAccountOperations};
     use hopr_internal_types::account::{AccountEntry, AccountType};
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
@@ -912,7 +905,7 @@ mod tests {
     -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let addr = Address::new(b"my address 123456789");
         let topic = Hash::create(&[b"my topic"]);
@@ -947,7 +940,7 @@ mod tests {
             handlers,
             db.clone(),
             IndexerConfig::default(),
-            async_channel::unbounded().0,
+            futures::channel::mpsc::channel(1000).0,
         )
         .without_panic_on_completion();
 
@@ -965,7 +958,7 @@ mod tests {
     {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
         let head_block = 1000;
         let latest_block = 15u64;
 
@@ -1024,7 +1017,7 @@ mod tests {
                 fast_sync: false,
                 ..Default::default()
             },
-            async_channel::unbounded().0,
+            futures::channel::mpsc::channel(1000).0,
         )
         .without_panic_on_completion();
 
@@ -1041,7 +1034,7 @@ mod tests {
     async fn test_indexer_should_pass_blocks_that_are_finalized() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let cfg = IndexerConfig::default();
 
@@ -1094,8 +1087,8 @@ mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let indexer =
-            Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).without_panic_on_completion();
+        let indexer = Indexer::new(rpc, handlers, db.clone(), cfg, futures::channel::mpsc::channel(1000).0)
+            .without_panic_on_completion();
         let _ = join!(indexer.start(), async move {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
@@ -1106,7 +1099,7 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn test_indexer_fast_sync_full_with_resume() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let addr = Address::new(b"my address 123456789");
         let topic = Hash::create(&[b"my topic"]);
@@ -1131,7 +1124,7 @@ mod tests {
             assert_eq!(db.get_logs_block_numbers(None, None, Some(false)).await?.len(), 2);
 
             let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
-            let (tx_events, _) = async_channel::unbounded();
+            let (tx_events, _) = futures::channel::mpsc::channel(1000);
 
             let head_block = 5;
             let mut rpc = MockHoprIndexerOps::new();
@@ -1218,7 +1211,7 @@ mod tests {
             assert_eq!(db.get_logs_block_numbers(None, None, Some(false)).await?.len(), 2);
 
             let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
-            let (tx_events, _) = async_channel::unbounded();
+            let (tx_events, _) = futures::channel::mpsc::channel(1000);
 
             let head_block = 5;
             let mut rpc = MockHoprIndexerOps::new();
@@ -1270,7 +1263,7 @@ mod tests {
     async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let cfg = IndexerConfig::default();
 
@@ -1327,7 +1320,7 @@ mod tests {
         // Generate the expected events to be able to process the blocks
         handlers
             .expect_collect_log_event()
-            .times(1)
+            .times(3)
             .withf(move |l, _| block_numbers.contains(&l.block_number))
             .returning(|l, _| {
                 let block_number = l.block_number;
@@ -1337,17 +1330,26 @@ mod tests {
                 }))
             });
 
-        let (tx_events, rx_events) = async_channel::unbounded();
+        let (tx_events, rx_events) = futures::channel::mpsc::channel(1000);
         let indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).without_panic_on_completion();
         indexer.start().await?;
 
         // At this point we expect 2 events to arrive. The third event, which was generated first,
         // should be dropped because it was generated before the indexer was in sync with head.
-        let _first = rx_events.recv();
-        let _second = rx_events.recv();
-        let third = rx_events.try_recv();
+        pin_mut!(rx_events);
+        tokio::time::timeout(std::time::Duration::from_millis(100), rx_events.next())
+            .await?
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_millis(100), rx_events.next())
+            .await?
+            .unwrap();
 
-        assert!(third.is_err());
+        // Must time out
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), rx_events.next())
+                .await
+                .is_err()
+        );
 
         Ok(())
     }
@@ -1356,7 +1358,7 @@ mod tests {
     async fn test_indexer_should_not_reprocess_last_processed_block() -> anyhow::Result<()> {
         let last_processed_block = 100_u64;
 
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let addr = Address::new(b"my address 123456789");
         let topic = Hash::create(&[b"my topic"]);
@@ -1426,7 +1428,7 @@ mod tests {
 
         let indexer_cfg = IndexerConfig::new(0, false, false, None, "/tmp/test_data".to_string());
 
-        let (tx_events, _) = async_channel::unbounded();
+        let (tx_events, _) = futures::channel::mpsc::channel(1000);
         let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
         indexer.start().await?;
 

@@ -288,7 +288,7 @@ mod tests {
 
         assert_lt!(
             as_data.plain_text.len(),
-            ApplicationData::PAYLOAD_SIZE - hopr_db_api::protocol::HoprSurb::SIZE
+            ApplicationData::PAYLOAD_SIZE - hopr_crypto_packet::HoprSurb::SIZE
         );
 
         Ok(())
@@ -305,7 +305,7 @@ mod tests {
 
         assert_lt!(
             as_data.plain_text.len(),
-            ApplicationData::PAYLOAD_SIZE - hopr_db_api::protocol::HoprSurb::SIZE
+            ApplicationData::PAYLOAD_SIZE - hopr_crypto_packet::HoprSurb::SIZE
         );
 
         Ok(())

@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
-use futures::{Stream, StreamExt};
-use hopr_chain_actions::action_state::{ActionState, IndexerActionTracker};
+use futures::{Stream, StreamExt, stream};
 use hopr_chain_api::SignificantChainEvent;
-use hopr_db_sql::{accounts::HoprDbAccountOperations, registry::HoprDbRegistryOperations};
+use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
 use hopr_strategy::strategy::MultiStrategy;
+use tracing::info;
 
 use crate::{
     exports::{chain::types::chain_events::ChainEventType, transport::PeerDiscovery},
@@ -22,124 +22,83 @@ use crate::{
 /// * `preloading_event_stream` - a stream used by the components to preload the data from the objects (db, channel
 ///   graph...)
 #[allow(clippy::too_many_arguments)]
-pub async fn chain_events_to_transport_events<StreamIn, Db>(
+pub fn chain_events_to_transport_events<StreamIn>(
     event_stream: StreamIn,
     me_onchain: Address,
-    db: Db,
     multi_strategy: Arc<MultiStrategy>,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
-    indexer_action_tracker: Arc<IndexerActionTracker>,
+    db: HoprNodeDb,
 ) -> impl Stream<Item = PeerDiscovery> + Send + 'static
 where
-    Db: HoprDbRegistryOperations + HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
     StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
 {
-    Box::pin(event_stream.filter_map(move |event| {
-        let db = db.clone();
-        let multi_strategy = multi_strategy.clone();
-        let channel_graph = channel_graph.clone();
-        let indexer_action_tracker = indexer_action_tracker.clone();
+    Box::pin(
+        event_stream
+            .filter_map(move |event| {
+                let multi_strategy = multi_strategy.clone();
+                let channel_graph = channel_graph.clone();
+                let db = db.clone();
 
-        async move {
-            let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-            if resolved.is_empty() {
-                tracing::trace!(%event, "No indexer expectations resolved for the event");
-            } else {
-                tracing::debug!(count = resolved.len(), %event, "resolved indexer expectations");
-            }
-
-            match event.event_type {
-                ChainEventType::Announcement{peer, address, multiaddresses} => {
-                    let allowed = db
-                        .is_allowed_in_network_registry(None, &address)
-                        .await
-                        .unwrap_or(false);
-
-                    Some(vec![PeerDiscovery::Announce(peer, multiaddresses), if allowed {
-                        PeerDiscovery::Allow(peer)
-                    } else {
-                        PeerDiscovery::Ban(peer)
-                    }])
-                }
-                ChainEventType::ChannelOpened(channel) |
-                ChainEventType::ChannelClosureInitiated(channel) |
-                ChainEventType::ChannelClosed(channel) |
-                ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
-                ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
-                ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
-                    let maybe_direction = channel.direction(&me_onchain);
-
-                    let change = channel_graph
-                        .write_arc()
-                        .await
-                        .update_channel(channel);
-
-                    // Check if this is our own channel
-                    if let Some(own_channel_direction) = maybe_direction {
-                        if let Some(change_set) = change {
-                            for channel_change in change_set {
-                                let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
-                                    &*multi_strategy,
-                                    &channel,
-                                    own_channel_direction,
-                                    channel_change,
-                                )
-                                .await;
-                            }
-                        } else if channel.status == ChannelStatus::Open {
-                            // Emit Opening event if the channel did not exist before in the graph
-                            let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
-                                &*multi_strategy,
-                                &channel,
-                                own_channel_direction,
-                                ChannelChange::Status {
-                                    left: ChannelStatus::Closed,
-                                    right: ChannelStatus::Open,
-                                },
-                            )
-                            .await;
+                async move {
+                    match event.event_type {
+                        ChainEventType::Announcement{peer, multiaddresses, ..} => {
+                            Some(vec![PeerDiscovery::Announce(peer, multiaddresses)])
                         }
-                    }
+                        ChainEventType::ChannelOpened(channel) |
+                        ChainEventType::ChannelClosureInitiated(channel) |
+                        ChainEventType::ChannelClosed(channel) |
+                        ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
+                        ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
+                        ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
+                            let maybe_direction = channel.direction(&me_onchain);
 
-                    None
-                }
-                ChainEventType::NetworkRegistryUpdate(address, allowed) => {
-                    let packet_key = db.translate_key(None, address).await;
-                    match packet_key {
-                        Ok(pk) => {
-                            if let Some(pk) = pk {
-                                let offchain_key: Result<crate::prelude::OffchainPublicKey, _> = pk.try_into();
+                            let change = channel_graph
+                                .write_arc()
+                                .await
+                                .update_channel(channel);
 
-                                if let Ok(offchain_key) = offchain_key {
-                                    let peer_id = offchain_key.into();
+                            db.invalidate_unrealized_value(&channel).await;
 
-                                    let res = match allowed {
-                                        hopr_chain_types::chain_events::NetworkRegistryStatus::Allowed => PeerDiscovery::Allow(peer_id),
-                                        hopr_chain_types::chain_events::NetworkRegistryStatus::Denied => PeerDiscovery::Ban(peer_id),
-                                    };
-
-                                    Some(vec![res])
-                                } else {
-                                    tracing::error!("Failed to unwrap as offchain key at this point");
-                                    None
+                            // Check if this is our own channel
+                            if let Some(own_channel_direction) = maybe_direction {
+                                if let Some(change_set) = change {
+                                    for channel_change in change_set {
+                                        let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
+                                            &*multi_strategy,
+                                            &channel,
+                                            own_channel_direction,
+                                            channel_change,
+                                        )
+                                            .await;
+                                    }
+                                } else if channel.status == ChannelStatus::Open {
+                                    // Emit Opening event if the channel did not exist before in the graph
+                                    let _ = hopr_strategy::strategy::SingularStrategy::on_own_channel_changed(
+                                        &*multi_strategy,
+                                        &channel,
+                                        own_channel_direction,
+                                        ChannelChange::Status {
+                                            left: ChannelStatus::Closed,
+                                            right: ChannelStatus::Open,
+                                        },
+                                    )
+                                        .await;
                                 }
-                            } else {
-                                None
                             }
-                        }
-                        Err(error) => {
-                            tracing::error!(%error, "on_network_registry_node_allowed failed");
+
                             None
-                        },
+                        }
+                        ChainEventType::NetworkRegistryUpdate(address, allowed) => {
+                            info!(%address, ?allowed, "network registry update received as a no-op");
+                            None
+                        }
+                        ChainEventType::NodeSafeRegistered(safe_address) =>  {
+                            info!(%safe_address, "Node safe registered");
+                            None
+                        }
                     }
                 }
-                ChainEventType::NodeSafeRegistered(safe_address) =>  {
-                    tracing::info!(%safe_address, "Node safe registered");
-                    None
-                }
-            }
-        }
-    })
-    .flat_map(futures::stream::iter)
-)
+            })
+            .flat_map(stream::iter),
+    )
 }

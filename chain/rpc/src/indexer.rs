@@ -13,8 +13,6 @@ use alloy::{providers::Provider, rpc::types::Filter};
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::{Stream, StreamExt, stream::BoxStream};
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleGauge;
 use hopr_primitive_types::prelude::*;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, trace, warn};
@@ -28,8 +26,8 @@ use crate::{
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_RPC_CHAIN_HEAD: SimpleGauge =
-        SimpleGauge::new(
+    static ref METRIC_RPC_CHAIN_HEAD: hopr_metrics::SimpleGauge =
+        hopr_metrics::SimpleGauge::new(
             "hopr_chain_head_block_number",
             "Current block number of chain head",
     ).unwrap();

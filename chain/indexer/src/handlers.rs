@@ -8,6 +8,8 @@ use std::{
 
 use alloy::{primitives::B256, sol_types::SolEventInterface};
 use async_trait::async_trait;
+use futures_util::StreamExt;
+use hopr_api::db::{TicketMarker, TicketSelector};
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::HoprAnnouncementsEvents, hoprchannels::HoprChannels::HoprChannelsEvents,
     hoprnetworkregistry::HoprNetworkRegistry::HoprNetworkRegistryEvents,
@@ -19,20 +21,22 @@ use hopr_bindings::{
 use hopr_chain_rpc::{HoprIndexerRpcOperations, Log};
 use hopr_chain_types::{
     ContractAddresses,
-    chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent},
+    chain_events::{ChainEventType, SignificantChainEvent},
 };
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{
-    HoprDbAllOperations, OpenTransaction,
-    api::{info::DomainSeparator, tickets::TicketSelector},
+    HoprDbGeneralModelOperations, HoprIndexerDb, OpenTransaction,
     errors::DbSqlError,
-    prelude::TicketMarker,
+    prelude::{
+        DomainSeparator, HoprDbAccountOperations, HoprDbChannelOperations, HoprDbCorruptedChannelOperations,
+        HoprDbInfoOperations,
+    },
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::errors::{CoreEthereumIndexerError, Result};
+use crate::errors::{CoreEthereumIndexerError, CoreEthereumIndexerError::NodeDbError, Result};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -58,7 +62,8 @@ pub struct ContractEventHandlers<T, Db> {
     /// own address, aka message sender
     chain_key: ChainKeypair, // TODO: store only address here once Ticket have TryFrom DB
     /// callbacks to inform other modules
-    db: Db,
+    index_db: HoprIndexerDb,
+    node_db: Db,
     /// rpc operations to interact with the chain
     rpc_operations: T,
 }
@@ -76,7 +81,7 @@ impl<T, Db> Debug for ContractEventHandlers<T, Db> {
 impl<T, Db> ContractEventHandlers<T, Db>
 where
     T: HoprIndexerRpcOperations + Clone + Send + 'static,
-    Db: HoprDbAllOperations + Clone,
+    Db: hopr_api::db::HoprDbTicketOperations + Clone + Send + 'static,
 {
     /// Creates a new instance of contract event handlers with RPC operations support.
     ///
@@ -99,14 +104,16 @@ where
         addresses: ContractAddresses,
         safe_address: Address,
         chain_key: ChainKeypair,
-        db: Db,
+        index_db: HoprIndexerDb,
+        node_db: Db,
         rpc_operations: T,
     ) -> Self {
         Self {
             addresses: Arc::new(addresses),
             safe_address,
             chain_key,
-            db,
+            index_db,
+            node_db,
             rpc_operations,
         }
     }
@@ -139,7 +146,7 @@ where
                 let node_address: Address = address_announcement.node.into();
 
                 return match self
-                    .db
+                    .index_db
                     .insert_announcement(
                         Some(tx),
                         node_address,
@@ -170,7 +177,7 @@ where
                 ) {
                     Ok(binding) => {
                         match self
-                            .db
+                            .index_db
                             .insert_account(
                                 Some(tx),
                                 AccountEntry {
@@ -202,7 +209,7 @@ where
             }
             HoprAnnouncementsEvents::RevokeAnnouncement(revocation) => {
                 let node_address: Address = revocation.node.into();
-                match self.db.delete_all_announcements(Some(tx), node_address).await {
+                match self.index_db.delete_all_announcements(Some(tx), node_address).await {
                     Err(DbSqlError::MissingAccount) => {
                         return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
                     }
@@ -228,7 +235,7 @@ where
             HoprChannelsEvents::ChannelBalanceDecreased(balance_decreased) => {
                 let channel_id = balance_decreased.channelId.0.into();
 
-                let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
+                let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_channel_balance_decreased_event");
@@ -247,7 +254,7 @@ where
                     let diff = channel_edits.entry().balance - new_balance;
 
                     let updated_channel = self
-                        .db
+                        .index_db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?
                         .ok_or(CoreEthereumIndexerError::ProcessError(format!(
@@ -262,7 +269,7 @@ where
                         info!("updating safe balance from chain after channel balance decreased event");
                         match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                             Ok(balance) => {
-                                self.db.set_safe_hopr_balance(Some(tx), balance).await?;
+                                self.index_db.set_safe_hopr_balance(Some(tx), balance).await?;
                             }
                             Err(error) => {
                                 error!(%error, "error getting safe balance from chain after channel balance decreased event");
@@ -273,14 +280,14 @@ where
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
                     error!(%channel_id, "observed balance decreased event for a channel that does not exist");
-                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.index_db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::ChannelBalanceIncreased(balance_increased) => {
                 let channel_id = balance_increased.channelId.0.into();
 
-                let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
+                let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_channel_balance_increased_event");
@@ -299,7 +306,7 @@ where
                     let diff = new_balance - channel_edits.entry().balance;
 
                     let updated_channel = self
-                        .db
+                        .index_db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?
                         .ok_or(CoreEthereumIndexerError::ProcessError(format!(
@@ -311,7 +318,7 @@ where
                         info!("updating safe balance from chain after channel balance increased event");
                         match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                             Ok(balance) => {
-                                self.db.set_safe_hopr_balance(Some(tx), balance).await?;
+                                self.index_db.set_safe_hopr_balance(Some(tx), balance).await?;
                             }
                             Err(error) => {
                                 error!(%error, "error getting safe balance from chain after channel balance increased event");
@@ -324,7 +331,7 @@ where
                             .await
                         {
                             Ok(allowance) => {
-                                self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                                self.index_db.set_safe_hopr_allowance(Some(tx), allowance).await?;
                             }
                             Err(error) => {
                                 error!(%error, "error getting safe allowance from chain after channel balance increased event");
@@ -335,14 +342,14 @@ where
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
                     error!(%channel_id, "observed balance increased event for a channel that does not exist");
-                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.index_db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::ChannelClosed(channel_closed) => {
                 let channel_id = channel_closed.channelId.0.into();
 
-                let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
+                let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_channel_closed_event");
@@ -369,30 +376,36 @@ where
                             .change_balance(HoprBalance::zero())
                             .change_ticket_index(0);
 
-                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?.ok_or(
-                            CoreEthereumIndexerError::ProcessError(format!(
+                        let updated_channel = self
+                            .index_db
+                            .finish_channel_update(tx.into(), channel_edits)
+                            .await?
+                            .ok_or(CoreEthereumIndexerError::ProcessError(format!(
                                 "channel closed event for channel {channel_id} did not return an updated channel",
-                            )),
-                        )?;
+                            )))?;
 
                         // Perform additional tasks based on the channel's direction
                         match direction {
                             ChannelDirection::Incoming => {
                                 // On incoming channel, mark all unredeemed tickets as neglected
-                                self.db
+                                self.node_db
                                     .mark_tickets_as(updated_channel.into(), TicketMarker::Neglected)
-                                    .await?;
+                                    .await
+                                    .map_err(|e| NodeDbError(e.into()))?;
                             }
                             ChannelDirection::Outgoing => {
                                 // On outgoing channels, reset the current_ticket_index to zero
-                                self.db.reset_outgoing_ticket_index(channel_id).await?;
+                                self.node_db
+                                    .reset_outgoing_ticket_index(channel_id)
+                                    .await
+                                    .map_err(|e| NodeDbError(e.into()))?;
                             }
                         }
                         updated_channel
                     } else {
                         // Closed channels that are not our own can be safely removed from the database
                         let updated_channel = self
-                            .db
+                            .index_db
                             .finish_channel_update(tx.into(), channel_edits.delete())
                             .await?
                             .ok_or(CoreEthereumIndexerError::ProcessError(format!(
@@ -406,7 +419,7 @@ where
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
                     error!(%channel_id, "observed closure finalization event for a channel that does not exist.");
-                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.index_db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
@@ -415,7 +428,7 @@ where
                 let destination: Address = channel_opened.destination.into();
                 let channel_id = generate_channel_id(&source, &destination);
 
-                let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
+                let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
                         error!(%source, %destination, %channel_id, %e, "failed to begin channel update on on_channel_opened_event");
@@ -430,8 +443,10 @@ where
                     if channel_edits.entry().status != ChannelStatus::Closed {
                         warn!(%source, %destination, %channel_id, "received Open event for a channel that is not Closed, marking it as corrupted");
 
-                        self.db.finish_channel_update(tx.into(), channel_edits.delete()).await?;
-                        self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
+                        self.index_db
+                            .finish_channel_update(tx.into(), channel_edits.delete())
+                            .await?;
+                        self.index_db.upsert_corrupted_channel(tx.into(), channel_id).await?;
 
                         return Ok(None);
                     }
@@ -444,15 +459,19 @@ where
                     if source == self.chain_key.public().to_address()
                         || destination == self.chain_key.public().to_address()
                     {
-                        self.db
+                        self.node_db
                             .mark_tickets_as(TicketSelector::new(channel_id, current_epoch), TicketMarker::Neglected)
-                            .await?;
+                            .await
+                            .map_err(|e| NodeDbError(e.into()))?;
 
-                        self.db.reset_outgoing_ticket_index(channel_id).await?;
+                        self.node_db
+                            .reset_outgoing_ticket_index(channel_id)
+                            .await
+                            .map_err(|e| NodeDbError(e.into()))?;
                     }
 
                     // set all channel fields like we do on-chain on close
-                    self.db
+                    self.index_db
                         .finish_channel_update(
                             tx.into(),
                             channel_edits
@@ -476,7 +495,7 @@ where
                         1_u32.into(),
                     );
 
-                    self.db.upsert_channel(tx.into(), new_channel).await?;
+                    self.index_db.upsert_channel(tx.into(), new_channel).await?;
                     new_channel
                 };
 
@@ -485,7 +504,7 @@ where
             HoprChannelsEvents::TicketRedeemed(ticket_redeemed) => {
                 let channel_id = ticket_redeemed.channelId.0.into();
 
-                let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
+                let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_ticket_redeemed_event");
@@ -500,13 +519,14 @@ where
                         Some(ChannelDirection::Incoming) => {
                             // Filter all BeingRedeemed tickets in this channel and its current epoch
                             let mut matching_tickets = self
-                                .db
-                                .get_tickets(
+                                .node_db
+                                .stream_tickets(
                                     TicketSelector::from(channel_edits.entry())
-                                        .with_state(AcknowledgedTicketStatus::BeingRedeemed),
+                                        .with_state(AcknowledgedTicketStatus::BeingRedeemed)
+                                        .into(),
                                 )
-                                .await?
-                                .into_iter()
+                                .await
+                                .map_err(|e| NodeDbError(e.into()))?
                                 .filter(|ticket| {
                                     // The ticket that has been redeemed at this point has: index + index_offset - 1 ==
                                     // new_ticket_index - 1 Since unaggregated
@@ -515,17 +535,21 @@ where
                                     let ticket_idx = ticket.verified_ticket().index;
                                     let ticket_off = ticket.verified_ticket().index_offset as u64;
 
-                                    ticket_idx + ticket_off == ticket_redeemed.newTicketIndex.to::<u64>()
+                                    futures::future::ready(
+                                        ticket_idx + ticket_off == ticket_redeemed.newTicketIndex.to::<u64>(),
+                                    )
                                 })
-                                .collect::<Vec<_>>();
+                                .collect::<Vec<_>>()
+                                .await;
 
                             match matching_tickets.len().cmp(&1) {
                                 Ordering::Equal => {
                                     let ack_ticket = matching_tickets.pop().unwrap();
 
-                                    self.db
+                                    self.node_db
                                         .mark_tickets_as((&ack_ticket).into(), TicketMarker::Redeemed)
-                                        .await?;
+                                        .await
+                                        .map_err(|e| NodeDbError(e.into()))?;
                                     info!(%ack_ticket, "ticket marked as redeemed");
                                     Some(ack_ticket)
                                 }
@@ -549,8 +573,10 @@ where
 
                                     let entry_str = channel_edits.entry().to_string();
 
-                                    self.db.finish_channel_update(tx.into(), channel_edits.delete()).await?;
-                                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
+                                    self.index_db
+                                        .finish_channel_update(tx.into(), channel_edits.delete())
+                                        .await?;
+                                    self.index_db.upsert_corrupted_channel(tx.into(), channel_id).await?;
 
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
@@ -567,12 +593,13 @@ where
                         Some(ChannelDirection::Outgoing) => {
                             // We need to ensure the outgoing ticket index is at least this new value
                             debug!(channel = %channel_edits.entry(), "observed redeem event on an outgoing channel");
-                            self.db
+                            self.node_db
                                 .compare_and_set_outgoing_ticket_index(
                                     channel_edits.entry().get_id(),
                                     ticket_redeemed.newTicketIndex.to::<u64>(),
                                 )
-                                .await?;
+                                .await
+                                .map_err(|e| NodeDbError(e.into()))?;
                             None
                         }
                         // For a channel where neither source nor destination is us, we don't care
@@ -585,7 +612,7 @@ where
 
                     // Update the ticket index on the Channel entry and get the updated model
                     let channel = self
-                        .db
+                        .index_db
                         .finish_channel_update(
                             tx.into(),
                             channel_edits.change_ticket_index(U256::from_be_bytes(
@@ -599,25 +626,26 @@ where
 
                     // Neglect all the tickets in this channel
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
-                    self.db
+                    self.node_db
                         .mark_tickets_as(
                             TicketSelector::from(&channel)
                                 .with_index_range(..ticket_redeemed.newTicketIndex.to::<u64>()),
                             TicketMarker::Neglected,
                         )
-                        .await?;
+                        .await
+                        .map_err(|e| NodeDbError(e.into()))?;
 
                     Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                 } else {
                     error!(%channel_id, "observed ticket redeem on a channel that we don't have in the DB");
-                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.index_db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::OutgoingChannelClosureInitiated(closure_initiated) => {
                 let channel_id = closure_initiated.channelId.0.into();
 
-                let maybe_channel = match self.db.begin_channel_update(tx.into(), &channel_id).await {
+                let maybe_channel = match self.index_db.begin_channel_update(tx.into(), &channel_id).await {
                     Ok(channel) => channel,
                     Err(e) => {
                         error!(%channel_id, %e, "failed to begin channel update on on_outgoing_channel_closure_initiated_event");
@@ -632,7 +660,7 @@ where
                     );
 
                     let channel = self
-                        .db
+                        .index_db
                         .finish_channel_update(tx.into(), channel_edits.change_status(new_status))
                         .await?
                         .ok_or(CoreEthereumIndexerError::ProcessError(format!(
@@ -643,12 +671,12 @@ where
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
                     error!(%channel_id, "observed channel closure initiation on a channel that we don't have in the DB");
-                    self.db.upsert_corrupted_channel(tx.into(), channel_id).await?;
+                    self.index_db.upsert_corrupted_channel(tx.into(), channel_id).await?;
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
             HoprChannelsEvents::DomainSeparatorUpdated(domain_separator_updated) => {
-                self.db
+                self.index_db
                     .set_domain_separator(
                         Some(tx),
                         DomainSeparator::Channel,
@@ -659,7 +687,7 @@ where
                 Ok(None)
             }
             HoprChannelsEvents::LedgerDomainSeparatorUpdated(ledger_domain_separator_updated) => {
-                self.db
+                self.index_db
                     .set_domain_separator(
                         Some(tx),
                         DomainSeparator::Ledger,
@@ -702,7 +730,7 @@ where
                     info!("updating safe balance from chain after transfer event");
                     match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                         Ok(balance) => {
-                            self.db.set_safe_hopr_balance(Some(tx), balance).await?;
+                            self.index_db.set_safe_hopr_balance(Some(tx), balance).await?;
                         }
                         Err(error) => {
                             error!(%error, "error getting safe balance from chain after transfer event");
@@ -715,7 +743,7 @@ where
                         .await
                     {
                         Ok(allowance) => {
-                            self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                            self.index_db.set_safe_hopr_allowance(Some(tx), allowance).await?;
                         }
                         Err(error) => {
                             error!(%error, "error getting safe allowance from chain after transfer event");
@@ -749,7 +777,7 @@ where
                         .await
                     {
                         Ok(allowance) => {
-                            self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                            self.index_db.set_safe_hopr_allowance(Some(tx), allowance).await?;
                         }
                         Err(error) => {
                             error!(%error, "error getting safe allowance from chain after approval event");
@@ -765,107 +793,14 @@ where
 
     async fn on_network_registry_event(
         &self,
-        tx: &OpenTransaction,
+        _tx: &OpenTransaction,
         event: HoprNetworkRegistryEvents,
         _is_synced: bool,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["network_registry"]);
 
-        match event {
-            HoprNetworkRegistryEvents::DeregisteredByManager(deregistered) => {
-                debug!(
-                    node_address = %deregistered.nodeAddress,
-                    "on_network_registry_deregistered_by_manager_event",
-                );
-                let node_address: Address = deregistered.nodeAddress.into();
-                self.db
-                    .set_access_in_network_registry(Some(tx), node_address, false)
-                    .await?;
-
-                return Ok(Some(ChainEventType::NetworkRegistryUpdate(
-                    node_address,
-                    NetworkRegistryStatus::Denied,
-                )));
-            }
-            HoprNetworkRegistryEvents::Deregistered(deregistered) => {
-                debug!(
-                    node_address = %deregistered.nodeAddress,
-                    "on_network_registry_deregistered_event",
-                );
-                let node_address: Address = deregistered.nodeAddress.into();
-                self.db
-                    .set_access_in_network_registry(Some(tx), node_address, false)
-                    .await?;
-
-                return Ok(Some(ChainEventType::NetworkRegistryUpdate(
-                    node_address,
-                    NetworkRegistryStatus::Denied,
-                )));
-            }
-            HoprNetworkRegistryEvents::RegisteredByManager(registered) => {
-                let node_address: Address = registered.nodeAddress.into();
-                debug!(
-                    %node_address,
-                    "Node registered by manager, adding to the network registry",
-                );
-                self.db
-                    .set_access_in_network_registry(Some(tx), node_address, true)
-                    .await?;
-
-                if node_address == self.chain_key.public().to_address() {
-                    info!(
-                        "This node has been added to the registry, node activation process continues on: http://hub.hoprnet.org/."
-                    );
-                }
-
-                return Ok(Some(ChainEventType::NetworkRegistryUpdate(
-                    node_address,
-                    NetworkRegistryStatus::Allowed,
-                )));
-            }
-            HoprNetworkRegistryEvents::Registered(registered) => {
-                let node_address: Address = registered.nodeAddress.into();
-                debug!(
-                    %node_address,
-                    "Node registered, adding to the network registry",
-                );
-                self.db
-                    .set_access_in_network_registry(Some(tx), node_address, true)
-                    .await?;
-
-                if node_address == self.chain_key.public().to_address() {
-                    info!(
-                        "This node has been added to the registry, node can now continue the node activation process on: http://hub.hoprnet.org/."
-                    );
-                }
-
-                return Ok(Some(ChainEventType::NetworkRegistryUpdate(
-                    node_address,
-                    NetworkRegistryStatus::Allowed,
-                )));
-            }
-            HoprNetworkRegistryEvents::EligibilityUpdated(eligibility_updated) => {
-                debug!(
-                    staking_account = %eligibility_updated.stakingAccount,
-                    eligibility = %eligibility_updated.eligibility,
-                    "Node eligibility updated, updating the safe eligibility",
-                );
-                let account: Address = eligibility_updated.stakingAccount.into();
-                self.db
-                    .set_safe_eligibility(Some(tx), account, eligibility_updated.eligibility)
-                    .await?;
-            }
-            HoprNetworkRegistryEvents::NetworkRegistryStatusUpdated(enabled) => {
-                debug!(enabled = enabled.isEnabled, "on_network_registry_status_updated_event",);
-                self.db
-                    .set_network_registry_enabled(Some(tx), enabled.isEnabled)
-                    .await?;
-            }
-            _ => {
-                debug!("on_network_registry_event - not implemented for event: {:?}", event);
-            } // Not important to at the moment
-        };
+        debug!("on_network_registry_event - not implemented for event: {:?}", event);
 
         Ok(None)
     }
@@ -894,7 +829,7 @@ where
                 }
             }
             HoprNodeSafeRegistryEvents::DomainSeparatorUpdated(domain_separator_updated) => {
-                self.db
+                self.index_db
                     .set_domain_separator(
                         Some(tx),
                         DomainSeparator::SafeRegistry,
@@ -940,7 +875,7 @@ where
                     "on_ticket_minimum_win_prob_updated",
                 );
 
-                self.db
+                self.index_db
                     .set_minimum_incoming_ticket_win_prob(Some(tx), new_minimum_win_prob)
                     .await?;
 
@@ -954,7 +889,7 @@ where
                 // tickets below the new higher minimum as rejected
                 if old_minimum_win_prob.approx_cmp(&new_minimum_win_prob).is_lt() {
                     let mut selector: Option<TicketSelector> = None;
-                    for channel in self.db.get_incoming_channels(tx.into()).await? {
+                    for channel in self.index_db.get_incoming_channels(tx.into()).await? {
                         selector = selector
                             .map(|s| s.also_on_channel(channel.get_id(), channel.channel_epoch))
                             .or_else(|| Some(TicketSelector::from(channel)));
@@ -962,12 +897,13 @@ where
                     // Reject unredeemed tickets on all the channels with win prob lower than the new one
                     if let Some(selector) = selector {
                         let num_rejected = self
-                            .db
+                            .node_db
                             .mark_tickets_as(
                                 selector.with_winning_probability(..new_minimum_win_prob),
                                 TicketMarker::Rejected,
                             )
-                            .await?;
+                            .await
+                            .map_err(|e| NodeDbError(e.into()))?;
                         info!(
                             count = num_rejected,
                             "unredeemed tickets were rejected, because the minimum winning probability has been \
@@ -1000,7 +936,7 @@ where
                     "on_ticket_price_updated",
                 );
 
-                self.db
+                self.index_db
                     .update_ticket_price(Some(tx), HoprBalance::from_be_bytes(update._1.to_be_bytes::<32>()))
                     .await?;
 
@@ -1087,7 +1023,7 @@ where
 impl<T, Db> crate::traits::ChainLogHandler for ContractEventHandlers<T, Db>
 where
     T: HoprIndexerRpcOperations + Clone + Send + Sync + 'static,
-    Db: HoprDbAllOperations + Clone + Debug + Send + Sync + 'static,
+    Db: hopr_api::db::HoprDbTicketOperations + Clone + Send + Sync + 'static,
 {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
@@ -1132,7 +1068,7 @@ where
 
     async fn collect_log_event(&self, slog: SerializableLog, is_synced: bool) -> Result<Option<SignificantChainEvent>> {
         let myself = self.clone();
-        self.db
+        self.index_db
             .begin_transaction()
             .await?
             .perform(move |tx| {
@@ -1177,23 +1113,20 @@ mod tests {
         sol_types::{SolEvent, SolValue},
     };
     use anyhow::{Context, anyhow};
+    use futures_util::StreamExt;
     use hex_literal::hex;
+    use hopr_api::db::HoprDbTicketOperations;
     use hopr_chain_rpc::HoprIndexerRpcOperations;
-    use hopr_chain_types::{
-        ContractAddresses,
-        chain_events::{ChainEventType, NetworkRegistryStatus},
-    };
+    use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
     use hopr_crypto_types::prelude::*;
+    use hopr_db_node::HoprNodeDb;
     use hopr_db_sql::{
-        HoprDbAllOperations, HoprDbGeneralModelOperations,
+        HoprDbGeneralModelOperations, HoprIndexerDb,
         accounts::{ChainOrPacketKey, HoprDbAccountOperations},
-        api::{info::DomainSeparator, tickets::HoprDbTicketOperations},
         channels::HoprDbChannelOperations,
         corrupted_channels::HoprDbCorruptedChannelOperations,
-        db::HoprDb,
         info::HoprDbInfoOperations,
-        prelude::HoprDbResolverOperations,
-        registry::HoprDbRegistryOperations,
+        prelude::DomainSeparator,
     };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -1281,9 +1214,10 @@ mod tests {
         }
     }
 
-    fn init_handlers<T: Clone, Db: HoprDbAllOperations + Clone>(
+    fn init_handlers<T: Clone, Db: hopr_api::db::HoprDbTicketOperations + Clone + Send + Sync + 'static>(
         rpc_operations: T,
-        db: Db,
+        index_db: HoprIndexerDb,
+        node_db: Db,
     ) -> ContractEventHandlers<T, Db> {
         ContractEventHandlers {
             addresses: Arc::new(ContractAddresses {
@@ -1300,7 +1234,8 @@ mod tests {
             }),
             chain_key: SELF_CHAIN_KEY.clone(),
             safe_address: *STAKE_ADDRESS,
-            db,
+            index_db,
+            node_db,
             rpc_operations,
         }
     }
@@ -1311,7 +1246,8 @@ mod tests {
 
     #[tokio::test]
     async fn announce_keybinding() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
@@ -1319,7 +1255,7 @@ mod tests {
             inner: Arc::new(rpc_operations),
         };
 
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let keybinding = KeyBinding::new(*SELF_CHAIN_ADDRESS, &SELF_PRIV_KEY);
 
@@ -1363,14 +1299,15 @@ mod tests {
 
     #[tokio::test]
     async fn announce_address_announcement() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         // Assume that there is a keybinding
         let account_entry = AccountEntry {
@@ -1555,14 +1492,15 @@ mod tests {
 
     #[tokio::test]
     async fn announce_revoke() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse()?;
 
@@ -1620,7 +1558,8 @@ mod tests {
 
     #[tokio::test]
     async fn on_token_transfer_to() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let value = U256::MAX;
         let target_hopr_balance = HoprBalance::from(primitive_types::U256::from_big_endian(
@@ -1640,7 +1579,7 @@ mod tests {
             inner: Arc::new(rpc_operations),
         };
 
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let encoded_data = (value).abi_encode();
 
@@ -1670,7 +1609,8 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn on_token_transfer_from() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let mut rpc_operations = MockIndexerRpcOperations::new();
         rpc_operations
@@ -1685,7 +1625,7 @@ mod tests {
             inner: Arc::new(rpc_operations),
         };
 
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let value = U256::MAX;
 
@@ -1725,7 +1665,8 @@ mod tests {
 
     #[tokio::test]
     async fn on_token_approval_correct() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let target_allowance = HoprBalance::from(primitive_types::U256::from(1000u64));
         let mut rpc_operations = MockIndexerRpcOperations::new();
@@ -1737,7 +1678,7 @@ mod tests {
             inner: Arc::new(rpc_operations),
         };
 
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let encoded_data = (U256::from(1000u64)).abi_encode();
 
@@ -1791,376 +1732,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn on_network_registry_event_registered() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        db.set_network_registry_enabled(None, true).await?;
-
-        let encoded_data = ().abi_encode();
-
-        let registered_log = SerializableLog {
-            address: handlers.addresses.network_registry,
-            topics: vec![
-                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::Registered::SIGNATURE_HASH.into(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
-            ],
-            data: encoded_data,
-            // data: encode(&[]).into(),
-            ..test_log()
-        };
-
-        assert!(
-            !db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
-                .await?
-        );
-
-        let event_type = db
-            .begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log, false).await }))
-            .await?;
-
-        assert!(
-            matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Allowed),
-            "must return correct NR update"
-        );
-
-        assert!(
-            db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
-                .await?,
-            "must be allowed in NR"
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn on_network_registry_event_registered_by_manager() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        db.set_network_registry_enabled(None, true).await?;
-
-        let registered_log = SerializableLog {
-            address: handlers.addresses.network_registry,
-            topics: vec![
-                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::RegisteredByManager::SIGNATURE_HASH.into(),
-                // RegisteredByManagerFilter::signature().into(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
-            ],
-            data: ().abi_encode(),
-            // data: encode(&[]).into(),
-            ..test_log()
-        };
-
-        assert!(
-            !db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
-                .await?
-        );
-
-        let event_type = db
-            .begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log, false).await }))
-            .await?;
-
-        assert!(
-            matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Allowed),
-            "must return correct NR update"
-        );
-
-        assert!(
-            db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
-                .await?,
-            "must be allowed in NR"
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn on_network_registry_event_deregistered() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        db.set_network_registry_enabled(None, true).await?;
-
-        db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
-            .await?;
-
-        let encoded_data = ().abi_encode();
-
-        let registered_log = SerializableLog {
-            address: handlers.addresses.network_registry,
-            topics: vec![
-                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::Deregistered::SIGNATURE_HASH.into(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
-            ],
-            data: encoded_data,
-            ..test_log()
-        };
-
-        assert!(
-            db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
-                .await?
-        );
-
-        let event_type = db
-            .begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log, false).await }))
-            .await?;
-
-        assert!(
-            matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Denied),
-            "must return correct NR update"
-        );
-
-        assert!(
-            !db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
-                .await?,
-            "must not be allowed in NR"
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn on_network_registry_event_deregistered_by_manager() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        db.set_network_registry_enabled(None, true).await?;
-
-        db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
-            .await?;
-
-        let encoded_data = ().abi_encode();
-
-        let registered_log = SerializableLog {
-            address: handlers.addresses.network_registry,
-            topics: vec![
-                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::DeregisteredByManager::SIGNATURE_HASH.into(),
-                // DeregisteredByManagerFilter::signature().into(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
-            ],
-            data: encoded_data,
-            ..test_log()
-        };
-
-        assert!(
-            db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
-                .await?
-        );
-
-        let event_type = db
-            .begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log, false).await }))
-            .await?;
-
-        assert!(
-            matches!(event_type, Some(ChainEventType::NetworkRegistryUpdate(a, s)) if a == *SELF_CHAIN_ADDRESS && s == NetworkRegistryStatus::Denied),
-            "must return correct NR update"
-        );
-
-        assert!(
-            !db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
-                .await?,
-            "must not be allowed in NR"
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn on_network_registry_event_enabled() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        let encoded_data = ().abi_encode();
-
-        let nr_enabled = SerializableLog {
-            address: handlers.addresses.network_registry,
-            topics: vec![
-                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::NetworkRegistryStatusUpdated::SIGNATURE_HASH
-                    .into(),
-                // NetworkRegistryStatusUpdatedFilter::signature().into(),
-                H256::from_low_u64_be(1).into(),
-            ],
-            data: encoded_data,
-            ..test_log()
-        };
-
-        let event_type = db
-            .begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_enabled, false).await }))
-            .await?;
-
-        assert!(event_type.is_none(), "there's no chain event type for nr disable");
-
-        assert!(db.get_indexer_data(None).await?.nr_enabled);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn on_network_registry_event_disabled() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        db.set_network_registry_enabled(None, true).await?;
-
-        let encoded_data = ().abi_encode();
-
-        let nr_disabled = SerializableLog {
-            address: handlers.addresses.network_registry,
-            topics: vec![
-                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::NetworkRegistryStatusUpdated::SIGNATURE_HASH
-                    .into(),
-                // NetworkRegistryStatusUpdatedFilter::signature().into(),
-                H256::from_low_u64_be(0).into(),
-            ],
-            data: encoded_data,
-            ..test_log()
-        };
-
-        let event_type = db
-            .begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_disabled, false).await }))
-            .await?;
-
-        assert!(event_type.is_none(), "there's no chain event type for nr enable");
-
-        assert!(!db.get_indexer_data(None).await?.nr_enabled);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn on_network_registry_set_eligible() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        let encoded_data = ().abi_encode();
-
-        let set_eligible = SerializableLog {
-            address: handlers.addresses.network_registry,
-            topics: vec![
-                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::EligibilityUpdated::SIGNATURE_HASH.into(),
-                // EligibilityUpdatedFilter::signature().into(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
-                H256::from_low_u64_be(1).into(),
-            ],
-            data: encoded_data,
-            ..test_log()
-        };
-
-        let event_type = db
-            .begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible, false).await }))
-            .await?;
-
-        assert!(
-            event_type.is_none(),
-            "there's no chain event type for setting nr eligibility"
-        );
-
-        assert!(db.is_safe_eligible(None, *STAKE_ADDRESS).await?);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn on_network_registry_set_not_eligible() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
-
-        db.set_safe_eligibility(None, *STAKE_ADDRESS, false).await?;
-
-        let encoded_data = ().abi_encode();
-
-        let set_eligible = SerializableLog {
-            address: handlers.addresses.network_registry,
-            topics: vec![
-                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::EligibilityUpdated::SIGNATURE_HASH.into(),
-                // EligibilityUpdatedFilter::signature().into(),
-                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
-                H256::from_low_u64_be(0).into(),
-            ],
-            data: encoded_data,
-            ..test_log()
-        };
-
-        let event_type = db
-            .begin_transaction()
-            .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible, true).await }))
-            .await?;
-
-        assert!(
-            event_type.is_none(),
-            "there's no chain event type for unsetting nr eligibility"
-        );
-
-        assert!(!db.is_safe_eligible(None, *STAKE_ADDRESS).await?);
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn on_channel_event_balance_increased() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let value = U256::MAX;
         let target_hopr_balance = HoprBalance::from(primitive_types::U256::from_big_endian(
@@ -2179,7 +1753,7 @@ mod tests {
         let clonable_rpc_operations = ClonableMockOperations {
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -2230,14 +1804,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_event_domain_separator_updated() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let separator = Hash::from(hopr_crypto_random::random_bytes());
 
@@ -2280,7 +1855,8 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_event_balance_decreased() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let value = U256::MAX;
         let target_hopr_balance = HoprBalance::from(primitive_types::U256::from_big_endian(
@@ -2295,7 +1871,7 @@ mod tests {
         let clonable_rpc_operations = ClonableMockOperations {
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -2351,14 +1927,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_closed() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let starting_balance = HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1));
 
@@ -2406,7 +1983,8 @@ mod tests {
         assert_eq!(closed_channel.ticket_index, 0u64.into());
         assert_eq!(
             0,
-            db.get_outgoing_ticket_index(closed_channel.get_id())
+            node_db
+                .get_outgoing_ticket_index(closed_channel.get_id())
                 .await?
                 .load(Ordering::Relaxed)
         );
@@ -2417,14 +1995,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_foreign_channel_closed() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let starting_balance = HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1));
 
@@ -2472,14 +2051,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_opened() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
@@ -2518,7 +2098,8 @@ mod tests {
         assert_eq!(channel.ticket_index, 0u64.into());
         assert_eq!(
             0,
-            db.get_outgoing_ticket_index(channel.get_id())
+            node_db
+                .get_outgoing_ticket_index(channel.get_id())
                 .await?
                 .load(Ordering::Relaxed)
         );
@@ -2527,14 +2108,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_reopened() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -2583,7 +2165,8 @@ mod tests {
 
         assert_eq!(
             0,
-            db.get_outgoing_ticket_index(channel.get_id())
+            node_db
+                .get_outgoing_ticket_index(channel.get_id())
                 .await?
                 .load(Ordering::Relaxed)
         );
@@ -2592,14 +2175,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_should_not_reopen_when_not_closed() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -2646,14 +2230,15 @@ mod tests {
 
     #[tokio::test]
     async fn event_for_non_existing_channel_should_create_corrupted_channel() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
@@ -2717,7 +2302,8 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_ticket_redeemed_incoming_channel() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
         let rpc_operations = MockIndexerRpcOperations::new();
@@ -2726,7 +2312,7 @@ mod tests {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
@@ -2747,7 +2333,7 @@ mod tests {
         let ticket_value = ticket.verified_ticket().amount;
 
         db.upsert_channel(None, channel).await?;
-        db.upsert_ticket(None, ticket.clone()).await?;
+        node_db.upsert_ticket(ticket.clone()).await?;
 
         let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels,
@@ -2764,12 +2350,12 @@ mod tests {
             ..test_log()
         };
 
-        let outgoing_ticket_index_before = db
+        let outgoing_ticket_index_before = node_db
             .get_outgoing_ticket_index(channel.get_id())
             .await?
             .load(Ordering::Relaxed);
 
-        let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
+        let stats = node_db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
             HoprBalance::zero(),
             stats.redeemed_value,
@@ -2802,7 +2388,7 @@ mod tests {
             "channel entry must contain next ticket index"
         );
 
-        let outgoing_ticket_index_after = db
+        let outgoing_ticket_index_after = node_db
             .get_outgoing_ticket_index(channel.get_id())
             .await?
             .load(Ordering::Relaxed);
@@ -2812,11 +2398,15 @@ mod tests {
             "outgoing ticket index must not change"
         );
 
-        let tickets = db.get_tickets((&channel).into()).await?;
+        let tickets = node_db
+            .stream_tickets(Some((&channel).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
 
         assert!(tickets.is_empty(), "there should not be any tickets left");
 
-        let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
+        let stats = node_db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
             ticket_value, stats.redeemed_value,
             "there should be redeemed value worth 1 ticket"
@@ -2831,7 +2421,8 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_ticket_redeemed_incoming_channel_neglect_left_over_tickets() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
         let rpc_operations = MockIndexerRpcOperations::new();
@@ -2840,7 +2431,7 @@ mod tests {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
@@ -2861,11 +2452,11 @@ mod tests {
         let ticket_value = ticket.verified_ticket().amount;
 
         db.upsert_channel(None, channel).await?;
-        db.upsert_ticket(None, ticket.clone()).await?;
+        node_db.upsert_ticket(ticket.clone()).await?;
 
         let old_ticket =
             mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, ticket_index.as_u64() - 1, 1.0)?;
-        db.upsert_ticket(None, old_ticket.clone()).await?;
+        node_db.upsert_ticket(old_ticket.clone()).await?;
 
         let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels,
@@ -2878,12 +2469,12 @@ mod tests {
             ..test_log()
         };
 
-        let outgoing_ticket_index_before = db
+        let outgoing_ticket_index_before = node_db
             .get_outgoing_ticket_index(channel.get_id())
             .await?
             .load(Ordering::Relaxed);
 
-        let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
+        let stats = node_db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
             HoprBalance::zero(),
             stats.redeemed_value,
@@ -2916,7 +2507,7 @@ mod tests {
             "channel entry must contain next ticket index"
         );
 
-        let outgoing_ticket_index_after = db
+        let outgoing_ticket_index_after = node_db
             .get_outgoing_ticket_index(channel.get_id())
             .await?
             .load(Ordering::Relaxed);
@@ -2926,10 +2517,14 @@ mod tests {
             "outgoing ticket index must not change"
         );
 
-        let tickets = db.get_tickets((&channel).into()).await?;
+        let tickets = node_db
+            .stream_tickets(Some((&channel).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
         assert!(tickets.is_empty(), "there should not be any tickets left");
 
-        let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
+        let stats = node_db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
             ticket_value, stats.redeemed_value,
             "there should be redeemed value worth 1 ticket"
@@ -2943,7 +2538,8 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_ticket_redeemed_outgoing_channel() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
         let rpc_operations = MockIndexerRpcOperations::new();
@@ -2952,7 +2548,7 @@ mod tests {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -3000,7 +2596,7 @@ mod tests {
             "channel entry must contain next ticket index"
         );
 
-        let outgoing_ticket_index = db
+        let outgoing_ticket_index = node_db
             .get_outgoing_ticket_index(channel.get_id())
             .await?
             .load(Ordering::Relaxed);
@@ -3020,7 +2616,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_ticket_redeemed_on_incoming_channel_with_non_existent_ticket_should_pass() -> anyhow::Result<()>
     {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
         let rpc_operations = MockIndexerRpcOperations::new();
@@ -3029,7 +2626,7 @@ mod tests {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
@@ -3080,14 +2677,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_ticket_redeemed_on_foreign_channel_should_pass() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             Address::from(hopr_crypto_random::random_bytes()),
@@ -3138,14 +2736,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_channel_closure_initiated() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -3200,14 +2799,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_node_safe_registry_registered() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let encoded_data = ().abi_encode();
 
@@ -3237,14 +2837,15 @@ mod tests {
 
     #[tokio::test]
     async fn on_node_safe_registry_deregistered() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         // Nothing to write to the DB here, since we do not track this
 
@@ -3279,14 +2880,15 @@ mod tests {
 
     #[tokio::test]
     async fn ticket_price_update() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let encoded_data = (U256::from(1u64), U256::from(123u64)).abi_encode();
 
@@ -3323,14 +2925,15 @@ mod tests {
 
     #[tokio::test]
     async fn minimum_win_prob_update() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
         // ==> set mock expectations here
         let clonable_rpc_operations = ClonableMockOperations {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let encoded_data = (
             U256::from_be_slice(WinningProbability::ALWAYS.as_ref()),
@@ -3371,7 +2974,8 @@ mod tests {
 
     #[tokio::test]
     async fn lowering_minimum_win_prob_update_should_reject_non_satisfying_unredeemed_tickets() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_minimum_incoming_ticket_win_prob(None, 0.1.try_into()?).await?;
 
         let new_minimum = 0.5;
@@ -3389,12 +2993,16 @@ mod tests {
         db.upsert_channel(None, channel_1).await?;
 
         let ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, 1, ticket_win_probs[0])?;
-        db.upsert_ticket(None, ticket).await?;
+        node_db.upsert_ticket(ticket).await?;
 
         let ticket = mock_acknowledged_ticket(&COUNTERPARTY_CHAIN_KEY, &SELF_CHAIN_KEY, 2, ticket_win_probs[1])?;
-        db.upsert_ticket(None, ticket).await?;
+        node_db.upsert_ticket(ticket).await?;
 
-        let tickets = db.get_tickets((&channel_1).into()).await?;
+        let tickets = node_db
+            .stream_tickets(Some((&channel_1).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
         assert_eq!(tickets.len(), 2);
 
         // ---
@@ -3412,15 +3020,19 @@ mod tests {
         db.upsert_channel(None, channel_2).await?;
 
         let ticket = mock_acknowledged_ticket(&other_counterparty, &SELF_CHAIN_KEY, 1, ticket_win_probs[2])?;
-        db.upsert_ticket(None, ticket).await?;
+        node_db.upsert_ticket(ticket).await?;
 
         let ticket = mock_acknowledged_ticket(&other_counterparty, &SELF_CHAIN_KEY, 2, ticket_win_probs[3])?;
-        db.upsert_ticket(None, ticket).await?;
+        node_db.upsert_ticket(ticket).await?;
 
-        let tickets = db.get_tickets((&channel_2).into()).await?;
+        let tickets = node_db
+            .stream_tickets(Some((&channel_2).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
         assert_eq!(tickets.len(), 2);
 
-        let stats = db.get_ticket_statistics(None).await?;
+        let stats = node_db.get_ticket_statistics(None).await?;
         assert_eq!(HoprBalance::zero(), stats.rejected_value);
 
         let rpc_operations = MockIndexerRpcOperations::new();
@@ -3429,7 +3041,7 @@ mod tests {
             //
             inner: Arc::new(rpc_operations),
         };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
+        let handlers = init_handlers(clonable_rpc_operations, db.clone(), node_db.clone());
 
         let encoded_data = (
             U256::from_be_slice(WinningProbability::try_from(0.1)?.as_ref()),
@@ -3462,13 +3074,21 @@ mod tests {
             new_minimum
         );
 
-        let tickets = db.get_tickets((&channel_1).into()).await?;
+        let tickets = node_db
+            .stream_tickets(Some((&channel_1).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
         assert_eq!(tickets.len(), 1);
 
-        let tickets = db.get_tickets((&channel_2).into()).await?;
+        let tickets = node_db
+            .stream_tickets(Some((&channel_2).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
         assert_eq!(tickets.len(), 0);
 
-        let stats = db.get_ticket_statistics(None).await?;
+        let stats = node_db.get_ticket_statistics(None).await?;
         let rejected_value: primitive_types::U256 = ticket_win_probs
             .iter()
             .filter(|p| **p < new_minimum)

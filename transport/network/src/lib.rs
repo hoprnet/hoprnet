@@ -25,5 +25,4 @@ pub mod errors;
 /// Implementation of the peer network logic
 pub mod network;
 
-pub use hopr_db_api::peers::HoprDbPeersOperations;
 pub use libp2p_identity::PeerId;
