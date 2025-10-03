@@ -116,7 +116,7 @@ lazy_static::lazy_static! {
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
-    static ref METRIC_REPLAYED_PACKET_COUNT: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_REPLAYED_PACKET_COUNT: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
         "hopr_replayed_packet_count",
         "The total count of replayed packets during the packet processing pipeline run",
     ).unwrap();
