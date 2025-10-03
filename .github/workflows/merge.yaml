@@ -162,7 +162,7 @@ jobs:
   bencher:
     name: Benchmarks
     uses: ./.github/workflows/bencher.yaml
-    if: vars.BENCHMARK_TESTS_ENABLED == 'true'
+    if: vars.TEST_BENCHMARK_ENABLED == 'true'
     secrets: inherit
     with:
       source_repo: ${{ github.event.pull_request.base.repo.full_name }}

@@ -33,6 +33,7 @@ jobs:
   performance:
     name: Download
     runs-on: self-hosted-hoprnet-bigger
+    if: vars.TEST_CHECK_PERFORMANCE_ENABLED == 'true'
     timeout-minutes: 30
     steps:
       - name: Harden Runner
