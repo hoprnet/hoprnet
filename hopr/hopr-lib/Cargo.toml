@@ -28,6 +28,7 @@ prometheus = [
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
   "hopr-strategy/prometheus",
+  "hopr-db-node/prometheus",
 ]
 capture = ["hopr-transport/capture"]
 

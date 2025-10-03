@@ -24,7 +24,7 @@ use crate::{db::HoprNodeDb, errors::NodeDbError};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    pub static ref METRIC_HOPR_TICKETS_INCOMING_STATISTICS: hopr_metrics::metrics::MultiGauge = hopr_metrics::metrics::MultiGauge::new(
+    pub static ref METRIC_HOPR_TICKETS_INCOMING_STATISTICS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
         "hopr_tickets_incoming_statistics",
         "Ticket statistics for channels with incoming tickets.",
         &["channel", "statistic"]

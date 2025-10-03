@@ -14,7 +14,11 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-db-node/runtime-tokio",
 ]
-prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
+prometheus = [
+  "dep:hopr-metrics",
+  "hopr-path/prometheus",
+  "hopr-db-node/prometheus",
+]
 capture = ["dep:pcap-file"]
 
 [dependencies]

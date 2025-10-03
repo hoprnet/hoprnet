@@ -22,6 +22,7 @@ prometheus = [
   "hopr-chain-actions/prometheus",
   "hopr-chain-indexer/prometheus",
   "hopr-db-sql/prometheus",
+  "hopr-db-node/prometheus",
 ]
 
 [build-dependencies]
