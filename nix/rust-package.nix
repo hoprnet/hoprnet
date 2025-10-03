@@ -42,8 +42,6 @@ let
       "/lib64/ld-linux-x86-64.so.2"
     else if hostPlatform.isLinux && hostPlatform.isAarch64 then
       "/lib64/ld-linux-aarch64.so.1"
-    else if hostPlatform.isLinux && hostPlatform.isArmv7 then
-      "/lib64/ld-linux-armhf.so.3"
     else
       "";
 
@@ -77,6 +75,14 @@ let
   isDarwinForDarwin = buildPlatform.isDarwin && hostPlatform.isDarwin;
   isDarwinForNonDarwin = buildPlatform.isDarwin && !hostPlatform.isDarwin;
 
+  linuxNativeBuildInputs =
+    if buildPlatform.isLinux then
+      [
+        # mold is only supported on Linux
+        mold
+      ]
+    else
+      [ ];
   darwinBuildInputs =
     if isDarwinForDarwin || isDarwinForNonDarwin then
       [
@@ -105,17 +111,16 @@ let
     inherit pname pnameSuffix version;
     CARGO_PROFILE = actualCargoProfile;
 
-    nativeBuildInputs =
-      [
-        llvmPackages.bintools
-        mold
-        solcDefault
-        foundryBin
-        pkg-config
-        libiconv
-      ]
-      ++ stdenv.extraNativeBuildInputs
-      ++ darwinNativeBuildInputs;
+    nativeBuildInputs = [
+      llvmPackages.bintools
+      solcDefault
+      foundryBin
+      pkg-config
+      libiconv
+    ]
+    ++ stdenv.extraNativeBuildInputs
+    ++ darwinNativeBuildInputs
+    ++ linuxNativeBuildInputs;
     buildInputs = buildInputs ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
@@ -152,6 +157,11 @@ let
       }
     else if runClippy then
       sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
+    else if runBench then
+      sharedArgsBase
+      // {
+        LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
+      }
     else
       sharedArgsBase;
 

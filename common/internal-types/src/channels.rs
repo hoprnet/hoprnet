@@ -6,9 +6,10 @@ use std::{
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-/// Describes status of a channel
-#[derive(Copy, Clone, Debug, smart_default::SmartDefault, strum::Display)]
+#[derive(Copy, Clone, Debug, smart_default::SmartDefault, strum::Display, strum::EnumDiscriminants)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[strum_discriminants(vis(pub))]
+#[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(i8))]
 #[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
     /// The channel is closed.
@@ -62,7 +63,7 @@ pub enum ChannelDirection {
     Outgoing = 1,
 }
 
-/// Alias for the [`Hash`] representing a channel ID.
+/// Alias for the [`Hash`](struct@Hash) representing a channel ID.
 pub type ChannelId = Hash;
 
 /// Overall description of a channel
@@ -251,6 +252,34 @@ impl ChannelChange {
     }
 }
 
+/// A wrapper around [`ChannelId`] representing a Channel that is corrupted.
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CorruptedChannelEntry(ChannelId);
+
+impl From<ChannelId> for CorruptedChannelEntry {
+    fn from(value: ChannelId) -> Self {
+        CorruptedChannelEntry(value)
+    }
+}
+
+impl CorruptedChannelEntry {
+    /// Returns the channel ID of the corrupted channel.
+    pub fn channel_id(&self) -> &ChannelId {
+        &self.0
+    }
+}
+
+/// A pair of source and destination addresses representing a channel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct SrcDstPair(Address, Address);
+
+impl From<ChannelEntry> for SrcDstPair {
+    fn from(channel: ChannelEntry) -> Self {
+        SrcDstPair(channel.source, channel.destination)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -260,10 +289,8 @@ mod tests {
     };
 
     use hex_literal::hex;
-    use hopr_crypto_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
 
-    use crate::channels::{ChannelEntry, ChannelStatus, generate_channel_id};
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -290,6 +317,19 @@ mod tests {
         assert_eq!(
             "PendingToClose",
             ChannelStatus::PendingToClose(SystemTime::now()).to_string()
+        );
+    }
+
+    #[test]
+    fn channel_status_repr_compat() {
+        assert_eq!(ChannelStatusDiscriminants::Open as i8, i8::from(ChannelStatus::Open));
+        assert_eq!(
+            ChannelStatusDiscriminants::Closed as i8,
+            i8::from(ChannelStatus::Closed)
+        );
+        assert_eq!(
+            ChannelStatusDiscriminants::PendingToClose as i8,
+            i8::from(ChannelStatus::PendingToClose(SystemTime::now()))
         );
     }
 

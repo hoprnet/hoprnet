@@ -57,6 +57,13 @@ impl IntoCondition for WrappedPeerSelector {
 
 #[async_trait]
 impl HoprDbPeersOperations for HoprDb {
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::add_network_peer",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn add_network_peer(
         &self,
         peer: &PeerId,
@@ -65,12 +72,14 @@ impl HoprDbPeersOperations for HoprDb {
         backoff: f64,
         quality_window: u32,
     ) -> Result<()> {
+        let peer = *peer;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+            .await
+            .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
+
         let new_peer = hopr_db_entity::network_peer::ActiveModel {
-            packet_key: sea_orm::ActiveValue::Set(Vec::from(
-                OffchainPublicKey::try_from(peer)
-                    .map_err(|_| crate::errors::DbSqlError::DecodingError)?
-                    .as_ref(),
-            )),
+            packet_key: sea_orm::ActiveValue::Set(Vec::from(pubkey.as_ref())),
             multi_addresses: sea_orm::ActiveValue::Set(
                 mas.into_iter().map(|m| m.to_string()).collect::<Vec<String>>().into(),
             ),
@@ -91,15 +100,22 @@ impl HoprDbPeersOperations for HoprDb {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::remove_network_peer",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn remove_network_peer(&self, peer: &PeerId) -> Result<()> {
+        let peer = *peer;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+            .await
+            .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
+
         let res = hopr_db_entity::network_peer::Entity::delete_many()
-            .filter(
-                hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
-                    OffchainPublicKey::try_from(peer)
-                        .map_err(|_| crate::errors::DbSqlError::DecodingError)?
-                        .as_ref(),
-                )),
-            )
+            .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(pubkey.as_ref())))
             .exec(&self.peers_db)
             .await
             .map_err(DbSqlError::from)?;
@@ -114,6 +130,13 @@ impl HoprDbPeersOperations for HoprDb {
         }
     }
 
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::update_network_peer",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn update_network_peer(&self, new_status: PeerStatus) -> Result<()> {
         let row = hopr_db_entity::network_peer::Entity::find()
             .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(new_status.id.0.as_ref())))
@@ -157,15 +180,21 @@ impl HoprDbPeersOperations for HoprDb {
         }
     }
 
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::get_network_peer",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn get_network_peer(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
+        let peer = *peer;
+        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
+            .await
+            .map_err(|_| crate::errors::DbSqlError::DecodingError)?;
         let row = hopr_db_entity::network_peer::Entity::find()
-            .filter(
-                hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(
-                    OffchainPublicKey::try_from(peer)
-                        .map_err(|_| crate::errors::DbSqlError::DecodingError)?
-                        .as_ref(),
-                )),
-            )
+            .filter(hopr_db_entity::network_peer::Column::PacketKey.eq(Vec::from(pubkey.as_ref())))
             .one(&self.peers_db)
             .await
             .map_err(DbSqlError::from)?;
@@ -178,6 +207,7 @@ impl HoprDbPeersOperations for HoprDb {
         }
     }
 
+    #[tracing::instrument(skip(self), name = "HoprDbPeersOperations::get_network_peers", level = "trace", err)]
     async fn get_network_peers<'a>(
         &'a self,
         selector: PeerSelector,
@@ -185,7 +215,6 @@ impl HoprDbPeersOperations for HoprDb {
     ) -> Result<BoxStream<'a, PeerStatus>> {
         let selector: WrappedPeerSelector = selector.into();
         let mut sub_stream = hopr_db_entity::network_peer::Entity::find()
-            // .filter(hopr_db_entity::network_peer::Column::Ignored.is_not_null())
             .filter(selector)
             .order_by(
                 network_peer::Column::LastSeen,
@@ -218,6 +247,13 @@ impl HoprDbPeersOperations for HoprDb {
         }))
     }
 
+    #[tracing::instrument(
+        skip(self),
+        name = "HoprDbPeersOperations::network_peer_stats",
+        level = "trace",
+        err,
+        ret
+    )]
     async fn network_peer_stats(&self, quality_threshold: f64) -> Result<Stats> {
         Ok(Stats {
             good_quality_public: hopr_db_entity::network_peer::Entity::find()
@@ -480,8 +516,12 @@ mod tests {
                 .await?;
         }
 
+        // The peers have by default current timestamp as LastSeen column when
+        // the `add_network_peer` method is called.
+        // Therefore, the `get_network_peers` must retrieve them in ascending order
+        // so that it later matches the `peers` vector in the assertion.
         let peers_from_db: Vec<PeerId> = db
-            .get_network_peers(Default::default(), false)
+            .get_network_peers(Default::default(), true)
             .await?
             .map(|s| s.id.1)
             .collect()

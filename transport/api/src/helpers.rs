@@ -1,27 +1,20 @@
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use async_lock::RwLock;
-use futures::{TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
+use futures::{FutureExt, StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
-use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::crypto_traits::Randomizable;
-use hopr_db_sql::{HoprDbAllOperations, api::prelude::DbError};
+use hopr_db_sql::{HoprDbAllOperations, prelude::FoundSurb};
 use hopr_internal_types::prelude::*;
-use hopr_network_types::{
-    prelude::{ResolvedTransportRouting, RoutingOptions},
-    types::DestinationRouting,
-};
+use hopr_network_types::prelude::*;
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
-use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
-use hopr_transport_packet::prelude::ApplicationData;
+use hopr_primitive_types::prelude::*;
+use hopr_protocol_app::prelude::*;
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
-use hopr_transport_session::{
-    errors::{SessionManagerError, TransportSessionError},
-    traits::SendMsg,
-};
 use tracing::trace;
 
-use crate::errors::HoprTransportError;
+use crate::constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -64,6 +57,8 @@ pub(crate) struct PathPlanner<T, S> {
     selector: S,
     me: Address,
 }
+
+const DEFAULT_PACKET_PLANNER_CONCURRENCY: usize = 10;
 
 impl<T, S> PathPlanner<T, S>
 where
@@ -140,8 +135,9 @@ where
     pub(crate) async fn resolve_routing(
         &self,
         size_hint: usize,
+        max_surbs: usize,
         routing: DestinationRouting,
-    ) -> crate::errors::Result<ResolvedTransportRouting> {
+    ) -> crate::errors::Result<(ResolvedTransportRouting, Option<usize>)> {
         match routing {
             DestinationRouting::Forward {
                 destination,
@@ -152,8 +148,9 @@ where
                 let forward_path = self.resolve_path(self.me, destination, forward_options).await?;
 
                 let return_paths = if let Some(return_options) = return_options {
-                    let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint);
-                    trace!(%destination, %num_possible_surbs, data_len = size_hint, "resolving packet return paths");
+                    // Safeguard for the correct number of SURBs
+                    let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint).min(max_surbs);
+                    trace!(%destination, %num_possible_surbs, data_len = size_hint, max_surbs, "resolving packet return paths");
 
                     (0..num_possible_surbs)
                         .map(|_| self.resolve_path(destination, self.me, return_options.clone()))
@@ -166,83 +163,101 @@ where
 
                 trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
 
-                Ok(ResolvedTransportRouting::Forward {
-                    pseudonym: pseudonym.unwrap_or_else(HoprPseudonym::random),
-                    forward_path,
-                    return_paths,
-                })
+                Ok((
+                    ResolvedTransportRouting::Forward {
+                        pseudonym: pseudonym.unwrap_or_else(HoprPseudonym::random),
+                        forward_path,
+                        return_paths,
+                    },
+                    None,
+                ))
             }
             DestinationRouting::Return(matcher) => {
-                let (sender_id, surb) = self.db.find_surb(matcher).await?;
-                Ok(ResolvedTransportRouting::Return(sender_id, surb))
+                let FoundSurb {
+                    sender_id,
+                    surb,
+                    remaining,
+                } = self.db.find_surb(matcher).await?;
+                Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct MessageSender<T, S> {
-    pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
-    pub resolver: PathPlanner<T, S>,
-}
-
-impl<T, S> MessageSender<T, S>
+// TODO: consider making this a `with` decorator for `MsgSender`
+// ^^ This requires
+//   a) `MsgSender` to be a `Sink`
+//   b) Dropping the `Clone` requirement on `Sink` that is given into `SessionManager`
+// However the DestinationRouting resolution concurrency (from for_each_concurrent) would be lost.
+// Therefore, this will likely make sense when the path planner is behind some sort of a mutex,
+// where concurrent resolution would not make sense.
+pub(crate) fn run_packet_planner<T, S>(
+    planner: PathPlanner<T, S>,
+    packet_sender: MsgSender<Sender<SendMsgInput>>,
+) -> Sender<(DestinationRouting, ApplicationDataOut)>
 where
-    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
-    S: PathSelector + Send + Sync,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
+    S: PathSelector + Clone + Send + Sync + 'static,
 {
-    pub fn new(
-        process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
-        resolver: PathPlanner<T, S>,
-    ) -> Self {
-        Self {
-            process_packet_send,
-            resolver,
-        }
-    }
-}
+    let (tx, rx) =
+        futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
-#[async_trait::async_trait]
-impl<T, S> SendMsg for MessageSender<T, S>
-where
-    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
-    S: PathSelector + Send + Sync,
-{
-    #[tracing::instrument(level = "debug", skip(self, data))]
-    async fn send_message(
-        &self,
-        data: ApplicationData,
-        routing: DestinationRouting,
-    ) -> std::result::Result<(), TransportSessionError> {
-        let routing = self
-            .resolver
-            .resolve_routing(data.len(), routing)
-            .await
-            .map_err(|error| {
-                tracing::error!(%error, "failed to resolve routing");
-                // Out of SURBs error gets a special distinction by the Session code
-                if let HoprTransportError::Db(DbError::NoSurbAvailable(_)) = error {
-                    TransportSessionError::OutOfSurbs
-                } else {
-                    TransportSessionError::Path
+    let planner_concurrency = std::env::var("HOPR_PACKET_PLANNER_CONCURRENCY")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_PACKET_PLANNER_CONCURRENCY);
+
+    let distress_threshold = planner.db.get_surb_config().distress_threshold;
+    hopr_async_runtime::prelude::spawn(
+        rx.for_each_concurrent(planner_concurrency, move |(routing, mut data)| {
+            let planner = planner.clone();
+            let packet_sender = packet_sender.clone();
+            async move {
+                let max_surbs = data.estimate_surbs_with_msg();
+
+                match planner.resolve_routing(data.data.total_len(), max_surbs, routing).await {
+                    Ok((resolved, rem_surbs)) => {
+                        // Set the SURB distress/out-of-SURBs flag if applicable.
+                        // These flags are translated into HOPR protocol packet signals and are
+                        // applicable only on the return path.
+                        let mut signals_to_dst = data
+                            .packet_info
+                            .as_ref()
+                            .map(|info| info.signals_to_destination)
+                            .unwrap_or_default();
+
+                        if resolved.is_return() {
+                            signals_to_dst = match rem_surbs {
+                                Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                                    signals_to_dst | PacketSignal::SurbDistress
+                                }
+                                Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
+                                _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
+                            };
+                        } else {
+                            // Unset these flags as they make no sense on the forward path.
+                            signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
+                        }
+
+                        data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
+
+                        // The awaiter here is intentionally dropped,
+                        // since we do not intend to be notified about packet delivery to the first hop
+                        if let Err(error) = packet_sender.send_packet(data, resolved).await {
+                            tracing::error!(%error, "failed to enqueue packet for sending");
+                        }
+                    }
+                    Err(error) => tracing::error!(%error, "failed to resolve path for routing"),
                 }
-            })?;
+            }
+        })
+        .inspect(|_| {
+            tracing::warn!(
+                task = "transport (packet planner)",
+                "long-running background task finished"
+            )
+        }),
+    );
 
-        self.process_packet_send
-            .get()
-            .ok_or_else(|| SessionManagerError::NotStarted)?
-            .send_packet(data, routing)
-            .await
-            .map_err(|_| TransportSessionError::Closed)?
-            .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
-            .await
-            .map_err(|error| {
-                tracing::error!(%error, "packet send error");
-                TransportSessionError::Timeout
-            })?;
-
-        trace!("packet sent to the outgoing queue");
-
-        Ok(())
-    }
+    tx
 }

@@ -9,7 +9,12 @@
   useRustNightly ? false,
 }:
 let
-  cargoTarget = pkgs.stdenv.buildPlatform.config;
+  buildPlatform = pkgs.stdenv.buildPlatform;
+  cargoTarget =
+    if buildPlatform.config == "arm64-apple-darwin" then
+      "aarch64-apple-darwin"
+    else
+      buildPlatform.config;
   rustToolchain =
     if useRustNightly then
       pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
@@ -18,6 +23,14 @@ let
         targets = [ cargoTarget ];
       };
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+  linuxMinimumPackages = pkgs.lib.optionals pkgs.stdenv.isLinux (
+    with pkgs;
+    [
+      # mold is only supported on Linux
+      mold
+      autoPatchelfHook
+    ]
+  );
   minimumPackages =
     with pkgs;
     [
@@ -31,23 +44,23 @@ let
       just
       llvmPackages.bintools
       lsof
-      mold
       openssl
       patchelf
       pkg-config
       time
       which
       yq-go
+      help2man
 
       ## formatting
       config.treefmt.build.wrapper
     ]
-    ++ (lib.attrValues config.treefmt.build.programs)
-    ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+    ++ (pkgs.lib.attrValues config.treefmt.build.programs)
+    ++ linuxMinimumPackages;
   packages = minimumPackages ++ shellPackages;
 
   # mold is only supported on Linux, so falling back to lld on Darwin
-  linker = if pkgs.stdenv.buildPlatform.isDarwin then "lld" else "mold";
+  linker = if buildPlatform.isDarwin then "lld" else "mold";
 in
 craneLib.devShell {
   inherit shellHook packages;
@@ -59,4 +72,5 @@ craneLib.devShell {
     ++ pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]
   );
   CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
+  HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES = "true"; # Allow local private IPs in dev shells
 }

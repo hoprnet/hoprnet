@@ -292,8 +292,11 @@ pub trait HoprRpcOperations {
     /// Retrieves the on-chain status of node, safe, and module.
     async fn check_node_safe_module_status(&self, node_address: Address) -> Result<NodeSafeModuleStatus>;
 
-    /// Sends transaction to the RPC provider.
+    /// Sends transaction to the RPC provider, does not await confirmation.
     async fn send_transaction(&self, tx: TransactionRequest) -> Result<PendingTransaction>;
+
+    /// Sends transaction to the RPC provider, awaits confirmation.
+    async fn send_transaction_with_confirm(&self, tx: TransactionRequest) -> Result<Hash>;
 }
 
 /// Structure containing filtered logs that all belong to the same block.

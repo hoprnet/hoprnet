@@ -20,8 +20,9 @@ fn tag_bloom_filter_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("tag_bloom_filter");
     group.sample_size(100_000);
     group.throughput(Throughput::Elements(1));
+    group.measurement_time(std::time::Duration::from_secs(10));
 
-    group.bench_function("check", |b| {
+    group.bench_function("check_existing", |b| {
         b.iter(|| {
             bloom.check(black_box(&existing_tag));
         })

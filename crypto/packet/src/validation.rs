@@ -1,12 +1,13 @@
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use tracing::debug;
+use tracing::{debug, instrument};
 
 use crate::errors::TicketValidationError;
 
 /// Performs validations of the given unacknowledged ticket and channel.
 /// This is a higher-level function, hence it is not in `hopr-internal-types` crate.
+#[instrument(level = "trace", skip_all, err)]
 pub fn validate_unacknowledged_ticket(
     ticket: Ticket,
     channel: &ChannelEntry,
@@ -115,7 +116,7 @@ mod tests {
             .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
-            .challenge(Default::default())
+            .eth_challenge(Default::default())
             .build_signed(&SENDER_PRIV_KEY, &Hash::default())?
             .leak())
     }

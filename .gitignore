@@ -3,6 +3,7 @@
 **/target
 **/.idea
 **/gha-creds-*.json
+.DS_Store
 
 openapi.spec.json
 
@@ -212,3 +213,7 @@ result
 deploy/nfpm/nfpm.generated.yaml
 deploy/nfpm/changelog*
 privatekey.asc
+deploy/nfpm/*.1.gz
+
+# pcap packet capture files
+**/*.pcap

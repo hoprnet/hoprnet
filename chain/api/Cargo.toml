@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-api"
-version = "0.6.0"
+version = "0.7.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR chain interface"
 edition = "2021"
@@ -23,6 +23,9 @@ prometheus = [
   "hopr-chain-indexer/prometheus",
   "hopr-db-sql/prometheus",
 ]
+
+[build-dependencies]
+anyhow = { workspace = true }
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [

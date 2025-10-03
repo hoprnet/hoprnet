@@ -1,8 +1,10 @@
 {
   Cmd ? [ ],
-  Entrypoint,
+  Entrypoint ? [ ],
   env ? [ ],
   extraContents ? [ ],
+  extraPorts ? { },
+  fakeRootCommands ? null,
   name,
   pkgs,
 }:
@@ -17,6 +19,9 @@ let
       findutils
       iana-etc
       nettools
+      gnugrep # Used for searching env variables
+      gnutar # Used to extract the database files from the docker container
+
     ]
     ++ extraContents;
   Env = [
@@ -24,12 +29,32 @@ let
     # "RUST_LOG=info"   # 'info' level is set by default with some spamming components set to override
     "RUST_BACKTRACE=full"
     "LD_LIBRARY_PATH=${libPath}"
-  ] ++ env;
+  ]
+  ++ env;
+  ExposedPorts = extraPorts;
 in
-pkgs.dockerTools.buildLayeredImage {
-  inherit name contents;
-  tag = "latest";
-  # breaks binary reproducibility, but makes usage easier
-  created = "now";
-  config = { inherit Cmd Entrypoint Env; };
-}
+pkgs.dockerTools.buildLayeredImage (
+  {
+    inherit name contents;
+    tag = "latest";
+    # breaks binary reproducibility, but makes usage easier
+    created = "now";
+    config = {
+      inherit
+        Cmd
+        Entrypoint
+        Env
+        ExposedPorts
+        ;
+    };
+  }
+  // (
+    if fakeRootCommands != null then
+      {
+        enableFakechroot = true;
+        inherit fakeRootCommands;
+      }
+    else
+      { }
+  )
+)

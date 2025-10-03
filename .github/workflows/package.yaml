@@ -7,6 +7,9 @@ name: Package
 on:
   workflow_call:
     inputs:
+      runner:
+        required: true
+        type: string
       branch:
         required: true
         type: string
@@ -27,13 +30,18 @@ concurrency:
   group: ${{ inputs.branch }}-package-${{ inputs.target }}-${{ inputs.packager }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   package:
-    runs-on: self-hosted-hoprnet-small
+    name: Package
+    runs-on: ${{ inputs.runner }}
     if: github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
           ref: ${{ inputs.branch }}
@@ -85,27 +93,47 @@ jobs:
           # Remove suffix from architecture
           architecture=${architecture%-linux}
           echo "package_file_name=hoprd_${current_version}_${architecture}" | tee -a $GITHUB_OUTPUT
+          echo "current_version=${current_version}" | tee -a $GITHUB_OUTPUT
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          nix_path: nixpkgs=channel:nixos-24.05
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt install -y help2man just
+          if [[ "${{ inputs.target }}" == "x86_64-linux" ]]; then
+            nfpm_url=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | jq -r '.assets[] | select(.name | endswith("amd64.deb")) | .browser_download_url')
+          else
+            nfpm_url=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | jq -r '.assets[] | select(.name | endswith("arm64.deb")) | .browser_download_url')
+          fi
+          curl -L -o nfpm.deb "$nfpm_url"
+          sudo apt install -y ./nfpm.deb
 
-      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        with:
-          name: hoprnet
-          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-        env:
-          USER: runner
+      - name: Create man pages
+        run: |
+          help2man --name="HOPR node executable" --no-info --output ./deploy/nfpm/hoprd.1 ./dist/bin/hoprd
+          gzip -9n ./deploy/nfpm/hoprd.1
+          help2man --name="HOPR CLI helper tool" --no-info --output ./deploy/nfpm/hopli.1 ./dist/bin/hopli
+          gzip -9n ./deploy/nfpm/hopli.1
 
-      - name: Package
-        run: nix develop -c just package ${{ inputs.packager }} ${{ inputs.target }}
+      - name: Create Changelog
+        run: |
+          ./scripts/generate-changelog.sh "${{ steps.download.outputs.current_version }}" "${{ inputs.packager }}" true > ./deploy/nfpm/changelog
+          if [[ "${{ inputs.packager }}" == "deb" ]]; then
+            gzip -9 -c ./deploy/nfpm/changelog > ./deploy/nfpm/changelog.gz
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Test Package
+      - name: Create package
+        run: just package ${{ inputs.packager }} ${{ inputs.target }}
+
+      - name: Create signatures
+        run: just sign-file "${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}"
+        env:
+          GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
+
+      - name: Test package
         if: vars.TEST_OS_PACKAGE_ENABLED == 'true'
+        timeout-minutes: 30
         continue-on-error: true
         run: |
           echo "${{ secrets.TEST_OS_PACKAGE_HOPR_IDENTITY_FILE }}" | base64 -d > ${{ github.workspace }}/deploy/nfpm/hopr.id
@@ -118,8 +146,21 @@ jobs:
           HOPRD_PROVIDER: ${{ secrets.TEST_OS_PACKAGE_HOPRD_PROVIDER }}
           GCP_PROJECT: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
 
-      - name: Upload packaged artifact
+      - name: Publish package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}
           path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}
+
+      - name: Publish package hash
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.sha256
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.sha256
+
+      - name: Publish package signature
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.download.outputs.package_file_name }}.${{ inputs.extension }}.asc
+          path: ${{ github.workspace }}/dist/packages/hoprd-${{ inputs.target }}.${{ inputs.packager }}.asc
+

@@ -8,48 +8,45 @@ use std::{
 
 use futures::io::{AsyncRead, AsyncWrite};
 
-/// Joins [futures::AsyncRead] and [futures::AsyncWrite] into a single object.
-pub struct DuplexIO<R, W>(pub R, pub W);
+/// Joins [`futures::AsyncRead`] and [`futures::AsyncWrite`] into a single object.
+#[pin_project::pin_project]
+pub struct DuplexIO<W, R>(#[pin] pub W, #[pin] pub R);
 
-impl<R, W> From<(R, W)> for DuplexIO<R, W>
+impl<R, W> From<(W, R)> for DuplexIO<W, R>
 where
     R: AsyncRead,
     W: AsyncWrite,
 {
-    fn from(value: (R, W)) -> Self {
+    fn from(value: (W, R)) -> Self {
         Self(value.0, value.1)
     }
 }
 
-impl<R, W> AsyncRead for DuplexIO<R, W>
+impl<R, W> AsyncRead for DuplexIO<W, R>
 where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    R: AsyncRead,
+    W: AsyncWrite,
 {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.0).poll_read(cx, buf)
+        self.project().1.poll_read(cx, buf)
     }
 }
 
-impl<R, W> AsyncWrite for DuplexIO<R, W>
+impl<R, W> AsyncWrite for DuplexIO<W, R>
 where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    R: AsyncRead,
+    W: AsyncWrite,
 {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_write(cx, buf)
+        self.project().0.poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_flush(cx)
+        self.project().0.poll_flush(cx)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_close(cx)
+        self.project().0.poll_close(cx)
     }
 }
 
@@ -114,10 +111,14 @@ impl Hash for SocketAddrStr {
 }
 
 #[cfg(feature = "runtime-tokio")]
-pub use tokio_utils::copy_duplex;
+pub use tokio_utils::{copy_duplex, copy_duplex_abortable};
 
 #[cfg(feature = "runtime-tokio")]
 mod tokio_utils {
+    use futures::{
+        FutureExt,
+        future::{AbortHandle, Abortable},
+    };
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
     use super::*;
@@ -145,10 +146,12 @@ mod tokio_utils {
             match state {
                 TransferState::Running(buf) => {
                     let count = std::task::ready!(buf.poll_copy(cx, r.as_mut(), w.as_mut()))?;
+                    tracing::trace!(processed = count, "direction copy complete");
                     *state = TransferState::ShuttingDown(count);
                 }
                 TransferState::ShuttingDown(count) => {
                     std::task::ready!(w.as_mut().poll_shutdown(cx))?;
+                    tracing::trace!(processed = *count, "direction shutdown complete");
                     *state = TransferState::Done(*count);
                 }
                 TransferState::Done(count) => return Poll::Ready(Ok(*count)),
@@ -158,13 +161,37 @@ mod tokio_utils {
 
     /// This is a proper re-implementation of Tokio's
     /// [`copy_bidirectional_with_sizes`](tokio::io::copy_bidirectional_with_sizes), which does not leave the stream
-    /// in half-open-state when one side closes read or write side. Instead, if either side encounters and empty
+    /// in half-open-state when one side closes read or write side.
+    ///
+    /// Instead, if either side encounters and empty
     /// read (EOF indication), the write-side is closed as well and vice versa.
     pub async fn copy_duplex<A, B>(
         a: &mut A,
         b: &mut B,
-        a_to_b_buffer_size: usize,
-        b_to_a_buffer_size: usize,
+        (a_to_b_buffer_size, b_to_a_buffer_size): (usize, usize),
+    ) -> std::io::Result<(u64, u64)>
+    where
+        A: AsyncRead + AsyncWrite + Unpin + ?Sized,
+        B: AsyncRead + AsyncWrite + Unpin + ?Sized,
+    {
+        let (_, ar_a) = AbortHandle::new_pair();
+        let (_, ar_b) = AbortHandle::new_pair();
+
+        copy_duplex_abortable(a, b, (a_to_b_buffer_size, b_to_a_buffer_size), (ar_a, ar_b)).await
+    }
+
+    /// Variant of [`copy_duplex`] with an option to abort either side early using the given
+    /// [`AbortRegistrations`](futures::future::AbortRegistration).
+    ///
+    /// Once a side is aborted, its proper shutdown is initiated, and once done, the other side's
+    /// shutdown is also initiated.
+    /// The difference between the two abort handles is only in the order - which side gets shutdown
+    /// first after the abort is called.
+    pub async fn copy_duplex_abortable<A, B>(
+        a: &mut A,
+        b: &mut B,
+        (a_to_b_buffer_size, b_to_a_buffer_size): (usize, usize),
+        (a_abort, b_abort): (futures::future::AbortRegistration, futures::future::AbortRegistration),
     ) -> std::io::Result<(u64, u64)>
     where
         A: AsyncRead + AsyncWrite + Unpin + ?Sized,
@@ -173,10 +200,33 @@ mod tokio_utils {
         let mut a_to_b = TransferState::Running(CopyBuffer::new(a_to_b_buffer_size));
         let mut b_to_a = TransferState::Running(CopyBuffer::new(b_to_a_buffer_size));
 
+        // Abort futures are fused: once aborted, each poll returns Err(Aborted)
+        let (mut abort_a, mut abort_b) = (
+            Abortable::new(futures::future::pending::<()>(), a_abort),
+            Abortable::new(futures::future::pending::<()>(), b_abort),
+        );
+
         std::future::poll_fn(|cx| {
             let mut a_to_b_result = transfer_one_direction(cx, &mut a_to_b, a, b)?;
             let mut b_to_a_result = transfer_one_direction(cx, &mut b_to_a, b, a)?;
 
+            // Initiate A's shutdown if A is aborted while still running
+            if let (Poll::Ready(Err(_)), TransferState::Running(buf)) = (abort_a.poll_unpin(cx), &a_to_b) {
+                tracing::trace!("A-side has been aborted.");
+                a_to_b = TransferState::ShuttingDown(buf.amt);
+                // We need an artificial wake-up here, as if an empty read was received
+                cx.waker().wake_by_ref();
+            }
+
+            // Initiate B's shutdown if B is aborted while still running
+            if let (Poll::Ready(Err(_)), TransferState::Running(buf)) = (abort_b.poll_unpin(cx), &b_to_a) {
+                tracing::trace!("B-side has been aborted.");
+                b_to_a = TransferState::ShuttingDown(buf.amt);
+                // We need an artificial wake-up here, as if an empty read was received
+                cx.waker().wake_by_ref();
+            }
+
+            // Once B-side is done, initiate shutdown of A-side
             if let TransferState::Done(_) = b_to_a {
                 if let TransferState::Running(buf) = &a_to_b {
                     tracing::trace!("B-side has completed, terminating A-side.");
@@ -185,6 +235,7 @@ mod tokio_utils {
                 }
             }
 
+            // Once A-side is done, initiate shutdown of B-side
             if let TransferState::Done(_) = a_to_b {
                 if let TransferState::Running(buf) = &b_to_a {
                     tracing::trace!("A-side has completed, terminate B-side.");
@@ -197,6 +248,11 @@ mod tokio_utils {
             let a_to_b_bytes_transferred = std::task::ready!(a_to_b_result);
             let b_to_a_bytes_transferred = std::task::ready!(b_to_a_result);
 
+            tracing::trace!(
+                a_to_b = a_to_b_bytes_transferred,
+                b_to_a = b_to_a_bytes_transferred,
+                "copy completed"
+            );
             Poll::Ready(Ok((a_to_b_bytes_transferred, b_to_a_bytes_transferred)))
         })
         .await
@@ -330,17 +386,19 @@ mod tokio_utils {
     }
 }
 
-/// Converts a [`AsyncRead`] into [`Stream`] by reading at most `S` bytes
-/// in each call to [`Stream::poll_next`].
-pub struct AsyncReadStreamer<const S: usize, R>(pub R);
+/// Converts a [`AsyncRead`] into `futures::Stream` by reading at most `S` bytes
+/// in each call to `Stream::poll_next`.
+#[pin_project::pin_project]
+pub struct AsyncReadStreamer<const S: usize, R>(#[pin] pub R);
 
-impl<const S: usize, R: AsyncRead + Unpin> futures::Stream for AsyncReadStreamer<S, R> {
+impl<const S: usize, R: AsyncRead> futures::Stream for AsyncReadStreamer<S, R> {
     type Item = std::io::Result<Box<[u8]>>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut buffer = vec![0u8; S];
+        let mut this = self.project();
 
-        match futures::ready!(Pin::new(&mut self.0).poll_read(cx, &mut buffer)) {
+        match futures::ready!(this.0.as_mut().poll_read(cx, &mut buffer)) {
             Ok(0) => Poll::Ready(None),
             Ok(size) => {
                 buffer.truncate(size);
@@ -351,14 +409,46 @@ impl<const S: usize, R: AsyncRead + Unpin> futures::Stream for AsyncReadStreamer
     }
 }
 
-#[cfg(all(feature = "runtime-tokio", test))]
+/// Wraps a [`futures::Sink`] that accepts `Box<[u8]>` with an [`AsyncWrite`] interface,
+/// with each write to the underlying `Sink` being at most `C` bytes.
+#[pin_project::pin_project]
+pub struct AsyncWriteSink<const C: usize, S>(#[pin] pub S);
+
+impl<const C: usize, S> AsyncWrite for AsyncWriteSink<C, S>
+where
+    S: futures::Sink<Box<[u8]>>,
+    S::Error: Into<std::io::Error>,
+{
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        let mut this = self.project();
+
+        futures::ready!(this.0.as_mut().poll_ready(cx).map_err(Into::into))?;
+        let len = buf.len().min(C);
+
+        match this.0.as_mut().start_send(Box::from(&buf[..len])) {
+            Ok(()) => Poll::Ready(Ok(len)),
+            Err(e) => Poll::Ready(Err(e.into())),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        self.project().0.poll_flush(cx).map_err(Into::into)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        self.project().0.poll_close(cx).map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
 mod tests {
-    use futures::TryStreamExt;
+    use futures::{SinkExt, StreamExt, TryStreamExt};
+    #[cfg(feature = "runtime-tokio")]
     use tokio::io::AsyncWriteExt;
 
     use super::*;
-    use crate::utils::DuplexIO;
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_copy_duplex() -> anyhow::Result<()> {
         const DATA_LEN: usize = 2000;
@@ -369,14 +459,13 @@ mod tests {
         let bob_tx = hopr_crypto_random::random_bytes::<DATA_LEN>();
         let mut bob_rx = [0u8; DATA_LEN];
 
-        let alice = DuplexIO(alice_tx.as_ref(), futures::io::Cursor::new(alice_rx.as_mut()));
-        let bob = DuplexIO(bob_tx.as_ref(), futures::io::Cursor::new(bob_rx.as_mut()));
+        let alice = DuplexIO(futures::io::Cursor::new(alice_rx.as_mut()), alice_tx.as_ref());
+        let bob = DuplexIO(futures::io::Cursor::new(bob_rx.as_mut()), bob_tx.as_ref());
 
         let (a_to_b, b_to_a) = copy_duplex(
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(alice),
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(bob),
-            128,
-            128,
+            (128, 128),
         )
         .await?;
 
@@ -389,6 +478,65 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
+    #[test_log::test(tokio::test(flavor = "multi_thread"))]
+    async fn test_copy_duplex_with_abort_from_client() -> anyhow::Result<()> {
+        let (mut client_tx, mut client_rx) = tokio::io::duplex(10); // Create a mock duplex stream
+        let (mut server_rx, mut server_tx) = tokio::io::duplex(10); // Create a mock duplex stream
+
+        // Simulate 'a' finishing while there's still data for 'b'
+        client_tx.write_all(b"hello").await?;
+        server_tx.write_all(b"data").await?;
+
+        let (handle_a, reg_a) = futures::future::AbortHandle::new_pair();
+        let (_, reg_b) = futures::future::AbortHandle::new_pair();
+
+        let result = tokio::task::spawn(async move {
+            crate::utils::copy_duplex_abortable(&mut client_rx, &mut server_rx, (2, 2), (reg_a, reg_b)).await
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+        // The abort must make the task terminate, although none of the streams were shutdown
+        handle_a.abort();
+
+        let (a, b) = tokio::time::timeout(std::time::Duration::from_millis(100), result).await???;
+        assert_eq!(a, 5);
+        assert_eq!(b, 4);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "runtime-tokio")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_copy_duplex_with_abort_from_server() -> anyhow::Result<()> {
+        let (mut client_tx, mut client_rx) = tokio::io::duplex(10); // Create a mock duplex stream
+        let (mut server_rx, mut server_tx) = tokio::io::duplex(10); // Create a mock duplex stream
+
+        // Simulate 'a' finishing while there's still data for 'b'
+        client_tx.write_all(b"hello").await?;
+        server_tx.write_all(b"data").await?;
+
+        let (_, reg_a) = futures::future::AbortHandle::new_pair();
+        let (handle_b, reg_b) = futures::future::AbortHandle::new_pair();
+
+        let result = tokio::task::spawn(async move {
+            crate::utils::copy_duplex_abortable(&mut client_rx, &mut server_rx, (2, 2), (reg_a, reg_b)).await
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+        // The abort must make the task terminate, although none of the streams were shutdown
+        handle_b.abort();
+
+        let (a, b) = tokio::time::timeout(std::time::Duration::from_millis(100), result).await???;
+        assert_eq!(a, 5);
+        assert_eq!(b, 4);
+
+        Ok(())
+    }
+
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_copy_duplex_small() -> anyhow::Result<()> {
         const DATA_LEN: usize = 100;
@@ -399,14 +547,13 @@ mod tests {
         let bob_tx = hopr_crypto_random::random_bytes::<DATA_LEN>();
         let mut bob_rx = [0u8; DATA_LEN];
 
-        let alice = DuplexIO(alice_tx.as_ref(), futures::io::Cursor::new(alice_rx.as_mut()));
-        let bob = DuplexIO(bob_tx.as_ref(), futures::io::Cursor::new(bob_rx.as_mut()));
+        let alice = DuplexIO(futures::io::Cursor::new(alice_rx.as_mut()), alice_tx.as_ref());
+        let bob = DuplexIO(futures::io::Cursor::new(bob_rx.as_mut()), bob_tx.as_ref());
 
         let (a_to_b, b_to_a) = copy_duplex(
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(alice),
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(bob),
-            128,
-            128,
+            (128, 128),
         )
         .await?;
 
@@ -419,6 +566,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_client_to_server() -> anyhow::Result<()> {
         let (mut client_tx, mut client_rx) = tokio::io::duplex(8); // Create a mock duplex stream
@@ -431,7 +579,7 @@ mod tests {
         server_tx.write_all(b"data").await?;
         server_tx.shutdown().await?;
 
-        let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, 2, 2).await?;
+        let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, (2, 2)).await?;
 
         let (client_to_server_count, server_to_client_count) = result;
         assert_eq!(client_to_server_count, 5); // 'hello' was transferred
@@ -440,6 +588,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_server_to_client() -> anyhow::Result<()> {
         let (mut client_tx, mut client_rx) = tokio::io::duplex(32); // Create a mock duplex stream
@@ -451,7 +600,7 @@ mod tests {
 
         client_tx.write_all(b"some longer data to transfer").await?;
 
-        let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, 2, 2).await?;
+        let result = crate::utils::copy_duplex(&mut client_rx, &mut server_rx, (2, 2)).await?;
 
         let (client_to_server_count, server_to_client_count) = result;
         assert_eq!(server_to_client_count, 5); // 'hello' was transferred
@@ -460,6 +609,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_async_read_streamer_complete_chunk() {
         let data = b"Hello, World!!";
@@ -508,6 +658,27 @@ mod tests {
         let mut streamer = AsyncReadStreamer::<14, _>(reader);
 
         assert_eq!(Some(Box::from(reader)), streamer.try_next().await?);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_async_write_sink_should_perform_write_in_chunks() -> anyhow::Result<()> {
+        let data = b"Hello, World!!";
+        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+        use futures::AsyncWriteExt;
+
+        let mut writer = AsyncWriteSink::<7, _>(tx.sink_map_err(|e| std::io::Error::other(e)));
+
+        AsyncWriteExt::write_all(&mut writer, data).await?;
+        AsyncWriteExt::flush(&mut writer).await?;
+        AsyncWriteExt::close(&mut writer).await?;
+
+        let rx_data = rx.collect::<Vec<_>>().await;
+        assert_eq!(2, rx_data.len());
+        assert_eq!(rx_data[0], (&data[0..7]).into());
+        assert_eq!(rx_data[1], (&data[7..]).into());
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::HoprState;
+use crate::state::HoprState;
 
 /// Enumeration of status errors thrown from this library.
 #[derive(Error, Debug)]

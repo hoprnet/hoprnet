@@ -5,6 +5,7 @@ use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelud
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use tracing::instrument;
 
 use crate::{
     HoprDbGeneralModelOperations, OptTx,
@@ -72,7 +73,7 @@ pub trait HoprDbChannelOperations {
 
     /// Commits changes of the channel to the database.
     /// Returns the updated channel, or on deletion, the deleted channel entry.
-    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
+    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>>;
 
     /// Retrieves the channel by source and destination.
     /// This operation should be able to use cache since it can be also called from
@@ -101,7 +102,7 @@ pub trait HoprDbChannelOperations {
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Outgoing, my_node)`
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    /// Retrieves all channel information from the DB.
+    /// Retrieves all channels information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
     /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s
@@ -141,28 +142,26 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbSqlError>(
-                        if let Some(model) = Channel::find()
-                            .filter(channel::Column::ChannelId.eq(id_hex))
-                            .one(tx.as_ref())
-                            .await?
-                        {
-                            Some(ChannelEditor {
-                                orig: model.clone().try_into()?,
-                                model: model.into_active_model(),
-                                delete: false,
-                            })
-                        } else {
-                            None
-                        },
-                    )
+                    match Channel::find()
+                        .filter(channel::Column::ChannelId.eq(id_hex.clone()))
+                        .one(tx.as_ref())
+                        .await?
+                    {
+                        Some(model) => Ok(Some(ChannelEditor {
+                            orig: ChannelEntry::try_from(model.clone())?,
+                            model: model.into_active_model(),
+                            delete: false,
+                        })),
+                        None => Ok(None),
+                    }
                 })
             })
             .await
     }
 
-    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
+    async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>> {
         let epoch = editor.model.epoch.clone();
+
         let parties = ChannelParties(editor.orig.source, editor.orig.destination);
         let ret = self
             .nest_transaction(tx)
@@ -171,10 +170,13 @@ impl HoprDbChannelOperations for HoprDb {
                 Box::pin(async move {
                     if !editor.delete {
                         let model = editor.model.update(tx.as_ref()).await?;
-                        Ok::<_, DbSqlError>(model.try_into()?)
+                        match ChannelEntry::try_from(model) {
+                            Ok(channel) => Ok::<_, DbSqlError>(Some(channel)),
+                            Err(e) => Err(DbSqlError::from(e)),
+                        }
                     } else {
                         editor.model.delete(tx.as_ref()).await?;
-                        Ok::<_, DbSqlError>(editor.orig)
+                        Ok::<_, DbSqlError>(Some(editor.orig))
                     }
                 })
             })
@@ -195,6 +197,7 @@ impl HoprDbChannelOperations for HoprDb {
         Ok(ret)
     }
 
+    #[instrument(level = "trace", skip(self, tx), err)]
     async fn get_channel_by_parties<'a>(
         &'a self,
         tx: OptTx<'a>,
@@ -205,6 +208,7 @@ impl HoprDbChannelOperations for HoprDb {
         let fetch_channel = async move {
             let src_hex = src.to_hex();
             let dst_hex = dst.to_hex();
+            tracing::warn!(%src, %dst, "cache miss on get_channel_by_parties");
             self.nest_transaction(tx)
                 .await?
                 .perform(|tx| {
@@ -301,7 +305,7 @@ impl HoprDbChannelOperations for HoprDb {
                         )))
                         .and(channel::Column::ClosureTime.gt(Utc::now()))),
             )
-            .stream(&self.index_db)
+            .stream(self.index_db.read_only())
             .await?
             .map_err(DbSqlError::from)
             .and_then(|m| async move { Ok(ChannelEntry::try_from(m)?) })

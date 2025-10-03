@@ -1,11 +1,14 @@
-use hopr_internal_types::{channels::ChannelStatus, prelude::ChannelEntry};
+use hopr_internal_types::{
+    channels::{ChannelId, ChannelStatus, CorruptedChannelEntry},
+    prelude::ChannelEntry,
+};
 use hopr_primitive_types::{
     balance::HoprBalance,
     prelude::{IntoEndian, ToHex, U256},
 };
 use sea_orm::Set;
 
-use crate::{channel, errors::DbEntityError};
+use crate::{channel, corrupted_channel, errors::DbEntityError};
 
 /// Extension trait for updating [ChannelStatus] inside [channel::ActiveModel].
 /// This is needed as `status` maps to two model members.
@@ -45,13 +48,12 @@ impl TryFrom<&channel::Model> for ChannelEntry {
     type Error = DbEntityError;
 
     fn try_from(value: &channel::Model) -> Result<Self, Self::Error> {
-        let status = value.try_into()?;
         Ok(ChannelEntry::new(
             value.source.parse()?,
             value.destination.parse()?,
             HoprBalance::from(U256::from_be_bytes(&value.balance)),
             U256::from_be_bytes(&value.ticket_index),
-            status,
+            value.try_into()?,
             U256::from_be_bytes(&value.epoch),
         ))
     }
@@ -78,5 +80,33 @@ impl From<ChannelEntry> for channel::ActiveModel {
         };
         ret.set_status(value.status);
         ret
+    }
+}
+
+impl TryFrom<&corrupted_channel::Model> for CorruptedChannelEntry {
+    type Error = DbEntityError;
+
+    fn try_from(value: &corrupted_channel::Model) -> Result<Self, Self::Error> {
+        let channel_id = ChannelId::from_hex(value.channel_id.as_str())
+            .map_err(|_| DbEntityError::ConversionError("invalid channel ID".into()))?;
+
+        Ok(channel_id.into())
+    }
+}
+
+impl TryFrom<corrupted_channel::Model> for CorruptedChannelEntry {
+    type Error = DbEntityError;
+
+    fn try_from(value: corrupted_channel::Model) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
+impl From<CorruptedChannelEntry> for corrupted_channel::ActiveModel {
+    fn from(value: CorruptedChannelEntry) -> Self {
+        corrupted_channel::ActiveModel {
+            channel_id: Set(value.channel_id().to_hex()),
+            ..Default::default()
+        }
     }
 }

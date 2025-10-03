@@ -14,9 +14,9 @@ use std::{
 };
 
 use clap::{Parser, ValueHint};
+use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
-use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -209,9 +209,9 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
         let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
 
         let decoded_key = hex::decode(priv_key_without_prefix)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {e:?}")))?;
         ChainKeypair::from_secret(&decoded_key)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {e:?}")))
     }
 
     /// Read the default private key and return an address string
@@ -266,9 +266,9 @@ impl ArgEnvReader<ChainKeypair, String> for ManagerPrivateKeyArgs {
         // trim the 0x prefix if needed
         let priv_key_without_prefix = pri_key.strip_prefix("0x").unwrap_or(&pri_key).to_string();
         let decoded_key = hex::decode(priv_key_without_prefix)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {:?}", e)))?;
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to decode private key: {e:?}")))?;
         ChainKeypair::from_secret(&decoded_key)
-            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {:?}", e)))
+            .map_err(|e| HelperErrors::UnableToReadPrivateKey(format!("Failed to create keypair: {e:?}")))
     }
 
     /// Read the default private key and return an address string
@@ -479,7 +479,7 @@ impl IdentityFileArgs {
             // read all the identities from the directory
             Ok(read_identities(files, &pwd)?
                 .values()
-                .map(|ni| ni.chain_key.public().0.to_address())
+                .map(|ni| ni.chain_key.public().to_address())
                 .collect())
         } else {
             Ok(Vec::<Address>::new())
@@ -505,7 +505,7 @@ mod tests {
         let key = private_key_args.read_default()?;
 
         let ref_decoded_value = hex::decode(DUMMY_PRIVATE_KEY)?;
-        println!("ref_decoded_value {:?}", ref_decoded_value);
+        println!("ref_decoded_value {ref_decoded_value:?}");
 
         assert_eq!(
             key.public().to_address().to_checksum(),
@@ -541,8 +541,8 @@ mod tests {
 
         let read_id = read_identity(files[0].as_path(), pwd)?;
         assert_eq!(
-            read_id.1.chain_key.public().0.to_address(),
-            created_id.chain_key.public().0.to_address()
+            read_id.1.chain_key.public().to_address(),
+            created_id.chain_key.public().to_address()
         );
         Ok(())
     }
@@ -559,14 +559,14 @@ mod tests {
         // created and the read id is identical
         let files = get_files(path, &None);
         assert_eq!(files.len(), 1, "must have one identity file");
-        let address = created_id.chain_key.public().0.to_address();
+        let address = created_id.chain_key.public().to_address();
 
         let new_pwd = "supersecured";
         let (_, returned_key) = update_identity_password(created_id, files[0].as_path(), new_pwd)?;
 
         // check the returned value
         assert_eq!(
-            returned_key.chain_key.public().0.to_address(),
+            returned_key.chain_key.public().to_address(),
             address,
             "returned keys are identical"
         );
@@ -574,7 +574,7 @@ mod tests {
         // check the read value
         let (_, read_id) = read_identity(files[0].as_path(), new_pwd)?;
         assert_eq!(
-            read_id.chain_key.public().0.to_address(),
+            read_id.chain_key.public().to_address(),
             address,
             "cannot use the new password to read files"
         );
@@ -595,8 +595,8 @@ mod tests {
         let read_id = read_identities(files, pwd)?;
         assert_eq!(read_id.len(), 1);
         assert_eq!(
-            read_id.values().next().unwrap().chain_key.public().0.to_address(),
-            created_id.chain_key.public().0.to_address()
+            read_id.values().next().unwrap().chain_key.public().to_address(),
+            created_id.chain_key.public().to_address()
         );
 
         // print the read id
@@ -709,14 +709,7 @@ mod tests {
         let val = read_identities(files, pwd)?;
         assert_eq!(val.len(), 1);
         assert_eq!(
-            val.values()
-                .next()
-                .unwrap()
-                .chain_key
-                .public()
-                .0
-                .to_address()
-                .to_string(),
+            val.values().next().unwrap().chain_key.public().to_address().to_string(),
             alice_address
         );
         Ok(())
@@ -725,7 +718,7 @@ mod tests {
     fn get_files(identity_directory: &str, identity_prefix: &Option<String>) -> Vec<PathBuf> {
         // early return if failed in reading identity directory
         let directory = fs::read_dir(Path::new(identity_directory))
-            .unwrap_or_else(|_| panic!("cannot read directory {}", identity_directory));
+            .unwrap_or_else(|_| panic!("cannot read directory {identity_directory}"));
 
         // read all the files from the directory that contains
         // 1) "id" in its name

@@ -56,12 +56,13 @@ lazy_static::lazy_static! {
 #[async_trait]
 pub trait TicketRedeemActions {
     /// Redeems all redeemable tickets in all channels.
-    async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>>;
+    async fn redeem_all_tickets(&self, min_value: HoprBalance, only_aggregated: bool) -> Result<Vec<PendingAction>>;
 
     /// Redeems all redeemable tickets in the incoming channel from the given counterparty.
     async fn redeem_tickets_with_counterparty(
         &self,
         counterparty: &Address,
+        min_value: HoprBalance,
         only_aggregated: bool,
     ) -> Result<Vec<PendingAction>>;
 
@@ -69,6 +70,7 @@ pub trait TicketRedeemActions {
     async fn redeem_tickets_in_channel(
         &self,
         channel: &ChannelEntry,
+        min_value: HoprBalance,
         only_aggregated: bool,
     ) -> Result<Vec<PendingAction>>;
 
@@ -86,7 +88,7 @@ where
     Db: HoprDbChannelOperations + HoprDbTicketOperations + HoprDbInfoOperations + Clone + Send + Sync + std::fmt::Debug,
 {
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
+    async fn redeem_all_tickets(&self, min_value: HoprBalance, only_aggregated: bool) -> Result<Vec<PendingAction>> {
         let incoming_channels = self
             .db
             .get_channels_via(None, ChannelDirection::Incoming, &self.self_address())
@@ -100,7 +102,10 @@ where
 
         // Must be synchronous because underlying Ethereum transactions are sequential
         for incoming_channel in incoming_channels {
-            match self.redeem_tickets_in_channel(&incoming_channel, only_aggregated).await {
+            match self
+                .redeem_tickets_in_channel(&incoming_channel, min_value, only_aggregated)
+                .await
+            {
                 Ok(mut successful_txs) => {
                     receivers.append(&mut successful_txs);
                 }
@@ -121,6 +126,7 @@ where
     async fn redeem_tickets_with_counterparty(
         &self,
         counterparty: &Address,
+        min_value: HoprBalance,
         only_aggregated: bool,
     ) -> Result<Vec<PendingAction>> {
         let maybe_channel = self
@@ -128,7 +134,8 @@ where
             .get_channel_by_parties(None, counterparty, &self.self_address(), false)
             .await?;
         if let Some(channel) = maybe_channel {
-            self.redeem_tickets_in_channel(&channel, only_aggregated).await
+            self.redeem_tickets_in_channel(&channel, min_value, only_aggregated)
+                .await
         } else {
             Err(ChannelDoesNotExist)
         }
@@ -138,12 +145,14 @@ where
     async fn redeem_tickets_in_channel(
         &self,
         channel: &ChannelEntry,
+        min_value: HoprBalance,
         only_aggregated: bool,
     ) -> Result<Vec<PendingAction>> {
         self.redeem_tickets(
             TicketSelector::from(channel)
                 .with_aggregated_only(only_aggregated)
                 .with_index_range(channel.ticket_index.as_u64()..)
+                .with_amount(min_value..)
                 .with_state(AcknowledgedTicketStatus::Untouched),
         )
         .await
@@ -280,6 +289,8 @@ mod tests {
         static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).expect("lazy static keypair should be constructible");
     }
 
+    const PRICE_PER_PACKET: u128 = 10000000000000000u128; // 0.01 HOPR
+
     fn generate_random_ack_ticket(
         idx: u64,
         counterparty: &ChainKeypair,
@@ -288,22 +299,18 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
-
-        let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
+        let resp = Response::from_half_keys(&hk1, &hk2)?;
 
         Ok(TicketBuilder::default()
             .addresses(counterparty, &*ALICE)
-            .amount(price_per_packet.div_f64(1.0f64)? * 5u32)
+            .amount(U256::from(PRICE_PER_PACKET).div_f64(1.0f64)? * 5u32)
             .index(idx)
             .index_offset(1)
             .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(channel_epoch)
-            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .challenge(resp.to_challenge()?)
             .build_signed(counterparty, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
+            .into_acknowledged(resp))
     }
 
     async fn create_channel_with_ack_tickets(
@@ -371,6 +378,20 @@ mod tests {
         let (channel_from_charlie, charlie_tickets) =
             create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, 4u32).await?;
 
+        // Add extra ticket to Charlie that has very low value
+        let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random())?;
+        let low_value_ack_ticket = TicketBuilder::default()
+            .addresses(&*CHARLIE, &*ALICE)
+            .amount(PRICE_PER_PACKET)
+            .index((ticket_count + 1) as u64)
+            .index_offset(1)
+            .win_prob(WinningProbability::ALWAYS)
+            .channel_epoch(4u32)
+            .challenge(resp.to_challenge()?)
+            .build_signed(&CHARLIE, &Hash::default())?
+            .into_acknowledged(resp);
+        db.upsert_ticket(None, low_value_ack_ticket).await?;
+
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
 
@@ -413,7 +434,7 @@ mod tests {
             .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
-        // and then all Charlie's tickets get redeemed
+        // And then all Charlie's tickets get redeemed except the one that does not meet the minimum value
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count)
@@ -430,7 +451,14 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
 
-        let confirmations = futures::future::try_join_all(actions.redeem_all_tickets(false).await?.into_iter()).await?;
+        // Make sure that the low value ticket does not pass the min_value check
+        let confirmations = futures::future::try_join_all(
+            actions
+                .redeem_all_tickets((PRICE_PER_PACKET * 5).into(), false)
+                .await?
+                .into_iter(),
+        )
+        .await?;
 
         assert_eq!(2 * ticket_count, confirmations.len(), "must have all confirmations");
         assert!(
@@ -450,9 +478,17 @@ mod tests {
         );
         assert!(
             db_acks_charlie
-                .into_iter()
+                .iter()
+                .take(ticket_count)
                 .all(|tkt| tkt.status == AcknowledgedTicketStatus::BeingRedeemed),
-            "all charlie's tickets must be in BeingRedeemed state"
+            "all valuable charlie's tickets must be in BeingRedeemed state"
+        );
+        assert!(
+            db_acks_charlie
+                .iter()
+                .skip(ticket_count)
+                .all(|tkt| tkt.status == AcknowledgedTicketStatus::Untouched),
+            "all non-valuable charlie's tickets must be in Untouched state"
         );
 
         Ok(())
@@ -515,7 +551,7 @@ mod tests {
 
         let confirmations = futures::future::try_join_all(
             actions
-                .redeem_tickets_with_counterparty(&BOB.public().to_address(), false)
+                .redeem_tickets_with_counterparty(&BOB.public().to_address(), 0.into(), false)
                 .await?
                 .into_iter(),
         )
@@ -605,7 +641,7 @@ mod tests {
 
         let confirmations = futures::future::try_join_all(
             actions
-                .redeem_tickets_in_channel(&channel_from_bob, false)
+                .redeem_tickets_in_channel(&channel_from_bob, 0.into(), false)
                 .await?
                 .into_iter(),
         )
@@ -687,7 +723,7 @@ mod tests {
 
         futures::future::join_all(
             actions
-                .redeem_tickets_in_channel(&channel_from_bob, false)
+                .redeem_tickets_in_channel(&channel_from_bob, 0.into(), false)
                 .await?
                 .into_iter(),
         )
@@ -757,7 +793,7 @@ mod tests {
 
         futures::future::join_all(
             actions
-                .redeem_tickets_in_channel(&channel_from_bob, false)
+                .redeem_tickets_in_channel(&channel_from_bob, 0.into(), false)
                 .await?
                 .into_iter(),
         )

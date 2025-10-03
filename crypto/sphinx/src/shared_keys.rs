@@ -68,10 +68,13 @@ const HASH_KEY_SPHINX_SECRET: &str = "HASH_KEY_SPHINX_SECRET";
 const HASH_KEY_SPHINX_BLINDING: &str = "HASH_KEY_SPHINX_BLINDING";
 
 impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
-    /// Generates shared secrets given the group element of the peers.
+    /// Generates shared secrets given the group element of the peers and their Alpha value encodings.
+    ///
     /// The order of the peer group elements is preserved for resulting shared keys.
-    pub fn generate(peer_group_elements: Vec<G>) -> hopr_crypto_types::errors::Result<SharedKeys<E, G>> {
-        let mut shared_keys = Vec::new();
+    pub(crate) fn generate(
+        peer_group_elements: Vec<(G, &Alpha<G::AlphaLen>)>,
+    ) -> hopr_crypto_types::errors::Result<SharedKeys<E, G>> {
+        let mut shared_keys = Vec::with_capacity(peer_group_elements.len());
 
         // coeff_prev becomes: x * b_0 * b_1 * b_2 * ...
         // alpha_prev becomes: x * b_0 * b_1 * b_2 * ... * G
@@ -82,13 +85,12 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
         // Iterate through all the given peer public keys
         let keys_len = peer_group_elements.len();
-        for (i, group_element) in peer_group_elements.into_iter().enumerate() {
-            // Try to decode the given public key point & multiply by the current coefficient
-            let salt = group_element.to_alpha();
+        for (i, (group_element, salt)) in peer_group_elements.into_iter().enumerate() {
+            // Multiply the public key by the current coefficient
             let shared_secret = group_element.mul(&coeff_prev);
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
-            shared_keys.push(shared_secret.extract_key(HASH_KEY_SPHINX_SECRET, &salt));
+            shared_keys.push(shared_secret.extract_key(HASH_KEY_SPHINX_SECRET, salt.as_ref()));
 
             // Stop here, we don't need to compute anything more
             if i == keys_len - 1 {
@@ -116,17 +118,19 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     }
 
     /// Calculates the forward transformation given the local private key.
-    /// The `public_group_element` is a precomputed group element associated with the private key for efficiency.
-    pub fn forward_transform(
+    ///
+    /// Efficiency note: the `public_element_alpha` is a precomputed group element Alpha encoding associated with the
+    /// `private_scalar`.
+    pub(crate) fn forward_transform(
         alpha: &Alpha<G::AlphaLen>,
         private_scalar: &E,
-        public_group_element: &G,
+        public_element_alpha: &Alpha<G::AlphaLen>,
     ) -> hopr_crypto_types::errors::Result<(Alpha<G::AlphaLen>, SharedSecret)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
         let s_k = alpha_point.clone().mul(private_scalar);
 
-        let secret = s_k.extract_key(HASH_KEY_SPHINX_SECRET, &public_group_element.to_alpha());
+        let secret = s_k.extract_key(HASH_KEY_SPHINX_SECRET, public_element_alpha);
 
         let b_k = s_k.extract_key(HASH_KEY_SPHINX_BLINDING, alpha);
 
@@ -153,13 +157,16 @@ pub trait SphinxSuite {
     type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
 
     /// Pseudo-Random Permutation used to encrypt and decrypt packet payload
-    type PRP: crypto_traits::StreamCipher + crypto_traits::KeyIvInit;
+    type PRP: crypto_traits::PRP + crypto_traits::KeyIvInit;
 
     /// Convenience function to generate shared keys from the path of public keys.
-    fn new_shared_keys(
-        public_keys: &[<Self::P as Keypair>::Public],
-    ) -> hopr_crypto_types::errors::Result<SharedKeys<Self::E, Self::G>> {
-        SharedKeys::generate(public_keys.iter().map(|pk| pk.into()).collect())
+    fn new_shared_keys<'a>(
+        public_keys: &'a [<Self::P as Keypair>::Public],
+    ) -> hopr_crypto_types::errors::Result<SharedKeys<Self::E, Self::G>>
+    where
+        &'a Alpha<<Self::G as GroupElement<Self::E>>::AlphaLen>: From<&'a <Self::P as Keypair>::Public>,
+    {
+        SharedKeys::generate(public_keys.iter().map(|pk| (pk.into(), pk.into())).collect())
     }
 
     /// Instantiates a new Pseudo-Random Permutation IV and key for general packet data.
@@ -180,10 +187,21 @@ pub(crate) mod tests {
     use super::*;
 
     pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) {
-        let (pub_keys, priv_keys): (Vec<S::G>, Vec<S::E>) = (0..node_count).map(|_| S::G::random_pair()).unzip();
+        let (pub_keys, priv_keys): (Vec<(S::G, Alpha<<S::G as GroupElement<S::E>>::AlphaLen>)>, Vec<S::E>) = (0
+            ..node_count)
+            .map(|_| {
+                let pair = S::G::random_pair();
+                ((pair.0.clone(), pair.0.to_alpha()), pair.1)
+            })
+            .unzip();
+
+        let pub_keys_alpha = pub_keys
+            .iter()
+            .map(|(pk, alpha)| (pk.clone(), alpha))
+            .collect::<Vec<_>>();
 
         // Now generate the key shares for the public keys
-        let generated_shares = SharedKeys::<S::E, S::G>::generate(pub_keys.clone()).unwrap();
+        let generated_shares = SharedKeys::<S::E, S::G>::generate(pub_keys_alpha.clone()).unwrap();
         assert_eq!(
             node_count,
             generated_shares.secrets.len(),
@@ -193,7 +211,7 @@ pub(crate) mod tests {
         let mut alpha_cpy = generated_shares.alpha.clone();
         for (i, priv_key) in priv_keys.into_iter().enumerate() {
             let (alpha, secret) =
-                SharedKeys::<S::E, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i]).unwrap();
+                SharedKeys::<S::E, S::G>::forward_transform(&alpha_cpy, &priv_key, &pub_keys[i].1).unwrap();
 
             assert_eq!(
                 secret.ct_eq(&generated_shares.secrets[i]).unwrap_u8(),

@@ -1,11 +1,14 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, AtomicU64, Ordering},
+use std::{
+    path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+    },
 };
 
 use alloy::sol_types::SolEvent;
 use futures::{
-    StreamExt,
+    FutureExt, StreamExt,
     future::AbortHandle,
     stream::{self},
 };
@@ -21,6 +24,7 @@ use tracing::{debug, error, info, trace};
 use crate::{
     IndexerConfig,
     errors::{CoreEthereumIndexerError, Result},
+    snapshot::{SnapshotInfo, SnapshotManager},
     traits::ChainLogHandler,
 };
 
@@ -145,12 +149,16 @@ where
 
         // First, check whether fast sync is enabled and can be performed.
         // If so:
-        //   1. Delete the existing indexed data
-        //   2. Reset fast sync progress
-        //   3. Run the fast sync process until completion
-        //   4. Finally, starting the rpc indexer.
+        //   1. Download the snapshot if the logs database is empty and the snapshot is enabled
+        //   2. Delete the existing indexed data
+        //   3. Reset fast sync progress
+        //   4. Run the fast sync process until completion
+        //   5. Finally, starting the rpc indexer.
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
+
+        // Pre-start operations to ensure the indexer is ready, including snapshot fetching
+        self.pre_start().await?;
 
         #[derive(PartialEq, Eq)]
         enum FastSyncMode {
@@ -246,109 +254,114 @@ where
 
         info!(next_block_to_process, "Indexer start point");
 
-        let indexing_abort_handle = hopr_async_runtime::spawn_as_abortable!(async move {
-            // Update the chain head once again
-            debug!("Updating chain head at indexer startup");
-            Self::update_chain_head(&rpc, chain_head.clone()).await;
+        let indexing_abort_handle = hopr_async_runtime::spawn_as_abortable!(
+            async move {
+                // Update the chain head once again
+                debug!("Updating chain head at indexer startup");
+                Self::update_chain_head(&rpc, chain_head.clone()).await;
 
-            #[cfg(all(feature = "prometheus", not(test)))]
-            {
-                METRIC_INDEXER_SYNC_SOURCE.set(&["fast-sync"], 0.0);
-                METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 1.0);
-            }
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_INDEXER_SYNC_SOURCE.set(&["fast-sync"], 0.0);
+                    METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 1.0);
+                }
 
-            let rpc_ref = &rpc;
+                let rpc_ref = &rpc;
 
-            let event_stream = rpc
-                .try_stream_logs(next_block_to_process, log_filters, is_synced.load(Ordering::Relaxed))
-                .expect("block stream should be constructible")
-                .then(|block| {
-                    let db = db.clone();
-                    let chain_head = chain_head.clone();
-                    let is_synced = is_synced.clone();
-                    let tx = tx.clone();
-                    let logs_handler = logs_handler.clone();
+                let event_stream = rpc
+                    .try_stream_logs(next_block_to_process, log_filters, is_synced.load(Ordering::Relaxed))
+                    .expect("block stream should be constructible")
+                    .then(|block| {
+                        let db = db.clone();
+                        let chain_head = chain_head.clone();
+                        let is_synced = is_synced.clone();
+                        let tx = tx.clone();
+                        let logs_handler = logs_handler.clone();
 
-                    async move {
-                        Self::calculate_sync_process(
-                            block.block_id,
-                            rpc_ref,
-                            db,
-                            chain_head.clone(),
-                            is_synced.clone(),
-                            next_block_to_process,
-                            tx.clone(),
-                            logs_handler.safe_address().into(),
-                            logs_handler.contract_addresses_map().channels.into(),
-                        )
-                        .await;
+                        async move {
+                            Self::calculate_sync_process(
+                                block.block_id,
+                                rpc_ref,
+                                db,
+                                chain_head.clone(),
+                                is_synced.clone(),
+                                next_block_to_process,
+                                tx.clone(),
+                                logs_handler.safe_address().into(),
+                                logs_handler.contract_addresses_map().channels.into(),
+                            )
+                            .await;
 
-                        block
-                    }
-                })
-                .filter_map(|block| {
-                    let db = db.clone();
-                    let logs_handler = logs_handler.clone();
+                            block
+                        }
+                    })
+                    .filter_map(|block| {
+                        let db = db.clone();
+                        let logs_handler = logs_handler.clone();
 
-                    async move {
-                        debug!(%block, "storing logs from block");
-                        let logs = block.logs.clone();
+                        async move {
+                            debug!(%block, "storing logs from block");
+                            let logs = block.logs.clone();
 
-                        // Filter out the token contract logs because we do not need to store these
-                        // in the database.
-                        let logs_vec = logs
-                            .into_iter()
-                            .filter(|log| log.address != logs_handler.contract_addresses_map().token)
-                            .collect();
+                            // Filter out the token contract logs because we do not need to store these
+                            // in the database.
+                            let logs_vec = logs
+                                .into_iter()
+                                .filter(|log| log.address != logs_handler.contract_addresses_map().token)
+                                .collect();
 
-                        match db.store_logs(logs_vec).await {
-                            Ok(store_results) => {
-                                if let Some(error) = store_results
-                                    .into_iter()
-                                    .filter(|r| r.is_err())
-                                    .map(|r| r.unwrap_err())
-                                    .next()
-                                {
-                                    error!(%block, %error, "failed to processed stored logs from block");
+                            match db.store_logs(logs_vec).await {
+                                Ok(store_results) => {
+                                    if let Some(error) = store_results
+                                        .into_iter()
+                                        .filter(|r| r.is_err())
+                                        .map(|r| r.unwrap_err())
+                                        .next()
+                                    {
+                                        error!(%block, %error, "failed to processed stored logs from block");
+                                        None
+                                    } else {
+                                        Some(block)
+                                    }
+                                }
+                                Err(error) => {
+                                    error!(%block, %error, "failed to store logs from block");
                                     None
-                                } else {
-                                    Some(block)
                                 }
                             }
-                            Err(error) => {
-                                error!(%block, %error, "failed to store logs from block");
-                                None
-                            }
+                        }
+                    })
+                    .filter_map(|block| {
+                        let db = db.clone();
+                        let logs_handler = logs_handler.clone();
+                        let is_synced = is_synced.clone();
+                        async move {
+                            Self::process_block(&db, &logs_handler, block, false, is_synced.load(Ordering::Relaxed))
+                                .await
+                        }
+                    })
+                    .flat_map(stream::iter);
+
+                futures::pin_mut!(event_stream);
+                while let Some(event) = event_stream.next().await {
+                    trace!(%event, "processing on-chain event");
+                    // Pass the events further only once we're fully synced
+                    if is_synced.load(Ordering::Relaxed) {
+                        if let Err(error) = tx_significant_events.try_send(event) {
+                            error!(%error, "failed to pass a significant chain event further");
                         }
                     }
-                })
-                .filter_map(|block| {
-                    let db = db.clone();
-                    let logs_handler = logs_handler.clone();
-                    let is_synced = is_synced.clone();
-                    async move {
-                        Self::process_block(&db, &logs_handler, block, false, is_synced.load(Ordering::Relaxed)).await
-                    }
-                })
-                .flat_map(stream::iter);
+                }
 
-            futures::pin_mut!(event_stream);
-            while let Some(event) = event_stream.next().await {
-                trace!(%event, "processing on-chain event");
-                // Pass the events further only once we're fully synced
-                if is_synced.load(Ordering::Relaxed) {
-                    if let Err(error) = tx_significant_events.try_send(event) {
-                        error!(%error, "failed to pass a significant chain event further");
-                    }
+                if panic_on_completion {
+                    panic!(
+                        "Indexer event stream has been terminated. This error may be caused by a failed RPC \
+                         connection."
+                    );
                 }
             }
-
-            if panic_on_completion {
-                panic!(
-                    "Indexer event stream has been terminated. This error may be caused by a failed RPC connection."
-                );
-            }
-        });
+            .inspect(|_| tracing::warn!(task = "indexer", "long-running background task finished"))
+        );
 
         if rx.next().await.is_some() {
             Ok(indexing_abort_handle)
@@ -357,6 +370,29 @@ where
                 "Error during indexing start".into(),
             ))
         }
+    }
+
+    pub async fn pre_start(&self) -> Result<()> {
+        let fast_sync_configured = self.cfg.fast_sync;
+        let index_empty = self.db.index_is_empty().await?;
+
+        // Check if we need to download snapshot before fast sync
+        let logs_db_has_data = self.has_logs_data().await?;
+
+        if fast_sync_configured && index_empty && !logs_db_has_data && self.cfg.enable_logs_snapshot {
+            info!("Logs database is empty, attempting to download logs snapshot...");
+
+            match self.download_snapshot().await {
+                Ok(snapshot_info) => {
+                    info!("Logs snapshot downloaded successfully: {:?}", snapshot_info);
+                }
+                Err(e) => {
+                    error!("Failed to download logs snapshot: {}. Continuing with regular sync.", e);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Generates specialized log filters for efficient blockchain event processing.
@@ -525,6 +561,10 @@ where
                             panic!("failed to mark log as processed, panicking to prevent data loss")
                         }
                     },
+                    Err(CoreEthereumIndexerError::ProcessError(error)) => {
+                        error!(block_id, %error, "failed to process log into event, continuing indexing");
+                        None
+                    }
                     Err(error) => {
                         error!(block_id, %error, "failed to process log into event, panicking to prevent data loss");
                         panic!("failed to process log into event, panicking to prevent data loss")
@@ -704,6 +744,70 @@ where
                     error!(%error, "failed to notify about achieving indexer synchronization")
                 }
             }
+        }
+    }
+
+    /// Checks if the logs database has any existing data.
+    ///
+    /// This method determines whether the database already contains logs, which helps
+    /// decide whether to download a snapshot for faster synchronization. It queries
+    /// the database for the total log count and returns an error if the query fails
+    /// (e.g., when the database doesn't exist yet).
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(true)` if the database contains one or more logs
+    /// - `Ok(false)` if the database is empty
+    /// - `Err(e)` if the database cannot be queried
+    async fn has_logs_data(&self) -> Result<bool> {
+        self.db
+            .get_logs_count(None, None)
+            .await
+            .map(|count| count > 0)
+            .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))
+    }
+
+    /// Downloads and installs a database snapshot for faster initial synchronization.
+    ///
+    /// This method coordinates the snapshot download process by:
+    /// 1. Validating the indexer configuration
+    /// 2. Creating a snapshot manager instance
+    /// 3. Downloading and extracting the snapshot to the data directory
+    ///
+    /// Snapshots allow new nodes to quickly synchronize with the network by downloading
+    /// pre-built database files instead of fetching all historical logs from scratch.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(SnapshotInfo)` containing details about the downloaded snapshot
+    /// - `Err(CoreEthereumIndexerError::SnapshotError)` if validation or download fails
+    ///
+    /// # Prerequisites
+    ///
+    /// - Configuration must be valid (proper URL format, data directory set)
+    /// - Sufficient disk space must be available
+    /// - Network connectivity to the snapshot URL
+    pub async fn download_snapshot(&self) -> Result<SnapshotInfo> {
+        // Validate config before proceeding
+        if let Err(e) = self.cfg.validate() {
+            return Err(CoreEthereumIndexerError::SnapshotError(e.to_string()));
+        }
+
+        let snapshot_manager = SnapshotManager::with_db(self.db.clone())
+            .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))?;
+
+        let data_dir = Path::new(&self.cfg.data_directory);
+
+        // The URL has been verified so we can just use it.
+        if let Some(url) = &self.cfg.logs_snapshot_url {
+            snapshot_manager
+                .download_and_setup_snapshot(url, data_dir)
+                .await
+                .map_err(|e| CoreEthereumIndexerError::SnapshotError(e.to_string()))
+        } else {
+            Err(CoreEthereumIndexerError::SnapshotError(
+                "Logs snapshot URL is not configured".to_string(),
+            ))
         }
     }
 }
@@ -1059,10 +1163,7 @@ mod tests {
                 .expect_contract_addresses_map()
                 .return_const(ContractAddresses::default());
 
-            let indexer_cfg = IndexerConfig {
-                start_block_number: 0,
-                fast_sync: true,
-            };
+            let indexer_cfg = IndexerConfig::new(0, true, false, None, "/tmp/test_data".to_string());
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -1150,10 +1251,7 @@ mod tests {
                 .expect_contract_addresses_map()
                 .return_const(ContractAddresses::default());
 
-            let indexer_cfg = IndexerConfig {
-                start_block_number: 0,
-                fast_sync: true,
-            };
+            let indexer_cfg = IndexerConfig::new(0, true, false, None, "/tmp/test_data".to_string());
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
                 tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -1326,10 +1424,7 @@ mod tests {
             .expect_contract_addresses_map()
             .return_const(ContractAddresses::default());
 
-        let indexer_cfg = IndexerConfig {
-            start_block_number: 0,
-            fast_sync: false,
-        };
+        let indexer_cfg = IndexerConfig::new(0, false, false, None, "/tmp/test_data".to_string());
 
         let (tx_events, _) = async_channel::unbounded();
         let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();

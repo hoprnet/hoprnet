@@ -56,16 +56,18 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   binary:
+    name: Binary
     if: >-
       github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request_target' && inputs.target != '' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target)))
     runs-on: ${{ github.event.inputs.runner || inputs.runner }}
     timeout-minutes: 60
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -110,7 +112,7 @@ jobs:
           echo "runner=${{ inputs.runner || github.event.inputs.runner }}"
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
           repository: ${{ steps.vars.outputs.source_repo }}
@@ -118,7 +120,7 @@ jobs:
 
       - name: Install Nix
         if: steps.vars.outputs.runner_needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
+        uses: cachix/install-nix-action@7be5dee1421f63d07e71ce6e0a9f8a4b07c2a487 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           nix_path: nixpkgs=channel:nixos-24.05
@@ -134,33 +136,30 @@ jobs:
       - name: Build ${{ steps.vars.outputs.binary }} binaries
         run: nix build -L .#${{ steps.vars.outputs.binary }}${{ steps.vars.outputs.package_suffix }}
 
-      - name: Create ${{ steps.vars.outputs.binary }} Signature
+      - name: Create ${{ steps.vars.outputs.binary }} signature
         run: |
-          nix run .#sign -- "${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}"
+          mkdir -p ${{ github.workspace }}/dist/bin
+          cp ${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }} ${{ github.workspace }}/dist/bin/
+          nix develop -L .#ci -c bash -c 'just sign-file "${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}"'
         env:
           GPG_HOPRNET_PRIVATE_KEY: ${{ secrets.GPG_HOPRNET_PRIVATE_KEY }}
 
-
-      - name: Publish Github Workflow artifact
+      - name: Publish ${{ steps.vars.outputs.binary }} binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}
-          path: ${{ github.workspace }}/result/bin/${{ steps.vars.outputs.binary }}
-
-      - name: Publish Github Workflow artifact signature
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sig
-          path: ${{ github.workspace }}/${{ steps.vars.outputs.binary }}.sig
+          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}
 
       - name: Publish Github Workflow artifact hash
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sha256
-          path: ${{ github.workspace }}/${{ steps.vars.outputs.binary }}.sha256
+          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.sha256
 
-      - name: Publish Github Workflow artifact hash signature
+      - name: Publish Github Workflow artifact signature
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.sha256.asc
-          path: ${{ github.workspace }}/${{ steps.vars.outputs.binary }}.sha256.asc
+          name: ${{ steps.vars.outputs.binary }}-${{ steps.vars.outputs.target }}.asc
+          path: ${{ github.workspace }}/dist/bin/${{ steps.vars.outputs.binary }}.asc
+
+

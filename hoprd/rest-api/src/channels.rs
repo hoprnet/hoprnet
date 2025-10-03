@@ -6,10 +6,10 @@ use axum::{
     response::IntoResponse,
 };
 use futures::TryFutureExt;
-use hopr_crypto_types::types::Hash;
 use hopr_lib::{
     Address, AsUnixTimestamp, ChainActionsError, ChannelEntry, ChannelStatus, HoprBalance, ToHex,
     errors::{HoprLibError, HoprStatusError},
+    prelude::Hash,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -110,7 +110,7 @@ pub(crate) struct NodeChannelsResponse {
     all: Vec<ChannelInfoResponse>,
 }
 
-async fn query_topology_info(channel: &ChannelEntry) -> Result<ChannelInfoResponse, HoprLibError> {
+async fn query_topology_info(channel: ChannelEntry) -> Result<ChannelInfoResponse, HoprLibError> {
     Ok(ChannelInfoResponse {
         channel_id: channel.get_id(),
         source: channel.source,
@@ -173,7 +173,7 @@ pub(super) async fn list_channels(
         let topology = hopr
             .all_channels()
             .and_then(|channels| async move {
-                futures::future::try_join_all(channels.iter().map(query_topology_info)).await
+                futures::future::try_join_all(channels.into_iter().map(query_topology_info)).await
             })
             .await;
 
@@ -363,7 +363,7 @@ pub(super) async fn show_channel(
     match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
             Ok(Some(channel)) => {
-                let info = query_topology_info(&channel).await;
+                let info = query_topology_info(channel).await;
                 match info {
                     Ok(info) => (StatusCode::OK, Json(info)).into_response(),
                     Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -532,4 +532,44 @@ pub(super) async fn fund_channel(
         },
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "channelIds": ["0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f"],
+}))]
+#[serde(rename_all = "camelCase")]
+/// Response body for the list of corrupted channels.
+pub(crate) struct CorruptedChannelsResponse {
+    #[schema(value_type = Vec<String>)]
+    channel_ids: Vec<String>,
+}
+
+#[utoipa::path(
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/channels/corrupted"),
+    description = "List corrupted channels due to incorrect indexing.",
+    responses(
+        (status = 200, description = "Corrupted channels retrieved", body = CorruptedChannelsResponse),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Channels",
+)]
+pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    let corrupted = match hopr.corrupted_channels().await {
+        Ok(corrupted) => corrupted,
+        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    };
+
+    let channel_ids: Vec<String> = corrupted.into_iter().map(|c| c.channel_id().to_string()).collect();
+
+    (StatusCode::OK, Json(CorruptedChannelsResponse { channel_ids })).into_response()
 }

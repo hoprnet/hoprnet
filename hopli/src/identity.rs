@@ -37,12 +37,12 @@
 use std::{collections::HashMap, str::FromStr};
 
 use clap::{Parser, builder::RangedU64ValueParser};
+use hopr_crypto_keypair::key_pair::HoprKeys;
 use hopr_crypto_types::{
     keypairs::Keypair,
     prelude::{OffchainPublicKey, PeerId},
 };
 use hopr_primitive_types::{prelude::ToHex, primitives::Address};
-use hoprd_keypair::key_pair::HoprKeys;
 use tracing::{debug, info};
 
 use crate::{
@@ -174,7 +174,7 @@ impl IdentitySubcommands {
             .collect();
 
         info!("Identities: {:?}", node_identities);
-        println!("Identity addresses: {:?}", node_addresses);
+        println!("Identity addresses: {node_addresses:?}");
         println!("Identity peerids: [{}]", peer_ids.join(", "));
         Ok(())
     }
@@ -231,7 +231,8 @@ impl Cmd for IdentitySubcommands {
                     let pk = PeerId::from_str(&peer_or_key.peer_or_key)
                         .map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key.clone()))
                         .and_then(|p| {
-                            OffchainPublicKey::try_from(p).map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key))
+                            OffchainPublicKey::from_peerid(&p)
+                                .map_err(|_| UnableToParseAddress(peer_or_key.peer_or_key))
                         })?;
                     println!("{}", pk.to_hex());
                     Ok(())

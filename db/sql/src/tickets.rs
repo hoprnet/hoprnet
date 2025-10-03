@@ -423,7 +423,11 @@ impl HoprDbTicketOperations for HoprDb {
 
     async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<()> {
         let channel_id = ticket.channel_id;
-        let amount = ticket.amount;
+        let amount = ticket
+            .amount
+            .mul_f64(ticket.win_prob().as_f64())
+            .map_err(DbSqlError::from)?;
+
         Ok(self
             .ticket_manager
             .with_write_locked_db(|tx| {
@@ -1238,7 +1242,7 @@ impl HoprDbTicketOperations for HoprDb {
             )
             .win_prob(WinningProbability::ALWAYS) // Aggregated tickets have always 100% winning probability
             .channel_epoch(channel_epoch)
-            .challenge(first_acked_ticket.verified_ticket().challenge)
+            .eth_challenge(first_acked_ticket.verified_ticket().challenge)
             .build_signed(me, &domain_separator)
             .map_err(DbSqlError::from)?)
     }
@@ -1370,10 +1374,7 @@ mod tests {
     ) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
-
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         Ok(TicketBuilder::default()
             .addresses(src, dst)
@@ -1382,7 +1383,7 @@ mod tests {
             .index_offset(index_offset)
             .win_prob(win_prob.try_into()?)
             .channel_epoch(4)
-            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .challenge(challenge)
             .build_signed(src, &Hash::default())?
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
@@ -1391,13 +1392,22 @@ mod tests {
         db: &HoprDb,
         count_tickets: u64,
     ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
-        init_db_with_tickets_and_channel(db, count_tickets, None).await
+        init_db_with_tickets_and_channel(db, count_tickets, None, 1.0).await
+    }
+
+    async fn init_db_with_low_win_prob_tickets(
+        db: &HoprDb,
+        count_tickets: u64,
+        win_prob: f64,
+    ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
+        init_db_with_tickets_and_channel(db, count_tickets, None, win_prob).await
     }
 
     async fn init_db_with_tickets_and_channel(
         db: &HoprDb,
         count_tickets: u64,
         channel_ticket_index: Option<u32>,
+        win_prob: f64,
     ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
@@ -1411,7 +1421,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let tickets: Vec<AcknowledgedTicket> = (0..count_tickets)
-            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, 1, 1.0))
+            .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, 1, win_prob))
             .collect::<anyhow::Result<Vec<AcknowledgedTicket>>>()?;
 
         let db_clone = db.clone();
@@ -1620,6 +1630,40 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(ticket.verified_ticket().amount, stats.rejected_value);
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
+            "per channel stats must be same"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_mark_unsaved_low_win_prob_ticket_rejected() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let win_prob: f64 = 0.25;
+
+        let tickets = init_db_with_low_win_prob_tickets(&db, 10, win_prob).await?.1;
+
+        assert!(!tickets.is_empty(), "tickets must be present");
+
+        let stats = db.get_ticket_statistics(None).await?;
+        assert_eq!(HoprBalance::zero(), stats.rejected_value);
+        assert_eq!(
+            stats,
+            db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
+            "per channel stats must be same"
+        );
+
+        for ticket in tickets.iter() {
+            db.mark_unsaved_ticket_rejected(ticket.verified_ticket()).await?;
+        }
+
+        let stats = db.get_ticket_statistics(None).await?;
+        let sum_all_tickets: HoprBalance = tickets.iter().map(|t| t.verified_ticket().amount).sum();
+
+        assert_eq!(sum_all_tickets.mul_f64(win_prob)?, stats.rejected_value);
         assert_eq!(
             stats,
             db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
@@ -2743,7 +2787,7 @@ mod tests {
             )
             .win_prob(1.0.try_into()?)
             .channel_epoch(first_ticket.channel_epoch)
-            .challenge(first_ticket.challenge)
+            .eth_challenge(first_ticket.challenge)
             .build_signed(&BOB, &Hash::default())?;
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
@@ -2798,7 +2842,7 @@ mod tests {
             )
             .win_prob(1.0.try_into()?)
             .channel_epoch(first_ticket.channel_epoch)
-            .challenge(first_ticket.challenge)
+            .eth_challenge(first_ticket.challenge)
             .build_signed(&BOB, &Hash::default())?;
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
@@ -2841,7 +2885,7 @@ mod tests {
             )
             .win_prob(0.5.try_into()?) // 50% winning prob
             .channel_epoch(first_ticket.channel_epoch)
-            .challenge(first_ticket.challenge)
+            .eth_challenge(first_ticket.challenge)
             .build_signed(&BOB, &Hash::default())?;
 
         assert_eq!(tickets.len(), COUNT_TICKETS);
@@ -3343,7 +3387,7 @@ mod tests {
         let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random())?;
         tickets[1] = TicketBuilder::from(tickets[1].ticket.clone())
             .win_prob(0.0.try_into()?)
-            .challenge(resp.to_challenge().into())
+            .challenge(resp.to_challenge()?)
             .build_signed(&BOB, &Hash::default())?
             .into_acknowledged(resp)
             .into_transferable(&ALICE, &Hash::default())?;
@@ -3421,7 +3465,7 @@ mod tests {
         const COUNT_TICKETS: u64 = 2;
 
         // we set up the channel to have ticket index 1, and ensure that fix does not trigger
-        let (..) = init_db_with_tickets_and_channel(&db, COUNT_TICKETS, Some(1u32)).await?;
+        let (..) = init_db_with_tickets_and_channel(&db, COUNT_TICKETS, Some(1u32), 1.0).await?;
 
         // mark the first ticket as being redeemed
         let mut ticket = hopr_db_entity::ticket::Entity::find()

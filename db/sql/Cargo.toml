@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-sql"
-version = "0.14.2"
+version = "0.18.5"
 edition = "2021"
 description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"
@@ -8,15 +8,17 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = ["traits"]
+default = ["traits", "sqlite"]
 traits = []
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "sea-orm/runtime-tokio",
-  "sea-query-binder/runtime-tokio-rustls",
+  "sea-orm/runtime-tokio-rustls",
   "sqlx/runtime-tokio-rustls",
+  "sqlx/runtime-tokio",
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+sqlite = ["sea-query/backend-sqlite", "sea-query-binder/sqlx-sqlite"]
 
 [dependencies]
 async-lock = { workspace = true }
@@ -26,16 +28,17 @@ bincode = { workspace = true }
 chrono = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 moka = { workspace = true, features = ["sync"] }
 multiaddr = { workspace = true }
+parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
 sea-orm = { workspace = true }
 sea-query = { workspace = true, default-features = false, features = [
   "with-chrono",
   "derive",
-  "backend-sqlite",
   "attr",
 ] }
 smart-default = { workspace = true }
@@ -43,6 +46,7 @@ sqlx = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+validator = { workspace = true }
 
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
@@ -60,17 +64,16 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-tokio = { workspace = true }
+hex-literal = { workspace = true }
+lazy_static = { workspace = true }
 rand = { workspace = true }
-sea-orm = { workspace = true, features = ["runtime-tokio-rustls"] }
+sea-orm = { workspace = true }
 sea-query-binder = { workspace = true, default-features = false, features = [
   "with-chrono",
-  "sqlx-sqlite",
   "runtime-tokio-rustls",
 ] }
-sqlx = { workspace = true, features = ["runtime-tokio-rustls"] }
-lazy_static = { workspace = true }
-hex-literal = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio"] }
+tokio = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-random = { workspace = true }

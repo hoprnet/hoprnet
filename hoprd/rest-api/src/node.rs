@@ -6,8 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, prelude::Hash};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -18,15 +17,12 @@ use crate::{
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "version": "2.1.0",
-        "apiVersion": "3.10.0"
     }))]
 #[serde(rename_all = "camelCase")]
-/// Running node version alongside the API version.
+/// Running node version.
 pub(crate) struct NodeVersionResponse {
     #[schema(example = "2.1.0")]
     version: String,
-    #[schema(example = "3.10.0")]
-    api_version: String,
 }
 
 /// Get the release version of the running node.
@@ -44,10 +40,9 @@ pub(crate) struct NodeVersionResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let version = state.hopr.version();
-    let api_version = env!("CARGO_PKG_VERSION").to_owned();
-    (StatusCode::OK, Json(NodeVersionResponse { version, api_version })).into_response()
+pub(super) async fn version() -> impl IntoResponse {
+    let version = hopr_lib::constants::APP_VERSION.to_string();
+    (StatusCode::OK, Json(NodeVersionResponse { version })).into_response()
 }
 
 /// Get the configuration of the running node.
@@ -423,6 +418,7 @@ pub(super) async fn channel_graph(
         "indexBlockPrevChecksum": 0,
         "indexerLastLogBlock": 123450,
         "indexerLastLogChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+        "isIndexerCorrupted": false,
     }))]
 #[serde(rename_all = "camelCase")]
 /// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses
@@ -473,6 +469,8 @@ pub(crate) struct NodeInfoResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae")]
     indexer_last_log_checksum: Hash,
+    #[schema(example = true)]
+    is_indexer_corrupted: bool,
 }
 
 /// Get information about this HOPR Node.
@@ -505,6 +503,13 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
 
     let is_eligible = hopr.is_allowed_to_access_network(either::Right(me_address)).await?;
 
+    // If one channel or more are corrupted, we consider the indexer as corrupted.
+    let is_indexer_corrupted = hopr
+        .corrupted_channels()
+        .await
+        .map(|channels| !channels.is_empty())
+        .unwrap_or_default();
+
     match hopr.get_channel_closure_notice_period().await {
         Ok(channel_closure_notice_period) => {
             let body = NodeInfoResponse {
@@ -525,6 +530,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 indexer_block: indexer_state_info.latest_block_number,
                 indexer_last_log_block: indexer_state_info.latest_log_block_number,
                 indexer_last_log_checksum: indexer_state_info.latest_log_checksum,
+                is_indexer_corrupted,
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())

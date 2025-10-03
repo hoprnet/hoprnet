@@ -94,6 +94,7 @@ class TicketStatistics(JsonResponse):
 class Configuration(JsonResponse):
     safe_address: str = APIfield("hopr/safe_module/safe_address")
     module_address: str = APIfield("hopr/safe_module/module_address")
+    strategies: list[dict] = APIfield("hopr/strategy/strategies")
 
 
 @APIobject
@@ -116,7 +117,15 @@ class Session(JsonResponse):
     target: str = APIfield()
     forward_path: str = APIfield("forwardPath")
     return_path: str = APIfield("returnPath")
-    mtu: int = APIfield()
+    hopr_mtu: int = APIfield("hoprMtu")
+    surb_len: int = APIfield("surbLen")
+    active_clients: list[str] = APIfield("activeClients")
+
+
+@APIobject
+class SessionConfig(JsonResponse):
+    response_buffer: str = APIfield("responseBuffer")
+    max_surb_upstream: str = APIfield("maxSurbUpstream")
 
 
 @APIobject

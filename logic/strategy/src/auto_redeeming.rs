@@ -11,17 +11,13 @@ use std::{
 
 use async_trait::async_trait;
 use hopr_chain_actions::redeem::TicketRedeemActions;
-use hopr_db_sql::{api::tickets::HoprDbTicketOperations, prelude::TicketSelector};
-use hopr_internal_types::{
-    prelude::*,
-    tickets::{AcknowledgedTicket, AcknowledgedTicketStatus},
-};
+use hopr_internal_types::{prelude::*, tickets::AcknowledgedTicket};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 use validator::Validate;
 
 use crate::{Strategy, errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy};
@@ -36,8 +32,12 @@ fn just_true() -> bool {
     true
 }
 
+fn just_false() -> bool {
+    false
+}
+
 fn min_redeem_hopr() -> HoprBalance {
-    HoprBalance::from_str("0.09 wxHOPR").unwrap()
+    HoprBalance::from_str("1 wxHOPR").unwrap()
 }
 
 /// Configuration object for the `AutoRedeemingStrategy`
@@ -47,78 +47,121 @@ pub struct AutoRedeemingStrategyConfig {
     /// If set, the strategy will redeem only aggregated tickets.
     /// Otherwise, it redeems all acknowledged winning tickets.
     ///
-    /// Default is true.
-    #[serde(default = "just_true")]
-    #[default = true]
+    /// Default is `false`.
+    #[serde(default = "just_false")]
+    #[default = false]
     pub redeem_only_aggregated: bool,
 
     /// If set to true, will redeem all tickets in the channel (which are over the
     /// `minimum_redeem_ticket_value` threshold) once it transitions to `PendingToClose`.
     ///
-    /// Default is true.
+    /// Default is `true`.
     #[serde(default = "just_true")]
     #[default = true]
     pub redeem_all_on_close: bool,
 
     /// The strategy will only redeem an acknowledged winning ticket if it has at least this value of HOPR.
     /// If 0 is given, the strategy will redeem tickets regardless of their value.
-    /// This is not used for cases where `on_close_redeem_single_tickets_value_min` applies.
     ///
-    /// Default is 0.09 wxHOPR.
+    /// Default is `1 wxHOPR`.
     #[serde(default = "min_redeem_hopr")]
     #[serde_as(as = "DisplayFromStr")]
     #[default(min_redeem_hopr())]
     pub minimum_redeem_ticket_value: HoprBalance,
+
+    /// If set, the strategy will redeem each incoming winning ticket.
+    /// Otherwise, it will try to redeem tickets in all channels periodically.
+    ///
+    /// Set this to `true` when winning tickets are not happening too often (e.g., when winning probability
+    /// is below 1%).
+    /// Set this to `false` when winning tickets are happening very often (e.g., when winning probability
+    /// is above 1%).
+    ///
+    /// Default is `true`
+    #[serde(default = "just_false")]
+    #[default = false]
+    pub redeem_on_winning: bool,
 }
 
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<A: TicketRedeemActions, Db: HoprDbTicketOperations> {
+pub struct AutoRedeemingStrategy<A: TicketRedeemActions> {
     hopr_chain_actions: A,
-    db: Db,
     cfg: AutoRedeemingStrategyConfig,
 }
 
-impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> Debug for AutoRedeemingStrategy<A, Db> {
+impl<A: TicketRedeemActions> Debug for AutoRedeemingStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> Display for AutoRedeemingStrategy<A, Db> {
+impl<A: TicketRedeemActions> Display for AutoRedeemingStrategy<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> AutoRedeemingStrategy<A, Db> {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, db: Db, hopr_chain_actions: A) -> Self {
+impl<A: TicketRedeemActions> AutoRedeemingStrategy<A> {
+    pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A) -> Self {
         Self {
             cfg,
-            db,
             hopr_chain_actions,
         }
     }
 }
 
 #[async_trait]
-impl<A, Db> SingularStrategy for AutoRedeemingStrategy<A, Db>
+impl<A> SingularStrategy for AutoRedeemingStrategy<A>
 where
     A: TicketRedeemActions + Send + Sync,
-    Db: HoprDbTicketOperations + Send + Sync,
 {
+    async fn on_tick(&self) -> crate::errors::Result<()> {
+        if !self.cfg.redeem_on_winning {
+            debug!("trying to redeem all tickets in all channels");
+
+            let count = self
+                .hopr_chain_actions
+                .redeem_all_tickets(self.cfg.minimum_redeem_ticket_value, self.cfg.redeem_only_aggregated)
+                .await?
+                .len();
+            if count > 0 {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_COUNT_AUTO_REDEEMS.increment_by(count as u64);
+
+                info!(count, "strategy issued ticket redemptions");
+            } else {
+                debug!(count, "strategy issued no ticket redemptions");
+            }
+
+            Ok(())
+        } else {
+            Err(CriteriaNotSatisfied)
+        }
+    }
+
     async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
-        if (!self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated())
-            && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value)
+        if self.cfg.redeem_on_winning
+            && ((!self.cfg.redeem_only_aggregated || ack.verified_ticket().is_aggregated())
+                && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value))
         {
             info!(%ack, "redeeming");
 
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_COUNT_AUTO_REDEEMS.increment();
 
-            let rx = self.hopr_chain_actions.redeem_ticket(ack.clone()).await?;
-            std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+            let rxs = self
+                .hopr_chain_actions
+                .redeem_tickets_with_counterparty(
+                    ack.ticket.verified_issuer(),
+                    self.cfg.minimum_redeem_ticket_value,
+                    self.cfg.redeem_only_aggregated,
+                )
+                .await?;
+
+            std::mem::drop(rxs); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+
             Ok(())
         } else {
             Err(CriteriaNotSatisfied)
@@ -142,38 +185,24 @@ where
             }
             info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
 
-            let selector = TicketSelector::from(channel)
-                .with_state(AcknowledgedTicketStatus::Untouched)
-                .with_amount(self.cfg.minimum_redeem_ticket_value..);
+            let count = self
+                .hopr_chain_actions
+                .redeem_tickets_in_channel(
+                    channel,
+                    self.cfg.minimum_redeem_ticket_value,
+                    self.cfg.redeem_only_aggregated,
+                )
+                .await?
+                .len();
 
-            let (redeem_sent_ok, redeem_sent_failed) =
-                futures::future::join_all(self.db.get_tickets(selector).await?.into_iter().map(|ack| {
-                    info!(%ack, worth = %ack.verified_ticket().amount, "redeeming ticket on channel close");
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_COUNT_AUTO_REDEEMS.increment_by(count as u64);
 
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_COUNT_AUTO_REDEEMS.increment();
-
-                    self.hopr_chain_actions.redeem_ticket(ack.clone())
-                }))
-                .await
-                .into_iter()
-                .map(|submission_res| {
-                    if let Err(err) = submission_res {
-                        error!(%err, "error while submitting ticket for redemption");
-                        (0_usize, 1_usize)
-                    } else {
-                        // We intentionally do not await the ticket redemption until confirmation
-                        (1, 0)
-                    }
-                })
-                .reduce(|(sum_ok, sum_fail), (ok, fail)| (sum_ok + ok, sum_fail + fail))
-                .unwrap_or((0, 0));
-
-            if redeem_sent_ok > 0 || redeem_sent_failed > 0 {
-                info!(redeem_sent_ok, redeem_sent_failed, %channel, "tickets channel being closed sent for redemption");
+            if count > 0 {
+                info!(count, %channel, "tickets in channel being closed sent for redemption");
                 Ok(())
             } else {
-                debug!(%channel, "no redeemable tickets with minimum amount in channel being closed");
+                info!(%channel, "no redeemable tickets with minimum amount in channel being closed");
                 Err(CriteriaNotSatisfied)
             }
         } else {
@@ -200,9 +229,7 @@ mod tests {
     use hopr_crypto_random::{Randomizable, random_bytes};
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
-        HoprDbGeneralModelOperations, TargetDb,
         api::{info::DomainSeparator, tickets::TicketSelector},
-        channels::HoprDbChannelOperations,
         db::HoprDb,
         info::HoprDbInfoOperations,
     };
@@ -224,9 +251,7 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         Ok(TicketBuilder::default()
             .addresses(&*BOB, &*ALICE)
@@ -235,7 +260,7 @@ mod tests {
             .index_offset(idx_offset)
             .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(4)
-            .challenge(Challenge::from(cp_sum).into())
+            .challenge(challenge)
             .build_signed(&BOB, &Hash::default())?
             .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
@@ -244,15 +269,17 @@ mod tests {
         TicketRedeemAct { }
         #[async_trait]
         impl TicketRedeemActions for TicketRedeemAct {
-            async fn redeem_all_tickets(&self, only_aggregated: bool) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
+            async fn redeem_all_tickets(&self, min_value: HoprBalance, only_aggregated: bool) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_with_counterparty(
                 &self,
                 counterparty: &Address,
+                min_value: HoprBalance,
                 only_aggregated: bool,
             ) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_in_channel(
                 &self,
                 channel: &ChannelEntry,
+                min_value: HoprBalance,
                 only_aggregated: bool,
             ) -> hopr_chain_actions::errors::Result<Vec<PendingAction >>;
             async fn redeem_tickets(&self, selector: TicketSelector) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
@@ -286,55 +313,117 @@ mod tests {
             .await?;
 
         let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
-        let ack_clone = ack_ticket.clone();
-        let ack_clone_2 = ack_ticket.clone();
 
         let mut actions = MockTicketRedeemAct::new();
-        let mock_confirm = mock_action_confirmation(ack_clone_2)?;
+        let mock_confirm = mock_action_confirmation(ack_ticket.clone())?;
         actions
-            .expect_redeem_ticket()
+            .expect_redeem_tickets_with_counterparty()
             .once()
-            .withf(move |ack| ack_clone.ticket.eq(&ack.ticket))
-            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
+            .with(
+                mockall::predicate::eq(ack_ticket.ticket.verified_issuer().clone()),
+                mockall::predicate::eq(HoprBalance::from(0)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
             minimum_redeem_ticket_value: 0.into(),
+            redeem_on_winning: true,
             ..Default::default()
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
         ars.on_acknowledged_winning_ticket(&ack_ticket).await?;
+        assert!(ars.on_tick().await.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_auto_redeeming_strategy_redeem_on_tick() -> anyhow::Result<()> {
+        let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
+
+        let mut actions = MockTicketRedeemAct::new();
+        let mock_confirm = mock_action_confirmation(ack_ticket.clone())?;
+        actions
+            .expect_redeem_all_tickets()
+            .once()
+            .with(
+                mockall::predicate::eq(HoprBalance::from(*PRICE_PER_PACKET * 5)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _| Ok(vec![ok(mock_confirm).boxed()]));
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
+            redeem_on_winning: false,
+            ..Default::default()
+        };
+
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
+        ars.on_tick().await?;
+        assert!(ars.on_acknowledged_winning_ticket(&ack_ticket).await.is_err());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_auto_redeeming_strategy_should_not_redeem_unworthy_tickets_on_tick() -> anyhow::Result<()> {
+        // Make the ticket worth less than the threshold
+        let ack_ticket = generate_random_ack_ticket(0, 1, 4)?;
+
+        let mut actions = MockTicketRedeemAct::new();
+        let mock_confirm = mock_action_confirmation(ack_ticket.clone())?;
+        actions
+            .expect_redeem_all_tickets()
+            .once()
+            .with(
+                mockall::predicate::eq(HoprBalance::from(*PRICE_PER_PACKET * 5)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _| Ok(vec![ok(mock_confirm).boxed()]));
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
+            redeem_on_winning: false,
+            ..Default::default()
+        };
+
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
+        ars.on_tick().await?;
+        assert!(ars.on_acknowledged_winning_ticket(&ack_ticket).await.is_err());
 
         Ok(())
     }
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem_agg_only() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await?;
-
         let ack_ticket_unagg = generate_random_ack_ticket(0, 1, 5)?;
         let ack_ticket_agg = generate_random_ack_ticket(0, 3, 5)?;
 
-        let ack_clone_agg = ack_ticket_agg.clone();
-        let ack_clone_agg_2 = ack_ticket_agg.clone();
         let mut actions = MockTicketRedeemAct::new();
-        let mock_confirm = mock_action_confirmation(ack_clone_agg_2)?;
+        let mock_confirm = mock_action_confirmation(ack_ticket_agg.clone())?;
         actions
-            .expect_redeem_ticket()
+            .expect_redeem_tickets_with_counterparty()
             .once()
-            .withf(move |ack| ack_clone_agg.ticket.eq(&ack.ticket))
-            .return_once(|_| Ok(ok(mock_confirm).boxed()));
+            .with(
+                mockall::predicate::eq(ack_ticket_agg.ticket.verified_issuer().clone()),
+                mockall::predicate::eq(HoprBalance::from(0)),
+                mockall::predicate::eq(true),
+            )
+            .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
             minimum_redeem_ticket_value: 0.into(),
+            redeem_on_winning: true,
             ..Default::default()
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
         ars.on_acknowledged_winning_ticket(&ack_ticket_unagg)
             .await
             .expect_err("non-agg ticket should not satisfy");
@@ -345,30 +434,29 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem_minimum_ticket_amount() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await?;
-
         let ack_ticket_below = generate_random_ack_ticket(1, 1, 4)?;
         let ack_ticket_at = generate_random_ack_ticket(1, 1, 5)?;
 
-        let ack_clone_at = ack_ticket_at.clone();
-        let ack_clone_at_2 = ack_ticket_at.clone();
-        let mock_confirm = mock_action_confirmation(ack_clone_at_2)?;
+        let mock_confirm = mock_action_confirmation(ack_ticket_at.clone())?;
         let mut actions = MockTicketRedeemAct::new();
         actions
-            .expect_redeem_ticket()
+            .expect_redeem_tickets_with_counterparty()
             .once()
-            .withf(move |ack| ack_clone_at.ticket.eq(&ack.ticket))
-            .return_once(|_| Ok(ok(mock_confirm).boxed()));
+            .with(
+                mockall::predicate::eq(ack_ticket_at.ticket.verified_issuer().clone()),
+                mockall::predicate::eq(HoprBalance::from(*PRICE_PER_PACKET * 5)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
             minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
+            redeem_on_winning: true,
             ..Default::default()
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
         ars.on_acknowledged_winning_ticket(&ack_ticket_below)
             .await
             .expect_err("ticket below threshold should not satisfy");
@@ -379,10 +467,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_should_redeem_singular_ticket_on_close() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await?;
-
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
@@ -395,27 +479,26 @@ mod tests {
         // Make the ticket worth exactly the threshold
         let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
 
-        db.upsert_channel(None, channel).await?;
-        db.upsert_ticket(None, ack_ticket.clone()).await?;
-
-        let ack_clone = ack_ticket.clone();
-        let ack_clone_2 = ack_ticket.clone();
-
         let mut actions = MockTicketRedeemAct::new();
-        let mock_confirm = mock_action_confirmation(ack_clone_2)?;
+        let mock_confirm = mock_action_confirmation(ack_ticket)?;
         actions
-            .expect_redeem_ticket()
+            .expect_redeem_tickets_in_channel()
             .once()
-            .withf(move |ack| ack_clone.ticket.eq(&ack.ticket))
-            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
+            .with(
+                mockall::predicate::eq(channel),
+                mockall::predicate::eq(HoprBalance::from(*PRICE_PER_PACKET * 5)),
+                mockall::predicate::eq(true),
+            )
+            .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
             redeem_all_on_close: true,
             minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
+            ..Default::default()
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
         ars.on_own_channel_changed(
             &channel,
             ChannelDirection::Incoming,
@@ -430,56 +513,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_auto_redeeming_strategy_should_not_redeem_singular_ticket_worth_less_on_close() -> anyhow::Result<()>
-    {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await?;
-
-        let channel = ChannelEntry::new(
-            BOB.public().to_address(),
-            ALICE.public().to_address(),
-            10.into(),
-            0.into(),
-            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
-            0.into(),
-        );
-
-        // Make this ticket worth less than the threshold
-        let ack_ticket = generate_random_ack_ticket(0, 1, 3)?;
-
-        db.upsert_channel(None, channel).await?;
-        db.upsert_ticket(None, ack_ticket).await?;
-
-        let mut actions = MockTicketRedeemAct::new();
-        actions.expect_redeem_ticket().never();
-
-        let cfg = AutoRedeemingStrategyConfig {
-            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
-            redeem_only_aggregated: false,
-            redeem_all_on_close: true,
-        };
-
-        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
-        ars.on_own_channel_changed(
-            &channel,
-            ChannelDirection::Incoming,
-            ChannelChange::Status {
-                left: ChannelStatus::Open,
-                right: channel.status,
-            },
-        )
-        .await
-        .expect_err("event should not satisfy criteria");
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_auto_redeeming_strategy_should_not_redeem_unworthy_tickets_on_close() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
-        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
-            .await?;
-
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
@@ -489,39 +523,28 @@ mod tests {
             4.into(),
         );
 
-        db.upsert_channel(None, channel).await?;
-
-        let db_clone = db.clone();
-        let ack_ticket_1 = generate_random_ack_ticket(1, 1, 3)?;
-        let ack_ticket_2 = generate_random_ack_ticket(2, 1, 5)?;
-
-        let ack_ticket_2_clone = ack_ticket_2.clone();
-
-        db.begin_transaction_in_db(TargetDb::Tickets)
-            .await?
-            .perform(move |tx| {
-                Box::pin(async move {
-                    db_clone.upsert_ticket(Some(tx), ack_ticket_1).await?;
-                    db_clone.upsert_ticket(Some(tx), ack_ticket_2).await
-                })
-            })
-            .await?;
+        let ack_ticket = generate_random_ack_ticket(1, 1, 3)?;
 
         let mut actions = MockTicketRedeemAct::new();
-        let mock_confirm = mock_action_confirmation(ack_ticket_2_clone.clone())?;
+        let mock_confirm = mock_action_confirmation(ack_ticket.clone())?;
         actions
-            .expect_redeem_ticket()
+            .expect_redeem_tickets_in_channel()
             .once()
-            .withf(move |ack| ack_ticket_2_clone.ticket.eq(&ack.ticket))
-            .return_once(move |_| Ok(ok(mock_confirm).boxed()));
+            .with(
+                mockall::predicate::eq(channel),
+                mockall::predicate::eq(HoprBalance::from(*PRICE_PER_PACKET * 5)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _, _| Ok(vec![ok(mock_confirm).boxed()]));
 
         let cfg = AutoRedeemingStrategyConfig {
             minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
             redeem_only_aggregated: false,
             redeem_all_on_close: true,
+            ..Default::default()
         };
 
-        let ars = AutoRedeemingStrategy::new(cfg, db, actions);
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
         ars.on_own_channel_changed(
             &channel,
             ChannelDirection::Incoming,
@@ -531,6 +554,44 @@ mod tests {
             },
         )
         .await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_auto_redeeming_strategy_redeem_multiple_tickets_in_channel() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
+            .await?;
+
+        let ack_ticket_0 = generate_random_ack_ticket(0, 1, 5)?;
+        let ack_ticket_1 = generate_random_ack_ticket(0, 2, 5)?;
+
+        let mut actions: MockTicketRedeemAct = MockTicketRedeemAct::new();
+        let mock_confirms = vec![
+            mock_action_confirmation(ack_ticket_0.clone())?,
+            mock_action_confirmation(ack_ticket_1.clone())?,
+        ];
+        actions
+            .expect_redeem_tickets_with_counterparty()
+            .once()
+            .with(
+                mockall::predicate::eq(ack_ticket_1.ticket.verified_issuer().clone()),
+                mockall::predicate::eq(HoprBalance::from(0)),
+                mockall::predicate::eq(false),
+            )
+            .return_once(move |_, _, _| Ok(mock_confirms.into_iter().map(|c| ok(c).boxed()).collect()));
+
+        let cfg = AutoRedeemingStrategyConfig {
+            redeem_only_aggregated: false,
+            minimum_redeem_ticket_value: 0.into(),
+            redeem_on_winning: true,
+            ..Default::default()
+        };
+
+        let ars = AutoRedeemingStrategy::new(cfg, actions);
+        ars.on_acknowledged_winning_ticket(&ack_ticket_1).await?;
+        assert!(ars.on_tick().await.is_err());
 
         Ok(())
     }

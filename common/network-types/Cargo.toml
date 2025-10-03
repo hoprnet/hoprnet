@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "0.7.1"
+version = "1.0.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition = "2021"
@@ -10,6 +10,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
+capture = ["dep:pcap-file"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
@@ -22,40 +23,30 @@ runtime-tokio = [
   "dep:tokio",
   "dep:tokio-util",
   "hopr-async-runtime/runtime-tokio",
-  "hickory-resolver/tokio-runtime",
+  "hickory-resolver/tokio",
 ]
-prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
-aquamarine = { workspace = true }
 arrayvec = { workspace = true }
-bitvec = { workspace = true }
 cfg-if = { workspace = true }
-crossbeam-queue = { workspace = true }
-crossbeam-skiplist = { workspace = true }
-dashmap = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
-governor = { workspace = true }
-bytesize = { workspace = true }
-hex = { workspace = true }
 hickory-resolver = { workspace = true }
-lazy_static = { workspace = true, optional = true }
+lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
-rand = { workspace = true }
-rand_distr = { workspace = true }
+multiaddr = { workspace = true }
+pin-project = { workspace = true }
+pcap-file = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
-smart-default = { workspace = true }
-socket2 = { workspace = true }
+socket2 = { workspace = true, features = ["all"] }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
 tracing = { workspace = true }
-validator = { workspace = true }
 
-hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
@@ -67,24 +58,14 @@ hopr-path = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-stream = { workspace = true }
-ctor = { workspace = true }
-criterion = { workspace = true }
-hex-literal = { workspace = true }
-lazy_static = { workspace = true }
 parameterized = { workspace = true }
-rand = { workspace = true }
-rand_distr = { workspace = true }
-rayon = { workspace = true }
-test-log = { workspace = true, features = ["trace"] }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+test-log = { workspace = true }
+serial_test = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
-
-[[bench]]
-name = "session"
-harness = false

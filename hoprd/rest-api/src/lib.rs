@@ -19,13 +19,11 @@ pub(crate) mod env {
 }
 
 use std::{
-    collections::HashMap,
     error::Error,
     iter::once,
     sync::{Arc, atomic::AtomicU16},
 };
 
-use async_lock::RwLock;
 use axum::{
     Router,
     extract::Json,
@@ -33,8 +31,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
-use hopr_lib::{Address, Hopr, errors::HoprLibError};
-use hopr_network_types::prelude::IpProtocol;
+use hopr_lib::{Address, Hopr, errors::HoprLibError, utils::session::ListenerJoinHandles};
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use tokio::net::TcpListener;
@@ -53,7 +50,7 @@ use utoipa::{
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::{config::Auth, session::StoredSessionEntry};
+use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
@@ -63,11 +60,6 @@ pub(crate) struct AppState {
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
-
-pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry>>>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
@@ -90,6 +82,7 @@ pub(crate) struct InternalState {
         channels::list_channels,
         channels::open_channel,
         channels::show_channel,
+        channels::corrupted_channels,
         checks::eligiblez,
         checks::healthyz,
         checks::readyz,
@@ -107,6 +100,8 @@ pub(crate) struct InternalState {
         root::metrics,
         session::create_client,
         session::list_clients,
+        session::adjust_session,
+        session::session_config,
         session::close_client,
         tickets::aggregate_tickets_in_channel,
         tickets::redeem_all_tickets,
@@ -127,7 +122,7 @@ pub(crate) struct InternalState {
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
             node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery, node::NodeGraphResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol,
+            session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),
@@ -229,7 +224,7 @@ async fn build_api(
     Router::new()
         .merge(
             Router::new()
-                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
+                .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
                 .merge(Scalar::with_url("/scalar", ApiDoc::openapi())),
         )
         .merge(
@@ -285,6 +280,7 @@ async fn build_api(
                 .route("/peers/{destination}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
+                .route("/channels/corrupted", get(channels::corrupted_channels))
                 .route("/channels/{channelId}", get(channels::show_channel))
                 .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
                 .route("/channels/{channelId}", delete(channels::close_channel))
@@ -310,6 +306,8 @@ async fn build_api(
                 .route("/node/entry-nodes", get(node::entry_nodes))
                 .route("/node/graph", get(node::channel_graph))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
+                .route("/session/config/{id}", get(session::session_config))
+                .route("/session/config/{id}", post(session::adjust_session))
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/{protocol}", post(session::create_client))
                 .route("/session/{protocol}", get(session::list_clients))
@@ -389,6 +387,8 @@ enum ApiErrorStatus {
     InvalidQuality,
     NotReady,
     ListenHostAlreadyUsed,
+    SessionNotFound,
+    InvalidSessionId,
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

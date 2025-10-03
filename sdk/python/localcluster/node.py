@@ -45,6 +45,7 @@ class Node:
         identity_path: str,
         cfg_file: str,
         base_port: int,
+        cluster_size: int,
         api_addr: Optional[str] = None,
         use_nat: bool = False,
         remove_temp_data: bool = True,
@@ -80,26 +81,25 @@ class Node:
         self.anvil_port: int = 0
         self.tokio_console_port: int = 0
 
-        self.prepare()
+        self.prepare(cluster_size)
 
     @property
     def api(self):
         return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", Bearer(self.api_token), "/api/v4")
 
-    def prepare(self):
+    def prepare(self, cluster_size: int):
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
         self.cfg_file_path = MAIN_DIR.joinpath(self.cfg_file)
         self.anvil_port = self.base_port
-        self.api_port = self.base_port + (self.id * 3)
-        self.p2p_port = self.api_port + 1
-        self.tokio_console_port = self.p2p_port + 1
+        self.api_port = self.base_port + self.id
+        self.p2p_port = self.api_port + cluster_size
+        self.tokio_console_port = self.p2p_port + cluster_size
 
         logging.info(
             f"Node {self.id} ports: "
             + f"api {self.api_port}, "
             + f"p2p {self.p2p_port}, "
-            + f"tokio console {self.tokio_console_port}, "
-            + f"anvil {self.anvil_port}"
+            + f"tokio console {self.tokio_console_port}"
         )
 
     def load_native_address(self):
@@ -200,7 +200,7 @@ class Node:
 
     def setup(self, password: str, config_file: Path, dir: Path, log_tag: str):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
-        log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
+        log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "info"
 
         api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
         custom_env = {
@@ -209,11 +209,11 @@ class Node:
                     log_level,
                     "hyper_util=warn",
                     "hickory_resolver=warn",
+                    "hopr_transport_session=debug",
+                    "hopr_protocol_session=debug",
+                    "hopr_network_types=debug",
+                    "hopr_protocol_session=debug",
                     "isahc=error",
-                    "libp2p_swarm=info",
-                    "libp2p_tcp=info",
-                    "libp2p_dns=info",
-                    "multistream_select=info",
                     "sea_orm=warn",
                     "sqlx=warn",
                 ]
@@ -224,6 +224,7 @@ class Node:
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
             "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
+            "HOPR_CAPTURE_PACKETS": self.dir.joinpath(f"capture_{self.id}.pcap"),
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 
@@ -264,12 +265,12 @@ class Node:
         ready = False
 
         while not ready:
-            # we choose a long timeout here to accomodate the node just starting
+            # we choose a long timeout here to accommodate the node just starting
             peers_info = await asyncio.wait_for(self.api.peers(), timeout=10)
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
             # filter out peers that are not well-connected yet
-            connected_peers = [p.address for p in peers_info if p.quality >= 0.25]
+            connected_peers = [p.address for p in peers_info if p.quality >= 0.1]
             connected_peers.sort()
             logging.debug(f"Peers connected on {self.id}: {connected_peers}")
 
@@ -303,6 +304,7 @@ class Node:
         use_nat: bool,
         exposed: bool,
         base_port: int,
+        cluster_size: int,
     ):
         token = config.get("api_token", defaults.get("api_token"))
 
@@ -313,6 +315,7 @@ class Node:
             network,
             config["identity_path"],
             config["config_file"],
+            cluster_size=cluster_size,
             api_addr="0.0.0.0" if exposed else None,
             use_nat=use_nat,
             base_port=base_port,

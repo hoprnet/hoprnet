@@ -1,7 +1,7 @@
 [package]
 name = "hopr-db-migration"
 description = "Contains database migrations for a HOPR node database"
-version = "0.2.0"
+version = "0.2.2"
 edition = "2021"
 publish = false
 homepage = "https://hoprnet.org/"

@@ -1,6 +1,8 @@
 use crate::errors::{GeneralError, GeneralError::ParseError, Result};
 
 /// A generic type that can be converted to a hexadecimal string.
+///
+/// Implementors of this trait should automatically take care of the optional `0x` prefix.
 pub trait ToHex {
     /// Hexadecimal representation of this type.
     fn to_hex(&self) -> String;
@@ -11,7 +13,8 @@ pub trait ToHex {
         Self: Sized;
 }
 
-/// Represents a type that can be encoded to/decoded from a fixed sized byte array of size `N`.
+/// Represents a type that can be encoded to/decoded from a fixed-sized byte array of size `N`.
+///
 /// This requires processing and memory allocation to represent the type in binary encoding.
 ///
 /// Differences between [BytesEncodable] and [BytesRepresentable]:
@@ -27,8 +30,9 @@ pub trait BytesEncodable<const N: usize, E = GeneralError>:
     /// Size of the encoded byte array. Defaults to `N` and should not be overridden.
     const SIZE: usize = N;
 
-    /// Convenience function to represent the
-    /// A shorthand for `let v: [u8; N] = self.into()`.
+    /// Convenience function to represent
+    ///
+    /// Shorthand for `let v: [u8; N] = self.into()`.
     #[inline]
     fn into_encoded(self) -> [u8; N] {
         self.into()
@@ -41,7 +45,7 @@ pub trait BytesEncodable<const N: usize, E = GeneralError>:
     }
 }
 
-/// Represents a type that is already internally represented by a fixed size byte array,
+/// Represents a type already internally represented by a fixed size byte array,
 /// and therefore requires no memory allocation to represent the type in binary encoding.
 ///
 /// This is a strict subset of [BytesEncodable], see its documentation for details.
@@ -52,7 +56,7 @@ pub trait BytesRepresentable<E = GeneralError>: AsRef<[u8]> + for<'a> TryFrom<&'
     /// Convenience function to copy this type's binary representation into a Box.
     #[inline]
     fn into_boxed(self) -> Box<[u8]> {
-        self.as_ref().to_vec().into_boxed_slice()
+        self.as_ref().into()
     }
 }
 
@@ -62,7 +66,7 @@ impl<T: BytesRepresentable> ToHex for T {
     }
 
     fn from_hex(str: &str) -> Result<Self> {
-        if !str.is_empty() && str.len() % 2 == 0 {
+        if !str.is_empty() && str.len().is_multiple_of(2) {
             let data = if &str[..2] == "0x" || &str[..2] == "0X" {
                 &str[2..]
             } else {
@@ -92,9 +96,9 @@ pub trait UnitaryFloatOps: Sized {
 
 /// Extension trait for fixed size numbers to allow conversion to/from endian representations.
 pub trait IntoEndian<const N: usize> {
-    /// Create instance from Big Endian bytes. Should panic if size is more than `N`.
+    /// Create an instance from Big Endian bytes. Should panic if size is more than `N`.
     fn from_be_bytes<T: AsRef<[u8]>>(bytes: T) -> Self;
-    /// Create instance from Little Endian bytes. Should panic if size is more than `N`.
+    /// Create an instance from Little Endian bytes. Should panic if size is more than `N`.
     fn from_le_bytes<T: AsRef<[u8]>>(bytes: T) -> Self;
     /// Convert instance to Little Endian bytes.
     fn to_le_bytes(self) -> [u8; N];
@@ -102,7 +106,7 @@ pub trait IntoEndian<const N: usize> {
     fn to_be_bytes(self) -> [u8; N];
 }
 
-/// A trait that adds extension method to represent a time object as `Duration` since Unix epoch.
+/// A trait that's added an extension method to represent a time object as `Duration` since Unix epoch.
 pub trait AsUnixTimestamp {
     /// Represents self as `Duration` since Unix epoch.
     fn as_unix_timestamp(&self) -> std::time::Duration;
@@ -114,7 +118,7 @@ impl AsUnixTimestamp for std::time::SystemTime {
     }
 }
 
-/// A trait that adds extension method to perform saturated substractions on `SystemTime` instances.
+/// A trait that adds an extension method to perform saturated substractions on `SystemTime` instances.
 pub trait SaturatingSub {
     /// Performs saturated substraction on `SystemTime` instances.
     fn saturating_sub(&self, earlier: std::time::SystemTime) -> std::time::Duration;

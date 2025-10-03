@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use hickory_resolver::{AsyncResolver, name_server::ConnectionProvider};
+use hickory_resolver::name_server::ConnectionProvider;
 use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
@@ -88,9 +88,9 @@ impl IpOrHost {
                 // which prevents IO access to system-level files.
                 let config = hickory_resolver::config::ResolverConfig::new();
                 let options = hickory_resolver::config::ResolverOpts::default();
-                let resolver = hickory_resolver::AsyncResolver::tokio(config, options);
+                let resolver = hickory_resolver::Resolver::builder_with_config(config, hickory_resolver::name_server::TokioConnectionProvider::default()).with_options(options).build();
             } else {
-                let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
+                let resolver = hickory_resolver::Resolver::builder_tokio()?.build();
             }
         };
 
@@ -99,7 +99,10 @@ impl IpOrHost {
 
     /// Tries to resolve the DNS name and returns all IP addresses found.
     /// If this enum is already an IP address and port, it will simply return it.
-    pub async fn resolve<P: ConnectionProvider>(self, resolver: AsyncResolver<P>) -> std::io::Result<Vec<SocketAddr>> {
+    pub async fn resolve<P: ConnectionProvider>(
+        self,
+        resolver: hickory_resolver::Resolver<P>,
+    ) -> std::io::Result<Vec<SocketAddr>> {
         match self {
             IpOrHost::Dns(name, port) => Ok(resolver
                 .lookup_ip(name)
@@ -335,6 +338,18 @@ impl SurbMatcher {
     }
 }
 
+impl From<HoprPseudonym> for SurbMatcher {
+    fn from(value: HoprPseudonym) -> Self {
+        Self::Pseudonym(value)
+    }
+}
+
+impl From<&HoprPseudonym> for SurbMatcher {
+    fn from(pseudonym: &HoprPseudonym) -> Self {
+        (*pseudonym).into()
+    }
+}
+
 /// Routing information containing forward or return routing options.
 ///
 /// Information in this object represents the minimum required basis
@@ -407,17 +422,26 @@ impl ResolvedTransportRouting {
             return_paths: vec![],
         }
     }
+
+    /// Returns the number of return paths (SURBs) on the [`ResolvedTransportRouting::Forward`]
+    /// variant, or always 0 on the [`ResolvedTransportRouting::Return`] variant.
+    pub fn count_return_paths(&self) -> usize {
+        match self {
+            ResolvedTransportRouting::Forward { return_paths, .. } => return_paths.len(),
+            ResolvedTransportRouting::Return(..) => 0,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::net::SocketAddr;
-
-    use anyhow::anyhow;
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
+    #[cfg(feature = "runtime-tokio")]
+    use {anyhow::anyhow, std::net::SocketAddr};
 
     use super::*;
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
         match IpOrHost::Dns("localhost".to_string(), 1000)
@@ -432,6 +456,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;

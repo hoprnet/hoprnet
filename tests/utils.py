@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import logging
 import random
 import re
@@ -24,13 +25,29 @@ RESERVED_TAG_UPPER_BOUND = 1023
 APPLICATION_TAG_THRESHOLD_FOR_SESSIONS = RESERVED_TAG_UPPER_BOUND + 1
 
 
-def shuffled(coll):
-    random.shuffle(coll)
-    return coll
-
-
 def make_routes(routes_with_hops: list[int], nodes: list[Node]):
-    return [shuffled(nodes)[: (hop + 2)] for hop in routes_with_hops]
+    return [random.sample(nodes, hop + 2) for hop in routes_with_hops]
+
+
+def random_distinct_pairs_from(values: list, count: int):
+    return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
+
+
+def random_non_looping_routes_from(*source_lists: tuple[list[str], int]):
+    # Each entry in source_lists is a tuple (list_of_node_addresses, count_to_pick_from_that_list)
+    # The function picks nodes from each list, ensuring no node is picked more than once
+
+    route = []
+    for source_list, count in source_lists:
+        candidates = set(source_list) - set(route)
+        if not candidates:
+            return None
+        route.extend(random.sample(list(candidates), count))
+
+    assert len(route) == len(set(route))
+    assert len(route) == sum(count for _, count in source_lists)
+
+    return route
 
 
 @asynccontextmanager
@@ -98,7 +115,7 @@ async def check_outgoing_channel_closed(src: Node, channel_id: str):
 
 async def check_rejected_tickets_value(src: Node, value: Balance):
     while (current := (await src.api.get_tickets_statistics()).rejected_value) < value:
-        logging.info(f"Rejected tickets value: {current}, wanted min: {value}")
+        logging.debug(f"Rejected tickets value: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
@@ -366,10 +383,22 @@ class HoprSession:
             s.close()
 
     @property
-    def mtu(self):
+    def surb_len(self):
         if self._session is None:
             raise Exception("Session is not open")
-        return self._session.mtu
+        return self._session.surb_len
+
+    @property
+    def active_clients(self):
+        if self._session is None:
+            raise Exception("Session is not open")
+        return self._session.active_clients
+
+    @property
+    def hopr_mtu(self):
+        if self._session is None:
+            raise Exception("Session is not open")
+        return self._session.hopr_mtu
 
     @property
     def listen_port(self):
@@ -410,11 +439,11 @@ async def basic_send_and_receive_packets(
         dest,
         fwd_path,
         return_path,
-        SessionCapabilitiesBody(no_delay=True, segmentation=True),
+        SessionCapabilitiesBody(segmentation=True, no_rate_control=True, no_delay=True),
         use_response_buffer=None,
     ) as session:
         addr = ("127.0.0.1", session.listen_port)
-        msg_len = int(session.mtu / 2)  # Allow space for SURBs, since no response buffer is used
+        msg_len = int(session.hopr_mtu / 2)  # Allow space for SURBs, since no response buffer is used
 
         expected = [f"#{i}".ljust(msg_len) for i in range(msg_count)]
         actual = []

@@ -11,9 +11,15 @@ from . import bringup, utils
     "--fully_connected", is_flag=True, show_default=True, default=False, help="Creates channel between all nodes"
 )
 @click.option("--exposed", is_flag=True, show_default=True, default=False, help="Expose the nodes to the local network")
+@click.option("--size", default=6, show_default=True, help="Number of nodes in the cluster")
 @utils.coro
-async def main(config: str, fully_connected: bool, exposed: bool):
-    cluster, anvil = await bringup(config, False, fully_connected, exposed=exposed)
+async def main(config: str, fully_connected: bool, exposed: bool, size: int):
+    cluster_and_anvil = await bringup(
+        config, test_mode=False, fully_connected=fully_connected, exposed=exposed, size=size
+    )
+
+    assert cluster_and_anvil is not None, "Failed to bring up the cluster"
+    cluster, anvil = cluster_and_anvil
 
     cluster.clean_up()
     anvil.kill()

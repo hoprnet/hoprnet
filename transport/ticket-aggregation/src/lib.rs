@@ -35,7 +35,7 @@ pub enum TicketAggregationError {
     DatabaseError(#[from] hopr_db_api::errors::DbError),
 }
 
-/// Result used by the crate, based on the [ProtocolError] error type.
+/// Result used by the crate, based on the [`TicketAggregationError`] error type.
 pub type Result<T> = core::result::Result<T, TicketAggregationError>;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -303,9 +303,12 @@ where
             async move {
                 let processed = match event {
                     TicketAggregationToProcess::ToProcess(destination, acked_tickets, response) => {
-                        let opk: std::result::Result<OffchainPublicKey, hopr_primitive_types::errors::GeneralError> =
-                            destination.try_into();
-                        match opk {
+                        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
+                        let pubkey: std::result::Result<OffchainPublicKey, hopr_primitive_types::errors::GeneralError> =
+                            hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&destination))
+                                .await;
+
+                        match pubkey {
                             Ok(opk) => {
                                 let count = acked_tickets.len();
                                 match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
@@ -485,7 +488,7 @@ mod tests {
             .index_offset(1)
             .win_prob(ticket_win_prob.try_into()?)
             .channel_epoch(1)
-            .challenge(response.to_challenge().into())
+            .challenge(response.to_challenge()?)
             .build_signed(signer, &domain_separator)?
             .into_acknowledged(response))
     }

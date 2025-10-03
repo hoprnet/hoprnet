@@ -3,15 +3,6 @@
 
 pub use futures::future::AbortHandle;
 
-#[cfg(feature = "runtime-async-std")]
-#[deprecated(note = "Use `runtime-tokio` feature, the `async-std` crate is deprecated")]
-pub mod prelude {
-    pub use async_std::{
-        future::timeout as timeout_fut,
-        task::{JoinHandle, sleep, spawn, spawn_blocking, spawn_local},
-    };
-}
-
 // Both features could be enabled during testing; therefore, we only use tokio when it's
 // exclusively enabled.
 #[cfg(feature = "runtime-tokio")]
@@ -33,5 +24,5 @@ macro_rules! spawn_as_abortable {
 }
 
 // If no runtime is enabled, fail compilation
-#[cfg(all(not(feature = "runtime-tokio"), not(feature = "runtime-async-std")))]
+#[cfg(not(feature = "runtime-tokio"))]
 compile_error!("No runtime enabled");

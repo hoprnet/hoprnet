@@ -6,7 +6,7 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
     rust-overlay.url = "github:oxalica/rust-overlay/master";
-    crane.url = "github:ipetkov/crane/v0.20.1";
+    crane.url = "github:ipetkov/crane/v0.21.0";
     # pin it to a version which we are compatible with
     foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     solc.url = "github:hellwolf/solc.nix";
@@ -87,7 +87,25 @@
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
-              ./hopr/hopr-lib/data
+              ./hopr/chain-config/data
+              ./ethereum/contracts/contracts-addresses.json
+              ./ethereum/contracts/foundry.in.toml
+              ./ethereum/contracts/remappings.txt
+              ./hoprd/hoprd/example_cfg.yaml
+              (fs.fileFilter (file: file.hasExt "rs") ./.)
+              (fs.fileFilter (file: file.hasExt "toml") ./.)
+              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+            ];
+          };
+          testSrc = fs.toSource {
+            root = ./.;
+            fileset = fs.unions [
+              ./.cargo/config.toml
+              ./Cargo.lock
+              ./README.md
+              ./hopr/chain-config/data
+              ./hopr/hopr-lib/tests
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
@@ -198,10 +216,20 @@
             }
           );
           hoprd-aarch64-linux = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-linux-profile = rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
+
           # CAVEAT: must be built from a darwin system
           hoprd-x86_64-darwin = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-x86_64-darwin-profile = rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hoprdBuildArgs;
+          hoprd-aarch64-darwin-profile = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (
+            hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
+          );
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             runTests = true;
@@ -211,6 +239,7 @@
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
+              src = testSrc;
               runTests = true;
               cargoExtraArgs = "-Z panic-abort-tests";
             }
@@ -227,18 +256,44 @@
             }
           );
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
-          hoprd-candidate =
+          mkHoprdCandidate =
+            cargoExtraArgs:
             if buildPlatform.isLinux && buildPlatform.isx86_64 then
               rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
-                hoprdBuildArgs // { CARGO_PROFILE = "candidate"; }
+                hoprdBuildArgs
+                // {
+                  inherit cargoExtraArgs;
+                  CARGO_PROFILE = "candidate";
+                }
               )
             else
               rust-builder-local.callPackage ./nix/rust-package.nix (
-                hoprdBuildArgs // { CARGO_PROFILE = "candidate"; }
+                hoprdBuildArgs
+                // {
+                  inherit cargoExtraArgs;
+                  CARGO_PROFILE = "candidate";
+                }
               );
-          hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs // { runBench = true; }
-          );
+          # Use cross-compilation environment when possible to have the same setup as our production builds when benchmarking.
+          hoprd-bench =
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isLinux && buildPlatform.isAarch64 then
+              rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isDarwin && buildPlatform.isx86_64 then
+              rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else if buildPlatform.isDarwin && buildPlatform.isAarch64 then
+              rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix (
+                hoprdBuildArgs // { runBench = true; }
+              )
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runBench = true; });
 
           hopliBuildArgs = {
             inherit src depsSrc rev;
@@ -275,6 +330,7 @@
             # lldb
             rust-bin.stable.latest.minimal
             valgrind
+            gnutar # Used to extract the pcap file from the docker container
           ];
 
           dockerHoprdEntrypoint = pkgs.writeShellScriptBin "docker-entrypoint.sh" ''
@@ -337,7 +393,8 @@
             extraContents = [
               dockerHoprdEntrypoint
               package
-            ] ++ deps;
+            ]
+            ++ deps;
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
           };
@@ -461,32 +518,36 @@
               (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
             ];
           };
-          hopr-pluto = pkgs.dockerTools.buildLayeredImage {
+          plutoDeps = with pkgs; [
+            curl
+            foundry-bin
+            gnumake
+            hoprd
+            hopli
+            plutoSrc
+            python313
+            runtimeShellPackage
+            solcDefault
+            lsof
+            tini
+            uv
+            which
+          ];
+          pluto-docker = import ./nix/docker-builder.nix {
             name = "hopr-pluto";
-            tag = "latest";
-            # breaks binary reproducibility, but makes usage easier
-            created = "now";
-            contents = with pkgs; [
-              coreutils
-              curl
-              findutils
-              foundry-bin
-              gnumake
-              hoprd
-              hopli
-              jq
-              lsof
-              openssl
-              plutoSrc
-              python313
-              runtimeShellPackage
-              solcDefault
-              time
-              tini
-              uv
-              which
+            pkgs = pkgs;
+            extraContents = plutoDeps;
+            extraPorts = {
+              "3001-3006/tcp" = { };
+              "10001-10101/tcp" = { };
+              "10001-10101/udp" = { };
+            };
+            Cmd = [
+              "/bin/tini"
+              "--"
+              "bash"
+              "/scripts/run-local-cluster.sh"
             ];
-            enableFakechroot = true;
             fakeRootCommands = ''
               #!${pkgs.runtimeShell}
 
@@ -515,29 +576,8 @@
               # need to point to the contracts directory for forge to work
               ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
 
-              export PATH="/target/debug/:$PATH"
-
               mkdir /tmp/
-              mkdir /tmp/hopr-localcluster
-              mkdir /tmp/hopr-localcluster/anvil
-
             '';
-            config = {
-              Env = [
-                "LD_LIBRARY_PATH=${pkgs.openssl.out}/lib:$LD_LIBRARY_PATH"
-              ];
-              Cmd = [
-                "/bin/tini"
-                "--"
-                "bash"
-                "/scripts/run-local-cluster.sh"
-              ];
-              ExposedPorts = {
-                "8545/tcp" = { };
-                "3003-3018/tcp" = { };
-                "10001-10101/tcp" = { };
-              };
-            };
           };
 
           dockerImageUploadScript =
@@ -548,6 +588,7 @@
               ${pkgs.skopeo}/bin/skopeo copy --insecure-policy \
                 --dest-registry-token="$GOOGLE_ACCESS_TOKEN" \
                 "docker-archive:$OCI_ARCHIVE" "docker://$IMAGE_TARGET"
+              echo "Uploaded image to $IMAGE_TARGET"
             '';
           hoprd-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-docker;
@@ -568,7 +609,7 @@
             drv = dockerImageUploadScript hopli-profile-docker;
           };
           hopr-pluto-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hopr-pluto;
+            drv = dockerImageUploadScript pluto-docker;
           };
           docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs // { buildDocs = true; }
@@ -603,6 +644,7 @@
               uv run --frozen -m pytest tests/
             '';
             doCheck = true;
+            HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES = "true"; # Allow local private IPs in smoke tests
           };
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
@@ -711,7 +753,7 @@
               crane
               solcDefault
               ;
-            hoprd = hoprd-candidate;
+            hoprd = (mkHoprdCandidate "");
             hopli = hopli-candidate;
           };
           docsShell = import ./nix/devShell.nix {
@@ -750,43 +792,6 @@
               ];
               text = ''
                 cargo audit
-              '';
-            };
-          };
-
-          sign-file = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellApplication {
-              name = "sign-file";
-              runtimeInputs = [
-                pkgs.gnupg
-                pkgs.coreutils
-                pkgs.openssl
-                pkgs.perl
-              ];
-              text = ''
-                set -euo pipefail
-                source_file="$1"
-                echo "Signing file: $source_file"
-                outdir="$(pwd)"
-                basename="$(basename "$source_file")"
-                dirname="$(dirname "$source_file")"
-
-                # Create isolated GPG keyring
-                gnupghome="$(mktemp -d)"
-                export GNUPGHOME="$gnupghome"
-                echo "$GPG_HOPRNET_PRIVATE_KEY" | gpg --batch --import
-
-                # Generate hash and signature
-                cd "$dirname"
-                shasum -a 256 "$basename" > "$outdir/$basename.sha256"
-                echo "Hash written to $outdir/$basename.sha256"
-                gpg --armor --output "$outdir/$basename.sig" --detach-sign "$basename"
-                echo "Signature written to $outdir/$basename.sig"
-                gpg --armor --output "$outdir/$basename.sha256.asc" --sign "$outdir/$basename.sha256"
-                echo "Signature for hash written to $outdir/$basename.sha256.asc"
-
-                # Clean up
-                rm -rf "$gnupghome"
               '';
             };
           };
@@ -942,7 +947,6 @@
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
-            sign = sign-file;
           };
 
           packages = {
@@ -960,20 +964,26 @@
               hopli-dev-docker
               hopli-profile-docker
               ;
-            inherit hoprd-candidate hopli-candidate;
+            inherit hopli-candidate;
             inherit hopr-test hopr-test-nightly;
-            inherit anvil-docker hopr-pluto;
+            inherit anvil-docker pluto-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
-            inherit hoprd-aarch64-linux hoprd-x86_64-linux hoprd-x86_64-linux-dev;
-            inherit hopli-aarch64-linux hopli-x86_64-linux hopli-x86_64-linux-dev;
-            # FIXME: Darwin cross-builds are currently broken.
-            # Follow https://github.com/nixos/nixpkgs/pull/256590
-            inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
-            inherit hopli-aarch64-darwin hopli-x86_64-darwin;
             inherit hoprd-bench;
             inherit hoprd-man hopli-man;
+            # binary packages
+            inherit hoprd-x86_64-linux hoprd-x86_64-linux-dev hoprd-x86_64-linux-profile;
+            inherit hoprd-aarch64-linux hoprd-aarch64-linux-profile;
+            inherit hopli-x86_64-linux hopli-x86_64-linux-dev;
+            inherit hopli-aarch64-linux;
+            # FIXME: Darwin cross-builds are currently broken.
+            # Follow https://github.com/nixos/nixpkgs/pull/256590
+            inherit hoprd-x86_64-darwin hoprd-x86_64-darwin-profile;
+            inherit hoprd-aarch64-darwin hoprd-aarch64-darwin-profile;
+            inherit hopli-x86_64-darwin;
+            inherit hopli-aarch64-darwin;
             default = hoprd;
+            hoprd-candidate = (mkHoprdCandidate "");
           };
 
           devShells.default = devShell;

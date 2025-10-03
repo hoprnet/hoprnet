@@ -1,19 +1,15 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, num::NonZeroUsize};
 
-use hopr_lib::{HoprOffchainKeypair, ServiceId, errors::HoprLibError, transfer_session};
-use hopr_network_types::{prelude::ForeignDataMode, udp::UdpStreamParallelism};
+use hopr_lib::{
+    HoprOffchainKeypair, ServiceId,
+    errors::HoprLibError,
+    exports::transport::MetricSessionCounterGuard,
+    prelude::{ConnectedUdpStream, ForeignDataMode, UdpStreamParallelism},
+    transfer_session,
+};
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 use crate::config::SessionIpForwardingConfig;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_ACTIVE_TARGETS: hopr_metrics::MultiGauge = hopr_metrics::MultiGauge::new(
-        "hopr_session_hoprd_target_connections",
-        "Number of currently active HOPR session target connections on this Exit node",
-        &["type"]
-    ).unwrap();
-}
 
 /// Implementation of [`hopr_lib::HoprSessionReactor`] that facilitates
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.
@@ -45,14 +41,18 @@ impl HoprServerIpForwardingReactor {
 pub const SERVICE_ID_LOOPBACK: ServiceId = 0;
 
 #[hopr_lib::async_trait]
-impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
+impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
-    async fn process(&self, mut session: hopr_lib::HoprIncomingSession) -> hopr_lib::errors::Result<()> {
+    async fn process(
+        &self,
+        mut session: hopr_lib::exports::transport::session::IncomingSession,
+    ) -> hopr_lib::errors::Result<()> {
         let session_id = *session.session.id();
         match session.target {
             hopr_lib::SessionTarget::UdpStream(udp_target) => {
-                let udp_target = udp_target
-                    .unseal(&self.keypair)
+                let kp = self.keypair.clone();
+                let udp_target = hopr_lib::utils::parallelize::cpu::spawn_blocking(move || udp_target.unseal(&kp))
+                    .await
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(
@@ -86,12 +86,18 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     )));
                 }
 
-                let mut udp_bridge = hopr_network_types::udp::ConnectedUdpStream::builder()
+                let mut udp_bridge = ConnectedUdpStream::builder()
                     .with_buffer_size(HOPR_UDP_BUFFER_SIZE)
                     .with_counterparty(resolved_udp_target)
                     .with_foreign_data_mode(ForeignDataMode::Error)
                     .with_queue_size(HOPR_UDP_QUEUE_SIZE)
-                    .with_receiver_parallelism(UdpStreamParallelism::Auto)
+                    .with_receiver_parallelism(
+                        std::env::var("HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM")
+                            .ok()
+                            .and_then(|s| s.parse::<NonZeroUsize>().ok())
+                            .map(UdpStreamParallelism::Specific)
+                            .unwrap_or(UdpStreamParallelism::Auto),
+                    )
                     .build(("0.0.0.0", 0))
                     .map_err(|e| {
                         HoprLibError::GeneralError(format!(
@@ -106,10 +112,11 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 );
 
                 tokio::task::spawn(async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.increment(&["udp"], 1.0);
+                    let _metric_counter_guard = MetricSessionCounterGuard::new("udp");
 
-                    match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE).await {
+                    // The Session forwards the termination to the udp_bridge, terminating
+                    // the UDP socket.
+                    match transfer_session(&mut session.session, &mut udp_bridge, HOPR_UDP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
                             session_to_stream_bytes,
@@ -124,16 +131,14 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                             "UDP server stream is closed"
                         ),
                     }
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.decrement(&["udp"], 1.0);
                 });
 
                 Ok(())
             }
             hopr_lib::SessionTarget::TcpStream(tcp_target) => {
-                let tcp_target = tcp_target
-                    .unseal(&self.keypair)
+                let kp = self.keypair.clone();
+                let tcp_target = hopr_lib::utils::parallelize::cpu::spawn_blocking(move || tcp_target.unseal(&kp))
+                    .await
                     .map_err(|e| HoprLibError::GeneralError(format!("cannot unseal target: {e}")))?;
 
                 tracing::debug!(?session_id, %tcp_target, "creating a connection to the TCP server");
@@ -179,11 +184,11 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                     %tcp_target,
                     "bridging the session to the TCP server"
                 );
-                tokio::task::spawn(async move {
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.increment(&["tcp"], 1.0);
 
-                    match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE).await {
+                tokio::task::spawn(async move {
+                    let _metric_counter_guard = MetricSessionCounterGuard::new("tcp");
+
+                    match transfer_session(&mut session.session, &mut tcp_bridge, HOPR_TCP_BUFFER_SIZE, None).await {
                         Ok((session_to_stream_bytes, stream_to_session_bytes)) => tracing::info!(
                             ?session_id,
                             session_to_stream_bytes,
@@ -198,9 +203,6 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                             "TCP server stream is closed"
                         ),
                     }
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_ACTIVE_TARGETS.decrement(&["tcp"], 1.0);
                 });
 
                 Ok(())
@@ -209,8 +211,7 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                 tracing::debug!(?session_id, "bridging the session to the loopback service");
                 let (mut reader, mut writer) = tokio::io::split(session.session);
 
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACTIVE_TARGETS.increment(&["loopback"], 1.0);
+                let _metric_counter_guard = MetricSessionCounterGuard::new("loopback");
 
                 // Uses 4 kB buffer for copying
                 match tokio::io::copy(&mut reader, &mut writer).await {
@@ -221,9 +222,6 @@ impl hopr_lib::HoprSessionReactor for HoprServerIpForwardingReactor {
                         "server loopback session service ended with an error"
                     ),
                 }
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_ACTIVE_TARGETS.decrement(&["loopback"], 1.0);
 
                 Ok(())
             }

@@ -1,12 +1,9 @@
 use std::fmt::Formatter;
 
 use hopr_crypto_sphinx::prelude::SharedSecret;
-use hopr_crypto_types::{
-    crypto_traits::Randomizable,
-    prelude::{SecretKey, sample_secp256k1_field_element},
-    types::{Challenge, HalfKey, HalfKeyChallenge, Response},
-};
+use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tracing::instrument;
 
 use crate::errors::{PacketError, Result};
 
@@ -58,7 +55,7 @@ impl ProofOfRelayValues {
     /// Returns the complete challenge that is present on the ticket corresponding to the
     /// packet.
     pub fn ticket_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&self.0[1 + HalfKeyChallenge::SIZE..])
+        EthereumChallenge(Address::new(&self.0[1 + HalfKeyChallenge::SIZE..]))
     }
 }
 
@@ -151,7 +148,7 @@ impl ProofOfRelayString {
 
     /// Challenge that must be printed on the ticket for the next downstream node.
     pub fn next_ticket_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&self.0[0..EthereumChallenge::SIZE])
+        EthereumChallenge(Address::new(&self.0[0..EthereumChallenge::SIZE]))
     }
 
     /// Proof of Relay hint value for this node. In case this node is a sender
@@ -206,13 +203,14 @@ pub struct ProofOfRelayOutput {
 /// * `secret` shared secret with the creator of the packet
 /// * `pors` `ProofOfRelayString` as included within the packet
 /// * `challenge` the ticket challenge of the incoming ticket
+#[instrument(level = "trace", skip_all, err)]
 pub fn pre_verify(
     secret: &SharedSecret,
     pors: &ProofOfRelayString,
     challenge: &EthereumChallenge,
 ) -> Result<ProofOfRelayOutput> {
     let own_key = derive_own_key_share(secret);
-    let own_share = own_key.to_challenge();
+    let own_share = own_key.to_challenge()?;
 
     if Challenge::from_hint_and_share(&own_share, &pors.acknowledgement_challenge_or_hint())?
         .to_ethereum_challenge()
@@ -239,14 +237,20 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
             .unwrap_or_else(|| {
                 derive_ack_key_share(&secrets[i]) // s0_ack
             })
-            .to_challenge();
+            .to_challenge()?;
 
-        let s1 = derive_own_key_share(&secrets[i]); // s1_own
-        let s2 = derive_ack_key_share(secrets.get(i + 1).unwrap_or(&SharedSecret::random()));
+        let next_ticket_challenge = if let Some(next_secret) = secrets.get(i + 1) {
+            let s1 = derive_own_key_share(&secrets[i]); // s1_own
+            let s2 = derive_ack_key_share(next_secret); // s2_ack
 
-        let next_ticket_challenge = Response::from_half_keys(&s1, &s2)? // (s1_own + s2_ack) * G
-            .to_challenge()
-            .to_ethereum_challenge();
+            last_ack_key_share = Some(s2);
+
+            Response::from_half_keys(&s1, &s2)? // (s1_own + s2_ack) * G
+                .to_challenge()?
+                .to_ethereum_challenge()
+        } else {
+            EthereumChallenge(hopr_crypto_random::random_bytes::<{ Address::SIZE }>().into())
+        };
 
         if i > 0 {
             por_strings.push(ProofOfRelayString::new(&next_ticket_challenge, &hint));
@@ -257,7 +261,6 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
                 &next_ticket_challenge,
             ));
         }
-        last_ack_key_share = Some(s2);
     }
 
     Ok((
@@ -268,6 +271,8 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
 
 #[cfg(test)]
 mod tests {
+    use hopr_crypto_random::Randomizable;
+
     use super::*;
 
     impl ProofOfRelayValues {
@@ -279,15 +284,14 @@ mod tests {
             let s0 = derive_own_key_share(secret_b);
             let s1 = derive_ack_key_share(secret_c.unwrap_or(&SharedSecret::random()));
 
-            let ack_challenge = derive_ack_key_share(secret_b).to_challenge();
+            let ack_challenge = derive_ack_key_share(secret_b).to_challenge()?;
             let ticket_challenge = Response::from_half_keys(&s0, &s1)?
-                .to_challenge()
+                .to_challenge()?
                 .to_ethereum_challenge();
 
             Ok((Self::new(chain_length, &ack_challenge, &ticket_challenge), s0))
         }
     }
-
     impl ProofOfRelayString {
         /// Creates an instance from the shared secrets with node+2 and node+3
         fn create(secret_c: &SharedSecret, secret_d: Option<&SharedSecret>) -> hopr_crypto_types::errors::Result<Self> {
@@ -296,11 +300,10 @@ mod tests {
             let s2 = derive_ack_key_share(secret_d.unwrap_or(&SharedSecret::random())); // s2_ack
 
             let next_ticket_challenge = Response::from_half_keys(&s1, &s2)? // (s1_own + s2_ack) * G
-                .to_challenge()
+                .to_challenge()?
                 .to_ethereum_challenge();
 
-            let hint = s0.to_challenge();
-
+            let hint = s0.to_challenge()?;
             Ok(Self::new(&next_ticket_challenge, &hint))
         }
 
@@ -322,7 +325,9 @@ mod tests {
 
     /// Checks if the given response solves the given challenge.
     fn validate_por_response(ethereum_challenge: &EthereumChallenge, response: &Response) -> bool {
-        response.to_challenge().to_ethereum_challenge().eq(ethereum_challenge)
+        response
+            .to_challenge()
+            .is_ok_and(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
     }
 
     /// Checks if the given acknowledgement solves the given challenge.
@@ -388,7 +393,7 @@ mod tests {
         let first_result = pre_verify(&secrets[0], &first_por_string, &first_challenge_eth)
             .expect("First challenge must be plausible");
 
-        let expected_hkc = derive_ack_key_share(&secrets[1]).to_challenge();
+        let expected_hkc = derive_ack_key_share(&secrets[1]).to_challenge()?;
         assert_eq!(expected_hkc, first_result.ack_challenge);
 
         // Simulates the transformation done by the first relayer
@@ -420,7 +425,7 @@ mod tests {
         assert!(
             validate_por_hint(
                 &first_result.next_ticket_challenge,
-                &second_result.own_key.to_challenge(),
+                &second_result.own_key.to_challenge()?,
                 &second_ack
             ),
             "Second acknowledgement must solve the challenge"

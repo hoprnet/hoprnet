@@ -185,6 +185,8 @@ impl TicketManager {
                     }
                 }
             }
+
+            tracing::warn!(task = "ticket processing", "long-running background task finished")
         });
 
         Ok(())
@@ -257,35 +259,35 @@ impl TicketManager {
         let channel_epoch = selector.channel_identifiers[0].1;
         let selector: WrappedTicketSelector = selector.into();
 
-        let transaction = OpenTransaction(
-            self.tickets_db
-                .begin_with_config(None, None)
-                .await
-                .map_err(crate::errors::DbSqlError::BackendError)?,
-            crate::TargetDb::Tickets,
-        );
-
+        let tickets_db = self.tickets_db.clone();
         let selector_clone = selector.clone();
         Ok(self
             .caches
             .unrealized_value
             .try_get_with_by_ref(&(channel_id, channel_epoch), async move {
-                transaction
-                    .perform(|tx| {
-                        Box::pin(async move {
-                            ticket::Entity::find()
-                                .filter(selector_clone)
-                                .stream(tx.as_ref())
-                                .await
-                                .map_err(crate::errors::DbSqlError::from)?
-                                .map_err(crate::errors::DbSqlError::from)
-                                .try_fold(HoprBalance::zero(), |value, t| async move {
-                                    Ok(value + HoprBalance::from_be_bytes(t.amount))
-                                })
-                                .await
-                        })
+                tracing::warn!(%channel_id, %channel_epoch, "cache miss on unrealized value");
+                OpenTransaction(
+                    tickets_db
+                        .begin_with_config(None, None)
+                        .await
+                        .map_err(DbSqlError::BackendError)?,
+                    crate::TargetDb::Tickets,
+                )
+                .perform(|tx| {
+                    Box::pin(async move {
+                        ticket::Entity::find()
+                            .filter(selector_clone)
+                            .stream(tx.as_ref())
+                            .await
+                            .map_err(crate::errors::DbSqlError::from)?
+                            .map_err(crate::errors::DbSqlError::from)
+                            .try_fold(HoprBalance::zero(), |value, t| async move {
+                                Ok(value + HoprBalance::from_be_bytes(t.amount))
+                            })
+                            .await
                     })
-                    .await
+                })
+                .await
             })
             .await?)
     }
@@ -359,16 +361,14 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let cp1: CurvePoint = hk1.to_challenge().try_into()?;
-        let cp2: CurvePoint = hk2.to_challenge().try_into()?;
-        let cp_sum = CurvePoint::combine(&[&cp1, &cp2]);
+        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         let ticket = TicketBuilder::default()
             .direction(&BOB.public().to_address(), &ALICE.public().to_address())
             .amount(TICKET_VALUE)
             .index(index as u64)
             .channel_epoch(4)
-            .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
+            .challenge(challenge)
             .build_signed(&BOB, &Hash::default())?;
 
         Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
