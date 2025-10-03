@@ -16,11 +16,11 @@ use petgraph::{
 };
 use tracing::{debug, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
-use {hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge};
+use {hopr_internal_types::channels::ChannelDirection, hopr_metrics::MultiGauge};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_NUMBER_OF_CHANNELS:  hopr_metrics::MultiGauge =  hopr_metrics::MultiGauge::new(
+    static ref METRIC_NUMBER_OF_CHANNELS:  MultiGauge =  MultiGauge::new(
         "hopr_channels_count",
         "Number of channels per direction",
         &["direction"]
