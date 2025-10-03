@@ -9,6 +9,7 @@
   rust-overlay,
   solc,
   useRustNightly ? false,
+  enableCoverage ? false,
 }@args:
 let
   crossSystem0 = crossSystem;
@@ -148,16 +149,19 @@ in
     # Override the derivation to add cross-compilation environment variables.
     crate.overrideAttrs (
       previous:
-      buildEnv // coverageEnv
+      buildEnv
+      // (if enableCoverage then coverageEnv else {})
       // {
         # Add profiler_builtins to build inputs if doing coverage
-        buildInputs = (previous.buildInputs or []) ++ [
-          profiler_builtins
-        ];
+        buildInputs = (previous.buildInputs or []) ++ (
+          if enableCoverage then [profiler_builtins] else []
+        );
         # We also have to override the `cargoArtifacts` derivation with the same changes.
         cargoArtifacts =
           if previous.cargoArtifacts != null then
-            previous.cargoArtifacts.overrideAttrs (previous: buildEnv // coverageEnv)
+            previous.cargoArtifacts.overrideAttrs (
+              previous: buildEnv // (if enableCoverage then coverageEnv else {})
+            )
           else
             null;
       }

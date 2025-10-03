@@ -232,15 +232,15 @@
           );
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            src = testSrc;
             runTests = true;
-            runTestsWithCoverage = true;
           });
 
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
               src = testSrc;
-              runTests = true;
+              runTestsWithCoverage = true;
               cargoExtraArgs = "-Z panic-abort-tests";
             }
           );

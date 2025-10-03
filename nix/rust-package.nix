@@ -144,7 +144,7 @@ let
         nativeBuildInputs = sharedArgsBase.nativeBuildInputs ++ [ cargoLlvmCov ]; # add llvm-cov
         postBuild = ''
           # Generate coverage report
-          cargo llvm-cov --workspace --lcov --output-path lcov.info --features "runtime-async-std runtime-tokio"
+          cargo llvm-cov --workspace --lcov --output-path lcov.info --features "runtime-tokio"
         '';
     }
     else if runTests then
