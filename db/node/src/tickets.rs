@@ -332,7 +332,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                         };
 
                         {
-                            let _g = self.ticket_manager.mutex.lock();
+                            let _g = self.ticket_manager.mutex.lock().await;
                             if let Err(error) = active_ticket.update(&self.tickets_db).await {
                                 error!(%error, "failed to update ticket in the db");
                             }
