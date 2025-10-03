@@ -153,7 +153,7 @@ impl TicketManager {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS
-                .set(&["unredeemed"], (unrealized_value + value).amount().as_u128() as f64);
+                .increment(&["unredeemed"], (value).amount().as_u128() as f64);
         }
 
         self.caches
