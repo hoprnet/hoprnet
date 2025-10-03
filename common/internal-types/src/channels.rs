@@ -6,6 +6,7 @@ use std::{
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
+/// Describes status of a channel
 #[derive(Copy, Clone, Debug, smart_default::SmartDefault, strum::Display, strum::EnumDiscriminants)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[strum_discriminants(vis(pub))]

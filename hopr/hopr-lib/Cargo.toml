@@ -17,23 +17,18 @@ session-client = []
 session-server = []
 transport-quic = ["hopr-transport/transport-quic"]
 runtime-tokio = [
-  "hopr-chain-api/runtime-tokio",
-  "hopr-chain-rpc/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-strategy/runtime-tokio",
   "hopr-transport/runtime-tokio",
+  "hopr-chain-api/runtime-tokio",
 ]
 prometheus = [
-  "hopr-chain-api/prometheus",
-  "hopr-chain-indexer/prometheus",
-  "hopr-chain-rpc/prometheus",
   "dep:hopr-metrics",
-  "hopr-db-sql/prometheus",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
   "hopr-strategy/prometheus",
+  "hopr-db-node/prometheus",
 ]
 capture = ["hopr-transport/capture"]
 fixed_rng = ["hopr-crypto-random/fixed_rng"]
@@ -59,7 +54,6 @@ alloy = { workspace = true, default-features = false, features = [
   "json-rpc",
   "node-bindings",
 ] }
-async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
@@ -84,17 +78,14 @@ tokio = { workspace = true, optional = true }
 tokio-stream = { workspace = true, optional = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-chain-actions = { workspace = true }
 hopr-chain-api = { workspace = true }
-hopr-chain-indexer = { workspace = true }
-hopr-chain-rpc = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
-hopr-db-sql = { workspace = true }
+hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
@@ -119,5 +110,8 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 url = { workspace = true }
 
+hopr-chain-actions = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-indexer = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }

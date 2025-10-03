@@ -92,6 +92,7 @@
 //!
 //! See the [payload] module for details.
 use hopr_crypto_types::prelude::*;
+use hopr_db_sql::HoprIndexerDb;
 use hopr_primitive_types::prelude::*;
 
 use crate::action_queue::ActionSender;
@@ -106,27 +107,23 @@ pub mod payload;
 pub mod redeem;
 
 /// Contains all actions that a node can execute on-chain.
-#[derive(Debug, Clone)]
-pub struct ChainActions<Db>
-where
-    Db: Clone + std::fmt::Debug,
-{
+#[derive(Clone)]
+pub struct ChainActions<Db> {
     me: Address,
     chain_key: ChainKeypair,
-    db: Db,
+    index_db: HoprIndexerDb,
+    node_db: Db,
     tx_sender: ActionSender,
 }
 
-impl<Db> ChainActions<Db>
-where
-    Db: Clone + std::fmt::Debug,
-{
-    /// Creates new instance.
-    pub fn new(me: &ChainKeypair, db: Db, tx_sender: ActionSender) -> Self {
+impl<Db> ChainActions<Db> {
+    /// Creates a new instance.
+    pub fn new(me: &ChainKeypair, index_db: HoprIndexerDb, node_db: Db, tx_sender: ActionSender) -> Self {
         Self {
             me: me.public().to_address(),
             chain_key: me.clone(),
-            db,
+            index_db,
+            node_db,
             tx_sender,
         }
     }

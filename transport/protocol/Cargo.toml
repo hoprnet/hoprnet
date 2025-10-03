@@ -10,8 +10,15 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
-prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
+runtime-tokio = [
+  "hopr-async-runtime/runtime-tokio",
+  "hopr-db-node/runtime-tokio",
+]
+prometheus = [
+  "dep:hopr-metrics",
+  "hopr-path/prometheus",
+  "hopr-db-node/prometheus",
+]
 capture = ["dep:pcap-file"]
 
 [dependencies]
@@ -38,15 +45,16 @@ tokio-util = { workspace = true, default-features = false, features = [
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
+hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
-hopr-parallelize = { workspace = true }
+hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -57,12 +65,14 @@ hopr-transport-identity = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
+bimap = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
+test-log = { workspace = true }
 hopr-protocol-session = { workspace = true, features = ["session-types"] }
 hopr-protocol-start = { workspace = true }
 hopr-transport-session = { workspace = true }

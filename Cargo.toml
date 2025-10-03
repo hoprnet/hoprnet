@@ -19,9 +19,9 @@ members = [
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
-  "db/api",
   "db/entity",
   "db/migration",
+  "db/node",
   "db/sql",
   "ethereum/bindings",
   "hopli",
@@ -45,7 +45,6 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
-  "transport/ticket-aggregation",
 ]
 
 [workspace.dependencies]
@@ -254,9 +253,9 @@ hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, feature
   "ed25519",
 ] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
-hopr-db-api = { path = "db/api" }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
+hopr-db-node = { path = "db/node" }
 hopr-db-sql = { path = "db/sql" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
 hopr-chain-config = { path = "hopr/chain-config", default-features = false }
@@ -280,7 +279,6 @@ hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
-hopr-transport-ticket-aggregation = { path = "transport/ticket-aggregation" } # dead package waiting for reimplementation as a session protocol
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 
 [profile.dev]

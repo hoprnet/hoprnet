@@ -2,8 +2,7 @@ use std::{net::Ipv4Addr, num::NonZeroU8};
 
 use futures::{Sink, SinkExt, Stream, StreamExt, select};
 use hopr_internal_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleGauge;
+use hopr_network_types::prelude::is_public_address;
 use hopr_transport_identity::{
     Multiaddr, PeerId,
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
@@ -21,7 +20,7 @@ use crate::{HoprNetworkBehavior, HoprNetworkBehaviorEvent, constants, errors::Re
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT: SimpleGauge = SimpleGauge::new(
+    static ref METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_transport_p2p_opened_connection_count",
         "Number of currently open connections"
     ).unwrap();
@@ -41,6 +40,13 @@ where
 
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
+    //
+    // NOTE: Private address filtering is implemented at multiple levels for defense-in-depth:
+    // 1. Discovery behavior filters PeerDiscovery::Allow and PeerDiscovery::Announce events
+    // 2. SwarmEvent::NewExternalAddrOfPeer events are filtered using is_public_address()
+    // 3. Network layer filters addresses in both add() and get() methods (primary protection)
+    // 4. libp2p's global_only transport wrapper could be added here but the above filtering provides equivalent
+    //    protection while maintaining compatibility with the existing code
     #[cfg(feature = "runtime-tokio")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
@@ -306,8 +312,13 @@ impl HoprSwarm {
                     SwarmEvent::NewExternalAddrOfPeer {
                         peer_id, address
                     } => {
-                        swarm.add_peer_address(peer_id, address.clone());
-                        trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "New peer stored in swarm")
+                        // Only store public/routable addresses
+                        if is_public_address(&address) {
+                            swarm.add_peer_address(peer_id, address.clone());
+                            trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Public peer address stored in swarm")
+                        } else {
+                            trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Private/local peer address ignored")
+                        }
                     },
                     _ => trace!(transport="libp2p", "Unsupported enum option detected")
                 }

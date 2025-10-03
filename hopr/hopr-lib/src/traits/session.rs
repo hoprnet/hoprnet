@@ -1,5 +1,5 @@
 #[cfg(feature = "session-server")]
-use crate::{errors::Result, exports::transport::session::IncomingSession};
+use crate::{errors::Result, exports::transport::IncomingSession};
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.

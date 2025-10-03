@@ -72,4 +72,5 @@ craneLib.devShell {
     ++ pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]
   );
   CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
+  HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES = "true"; # Allow local private IPs in dev shells
 }

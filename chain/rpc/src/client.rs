@@ -51,27 +51,24 @@ use validator::Validate;
 pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u128 = 3_000_000_000;
 pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u128 = 100_000_000;
 
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
-
 use crate::{rpc::DEFAULT_GAS_ORACLE_URL, transport::HttpRequestor};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_RPC_CALLS: MultiCounter = MultiCounter::new(
+    static ref METRIC_COUNT_RPC_CALLS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
         "hopr_rpc_call_count",
         "Number of Ethereum RPC calls over HTTP and their result",
         &["call", "result"]
     )
     .unwrap();
-    static ref METRIC_RPC_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
+    static ref METRIC_RPC_CALLS_TIMING: hopr_metrics::MultiHistogram = hopr_metrics::MultiHistogram::new(
         "hopr_rpc_call_time_sec",
         "Timing of RPC calls over HTTP in seconds",
         vec![0.1, 0.5, 1.0, 2.0, 5.0, 7.0, 10.0],
         &["call"]
     )
     .unwrap();
-    static ref METRIC_RETRIES_PER_RPC_CALL: MultiHistogram = MultiHistogram::new(
+    static ref METRIC_RETRIES_PER_RPC_CALL: hopr_metrics::MultiHistogram = hopr_metrics::MultiHistogram::new(
         "hopr_retries_per_rpc_call",
         "Number of retries per RPC call",
         vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],

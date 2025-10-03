@@ -5,12 +5,12 @@ use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelud
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+use sea_query::Condition;
 use tracing::instrument;
 
 use crate::{
-    HoprDbGeneralModelOperations, OptTx,
+    HoprDbGeneralModelOperations, HoprIndexerDb, OptTx,
     cache::ChannelParties,
-    db::HoprDb,
     errors::{DbSqlError, Result},
 };
 
@@ -105,6 +105,13 @@ pub trait HoprDbChannelOperations {
     /// Retrieves all channels information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
+    async fn stream_channels<'a>(
+        &'a self,
+        counterparty: Option<Address>,
+        directions: &[ChannelDirection],
+        states: &[ChannelStatusDiscriminants],
+    ) -> Result<BoxStream<'a, ChannelEntry>>;
+
     /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>>;
 
@@ -113,7 +120,7 @@ pub trait HoprDbChannelOperations {
 }
 
 #[async_trait]
-impl HoprDbChannelOperations for HoprDb {
+impl HoprDbChannelOperations for HoprIndexerDb {
     async fn get_channel_by_id<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEntry>> {
         let id_hex = id.to_hex();
         self.nest_transaction(tx)
@@ -160,8 +167,6 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<Option<ChannelEntry>> {
-        let epoch = editor.model.epoch.clone();
-
         let parties = ChannelParties(editor.orig.source, editor.orig.destination);
         let ret = self
             .nest_transaction(tx)
@@ -182,17 +187,6 @@ impl HoprDbChannelOperations for HoprDb {
             })
             .await?;
         self.caches.src_dst_to_channel.invalidate(&parties).await;
-
-        // Finally invalidate any unrealized values from the cache.
-        // This might be a no-op if the channel was not in the cache
-        // like for channels that are not ours.
-        let channel_id = editor.orig.get_id();
-        if let Some(channel_epoch) = epoch.try_as_ref() {
-            self.caches
-                .unrealized_value
-                .invalidate(&(channel_id, U256::from_big_endian(channel_epoch.as_slice())))
-                .await;
-        }
 
         Ok(ret)
     }
@@ -294,6 +288,54 @@ impl HoprDbChannelOperations for HoprDb {
             .await
     }
 
+    async fn stream_channels<'a>(
+        &'a self,
+        counterparty: Option<Address>,
+        directions: &[ChannelDirection],
+        states: &[ChannelStatusDiscriminants],
+    ) -> Result<BoxStream<'a, ChannelEntry>> {
+        let mut incoming_cond = Condition::all();
+        if directions.contains(&ChannelDirection::Incoming) {
+            incoming_cond = incoming_cond.add(channel::Column::Destination.eq(self.me_onchain.to_hex()));
+            if let Some(counterparty) = counterparty {
+                incoming_cond = incoming_cond.add(channel::Column::Source.eq(counterparty.to_hex()));
+            }
+        }
+
+        let mut outgoing_cond = Condition::all();
+        if directions.contains(&ChannelDirection::Outgoing) || directions.is_empty() {
+            outgoing_cond = outgoing_cond.add(channel::Column::Source.eq(self.me_onchain.to_hex()));
+            if let Some(counterparty) = counterparty {
+                outgoing_cond = outgoing_cond.add(channel::Column::Destination.eq(counterparty.to_hex()));
+            }
+        }
+
+        let mut states_condition = Condition::any();
+        for state in states {
+            states_condition = states_condition.add(channel::Column::Status.eq(*state as i8));
+        }
+
+        Ok(Channel::find()
+            .filter(sea_query::all![
+                sea_query::any![incoming_cond, outgoing_cond],
+                states_condition
+            ])
+            .stream(self.index_db.read_only())
+            .await?
+            .filter_map(|maybe_channel| {
+                futures::future::ready(
+                    maybe_channel
+                        .and_then(|c| {
+                            ChannelEntry::try_from(c)
+                                .map_err(|e| sea_orm::error::DbErr::Custom(format!("cannot decode entity: {e}")))
+                        })
+                        .inspect_err(|error| tracing::error!(%error, "invalid channel entry"))
+                        .ok(),
+                )
+            })
+            .boxed())
+    }
+
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>> {
         Ok(Channel::find()
             .filter(
@@ -334,15 +376,8 @@ impl HoprDbChannelOperations for HoprDb {
 
         self.caches.src_dst_to_channel.invalidate(&parties).await;
 
-        // Finally, invalidate any unrealized values from the cache.
-        // This might be a no-op if the channel was not in the cache
-        // like for channels that are not ours.
-        let channel_id = channel_entry.get_id();
-        let channel_epoch = channel_entry.channel_epoch;
-        self.caches
-            .unrealized_value
-            .invalidate(&(channel_id, channel_epoch))
-            .await;
+        // The invalidation of the unrealized value is done in the finish_channel_update function.
+        // Has no effect if the channel has been inserted.
 
         Ok(())
     }
@@ -359,11 +394,12 @@ mod tests {
     };
     use hopr_primitive_types::prelude::Address;
 
-    use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations, db::HoprDb};
+    use super::*;
+    use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations};
 
     #[tokio::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let ce = ChannelEntry::new(
             Address::default(),
@@ -387,7 +423,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_get_by_parties() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
@@ -407,7 +443,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_for_destination_that_does_not_exist_returns_none() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let from_db = db
             .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
@@ -422,7 +458,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_for_destination_that_exists_should_be_returned() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let expected_destination = Address::default();
 
@@ -453,7 +489,7 @@ mod tests {
         let addr_1 = ckp.public().to_address();
         let addr_2 = ChainKeypair::random().public().to_address();
 
-        let db = HoprDb::new_in_memory(ckp).await?;
+        let db = HoprIndexerDb::new_in_memory(ckp).await?;
 
         let ce_1 = ChannelEntry::new(
             addr_1,

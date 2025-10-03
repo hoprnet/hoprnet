@@ -68,23 +68,6 @@ fn is_running(state: Arc<AppState>) -> impl IntoResponse {
         ),
         tag = "Checks"
     )]
-pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let hopr = state.hopr.clone();
-
-    match hopr.get_eligibility_status().await {
-        Ok(true) => (StatusCode::OK, "").into_response(),
-        Ok(false) => (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response(),
-        Err(hopr_lib::errors::HoprLibError::ChainApi(e)) => {
-            // The "division by zero" error is caused by the self-registration,
-            // which is forbidden to the public and thus returns false
-            // therefore the eligibility check should be ignored
-            let err_str = e.to_string();
-            if err_str.to_lowercase().contains("division or modulo by zero") {
-                (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response()
-            } else {
-                (StatusCode::INTERNAL_SERVER_ERROR, err_str).into_response()
-            }
-        }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+pub(super) async fn eligiblez(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
+    (StatusCode::OK, "").into_response()
 }
