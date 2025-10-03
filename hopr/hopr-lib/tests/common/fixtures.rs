@@ -27,7 +27,6 @@ impl std::ops::Deref for ClusterGuard {
 }
 
 static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
-// static SWARM_N_FIXTURE: Lazy<OnceCell<Vec<HoprTester>>> = Lazy::new(|| OnceCell::const_new());
 static CLUSTER_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 pub const SNAPSHOT_BASE: &str = "/tmp/hopr-tests";
