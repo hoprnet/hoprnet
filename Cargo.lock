@@ -4994,7 +4994,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "3.1.0"
+version = "3.0.1"
 dependencies = [
  "alloy",
  "anyhow",
@@ -5573,7 +5573,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "3.1.0"
+version = "3.0.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
