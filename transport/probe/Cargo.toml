@@ -14,9 +14,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 prometheus = ["dep:hopr-metrics"]
-runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
-]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 anyhow = { workspace = true }

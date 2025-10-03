@@ -13,13 +13,8 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = [
-  "hopr-transport-protocol/runtime-tokio",
-]
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-transport-protocol/prometheus",
-]
+runtime-tokio = ["hopr-transport-protocol/runtime-tokio"]
+prometheus = ["dep:hopr-metrics", "hopr-transport-protocol/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }
