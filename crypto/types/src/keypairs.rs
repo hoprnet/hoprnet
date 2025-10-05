@@ -167,6 +167,12 @@ impl From<&ChainKeypair> for Address {
     }
 }
 
+impl<'a> From<&'a ChainKeypair> for &'a Address {
+    fn from(value: &'a ChainKeypair) -> Self {
+        value.public().as_ref()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use libp2p_identity::PeerId;

@@ -88,6 +88,8 @@ pub enum ChannelDirection {
 pub struct ChannelId(Hash);
 
 impl ChannelId {
+    pub const SIZE: usize = Hash::SIZE;
+
     /// Creates channel ID from two `source` and `destination` objects that can be converted into [`Address`]
     pub fn from_addrs<A1: Into<Address>, A2: Into<Address>>(source: A1, destination: A2) -> Self {
         (source.into(), destination.into()).into()

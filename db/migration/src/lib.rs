@@ -31,6 +31,7 @@ mod m20250701_000028_peers_deprecate_fields;
 mod m20250709_000029_channels_add_corrupted_state;
 mod m20250808_000030_index_create_corrupted_channel;
 mod m20250909_000031_peer_store_add_indices;
+mod m20251006_000032_ticket_add_counterparty;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -84,6 +85,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250709_000029_channels_add_corrupted_state::Migration),
             Box::new(m20250808_000030_index_create_corrupted_channel::Migration),
             Box::new(m20250909_000031_peer_store_add_indices::Migration),
+            Box::new(m20251006_000032_ticket_add_counterparty::Migration),
         ]
     }
 }
@@ -151,6 +153,7 @@ impl MigratorTrait for MigratorTickets {
                 BackendType::SQLite,
             )),
             Box::new(m20240404_000013_tickets_recreate_ticket::Migration(BackendType::SQLite)),
+            Box::new(m20251006_000032_ticket_add_counterparty::Migration),
         ]
     }
 }

@@ -53,20 +53,17 @@ pub struct TicketSelector {
     pub amount: (Bound<HoprBalance>, Bound<HoprBalance>),
     /// Further restriction to tickets with the given state.
     pub state: Option<AcknowledgedTicketStatus>,
-    /// Further restrict to only aggregated tickets.
-    pub only_aggregated: bool,
 }
 
 impl Display for TicketSelector {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let out = format!(
-            "ticket selector in {:?} {}{}{}{}{}",
+            "ticket selector in {:?} {}{}{}{}",
             self.channel_identifiers,
             self.index,
             self.state
                 .map(|state| format!(" in state {state}"))
                 .unwrap_or("".into()),
-            if self.only_aggregated { " only aggregated" } else { "" },
             match &self.win_prob {
                 (Bound::Unbounded, Bound::Unbounded) => "".to_string(),
                 bounds => format!(" with winning probability in {bounds:?}"),
@@ -94,7 +91,6 @@ impl PartialEq for TicketSelector {
         self.channel_identifiers == other.channel_identifiers
             && self.index == other.index
             && self.state == other.state
-            && self.only_aggregated == other.only_aggregated
             && self.amount == other.amount
             && approx_cmp_bounds(self.win_prob.0, other.win_prob.0)
             && approx_cmp_bounds(self.win_prob.1, other.win_prob.1)
@@ -110,7 +106,6 @@ impl TicketSelector {
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
             state: None,
-            only_aggregated: false,
         }
     }
 
@@ -205,13 +200,6 @@ impl TicketSelector {
         self
     }
 
-    /// Returns this instance with `only_aggregated` flag value.
-    #[must_use]
-    pub fn with_aggregated_only(mut self, only_aggregated: bool) -> Self {
-        self.only_aggregated = only_aggregated;
-        self
-    }
-
     /// Returns this instance with a winning probability range bounds set.
     #[must_use]
     pub fn with_winning_probability<T: RangeBounds<WinningProbability>>(mut self, range: T) -> Self {
@@ -231,14 +219,13 @@ impl From<&AcknowledgedTicket> for TicketSelector {
     fn from(value: &AcknowledgedTicket) -> Self {
         Self {
             channel_identifiers: vec![(
-                value.verified_ticket().channel_id,
+                *value.ticket.channel_id(),
                 value.verified_ticket().channel_epoch,
             )],
             index: TicketIndexSelector::Single(value.verified_ticket().index),
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
             state: Some(value.status),
-            only_aggregated: value.verified_ticket().index_offset > 1,
         }
     }
 }
@@ -247,14 +234,13 @@ impl From<&RedeemableTicket> for TicketSelector {
     fn from(value: &RedeemableTicket) -> Self {
         Self {
             channel_identifiers: vec![(
-                value.verified_ticket().channel_id,
+                *value.ticket.channel_id(),
                 value.verified_ticket().channel_epoch,
             )],
             index: TicketIndexSelector::Single(value.verified_ticket().index),
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
             state: None,
-            only_aggregated: value.verified_ticket().index_offset > 1,
         }
     }
 }
@@ -267,7 +253,6 @@ impl From<&ChannelEntry> for TicketSelector {
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
             state: None,
-            only_aggregated: false,
         }
     }
 }

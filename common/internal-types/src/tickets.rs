@@ -12,7 +12,7 @@ use crate::{channels::ChannelId, errors, errors::CoreTypesError, prelude::CoreTy
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
-const ENCODED_TICKET_LENGTH: usize = 64;
+const ENCODED_TICKET_LENGTH: usize = 48;
 
 /// Custom float to integer encoding used in the integer-only
 /// Ethereum Virtual Machine (EVM). Chosen to be easily
@@ -260,13 +260,11 @@ pub(crate) fn check_ticket_win(
 /// and [TicketBuilder::build_verified].
 #[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct TicketBuilder {
-    channel_id: Option<ChannelId>,
+    counterparty: Option<Address>,
     amount: Option<U256>,
     balance: Option<HoprBalance>,
     #[default = 0]
     index: u64,
-    #[default = 1]
-    index_offset: u32,
     #[default = 1]
     channel_epoch: u32,
     win_prob: WinningProbability,
@@ -281,38 +279,21 @@ impl TicketBuilder {
         Self {
             index: 0,
             amount: Some(U256::zero()),
-            index_offset: 1,
             win_prob: WinningProbability::NEVER,
             channel_epoch: 0,
             ..Default::default()
         }
     }
 
-    /// Sets channel id based on the `source` and `destination`.
-    /// This, [TicketBuilder::channel_id] or [TicketBuilder::addresses] must be set.
+    /// Sets the counterparty of the ticket.
     #[must_use]
-    pub fn direction(mut self, source: &Address, destination: &Address) -> Self {
-        self.channel_id = Some((source, destination).into());
-        self
-    }
-
-    /// Sets channel id based on the `source` and `destination`.
-    /// This, [TicketBuilder::channel_id] or [TicketBuilder::direction] must be set.
-    #[must_use]
-    pub fn addresses<T: Into<Address>, U: Into<Address>>(mut self, source: T, destination: U) -> Self {
-        self.channel_id = Some(ChannelId::from_addrs(source, destination));
-        self
-    }
-
-    /// Sets the channel id.
-    /// This, [TicketBuilder::addresses] or [TicketBuilder::direction] must be set.
-    #[must_use]
-    pub fn channel_id(mut self, channel_id: ChannelId) -> Self {
-        self.channel_id = Some(channel_id);
+    pub fn counterparty<A: Into<Address>>(mut self, counterparty: A) -> Self {
+        self.counterparty = Some(counterparty.into());
         self
     }
 
     /// Sets the ticket amount.
+    ///
     /// This or [TicketBuilder::balance] must be set and be less or equal to 10^25.
     #[must_use]
     pub fn amount<T: Into<U256>>(mut self, amount: T) -> Self {
@@ -322,6 +303,7 @@ impl TicketBuilder {
     }
 
     /// Sets the ticket amount as HOPR balance.
+    ///
     /// This or [TicketBuilder::amount] must be set and be less or equal to 10^25.
     #[must_use]
     pub fn balance(mut self, balance: HoprBalance) -> Self {
@@ -331,20 +313,12 @@ impl TicketBuilder {
     }
 
     /// Sets the ticket index.
+    ///
     /// Must be less or equal to 2^48.
     /// Defaults to 0.
     #[must_use]
     pub fn index(mut self, index: u64) -> Self {
         self.index = index;
-        self
-    }
-
-    /// Sets the index offset.
-    /// Must be greater or equal 1.
-    /// Defaults to 1.
-    #[must_use]
-    pub fn index_offset(mut self, index_offset: u32) -> Self {
-        self.index_offset = index_offset;
         self
     }
 
@@ -358,7 +332,8 @@ impl TicketBuilder {
     }
 
     /// Sets the ticket winning probability.
-    /// Defaults to 1.0
+    ///
+    /// Defaults to [`WinningProbability::ALWAYS`].
     #[must_use]
     pub fn win_prob(mut self, win_prob: WinningProbability) -> Self {
         self.win_prob = win_prob;
@@ -375,6 +350,7 @@ impl TicketBuilder {
     }
 
     /// Sets the [`EthereumChallenge`] for the Proof of Relay.
+    ///
     /// Either this method or [`Ticket::challenge`] must be called.
     pub fn eth_challenge(mut self, challenge: EthereumChallenge) -> Self {
         self.challenge = Some(challenge);
@@ -382,6 +358,7 @@ impl TicketBuilder {
     }
 
     /// Set the signature of this ticket.
+    ///
     /// Defaults to `None`.
     #[must_use]
     pub fn signature(mut self, signature: Signature) -> Self {
@@ -389,7 +366,8 @@ impl TicketBuilder {
         self
     }
 
-    /// Verifies all inputs and builds the [Ticket].
+    /// Verifies all inputs and builds the [`Ticket`].
+    ///
     /// This **does not** perform signature verification if a [signature](TicketBuilder::signature)
     /// was set.
     pub fn build(self) -> errors::Result<Ticket> {
@@ -417,17 +395,10 @@ impl TicketBuilder {
             return Err(InvalidInputData("cannot hold channel epoch larger than 2^24".into()));
         }
 
-        if self.index_offset < 1 {
-            return Err(InvalidInputData(
-                "ticket index offset must be greater or equal to 1".into(),
-            ));
-        }
-
         Ok(Ticket {
-            channel_id: self.channel_id.ok_or(InvalidInputData("missing channel id".into()))?,
+            counterparty: self.counterparty.ok_or(InvalidInputData("missing channel id".into()))?,
             amount,
             index: self.index,
-            index_offset: self.index_offset,
             encoded_win_prob: self.win_prob.into(),
             channel_epoch: self.channel_epoch,
             challenge: self
@@ -447,14 +418,16 @@ impl TicketBuilder {
         }
     }
 
-    /// Validates all inputs and builds the [VerifiedTicket] by **assuming** the previously
+    /// Validates all inputs and builds the [`VerifiedTicket`] by **assuming** the previously
     /// set [signature](TicketBuilder::signature) is valid and belongs to the given ticket `hash`.
+    ///
     /// It does **not** check whether `hash` matches the input data nor that the signature verifies
     /// the given hash.
     pub fn build_verified(self, hash: Hash) -> errors::Result<VerifiedTicket> {
         if let Some(signature) = self.signature {
             let issuer = signature.recover_from_hash(&hash)?.to_address();
-            Ok(VerifiedTicket(self.build()?, hash, issuer))
+            let id = (issuer, self.counterparty.ok_or(InvalidInputData("counterparty must be set".into()))?).into();
+            Ok(VerifiedTicket(self.build()?, hash, issuer, id))
         } else {
             Err(InvalidInputData("signature is missing".into()))
         }
@@ -464,11 +437,10 @@ impl TicketBuilder {
 impl From<&Ticket> for TicketBuilder {
     fn from(value: &Ticket) -> Self {
         Self {
-            channel_id: Some(value.channel_id),
+            counterparty: Some(value.counterparty),
             amount: None,
             balance: Some(value.amount),
             index: value.index,
-            index_offset: value.index_offset,
             channel_epoch: value.channel_epoch,
             win_prob: value.encoded_win_prob.into(),
             challenge: Some(value.challenge),
@@ -487,10 +459,10 @@ impl From<Ticket> for TicketBuilder {
 /// Contains the overall description of a ticket with a signature.
 ///
 /// This structure is not considered [verified](VerifiedTicket), unless
-/// the [Ticket::verify] or [Ticket::sign] methods are called.
+/// the [`Ticket::verify`] or [`Ticket::sign`] methods are called.
 ///
 /// # Ticket state machine
-/// See the entire state machine describing the relations of different ticket types below:
+/// See the entire state machine describing the relations of the different ticket types below:
 /// ```mermaid
 /// flowchart TB
 ///     A[Ticket] -->|verify| B(VerifiedTicket)
@@ -507,23 +479,22 @@ impl From<Ticket> for TicketBuilder {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ticket {
-    /// Channel ID.
+    /// Counterparty address of the ticket.
     ///
-    /// See [`ChannelId`] for how this value is generated.
-    pub channel_id: ChannelId,
+    /// This is the beneficiary of the `amount`
+    pub counterparty: Address,
     /// Amount of HOPR tokens this ticket is worth.
+    ///
     /// Always between 0 and 2^92.
     pub amount: HoprBalance, // 92 bits
     /// Ticket index.
+    ///
     /// Always between 0 and 2^48.
     pub index: u64, // 48 bits
-    /// Ticket index offset.
-    /// Always between 1 and 2^32.
-    /// For normal tickets this is always equal to 1, for aggregated this is always > 1.
-    pub index_offset: u32, // 32 bits
     /// Encoded winning probability represented via 56-bit number.
     pub encoded_win_prob: EncodedWinProb, // 56 bits
     /// Epoch of the channel this ticket belongs to.
+    ///
     /// Always between 0 and 2^24.
     pub channel_epoch: u32, // 24 bits
     /// Represent the Proof of Relay challenge encoded as an Ethereum address.
@@ -541,8 +512,8 @@ impl PartialOrd for Ticket {
 impl Ord for Ticket {
     fn cmp(&self, other: &Self) -> Ordering {
         // Ordering:
-        // [channel_id][channel_epoch][ticket_index]
-        match self.channel_id.cmp(&other.channel_id) {
+        // [counterparty][channel_epoch][ticket_index]
+        match self.counterparty.cmp(&other.counterparty) {
             Ordering::Equal => match self.channel_epoch.cmp(&other.channel_epoch) {
                 Ordering::Equal => self.index.cmp(&other.index),
                 Ordering::Greater => Ordering::Greater,
@@ -558,19 +529,21 @@ impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ticket #{}, amount {}, offset {}, epoch {} in channel {}",
-            self.index, self.amount, self.index_offset, self.channel_epoch, self.channel_id
+            "ticket #{}, amount {} for {}, epoch {}",
+            self.index, self.amount, self.counterparty, self.channel_epoch
         )
     }
 }
 
 impl Ticket {
-    fn encode_without_signature(&self) -> [u8; Self::SIZE - Signature::SIZE] {
-        let mut ret = [0u8; Self::SIZE - Signature::SIZE];
+    const UNSIGNED_SIZE: usize = Self::SIZE - Signature::SIZE;
+
+    fn on_chain_ticket_encoding(&self, channel_id: &ChannelId) -> [u8; Self::UNSIGNED_SIZE] {
+        let mut ret = [0u8; Self::UNSIGNED_SIZE];
         let mut offset = 0;
 
-        ret[offset..offset + Hash::SIZE].copy_from_slice(self.channel_id.as_ref());
-        offset += Hash::SIZE;
+        ret[offset..offset + ChannelId::SIZE].copy_from_slice(channel_id.as_ref());
+        offset += ChannelId::SIZE;
 
         // There are only 2^96 HOPR tokens
         ret[offset..offset + 12].copy_from_slice(&self.amount.amount().to_be_bytes()[20..32]);
@@ -580,7 +553,8 @@ impl Ticket {
         ret[offset..offset + 6].copy_from_slice(&self.index.to_be_bytes()[2..8]);
         offset += 6;
 
-        ret[offset..offset + 4].copy_from_slice(&self.index_offset.to_be_bytes());
+        // Index offset is always 1
+        ret[offset..offset + 4].copy_from_slice(&1_u32.to_be_bytes());
         offset += 4;
 
         // Channel epoch can go only up to 2^24
@@ -595,20 +569,21 @@ impl Ticket {
         ret
     }
 
-    /// Computes Ethereum signature hash of the ticket,
-    /// must be equal to on-chain computation
-    pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
-        let ticket_hash = Hash::create(&[self.encode_without_signature().as_ref()]); // cannot fail
+    fn get_hash_and_channel_id(&self, issuer: &Address, domain_separator: &Hash) -> (Hash, ChannelId) {
+        let channel_id: ChannelId = (issuer, &self.counterparty).into();
+
+        let ticket_hash = Hash::create(&[&self.on_chain_ticket_encoding(&channel_id)]); // cannot fail
         let hash_struct = Hash::create(&[&REDEEM_CALL_SELECTOR, &[0u8; 28], ticket_hash.as_ref()]);
-        Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
+        (Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()]), channel_id)
     }
 
     /// Signs the ticket using the given private key, turning this ticket into [VerifiedTicket].
     /// If a signature was already present, it will be replaced.
     pub fn sign(mut self, signing_key: &ChainKeypair, domain_separator: &Hash) -> VerifiedTicket {
-        let ticket_hash = self.get_hash(domain_separator);
+        let (ticket_hash, id) = self.get_hash_and_channel_id(signing_key.into(), domain_separator);
+
         self.signature = Some(Signature::sign_hash(&ticket_hash, signing_key));
-        VerifiedTicket(self, ticket_hash, signing_key.public().to_address())
+        VerifiedTicket(self, ticket_hash, signing_key.public().to_address(), id)
     }
 
     /// Verifies the signature of this ticket, turning this ticket into `VerifiedTicket`.
@@ -620,11 +595,11 @@ impl Ticket {
     /// The operation can fail if a public key cannot be recovered from the ticket signature.
     #[instrument(level = "trace", skip_all, err)]
     pub fn verify(self, issuer: &Address, domain_separator: &Hash) -> Result<VerifiedTicket, Box<Ticket>> {
-        let ticket_hash = self.get_hash(domain_separator);
+        let (ticket_hash, id) = self.get_hash_and_channel_id(issuer, domain_separator);
 
         if let Some(signature) = &self.signature {
             match signature.recover_from_hash(&ticket_hash) {
-                Ok(pk) if pk.to_address().eq(issuer) => Ok(VerifiedTicket(self, ticket_hash, *issuer)),
+                Ok(pk) if pk.to_address().eq(issuer) => Ok(VerifiedTicket(self, ticket_hash, *issuer, id)),
                 Err(e) => {
                     error!("failed to verify ticket signature: {e}");
                     Err(self.into())
@@ -634,13 +609,6 @@ impl Ticket {
         } else {
             Err(self.into())
         }
-    }
-
-    /// Returns true if this ticket aggregates multiple tickets.
-    #[inline]
-    pub fn is_aggregated(&self) -> bool {
-        // Aggregated tickets have always an index offset > 1
-        self.index_offset > 1
     }
 
     /// Returns the decoded winning probability of the ticket
@@ -653,8 +621,30 @@ impl Ticket {
 impl From<Ticket> for [u8; TICKET_SIZE] {
     fn from(value: Ticket) -> Self {
         let mut ret = [0u8; TICKET_SIZE];
-        ret[0..Ticket::SIZE - Signature::SIZE].copy_from_slice(value.encode_without_signature().as_ref());
-        ret[Ticket::SIZE - Signature::SIZE..].copy_from_slice(
+        let mut offset = 0;
+
+        ret[offset..offset + Address::SIZE].copy_from_slice(value.counterparty.as_ref());
+        offset += Address::SIZE;
+
+        // There are only 2^96 HOPR tokens
+        ret[offset..offset + 12].copy_from_slice(&value.amount.amount().to_be_bytes()[20..32]);
+        offset += 12;
+
+        // Ticket index can go only up to 2^48
+        ret[offset..offset + 6].copy_from_slice(&value.index.to_be_bytes()[2..8]);
+        offset += 6;
+
+        // Channel epoch can go only up to 2^24
+        ret[offset..offset + 3].copy_from_slice(&value.channel_epoch.to_be_bytes()[1..4]);
+        offset += 3;
+
+        ret[offset..offset + ENCODED_WIN_PROB_LENGTH].copy_from_slice(&value.encoded_win_prob);
+        offset += ENCODED_WIN_PROB_LENGTH;
+
+        ret[offset..offset + EthereumChallenge::SIZE].copy_from_slice(value.challenge.as_ref());
+        offset += EthereumChallenge::SIZE;
+
+        ret[offset..offset + Signature::SIZE].copy_from_slice(
             value
                 .signature
                 .expect("cannot serialize ticket without signature")
@@ -671,9 +661,8 @@ impl TryFrom<&[u8]> for Ticket {
         if value.len() == Self::SIZE {
             let mut offset = 0;
 
-            // TODO: not necessary to the ChannelId over the wire, only the counterparty is sufficient
-            let channel_id = Hash::try_from(&value[offset..offset + Hash::SIZE])?;
-            offset += Hash::SIZE;
+            let address = Address::try_from(&value[offset..offset + Address::SIZE])?;
+            offset += Address::SIZE;
 
             let mut amount = [0u8; 32];
             amount[20..32].copy_from_slice(&value[offset..offset + 12]);
@@ -682,10 +671,6 @@ impl TryFrom<&[u8]> for Ticket {
             let mut index = [0u8; 8];
             index[2..8].copy_from_slice(&value[offset..offset + 6]);
             offset += 6;
-
-            let mut index_offset = [0u8; 4];
-            index_offset.copy_from_slice(&value[offset..offset + 4]);
-            offset += 4;
 
             let mut channel_epoch = [0u8; 4];
             channel_epoch[1..4].copy_from_slice(&value[offset..offset + 3]);
@@ -703,10 +688,9 @@ impl TryFrom<&[u8]> for Ticket {
 
             // Validate the boundaries of the parsed values
             TicketBuilder::default()
-                .channel_id(channel_id.into())
+                .counterparty(address)
                 .amount(U256::from_big_endian(&amount))
                 .index(u64::from_be_bytes(index))
-                .index_offset(u32::from_be_bytes(index_offset))
                 .channel_epoch(u32::from_be_bytes(channel_epoch))
                 .win_prob(win_prob)
                 .eth_challenge(challenge)
@@ -724,11 +708,9 @@ const TICKET_SIZE: usize = ENCODED_TICKET_LENGTH + EthereumChallenge::SIZE + Sig
 impl BytesEncodable<TICKET_SIZE> for Ticket {}
 
 /// Holds a ticket that has been already verified.
-/// This structure guarantees that [`Ticket::get_hash()`] of [`VerifiedTicket::verified_ticket()`]
-/// is always equal to [`VerifiedTicket::verified_hash`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct VerifiedTicket(Ticket, Hash, Address);
+pub struct VerifiedTicket(Ticket, Hash, Address, ChannelId);
 
 impl VerifiedTicket {
     /// Returns the verified encoded winning probability of the ticket
@@ -791,6 +773,12 @@ impl VerifiedTicket {
     #[inline]
     pub fn verified_issuer(&self) -> &Address {
         &self.2
+    }
+
+    /// Gets the ID of the [`ChannelEntry`] this ticket belongs to.
+    #[inline]
+    pub fn channel_id(&self) -> &ChannelId {
+        &self.3
     }
 
     /// Shorthand to retrieve reference to the verified ticket signature
@@ -1116,8 +1104,6 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 
 #[cfg(test)]
 pub mod tests {
-    use std::ops::Deref;
-
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
@@ -1226,23 +1212,22 @@ pub mod tests {
     #[test]
     pub fn test_ticket_builder_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
-            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .counterparty(&*BOB)
             .eth_challenge(Default::default())
             .build()?;
         assert_eq!(0, ticket.index);
         assert_eq!(0.0, ticket.win_prob().as_f64());
         assert_eq!(0, ticket.channel_epoch);
-        assert_eq!(ChannelId::from_addrs(ALICE.deref(), BOB.deref()), ticket.channel_id);
+        assert_eq!(BOB.public().to_address(), ticket.counterparty);
         Ok(())
     }
 
     #[test]
     pub fn test_ticket_serialize_deserialize() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
-            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .counterparty(&*BOB)
             .balance(1.into())
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .eth_challenge(Default::default())
@@ -1262,10 +1247,9 @@ pub mod tests {
     #[cfg(feature = "serde")]
     pub fn test_ticket_serialize_deserialize_serde() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
-            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .counterparty(&*BOB)
             .balance(1.into())
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .eth_challenge(Default::default())
@@ -1285,10 +1269,9 @@ pub mod tests {
     #[test]
     pub fn test_ticket_sign_verify() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
-            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .counterparty(&*BOB)
             .balance(1.into())
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .eth_challenge(Default::default())
@@ -1304,7 +1287,7 @@ pub mod tests {
     #[test]
     pub fn test_zero_hop() -> anyhow::Result<()> {
         let ticket = TicketBuilder::zero_hop()
-            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .counterparty(&*BOB)
             .eth_challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
@@ -1328,10 +1311,9 @@ pub mod tests {
         let path_pos = 5u64;
 
         Ok(TicketBuilder::default()
-            .direction(&pk.public().to_address(), counterparty)
+            .counterparty(*counterparty)
             .amount(price_per_packet.div_f64(win_prob)? * U256::from(path_pos))
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(4)
             .eth_challenge(challenge.unwrap_or_default())
@@ -1406,10 +1388,9 @@ pub mod tests {
         let resp = Response::from_half_keys(&hk1, &hk2)?;
 
         let verified = TicketBuilder::default()
-            .direction(&ALICE.public().to_address(), &BOB.public().to_address())
+            .counterparty(&*BOB)
             .balance(1.into())
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(resp.to_challenge()?)

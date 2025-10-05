@@ -24,10 +24,9 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
         .build();
 
     let ticket = TicketBuilder::default()
-        .addresses(&source, &dest)
+        .counterparty(&dest)
         .balance(HoprBalance::new_base(100))
         .index(1)
-        .index_offset(1)
         .eth_challenge(Default::default())
         .win_prob(WinningProbability::ALWAYS)
         .channel_epoch(1)

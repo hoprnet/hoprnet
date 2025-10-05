@@ -594,16 +594,16 @@ mod tests {
 
         if path_len > 1 {
             Ok(TicketBuilder::default()
-                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
+                .counterparty(next_peer_channel_key.to_address())
                 .amount(price_per_packet.div_f64(1.0)? * U256::from(path_len as u64 - 1))
                 .index(1)
-                .index_offset(1)
                 .win_prob(WinningProbability::ALWAYS)
                 .channel_epoch(1)
                 .eth_challenge(Default::default()))
         } else {
             Ok(TicketBuilder::zero_hop()
-                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address()))
+                .counterparty(next_peer_channel_key.to_address())
+            )
         }
     }
 
