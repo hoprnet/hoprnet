@@ -15,7 +15,7 @@ import { Initializable } from "openzeppelin-contracts-upgradeable-5.4.0/proxy/ut
 import { Create2 } from "openzeppelin-contracts-5.4.0/utils/Create2.sol";
 import { ERC1967Proxy } from "openzeppelin-contracts-5.4.0/proxy/ERC1967/ERC1967Proxy.sol";
 
-/**F
+/**
  * @dev This files tests both HoprNodeManagementModule and the CapabilityPermissions.sol
  */
 contract HoprNodeManagementModuleTest is
