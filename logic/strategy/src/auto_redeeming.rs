@@ -357,11 +357,13 @@ mod tests {
         let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
 
         let mut mock = MockTestActions::new();
+        mock.expect_me().return_const(BOB.public().to_address());
 
         mock.expect_stream_channels()
             .once()
             .with(mockall::predicate::eq(ChannelSelector {
-                direction: vec![ChannelDirection::Incoming],
+                source: Some(BOB.public().to_address()),
+                destination: Some(ALICE.public().to_address()),
                 allowed_states: vec![
                     ChannelStatusDiscriminants::Open,
                     ChannelStatusDiscriminants::PendingToClose,

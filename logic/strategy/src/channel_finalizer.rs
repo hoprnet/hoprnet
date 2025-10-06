@@ -177,10 +177,13 @@ mod tests {
         );
 
         let mut mock = MockTestActions::new();
+        mock.expect_me().return_const(*ALICE);
+
         mock.expect_stream_channels()
             .once()
             .with(mockall::predicate::eq(ChannelSelector {
-                direction: vec![ChannelDirection::Outgoing],
+                source: Some(*ALICE),
+                destination: Some(*BOB),
                 allowed_states: vec![ChannelStatusDiscriminants::PendingToClose],
                 ..Default::default()
             }))

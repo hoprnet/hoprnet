@@ -104,9 +104,6 @@ pub trait HoprDbChannelOperations {
         states: &[ChannelStatusDiscriminants],
     ) -> Result<BoxStream<'a, ChannelEntry>>;
 
-    /// Returns a stream of all channels that are `Open` or `PendingToClose` with an active grace period.s
-    async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>>;
-
     /// Inserts or updates the given channel entry.
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()>;
 }
@@ -274,21 +271,6 @@ impl HoprDbChannelOperations for HoprIndexerDb {
             .collect::<Vec<_>>()
             .await;
         Ok(entries)
-
-        // self.nest_transaction(tx)
-        // .await?
-        // .perform(|tx| {
-        // Box::pin(async move {
-        // Channel::find()
-        // .stream(tx.as_ref())
-        // .await?
-        // .map_err(DbSqlError::from)
-        // .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
-        // .try_collect()
-        // .await
-        // })
-        // })
-        // .await
     }
 
     async fn stream_channels<'a>(
@@ -326,37 +308,6 @@ impl HoprDbChannelOperations for HoprIndexerDb {
                 )
             })
             .boxed())
-    }
-
-    async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>> {
-        Ok(self
-            .stream_channels(
-                None,
-                None,
-                &[
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            )
-            .await?
-            .map(Ok)
-            .boxed())
-
-        // Ok(Channel::find()
-        // .filter(
-        // channel::Column::Status
-        // .eq(i8::from(ChannelStatus::Open))
-        // .or(channel::Column::Status
-        // .eq(i8::from(ChannelStatus::PendingToClose(
-        // hopr_platform::time::native::current_time(), // irrelevant
-        // )))
-        // .and(channel::Column::ClosureTime.gt(Utc::now()))),
-        // )
-        // .stream(self.index_db.read_only())
-        // .await?
-        // .map_err(DbSqlError::from)
-        // .and_then(|m| async move { Ok(ChannelEntry::try_from(m)?) })
-        // .boxed())
     }
 
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
