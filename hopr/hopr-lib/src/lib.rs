@@ -1467,4 +1467,17 @@ impl Hopr {
         let cg = self.channel_graph.read_arc().await;
         serde_json::to_string(cg.deref()).map_err(|e| HoprLibError::GeneralError(e.to_string()))
     }
+
+    // === telemetry
+    /// Prometheus formatted metrics collected by the hopr-lib components.
+    pub fn collect_hopr_metrics() -> errors::Result<String> {
+        cfg_if::cfg_if! {
+            if #[cfg(all(feature = "prometheus", not(test)))] {
+                hopr_metrics::gather_all_metrics().map_err(|e| HoprLibError::GeneralError(e.to_string()))
+            } else {
+        Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
+
+            }
+        }
+    }
 }
