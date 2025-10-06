@@ -1,6 +1,5 @@
 //! Crate containing the API object for chain operations used by the HOPRd node.
 
-pub mod config;
 pub mod errors;
 pub mod executors;
 
@@ -13,7 +12,6 @@ use alloy::{
         layers::RetryBackoffLayer,
     },
 };
-use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use futures::{
     FutureExt, Stream, StreamExt,
@@ -40,6 +38,7 @@ use hopr_chain_actions::{
     payload::SafePayloadGenerator,
     redeem::TicketRedeemActions,
 };
+pub use hopr_chain_config as config;
 pub use hopr_chain_indexer::IndexerConfig;
 use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers};
 use hopr_chain_rpc::{
@@ -164,9 +163,9 @@ impl HoprChain {
     #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
     pub fn new(
         me_onchain: ChainKeypair,
+        chain_config: config::ChainNetworkConfig,
         node_db: HoprNodeDb,
         data_dir_path: &str,
-        chain_config: ChainNetworkConfig,
         module_address: Address,
         contract_addresses: ContractAddresses,
         safe_address: Address,

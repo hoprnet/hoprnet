@@ -14,10 +14,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 prometheus = ["dep:hopr-metrics"]
-runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
-  "hopr-transport-protocol/runtime-tokio",
-]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -48,7 +45,6 @@ hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
-hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
 lazy_static = { workspace = true }
