@@ -61,7 +61,10 @@ contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChanne
         bytes28 currentRootHash = latestRoot.rootHash;
         uint32 currentBlockNumber = uint32(block.number);
 
+        uint256 beforeGas = gasleft();
         indexEvent(abi.encodePacked(ChannelOpened.selector));
+        // emit log_named_uint(key: "Gas used for indexing", val: 5871)
+        emit log_named_uint("Gas used for indexing", beforeGas - gasleft());
 
         // snapshot should be unchanged
         assertEq(initialRoot, latestSnapshotRoot.rootHash);
