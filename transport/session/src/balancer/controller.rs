@@ -296,10 +296,13 @@ where
                     let bounds_before_update = self.controller.bounds();
 
                     // Perform controller update (this internally samples the SurbFlowEstimator)
-                    // and send an update about the current level to the outgoing stream
+                    // and send an update about the current level to the outgoing stream.
+                    // If the other party has closed the stream, we don't care about the update.
                     let level = self.update(current_cfg.surb_decay.as_ref());
-                    if let Err(error) = level_tx.try_send(level) {
-                        tracing::error!(%error, "cannot send balancer level update");
+                    if !level_tx.is_closed() {
+                        if let Err(error) = level_tx.try_send(level) {
+                            tracing::error!(%error, "cannot send balancer level update");
+                        }
                     }
 
                     // See if the setpoint has been updated at the controller as a result
