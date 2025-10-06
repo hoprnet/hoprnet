@@ -127,10 +127,10 @@ moka = { version = "0.12.11", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num_enum = "0.7.4"
-opentelemetry = { version = "0.30.0" }
-opentelemetry-otlp = { version = "0.30.0", default-features = false }
-opentelemetry_sdk = { version = "0.30.0" }
-tracing-opentelemetry = { version = "0.31.0" }
+opentelemetry = { version = "0.31.0" }
+opentelemetry-otlp = { version = "0.31.0", default-features = false }
+opentelemetry_sdk = { version = "0.31.0" }
+tracing-opentelemetry = { version = "0.32.0" }
 temp-env = "0.3.6"
 parameterized = "2.0.0"
 parking_lot = "0.12.4"
