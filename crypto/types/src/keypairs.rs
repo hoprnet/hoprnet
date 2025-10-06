@@ -167,6 +167,12 @@ impl From<&ChainKeypair> for Address {
     }
 }
 
+impl AsRef<Address> for ChainKeypair {
+    fn as_ref(&self) -> &Address {
+        self.public().as_ref()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use libp2p_identity::PeerId;

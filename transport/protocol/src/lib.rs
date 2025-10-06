@@ -92,8 +92,8 @@ use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
-
-use crate::processor::{PacketUnwrapping, PacketWrapping};
+use hopr_api::db::{HoprDbTicketOperations, IncomingPacketError, OutgoingPacket};
+use crate::errors::PacketProcessingError;
 pub use crate::timer::execute_on_tick;
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
@@ -120,6 +120,43 @@ lazy_static::lazy_static! {
         "hopr_replayed_packet_count",
         "The total count of replayed packets during the packet processing pipeline run",
     ).unwrap();
+}
+
+#[async_trait::async_trait]
+pub trait PacketWrapping {
+    type Input;
+    type Error;
+
+    async fn send(
+        &self,
+        data: ApplicationDataOut,
+        routing: ResolvedTransportRouting,
+    ) -> Result<OutgoingPacket, Self::Error>;
+
+    async fn send_ack(
+        &self,
+        ack: Acknowledgement,
+        destination: &OffchainPublicKey,
+    ) -> Result<OutgoingPacket, Self::Error>;
+}
+
+#[async_trait::async_trait]
+pub trait PacketUnwrapping {
+    type Packet;
+
+    type Error;
+
+    async fn recv(
+        &self,
+        peer: OffchainPublicKey,
+        data: Box<[u8]>,
+    ) -> Result<Self::Packet, IncomingPacketError<Self::Error>>;
+
+    async fn recv_ack(
+        &self,
+        peer: OffchainPublicKey,
+        ack: Acknowledgement,
+    ) -> Result<(), Self::Error>;
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -175,7 +212,7 @@ pub async fn run_msg_ack_protocol<Db, R>(
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
-    Db: HoprDbProtocolOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Clone + Send + Sync + 'static,
 {
     let me = packet_cfg.packet_keypair.clone();
@@ -537,11 +574,6 @@ where
                             if elapsed.as_millis() > SLOW_OP_MS {
                                 tracing::warn!(?elapsed," ack_tx.send took too long");
                             }
-                            let elapsed = now.elapsed();
-                            if elapsed.as_millis() > SLOW_OP_MS {
-                                tracing::warn!(%previous_hop, ?elapsed, "ack_processor.handle_acknowledgement took too long");
-                            }
-
                             // We do not acknowledge back acknowledgements.
                             None
                         },
