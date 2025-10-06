@@ -4871,6 +4871,7 @@ dependencies = [
  "smart-default",
  "sqlx",
  "strum 0.27.2",
+ "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tracing",

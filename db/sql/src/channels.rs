@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{StreamExt, TryStreamExt, stream::BoxStream};
+use futures::{StreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelude::Channel};
 use hopr_internal_types::prelude::*;
@@ -85,14 +85,6 @@ pub trait HoprDbChannelOperations {
         dst: &Address,
         use_cache: bool,
     ) -> Result<Option<ChannelEntry>>;
-
-    /// Fetches all channels that are `Incoming` to the given `target`, or `Outgoing` from the given `target`
-    async fn get_channels_via<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        direction: ChannelDirection,
-        target: &Address,
-    ) -> Result<Vec<ChannelEntry>>;
 
     /// Fetches all channels that are `Incoming` to this node.
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Incoming, my_node)`
@@ -235,57 +227,68 @@ impl HoprDbChannelOperations for HoprIndexerDb {
         }
     }
 
-    async fn get_channels_via<'a>(
-        &'a self,
-        tx: OptTx<'a>,
-        direction: ChannelDirection,
-        target: &Address,
-    ) -> Result<Vec<ChannelEntry>> {
-        let target_hex = target.to_hex();
-        self.nest_transaction(tx)
+    async fn get_incoming_channels<'a>(&'a self, _tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
+        Ok(self
+            .stream_channels(
+                None,
+                &[ChannelDirection::Incoming],
+                &[
+                    ChannelStatusDiscriminants::Open,
+                    ChannelStatusDiscriminants::PendingToClose,
+                    ChannelStatusDiscriminants::Closed,
+                ],
+            )
             .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Channel::find()
-                        .filter(match direction {
-                            ChannelDirection::Incoming => channel::Column::Destination.eq(target_hex),
-                            ChannelDirection::Outgoing => channel::Column::Source.eq(target_hex),
-                        })
-                        .all(tx.as_ref())
-                        .await?
-                        .into_iter()
-                        .map(|x| ChannelEntry::try_from(x).map_err(DbSqlError::from))
-                        .collect::<Result<Vec<_>>>()
-                })
-            })
-            .await
+            .collect::<Vec<_>>()
+            .await)
     }
 
-    async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.get_channels_via(tx, ChannelDirection::Incoming, &self.me_onchain)
-            .await
-    }
-
-    async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.get_channels_via(tx, ChannelDirection::Outgoing, &self.me_onchain)
-            .await
-    }
-
-    async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
-        self.nest_transaction(tx)
+    async fn get_outgoing_channels<'a>(&'a self, _tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
+        Ok(self
+            .stream_channels(
+                None,
+                &[ChannelDirection::Outgoing],
+                &[
+                    ChannelStatusDiscriminants::Open,
+                    ChannelStatusDiscriminants::PendingToClose,
+                    ChannelStatusDiscriminants::Closed,
+                ],
+            )
             .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Channel::find()
-                        .stream(tx.as_ref())
-                        .await?
-                        .map_err(DbSqlError::from)
-                        .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
-                        .try_collect()
-                        .await
-                })
-            })
-            .await
+            .collect::<Vec<_>>()
+            .await)
+    }
+
+    async fn get_all_channels<'a>(&'a self, _tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
+        let entries = self
+            .stream_channels(
+                None,
+                &[ChannelDirection::Incoming, ChannelDirection::Outgoing],
+                &[
+                    ChannelStatusDiscriminants::Open,
+                    ChannelStatusDiscriminants::PendingToClose,
+                    ChannelStatusDiscriminants::Closed,
+                ],
+            )
+            .await?
+            .collect::<Vec<_>>()
+            .await;
+        Ok(entries)
+
+        // self.nest_transaction(tx)
+        // .await?
+        // .perform(|tx| {
+        // Box::pin(async move {
+        // Channel::find()
+        // .stream(tx.as_ref())
+        // .await?
+        // .map_err(DbSqlError::from)
+        // .try_filter_map(|m| async move { Ok(Some(ChannelEntry::try_from(m)?)) })
+        // .try_collect()
+        // .await
+        // })
+        // })
+        // .await
     }
 
     async fn stream_channels<'a>(
@@ -294,12 +297,15 @@ impl HoprDbChannelOperations for HoprIndexerDb {
         directions: &[ChannelDirection],
         states: &[ChannelStatusDiscriminants],
     ) -> Result<BoxStream<'a, ChannelEntry>> {
+        let mut inner_cond = Condition::any();
+
         let mut incoming_cond = Condition::all();
         if directions.contains(&ChannelDirection::Incoming) {
             incoming_cond = incoming_cond.add(channel::Column::Destination.eq(self.me_onchain.to_hex()));
             if let Some(counterparty) = counterparty {
                 incoming_cond = incoming_cond.add(channel::Column::Source.eq(counterparty.to_hex()));
             }
+            inner_cond = inner_cond.add(incoming_cond);
         }
 
         let mut outgoing_cond = Condition::all();
@@ -308,6 +314,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
             if let Some(counterparty) = counterparty {
                 outgoing_cond = outgoing_cond.add(channel::Column::Destination.eq(counterparty.to_hex()));
             }
+            inner_cond = inner_cond.add(outgoing_cond);
         }
 
         let mut states_condition = Condition::any();
@@ -316,10 +323,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
         }
 
         Ok(Channel::find()
-            .filter(sea_query::all![
-                sea_query::any![incoming_cond, outgoing_cond],
-                states_condition
-            ])
+            .filter(sea_query::all![inner_cond, states_condition])
             .stream(self.index_db.read_only())
             .await?
             .filter_map(|maybe_channel| {
@@ -337,21 +341,34 @@ impl HoprDbChannelOperations for HoprIndexerDb {
     }
 
     async fn stream_active_channels<'a>(&'a self) -> Result<BoxStream<'a, Result<ChannelEntry>>> {
-        Ok(Channel::find()
-            .filter(
-                channel::Column::Status
-                    .eq(i8::from(ChannelStatus::Open))
-                    .or(channel::Column::Status
-                        .eq(i8::from(ChannelStatus::PendingToClose(
-                            hopr_platform::time::native::current_time(), // irrelevant
-                        )))
-                        .and(channel::Column::ClosureTime.gt(Utc::now()))),
+        Ok(self
+            .stream_channels(
+                None,
+                &[ChannelDirection::Incoming, ChannelDirection::Outgoing],
+                &[
+                    ChannelStatusDiscriminants::Open,
+                    ChannelStatusDiscriminants::PendingToClose,
+                ],
             )
-            .stream(self.index_db.read_only())
             .await?
-            .map_err(DbSqlError::from)
-            .and_then(|m| async move { Ok(ChannelEntry::try_from(m)?) })
+            .map(Ok)
             .boxed())
+
+        // Ok(Channel::find()
+        // .filter(
+        // channel::Column::Status
+        // .eq(i8::from(ChannelStatus::Open))
+        // .or(channel::Column::Status
+        // .eq(i8::from(ChannelStatus::PendingToClose(
+        // hopr_platform::time::native::current_time(), // irrelevant
+        // )))
+        // .and(channel::Column::ClosureTime.gt(Utc::now()))),
+        // )
+        // .stream(self.index_db.read_only())
+        // .await?
+        // .map_err(DbSqlError::from)
+        // .and_then(|m| async move { Ok(ChannelEntry::try_from(m)?) })
+        // .boxed())
     }
 
     async fn upsert_channel<'a>(&'a self, tx: OptTx<'a>, channel_entry: ChannelEntry) -> Result<()> {
@@ -388,10 +405,7 @@ mod tests {
     use anyhow::Context;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
-    use hopr_internal_types::{
-        channels::ChannelStatus,
-        prelude::{ChannelDirection, ChannelEntry},
-    };
+    use hopr_internal_types::{channels::ChannelStatus, prelude::ChannelEntry};
     use hopr_primitive_types::prelude::Address;
 
     use super::*;
@@ -443,13 +457,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_for_destination_that_does_not_exist_returns_none() -> anyhow::Result<()> {
-        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
+        let ckp = ChainKeypair::random();
+        let db = HoprIndexerDb::new_in_memory(ckp.clone()).await?;
 
         let from_db = db
-            .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
-            .await?
-            .first()
-            .cloned();
+            .get_channel_by_parties(None, &Address::default(), &ckp.public().to_address(), false)
+            .await?;
 
         assert_eq!(None, from_db, "should return None");
 
@@ -458,12 +471,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_channel_get_for_destination_that_exists_should_be_returned() -> anyhow::Result<()> {
-        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
+        let ckp = ChainKeypair::random();
+        let db = HoprIndexerDb::new_in_memory(ckp.clone()).await?;
 
         let expected_destination = Address::default();
 
         let ce = ChannelEntry::new(
-            Address::default(),
+            ckp.public().to_address(),
             expected_destination,
             0.into(),
             0_u32.into(),
@@ -473,17 +487,15 @@ mod tests {
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
-            .get_channels_via(None, ChannelDirection::Incoming, &Address::default())
-            .await?
-            .first()
-            .cloned();
+            .get_channel_by_parties(None, &ckp.public().to_address(), &Address::default(), false)
+            .await?;
 
         assert_eq!(Some(ce), from_db, "should return a valid channel");
 
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_incoming_outgoing_channels() -> anyhow::Result<()> {
         let ckp = ChainKeypair::random();
         let addr_1 = ckp.public().to_address();
