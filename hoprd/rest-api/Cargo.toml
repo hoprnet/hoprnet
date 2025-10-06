@@ -30,7 +30,6 @@ human-bandwidth = { workspace = true }
 base64 = { workspace = true }
 bytesize = { workspace = true }
 const_format = { workspace = true }
-either = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
