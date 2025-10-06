@@ -38,7 +38,7 @@
       "addresses": {
         "announcements": "0xf1c143B1bA20C7606d56aA2FA94502D25744b982",
         "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
-        "module_implementation": "0x1e158754342432d866F1ab6e2e23DD71e496BC6B",
+        "module_implementation": "0xE74Ebb2A63AC86a84D6C0040A17465E3997F3F68",
         "network_registry": "0x15a315E1320cFF0de84671c0139042EE320CE38d",
         "network_registry_proxy": "0x20559cbD3C2eDcD0b396431226C00D2Cd102eB3F",
         "node_safe_registry": "0x4F7C7dE3BA2B29ED8B2448dF2213cA43f94E45c0",
