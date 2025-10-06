@@ -62,7 +62,6 @@ base64 = { workspace = true, optional = true }
 bytesize = { workspace = true, optional = true }
 const_format = { workspace = true }
 dashmap = { workspace = true, optional = true }
-either = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true, optional = true }
 human-bandwidth = { workspace = true, optional = true }
