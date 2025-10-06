@@ -1344,4 +1344,17 @@ impl Hopr {
     pub async fn get_indexer_state(&self) -> errors::Result<hopr_chain_api::IndexerStateInfo> {
         Ok(self.hopr_chain_api.get_indexer_state().await?)
     }
+
+    // === telemetry
+    /// Prometheus formatted metrics collected by the hopr-lib components.
+    pub fn collect_hopr_metrics() -> errors::Result<String> {
+        cfg_if::cfg_if! {
+            if #[cfg(all(feature = "prometheus", not(test)))] {
+                hopr_metrics::gather_all_metrics().map_err(|e| HoprLibError::GeneralError(e.to_string()))
+            } else {
+        Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
+
+            }
+        }
+    }
 }
