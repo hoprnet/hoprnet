@@ -5,6 +5,7 @@ resolver = "2"
 members = [
   "chain/actions",
   "chain/api",
+  "chain/config",
   "chain/indexer",
   "chain/rpc",
   "chain/types",
@@ -25,7 +26,6 @@ members = [
   "db/sql",
   "ethereum/bindings",
   "hopli",
-  "hopr/chain-config",
   "hopr/hopr-lib",
   "hoprd/hoprd",
   "hoprd/rest-api",
@@ -240,6 +240,7 @@ hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { path = "ethereum/bindings", default-features = false }
 hopr-chain-actions = { path = "chain/actions", default-features = false }
 hopr-chain-api = { path = "chain/api", default-features = false }
+hopr-chain-config = { path = "chain/config", default-features = false }
 hopr-chain-indexer = { path = "chain/indexer", default-features = false }
 hopr-chain-rpc = { path = "chain/rpc", default-features = false }
 hopr-chain-types = { path = "chain/types", default-features = false }
@@ -256,7 +257,6 @@ hopr-db-migration = { path = "db/migration" }
 hopr-db-node = { path = "db/node" }
 hopr-db-sql = { path = "db/sql" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
-hopr-chain-config = { path = "hopr/chain-config", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-network-types = { path = "common/network-types", default-features = false }

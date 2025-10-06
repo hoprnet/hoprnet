@@ -2,7 +2,7 @@ use std::{env, fs, path::Path};
 
 use anyhow::Context;
 
-const CONFIG_FILE_PATH: &str = "../../hopr/chain-config/data/protocol-config.json";
+const CONFIG_FILE_PATH: &str = "./data/protocol-config.json";
 
 fn main() -> anyhow::Result<()> {
     let out_dir = env::var("OUT_DIR").context("OUT_DIR environment variable should be set")?;

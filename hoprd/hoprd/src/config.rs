@@ -218,7 +218,7 @@ impl HoprdConfig {
                 &std::fs::read_to_string(&protocol_config)
                     .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?,
             )
-            .map_err(crate::errors::HoprdError::ConfigError)?;
+            .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
         }
 
         //   TODO: custom provider is redundant with the introduction of protocol-config.json
