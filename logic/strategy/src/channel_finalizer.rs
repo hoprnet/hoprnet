@@ -77,7 +77,8 @@ where
         let mut outgoing_channels = self
             .hopr_chain_actions
             .stream_channels(ChannelSelector {
-                direction: vec![ChannelDirection::Outgoing],
+                source: Some(*self.hopr_chain_actions.me()),
+                destination: None,
                 allowed_states: vec![ChannelStatusDiscriminants::PendingToClose],
                 ..Default::default()
             })

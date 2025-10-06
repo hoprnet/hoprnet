@@ -99,8 +99,8 @@ pub trait HoprDbChannelOperations {
 
     async fn stream_channels<'a>(
         &'a self,
-        counterparty: Option<Address>,
-        directions: &[ChannelDirection],
+        source: Option<Address>,
+        destination: Option<Address>,
         states: &[ChannelStatusDiscriminants],
     ) -> Result<BoxStream<'a, ChannelEntry>>;
 
@@ -231,7 +231,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
         Ok(self
             .stream_channels(
                 None,
-                &[ChannelDirection::Incoming],
+                Some(self.me_onchain),
                 &[
                     ChannelStatusDiscriminants::Open,
                     ChannelStatusDiscriminants::PendingToClose,
@@ -246,8 +246,8 @@ impl HoprDbChannelOperations for HoprIndexerDb {
     async fn get_outgoing_channels<'a>(&'a self, _tx: OptTx<'a>) -> Result<Vec<ChannelEntry>> {
         Ok(self
             .stream_channels(
+                Some(self.me_onchain),
                 None,
-                &[ChannelDirection::Outgoing],
                 &[
                     ChannelStatusDiscriminants::Open,
                     ChannelStatusDiscriminants::PendingToClose,
@@ -263,7 +263,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
         let entries = self
             .stream_channels(
                 None,
-                &[ChannelDirection::Incoming, ChannelDirection::Outgoing],
+                None,
                 &[
                     ChannelStatusDiscriminants::Open,
                     ChannelStatusDiscriminants::PendingToClose,
@@ -293,28 +293,16 @@ impl HoprDbChannelOperations for HoprIndexerDb {
 
     async fn stream_channels<'a>(
         &'a self,
-        counterparty: Option<Address>,
-        directions: &[ChannelDirection],
+        source: Option<Address>,
+        destination: Option<Address>,
         states: &[ChannelStatusDiscriminants],
     ) -> Result<BoxStream<'a, ChannelEntry>> {
-        let mut inner_cond = Condition::any();
-
         let mut incoming_cond = Condition::all();
-        if directions.contains(&ChannelDirection::Incoming) {
-            incoming_cond = incoming_cond.add(channel::Column::Destination.eq(self.me_onchain.to_hex()));
-            if let Some(counterparty) = counterparty {
-                incoming_cond = incoming_cond.add(channel::Column::Source.eq(counterparty.to_hex()));
-            }
-            inner_cond = inner_cond.add(incoming_cond);
+        if let Some(source) = source {
+            incoming_cond = incoming_cond.add(channel::Column::Source.eq(source.to_hex()));
         }
-
-        let mut outgoing_cond = Condition::all();
-        if directions.contains(&ChannelDirection::Outgoing) || directions.is_empty() {
-            outgoing_cond = outgoing_cond.add(channel::Column::Source.eq(self.me_onchain.to_hex()));
-            if let Some(counterparty) = counterparty {
-                outgoing_cond = outgoing_cond.add(channel::Column::Destination.eq(counterparty.to_hex()));
-            }
-            inner_cond = inner_cond.add(outgoing_cond);
+        if let Some(destination) = destination {
+            incoming_cond = incoming_cond.add(channel::Column::Destination.eq(destination.to_hex()));
         }
 
         let mut states_condition = Condition::any();
@@ -323,7 +311,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
         }
 
         Ok(Channel::find()
-            .filter(sea_query::all![inner_cond, states_condition])
+            .filter(sea_query::all![incoming_cond, states_condition])
             .stream(self.index_db.read_only())
             .await?
             .filter_map(|maybe_channel| {
@@ -344,7 +332,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
         Ok(self
             .stream_channels(
                 None,
-                &[ChannelDirection::Incoming, ChannelDirection::Outgoing],
+                None,
                 &[
                     ChannelStatusDiscriminants::Open,
                     ChannelStatusDiscriminants::PendingToClose,

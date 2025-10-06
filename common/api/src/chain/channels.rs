@@ -13,10 +13,10 @@ use crate::chain::ChainReceipt;
 /// See [`ChainReadChannelOperations::stream_channels`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ChannelSelector {
-    /// Filter by counterparty address.
-    pub counterparty: Option<Address>,
-    /// Filter by direction.
-    pub direction: Vec<ChannelDirection>,
+    /// Filter by source address.
+    pub source: Option<Address>,
+    /// Filter by destination address
+    pub destination: Option<Address>,
     /// Filter by possible channel states.
     pub allowed_states: Vec<ChannelStatusDiscriminants>,
 }
@@ -24,8 +24,8 @@ pub struct ChannelSelector {
 impl ChannelSelector {
     pub fn any() -> Self {
         Self {
-            counterparty: None,
-            direction: vec![ChannelDirection::Incoming, ChannelDirection::Outgoing],
+            source: None,
+            destination: None,
             allowed_states: vec![
                 ChannelStatusDiscriminants::Open,
                 ChannelStatusDiscriminants::Closed,
@@ -39,6 +39,8 @@ impl ChannelSelector {
 #[async_trait::async_trait]
 pub trait ChainReadChannelOperations {
     type Error: Error + Send + Sync + 'static;
+
+    fn me(&self) -> &Address;
 
     /// Returns a single channel given `src` and `dst`.
     async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error>;

@@ -510,6 +510,10 @@ impl ChainWriteAccountOperations for HoprChain {
 impl ChainReadChannelOperations for HoprChain {
     type Error = HoprChainError;
 
+    fn me(&self) -> &Address {
+        self.me_onchain.public().as_ref()
+    }
+
     async fn channel_by_parties(
         &self,
         src: &Address,
@@ -528,7 +532,7 @@ impl ChainReadChannelOperations for HoprChain {
     ) -> std::result::Result<BoxStream<'a, ChannelEntry>, Self::Error> {
         Ok(self
             .db
-            .stream_channels(selector.counterparty, &selector.direction, &selector.allowed_states)
+            .stream_channels(selector.source, selector.destination, &selector.allowed_states)
             .await?)
     }
 }

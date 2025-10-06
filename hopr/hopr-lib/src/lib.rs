@@ -755,7 +755,7 @@ impl Hopr {
         let mut channels = self
             .hopr_chain_api
             .stream_channels(ChannelSelector {
-                direction: vec![ChannelDirection::Incoming],
+                destination: self.me_onchain().into(),
                 ..Default::default()
             })
             .await?;
@@ -1088,8 +1088,8 @@ impl Hopr {
         Ok(self
             .hopr_chain_api
             .stream_channels(ChannelSelector {
-                counterparty: Some(*src),
-                direction: vec![ChannelDirection::Incoming],
+                source: Some(*src),
+                destination: Some(self.me_onchain()),
                 allowed_states: vec![
                     ChannelStatusDiscriminants::Closed,
                     ChannelStatusDiscriminants::Open,
@@ -1106,8 +1106,8 @@ impl Hopr {
         Ok(self
             .hopr_chain_api
             .stream_channels(ChannelSelector {
-                counterparty: Some(*dest),
-                direction: vec![ChannelDirection::Outgoing],
+                destination: Some(*dest),
+                source: Some(self.me_onchain()),
                 allowed_states: vec![
                     ChannelStatusDiscriminants::Closed,
                     ChannelStatusDiscriminants::Open,
@@ -1124,8 +1124,8 @@ impl Hopr {
         Ok(self
             .hopr_chain_api
             .stream_channels(ChannelSelector {
-                counterparty: None,
-                direction: vec![],
+                source: None,
+                destination: None,
                 allowed_states: vec![
                     ChannelStatusDiscriminants::Closed,
                     ChannelStatusDiscriminants::Open,
@@ -1228,8 +1228,8 @@ impl Hopr {
         // Does not need to be done concurrently, because we do not await each channel's redemption
         self.hopr_chain_api
             .stream_channels(ChannelSelector {
-                counterparty: None,
-                direction: vec![ChannelDirection::Incoming],
+                destination: chain_api.me_onchain().into(),
+                source: None,
                 allowed_states: vec![
                     ChannelStatusDiscriminants::Open,
                     ChannelStatusDiscriminants::PendingToClose,

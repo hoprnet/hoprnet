@@ -124,7 +124,8 @@ where
             let chain_actions = self.hopr_chain_actions.clone();
             self.hopr_chain_actions
                 .stream_channels(ChannelSelector {
-                    direction: vec![ChannelDirection::Incoming],
+                    destination: Some(*self.hopr_chain_actions.me()),
+                    source: None,
                     allowed_states: vec![
                         ChannelStatusDiscriminants::Open,
                         ChannelStatusDiscriminants::PendingToClose,
