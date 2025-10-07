@@ -62,7 +62,7 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
-use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig, SendMsgInput};
+use hopr_transport_protocol::processor::PacketInteractionConfig;
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
@@ -125,7 +125,6 @@ pub struct HoprTransport<Db, R> {
     resolver: R,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<Network<Db>>,
-    process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     path_planner: PathPlanner<Db, R, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
@@ -152,8 +151,6 @@ where
         channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
-        let process_packet_send = Arc::new(OnceLock::new());
-
         let me_peerid: PeerId = me.into();
         let me_chain_addr = me_onchain.public().to_address();
 
@@ -168,7 +165,6 @@ where
                 cfg.network.clone(),
                 db.clone(),
             )),
-            process_packet_send,
             path_planner: PathPlanner::new(
                 me_chain_addr,
                 db.clone(),
@@ -331,11 +327,6 @@ where
 
         let (external_msg_send, external_msg_rx) =
             channel::<(ApplicationDataOut, ResolvedTransportRouting)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
-
-        self.process_packet_send
-            .clone()
-            .set(MsgSender::new(external_msg_send.clone()))
-            .expect("must set the packet processing writer only once");
 
         // -- transport medium
         let mixer_cfg = build_mixer_cfg_from_env();
@@ -545,7 +536,7 @@ where
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
         for (k, v) in probe
             .continuously_scan(
-                (external_msg_send, rx_from_protocol),
+                (external_msg_send.clone(), rx_from_protocol),
                 manual_ping_rx,
                 network_notifier::ProbeNetworkInteractions::new(
                     self.network.clone(),
@@ -573,13 +564,7 @@ where
             .expect("must set the ticket aggregation writer only once");
 
         // -- session management
-        let packet_planner = run_packet_planner(
-            self.path_planner.clone(),
-            self.process_packet_send
-                .get()
-                .cloned()
-                .expect("packet sender must be set"),
-        );
+        let packet_planner = run_packet_planner(self.path_planner.clone(), external_msg_send);
 
         self.smgr
             .start(packet_planner, on_incoming_session)

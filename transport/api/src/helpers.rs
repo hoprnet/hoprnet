@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
-use futures::{FutureExt, StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
+use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
 use hopr_api::{
     chain::ChainKeyOperations,
     db::{FoundSurb, HoprDbProtocolOperations},
@@ -14,7 +14,6 @@ use hopr_network_types::prelude::*;
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, errors::PathError, selectors::PathSelector};
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
-use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use tracing::trace;
 
 use crate::{constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, errors::HoprTransportError};
@@ -235,7 +234,7 @@ where
 // where concurrent resolution would not make sense.
 pub(crate) fn run_packet_planner<Db, R, S>(
     planner: PathPlanner<Db, R, S>,
-    packet_sender: MsgSender<Sender<SendMsgInput>>,
+    packet_sender: Sender<(ApplicationDataOut, ResolvedTransportRouting)>,
 ) -> Sender<(DestinationRouting, ApplicationDataOut)>
 where
     Db: HoprDbProtocolOperations + Send + Sync + Clone + 'static,
@@ -254,7 +253,7 @@ where
     hopr_async_runtime::prelude::spawn(
         rx.for_each_concurrent(planner_concurrency, move |(routing, mut data)| {
             let planner = planner.clone();
-            let packet_sender = packet_sender.clone();
+            let mut packet_sender = packet_sender.clone();
             async move {
                 let max_surbs = data.estimate_surbs_with_msg();
 
@@ -284,7 +283,7 @@ where
 
                         data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
 
-                        if let Err(error) = packet_sender.send_packet(data, resolved).await {
+                        if let Err(error) = packet_sender.send((data, resolved)).await {
                             tracing::error!(%error, "failed to enqueue packet for sending");
                         }
                     }
