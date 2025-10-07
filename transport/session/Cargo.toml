@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.12.0"
+version = "0.13.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -55,9 +55,9 @@ hopr-protocol-app = { workspace = true, features = ["serde"] }
 hopr-protocol-session = { workspace = true, features = ["serde"] }
 hopr-protocol-start = { workspace = true }
 
-
 [dev-dependencies]
 anyhow = { workspace = true }
+criterion = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
@@ -75,3 +75,7 @@ ignored = ["serde_with"]
 [[bench]]
 name = "session_bench"
 harness = false
+
+# Target-specific dependencies for memory allocators
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.6.0"

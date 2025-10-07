@@ -13,6 +13,12 @@ use hopr_crypto_sphinx::prelude::{SharedSecret, SphinxSuite};
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use por::{generate_proof_of_relay, pre_verify};
 
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[cfg(target_os = "linux")]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 const SAMPLE_SIZE: usize = 100_000;
 
 pub fn proof_of_relay_bench(c: &mut Criterion) {

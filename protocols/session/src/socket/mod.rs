@@ -29,7 +29,7 @@ pub struct SessionSocketConfig {
     ///
     /// The size is always greater or equal to the MTU `C` of the underlying transport, and
     /// less or equal to:
-    /// - (`C` -  `SessionMessage::SEGMENT_OVERHEAD`) * (`SeqIndicator::MAX` + 1) for stateless sockets, or
+    /// - (`C` - `SessionMessage::SEGMENT_OVERHEAD`) * (`SeqIndicator::MAX` + 1) for stateless sockets, or
     /// - (`C` - `SessionMessage::SEGMENT_OVERHEAD`) * min(`SeqIndicator::MAX` + 1,
     ///   `SegmentRequest::MAX_MISSING_SEGMENTS_PER_FRAME`) for stateful sockets
     ///
@@ -131,9 +131,16 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             // Filter-out segments that we've seen already
             .filter_map(move |packet| {
                 futures::future::ready(match packet {
-                    Ok(packet) => packet
-                        .try_as_segment()
-                        .filter(|s| s.frame_id > last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed)),
+                    Ok(packet) => packet.try_as_segment().filter(|s| {
+                        // Filter old frame ids to save space in the Reassembler
+                        let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
+                        if s.frame_id <= last_emitted_id {
+                            tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                            false
+                        } else {
+                            true
+                        }
+                    }),
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
                         None
@@ -226,7 +233,14 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
 
         let inspector = FrameInspector::new(cfg.capacity);
 
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let ctl_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_CTL_CHANNEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
+            .unwrap_or(2048);
+
+        tracing::debug!(capacity = ctl_channel_capacity, "Creating session control channel");
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(ctl_channel_capacity);
         state.run(SocketComponents {
             inspector: Some(inspector.clone()),
             ctl_tx,
@@ -236,7 +250,6 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let (segments_tx, segments_rx) = futures::channel::mpsc::channel(cfg.capacity);
         let mut st_1 = state.clone();
         let upstream_frames_in = segments_tx
-            //.sink_map_err(|_| SessionError::InvalidSegment)
             .with(move |segment| {
                 // The segment_sent event is raised only for segments coming from Upstream,
                 // not for the segments from the Control stream (= segment resends).
@@ -291,9 +304,15 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             tracing::debug!(%error, "incoming message state update failed");
                         }
                         // Filter old frame ids to save space in the Reassembler
-                        packet
-                            .try_as_segment()
-                            .filter(|s| s.frame_id > last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed))
+                        packet.try_as_segment().filter(|s| {
+                            let last_emitted_id = last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed);
+                            if s.frame_id <= last_emitted_id {
+                                tracing::warn!(frame_id = s.frame_id, last_emitted_id, "frame already seen");
+                                false
+                            } else {
+                                true
+                            }
+                        })
                     }
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");

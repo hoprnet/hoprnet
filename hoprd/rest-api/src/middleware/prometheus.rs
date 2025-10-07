@@ -1,33 +1,32 @@
 use axum::{extract::Request, middleware::Next, response::Response};
 #[cfg(all(feature = "prometheus", not(test)))]
-use {
-    hopr_lib::AsUnixTimestamp,
-    hopr_metrics::metrics::{MultiCounter, MultiHistogram, SimpleGauge},
-    hopr_platform::time::native::current_time,
-};
+use hopr_lib::AsUnixTimestamp;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_API_CALLS: MultiCounter = MultiCounter::new(
+    static ref METRIC_COUNT_API_CALLS:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_http_api_call_count",
         "Number of different REST API calls and their statuses",
-        &["endpoint", "method", "status"]
+        &["path", "method", "status"]
     )
     .unwrap();
-    static ref METRIC_COUNT_API_CALLS_TIMING: MultiHistogram = MultiHistogram::new(
+    static ref METRIC_COUNT_API_CALLS_TIMING:  hopr_metrics::MultiHistogram =  hopr_metrics::MultiHistogram::new(
         "hopr_http_api_call_timing_sec",
         "Timing of different REST API calls in seconds",
         vec![0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0],
-        &["endpoint", "method"]
+        &["path", "method"]
     )
     .unwrap();
-    static ref METRIC_API_LAST_TIME: SimpleGauge = SimpleGauge::new(
+    static ref METRIC_API_LAST_TIME:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_http_api_last_used_time",
         "The unix timestamp in seconds at which any API endpoint was last fetched"
     ).unwrap();
 
-    // Matches Ed25519-based peer IDs and channel IDs (Keccak256 hashes)
-    static ref ID_REGEX: regex::Regex = regex::Regex::new(r"(0x[0-9A-Fa-f]{64})|(12D3KooW[A-z0-9]{44})").unwrap();
+    // Matches Ethereum addresses which contains 40 hex characters prefixed by '0x'
+    // Matches ChannelsIds which contains 64 hex characters prefixed by '0x'
+    // Matches PeerIds which contains 12D3KooW followed by 44 base58 characters
+    // Matches IPv4 addresses with ports in format x.x.x.x/port
+    static ref ID_REGEX: regex::Regex = regex::Regex::new(r"(0x[0-9A-Fa-f]{40})|(0x[0-9A-Fa-f]{64})|(12D3KooW[A-Za-z0-9]{44})|(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,5})").unwrap();
 }
 
 /// Custom prometheus recording middleware
@@ -54,7 +53,7 @@ pub(crate) async fn record(
     }
 
     // Set for any API call
-    METRIC_API_LAST_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
+    METRIC_API_LAST_TIME.set(std::time::SystemTime::now().as_unix_timestamp().as_secs_f64());
 
     response
 }

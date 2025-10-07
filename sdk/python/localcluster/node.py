@@ -45,6 +45,7 @@ class Node:
         identity_path: str,
         cfg_file: str,
         base_port: int,
+        cluster_size: int,
         api_addr: Optional[str] = None,
         use_nat: bool = False,
         remove_temp_data: bool = True,
@@ -80,26 +81,25 @@ class Node:
         self.anvil_port: int = 0
         self.tokio_console_port: int = 0
 
-        self.prepare()
+        self.prepare(cluster_size)
 
     @property
     def api(self):
         return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", Bearer(self.api_token), "/api/v4")
 
-    def prepare(self):
+    def prepare(self, cluster_size: int):
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
         self.cfg_file_path = MAIN_DIR.joinpath(self.cfg_file)
         self.anvil_port = self.base_port
-        self.api_port = self.base_port + (self.id * 3)
-        self.p2p_port = self.api_port + 1
-        self.tokio_console_port = self.p2p_port + 1
+        self.api_port = self.base_port + self.id
+        self.p2p_port = self.api_port + cluster_size
+        self.tokio_console_port = self.p2p_port + cluster_size
 
         logging.info(
             f"Node {self.id} ports: "
             + f"api {self.api_port}, "
             + f"p2p {self.p2p_port}, "
-            + f"tokio console {self.tokio_console_port}, "
-            + f"anvil {self.anvil_port}"
+            + f"tokio console {self.tokio_console_port}"
         )
 
     def load_native_address(self):
@@ -270,7 +270,7 @@ class Node:
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
             # filter out peers that are not well-connected yet
-            connected_peers = [p.address for p in peers_info if p.quality >= 0.25]
+            connected_peers = [p.address for p in peers_info if p.quality >= 0.1]
             connected_peers.sort()
             logging.debug(f"Peers connected on {self.id}: {connected_peers}")
 
@@ -304,6 +304,7 @@ class Node:
         use_nat: bool,
         exposed: bool,
         base_port: int,
+        cluster_size: int,
     ):
         token = config.get("api_token", defaults.get("api_token"))
 
@@ -314,6 +315,7 @@ class Node:
             network,
             config["identity_path"],
             config["config_file"],
+            cluster_size=cluster_size,
             api_addr="0.0.0.0" if exposed else None,
             use_nat=use_nat,
             base_port=base_port,
@@ -340,7 +342,8 @@ class Node:
         output_strings.append(
             f"\t\tRest API:\thttp://{self.api_addr}:{self.api_port}/scalar | http://{self.api_addr}:{self.api_port}/swagger-ui/index.html"
         )
-        output_strings.append(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}\n\n")
+        output_strings.append(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}")
+        output_strings.append(f"\t\tProcess ID:\t{self.proc.pid if self.proc else 'N/A'}\n\n")
 
         return "\n".join(output_strings)
 

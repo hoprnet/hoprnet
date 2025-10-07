@@ -5,7 +5,6 @@ from typing import Optional, Tuple
 
 import yaml
 
-from . import utils
 from .anvil import Anvil, AnvilState
 from .cluster import Cluster
 from .constants import (
@@ -25,12 +24,12 @@ random.seed(SEED)
 
 async def bringup(
     config: str,
-    size: Optional[int] = None,
     test_mode: bool = False,
     fully_connected: bool = False,
     use_nat: bool = False,
     exposed: bool = False,
     base_port: int = BASE_PORT,
+    size: Optional[int] = None,
 ) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
@@ -121,14 +120,5 @@ async def bringup(
         await cluster.connect_peers()
 
     logging.info("All nodes ready")
-
-    if not test_mode:
-        # SHOW NODES' INFORMATIONS
-        await cluster.links()
-
-        try:
-            utils.wait_for_user_interrupt()
-        finally:
-            pass
 
     return cluster, anvil

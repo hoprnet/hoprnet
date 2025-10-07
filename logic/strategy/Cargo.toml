@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.14.2"
+version = "0.15.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -13,28 +13,13 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
-  "hopr-transport-protocol/runtime-tokio",
-  "hopr-transport-ticket-aggregation/runtime-tokio",
-
-]
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-chain-actions/prometheus",
-  "hopr-db-sql/prometheus",
-  "hopr-transport-network/prometheus",
-  "hopr-transport-protocol/prometheus",
-  "hopr-transport-ticket-aggregation/prometheus",
-]
+runtime-tokio = ["hopr-transport-protocol/runtime-tokio"]
+prometheus = ["dep:hopr-metrics", "hopr-transport-protocol/prometheus"]
 
 [dependencies]
-async-lock = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
-rand = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
 smart-default = { workspace = true }
@@ -43,26 +28,19 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-api = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-transport-network = { workspace = true }
-hopr-chain-actions = { workspace = true }
-hopr-async-runtime = { workspace = true }
-hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-protocol = { workspace = true }
-hopr-transport-ticket-aggregation = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
-hopr-chain-types = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 futures = { workspace = true }
-test-log = { workspace = true }

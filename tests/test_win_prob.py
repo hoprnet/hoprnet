@@ -23,6 +23,7 @@ from .utils import (
     check_winning_tickets_count,
     create_bidirectional_channels_for_route,
     get_ticket_price,
+    random_non_looping_routes_from,
 )
 
 
@@ -77,16 +78,15 @@ class TestWinProbWithSwarm:
     @pytest.mark.parametrize(
         "route",
         [
-            [
-                *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
-                *random.sample(barebone_nodes(), 2),
-            ]
+            random_non_looping_routes_from((nodes_with_lower_outgoing_win_prob(), 1), (barebone_nodes(), 2))
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
     async def test_hoprd_should_relay_packets_with_lower_win_prob_then_redeem_them(
         self, route, swarm7: dict[str, Node], base_port: int
     ):
+        assert len(route) == len(set(route))  # checks that all elements of route are unique. Should never fail
+
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
         win_prob = Decimal("0.1")
@@ -168,16 +168,15 @@ class TestWinProbWithSwarm:
     @pytest.mark.parametrize(
         "route",
         [
-            [
-                *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
-                *random.sample(barebone_nodes(), 2),
-            ]
+            random_non_looping_routes_from((nodes_with_lower_outgoing_win_prob(), 1), (barebone_nodes(), 2))
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
     async def test_hoprd_should_reject_unredeemed_tickets_with_lower_win_prob_when_min_bound_increases(
-        self, route, swarm7: dict[str, Node], base_port: int
+        self, route: list[str], swarm7: dict[str, Node], base_port: int
     ):
+        assert len(route) == len(set(route))  # checks that all elements of route are unique. Should never fail
+
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
         win_prob = Decimal("0.1")
@@ -243,14 +242,13 @@ class TestWinProbWithSwarm:
     @pytest.mark.parametrize(
         "route",
         [
-            [
-                *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
-                *random.sample(barebone_nodes(), 3),
-            ]
+            random_non_looping_routes_from((nodes_with_lower_outgoing_win_prob(), 1), (barebone_nodes(), 3))
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
     async def test_hoprd_should_relay_with_increased_win_prob(self, route, swarm7: dict[str, Node], base_port: int):
+        assert len(route) == len(set(route))  # checks that all elements of route are unique. Should never fail
+
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
         win_prob = Decimal("0.1")
@@ -304,19 +302,20 @@ class TestWinProbWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "route",
+        "src, mid, dest",
         [
-            [
-                *random.sample(barebone_nodes(), 1),
-                *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
-                *random.sample(barebone_nodes(), 1),
-            ]
+            random_non_looping_routes_from(
+                (barebone_nodes(), 1), (nodes_with_lower_outgoing_win_prob(), 1), (barebone_nodes(), 1)
+            )
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
     async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(
-        self, route, swarm7: dict[str, Node], base_port: int
+        self, src: str, mid: str, dest: str, swarm7: dict[str, Node], base_port: int
     ):
+        route = [src, mid, dest]
+        assert len(route) == len(set(route))  # checks that all elements of route are unique. Should never fail
+
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
         win_prob = Decimal("0.1")
@@ -367,32 +366,25 @@ class TestWinProbWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "route",
+        "src, mid, dest",
         [
-            [
-                *random.sample(nodes_with_lower_outgoing_win_prob(), 1),
-                *random.sample(barebone_nodes(), 2),
-            ]
+            random_non_looping_routes_from((nodes_with_lower_outgoing_win_prob(), 1), (barebone_nodes(), 2))
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
-    async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(self, route, swarm7: dict[str, Node]):
-        ticket_price = await get_ticket_price(swarm7[route[0]])
+    async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(
+        self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
+    ):
+        ticket_price = await get_ticket_price(swarm7[src])
         win_prob = Decimal("0.1")
 
-        src = route[0]
-        relay = route[1]
-        dest = route[-1]
-
         async with create_bidirectional_channels_for_route(
-            [swarm7[hop] for hop in route],
+            [swarm7[hop] for hop in (src, mid, dest)],
             3 * ticket_price / win_prob,
             2 * ticket_price / win_prob,
         ):
             # ensure ticket stats are what we expect before starting
-            statistics_before = await swarm7[relay].api.get_tickets_statistics()
-            unredeemed_value_before = statistics_before.unredeemed_value
-            rejected_value_before = statistics_before.rejected_value
+            statistics_before = await swarm7[mid].api.get_tickets_statistics()
 
             was_active = False
             try:
@@ -400,8 +392,8 @@ class TestWinProbWithSwarm:
                     Protocol.UDP,
                     swarm7[src],
                     swarm7[dest],
-                    fwd_path={"IntermediatePath": [swarm7[relay].address]},
-                    return_path={"IntermediatePath": [swarm7[relay].address]},
+                    fwd_path={"IntermediatePath": [swarm7[mid].address]},
+                    return_path={"IntermediatePath": [swarm7[mid].address]},
                     use_response_buffer=None,
                 ):
                     was_active = True
@@ -410,13 +402,13 @@ class TestWinProbWithSwarm:
 
                 # wait until the relay rejects the session establishment packet
                 await asyncio.wait_for(
-                    check_rejected_tickets_value(swarm7[relay], rejected_value_before + ticket_price / win_prob),
+                    check_rejected_tickets_value(swarm7[mid], statistics_before.rejected_value + ticket_price),
                     30.0,
                 )
 
                 # unredeemed value should not change on the relay
-                ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
-                assert ticket_statistics.unredeemed_value == unredeemed_value_before
+                ticket_statistics = await swarm7[mid].api.get_tickets_statistics()
+                assert ticket_statistics.unredeemed_value == statistics_before.unredeemed_value
                 assert ticket_statistics.winning_count == statistics_before.winning_count
 
             assert was_active is False

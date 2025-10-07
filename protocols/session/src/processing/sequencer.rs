@@ -64,7 +64,7 @@ where
         Self {
             inner,
             buffer: BinaryHeap::with_capacity(capacity),
-            timer: futures_time::task::sleep(max_wait.into()),
+            timer: futures_time::task::sleep(max_wait.max(Duration::from_millis(1)).into()),
             next_id: 1,
             last_emitted: Instant::now(),
             max_wait,

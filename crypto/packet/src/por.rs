@@ -1,11 +1,7 @@
 use std::fmt::Formatter;
 
 use hopr_crypto_sphinx::prelude::SharedSecret;
-use hopr_crypto_types::{
-    crypto_traits::Randomizable,
-    prelude::{SecretKey, sample_secp256k1_field_element},
-    types::{Challenge, HalfKey, HalfKeyChallenge, Response},
-};
+use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::instrument;
 
@@ -243,12 +239,18 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
             })
             .to_challenge()?;
 
-        let s1 = derive_own_key_share(&secrets[i]); // s1_own
-        let s2 = derive_ack_key_share(secrets.get(i + 1).unwrap_or(&SharedSecret::random()));
+        let next_ticket_challenge = if let Some(next_secret) = secrets.get(i + 1) {
+            let s1 = derive_own_key_share(&secrets[i]); // s1_own
+            let s2 = derive_ack_key_share(next_secret); // s2_ack
 
-        let next_ticket_challenge = Response::from_half_keys(&s1, &s2)? // (s1_own + s2_ack) * G
-            .to_challenge()?
-            .to_ethereum_challenge();
+            last_ack_key_share = Some(s2);
+
+            Response::from_half_keys(&s1, &s2)? // (s1_own + s2_ack) * G
+                .to_challenge()?
+                .to_ethereum_challenge()
+        } else {
+            EthereumChallenge(hopr_crypto_random::random_bytes::<{ Address::SIZE }>().into())
+        };
 
         if i > 0 {
             por_strings.push(ProofOfRelayString::new(&next_ticket_challenge, &hint));
@@ -259,7 +261,6 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
                 &next_ticket_challenge,
             ));
         }
-        last_ack_key_share = Some(s2);
     }
 
     Ok((
@@ -270,6 +271,8 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
 
 #[cfg(test)]
 mod tests {
+    use hopr_crypto_random::Randomizable;
+
     use super::*;
 
     impl ProofOfRelayValues {
@@ -289,7 +292,6 @@ mod tests {
             Ok((Self::new(chain_length, &ack_challenge, &ticket_challenge), s0))
         }
     }
-
     impl ProofOfRelayString {
         /// Creates an instance from the shared secrets with node+2 and node+3
         fn create(secret_c: &SharedSecret, secret_d: Option<&SharedSecret>) -> hopr_crypto_types::errors::Result<Self> {

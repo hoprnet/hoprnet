@@ -2,20 +2,32 @@ use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-use futures::{StreamExt, future::AbortHandle};
-use hopr_lib::{HoprLibProcesses, ToHex};
+use futures::{
+    FutureExt, StreamExt,
+    future::{AbortHandle, abortable},
+};
+use hopr_lib::{HoprKeys, IdentityRetrievalModes, ToHex, state::HoprLibProcesses, utils::session::ListenerJoinHandles};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
-use hoprd_api::{ListenerJoinHandles, RestApiParameters, serve_api};
-use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
+
+#[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
+mod jemalloc_stats;
+
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
     opentelemetry_otlp::WithExportConfig as _,
     opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
 };
+
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[cfg(target_os = "linux")]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -132,12 +144,17 @@ impl std::fmt::Debug for HoprdProcesses {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
-    if hopr_crypto_random::is_rng_fixed() {
-        warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
-    }
+    #[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
+    let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
         warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
+    }
+
+    if cfg!(debug_assertions) {
+        warn!("Executable was built using the DEBUG profile.");
+    } else {
+        info!("Executable was built using the RELEASE profile.");
     }
 
     let args = <CliArgs as clap::Parser>::parse();
@@ -218,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
 
-        processes.push(HoprdProcesses::RestApi(hopr_async_runtime::spawn_as_abortable!(
+        let (proc, abort_handle) = abortable(
             async move {
                 if let Err(e) = serve_api(RestApiParameters {
                     listener: api_listener,
@@ -233,7 +250,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     error!(error = %e, "the REST API server could not start")
                 }
             }
-        )));
+            .inspect(|_| tracing::warn!(task = "hoprd - REST API", "long-running background task finished")),
+        );
+        let _jh = tokio::spawn(proc);
+        processes.push(HoprdProcesses::RestApi(abort_handle));
     }
 
     let (_hopr_socket, hopr_processes) = node

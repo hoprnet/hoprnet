@@ -8,8 +8,9 @@ from websockets.asyncio.client import connect
 
 from sdk.python.localcluster.node import Node
 
-from .conftest import nodes_with_auth, random_distinct_pairs_from, to_ws_url
+from .conftest import nodes_with_auth, to_ws_url
 from .test_session import STANDARD_MTU_SIZE, EchoServer, SocketType
+from .utils import random_distinct_pairs_from
 
 DEFAULT_ARGS = [
     ("hops", 0),

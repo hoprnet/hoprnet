@@ -443,10 +443,12 @@ where
 #[cfg(test)]
 mod tests {
     use futures::{SinkExt, StreamExt, TryStreamExt};
+    #[cfg(feature = "runtime-tokio")]
     use tokio::io::AsyncWriteExt;
 
     use super::*;
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_copy_duplex() -> anyhow::Result<()> {
         const DATA_LEN: usize = 2000;
@@ -476,6 +478,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[test_log::test(tokio::test(flavor = "multi_thread"))]
     async fn test_copy_duplex_with_abort_from_client() -> anyhow::Result<()> {
         let (mut client_tx, mut client_rx) = tokio::io::duplex(10); // Create a mock duplex stream
@@ -504,6 +507,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_copy_duplex_with_abort_from_server() -> anyhow::Result<()> {
         let (mut client_tx, mut client_rx) = tokio::io::duplex(10); // Create a mock duplex stream
@@ -532,6 +536,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_copy_duplex_small() -> anyhow::Result<()> {
         const DATA_LEN: usize = 100;
@@ -561,6 +566,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_client_to_server() -> anyhow::Result<()> {
         let (mut client_tx, mut client_rx) = tokio::io::duplex(8); // Create a mock duplex stream
@@ -582,6 +588,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_server_to_client() -> anyhow::Result<()> {
         let (mut client_tx, mut client_rx) = tokio::io::duplex(32); // Create a mock duplex stream
@@ -602,6 +609,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "runtime-tokio")]
     #[tokio::test]
     async fn test_async_read_streamer_complete_chunk() {
         let data = b"Hello, World!!";

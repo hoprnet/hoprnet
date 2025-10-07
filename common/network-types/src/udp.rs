@@ -5,6 +5,7 @@ use std::{
     pin::Pin,
     sync::{Arc, OnceLock},
     task::{Context, Poll},
+    time::Duration,
 };
 
 use futures::{FutureExt, Sink, SinkExt, ready};
@@ -17,19 +18,17 @@ type BoxIoSink<T> = Box<dyn Sink<T, Error = std::io::Error> + Send + Unpin>;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_UDP_INGRESS_LEN: hopr_metrics::MultiHistogram =
-        hopr_metrics::MultiHistogram::new(
+    static ref METRIC_UDP_INGRESS_LEN: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
             "hopr_udp_ingress_packet_len",
-            "UDP packet lengths on ingress per counterparty",
-            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0],
-            &["counterparty"]
+            "UDP packet lengths on ingress",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0]
     ).unwrap();
-    static ref METRIC_UDP_EGRESS_LEN: hopr_metrics::MultiHistogram =
-        hopr_metrics::MultiHistogram::new(
+    static ref METRIC_UDP_EGRESS_LEN: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
             "hopr_udp_egress_packet_len",
-            "UDP packet lengths on egress per counterparty",
-            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0],
-            &["counterparty"]
+            "UDP packet lengths on egress",
+            vec![20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0]
     ).unwrap();
 }
 
@@ -53,7 +52,7 @@ lazy_static::lazy_static! {
 /// multiple sockets with `SO_REUSEADDR` and spin parallel tasks that will coordinate data and
 /// transmission retrieval using these sockets. This is driven by RX/TX MPMC queues, which are
 /// per-default unbounded (see [queue size](UdpStreamBuilder::with_queue_size) for details).
-#[pin_project::pin_project]
+#[pin_project::pin_project(PinnedDrop)]
 pub struct ConnectedUdpStream {
     socket_handles: Vec<tokio::task::JoinHandle<()>>,
     #[pin]
@@ -364,10 +363,11 @@ impl UdpStreamBuilder {
                 })
                 .filter_map(|result| match result {
                     Ok(bound) => Some(bound),
-                    Err(e) => {
+                    Err(error) => {
                         error!(
                             %binding_to,
-                            "failed to bind udp socket: {e}"
+                            %error,
+                            "failed to bind udp socket"
                         );
                         None
                     }
@@ -409,6 +409,8 @@ impl UdpStreamBuilder {
     }
 }
 
+const QUEUE_DISPATCH_THRESHOLD: Duration = Duration::from_millis(150);
+
 impl ConnectedUdpStream {
     /// Creates a receiver queue for the UDP stream.
     fn setup_rx_queue(
@@ -438,7 +440,7 @@ impl ConnectedUdpStream {
                         let addr = counterparty_rx.get_or_init(|| read_addr.into());
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_UDP_INGRESS_LEN.observe(&[addr.as_str()], read as f64);
+                        METRIC_UDP_INGRESS_LEN.observe(read as f64);
 
                         // If the data is from a counterparty, or we accept anything, pass it
                         if read_addr.eq(addr) || foreign_data_mode == ForeignDataMode::Accept {
@@ -480,30 +482,38 @@ impl ConnectedUdpStream {
                         done = true;
                         None
                     }
-                    Err(e) => {
+                    Err(error) => {
                         // Forward the error
                         debug!(
                             socket_id,
                             udp_bound_addr = ?sock_rx.local_addr(),
-                            error = %e,
+                            %error,
                             "forwarded error from socket"
                         );
                         done = true;
-                        Some(Err(e))
+                        Some(Err(error))
                     }
                 };
 
                 // Dispatch the received data to the queue.
                 // If the underlying queue is bounded, it will wait until there is space.
                 if let Some(out_res) = out_res {
-                    if let Err(err) = ingress_tx.send_async(out_res).await {
+                    let start = std::time::Instant::now();
+                    if let Err(error) = ingress_tx.send_async(out_res).await {
                         error!(
                             socket_id,
                             udp_bound_addr = ?sock_rx.local_addr(),
-                            error = %err,
+                            %error,
                             "failed to dispatch received data"
                         );
                         done = true;
+                    }
+                    let elapsed = start.elapsed();
+                    if elapsed > QUEUE_DISPATCH_THRESHOLD {
+                        warn!(
+                            ?elapsed,
+                            "udp queue dispatch took too long, consider increasing the queue size"
+                        );
                     }
                 }
 
@@ -533,19 +543,19 @@ impl ConnectedUdpStream {
                 match egress_rx.recv_async().await {
                     Ok(data) => {
                         if let Some(target) = counterparty_tx.get() {
-                            if let Err(e) = sock_tx.send_to(&data, target.as_ref()).await {
+                            if let Err(error) = sock_tx.send_to(&data, target.as_ref()).await {
                                 error!(
                                     ?socket_id,
                                     udp_bound_addr = ?sock_tx.local_addr(),
                                     ?target,
-                                    error = %e,
+                                    %error,
                                     "failed to send data"
                                 );
                             }
                             trace!(socket_id, bytes = data.len(), ?target, "sent bytes to");
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_UDP_EGRESS_LEN.observe(&[target.as_str()], data.len() as f64);
+                            METRIC_UDP_EGRESS_LEN.observe(data.len() as f64);
                         } else {
                             error!(
                                 ?socket_id,
@@ -555,11 +565,11 @@ impl ConnectedUdpStream {
                             break;
                         }
                     }
-                    Err(e) => {
+                    Err(error) => {
                         error!(
                             ?socket_id,
                             udp_bound_addr = ?sock_tx.local_addr(),
-                            error = %e,
+                            %error,
                             "cannot receive more data from egress channel"
                         );
                         break;
@@ -660,6 +670,16 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
                 "udp stream is closed",
             )))
         }
+    }
+}
+
+#[pin_project::pinned_drop]
+impl PinnedDrop for ConnectedUdpStream {
+    fn drop(self: Pin<&mut Self>) {
+        debug!(binding = ?self.bound_to,"dropping ConnectedUdpStream");
+        self.project().socket_handles.iter().for_each(|handle| {
+            handle.abort();
+        })
     }
 }
 

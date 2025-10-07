@@ -5,6 +5,12 @@ use hopr_crypto_types::{
     vrf::derive_vrf_parameters,
 };
 
+// Avoid musl's default allocator due to degraded performance
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[cfg(target_os = "linux")]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 const SAMPLE_SIZE: usize = 100_000;
 
 pub fn vrf_bench(c: &mut Criterion) {

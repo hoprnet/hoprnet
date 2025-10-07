@@ -16,7 +16,8 @@ hopr:
         funding_amount: "10 wxHOPR"
         min_stake_threshold: "1 wxHOPR"
       - !AutoRedeeming
-        redeem_only_aggregated: true
+        redeem_only_aggregated: false
+        redeem_on_winning: true
         minimum_redeem_ticket_value: "0 wxHOPR"
   protocol:
     outgoing_ticket_winning_prob: 1.0

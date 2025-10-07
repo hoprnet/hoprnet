@@ -1,4 +1,3 @@
-use hopr_chain_actions::errors::ChainActionsError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 
@@ -9,16 +8,10 @@ pub enum StrategyError {
     CriteriaNotSatisfied,
 
     #[error("non-specific strategy error: {0}")]
-    Other(String),
-
-    #[error(transparent)]
-    DbError(#[from] hopr_db_sql::api::errors::DbError),
+    Other(Box<dyn std::error::Error + Send + Sync>),
 
     #[error(transparent)]
     ProtocolError(#[from] hopr_transport_protocol::errors::ProtocolError),
-
-    #[error(transparent)]
-    ActionsError(#[from] ChainActionsError),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),

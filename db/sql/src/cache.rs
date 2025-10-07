@@ -1,27 +1,13 @@
-use std::{
-    sync::{Arc, Mutex, atomic::AtomicU64},
-    time::Duration,
-};
+use std::time::Duration;
 
 use dashmap::{DashMap, Entry};
-use hopr_crypto_packet::{
-    HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener,
-    prelude::{HoprSenderId, HoprSurbId},
-};
-use hopr_crypto_types::prelude::*;
-use hopr_db_api::{
-    info::{IndexerData, SafeInfo},
-    prelude::DbError,
-};
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::{
-    balance::HoprBalance,
-    prelude::{Address, KeyIdent, U256},
-};
-use moka::{Expiry, future::Cache, notification::RemovalCause};
-use ringbuffer::{AllocRingBuffer, RingBuffer};
+use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite};
+use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_internal_types::prelude::{AccountEntry, ChannelEntry};
+use hopr_primitive_types::prelude::{Address, KeyIdent};
+use moka::future::Cache;
 
-use crate::errors::DbSqlError;
+use crate::{errors::DbSqlError, info::IndexerData};
 
 /// Lists all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for the long term.
@@ -30,8 +16,6 @@ use crate::errors::DbSqlError;
 pub enum CachedValue {
     /// Cached [IndexerData].
     IndexerDataCache(IndexerData),
-    /// Cached [SafeInfo].
-    SafeInfoCache(Option<SafeInfo>),
 }
 
 impl TryFrom<CachedValue> for IndexerData {
@@ -40,227 +24,25 @@ impl TryFrom<CachedValue> for IndexerData {
     fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
         match value {
             CachedValue::IndexerDataCache(data) => Ok(data),
-            _ => Err(DbSqlError::DecodingError),
         }
-    }
-}
-
-impl TryFrom<CachedValue> for Option<SafeInfo> {
-    type Error = DbSqlError;
-
-    fn try_from(value: CachedValue) -> Result<Self, Self::Error> {
-        match value {
-            CachedValue::SafeInfoCache(data) => Ok(data),
-            _ => Err(DbSqlError::DecodingError),
-        }
-    }
-}
-
-struct ExpiryNever;
-
-impl<K, V> Expiry<K, V> for ExpiryNever {
-    fn expire_after_create(&self, _key: &K, _value: &V, _current_time: std::time::Instant) -> Option<Duration> {
-        None
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
-/// Represents a single SURB along with its ID popped from the [`SurbRingBuffer`].
 #[derive(Debug, Clone)]
-pub struct PoppedSurb<S> {
-    /// Complete SURB sender ID.
-    pub id: HoprSurbId,
-    /// The popped SURB.
-    pub surb: S,
-    /// Number of SURBs left in the RB after the pop.
-    pub remaining: usize,
-}
-
-/// Ring buffer containing SURBs along with their IDs.
-///
-/// All these SURBs usually belong to the same pseudonym and are therefore identified
-/// only by the [`HoprSurbId`].
-#[derive(Clone, Debug)]
-pub(crate) struct SurbRingBuffer<S>(Arc<Mutex<AllocRingBuffer<(HoprSurbId, S)>>>);
-
-impl<S> Default for SurbRingBuffer<S> {
-    fn default() -> Self {
-        // With the current packet size, this is almost 10 MB of data budget in SURBs
-        Self::new(10_000)
-    }
-}
-
-impl<S> SurbRingBuffer<S> {
-    pub fn new(capacity: usize) -> Self {
-        Self(Arc::new(Mutex::new(AllocRingBuffer::new(capacity))))
-    }
-
-    /// Push all SURBs with their IDs into the RB.
-    ///
-    /// Returns the total number of elements in the RB after the push.
-    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> Result<usize, DbError> {
-        let mut rb = self
-            .0
-            .lock()
-            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
-
-        rb.extend(surbs);
-        Ok(rb.len())
-    }
-
-    /// Pop the latest SURB and its IDs from the RB.
-    pub fn pop_one(&self) -> Result<PoppedSurb<S>, DbError> {
-        let mut rb = self
-            .0
-            .lock()
-            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
-
-        let (id, surb) = rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))?;
-        Ok(PoppedSurb {
-            id,
-            surb,
-            remaining: rb.len(),
-        })
-    }
-
-    /// Check if the next SURB has the given ID and pop it from the RB.
-    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<PoppedSurb<S>, DbError> {
-        let mut rb = self
-            .0
-            .lock()
-            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
-
-        if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
-            let (id, surb) = rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))?;
-            Ok(PoppedSurb {
-                id,
-                surb,
-                remaining: rb.len(),
-            })
-        } else {
-            Err(DbError::NoSurbAvailable("surb does not match the given id".into()))
-        }
-    }
-}
-
-/// Contains all caches used by the [crate::db::HoprDb].
-#[derive(Debug)]
-pub struct HoprDbCaches {
-    pub(crate) single_values: Cache<CachedValueDiscriminants, CachedValue>,
-    pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
-    pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
-    // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
-    // include tickets from other epochs
-    pub(crate) unrealized_value: Cache<(Hash, U256), HoprBalance>,
-    pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
-    pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
-    pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
-    // KeyIdMapper must be synchronous because it is used from a sync context.
-    pub(crate) key_id_mapper: CacheKeyMapper,
-    pseudonym_openers: moka::sync::Cache<HoprPseudonym, moka::sync::Cache<HoprSurbId, ReplyOpener>>,
-    pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer<HoprSurb>>,
-}
-
-impl Default for HoprDbCaches {
-    fn default() -> Self {
-        Self {
-            single_values: Cache::builder().time_to_idle(Duration::from_secs(1800)).build(),
-            unacked_tickets: Cache::builder()
-                .time_to_live(Duration::from_secs(30))
-                .max_capacity(1_000_000_000)
-                .build(),
-            ticket_index: Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build(),
-            unrealized_value: Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build(),
-            chain_to_offchain: Cache::builder()
-                .time_to_idle(Duration::from_secs(600))
-                .max_capacity(100_000)
-                .build(),
-            offchain_to_chain: Cache::builder()
-                .time_to_idle(Duration::from_secs(600))
-                .max_capacity(100_000)
-                .build(),
-            src_dst_to_channel: Cache::builder()
-                .time_to_live(Duration::from_secs(600))
-                .max_capacity(10_000)
-                .build(),
-            // Reply openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
-            // in a cascade fashion, allowing the entire batches (by Pseudonym) to be evicted
-            // if not used.
-            pseudonym_openers: moka::sync::Cache::builder()
-                .time_to_idle(Duration::from_secs(600))
-                .eviction_policy(moka::policy::EvictionPolicy::lru())
-                .eviction_listener(|sender_id, _reply_opener, cause| {
-                    tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
-                })
-                .max_capacity(10_000)
-                .build(),
-            // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
-            // For each Pseudonym, there's an RB of SURBs and their IDs.
-            surbs_per_pseudonym: Cache::builder()
-                .time_to_idle(Duration::from_secs(600))
-                .eviction_policy(moka::policy::EvictionPolicy::lru())
-                .eviction_listener(|pseudonym, _reply_opener, cause| {
-                    tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
-                })
-                .max_capacity(10_000)
-                .build(),
-            key_id_mapper: CacheKeyMapper::with_capacity(10_000),
-        }
-    }
-}
-
-impl HoprDbCaches {
-    pub(crate) fn insert_pseudonym_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
-        self.pseudonym_openers
-            .get_with(sender_id.pseudonym(), move || {
-                moka::sync::Cache::builder()
-                    .time_to_live(Duration::from_secs(3600))
-                    .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
-                        if cause != RemovalCause::Explicit {
-                            tracing::warn!(pseudonym = %sender_id.pseudonym(), surb_id = hex::encode(id.as_slice()), ?cause, "evicting reply opener for sender id");
-                        }
-                    })
-                    .max_capacity(100_000)
-                    .build()
-            })
-            .insert(sender_id.surb_id(), opener);
-    }
-
-    pub(crate) fn extract_pseudonym_opener(&self, sender_id: &HoprSenderId) -> Option<ReplyOpener> {
-        self.pseudonym_openers
-            .get(&sender_id.pseudonym())
-            .and_then(|cache| cache.remove(&sender_id.surb_id()))
-    }
-
-    // For future use by the SessionManager
-    #[allow(dead_code)]
-    pub(crate) fn invalidate_pseudonym_openers(&self, pseudonym: &HoprPseudonym) {
-        self.pseudonym_openers.invalidate(pseudonym);
-    }
-
-    /// Invalidates all caches.
-    pub fn invalidate_all(&self) {
-        self.single_values.invalidate_all();
-        self.unacked_tickets.invalidate_all();
-        self.unrealized_value.invalidate_all();
-        self.chain_to_offchain.invalidate_all();
-        self.offchain_to_chain.invalidate_all();
-        self.src_dst_to_channel.invalidate_all();
-        // NOTE: key_id_mapper intentionally not invalidated
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct CacheKeyMapper(
-    DashMap<KeyIdent<4>, OffchainPublicKey>,
-    DashMap<OffchainPublicKey, KeyIdent<4>>,
+pub struct CacheKeyMapper(
+    std::sync::Arc<DashMap<KeyIdent<4>, OffchainPublicKey>>,
+    std::sync::Arc<DashMap<OffchainPublicKey, KeyIdent<4>>>,
 );
 
 impl CacheKeyMapper {
     pub fn with_capacity(capacity: usize) -> Self {
-        Self(DashMap::with_capacity(capacity), DashMap::with_capacity(capacity))
+        Self(
+            std::sync::Arc::new(DashMap::with_capacity(capacity)),
+            std::sync::Arc::new(DashMap::with_capacity(capacity)),
+        )
     }
 
     /// Creates key id mapping for a public key of an [account](AccountEntry).
@@ -327,71 +109,44 @@ impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for 
     }
 }
 
+/// Contains all caches used by the [crate::db::HoprDb].
+#[derive(Debug, Clone)]
+pub struct HoprIndexerDbCaches {
+    pub(crate) single_values: Cache<CachedValueDiscriminants, CachedValue>,
+    pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
+    pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
+    pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
+    // KeyIdMapper must be synchronous because it is used from a sync context.
+    pub(crate) key_id_mapper: CacheKeyMapper,
+}
+
+impl Default for HoprIndexerDbCaches {
+    fn default() -> Self {
+        Self {
+            single_values: Cache::builder().time_to_idle(Duration::from_secs(1800)).build(),
+            chain_to_offchain: Cache::builder()
+                .time_to_idle(Duration::from_secs(600))
+                .max_capacity(100_000)
+                .build(),
+            offchain_to_chain: Cache::builder()
+                .time_to_idle(Duration::from_secs(600))
+                .max_capacity(100_000)
+                .build(),
+            src_dst_to_channel: Cache::builder()
+                .time_to_live(Duration::from_secs(600))
+                .max_capacity(10_000)
+                .build(),
+            key_id_mapper: CacheKeyMapper::with_capacity(10_000),
+        }
+    }
+}
+
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn surb_ring_buffer_must_drop_items_when_capacity_is_reached() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(3);
-        rb.push([([1u8; 8], 0)])?;
-        rb.push([([2u8; 8], 0)])?;
-        rb.push([([3u8; 8], 0)])?;
-        rb.push([([4u8; 8], 0)])?;
-
-        let popped = rb.pop_one()?;
-        assert_eq!([2u8; 8], popped.id);
-        assert_eq!(2, popped.remaining);
-
-        let popped = rb.pop_one()?;
-        assert_eq!([3u8; 8], popped.id);
-        assert_eq!(1, popped.remaining);
-
-        let popped = rb.pop_one()?;
-        assert_eq!([4u8; 8], popped.id);
-        assert_eq!(0, popped.remaining);
-
-        assert!(rb.pop_one().is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn surb_ring_buffer_must_be_fifo() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5);
-
-        let len = rb.push([([1u8; 8], 0)])?;
-        assert_eq!(1, len);
-
-        let len = rb.push([([2u8; 8], 0)])?;
-        assert_eq!(2, len);
-
-        let popped = rb.pop_one()?;
-        assert_eq!([1u8; 8], popped.id);
-        assert_eq!(1, popped.remaining);
-
-        let popped = rb.pop_one()?;
-        assert_eq!([2u8; 8], popped.id);
-        assert_eq!(0, popped.remaining);
-
-        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)])?;
-        assert_eq!(2, len);
-
-        assert_eq!([1u8; 8], rb.pop_one()?.id);
-        assert_eq!([2u8; 8], rb.pop_one()?.id);
-
-        Ok(())
-    }
-
-    #[test]
-    fn surb_ring_buffer_must_not_pop_if_id_does_not_match() -> anyhow::Result<()> {
-        let rb = SurbRingBuffer::new(5);
-
-        rb.push([([1u8; 8], 0)])?;
-
-        assert!(rb.pop_one_if_has_id(&[2u8; 8]).is_err());
-        assert_eq!([1u8; 8], rb.pop_one_if_has_id(&[1u8; 8])?.id);
-
-        Ok(())
+impl HoprIndexerDbCaches {
+    pub fn invalidate_all(&self) {
+        self.src_dst_to_channel.invalidate_all();
+        self.chain_to_offchain.invalidate_all();
+        self.offchain_to_chain.invalidate_all();
+        self.single_values.invalidate_all();
     }
 }

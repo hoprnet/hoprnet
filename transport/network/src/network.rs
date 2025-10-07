@@ -4,30 +4,31 @@ use std::{
 };
 
 use futures::StreamExt;
-pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
+use hopr_api::db::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
+use hopr_network_types::addr::is_public_address;
 use hopr_platform::time::current_time;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_primitive_types::prelude::*;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::debug;
-#[cfg(all(feature = "prometheus", not(test)))]
-use {
-    hopr_metrics::metrics::{MultiGauge, SimpleGauge},
-    hopr_primitive_types::prelude::*,
-};
 
-use crate::{config::NetworkConfig, errors::Result};
+use crate::{
+    config::NetworkConfig,
+    errors::{NetworkingError, Result},
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_NETWORK_HEALTH: SimpleGauge =
-        SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
-    static ref METRIC_PEERS_BY_QUALITY: MultiGauge =
-        MultiGauge::new("hopr_peers_by_quality", "Number different peer types by quality",
+    static ref METRIC_NETWORK_HEALTH:  hopr_metrics::SimpleGauge =
+         hopr_metrics::SimpleGauge::new("hopr_network_health", "Connectivity health indicator").unwrap();
+    static ref METRIC_PEERS_BY_QUALITY:  hopr_metrics::MultiGauge =
+         hopr_metrics::MultiGauge::new("hopr_peers_by_quality", "Number different peer types by quality",
             &["type", "quality"],
         ).unwrap();
-    static ref METRIC_PEER_COUNT: SimpleGauge =
-        SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
-    static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN: SimpleGauge = SimpleGauge::new(
+    static ref METRIC_PEER_COUNT:  hopr_metrics::SimpleGauge =
+         hopr_metrics::SimpleGauge::new("hopr_peer_count", "Number of all peers").unwrap();
+    static ref METRIC_NETWORK_HEALTH_TIME_TO_GREEN:  hopr_metrics::SimpleGauge =  hopr_metrics::SimpleGauge::new(
         "hopr_time_to_green_sec",
         "Time it takes for a node to transition to the GREEN network state"
     ).unwrap();
@@ -41,11 +42,11 @@ pub enum Health {
     Unknown = 0,
     /// No connection, default
     Red = 1,
-    /// Low quality connection to at least 1 public relay
+    /// Low-quality connection to at least 1 public relay
     Orange = 2,
-    /// High quality connection to at least 1 public relay
+    /// High-quality connection to at least 1 public relay
     Yellow = 3,
-    /// High quality connection to at least 1 public relay and 1 NAT node
+    /// High-quality connection to at least 1 public relay and 1 NAT node
     Green = 4,
 }
 
@@ -79,10 +80,7 @@ pub enum UpdateFailure {
 /// The network object storing information about the running observed state of the network,
 /// including peers, connection qualities and updates for other parts of the system.
 #[derive(Debug)]
-pub struct Network<T>
-where
-    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
-{
+pub struct Network<T> {
     me: PeerId,
     me_addresses: Vec<Multiaddr>,
     am_i_public: bool,
@@ -94,7 +92,7 @@ where
 
 impl<T> Network<T>
 where
-    T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+    T: HoprDbPeersOperations + Sync + Send,
 {
     pub fn new(my_peer_id: PeerId, my_multiaddresses: Vec<Multiaddr>, cfg: NetworkConfig, db: T) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -127,13 +125,28 @@ where
     /// Add a new peer into the network.
     ///
     /// Each peer must have an origin specification.
+    ///
+    /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out before storing
+    /// to prevent private addresses from entering the peer store. This filtering can be disabled
+    /// by setting the `HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES` env variable
+    /// to `true`.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn add(&self, peer: &PeerId, origin: PeerOrigin, mut addrs: Vec<Multiaddr>) -> Result<()> {
         if peer == &self.me {
-            return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
+            return Err(NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
 
-        if let Some(mut peer_status) = self.db.get_network_peer(peer).await? {
+        // Filter out private addresses before storing
+        addrs = addrs.into_iter().filter(is_public_address).collect();
+
+        debug!(%peer, %origin, multiaddresses = ?addrs, "Filtered addresses, proceeding with public addresses only");
+
+        if let Some(mut peer_status) = self
+            .db
+            .get_network_peer(peer)
+            .await
+            .map_err(|e| NetworkingError::DbChainError(e.into()))?
+        {
             debug!(%peer, %origin, multiaddresses = ?addrs, "Updating existing peer in the store");
 
             if !peer_status.is_ignored() || matches!(origin, PeerOrigin::IncomingConnection) {
@@ -147,7 +160,10 @@ where
                 .collect::<HashSet<_>>()
                 .into_iter()
                 .collect::<Vec<_>>();
-            self.db.update_network_peer(peer_status).await?;
+            self.db
+                .update_network_peer(peer_status)
+                .await
+                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
         } else {
             debug!(%peer, %origin, multiaddresses = ?addrs, "Adding peer to the store");
 
@@ -159,12 +175,17 @@ where
                     self.cfg.backoff_exponent,
                     self.cfg.quality_avg_window_size,
                 )
-                .await?;
+                .await
+                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
         }
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
+            let stats = self
+                .db
+                .network_peer_stats(self.cfg.quality_bad_threshold)
+                .await
+                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
             self.refresh_metrics(&stats)
         }
 
@@ -172,16 +193,45 @@ where
     }
 
     /// Get peer information and status.
+    ///
+    /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out from the returned
+    /// PeerStatus to prevent exposure through public APIs. This filtering can be disabled by
+    /// setting the `HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES` env variable
+    /// to `true`.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         if peer == &self.me {
             Ok(Some({
                 let mut ps = PeerStatus::new(*peer, PeerOrigin::Initialization, 0.0f64, 2u32);
-                ps.multiaddresses.clone_from(&self.me_addresses);
+                // Filter private addresses from self addresses before returning
+                ps.multiaddresses = self
+                    .me_addresses
+                    .iter()
+                    .filter(|addr| is_public_address(addr))
+                    .cloned()
+                    .collect();
                 ps
             }))
         } else {
-            Ok(self.db.get_network_peer(peer).await?)
+            // Get peer info from database and filter private addresses
+            match self
+                .db
+                .get_network_peer(peer)
+                .await
+                .map_err(|e| NetworkingError::DbChainError(e.into()))?
+            {
+                Some(mut peer_status) => {
+                    // Filter out private addresses from multiaddresses before returning
+                    peer_status.multiaddresses = peer_status
+                        .multiaddresses
+                        .iter()
+                        .filter(|addr| is_public_address(addr))
+                        .cloned()
+                        .collect();
+                    Ok(Some(peer_status))
+                }
+                None => Ok(None),
+            }
         }
     }
 
@@ -189,14 +239,21 @@ where
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn remove(&self, peer: &PeerId) -> Result<()> {
         if peer == &self.me {
-            return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
+            return Err(NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
 
-        self.db.remove_network_peer(peer).await?;
+        self.db
+            .remove_network_peer(peer)
+            .await
+            .map_err(|e| NetworkingError::DbChainError(e.into()))?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
+            let stats = self
+                .db
+                .network_peer_stats(self.cfg.quality_bad_threshold)
+                .await
+                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
             self.refresh_metrics(&stats);
             tracing::trace!(
                 health = %health_from_stats(&stats, self.am_i_public),
@@ -221,10 +278,15 @@ where
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn update(&self, peer: &PeerId, ping_result: std::result::Result<Duration, UpdateFailure>) -> Result<()> {
         if peer == &self.me {
-            return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
+            return Err(NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
 
-        if let Some(mut entry) = self.db.get_network_peer(peer).await? {
+        if let Some(mut entry) = self
+            .db
+            .get_network_peer(peer)
+            .await
+            .map_err(|e| NetworkingError::DbChainError(e.into()))?
+        {
             entry.heartbeats_sent += 1;
 
             match ping_result {
@@ -266,11 +328,18 @@ where
             }
 
             tracing::trace!(%peer, quality = entry.quality, quality_avg = hopr_primitive_types::sma::SMA::average(&entry.quality_avg), "Updating peer status in the store");
-            self.db.update_network_peer(entry).await?;
+            self.db
+                .update_network_peer(entry)
+                .await
+                .map_err(|e| NetworkingError::DbChainError(e.into()))?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
             {
-                let stats = self.db.network_peer_stats(self.cfg.quality_bad_threshold).await?;
+                let stats = self
+                    .db
+                    .network_peer_stats(self.cfg.quality_bad_threshold)
+                    .await
+                    .map_err(|e| NetworkingError::DbChainError(e.into()))?;
                 self.refresh_metrics(&stats);
                 tracing::trace!(
                     health = %health_from_stats(&stats, self.am_i_public),
@@ -325,12 +394,17 @@ where
         F: FnMut(PeerStatus) -> Fut,
         Fut: std::future::Future<Output = Option<V>>,
     {
-        let stream = self.db.get_network_peers(Default::default(), false).await?;
-        futures::pin_mut!(stream);
-        Ok(stream.filter_map(filter).collect().await)
+        Ok(self
+            .db
+            .get_network_peers(Default::default(), false)
+            .await
+            .map_err(|e| NetworkingError::DbChainError(e.into()))?
+            .filter_map(filter)
+            .collect()
+            .await)
     }
 
-    /// Returns a list of peer IDs eligible for pinging based on last seen time, ignore status, and backoff delay.
+    /// Returns a list of peer IDs eligible for pinging based on last-seen time, ignore status, and backoff delay.
     ///
     /// Peers are filtered to exclude self, those currently within their ignore timeframe, and those whose
     /// backoff-adjusted delay has not yet elapsed. The resulting peers are sorted by last seen time in ascending order.
@@ -342,12 +416,11 @@ where
     /// A vector of peer IDs that should be pinged.
     #[tracing::instrument(level = "debug", skip(self, threshold), ret(level = "trace"), err, fields(since = ?threshold))]
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> Result<Vec<PeerId>> {
-        let stream = self
+        Ok(self
             .db
-            .get_network_peers(PeerSelector::default().with_last_seen_lte(threshold), false)
-            .await?;
-        futures::pin_mut!(stream);
-        let mut data: Vec<PeerStatus> = stream
+            .get_network_peers(PeerSelector::default().with_last_seen_lte(threshold), true)
+            .await
+            .map_err(|e| NetworkingError::DbChainError(e.into()))?
             .filter_map(|v| async move {
                 if v.id.1 == self.me {
                     return None;
@@ -367,23 +440,13 @@ where
                 let delay = std::cmp::min(self.cfg.min_delay * (backoff as u32), self.cfg.max_delay);
 
                 if (v.last_seen + delay) < threshold {
-                    Some(v)
+                    Some(v.id.1)
                 } else {
                     None
                 }
             })
             .collect()
-            .await;
-
-        data.sort_by(|a, b| {
-            if a.last_seen < b.last_seen {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Greater
-            }
-        });
-
-        Ok(data.into_iter().map(|peer| peer.id.1).collect())
+            .await)
     }
 }
 
@@ -393,6 +456,7 @@ mod tests {
 
     use anyhow::Context;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_db_node::HoprNodeDb;
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
@@ -403,7 +467,7 @@ mod tests {
 
     impl<T> Network<T>
     where
-        T: HoprDbPeersOperations + Sync + Send + std::fmt::Debug,
+        T: HoprDbPeersOperations + Sync + Send,
     {
         /// Checks if the peer is present in the network, but it is being currently ignored.
         async fn is_ignored(&self, peer: &PeerId) -> bool {
@@ -424,7 +488,7 @@ mod tests {
         Ok(())
     }
 
-    async fn basic_network(my_id: &PeerId) -> anyhow::Result<Network<hopr_db_sql::db::HoprDb>> {
+    async fn basic_network(my_id: &PeerId) -> anyhow::Result<Network<HoprNodeDb>> {
         let cfg = NetworkConfig {
             quality_offline_threshold: 0.6,
             ..Default::default()
@@ -433,7 +497,7 @@ mod tests {
             *my_id,
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
         ))
     }
 
@@ -834,7 +898,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
@@ -861,7 +925,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         peers.add(&peer, PeerOrigin::NetworkRegistry, vec![]).await?;
@@ -888,7 +952,7 @@ mod tests {
             me,
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
@@ -917,7 +981,7 @@ mod tests {
             OffchainKeypair::random().public().into(),
             vec![],
             cfg,
-            hopr_db_sql::db::HoprDb::new_in_memory(ChainKeypair::random()).await?,
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
         );
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
@@ -929,6 +993,106 @@ mod tests {
         }
 
         assert_eq!(peers.health().await, Health::Green);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // untestable without a feature flag
+    async fn network_add_should_filter_private_multiaddresses() -> anyhow::Result<()> {
+        use multiaddr::Multiaddr;
+
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        // Create multiaddresses with both public and private addresses
+        let private_addr1: Multiaddr = "/ip4/192.168.1.100/tcp/9091".parse()?;
+        let private_addr2: Multiaddr = "/ip4/10.0.0.1/tcp/9092".parse()?;
+        let private_addr3: Multiaddr = "/ip4/127.0.0.1/tcp/9093".parse()?;
+        let public_addr: Multiaddr = "/ip4/8.8.8.8/tcp/9094".parse()?;
+
+        let mixed_addresses = vec![
+            private_addr1.clone(),
+            public_addr.clone(),
+            private_addr2.clone(),
+            private_addr3.clone(),
+        ];
+
+        let peers = Network::new(
+            me,
+            vec![public_addr.clone()], // Set only public address for self
+            Default::default(),
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
+        );
+
+        // Add peer with mixed addresses - private addresses should be filtered out during add
+        peers.add(&peer, PeerOrigin::NetworkRegistry, mixed_addresses).await?;
+
+        // Get the peer info - should only contain public addresses since private ones were filtered during add
+        let peer_status = peers.get(&peer).await?.context("peer should be present")?;
+
+        // Verify only public addresses remain in the database
+        assert_eq!(
+            peer_status.multiaddresses.len(),
+            1,
+            "Should only have 1 public address stored"
+        );
+        assert_eq!(
+            peer_status.multiaddresses[0], public_addr,
+            "Should only contain the public address"
+        );
+
+        // Test self peer filtering too (get method still filters self addresses as defensive measure)
+        let self_status = peers.get(&me).await?.context("self peer should be present")?;
+
+        // Verify only public addresses remain for self
+        assert_eq!(
+            self_status.multiaddresses.len(),
+            1,
+            "Self should only have 1 public address"
+        );
+        assert_eq!(
+            self_status.multiaddresses[0], public_addr,
+            "Self should only contain the public address"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore] // untestable without a feature flag
+    async fn network_get_should_filter_private_multiaddresses_as_defensive_measure() -> anyhow::Result<()> {
+        use multiaddr::Multiaddr;
+
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        // Create multiaddresses with both public and private addresses for self
+        let private_addr1: Multiaddr = "/ip4/192.168.1.100/tcp/9091".parse()?;
+        let public_addr: Multiaddr = "/ip4/8.8.8.8/tcp/9094".parse()?;
+
+        let mixed_self_addresses = vec![private_addr1.clone(), public_addr.clone()];
+
+        // Create network with mixed addresses for self (simulating if somehow private addresses get set)
+        let peers = Network::new(
+            me,
+            mixed_self_addresses,
+            Default::default(),
+            HoprNodeDb::new_in_memory(ChainKeypair::random()).await?,
+        );
+
+        // Test that get() method filters self addresses as a defensive measure
+        let self_status = peers.get(&me).await?.context("self peer should be present")?;
+
+        // Verify only public addresses remain for self
+        assert_eq!(
+            self_status.multiaddresses.len(),
+            1,
+            "Self should only have 1 public address"
+        );
+        assert_eq!(
+            self_status.multiaddresses[0], public_addr,
+            "Self should only contain the public address"
+        );
 
         Ok(())
     }

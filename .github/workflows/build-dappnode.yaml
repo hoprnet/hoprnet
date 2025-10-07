@@ -31,7 +31,7 @@ on:
         default: rotsee
 
 concurrency:
-  group: dappnode-${{ inputs.dappnode_repository }}-${{ inputs.source_branch || github.ref_name }}
+  group: dappnode-${{ inputs.dappnode_repository || github.event.inputs.network }}-${{ inputs.source_branch || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           disable-sudo: false # sudo is needed for docker compose installation
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -82,7 +82,7 @@ jobs:
           sudo apt-get install -y docker-compose
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
           repository: ${{ steps.vars.outputs.source_repo }}
@@ -97,22 +97,23 @@ jobs:
           install-sdk: 'true'
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version: 22.18.0
+          node-version: 20 # Revert to version 20, as the dappnode package is not yet compatible with Node 22
 
       - name: Checkout DAppNodePackage-Hopr
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
           repository: dappnode/${{ steps.vars.outputs.dappnode_repository }}
           path: "./dappnode"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          ref: main
+          ref: ${{ vars.DAPPNODE_REPOSITORY_BRANCH_NAME }}
 
       - name: Setup variables
         id: setup
         run: |
+          set -x
           # Set current_version based on branch type:
           # - For PRs: <current_version>-pr.<PR_number>
           # - For 'master' branch: <master_version>-latest
@@ -121,7 +122,7 @@ jobs:
           current_version=$(./scripts/get-current-version.sh docker)
           if [[ -z "${{ github.event.pull_request.number }}" ]]; then
             echo "Invoked manually"
-            declare base_branch=${{ steps.vars.outputs.GITHUB_REF_NAME }}
+            declare base_branch=${{ steps.vars.outputs.source_branch }}
             if [[ "${base_branch}" == "master" ]]; then
               echo "current_version=${{ vars.BRANCH_MASTER_RELEASE_NAME }}-latest" >> "$GITHUB_OUTPUT"
             elif [[ "${base_branch}" =~ ^"release" ]]; then
@@ -144,7 +145,7 @@ jobs:
           npx @dappnode/dappnodesdk publish patch  --provider "remote" --upload_to "ipfs" --verbose | tee build.log
 
           echo "DNP (DAppNode Package) built and uploaded" >> "$GITHUB_STEP_SUMMARY"
-          echo "Branch: ${{ steps.vars.outputs.GITHUB_REF_NAME }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch: ${{ steps.vars.outputs.source_branch }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Network: ${{ steps.vars.outputs.HOPRD_NETWORK }}" >> "$GITHUB_STEP_SUMMARY"
           grep "ipfs" build.log >> "$GITHUB_STEP_SUMMARY"
           ipfs_hash=$(grep -oP 'Release hash : \K/ipfs/\w+' build.log)
@@ -153,11 +154,3 @@ jobs:
         working-directory: "./dappnode"
         env:
           DEVELOPER_ADDRESS: "0x7305356ad936A06c4ea5DF45AD5E5C3ff9Db818E"
-
-      - name: Create comment
-        if: github.event_name == 'pull_request_target'
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4.0.0
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            The latest dAppNode package for ${{ inputs.dappnode_repository }} has been built and uploaded with IPFS hash: ${{ steps.publish.outputs.ipfs_hash }}

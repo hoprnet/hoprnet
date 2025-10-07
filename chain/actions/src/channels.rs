@@ -18,7 +18,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::HoprDbAllOperations;
+use hopr_db_sql::prelude::{HoprDbChannelOperations, HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
@@ -30,11 +30,10 @@ use crate::{
     errors::{
         ChainActionsError::{
             BalanceTooLow, ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
-            InvalidArguments, InvalidChannelStake, InvalidState, NotEnoughAllowance, PeerAccessDenied,
+            InvalidArguments, InvalidChannelStake, InvalidState, NotEnoughAllowance,
         },
         Result,
     },
-    redeem::TicketRedeemActions,
 };
 
 /// Gathers all channel-related on-chain actions.
@@ -48,19 +47,11 @@ pub trait ChannelActions {
 
     /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that
     /// channel, in case the `direction` is [`ChannelDirection::Incoming`].
-    async fn close_channel(
-        &self,
-        counterparty: Address,
-        direction: ChannelDirection,
-        redeem_before_close: bool,
-    ) -> Result<PendingAction>;
+    async fn close_channel(&self, channel_entry: ChannelEntry) -> Result<PendingAction>;
 }
 
 #[async_trait]
-impl<Db> ChannelActions for ChainActions<Db>
-where
-    Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
-{
+impl<Db: Sync> ChannelActions for ChainActions<Db> {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn open_channel(&self, destination: Address, amount: HoprBalance) -> Result<PendingAction> {
         if self.self_address() == destination {
@@ -72,52 +63,36 @@ where
         }
 
         // Perform all checks
-        let db_clone = self.db.clone();
-        let self_addr = self.self_address();
-        self.db
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
-                    debug!(%allowance, "current staking safe allowance");
-                    if allowance < amount {
-                        return Err(NotEnoughAllowance);
-                    }
+        let allowance: HoprBalance = self.index_db.get_safe_hopr_allowance(None).await?;
+        debug!(%allowance, "current staking safe allowance");
+        if allowance < amount {
+            return Err(NotEnoughAllowance);
+        }
 
-                    let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
-                    debug!(balance = %hopr_balance, "current Safe HOPR balance");
-                    if hopr_balance < amount {
-                        return Err(BalanceTooLow);
-                    }
+        let hopr_balance: HoprBalance = self.index_db.get_safe_hopr_balance(None).await?;
+        debug!(balance = %hopr_balance, "current Safe HOPR balance");
+        if hopr_balance < amount {
+            return Err(BalanceTooLow);
+        }
 
-                    if HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) < amount {
-                        return Err(InvalidChannelStake);
-                    }
+        if HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) < amount {
+            return Err(InvalidChannelStake);
+        }
 
-                    if db_clone.get_indexer_data(Some(tx)).await?.nr_enabled
-                        && !db_clone.is_allowed_in_network_registry(Some(tx), &destination).await?
-                    {
-                        return Err(PeerAccessDenied);
-                    }
-
-                    let maybe_channel = db_clone
-                        .get_channel_by_parties(Some(tx), &self_addr, &destination, false)
-                        .await?;
-                    if let Some(channel) = maybe_channel {
-                        debug!(%channel, "already found existing channel");
-                        if channel.status != ChannelStatus::Closed {
-                            error!(
-                                %destination,
-                                "channel to destination is already opened or pending to close"
-                            );
-                            return Err(ChannelAlreadyExists);
-                        }
-                    }
-                    Ok(())
-                })
-            })
+        let maybe_channel = self
+            .index_db
+            .get_channel_by_parties(None, &self.self_address(), &destination, false)
             .await?;
+        if let Some(channel) = maybe_channel {
+            debug!(%channel, "already found existing channel");
+            if channel.status != ChannelStatus::Closed {
+                error!(
+                    %destination,
+                    "channel to destination is already opened or pending to close"
+                );
+                return Err(ChannelAlreadyExists);
+            }
+        }
 
         info!(%destination, %amount, "initiating channel open");
         self.tx_sender.send(Action::OpenChannel(destination, amount)).await
@@ -129,31 +104,19 @@ where
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
-        let db_clone = self.db.clone();
-        let maybe_channel = self
-            .db
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
-                    debug!(%allowance, "current staking safe allowance");
-                    if allowance.lt(&amount) {
-                        return Err(NotEnoughAllowance);
-                    }
+        let allowance: HoprBalance = self.index_db.get_safe_hopr_allowance(None).await?;
+        debug!(%allowance, "current staking safe allowance");
+        if allowance.lt(&amount) {
+            return Err(NotEnoughAllowance);
+        }
 
-                    let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
-                    debug!(balance = %hopr_balance, "current Safe HOPR balance");
-                    if hopr_balance.lt(&amount) {
-                        return Err(BalanceTooLow);
-                    }
+        let hopr_balance: HoprBalance = self.index_db.get_safe_hopr_balance(None).await?;
+        debug!(balance = %hopr_balance, "current Safe HOPR balance");
+        if hopr_balance.lt(&amount) {
+            return Err(BalanceTooLow);
+        }
 
-                    Ok(db_clone.get_channel_by_id(Some(tx), &channel_id).await?)
-                })
-            })
-            .await?;
-
-        match maybe_channel {
+        match self.index_db.get_channel_by_id(None, &channel_id).await? {
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
                     if channel.balance + amount > HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) {
@@ -171,59 +134,31 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn close_channel(
-        &self,
-        counterparty: Address,
-        direction: ChannelDirection,
-        redeem_before_close: bool,
-    ) -> Result<PendingAction> {
-        let maybe_channel = match direction {
-            ChannelDirection::Incoming => {
-                self.db
-                    .get_channel_by_parties(None, &counterparty, &self.self_address(), false)
-                    .await?
-            }
-            ChannelDirection::Outgoing => {
-                self.db
-                    .get_channel_by_parties(None, &self.self_address(), &counterparty, false)
-                    .await?
-            }
-        };
+    async fn close_channel(&self, channel: ChannelEntry) -> Result<PendingAction> {
+        let direction = channel.direction(&self.me).ok_or(ChannelDoesNotExist)?; // Cannot close channel that is not own
 
-        match maybe_channel {
-            Some(channel) => {
-                match channel.status {
-                    ChannelStatus::Closed => Err(ChannelAlreadyClosed),
-                    ChannelStatus::PendingToClose(_) => {
-                        let remaining_closure_time = channel.remaining_closure_time(current_time());
-                        info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
-                        match remaining_closure_time {
-                            Some(Duration::ZERO) => {
-                                info!(%channel, %direction, "initiating finalization of channel closure");
-                                self.tx_sender.send(Action::CloseChannel(channel, direction)).await
-                            }
-                            _ => Err(ClosureTimeHasNotElapsed(
-                                channel
-                                    .remaining_closure_time(current_time())
-                                    .expect("impossible: closure time has not passed but no remaining closure time")
-                                    .as_secs(),
-                            )),
-                        }
-                    }
-                    ChannelStatus::Open => {
-                        if redeem_before_close && direction == ChannelDirection::Incoming {
-                            // TODO: trigger aggregation
-                            // Do not await the redemption, just submit it to the queue
-                            let redeemed = self.redeem_tickets_in_channel(&channel, false).await?.len();
-                            info!(count = redeemed, %channel, "redeemed tickets before channel closing");
-                        }
-
-                        info!(%channel, ?direction, "initiating channel closure");
+        match channel.status {
+            ChannelStatus::Closed => Err(ChannelAlreadyClosed),
+            ChannelStatus::PendingToClose(_) => {
+                let remaining_closure_time = channel.remaining_closure_time(current_time());
+                info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
+                match remaining_closure_time {
+                    Some(Duration::ZERO) => {
+                        info!(%channel, %direction, "initiating finalization of channel closure");
                         self.tx_sender.send(Action::CloseChannel(channel, direction)).await
                     }
+                    _ => Err(ClosureTimeHasNotElapsed(
+                        channel
+                            .remaining_closure_time(current_time())
+                            .expect("impossible: closure time has not passed but no remaining closure time")
+                            .as_secs(),
+                    )),
                 }
             }
-            None => Err(ChannelDoesNotExist),
+            ChannelStatus::Open => {
+                info!(%channel, ?direction, "initiating channel closure");
+                self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+            }
         }
     }
 }
@@ -242,9 +177,10 @@ mod tests {
     };
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
+    use hopr_db_node::HoprNodeDb;
     use hopr_db_sql::{
-        HoprDbGeneralModelOperations, api::info::DomainSeparator, channels::HoprDbChannelOperations, db::HoprDb,
-        errors::DbSqlError, info::HoprDbInfoOperations,
+        HoprDbGeneralModelOperations, HoprIndexerDb, channels::HoprDbChannelOperations, errors::DbSqlError,
+        info::HoprDbInfoOperations, prelude::DomainSeparator,
     };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -273,7 +209,7 @@ mod tests {
     }
 
     async fn init_db(
-        db: &HoprDb,
+        db: &HoprIndexerDb,
         safe_balance: HoprBalance,
         safe_allowance: HoprBalance,
         channel: Option<ChannelEntry>,
@@ -286,7 +222,6 @@ mod tests {
                 Box::pin(async move {
                     db_clone.set_safe_hopr_allowance(Some(tx), safe_allowance).await?;
                     db_clone.set_safe_hopr_balance(Some(tx), safe_balance).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
                     db_clone
                         .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
                         .await?;
@@ -306,7 +241,8 @@ mod tests {
         let stake: HoprBalance = 10_u32.into();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), None).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
@@ -330,12 +266,12 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
 
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move { tx_queue.start().await });
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
         let tx_res = actions.open_channel(*BOB, stake).await?.await?;
 
@@ -358,17 +294,18 @@ mod tests {
 
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel)).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -389,17 +326,18 @@ mod tests {
     async fn test_should_not_open_channel_to_self() -> anyhow::Result<()> {
         let stake = 10_u32.into();
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -417,17 +355,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_open_channel_with_too_big_stake() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, U256::max_value().into(), U256::max_value().into(), None).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -447,17 +386,18 @@ mod tests {
     async fn test_should_not_open_if_not_enough_allowance() -> anyhow::Result<()> {
         let stake = 10_000_u32.into();
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -477,17 +417,18 @@ mod tests {
     async fn test_should_not_open_if_not_enough_token_balance() -> anyhow::Result<()> {
         let stake = 10_000_u32.into();
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 1_u64.into(), 10_000_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -509,7 +450,8 @@ mod tests {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel)).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
@@ -531,13 +473,13 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
         let tx_res = actions.fund_channel(channel.get_id(), stake).await?.await?;
 
@@ -564,17 +506,18 @@ mod tests {
             U256::zero(),
         );
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, U256::max_value().into(), U256::max_value().into(), Some(channel)).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
@@ -594,17 +537,18 @@ mod tests {
     async fn test_should_not_fund_nonexistent_channel() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&ALICE, &BOB);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
         let stake = 10_u32.into();
         assert!(
             matches!(
@@ -624,17 +568,18 @@ mod tests {
     async fn test_should_not_fund_if_not_enough_allowance() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&ALICE, &BOB);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
         let stake = 10_000_u32.into();
         assert!(
             matches!(
@@ -654,17 +599,18 @@ mod tests {
     async fn test_should_not_fund_if_not_enough_balance() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&ALICE, &BOB);
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 1_u64.into(), 100_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
         let stake = 10_000_u32.into();
         assert!(
             matches!(
@@ -687,7 +633,8 @@ mod tests {
 
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
@@ -732,18 +679,15 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
-            .await?
-            .await?;
+        let tx_res = actions.close_channel(channel.clone()).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -760,10 +704,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
-            .await?
-            .await?;
+        let tx_res = actions.close_channel(channel.clone()).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -784,7 +725,8 @@ mod tests {
 
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
@@ -807,18 +749,15 @@ mod tests {
                 .boxed())
             });
 
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Incoming, false)
-            .await?
-            .await?;
+        let tx_res = actions.close_channel(channel.clone()).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -845,22 +784,23 @@ mod tests {
             U256::zero(),
         );
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel(channel.clone())
                     .await
                     .err()
                     .expect("should be an error"),
@@ -872,25 +812,31 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_should_not_close_nonexistent_channel() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+    async fn test_should_not_close_foreign_channel() -> anyhow::Result<()> {
+        let channel = ChannelEntry::new(
+            Address::from([0x01; 20]),
+            Address::from([0x02; 20]),
+            10_u32.into(),
+            U256::zero(),
+            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
+            U256::zero(),
+        );
+
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
-                actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
-                    .await
-                    .err()
-                    .expect("should be an error"),
+                actions.close_channel(channel).await.err().expect("should be an error"),
                 ChainActionsError::ChannelDoesNotExist
             ),
             "should fail when channel does not exist"
@@ -903,22 +849,23 @@ mod tests {
         let stake = 10_u32.into();
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE_KP.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
 
         let tx_queue = ActionQueue::new(
-            db.clone(),
+            node_db.clone(),
             MockActionState::new(),
             MockTransactionExecutor::new(),
             Default::default(),
         );
 
-        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_queue.new_sender());
 
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel(channel.clone())
                     .await
                     .err()
                     .expect("should be an error"),

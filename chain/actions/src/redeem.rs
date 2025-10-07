@@ -24,25 +24,19 @@
 //! the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent). by the Indexer.
 use async_trait::async_trait;
 use futures::StreamExt;
+use hopr_api::db::{HoprDbTicketOperations, TicketSelector};
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::{
-    api::{
-        info::DomainSeparator,
-        tickets::{HoprDbTicketOperations, TicketSelector},
-    },
-    channels::HoprDbChannelOperations,
-    prelude::HoprDbInfoOperations,
-};
+use hopr_db_sql::prelude::{HoprDbChannelOperations, HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use crate::{
     ChainActions,
     action_queue::PendingAction,
     errors::{
-        ChainActionsError::{ChannelDoesNotExist, InvalidState, OldTicket, WrongTicketState},
+        ChainActionsError,
+        ChainActionsError::{ChannelDoesNotExist, NodeDbError, OldTicket, WrongTicketState},
         Result,
     },
 };
@@ -52,26 +46,9 @@ lazy_static::lazy_static! {
     static ref EMPTY_TX_HASH: Hash = Hash::default();
 }
 
-/// Gathers all the ticket redemption-related on-chain calls.
+/// Gathers all the ticket-redemption-related on-chain calls.
 #[async_trait]
 pub trait TicketRedeemActions {
-    /// Redeems all redeemable tickets in all channels.
-    async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>>;
-
-    /// Redeems all redeemable tickets in the incoming channel from the given counterparty.
-    async fn redeem_tickets_with_counterparty(
-        &self,
-        counterparty: &Address,
-        only_aggregated: bool,
-    ) -> Result<Vec<PendingAction>>;
-
-    /// Redeems all redeemable tickets in the given channel.
-    async fn redeem_tickets_in_channel(
-        &self,
-        channel: &ChannelEntry,
-        only_aggregated: bool,
-    ) -> Result<Vec<PendingAction>>;
-
     /// Redeems all tickets based on the given [`TicketSelector`].
     async fn redeem_tickets(&self, selector: TicketSelector) -> Result<Vec<PendingAction>>;
 
@@ -83,75 +60,21 @@ pub trait TicketRedeemActions {
 #[async_trait]
 impl<Db> TicketRedeemActions for ChainActions<Db>
 where
-    Db: HoprDbChannelOperations + HoprDbTicketOperations + HoprDbInfoOperations + Clone + Send + Sync + std::fmt::Debug,
+    Db: HoprDbTicketOperations + Sync + 'static,
 {
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn redeem_all_tickets(&self, only_aggregated: bool) -> Result<Vec<PendingAction>> {
-        let incoming_channels = self
-            .db
-            .get_channels_via(None, ChannelDirection::Incoming, &self.self_address())
-            .await?;
-        debug!(
-            channel_count = incoming_channels.len(),
-            "starting to redeem all tickets in channels to self"
-        );
-
-        let mut receivers: Vec<PendingAction> = vec![];
-
-        // Must be synchronous because underlying Ethereum transactions are sequential
-        for incoming_channel in incoming_channels {
-            match self.redeem_tickets_in_channel(&incoming_channel, only_aggregated).await {
-                Ok(mut successful_txs) => {
-                    receivers.append(&mut successful_txs);
-                }
-                Err(e) => {
-                    warn!(
-                        channel = %generate_channel_id(&incoming_channel.source, &incoming_channel.destination),
-                        error = %e,
-                        "Failed to redeem tickets in channel",
-                    );
-                }
-            }
-        }
-
-        Ok(receivers)
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn redeem_tickets_with_counterparty(
-        &self,
-        counterparty: &Address,
-        only_aggregated: bool,
-    ) -> Result<Vec<PendingAction>> {
-        let maybe_channel = self
-            .db
-            .get_channel_by_parties(None, counterparty, &self.self_address(), false)
-            .await?;
-        if let Some(channel) = maybe_channel {
-            self.redeem_tickets_in_channel(&channel, only_aggregated).await
-        } else {
-            Err(ChannelDoesNotExist)
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn redeem_tickets_in_channel(
-        &self,
-        channel: &ChannelEntry,
-        only_aggregated: bool,
-    ) -> Result<Vec<PendingAction>> {
-        self.redeem_tickets(
-            TicketSelector::from(channel)
-                .with_aggregated_only(only_aggregated)
-                .with_index_range(channel.ticket_index.as_u64()..)
-                .with_state(AcknowledgedTicketStatus::Untouched),
-        )
-        .await
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_tickets(&self, selector: TicketSelector) -> Result<Vec<PendingAction>> {
-        let (count_redeemable_tickets, _) = self.db.get_tickets_value(selector.clone()).await?;
+        // Add safeguard so that we do not accidentally try to redeem tickets which
+        // are already in progress of some sort.
+        // Note that the caller is still responsible for taking care of the ticket index range
+        // not being less than the next ticket index on the corresponding channel entry.
+        let selector = selector.with_state(AcknowledgedTicketStatus::Untouched);
+
+        let (count_redeemable_tickets, _) = self
+            .node_db
+            .get_tickets_value(selector.clone())
+            .await
+            .map_err(|e| NodeDbError(e.into()))?;
 
         info!(
             count_redeemable_tickets, %selector,
@@ -164,24 +87,28 @@ where
         }
 
         let channel_dst = self
-            .db
+            .index_db
             .get_indexer_data(None)
             .await?
-            .domain_separator(DomainSeparator::Channel)
-            .ok_or(InvalidState("missing channel dst".into()))?;
+            .channels_dst
+            .ok_or(ChainActionsError::MissingDomainSeparator)?;
 
         let selector_id = selector.to_string();
 
         // Collect here, so we don't hold-up the stream open for too long
-        let redeem_stream = self
-            .db
+        let mut tickets_to_redeem = self
+            .node_db
             .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
-            .await?
+            .await
+            .map_err(|e| NodeDbError(e.into()))?
             .collect::<Vec<_>>()
             .await;
 
+        // Make sure the tickets to be redeemed are sorted by index
+        tickets_to_redeem.sort();
+
         let mut receivers: Vec<PendingAction> = vec![];
-        for ack_ticket in redeem_stream {
+        for ack_ticket in tickets_to_redeem {
             let ticket_id = ack_ticket.to_string();
 
             if let Ok(redeemable) = ack_ticket.into_redeemable(&self.chain_key, &channel_dst) {
@@ -211,7 +138,7 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> Result<PendingAction> {
         if let Some(channel) = self
-            .db
+            .index_db
             .get_channel_by_id(None, &ack_ticket.verified_ticket().channel_id)
             .await?
         {
@@ -229,19 +156,20 @@ where
 
             // Do not hold up the stream open for too long
             let maybe_ticket = self
-                .db
+                .node_db
                 .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::BeingRedeemed)
-                .await?
+                .await
+                .map_err(|e| NodeDbError(e.into()))?
                 .next()
                 .await;
 
             if let Some(ticket) = maybe_ticket {
                 let channel_dst = self
-                    .db
+                    .index_db
                     .get_indexer_data(None)
                     .await?
-                    .domain_separator(DomainSeparator::Channel)
-                    .ok_or(InvalidState("missing channel dst".into()))?;
+                    .channels_dst
+                    .ok_or(ChainActionsError::MissingDomainSeparator)?;
 
                 let redeemable = ticket.into_redeemable(&self.chain_key, &channel_dst)?;
 
@@ -263,9 +191,16 @@ mod tests {
     use hopr_chain_types::chain_events::{ChainEventType::TicketRedeemed, SignificantChainEvent};
     use hopr_crypto_random::{Randomizable, random_bytes};
     use hopr_crypto_types::prelude::*;
+    use hopr_db_node::HoprNodeDb;
     use hopr_db_sql::{
-        HoprDbGeneralModelOperations, TargetDb, api::info::DomainSeparator, db::HoprDb, errors::DbSqlError,
+        HoprDbGeneralModelOperations, HoprIndexerDb,
+        errors::DbSqlError,
         info::HoprDbInfoOperations,
+        prelude::{DomainSeparator, HoprDbChannelOperations},
+    };
+    use hopr_primitive_types::{
+        balance::HoprBalance,
+        prelude::{BytesRepresentable, U256, UnitaryFloatOps},
     };
 
     use super::*;
@@ -280,6 +215,8 @@ mod tests {
         static ref CHARLIE: ChainKeypair = ChainKeypair::from_secret(&hex!("d39a926980d6fa96a9eba8f8058b2beb774bc11866a386e9ddf9dc1152557c26")).expect("lazy static keypair should be constructible");
     }
 
+    const PRICE_PER_PACKET: u128 = 10000000000000000u128; // 0.01 HOPR
+
     fn generate_random_ack_ticket(
         idx: u64,
         counterparty: &ChainKeypair,
@@ -288,24 +225,23 @@ mod tests {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
-        let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
-
-        let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
+        let resp = Response::from_half_keys(&hk1, &hk2)?;
 
         Ok(TicketBuilder::default()
             .addresses(counterparty, &*ALICE)
-            .amount(price_per_packet.div_f64(1.0f64)? * 5u32)
+            .amount(U256::from(PRICE_PER_PACKET).div_f64(1.0f64)? * 5u32)
             .index(idx)
             .index_offset(1)
             .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(channel_epoch)
-            .challenge(challenge)
+            .challenge(resp.to_challenge()?)
             .build_signed(counterparty, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
+            .into_acknowledged(resp))
     }
 
     async fn create_channel_with_ack_tickets(
-        db: HoprDb,
+        db: HoprIndexerDb,
+        node_db: HoprNodeDb,
         ticket_count: usize,
         counterparty: &ChainKeypair,
         channel_epoch: u32,
@@ -336,22 +272,14 @@ mod tests {
             .await?;
 
         let ckp = counterparty.clone();
-        let input_tickets = db
-            .begin_transaction_in_db(TargetDb::Tickets)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let mut input_tickets = Vec::new();
-                    for i in 0..ticket_count {
-                        let ack_ticket = generate_random_ack_ticket(i as u64, &ckp, channel_epoch)
-                            .map_err(|e| hopr_db_sql::errors::DbSqlError::LogicalError(e.to_string()))?;
-                        db.upsert_ticket(Some(tx), ack_ticket.clone()).await?;
-                        input_tickets.push(ack_ticket);
-                    }
-                    Ok::<_, DbSqlError>(input_tickets)
-                })
-            })
-            .await?;
+
+        let mut input_tickets = Vec::new();
+        for i in 0..ticket_count {
+            let ack_ticket = generate_random_ack_ticket(i as u64, &ckp, channel_epoch)
+                .map_err(|e| hopr_db_sql::errors::DbSqlError::LogicalError(e.to_string()))?;
+            node_db.upsert_ticket(ack_ticket.clone()).await?;
+            input_tickets.push(ack_ticket);
+        }
 
         Ok((channel, input_tickets))
     }
@@ -361,13 +289,28 @@ mod tests {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
 
         // All the tickets can be redeemed because they are issued with the same channel epoch
         let (channel_from_bob, bob_tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), ticket_count, &BOB, 4u32).await?;
         let (channel_from_charlie, charlie_tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, 4u32).await?;
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), ticket_count, &CHARLIE, 4u32).await?;
+
+        // Add extra ticket to Charlie that has very low value
+        let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random())?;
+        let low_value_ack_ticket = TicketBuilder::default()
+            .addresses(&*CHARLIE, &*ALICE)
+            .amount(PRICE_PER_PACKET)
+            .index((ticket_count + 1) as u64)
+            .index_offset(1)
+            .win_prob(WinningProbability::ALWAYS)
+            .channel_epoch(4u32)
+            .challenge(resp.to_challenge()?)
+            .build_signed(&CHARLIE, &Hash::default())?
+            .into_acknowledged(resp);
+        node_db.upsert_ticket(low_value_ack_ticket).await?;
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -411,7 +354,7 @@ mod tests {
             .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
-        // and then all Charlie's tickets get redeemed
+        // And then all Charlie's tickets get redeemed except the one that does not meet the minimum value
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count)
@@ -420,15 +363,26 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let confirmations = futures::future::try_join_all(actions.redeem_all_tickets(false).await?.into_iter()).await?;
+        // Make sure that the low value ticket does not pass the min_value check
+        let confirmations = futures::future::try_join_all(
+            actions
+                .redeem_tickets(
+                    TicketSelector::from(&channel_from_bob)
+                        .also_on_channel_entry(&channel_from_charlie)
+                        .with_amount(HoprBalance::from(PRICE_PER_PACKET * 5)..),
+                )
+                .await?
+                .into_iter(),
+        )
+        .await?;
 
         assert_eq!(2 * ticket_count, confirmations.len(), "must have all confirmations");
         assert!(
@@ -436,9 +390,17 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await?;
+        let db_acks_bob = node_db
+            .stream_tickets(Some((&channel_from_bob).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
 
-        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await?;
+        let db_acks_charlie = node_db
+            .stream_tickets(Some((&channel_from_charlie).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
 
         assert!(
             db_acks_bob
@@ -448,9 +410,17 @@ mod tests {
         );
         assert!(
             db_acks_charlie
-                .into_iter()
+                .iter()
+                .take(ticket_count)
                 .all(|tkt| tkt.status == AcknowledgedTicketStatus::BeingRedeemed),
-            "all charlie's tickets must be in BeingRedeemed state"
+            "all valuable charlie's tickets must be in BeingRedeemed state"
+        );
+        assert!(
+            db_acks_charlie
+                .iter()
+                .skip(ticket_count)
+                .all(|tkt| tkt.status == AcknowledgedTicketStatus::Untouched),
+            "all non-valuable charlie's tickets must be in Untouched state"
         );
 
         Ok(())
@@ -461,13 +431,14 @@ mod tests {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 5;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
 
         // All the tickets can be redeemed because they are issued with the same channel epoch
         let (mut channel_from_bob, bob_tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), ticket_count, &BOB, 4u32).await?;
         let (channel_from_charlie, _) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &CHARLIE, 4u32).await?;
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), ticket_count, &CHARLIE, 4u32).await?;
 
         // Tickets with index 0 will be skipped, as that is already past
         channel_from_bob.ticket_index = 1_u32.into();
@@ -503,17 +474,15 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        tokio::task::spawn(async move {
-            tx_queue.start().await;
-        });
+        tokio::task::spawn(tx_queue.start());
 
-        let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
-                .redeem_tickets_with_counterparty(&BOB.public().to_address(), false)
+                .redeem_tickets(TicketSelector::from(&channel_from_bob).with_index_range(1..))
                 .await?
                 .into_iter(),
         )
@@ -526,9 +495,17 @@ mod tests {
             "tx hashes must be equal"
         );
 
-        let db_acks_bob = db.get_tickets((&channel_from_bob).into()).await?;
+        let db_acks_bob = node_db
+            .stream_tickets(Some((&channel_from_bob).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
 
-        let db_acks_charlie = db.get_tickets((&channel_from_charlie).into()).await?;
+        let db_acks_charlie = node_db
+            .stream_tickets(Some((&channel_from_charlie).into()))
+            .await?
+            .collect::<Vec<_>>()
+            .await;
 
         assert!(
             db_acks_bob
@@ -552,21 +529,24 @@ mod tests {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let ticket_count = 3;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
 
         let (channel_from_bob, mut tickets) =
-            create_channel_with_ack_tickets(db.clone(), ticket_count, &BOB, 4u32).await?;
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), ticket_count, &BOB, 4u32).await?;
 
         // Make the first ticket unredeemable
         tickets[0].status = AcknowledgedTicketStatus::BeingAggregated;
         let selector = TicketSelector::from(&tickets[0]).with_no_state();
-        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingAggregated)
+        node_db
+            .update_ticket_states(selector, AcknowledgedTicketStatus::BeingAggregated)
             .await?;
 
         // Make the second ticket unredeemable
         tickets[1].status = AcknowledgedTicketStatus::BeingRedeemed;
         let selector = TicketSelector::from(&tickets[1]).with_no_state();
-        db.update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed)
+        node_db
+            .update_ticket_states(selector, AcknowledgedTicketStatus::BeingRedeemed)
             .await?;
 
         // Expect only the redeemable tickets get redeemed
@@ -593,17 +573,15 @@ mod tests {
         }
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        tokio::task::spawn(async move {
-            tx_queue.start().await;
-        });
+        tokio::task::spawn(tx_queue.start());
 
-        let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
         let confirmations = futures::future::try_join_all(
             actions
-                .redeem_tickets_in_channel(&channel_from_bob, false)
+                .redeem_tickets(TicketSelector::from(&channel_from_bob))
                 .await?
                 .into_iter(),
         )
@@ -633,19 +611,21 @@ mod tests {
     -> anyhow::Result<()> {
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 2;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         // Create 1 ticket in Epoch 4
-        let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 4u32).await?;
+        let (channel_from_bob, mut tickets) =
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), 1, &BOB, 4u32).await?;
 
         // Insert another 2 tickets in Epoch 3
         let ticket = generate_random_ack_ticket(0, &BOB, 3)?;
-        db.upsert_ticket(None, ticket.clone()).await?;
+        node_db.upsert_ticket(ticket.clone()).await?;
         tickets.insert(0, ticket);
 
         let ticket = generate_random_ack_ticket(1, &BOB, 3)?;
-        db.upsert_ticket(None, ticket.clone()).await?;
+        node_db.upsert_ticket(ticket.clone()).await?;
         tickets.insert(1, ticket);
 
         let tickets_clone = tickets.clone();
@@ -675,17 +655,17 @@ mod tests {
         }
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions
-                .redeem_tickets_in_channel(&channel_from_bob, false)
+                .redeem_tickets(TicketSelector::from(&channel_from_bob))
                 .await?
                 .into_iter(),
         )
@@ -703,19 +683,21 @@ mod tests {
     async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() -> anyhow::Result<()> {
         let ticket_count = 3;
         let ticket_from_next_epoch_count = 2;
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         // Create 1 ticket in Epoch 4
-        let (channel_from_bob, mut tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 4u32).await?;
+        let (channel_from_bob, mut tickets) =
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), 1, &BOB, 4u32).await?;
 
         // Insert another 2 tickets in Epoch 5
         let ticket = generate_random_ack_ticket(0, &BOB, 5)?;
-        db.upsert_ticket(None, ticket.clone()).await?;
+        node_db.upsert_ticket(ticket.clone()).await?;
         tickets.insert(0, ticket);
 
         let ticket = generate_random_ack_ticket(1, &BOB, 5)?;
-        db.upsert_ticket(None, ticket.clone()).await?;
+        node_db.upsert_ticket(ticket.clone()).await?;
         tickets.insert(1, ticket);
 
         let tickets_clone = tickets.clone();
@@ -745,17 +727,17 @@ mod tests {
         }
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
         futures::future::join_all(
             actions
-                .redeem_tickets_in_channel(&channel_from_bob, false)
+                .redeem_tickets(TicketSelector::from(&channel_from_bob))
                 .await?
                 .into_iter(),
         )
@@ -773,10 +755,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_redeem_single_ticket() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let (channel_from_bob, tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 1u32).await?;
+        let (channel_from_bob, tickets) =
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), 1, &BOB, 1u32).await?;
 
         let ticket = tickets.into_iter().next().unwrap();
 
@@ -802,23 +786,24 @@ mod tests {
             });
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
         let confirmation = actions.redeem_ticket(ticket).await?.await?;
 
         assert_eq!(confirmation.tx_hash, random_hash);
 
         assert!(
-            db.get_tickets((&channel_from_bob).into())
+            node_db
+                .stream_tickets(Some((&channel_from_bob).into()))
                 .await?
-                .into_iter()
-                .all(|tkt| tkt.status == AcknowledgedTicketStatus::BeingRedeemed),
+                .all(|tkt| futures::future::ready(tkt.status == AcknowledgedTicketStatus::BeingRedeemed))
+                .await,
             "all bob's tickets must be in BeingRedeemed state"
         );
 
@@ -827,10 +812,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_redeem_single_ticket_with_lower_index_than_channel_index() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprIndexerDb::new_in_memory(ALICE.clone()).await?;
+        let node_db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
-        let (mut channel_from_bob, tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 1u32).await?;
+        let (mut channel_from_bob, tickets) =
+            create_channel_with_ack_tickets(db.clone(), node_db.clone(), 1, &BOB, 1u32).await?;
 
         channel_from_bob.ticket_index = 2_u32.into();
         db.upsert_channel(None, channel_from_bob).await?;
@@ -859,13 +846,13 @@ mod tests {
             });
 
         // Start the ActionQueue with the mock TransactionExecutor
-        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_queue = ActionQueue::new(node_db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
-        let actions = ChainActions::new(&ALICE, db.clone(), tx_sender.clone());
+        let actions = ChainActions::new(&ALICE, db.clone(), node_db.clone(), tx_sender.clone());
 
         assert!(matches!(actions.redeem_ticket(ticket).await, Err(OldTicket)));
 

@@ -75,23 +75,26 @@ mod capture;
 
 use std::{collections::HashMap, time::Duration};
 
-use futures::{SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
+use hopr_api::{
+    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
+    db::{HoprDbProtocolOperations, IncomingPacket},
+};
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::{HalfKey, OffchainPublicKey};
-use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
 use hopr_internal_types::{
     prelude::{Acknowledgement, HoprPseudonym},
     protocol::VerifiedAcknowledgement,
 };
 use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_protocol_app::prelude::ApplicationData;
-use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
+use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
+use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use tracing::{Instrument, error, trace, warn};
+use tracing::Instrument;
 
-use crate::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
-pub use crate::{processor::DEFAULT_PRICE_PER_PACKET, timer::execute_on_tick};
+use crate::processor::{PacketUnwrapping, PacketWrapping};
+pub use crate::timer::execute_on_tick;
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 const SLOW_OP_MS: u128 = 150;
@@ -106,28 +109,17 @@ pub const ACK_OUT_BUFFER_SIZE: usize = 1_000_000;
 pub const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
-use hopr_protocol_app::v1::ApplicationFlags;
-
-#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     // packet
-    static ref METRIC_PACKET_COUNT: MultiCounter = MultiCounter::new(
+    static ref METRIC_PACKET_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
         "hopr_packets_count",
         "Number of processed packets of different types (sent, received, forwarded)",
         &["type"]
     ).unwrap();
-    static ref METRIC_PACKET_COUNT_PER_PEER: MultiCounter = MultiCounter::new(
-        "hopr_packets_per_peer_count",
-        "Number of processed packets to/from distinct peers",
-        &["peer", "direction"]
-    ).unwrap();
-    static ref METRIC_REPLAYED_PACKET_COUNT: SimpleCounter = SimpleCounter::new(
+    static ref METRIC_REPLAYED_PACKET_COUNT: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
         "hopr_replayed_packet_count",
         "The total count of replayed packets during the packet processing pipeline run",
     ).unwrap();
-    static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
-        SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -142,8 +134,6 @@ pub enum ProtocolProcesses {
     TicketAck,
     #[strum(to_string = "HOPR [msg] - mixer")]
     Mixer,
-    #[strum(to_string = "bloom filter persistence (periodic)")]
-    BloomPersist,
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,
@@ -169,26 +159,24 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
-/// overlayed on top of the `wire_msg` Stream or Sink.
+/// overlay on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
-pub async fn run_msg_ack_protocol<Db>(
+pub async fn run_msg_ack_protocol<Db, R>(
     packet_cfg: processor::PacketInteractionConfig,
     db: Db,
-    bloom_filter_persistent_path: Option<String>,
+    resolver: R,
     wire_msg: (
         impl futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + Sync + 'static,
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
     ),
     api: (
-        impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
-        impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
-        + Send
-        + Sync
-        + 'static,
+        impl futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
+        impl futures::Stream<Item = (ApplicationDataOut, ResolvedTransportRouting)> + Send + Sync + 'static,
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
-    Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+    Db: HoprDbProtocolOperations + Clone + Send + Sync + 'static,
+    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Clone + Send + Sync + 'static,
 {
     let me = packet_cfg.packet_keypair.clone();
 
@@ -201,9 +189,7 @@ where
     {
         // Initialize the lazy statics here
         lazy_static::initialize(&METRIC_PACKET_COUNT);
-        lazy_static::initialize(&METRIC_PACKET_COUNT_PER_PEER);
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
-        lazy_static::initialize(&METRIC_REJECTED_TICKETS_COUNT);
     }
 
     #[cfg(feature = "capture")]
@@ -215,17 +201,17 @@ where
                     .map_err(std::io::Error::other)
                     .and_then(capture::UdpPacketDump::new)
                 {
-                    warn!("udp packet capture initialized to {desc}");
+                    tracing::warn!("udp packet capture initialized to {desc}");
                     Box::new(udp_writer)
                 } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
-                    warn!("pcap file packet capture initialized to {desc}");
+                    tracing::warn!("pcap file packet capture initialized to {desc}");
                     Box::new(pcap_writer)
                 } else {
-                    error!(desc, "failed to create packet capture: invalid socket address or file");
+                    tracing::error!(desc, "failed to create packet capture: invalid socket address or file");
                     Box::new(capture::NullWriter)
                 }
             } else {
-                warn!("no packet capture specified");
+                tracing::warn!("no packet capture specified");
                 Box::new(capture::NullWriter)
             };
         let (capture, ah) = capture::packet_capture_channel(writer);
@@ -233,49 +219,34 @@ where
         capture
     };
 
-    let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
-        let tbf = WrappedTagBloomFilter::new(bloom_filter_persistent_path);
-        let tbf_2 = tbf.clone();
-        processes.insert(
-            ProtocolProcesses::BloomPersist,
-            spawn_as_abortable!(Box::pin(execute_on_tick(
-                std::time::Duration::from_secs(90),
-                move || {
-                    let tbf_clone = tbf_2.clone();
-
-                    async move { tbf_clone.save().await }
-                },
-                "persisting the bloom filter to disk".into(),
-            ))),
-        );
-        tbf
-    } else {
-        WrappedTagBloomFilter::new("no_tbf".into())
-    };
+    let tbf = std::sync::Arc::new(parking_lot::Mutex::new(TagBloomFilter::default()));
 
     let (ticket_ack_tx, ticket_ack_rx) =
         futures::channel::mpsc::channel::<(Acknowledgement, OffchainPublicKey)>(TICKET_ACK_BUFFER_SIZE);
 
     let db_clone = db.clone();
+    let resolver_clone = resolver.clone();
     processes.insert(
         ProtocolProcesses::TicketAck,
         spawn_as_abortable!(ticket_ack_rx
             .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(ack, sender)| {
                 let db = db_clone.clone();
+                let resolver = resolver_clone.clone();
                 async move {
                     if let Ok(verified) = hopr_parallelize::cpu::spawn_blocking(move || ack.verify(&sender)).await {
-                        trace!(%sender, "received a valid acknowledgement");
-                            match db.handle_acknowledgement(verified).await {
-                                Ok(_) => trace!(%sender, "successfully processed a known acknowledgement"),
+                        tracing::trace!(%sender, "received a valid acknowledgement");
+                            match db.handle_acknowledgement(verified, &resolver).await {
+                                Ok(_) => tracing::trace!(%sender, "successfully processed a known acknowledgement"),
                                 // Eventually, we do not care here if the acknowledgement does not belong to any
                                 // unacknowledged packets.
-                                Err(error) => trace!(%sender, %error, "valid acknowledgement is unknown or error occurred while processing it"),
+                                Err(error) => tracing::trace!(%sender, %error, "valid acknowledgement is unknown or error occurred while processing it"),
                             }
                     } else {
-                        error!(%sender, "failed to verify signature on acknowledgement");
+                        tracing::error!(%sender, "failed to verify signature on acknowledgement");
                     }
                 }
-            }))
+            })
+            .inspect(|_| tracing::warn!(task = "transport (protocol - ticket acknowledgement)", "long-running background task finished")))
     );
 
     let (ack_out_tx, ack_out_rx) =
@@ -285,69 +256,81 @@ where
     let capture_clone = capture.clone();
 
     let db_clone = db.clone();
+    let resolver_clone = resolver.clone();
     let me_clone = me.clone();
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
         ProtocolProcesses::AckOut,
-        spawn_as_abortable!(ack_out_rx.for_each_concurrent(
-            NUM_CONCURRENT_ACK_OUT_PROCESSING,
-            move |(maybe_ack_key, destination)| {
-                let db = db_clone.clone();
-                let me = me_clone.clone();
-                let mut msg_to_send_tx_clone = msg_to_send_tx.clone();
+        spawn_as_abortable!(
+            ack_out_rx
+                .for_each_concurrent(
+                    NUM_CONCURRENT_ACK_OUT_PROCESSING,
+                    move |(maybe_ack_key, destination)| {
+                        let db = db_clone.clone();
+                        let resolver = resolver_clone.clone();
+                        let me = me_clone.clone();
+                        let mut msg_to_send_tx_clone = msg_to_send_tx.clone();
 
-                #[cfg(feature = "capture")]
-                let mut capture = capture_clone.clone();
-                async move {
-                    #[cfg(feature = "capture")]
-                    let (is_random, me_pub) = (
-                        maybe_ack_key.is_none(),
-                        *hopr_crypto_types::keypairs::Keypair::public(&me),
-                    );
+                        #[cfg(feature = "capture")]
+                        let mut capture = capture_clone.clone();
+                        async move {
+                            #[cfg(feature = "capture")]
+                            let (is_random, me_pub) = (
+                                maybe_ack_key.is_none(),
+                                *hopr_crypto_types::keypairs::Keypair::public(&me),
+                            );
 
-                    // Sign acknowledgement with the given half-key or generate a signed random one
-                    let ack = hopr_parallelize::cpu::spawn_blocking(move || {
-                        maybe_ack_key
-                            .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &me))
-                            .unwrap_or_else(|| VerifiedAcknowledgement::random(&me))
-                    })
-                    .await;
-
-                    #[cfg(feature = "capture")]
-                    let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
-                        me: me_pub,
-                        ack,
-                        is_random,
-                        next_hop: destination,
-                    }
-                    .into();
-
-                    match db.to_send_no_ack(ack.leak().as_ref().into(), destination).await {
-                        Ok(ack_packet) => {
-                            let now = std::time::Instant::now();
-                            if msg_to_send_tx_clone
-                                .send((ack_packet.next_hop.into(), ack_packet.data))
-                                .await
-                                .is_err()
-                            {
-                                error!("failed to forward an acknowledgement to the transport layer");
-                            }
-                            let elapsed = now.elapsed();
-                            if elapsed.as_millis() > SLOW_OP_MS {
-                                warn!(?elapsed, " msg_to_send_tx.send on ack took too long");
-                            }
+                            // Sign acknowledgement with the given half-key or generate a signed random one
+                            let ack = hopr_parallelize::cpu::spawn_blocking(move || {
+                                maybe_ack_key
+                                    .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &me))
+                                    .unwrap_or_else(|| VerifiedAcknowledgement::random(&me))
+                            })
+                            .await;
 
                             #[cfg(feature = "capture")]
-                            let _ = capture.try_send(captured_packet);
+                            let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
+                                me: me_pub,
+                                ack,
+                                is_random,
+                                next_hop: destination,
+                            }
+                            .into();
+
+                            match db
+                                .to_send_no_ack(ack.leak().as_ref().into(), destination, &resolver)
+                                .await
+                            {
+                                Ok(ack_packet) => {
+                                    let now = std::time::Instant::now();
+                                    if msg_to_send_tx_clone
+                                        .send((ack_packet.next_hop.into(), ack_packet.data))
+                                        .await
+                                        .is_err()
+                                    {
+                                        tracing::error!("failed to forward an acknowledgement to the transport layer");
+                                    }
+                                    let elapsed = now.elapsed();
+                                    if elapsed.as_millis() > SLOW_OP_MS {
+                                        tracing::warn!(?elapsed, " msg_to_send_tx.send on ack took too long");
+                                    }
+
+                                    #[cfg(feature = "capture")]
+                                    let _ = capture.try_send(captured_packet);
+                                }
+                                Err(error) => tracing::error!(%error, "failed to create ack packet"),
+                            }
                         }
-                        Err(error) => tracing::error!(%error, "failed to create ack packet"),
                     }
-                }
-            }
-        )),
+                )
+                .inspect(|_| tracing::warn!(
+                    task = "transport (protocol - ack outgoing)",
+                    "long-running background task finished"
+                ))
+        ),
     );
 
-    let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);
+    let msg_processor_read = processor::PacketProcessor::new(db.clone(), resolver.clone(), packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
 
     #[cfg(feature = "capture")]
@@ -359,7 +342,7 @@ where
         spawn_as_abortable!(async move {
             let _neverending = api
                 .1
-                .then_concurrent(|(data, routing, finalizer)| {
+                .then_concurrent(|(data, routing)| {
                     let msg_processor = msg_processor_write.clone();
 
                     #[cfg(feature = "capture")]
@@ -371,10 +354,8 @@ where
                             Ok(v) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
-                                    METRIC_PACKET_COUNT_PER_PEER.increment(&[&v.next_hop.to_string(), "out"]);
                                     METRIC_PACKET_COUNT.increment(&["sent"]);
                                 }
-                                finalizer.finalize(Ok(()));
 
                                 #[cfg(feature = "capture")]
                                 let _ = capture_clone.try_send(
@@ -383,9 +364,9 @@ where
                                         next_hop: v.next_hop,
                                         num_surbs,
                                         is_forwarded: false,
-                                        data: data_clone.to_bytes().into_vec().into(),
+                                        data: data_clone.data.to_bytes().into_vec().into(),
                                         ack_challenge: v.ack_challenge.as_ref().into(),
-                                        signals: data_clone.flags.bits(),
+                                        signals: data_clone.packet_info.unwrap_or_default().signals_to_destination,
                                         ticket: inspect_ticket_data_in_packet(&v.data).into(),
                                     }
                                     .into(),
@@ -393,18 +374,24 @@ where
 
                                 Some((v.next_hop.into(), v.data))
                             }
-                            Err(e) => {
-                                finalizer.finalize(Err(e));
+                            Err(error) => {
+                                tracing::error!(%error, "packet could not be wrapped for sending");
                                 None
                             }
                         }
                     }
                 })
                 .filter_map(futures::future::ready)
-                .inspect(|(peer, _)| trace!(%peer, "protocol message out"))
+                .inspect(|(peer, _)| tracing::trace!(%peer, "protocol message out"))
                 .map(Ok)
                 .forward(msg_to_send_tx)
-                .instrument(tracing::trace_span!("msg protocol processing - outgoing"))
+                .instrument(tracing::trace_span!("msg protocol processing - egress"))
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = "transport (protocol - msg egress)",
+                        "long-running background task finished"
+                    )
+                })
                 .await;
         }),
     );
@@ -431,7 +418,7 @@ where
                     let mut ack_out_tx = ack_out_tx_clone_1.clone();
                     let peer_id_key_cache = peer_id_cache.clone();
 
-                    trace!(%peer, "protocol message in");
+                    tracing::trace!(%peer, "protocol message in");
 
                     #[cfg(feature = "capture")]
                     let (mut capture_clone, ticket_data_clone) = (
@@ -447,36 +434,39 @@ where
                             Ok(peer) => peer,
                             Err(error) => {
                                 // There absolutely nothing we can do when the peer id is unparseable (e.g., non-ed25519 based)
-                                error!(%peer, %error, "dropping packet - cannot convert peer id");
+                                tracing::error!(%peer, %error, "dropping packet - cannot convert peer id");
                                 return None;
                             }
                         };
 
                         let now = std::time::Instant::now();
-                        let res = msg_processor.recv(peer_key, data).await.map_err(move |e| (peer, e));
+                        let res = msg_processor.recv(peer_key, data).await;
                         let elapsed = now.elapsed();
                         if elapsed.as_millis() > SLOW_OP_MS {
-                            warn!(%peer, ?elapsed, "msg_processor.recv took too long");
+                            tracing::warn!(%peer, ?elapsed, "msg_processor.recv took too long");
                         }
 
                         // If there was an error caused by interpretation of the packet data,
                         // we must send a random acknowledgement back.
-                        if let Err((peer, error)) = &res {
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            if let hopr_crypto_packet::errors::PacketError::TicketValidation(_) = error {
-                                METRIC_REJECTED_TICKETS_COUNT.increment();
-                            }
-
-                            error!(%peer, %error, "failed to process the received message");
+                        if let Err(error) = &res {
+                            tracing::error!(%peer, %error, "failed to process the received packet");
 
                             // Send random signed acknowledgement to give feedback to the sender
-                            let now = std::time::Instant::now();
-                            if let Err(error) = ack_out_tx.send((None, peer_key)).await {
-                                tracing::error!(%error, "failed to send ack to the egress queue");
-                            }
-                            let elapsed = now.elapsed();
-                            if elapsed.as_millis() > SLOW_OP_MS {
-                                warn!(%peer, ?elapsed, "ack_out.send on failed packet took too long");
+                            if error.is_undecodable() {
+                                // Do not send an ack back if the packet could not be decoded at all
+                                // 
+                                // Potentially adversarial behavior
+                                tracing::trace!(%peer, "not sending ack back on undecodable packet - possible adversarial behavior");
+                            } else {
+                                let now = std::time::Instant::now();
+
+                                if let Err(error) = ack_out_tx.send((None, peer_key)).await {
+                                    tracing::error!(%error, "failed to send ack to the egress queue");
+                                }
+                                let elapsed = now.elapsed();
+                                if elapsed.as_millis() > SLOW_OP_MS {
+                                    tracing::warn!(%peer, ?elapsed, "ack_out.send on failed packet took too long");
+                                }
                             }
                         }
 
@@ -496,29 +486,31 @@ where
                 .filter_map(move |maybe_packet| {
                     let tbf = tbf.clone();
 
-                    async move {
-                    if let Some(packet) = maybe_packet {
-                        match packet {
-                            IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
-                            IncomingPacket::Final { packet_tag, previous_hop,.. } |
-                            IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
-                                if tbf.is_tag_replay(&packet_tag).await {
-                                    warn!(%previous_hop, "replayed packet received");
+                    futures::future::ready(
+                        if let Some(packet) = maybe_packet {
+                            match packet {
+                                IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
+                                IncomingPacket::Final { packet_tag, previous_hop,.. } |
+                                IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
+                                    // This operation has run-time of ~10 nanoseconds,
+                                    // and therefore does not need to be invoked via spawn_blocking
+                                    if tbf.lock().check_and_set(&packet_tag) {
+                                        tracing::warn!(%previous_hop, "replayed packet received");
 
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_REPLAYED_PACKET_COUNT.increment();
+                                        #[cfg(all(feature = "prometheus", not(test)))]
+                                        METRIC_REPLAYED_PACKET_COUNT.increment();
 
-                                    None
-                                } else {
-                                    Some(packet)
+                                        None
+                                    } else {
+                                        Some(packet)
+                                    }
                                 }
                             }
+                        } else {
+                            tracing::trace!("received empty packet");
+                            None
                         }
-                    } else {
-                        trace!("received empty packet");
-                        None
-                    }
-                }
+                    )
                 })
                 .then_concurrent(move |packet| {
                     let mut msg_to_send_tx = wire_msg.0.clone();
@@ -536,14 +528,18 @@ where
                             ack,
                             ..
                         } => {
-                            trace!(%previous_hop, "acknowledging ticket using received ack");
+                            tracing::trace!(%previous_hop, "acknowledging ticket using received ack");
                             let now = std::time::Instant::now();
                             if let Err(error) = ticket_ack_tx_clone.send((ack, previous_hop)).await {
                                 tracing::error!(%error, "failed dispatching received acknowledgement to the ticket ack queue");
                             }
                             let elapsed = now.elapsed();
                             if elapsed.as_millis() > SLOW_OP_MS {
-                                warn!(?elapsed," ack_tx.send took too long");
+                                tracing::warn!(?elapsed," ack_tx.send took too long");
+                            }
+                            let elapsed = now.elapsed();
+                            if elapsed.as_millis() > SLOW_OP_MS {
+                                tracing::warn!(%previous_hop, ?elapsed, "ack_processor.handle_acknowledgement took too long");
                             }
 
                             // We do not acknowledge back acknowledgements.
@@ -554,27 +550,26 @@ where
                             sender,
                             plain_text,
                             ack_key,
-                            signals,
+                            info,
                             ..
                         } => {
                             // Send acknowledgement back
-                            trace!(%previous_hop, "acknowledging final packet back");
+                            tracing::trace!(%previous_hop, "acknowledging final packet back");
                             let now = std::time::Instant::now();
                             if let Err(error) = ack_out_tx.send((Some(ack_key), previous_hop)).await {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             }
                             let elapsed = now.elapsed();
                             if elapsed.as_millis() > SLOW_OP_MS {
-                                warn!(%previous_hop, ?elapsed, "ack_out.send on final packet took too long");
+                                tracing::warn!(%previous_hop, ?elapsed, "ack_out.send on final packet took too long");
                             }
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
-                                METRIC_PACKET_COUNT_PER_PEER.increment(&[&previous_hop.to_string(), "in"]);
                                 METRIC_PACKET_COUNT.increment(&["received"]);
                             }
 
-                            Some((sender, plain_text, signals))
+                            Some((sender, plain_text, info))
                         }
                         IncomingPacket::Forwarded {
                             previous_hop,
@@ -584,7 +579,8 @@ where
                             ..
                         } => {
                             // First, relay the packet to the next hop
-                            trace!(%previous_hop, %next_hop, "forwarding packet to the next hop");
+                            tracing::trace!(%previous_hop, %next_hop, "forwarding packet to the next hop");
+
                             #[cfg(feature = "capture")]
                             let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingPacket {
                                 me: me_pub,
@@ -593,7 +589,7 @@ where
                                 is_forwarded: true,
                                 data: data.as_ref().into(),
                                 ack_challenge: Default::default(),
-                                signals: 0,
+                                signals: None.into(),
                                 ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
                             }.into();
 
@@ -601,7 +597,7 @@ where
                                 .send((next_hop.into(), data))
                                 .await
                                 .unwrap_or_else(|_| {
-                                    error!("failed to forward a packet to the transport layer");
+                                    tracing::error!("failed to forward a packet to the transport layer");
                                 });
 
                             #[cfg(all(feature = "prometheus", not(test)))]
@@ -613,33 +609,38 @@ where
                             let _ = capture_clone.try_send(captured_packet);
 
                              // Send acknowledgement back
-                            trace!(%previous_hop, "acknowledging forwarded packet back");
+                            tracing::trace!(%previous_hop, "acknowledging forwarded packet back");
                             let now = std::time::Instant::now();
                             if let Err(error) = ack_out_tx.send((Some(ack_key), previous_hop)).await {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             }
                             let elapsed = now.elapsed();
                             if elapsed.as_millis() > SLOW_OP_MS {
-                                warn!(%previous_hop, ?elapsed, "ack_out.send on forwarded packet took too long");
+                                tracing::warn!(%previous_hop, ?elapsed, "ack_out.send on forwarded packet took too long");
                             }
 
                             None
                         }
                     }
                 }})
-                .filter_map(|maybe_data| async move {
-                    if let Some((sender, data, flags)) = maybe_data {
-                        ApplicationData::from_bytes(data.as_ref())
-                            .inspect_err(|error| tracing::error!(%error, "failed to decode application data"))
+                .filter_map(|maybe_data| futures::future::ready(
+                    // Create the ApplicationDataIn data structure for incoming data
+                    maybe_data
+                        .and_then(|(sender, data, aux_info)| ApplicationData::try_from(data.as_ref())
+                            .inspect_err(|error| tracing::error!(%sender, %error, "failed to decode application data"))
                             .ok()
-                            .map(|data| (sender, data.with_flags(ApplicationFlags::new_truncated(flags))))
-                    } else {
-                        None
-                    }
-                })
+                            .map(|data| (sender, ApplicationDataIn {
+                                data,
+                                packet_info: IncomingPacketInfo {
+                                    signals_from_sender: aux_info.packet_signals,
+                                    num_saved_surbs: aux_info.num_surbs,
+                                }
+                            })))
+                ))
                 .map(Ok)
                 .forward(api.0)
-                .instrument(tracing::trace_span!("msg protocol processing - incoming"))
+                .instrument(tracing::trace_span!("msg protocol processing - ingress"))
+                .inspect(|_| tracing::warn!(task = "transport (protocol - msg ingress)", "long-running background task finished"))
                 .await;
         }),
     );
