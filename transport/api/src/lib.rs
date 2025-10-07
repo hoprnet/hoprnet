@@ -64,6 +64,7 @@ use hopr_transport_probe::{
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig, SendMsgInput};
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
+pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
