@@ -43,7 +43,7 @@
         "node_stake_v2_factory": "0xFb22ecEe9Fb5b91C096d34649892ECC509912684",
         "ticket_price_oracle": "0x624af123A0149670848FA95e972b35FFeE6A48Fb",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-        "winning_probability_oracle": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1"
+        "winning_probability_oracle": "0xC15675d4CCa538D91a91a8D3EcFBB8499C3B0471"
       },
       "environment_type": "staging",
       "indexer_start_block_number": 29521261
@@ -89,9 +89,9 @@
         "network_registry": "0x582b4b586168621dAf83bEb2AeADb5fb20F8d50d",
         "network_registry_proxy": "0x2bc6b78B0aA892e97714F0e3b1c74487f92C5884",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-        "node_stake_v2_factory": "0x098B275485c406573D042848D66eb9d63fca311C",
+        "node_stake_v2_factory": "0x048D04C9f5F74d65e76626B943779DEC6EdCEFeC",
         "node_safe_registry": "0xe15C24a0910311c83aC78B5930d771089E93077b",
-        "module_implementation": "0xB7397C218766eBe6A1A634df523A1a7e412e67eA",
+        "module_implementation": "0x3f59B44bFF48427373dB13504C2830Ada2d600a3",
         "ticket_price_oracle": "0xcA5656Fe6F2d847ACA32cf5f38E51D2054cA1273",
         "winning_probability_oracle": "0x7Eb8d762fe794A108e568aD2097562cc5D3A1359"
       }
