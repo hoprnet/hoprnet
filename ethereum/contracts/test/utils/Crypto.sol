@@ -18,7 +18,6 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
         address dest;
         uint256 amount;
         uint256 maxTicketIndex;
-        uint256 indexOffset;
         uint256 epoch;
         uint256 winProb;
         uint256 porSecret;
@@ -39,20 +38,18 @@ abstract contract CryptoUtils is Test, HoprCrypto, SECP2561k {
             channelId,
             HoprChannelsType.Balance.wrap(uint96(args.amount)),
             HoprChannelsType.TicketIndex.wrap(uint48(args.maxTicketIndex)),
-            HoprChannelsType.TicketIndexOffset.wrap(uint32(args.indexOffset)),
             HoprChannelsType.ChannelEpoch.wrap(uint24(args.epoch)),
             HoprChannelsType.WinProb.wrap(uint56(args.winProb))
         );
 
         address challenge = HoprCrypto.scalarTimesBasepoint(args.porSecret);
 
-        uint256 secondPart = (args.amount << 160) | (args.maxTicketIndex << 112) | (args.indexOffset << 80)
-            | (args.epoch << 56) | args.winProb;
+        uint256 secondPart = (args.amount << 128) | (args.maxTicketIndex << 80) | (args.epoch << 56) | args.winProb;
 
         // Deviates from EIP712 due to computed property and non-standard struct property encoding
         bytes32 hashStruct = keccak256(
             abi.encode(
-                HoprChannels.redeemTicket.selector, keccak256(abi.encodePacked(channelId, secondPart, challenge))
+                HoprChannels.redeemTicket.selector, keccak256(abi.encodePacked(channelId, uint224(secondPart), challenge))
             )
         );
 

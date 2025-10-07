@@ -1263,7 +1263,6 @@ contract HoprNodeManagementModuleTest is
             bytes32(hex"11"),
             HoprChannelsType.Balance.wrap(1),
             HoprChannelsType.TicketIndex.wrap(1),
-            HoprChannelsType.TicketIndexOffset.wrap(1),
             HoprChannelsType.ChannelEpoch.wrap(1),
             HoprChannelsType.WinProb.wrap(1)
         );
