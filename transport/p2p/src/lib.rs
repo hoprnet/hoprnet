@@ -41,6 +41,7 @@ use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{StreamProtocol, autonat, identity::PublicKey, swarm::NetworkBehaviour};
+use libp2p::{kad, kad::store::MemoryStore};
 
 // Control object for the streams over the HOPR protocols
 #[derive(Clone)]
@@ -91,6 +92,7 @@ pub struct HoprNetworkBehavior {
     streams: libp2p_stream::Behaviour,
     identify: libp2p_identify::Behaviour,
     autonat: autonat::Behaviour,
+    kademlia: kad::Behaviour<MemoryStore>,
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -111,7 +113,8 @@ impl HoprNetworkBehavior {
                 "/hopr/identify/1.0.0".to_string(),
                 me.clone(),
             )),
-            autonat: autonat::Behaviour::new(me.into(), autonat::Config::default()),
+            autonat: autonat::Behaviour::new(me.clone().into(), autonat::Config::default()),
+            kademlia: kad::Behaviour::new(me.clone().into(), MemoryStore::new(me.clone().into())),
         }
     }
 }
@@ -128,6 +131,7 @@ pub enum HoprNetworkBehaviorEvent {
     ),
     Identify(Box<libp2p_identify::Event>),
     Autonat(autonat::Event),
+    Kademlia(kad::Event),
 }
 
 // Unexpected libp2p_stream event
@@ -161,6 +165,12 @@ impl From<libp2p_identify::Event> for HoprNetworkBehaviorEvent {
 impl From<autonat::Event> for HoprNetworkBehaviorEvent {
     fn from(event: autonat::Event) -> Self {
         Self::Autonat(event)
+    }
+}
+
+impl From<kad::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: kad::Event) -> Self {
+        Self::Kademlia(event)
     }
 }
 

@@ -9,8 +9,9 @@ use hopr_transport_identity::{
 };
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
-    autonat,
+    PeerId, autonat,
     identity::PublicKey,
+    kad,
     request_response::{OutboundRequestId, ResponseChannel},
     swarm::{NetworkInfo, SwarmEvent},
 };
@@ -121,6 +122,8 @@ impl HoprSwarm {
         let mut swarm = build_p2p_network(identity, indexer_update_input)
             .await
             .expect("swarm must be constructible");
+
+        swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Server));
 
         for multiaddress in my_multiaddresses.iter() {
             match resolve_dns_if_any(multiaddress) {
@@ -267,6 +270,41 @@ impl HoprSwarm {
 
                         print_network_info(swarm.network_info(), "incoming connection error");
                     }
+                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Kademlia(kad::Event::OutboundQueryProgressed { result, ..})) => {
+                        match result {
+                            kad::QueryResult::Bootstrap(event) => {
+                                match event {
+                                    Ok(_) => {
+                                        info!("Kademlia bootstrap successful");
+                                    }
+                                    Err(err) => {
+                                        warn!(%err, "Kademlia bootstrap failed");
+                                    }
+                                }
+                            }
+                            kad::QueryResult::GetClosestPeers(event) => {
+                                match event {
+                                    Ok(ok) => {
+                                        debug!(closest_peers_count = ok.peers.len(), "Kademlia query found closest peers");
+                                    }
+                                    Err(err) => {
+                                        debug!("Kademlia query failed: {err}");
+                                    }
+                                }
+                            }
+                            kad::QueryResult::PutRecord(event) => {
+                                match event {
+                                    Ok(ok) => {
+                                        info!(key = ?std::str::from_utf8(ok.key.as_ref()), "Kademlia successfully put record");
+                                    }
+                                    Err(err) => {
+                                        warn!(%err, "Kademlia failed to put record");
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                     SwarmEvent::OutgoingConnectionError {
                         connection_id,
                         error,
@@ -329,6 +367,26 @@ impl HoprSwarm {
                     },
                     _ => trace!(transport="libp2p", "Unsupported enum option detected")
                 }
+            }
+        }
+    }
+
+    pub fn add_to_dht(&mut self, peer_id: &PeerId, multiaddress: &Multiaddr) {
+        let routing_update = self
+            .swarm
+            .behaviour_mut()
+            .kademlia
+            .add_address(peer_id, multiaddress.clone());
+
+        info!(%peer_id, %multiaddress, ?routing_update, "DHT announce self");
+
+        let entry_key = kad::RecordKey::new(&peer_id.into());
+        match self.swarm.behaviour_mut().kademlia.start_providing(entry_key) {
+            Ok(query_id) => {
+                info!(%peer_id, %multiaddress, %query_id, "DHT announce started");
+            }
+            Err(e) => {
+                error!(%peer_id, %multiaddress, %e, "DHT announce failed to start");
             }
         }
     }

@@ -444,6 +444,12 @@ where
             ))),
         );
 
+        match self.my_multiaddresses.first() {
+            None => warn!("No multi-addresses configured for this node"),
+            Some(ma) => transport_layer.add_to_dht(me_peerid, ma),
+        }
+        // add discovered nodes from chain
+
         // -- msg-ack protocol over the wire transport
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: self.me.clone(),
