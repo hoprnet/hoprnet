@@ -1,10 +1,8 @@
-use futures::{Sink, SinkExt};
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbProtocolOperations, IncomingPacket, IncomingPacketError, OutgoingPacket},
 };
 pub use hopr_crypto_packet::errors::PacketError;
-use hopr_crypto_packet::errors::PacketError::TransportError;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
@@ -108,39 +106,6 @@ where
     /// Creates a new instance given the DB and configuration.
     pub fn new(db: Db, resolver: R, cfg: PacketInteractionConfig) -> Self {
         Self { db, resolver, cfg }
-    }
-}
-
-pub type SendMsgInput = (ApplicationDataOut, ResolvedTransportRouting);
-
-#[derive(Debug, Clone)]
-pub struct MsgSender<T>
-where
-    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
-{
-    tx: T,
-}
-
-impl<T> MsgSender<T>
-where
-    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
-{
-    pub fn new(tx: T) -> Self {
-        Self { tx }
-    }
-
-    /// Pushes a new packet into processing.
-    #[tracing::instrument(level = "trace", skip(self, data))]
-    pub async fn send_packet(
-        &self,
-        data: ApplicationDataOut,
-        routing: ResolvedTransportRouting,
-    ) -> Result<(), PacketError> {
-        self.tx
-            .clone()
-            .send((data, routing))
-            .await
-            .map_err(|_| TransportError("failed to send a message".into()))
     }
 }
 

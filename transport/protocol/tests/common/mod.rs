@@ -25,7 +25,7 @@ use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_gra
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig};
+use hopr_transport_protocol::processor::PacketInteractionConfig;
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 use tokio::time::timeout;
@@ -464,7 +464,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
     let pseudonym = HoprPseudonym::random();
     let mut sent_packet_count = 0;
     for test_msg in test_msgs.iter().take(packet_count) {
-        let sender = MsgSender::new(apis[0].0.clone());
+        let mut sender = apis[0].0.clone();
         let routing = ResolvedTransportRouting::Forward {
             pseudonym,
             forward_path: packet_path.clone(),
@@ -472,7 +472,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
         };
 
         sender
-            .send_packet(ApplicationDataOut::with_no_packet_info(test_msg.clone()), routing)
+            .send((ApplicationDataOut::with_no_packet_info(test_msg.clone()), routing))
             .await?;
 
         sent_packet_count += 1;
