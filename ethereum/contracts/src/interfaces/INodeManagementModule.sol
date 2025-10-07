@@ -17,4 +17,10 @@ interface IHoprNodeManagementModule {
      * @notice Returns if a node is included in the NodeManagementModule contract.
      */
     function isNode(address nodeAddress) external view returns (bool);
+
+    /**
+     * @notice Includes nodes in the NodeManagementModule contract.
+     * @param nodeAddresses The addresses of the nodes to include.
+     */
+    function includeNodes(address[] calldata nodeAddresses) external payable;
 }

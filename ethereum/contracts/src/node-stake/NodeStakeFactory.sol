@@ -31,6 +31,10 @@ abstract contract HoprNodeStakeFactoryEvents {
     event NewHoprNodeStakeModuleForSafe(address module, address safe);
 }
 
+interface IHoprNodeStakeFactory {
+    function deployModule(address safeProxyAddr, bytes32 defaultTarget, uint256 nonce) external returns (address moduleProxy);
+}
+
 /**
  *    &&&&
  *    &&&&
@@ -50,7 +54,7 @@ abstract contract HoprNodeStakeFactoryEvents {
  * @dev This contract is responsible for deploying a 1-of-n Safe proxy and a module proxy for HOPR node management.
  * The factory contract handles the deployment and initialization of these proxies.
  */
-contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC777Recipient {
+contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC777Recipient, IHoprNodeStakeFactory {
     using TargetUtils for Target;
     using SafeERC20 for IERC20;
 

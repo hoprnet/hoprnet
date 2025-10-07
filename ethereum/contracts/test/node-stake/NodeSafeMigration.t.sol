@@ -9,11 +9,8 @@ import { HoprNodeStakeFactory, HoprNodeStakeFactoryEvents } from "../../src/node
 import { Safe } from "safe-contracts-1.4.1/Safe.sol";
 import { SafeSuiteLibV141 } from "../../src/utils/SafeSuiteLibV141.sol";
 import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
-import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
 
 contract NodeSafeMigrationTest is Test, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
-    using ClonesUpgradeable for address;
-
     // HoprNodeManagementModule public moduleSingleton;
     // HoprNodeStakeFactory public factory;
     // address public caller;

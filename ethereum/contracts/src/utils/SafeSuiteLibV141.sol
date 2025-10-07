@@ -17,5 +17,6 @@ library SafeSuiteLibV141 {
     address internal constant SAFE_MultiSendCallOnly_ADDRESS = 0x9641d764fc13c8B624c04430C7356C1C7C8102e2;
     address internal constant SAFE_SignMessageLib_ADDRESS = 0xd53cd0aB83D845Ac265BE939c57F53AD838012c9;
     address internal constant SAFE_Safe_ADDRESS = 0x41675C099F32341bf84BFc5382aF534df5C7461a;
+    address internal constant SAFE_SafeL2_ADDRESS = 0x29fcB43b46531BcA003ddC8FCB67FFE91900C762;
     string internal constant SAFE_VERSION = "1.4.1";
 }

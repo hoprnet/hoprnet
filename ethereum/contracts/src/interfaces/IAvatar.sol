@@ -75,4 +75,18 @@ interface IAvatar {
         external
         view
         returns (address[] memory array, address next);
+
+    /// @dev Allows to execute a Safe transaction confirmed by required number of owners.
+    function execTransaction(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes memory signatures
+    ) external payable returns (bool);
 }
