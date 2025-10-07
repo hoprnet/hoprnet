@@ -167,9 +167,9 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
 
         vm.startPrank(caller);
         vm.expectEmit(true, false, false, true, address(factory));
-        emit NewHoprNodeStakeModule(expectedModuleAddress);
-        vm.expectEmit(true, false, false, true, address(factory));
         emit NewHoprNodeStakeSafe(expectedSafeAddress);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress);
 
         (module, safe) = factory.clone(
             nonce,
@@ -218,9 +218,9 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
 
         vm.startPrank(caller);
         vm.expectEmit(true, false, false, true, address(factory));
-        emit NewHoprNodeStakeModule(expectedModuleAddress);
-        vm.expectEmit(true, false, false, true, address(factory));
         emit NewHoprNodeStakeSafe(expectedSafeAddress);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress);
 
         // deploy safe and module, and fund the safe with tokens, all in one transaction
         hoprToken.send(address(factory), amount, userData);
@@ -256,9 +256,9 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
 
         vm.startPrank(caller);
         vm.expectEmit(true, false, false, true, address(factory));
-        emit NewHoprNodeStakeModule(expectedModuleAddress);
-        vm.expectEmit(true, false, false, true, address(factory));
         emit NewHoprNodeStakeSafe(expectedSafeAddress);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress);
 
         // deploy safe and module, and fund the safe with tokens, all in one transaction
         hoprToken.send(address(factory), amount, userData);
@@ -327,15 +327,40 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         ) = _helperMultiSendDeploy(safe1);
 
         vm.expectEmit(true, false, false, true, address(factory));
-        emit NewHoprNodeStakeModule(expectedModuleAddress3);
-        vm.expectEmit(true, false, false, true, address(factory));
         emit NewHoprNodeStakeSafe(expectedSafeAddress3);
         vm.expectEmit(true, false, false, true, address(factory));
-        emit NewHoprNodeStakeModule(expectedModuleAddress4);
+        emit NewHoprNodeStakeModule(expectedModuleAddress3);
         vm.expectEmit(true, false, false, true, address(factory));
         emit NewHoprNodeStakeSafe(expectedSafeAddress4);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress4);
         // The first two Safe txns were used during the deployment of safe1
         _helperSafeTxnToMultiSend(ISafe(safe1), 400, 0, safeTxData);
+
+        vm.stopPrank();
+        vm.clearMockedCalls();
+    }
+
+    function test_CloneOnlyAModuleFromAnExistingSafe() public mockTokenChannel {
+        address owner = vm.addr(666);
+        uint256 nonce = 666;
+        address[] memory admins = new address[](1);
+        admins[0] = owner;
+        // create a safe to call multisend
+        address safe1 = _helperDeployASafe(owner);
+
+        // predict the module address
+        address expectedModuleAddress = factory.predictModuleAddress(safe1, nonce, safe1, DEFAULT_TARGET);
+
+        // Test with multisend to create two safe-module pairs, from the previously deployed safe
+        vm.startPrank(safe1);
+
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModule(expectedModuleAddress);
+        vm.expectEmit(true, false, false, true, address(factory));
+        emit NewHoprNodeStakeModuleForSafe(expectedModuleAddress, safe1);
+        // The first two Safe txns were used during the deployment of safe1
+        factory.deployModule(safe1, DEFAULT_TARGET, nonce);
 
         vm.stopPrank();
         vm.clearMockedCalls();

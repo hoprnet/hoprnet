@@ -27,6 +27,8 @@ abstract contract HoprNodeStakeFactoryEvents {
     event HoprNodeStakeSafeLibUpdated(HoprNodeStakeFactory.SafeLibAddress safeLibAddresses);
     // Emit when a new default HOPR network is set
     event HoprNodeStakeHoprNetworkUpdated(HoprNodeStakeFactory.HoprNetwork hoprNetwork);
+    // Emit when a new module is created for a (safe) wallet
+    event NewHoprNodeStakeModuleForSafe(address module, address safe);
 }
 
 /**
@@ -263,6 +265,23 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
     }
 
     /**
+     * @dev Deploys a module proxy for HOPR node management using CREATE2, from a deployed Safe proxy.
+     * The module proxy is initialized with the Safe proxy address as owner, MultiSend address, and default target.
+     * Module proxy is an ERC1967Proxy that follows UUPS pattern.
+     * @notice Any wallet could call this function to deploy a module for an existing Safe, but the module
+     * will only be usable if the Safe owner enables it.
+     * @param safeProxyAddr The address of the Safe proxy that will be linked to the module.
+     * @param defaultTarget The default target (refer to TargetUtils.sol) for the current HoprChannels (and HoprToken)
+     * contract.
+     * @param nonce A nonce used to create a salt. Both the safe and module proxies share the same nonce.
+     * @return moduleProxy The address of the deployed module proxy.
+     */
+    function deployModule(address safeProxyAddr, bytes32 defaultTarget, uint256 nonce) public returns (address moduleProxy) {
+        moduleProxy = _deployModule(safeProxyAddr, defaultTarget, safeProxyAddr, nonce);
+        emit NewHoprNodeStakeModuleForSafe(moduleProxy, safeProxyAddr);
+    }
+
+    /**
      * @dev Internal function to deploy a 1-of-n Safe proxy and a module proxy for HOPR node management.
      * The Safe proxy is initialized with the provided list of admin addresses, and the module proxy
      * is initialized with the Safe proxy address, MultiSend address, and default target.
@@ -324,8 +343,6 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
             _prepareSafeTx(safeProxyAddr, swapOwnerData);
         }
 
-        emit NewHoprNodeStakeModule(moduleProxy);
-        emit NewHoprNodeStakeSafe(safeProxyAddr);
         return (moduleProxy, safeProxyAddr);
     }
 
@@ -389,8 +406,6 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
             _prepareSafeTx(safeProxyAddr, swapOwnerData);
         }
 
-        emit NewHoprNodeStakeModule(moduleProxy);
-        emit NewHoprNodeStakeSafe(safeProxyAddr);
         return (moduleProxy, safeProxyAddr);
     }
 
@@ -486,6 +501,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
             safeLibAddresses.safeAddress, safeInitializer, nonce
         );
         safeProxyAddr = payable(address(safeProxy));
+        emit NewHoprNodeStakeSafe(safeProxyAddr);
     }
 
     /**
@@ -518,6 +534,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
                 moduleInitializer
             )
         ));
+        emit NewHoprNodeStakeModule(moduleProxy);
     }
 
     /**
