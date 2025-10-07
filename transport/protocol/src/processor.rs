@@ -221,6 +221,7 @@ where
     ) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
+        tracing::debug!(?routing, "sent packet via routing");
         self.tx
             .clone()
             .send((data, routing, tx.into()))
