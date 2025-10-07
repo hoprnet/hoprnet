@@ -532,7 +532,12 @@ impl ChainReadChannelOperations for HoprChain {
     ) -> std::result::Result<BoxStream<'a, ChannelEntry>, Self::Error> {
         Ok(self
             .db
-            .stream_channels(selector.source, selector.destination, &selector.allowed_states)
+            .stream_channels(
+                selector.source,
+                selector.destination,
+                &selector.allowed_states,
+                (selector.closure_time_range.0, selector.closure_time_range.1),
+            )
             .await?)
     }
 }

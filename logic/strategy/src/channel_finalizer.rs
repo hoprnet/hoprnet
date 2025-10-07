@@ -6,9 +6,8 @@ use std::{
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector};
+use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector, Utc};
 use hopr_internal_types::prelude::*;
-use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
 use serde_with::{DurationSeconds, serde_as};
 use tracing::{debug, error, info};
@@ -29,7 +28,8 @@ lazy_static::lazy_static! {
 fn default_max_closure_overdue() -> Duration {
     Duration::from_secs(300)
 }
-/// Contains configuration of the [ClosureFinalizerStrategy].
+
+/// Contains configuration of the [`ClosureFinalizerStrategy`].
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct ClosureFinalizerStrategyConfig {
@@ -72,28 +72,17 @@ where
     A: ChainReadChannelOperations + ChainWriteChannelOperations + Send + Sync,
 {
     async fn on_tick(&self) -> errors::Result<()> {
-        let ts_limit = current_time().sub(self.cfg.max_closure_overdue);
-
+        let now = Utc::now();
         let mut outgoing_channels = self
             .hopr_chain_actions
-            .stream_channels(ChannelSelector {
-                source: Some(*self.hopr_chain_actions.me()),
-                destination: None,
-                allowed_states: vec![ChannelStatusDiscriminants::PendingToClose],
-            })
+            .stream_channels(
+                ChannelSelector::default()
+                    .with_source(*self.hopr_chain_actions.me())
+                    .with_allowed_states(&[ChannelStatusDiscriminants::PendingToClose])
+                    .with_closure_time_range(now.sub(self.cfg.max_closure_overdue)..=now),
+            )
             .await
-            .map_err(|e| errors::StrategyError::Other(e.into()))?
-            .filter_map(|channel| {
-                futures::future::ready(
-                    if matches!(channel.status, ChannelStatus::PendingToClose(ct) if ct > ts_limit)
-                        && channel.closure_time_passed(current_time())
-                    {
-                        Some(channel)
-                    } else {
-                        None
-                    },
-                )
-            });
+            .map_err(|e| errors::StrategyError::Other(e.into()))?;
 
         while let Some(channel) = outgoing_channels.next().await {
             info!(%channel, "channel closure finalizer: finalizing closure");
@@ -115,7 +104,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{ops::Add, time::SystemTime};
+    use std::{collections::Bound, time::SystemTime};
 
     use hex_literal::hex;
     use hopr_api::chain::ChainReceipt;
@@ -142,19 +131,6 @@ mod tests {
     async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
         let max_closure_overdue = Duration::from_secs(600);
 
-        // Should leave this channel opened
-        let c_open = ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into());
-
-        // Should leave this unfinalized, because the channel closure period has not yet elapsed
-        let c_pending = ChannelEntry::new(
-            *ALICE,
-            *CHARLIE,
-            10.into(),
-            0.into(),
-            ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
-            0.into(),
-        );
-
         // Should finalize closure of this channel
         let c_pending_elapsed = ChannelEntry::new(
             *ALICE,
@@ -165,30 +141,23 @@ mod tests {
             0.into(),
         );
 
-        // Should leave this unfinalized, because the channel closure is long overdue
-        let c_pending_overdue = ChannelEntry::new(
-            *ALICE,
-            *EUGENE,
-            10.into(),
-            0.into(),
-            ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
-            0.into(),
-        );
-
         let mut mock = MockTestActions::new();
         mock.expect_me().return_const(*ALICE);
 
         mock.expect_stream_channels()
             .once()
-            .with(mockall::predicate::eq(ChannelSelector {
-                source: Some(*ALICE),
-                destination: None,
-                allowed_states: vec![ChannelStatusDiscriminants::PendingToClose],
-                ..Default::default()
-            }))
-            .return_once(move |_| {
-                futures::stream::iter([c_open, c_pending, c_pending_overdue, c_pending_elapsed]).boxed()
-            });
+            .withf(move |selector| {
+                selector.source == Some(*ALICE)
+                    && selector.destination.is_none()
+                    && selector.allowed_states == &[ChannelStatusDiscriminants::PendingToClose]
+                    && match selector.closure_time_range {
+                        (Bound::Included(a), Bound::Included(b)) => {
+                            b.sub(a).to_std().is_ok_and(|d| d == max_closure_overdue)
+                        }
+                        _ => false,
+                    }
+            })
+            .return_once(move |_| futures::stream::iter([c_pending_elapsed]).boxed());
 
         mock.expect_close_channel()
             .once()

@@ -1,3 +1,5 @@
+use std::ops::{Bound, RangeBounds};
+
 use async_trait::async_trait;
 use futures::{StreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
@@ -97,11 +99,12 @@ pub trait HoprDbChannelOperations {
     /// Retrieves all channels information from the DB.
     async fn get_all_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    async fn stream_channels<'a>(
+    async fn stream_channels<'a, T: RangeBounds<DateTime<Utc>> + Send>(
         &'a self,
         source: Option<Address>,
         destination: Option<Address>,
         states: &[ChannelStatusDiscriminants],
+        closure_range: T,
     ) -> Result<BoxStream<'a, ChannelEntry>>;
 
     /// Inserts or updates the given channel entry.
@@ -234,6 +237,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
                     ChannelStatusDiscriminants::PendingToClose,
                     ChannelStatusDiscriminants::Closed,
                 ],
+                ..,
             )
             .await?
             .collect::<Vec<_>>()
@@ -250,6 +254,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
                     ChannelStatusDiscriminants::PendingToClose,
                     ChannelStatusDiscriminants::Closed,
                 ],
+                ..,
             )
             .await?
             .collect::<Vec<_>>()
@@ -266,6 +271,7 @@ impl HoprDbChannelOperations for HoprIndexerDb {
                     ChannelStatusDiscriminants::PendingToClose,
                     ChannelStatusDiscriminants::Closed,
                 ],
+                ..,
             )
             .await?
             .collect::<Vec<_>>()
@@ -273,11 +279,12 @@ impl HoprDbChannelOperations for HoprIndexerDb {
         Ok(entries)
     }
 
-    async fn stream_channels<'a>(
+    async fn stream_channels<'a, T: RangeBounds<DateTime<Utc>> + Send>(
         &'a self,
         source: Option<Address>,
         destination: Option<Address>,
         states: &[ChannelStatusDiscriminants],
+        closure_range: T,
     ) -> Result<BoxStream<'a, ChannelEntry>> {
         let mut incoming_cond = Condition::all();
         if let Some(source) = source {
@@ -289,7 +296,38 @@ impl HoprDbChannelOperations for HoprIndexerDb {
 
         let mut states_condition = Condition::any();
         for state in states {
-            states_condition = states_condition.add(channel::Column::Status.eq(*state as i8));
+            // If we're including the pending to close channels in the query, make sure
+            // we include range bounds on closure times
+            if state == &ChannelStatusDiscriminants::PendingToClose {
+                let mut closure_range_condition = Condition::all();
+                closure_range_condition = closure_range_condition
+                    .add(channel::Column::Status.eq(ChannelStatusDiscriminants::PendingToClose as i8));
+                match closure_range.start_bound() {
+                    Bound::Included(closure_start) => {
+                        closure_range_condition =
+                            closure_range_condition.add(channel::Column::ClosureTime.gte(*closure_start))
+                    }
+                    Bound::Excluded(closure_start) => {
+                        closure_range_condition =
+                            closure_range_condition.add(channel::Column::ClosureTime.gt(*closure_start))
+                    }
+                    _ => {}
+                }
+                match closure_range.end_bound() {
+                    Bound::Included(closure_end) => {
+                        closure_range_condition =
+                            closure_range_condition.add(channel::Column::ClosureTime.lte(*closure_end))
+                    }
+                    Bound::Excluded(closure_end) => {
+                        closure_range_condition =
+                            closure_range_condition.add(channel::Column::ClosureTime.lt(*closure_end))
+                    }
+                    _ => {}
+                }
+                states_condition = states_condition.add(closure_range_condition);
+            } else {
+                states_condition = states_condition.add(channel::Column::Status.eq(*state as i8));
+            }
         }
 
         Ok(Channel::find()

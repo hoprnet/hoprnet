@@ -123,14 +123,15 @@ where
 
             let chain_actions = self.hopr_chain_actions.clone();
             self.hopr_chain_actions
-                .stream_channels(ChannelSelector {
-                    destination: Some(*self.hopr_chain_actions.me()),
-                    source: None,
-                    allowed_states: vec![
-                        ChannelStatusDiscriminants::Open,
-                        ChannelStatusDiscriminants::PendingToClose,
-                    ],
-                })
+                .stream_channels(
+                    ChannelSelector::default()
+                        .with_destination(*self.hopr_chain_actions.me())
+                        .with_allowed_states(&[
+                            ChannelStatusDiscriminants::Open,
+                            ChannelStatusDiscriminants::PendingToClose,
+                        ])
+                        .with_closure_time_range(Utc::now()..),
+                )
                 .await
                 .map_err(|e| StrategyError::Other(e.into()))?
                 .for_each_concurrent(REDEEMING_CONCURRENCY, |channel| {
@@ -360,15 +361,15 @@ mod tests {
 
         mock.expect_stream_channels()
             .once()
-            .with(mockall::predicate::eq(ChannelSelector {
-                source: None,
-                destination: Some(BOB.public().to_address()),
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-                ..Default::default()
-            }))
+            .withf(move |selector| {
+                selector.source.is_none()
+                    && selector.destination == Some(BOB.public().to_address())
+                    && selector.allowed_states
+                        == &[
+                            ChannelStatusDiscriminants::Open,
+                            ChannelStatusDiscriminants::PendingToClose,
+                        ]
+            })
             .return_once(|_| futures::stream::iter([CHANNEL_1.clone(), CHANNEL_2.clone()]).boxed());
 
         mock.expect_redeem_with_selector()

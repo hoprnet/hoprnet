@@ -598,7 +598,17 @@ impl Hopr {
             let mut cg = channel_graph.write_arc().await;
 
             info!("Syncing channels from the previous runs");
-            let mut channel_stream = self.hopr_chain_api.stream_channels(ChannelSelector::any()).await?;
+            let mut channel_stream = self
+                .hopr_chain_api
+                .stream_channels(
+                    ChannelSelector::default()
+                        .with_allowed_states(&[
+                            ChannelStatusDiscriminants::Open,
+                            ChannelStatusDiscriminants::PendingToClose,
+                        ])
+                        .with_closure_time_range(Utc::now()..),
+                )
+                .await?;
             while let Some(channel) = channel_stream.next().await {
                 cg.update_channel(channel);
             }
@@ -1087,15 +1097,11 @@ impl Hopr {
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
             .hopr_chain_api
-            .stream_channels(ChannelSelector {
-                source: Some(*src),
-                destination: Some(self.me_onchain()),
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Closed,
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            })
+            .stream_channels(ChannelSelector::default().with_source(*src).with_allowed_states(&[
+                ChannelStatusDiscriminants::Closed,
+                ChannelStatusDiscriminants::Open,
+                ChannelStatusDiscriminants::PendingToClose,
+            ]))
             .await?
             .collect()
             .await)
@@ -1105,15 +1111,15 @@ impl Hopr {
     pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
             .hopr_chain_api
-            .stream_channels(ChannelSelector {
-                destination: Some(*dest),
-                source: Some(self.me_onchain()),
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Closed,
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            })
+            .stream_channels(
+                ChannelSelector::default()
+                    .with_destination(*dest)
+                    .with_allowed_states(&[
+                        ChannelStatusDiscriminants::Closed,
+                        ChannelStatusDiscriminants::Open,
+                        ChannelStatusDiscriminants::PendingToClose,
+                    ]),
+            )
             .await?
             .collect()
             .await)
@@ -1123,15 +1129,11 @@ impl Hopr {
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
             .hopr_chain_api
-            .stream_channels(ChannelSelector {
-                source: None,
-                destination: None,
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Closed,
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            })
+            .stream_channels(ChannelSelector::default().with_allowed_states(&[
+                ChannelStatusDiscriminants::Closed,
+                ChannelStatusDiscriminants::Open,
+                ChannelStatusDiscriminants::PendingToClose,
+            ]))
             .await?
             .collect()
             .await)
@@ -1227,14 +1229,14 @@ impl Hopr {
 
         // Does not need to be done concurrently, because we do not await each channel's redemption
         self.hopr_chain_api
-            .stream_channels(ChannelSelector {
-                destination: chain_api.me_onchain().into(),
-                source: None,
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            })
+            .stream_channels(
+                ChannelSelector::default()
+                    .with_destination(chain_api.me_onchain())
+                    .with_allowed_states(&[
+                        ChannelStatusDiscriminants::Open,
+                        ChannelStatusDiscriminants::PendingToClose,
+                    ]),
+            )
             .await?
             .for_each(|channel| {
                 let chain_api = chain_api.clone();
