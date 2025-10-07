@@ -94,10 +94,7 @@ ignore = [
   "src/static/HoprDistributor.sol",
   "src/static/HoprWrapperProxy.sol",
   "src/static/stake/mocks/ERC777Mock.sol",
-  "src/static/stake/mocks/ERC677Mock.sol",
-  # Temporarily ignore the unfinished migration contracts
-  "src/node-stake/migration/NodeSafeMigration.sol",
-  "test/node-stake/NodeSafeMigration.t.sol"
+  "src/static/stake/mocks/ERC677Mock.sol"
 ]
 
 exclude_lints = [
