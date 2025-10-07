@@ -72,7 +72,6 @@ pub use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
-use rand::seq::SliceRandom;
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, info, trace, warn};
@@ -313,7 +312,6 @@ where
             "Initializing swarm with peers from chain"
         );
 
-        let mut addresses: HashSet<Multiaddr> = HashSet::new();
         for node_entry in public_nodes {
             if let AccountType::Announced { multiaddr, .. } = node_entry.entry_type {
                 let peer: PeerId = node_entry.public_key.into();

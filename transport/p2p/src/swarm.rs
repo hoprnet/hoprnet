@@ -24,7 +24,7 @@ lazy_static::lazy_static! {
         "hopr_transport_p2p_opened_connection_count",
         "Number of currently open connections"
     ).unwrap();
-    static ref METRIC_TRANSPORT_NAT_STATUS: SimpleGauge = SimpleGauge::new(
+    static ref METRIC_TRANSPORT_NAT_STATUS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
         "hopr_transport_p2p_nat_status",
         "Current NAT status as reported by libp2p autonat. 0=Unknown, 1=Public, 2=Private"
     ).unwrap();

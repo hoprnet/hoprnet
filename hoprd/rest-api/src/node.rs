@@ -15,14 +15,6 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum NatStatus {
-    // Public,
-    // Private,
-    Unknown,
-}
-
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "version": "2.1.0",
     }))]
@@ -504,8 +496,6 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
         Ok(info) => info,
         Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     };
-
-    let is_eligible = hopr.is_allowed_to_access_network(either::Right(me_address)).await?;
 
     // If one channel or more are corrupted, we consider the indexer as corrupted.
     let is_indexer_corrupted = hopr
