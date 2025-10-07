@@ -36,7 +36,10 @@ telemetry = [
   "dep:opentelemetry_sdk",
   "dep:tracing-opentelemetry",
 ]
-transport-quic = ["hopr-lib/transport-announce-quic", "hopr-lib/transport-use-quic"]
+transport-quic = [
+  "hopr-lib/transport-announce-quic",
+  "hopr-lib/transport-use-quic",
+]
 explicit-path = ["hoprd-api/explicit-path"]
 capture = ["hopr-lib/capture"]
 # To use profiling:

@@ -32,7 +32,7 @@ libp2p = { workspace = true, features = [
   "autonat",
   "dns",
   "tcp",
-  "yamux"
+  "yamux",
 ] }
 libp2p-stream = { workspace = true }
 rand = { workspace = true }
