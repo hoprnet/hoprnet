@@ -82,7 +82,7 @@ use std::{
 
 use async_lock::RwLock;
 pub use async_trait::async_trait;
-use errors::{HoprLibError, HoprStatusError};
+pub use errors::{HoprLibError, HoprStatusError};
 use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc::channel, future::AbortHandle};
 use hopr_async_runtime::prelude::{sleep, spawn};
 pub use hopr_chain_actions::errors::ChainActionsError;
@@ -90,7 +90,7 @@ use hopr_chain_actions::{channels::ChannelActions, node::NodeActions, redeem::Ti
 pub use hopr_chain_api::config::{
     Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
 };
-use hopr_chain_api::{
+pub use hopr_chain_api::{
     HoprChain, HoprChainProcess, SignificantChainEvent, can_register_with_safe, config::ChainNetworkConfig,
     errors::HoprChainError, wait_for_funds,
 };
