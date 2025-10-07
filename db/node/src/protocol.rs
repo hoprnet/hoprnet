@@ -17,10 +17,6 @@ use tracing::{instrument, trace, warn};
 use crate::{cache::SurbRingBuffer, db::HoprNodeDb, errors::NodeDbError};
 
 
-impl HoprNodeDb {
-    
-}
-
 #[async_trait]
 impl HoprDbProtocolOperations for HoprNodeDb {
     type Error = NodeDbError;
