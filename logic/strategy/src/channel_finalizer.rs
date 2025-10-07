@@ -80,7 +80,6 @@ where
                 source: Some(*self.hopr_chain_actions.me()),
                 destination: None,
                 allowed_states: vec![ChannelStatusDiscriminants::PendingToClose],
-                ..Default::default()
             })
             .await
             .map_err(|e| errors::StrategyError::Other(e.into()))?
@@ -183,7 +182,7 @@ mod tests {
             .once()
             .with(mockall::predicate::eq(ChannelSelector {
                 source: Some(*ALICE),
-                destination: Some(*BOB),
+                destination: None,
                 allowed_states: vec![ChannelStatusDiscriminants::PendingToClose],
                 ..Default::default()
             }))

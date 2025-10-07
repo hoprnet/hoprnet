@@ -130,7 +130,6 @@ where
                         ChannelStatusDiscriminants::Open,
                         ChannelStatusDiscriminants::PendingToClose,
                     ],
-                    ..Default::default()
                 })
                 .await
                 .map_err(|e| StrategyError::Other(e.into()))?
@@ -362,8 +361,8 @@ mod tests {
         mock.expect_stream_channels()
             .once()
             .with(mockall::predicate::eq(ChannelSelector {
-                source: Some(BOB.public().to_address()),
-                destination: Some(ALICE.public().to_address()),
+                source: None,
+                destination: Some(BOB.public().to_address()),
                 allowed_states: vec![
                     ChannelStatusDiscriminants::Open,
                     ChannelStatusDiscriminants::PendingToClose,
