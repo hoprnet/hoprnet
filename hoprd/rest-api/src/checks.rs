@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
-use hopr_lib::state::HoprState;
+use hopr_lib::{Health, state::HoprState};
 
 use crate::AppState;
 
@@ -17,10 +17,12 @@ use crate::AppState;
         tag = "Checks"
     )]
 pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state) // FIXME: improve this once node state granularity is improved
+    eval_precondition(is_running(state)) // FIXME: improve this once node state granularity is improved
 }
 
-/// Check whether the node is ready to accept connections.
+/// Check whether the node is **ready** to accept connections.
+///
+/// Ready means that the node is running and has at least minimal connectivity.
 #[utoipa::path(
         get,
         path = "/readyz",
@@ -32,10 +34,12 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
         tag = "Checks"
     )]
 pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state) // FIXME: improve this once node state granularity is improved
+    eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
-/// Check whether the node is healthy.
+/// Check whether the node is **healthy**.
+///
+/// Healthy means that the node is running and has at least minimal connectivity.
 #[utoipa::path(
         get,
         path = "/healthyz",
@@ -47,15 +51,31 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
         tag = "Checks"
     )]
 pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    is_running(state) // FIXME: improve this once node state granularity is improved
+    eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
-fn is_running(state: Arc<AppState>) -> impl IntoResponse {
-    match state.hopr.status() {
-        HoprState::Running => (StatusCode::OK, "").into_response(),
-        _ => (StatusCode::PRECONDITION_FAILED, "").into_response(),
+#[inline]
+async fn is_minimally_connected(state: Arc<AppState>) -> bool {
+    matches!(
+        state.hopr.network_health().await,
+        Health::Orange | Health::Yellow | Health::Green
+    )
+}
+
+#[inline]
+fn is_running(state: Arc<AppState>) -> bool {
+    matches!(state.hopr.status(), HoprState::Running)
+}
+
+#[inline]
+fn eval_precondition(precondition: bool) -> impl IntoResponse {
+    if precondition {
+        (StatusCode::OK, "").into_response()
+    } else {
+        (StatusCode::PRECONDITION_FAILED, "").into_response()
     }
 }
+
 /// Check whether the node is eligible in the network.
 #[utoipa::path(
         get,
