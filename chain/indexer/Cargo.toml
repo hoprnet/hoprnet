@@ -18,11 +18,7 @@ runtime-tokio = [
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
 ]
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-chain-rpc/prometheus",
-  "hopr-db-sql/prometheus",
-]
+prometheus = ["dep:hopr-metrics", "hopr-chain-rpc/prometheus"]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
