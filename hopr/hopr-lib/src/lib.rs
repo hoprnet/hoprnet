@@ -36,6 +36,7 @@ pub mod state;
 #[doc(hidden)]
 pub mod exports {
     pub mod chain {
+        pub use hopr_chain_api as api;
         pub use hopr_chain_types as types;
     }
 
