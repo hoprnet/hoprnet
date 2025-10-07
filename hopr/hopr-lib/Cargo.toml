@@ -59,6 +59,7 @@ atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
 base64 = { workspace = true, optional = true }
 bytesize = { workspace = true, optional = true }
+cfg-if = { workspace = true }
 const_format = { workspace = true }
 dashmap = { workspace = true, optional = true }
 futures = { workspace = true }
