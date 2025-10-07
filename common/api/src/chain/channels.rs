@@ -1,37 +1,74 @@
-use std::error::Error;
+use std::{
+    error::Error,
+    ops::{Bound, RangeBounds},
+};
 
 use futures::{future::BoxFuture, stream::BoxStream};
 use hopr_internal_types::prelude::ChannelStatus;
 pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatusDiscriminants};
 use hopr_primitive_types::prelude::Address;
 pub use hopr_primitive_types::prelude::HoprBalance;
+pub type DateTime = chrono::DateTime<chrono::Utc>;
+pub use chrono::Utc;
 
 use crate::chain::ChainReceipt;
 
 /// Selector for channels.
 ///
 /// See [`ChainReadChannelOperations::stream_channels`].
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelSelector {
-    /// Filter by counterparty address.
-    pub counterparty: Option<Address>,
-    /// Filter by direction.
-    pub direction: Vec<ChannelDirection>,
+    /// Filter by source address.
+    pub source: Option<Address>,
+    /// Filter by destination address
+    pub destination: Option<Address>,
     /// Filter by possible channel states.
     pub allowed_states: Vec<ChannelStatusDiscriminants>,
+    /// Range of closure times if `PendingToClose` was specified in `allowed_states`,
+    /// otherwise has no effect.
+    pub closure_time_range: (Bound<DateTime>, Bound<DateTime>),
+}
+
+impl Default for ChannelSelector {
+    fn default() -> Self {
+        Self {
+            source: None,
+            destination: None,
+            allowed_states: vec![],
+            closure_time_range: (Bound::Unbounded, Bound::Unbounded),
+        }
+    }
 }
 
 impl ChannelSelector {
-    pub fn any() -> Self {
-        Self {
-            counterparty: None,
-            direction: vec![ChannelDirection::Incoming, ChannelDirection::Outgoing],
-            allowed_states: vec![
-                ChannelStatusDiscriminants::Open,
-                ChannelStatusDiscriminants::Closed,
-                ChannelStatusDiscriminants::PendingToClose,
-            ],
-        }
+    /// Sets the `source` bound on channel.
+    #[must_use]
+    pub fn with_source<A: Into<Address>>(mut self, address: A) -> Self {
+        self.source = Some(address.into());
+        self
+    }
+
+    /// Sets the `destination` bound on channel.
+    #[must_use]
+    pub fn with_destination<A: Into<Address>>(mut self, address: A) -> Self {
+        self.destination = Some(address.into());
+        self
+    }
+
+    /// Sets the allowed channel states.
+    #[must_use]
+    pub fn with_allowed_states(mut self, allowed_states: &[ChannelStatusDiscriminants]) -> Self {
+        self.allowed_states.extend_from_slice(allowed_states);
+        self
+    }
+
+    /// Sets the channel closure range.
+    ///
+    /// This has effect only if `PendingToClose` is set in the allowed states.
+    #[must_use]
+    pub fn with_closure_time_range<T: RangeBounds<DateTime>>(mut self, range: T) -> Self {
+        self.closure_time_range = (range.start_bound().cloned(), range.end_bound().cloned());
+        self
     }
 }
 
@@ -39,6 +76,9 @@ impl ChannelSelector {
 #[async_trait::async_trait]
 pub trait ChainReadChannelOperations {
     type Error: Error + Send + Sync + 'static;
+
+    /// Returns on-chain [`Address`] of the current node.
+    fn me(&self) -> &Address;
 
     /// Returns a single channel given `src` and `dst`.
     async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error>;
