@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use hopr_db_entity::{network_eligibility, network_registry};
+use hopr_db_entity::{chain_info, network_eligibility, network_registry};
 use hopr_primitive_types::prelude::{Address, ToHex};
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set};
 use sea_query::OnConflict;
 
 use crate::{
-    HoprDbGeneralModelOperations, OptTx,
+    HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID,
     db::HoprDb,
     errors::{DbSqlError, Result},
 };
@@ -83,13 +83,23 @@ impl HoprDbRegistryOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    Ok::<_, DbSqlError>(
-                        network_registry::Entity::find()
-                            .filter(network_registry::Column::ChainAddress.eq(address.to_hex()))
-                            .one(tx.as_ref())
-                            .await?
-                            .is_some(),
-                    )
+                    let is_registry_enabled = chain_info::Entity::find_by_id(SINGULAR_TABLE_FIXED_ID)
+                        .one(tx.as_ref())
+                        .await?
+                        .map(|v| v.network_registry_enabled)
+                        .unwrap_or(false);
+
+                    if is_registry_enabled {
+                        Ok::<_, DbSqlError>(
+                            network_registry::Entity::find()
+                                .filter(network_registry::Column::ChainAddress.eq(address.to_hex()))
+                                .one(tx.as_ref())
+                                .await?
+                                .is_some(),
+                        )
+                    } else {
+                        Ok(true)
+                    }
                 })
             })
             .await
@@ -154,7 +164,7 @@ mod tests {
     use hopr_primitive_types::prelude::Address;
     use lazy_static::lazy_static;
 
-    use crate::{db::HoprDb, registry::HoprDbRegistryOperations};
+    use crate::{db::HoprDb, info::HoprDbInfoOperations, registry::HoprDbRegistryOperations};
 
     lazy_static! {
         static ref ADDR_1: Address = "4331eaa9542b6b034c43090d9ec1c2198758dbc3"
@@ -168,6 +178,8 @@ mod tests {
     #[tokio::test]
     async fn test_network_registry_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+
+        db.set_network_registry_enabled(None, true).await?;
 
         assert!(!db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
         assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
