@@ -1,9 +1,9 @@
 [project]
 name = "sdk-api"
 version = "1.1.0"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13.7,<3.14"
 dependencies = [
-  "aiohttp>=3.12.15",
+  "aiohttp>=3.13.0",
   "api-lib>=0.0.4",
   "base58>=2.1.1",
   "cryptography>=45.0.7",
