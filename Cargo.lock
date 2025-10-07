@@ -4871,6 +4871,7 @@ dependencies = [
  "smart-default",
  "sqlx",
  "strum 0.27.2",
+ "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
@@ -4912,6 +4913,7 @@ dependencies = [
  "backon",
  "base64 0.22.1",
  "bytesize",
+ "cfg-if",
  "const_format",
  "dashmap",
  "futures",
@@ -5404,7 +5406,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.13.3"
+version = "0.13.4"
 dependencies = [
  "anyhow",
  "arrayvec",
