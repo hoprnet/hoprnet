@@ -112,7 +112,6 @@ pub(crate) struct HeartbeatInfo {
     "quality": 0.7,
     "backoff": 0.5,
     "isNew": true,
-    "reportedVersion": "2.1.0"
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerInfo {
@@ -171,7 +170,6 @@ pub(crate) struct AnnouncedPeer {
         "quality": 0.7,
         "backoff": 0.5,
         "isNew": true,
-        "reportedVersion": "2.1.0"
     }],
     "announced": [{
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
@@ -192,7 +190,6 @@ pub(crate) struct NodePeersResponse {
         "quality": 0.7,
         "backoff": 0.5,
         "isNew": true,
-        "reportedVersion": "2.1.0"
     }]))]
     connected: Vec<PeerInfo>,
     #[schema(example = json!([{
@@ -479,7 +476,7 @@ pub(crate) struct NodeInfoResponse {
         path = const_format::formatcp!("{BASE_PATH}/node/info"),
         description = "Get information about this HOPR Node",
         responses(
-            (status = 200, description = "Fetched node version", body = NodeInfoResponse),
+            (status = 200, description = "Fetched node informations", body = NodeInfoResponse),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
