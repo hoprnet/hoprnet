@@ -160,6 +160,10 @@ pub struct IndexerDbChainWrapper(pub HoprIndexerDb);
 impl ChainReadChannelOperations for IndexerDbChainWrapper {
     type Error = DbSqlError;
 
+    fn me(&self) -> &Address {
+        &self.0.me_onchain
+    }
+
     async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
         self.0.get_channel_by_parties(None, src, dst, false).await
     }

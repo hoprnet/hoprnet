@@ -95,10 +95,6 @@ pub trait HoprDbAccountOperations {
     /// This a unique account in the database that must always be present.
     async fn get_self_account<'a>(&'a self, tx: OptTx<'a>) -> Result<AccountEntry>;
 
-    /// Retrieves entries of accounts with routable address announcements (if `public_only` is `true`)
-    /// or about all accounts without routeable address announcements (if `public_only` is `false`).
-    async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>>;
-
     async fn stream_accounts<'a>(&'a self, public_only: bool) -> Result<BoxStream<'a, AccountEntry>>;
 
     /// Inserts a new account entry to the database.
@@ -198,31 +194,9 @@ impl HoprDbAccountOperations for HoprIndexerDb {
             .ok_or(DbSqlError::MissingAccount)
     }
 
-    async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Account::find()
-                        .find_with_related(Announcement)
-                        .filter(if public_only {
-                            announcement::Column::Multiaddress.ne("")
-                        } else {
-                            Expr::value(1)
-                        })
-                        .order_by_desc(announcement::Column::AtBlock)
-                        .all(tx.as_ref())
-                        .await?
-                        .into_iter()
-                        .map(|(a, b)| model_to_account_entry(a, b))
-                        .collect()
-                })
-            })
-            .await
-    }
-
     async fn stream_accounts<'a>(&'a self, public_only: bool) -> Result<BoxStream<'a, AccountEntry>> {
-        Ok(Account::find()
+        // .stream() cannot do CROSS JOIN, so we need to collect it via .all() first
+        let accounts = Account::find()
             .find_with_related(Announcement)
             .filter(if public_only {
                 announcement::Column::Multiaddress.ne("")
@@ -230,21 +204,13 @@ impl HoprDbAccountOperations for HoprIndexerDb {
                 Expr::value(1)
             })
             .order_by_desc(announcement::Column::AtBlock)
-            .stream(self.index_db.read_only())
+            .all(self.index_db.read_only())
             .await?
-            // TODO: using Stream::scan, group the Announcement entries by accounts
-            .filter_map(|maybe_model| {
-                futures::future::ready(match maybe_model {
-                    Ok((a, b)) => model_to_account_entry(a, b.into_iter().collect())
-                        .inspect_err(|error| tracing::error!(%error, "unable to map account entity"))
-                        .ok(),
-                    Err(error) => {
-                        tracing::error!(%error, "db error while fetching accounts");
-                        None
-                    }
-                })
-            })
-            .boxed())
+            .into_iter()
+            .map(|(a, b)| model_to_account_entry(a, b))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(futures::stream::iter(accounts).boxed())
     }
 
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()> {
@@ -931,7 +897,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_accounts() -> anyhow::Result<()> {
+    async fn test_stream_accounts() -> anyhow::Result<()> {
         let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
@@ -1008,8 +974,8 @@ mod tests {
             })
             .await?;
 
-        let all_accounts = db.get_accounts(None, false).await?;
-        let public_only = db.get_accounts(None, true).await?;
+        let all_accounts = db.stream_accounts(false).await?.collect::<Vec<_>>().await;
+        let public_only = db.stream_accounts(true).await?.collect::<Vec<_>>().await;
 
         assert_eq!(3, all_accounts.len());
 

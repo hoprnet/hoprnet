@@ -596,7 +596,17 @@ impl Hopr {
             let mut cg = channel_graph.write_arc().await;
 
             info!("Syncing channels from the previous runs");
-            let mut channel_stream = self.hopr_chain_api.stream_channels(ChannelSelector::any()).await?;
+            let mut channel_stream = self
+                .hopr_chain_api
+                .stream_channels(
+                    ChannelSelector::default()
+                        .with_allowed_states(&[
+                            ChannelStatusDiscriminants::Open,
+                            ChannelStatusDiscriminants::PendingToClose,
+                        ])
+                        .with_closure_time_range(Utc::now()..),
+                )
+                .await?;
             while let Some(channel) = channel_stream.next().await {
                 cg.update_channel(channel);
             }
@@ -753,7 +763,7 @@ impl Hopr {
         let mut channels = self
             .hopr_chain_api
             .stream_channels(ChannelSelector {
-                direction: vec![ChannelDirection::Incoming],
+                destination: self.me_onchain().into(),
                 ..Default::default()
             })
             .await?;
@@ -1085,15 +1095,11 @@ impl Hopr {
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
             .hopr_chain_api
-            .stream_channels(ChannelSelector {
-                counterparty: Some(*src),
-                direction: vec![ChannelDirection::Incoming],
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Closed,
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            })
+            .stream_channels(ChannelSelector::default().with_source(*src).with_allowed_states(&[
+                ChannelStatusDiscriminants::Closed,
+                ChannelStatusDiscriminants::Open,
+                ChannelStatusDiscriminants::PendingToClose,
+            ]))
             .await?
             .collect()
             .await)
@@ -1103,15 +1109,15 @@ impl Hopr {
     pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
             .hopr_chain_api
-            .stream_channels(ChannelSelector {
-                counterparty: Some(*dest),
-                direction: vec![ChannelDirection::Outgoing],
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Closed,
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            })
+            .stream_channels(
+                ChannelSelector::default()
+                    .with_destination(*dest)
+                    .with_allowed_states(&[
+                        ChannelStatusDiscriminants::Closed,
+                        ChannelStatusDiscriminants::Open,
+                        ChannelStatusDiscriminants::PendingToClose,
+                    ]),
+            )
             .await?
             .collect()
             .await)
@@ -1121,15 +1127,11 @@ impl Hopr {
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
             .hopr_chain_api
-            .stream_channels(ChannelSelector {
-                counterparty: None,
-                direction: vec![],
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Closed,
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            })
+            .stream_channels(ChannelSelector::default().with_allowed_states(&[
+                ChannelStatusDiscriminants::Closed,
+                ChannelStatusDiscriminants::Open,
+                ChannelStatusDiscriminants::PendingToClose,
+            ]))
             .await?
             .collect()
             .await)
@@ -1225,14 +1227,14 @@ impl Hopr {
 
         // Does not need to be done concurrently, because we do not await each channel's redemption
         self.hopr_chain_api
-            .stream_channels(ChannelSelector {
-                counterparty: None,
-                direction: vec![ChannelDirection::Incoming],
-                allowed_states: vec![
-                    ChannelStatusDiscriminants::Open,
-                    ChannelStatusDiscriminants::PendingToClose,
-                ],
-            })
+            .stream_channels(
+                ChannelSelector::default()
+                    .with_destination(chain_api.me_onchain())
+                    .with_allowed_states(&[
+                        ChannelStatusDiscriminants::Open,
+                        ChannelStatusDiscriminants::PendingToClose,
+                    ]),
+            )
             .await?
             .for_each(|channel| {
                 let chain_api = chain_api.clone();
@@ -1341,5 +1343,18 @@ impl Hopr {
 
     pub async fn get_indexer_state(&self) -> errors::Result<hopr_chain_api::IndexerStateInfo> {
         Ok(self.hopr_chain_api.get_indexer_state().await?)
+    }
+
+    // === telemetry
+    /// Prometheus formatted metrics collected by the hopr-lib components.
+    pub fn collect_hopr_metrics() -> errors::Result<String> {
+        cfg_if::cfg_if! {
+            if #[cfg(all(feature = "prometheus", not(test)))] {
+                hopr_metrics::gather_all_metrics().map_err(|e| HoprLibError::GeneralError(e.to_string()))
+            } else {
+        Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
+
+            }
+        }
     }
 }

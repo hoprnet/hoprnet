@@ -114,6 +114,7 @@ pub(crate) mod tests {
     // cannot be mocked directly due to impossible lifetimes.
     #[mockall::automock]
     pub trait TestActions {
+        fn me(&self) -> &Address;
         fn fund_channel(&self, channel_id: &ChannelId, amount: HoprBalance) -> Result<ChainReceipt, StrategyError>;
         fn close_channel(&self, channel_id: &ChannelId) -> Result<(ChannelStatus, ChainReceipt), StrategyError>;
         fn redeem_with_selector(&self, selector: TicketSelector) -> Vec<ChainReceipt>;
@@ -132,6 +133,10 @@ pub(crate) mod tests {
     #[async_trait::async_trait]
     impl<T: TestActions + Send + Sync> ChainReadChannelOperations for MockChainActions<T> {
         type Error = StrategyError;
+
+        fn me(&self) -> &Address {
+            self.0.me()
+        }
 
         async fn channel_by_parties(&self, _: &Address, _: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
             unimplemented!()

@@ -67,7 +67,7 @@ impl DbConnection {
 pub struct HoprIndexerDb {
     pub(crate) index_db: DbConnection,
     pub(crate) logs_db: sea_orm::DatabaseConnection,
-    pub(crate) me_onchain: Address,
+    pub me_onchain: Address,
     pub(crate) caches: HoprIndexerDbCaches,
 }
 
