@@ -35,12 +35,14 @@ use futures::{
     FutureExt, SinkExt, StreamExt,
     channel::mpsc::{Sender, channel},
 };
+use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbPeersOperations, HoprDbProtocolOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
+use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -82,10 +84,7 @@ pub use crate::{
     config::HoprTransportConfig,
     helpers::{PeerEligibility, TicketStatistics},
 };
-use crate::{
-    constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, helpers::run_packet_planner,
-    socket::HoprSocket,
-};
+use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, socket::HoprSocket};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
@@ -225,10 +224,7 @@ where
     ) -> crate::errors::Result<(
         HoprSocket<
             futures::channel::mpsc::Receiver<ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(
-                hopr_protocol_app::prelude::ApplicationDataOut,
-                hopr_transport_session::DestinationRouting,
-            )>,
+            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         >,
         HashMap<HoprTransportProcess, AbortHandle>,
     )>
@@ -328,8 +324,11 @@ where
 
         let mut processes: HashMap<HoprTransportProcess, AbortHandle> = HashMap::new();
 
-        let (external_msg_send, external_msg_rx) =
-            channel::<(ApplicationDataOut, ResolvedTransportRouting)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+        let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
+            channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+
+        let (resolved_routing_msg_tx, resolved_routing_msg_rx) =
+            channel::<(ResolvedTransportRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         // -- transport medium
         let mixer_cfg = build_mixer_cfg_from_env();
@@ -473,40 +472,62 @@ where
         let (on_incoming_data_tx, on_incoming_data_rx) =
             channel::<ApplicationDataIn>(msg_protocol_bidirectional_channel_capacity);
 
-        let (bridge_tx, bridge_rx) =
-            channel::<(ApplicationDataOut, DestinationRouting)>(msg_protocol_bidirectional_channel_capacity);
-
-        let pp = self.path_planner.clone();
-        spawn(
-            bridge_rx
-                .filter_map(move |(data, routing)| {
-                    let pp = pp.clone();
-
-                    async move {
-                        pp.resolve_routing(data.data.total_len(), 1, routing)
-                            .await
-                            .map(|(routing, _size)| (data, routing))
-                            .ok()
-                    }
-                })
-                .map(Ok)
-                .forward(external_msg_send.clone())
-                .inspect(|_| {
-                    tracing::warn!(
-                        task = "transport -> bridge -> protocol",
-                        "long-running background task finished"
-                    )
-                }),
-        );
-
-        let hopr_socket: crate::socket::HoprSocket<_, _> = (on_incoming_data_rx, bridge_tx).into();
-
         debug!(
             capacity = msg_protocol_bidirectional_channel_capacity,
             "Creating protocol bidirectional channel"
         );
         let (tx_from_protocol, rx_from_protocol) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
+
+        // We have to resolve DestinationRouting -> ResolvedTransportRouting before
+        // sending the external packets to the transport pipeline.
+        let path_planner = self.path_planner.clone();
+        let distress_threshold = self.db.get_surb_config().distress_threshold;
+        let all_resolved_external_msg_rx = unresolved_routing_msg_rx
+            .filter_map(move |(unresolved, mut data)| {
+                let path_planner = path_planner.clone();
+                async move {
+                    trace!(?unresolved, "resolving routing for packet");
+                    match path_planner
+                        .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
+                        .await
+                    {
+                        Ok((resolved, rem_surbs)) => {
+                            // Set the SURB distress/out-of-SURBs flag if applicable.
+                            // These flags are translated into HOPR protocol packet signals and are
+                            // applicable only on the return path.
+                            let mut signals_to_dst = data
+                                .packet_info
+                                .as_ref()
+                                .map(|info| info.signals_to_destination)
+                                .unwrap_or_default();
+
+                            if resolved.is_return() {
+                                signals_to_dst = match rem_surbs {
+                                    Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                                        signals_to_dst | PacketSignal::SurbDistress
+                                    }
+                                    Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
+                                    _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
+                                };
+                            } else {
+                                // Unset these flags as they make no sense on the forward path.
+                                signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
+                            }
+
+                            data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
+                            trace!(?resolved, "resolved routing for packet");
+                            Some((resolved, data))
+                        }
+                        Err(error) => {
+                            error!(%error, "failed to resolve routing");
+                            None
+                        }
+                    }
+                }
+            })
+            .merge(resolved_routing_msg_rx);
+
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -518,7 +539,7 @@ where
                 }),
                 wire_msg_rx.inspect(|(peer, _)| trace!(%peer, "received message from peer")),
             ),
-            (tx_from_protocol, external_msg_rx),
+            (tx_from_protocol, all_resolved_external_msg_rx),
         )
         .await
         .into_iter()
@@ -543,10 +564,12 @@ where
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
+        // TODO (Tibor): make Probing accept Sender<(DestinationRouting, ApplicationDataOut)> and remove the
+        // resolved_routing_msg_tx channel completely
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
         for (k, v) in probe
             .continuously_scan(
-                (external_msg_send.clone(), rx_from_protocol),
+                (resolved_routing_msg_tx, rx_from_protocol),
                 manual_ping_rx,
                 network_notifier::ProbeNetworkInteractions::new(
                     self.network.clone(),
@@ -574,10 +597,8 @@ where
             .expect("must set the ticket aggregation writer only once");
 
         // -- session management
-        let packet_planner = run_packet_planner(self.path_planner.clone(), external_msg_send);
-
         self.smgr
-            .start(packet_planner, on_incoming_session)
+            .start(unresolved_routing_msg_tx.clone(), on_incoming_session)
             .expect("failed to start session manager")
             .into_iter()
             .enumerate()
@@ -618,7 +639,7 @@ where
             ),
         );
 
-        Ok((hopr_socket, processes))
+        Ok(((on_incoming_data_rx, unresolved_routing_msg_tx).into(), processes))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

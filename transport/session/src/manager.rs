@@ -428,16 +428,13 @@ impl<S, T> Clone for SessionManager<S, T> {
     }
 }
 
+const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
+
 impl<S, T> SessionManager<S, T>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+    T: futures::Sink<IncomingSession> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
-    T: futures::Sink<IncomingSession, Error = futures::channel::mpsc::SendError>
-        + Unpin
-        + Clone
-        + Send
-        + Sync
-        + 'static,
     T::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
     /// Creates a new instance given the [`config`](SessionManagerConfig).
@@ -667,7 +664,12 @@ where
                 forward_routing.clone(),
                 ApplicationDataOut::with_no_packet_info(start_session_msg.try_into()?),
             ))
+            .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
             .await
+            .map_err(|_| {
+                error!(challenge, %pseudonym, %destination, "timeout sending session request message");
+                TransportSessionError::Timeout
+            })?
             .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?;
 
         // The timeout is given by the number of hops requested
@@ -869,14 +871,14 @@ where
                 "internal error: sender has been closed without completing the session establishment".into(),
             )
             .into()),
-            Ok(Err(e)) => {
+            Ok(Err(error)) => {
                 // The other side did not allow us to establish a session
                 error!(
-                    challenge = e.challenge,
-                    error = ?e,
+                    challenge = error.challenge,
+                    ?error,
                     "the other party rejected the session initiation with error"
                 );
-                Err(TransportSessionError::Rejected(e.reason))
+                Err(TransportSessionError::Rejected(error.reason))
             }
             Err(_) => {
                 // Timeout waiting for a session establishment
@@ -905,7 +907,12 @@ where
                     session_data.routing_opts.clone(),
                     ApplicationDataOut::with_no_packet_info(HoprStartProtocol::KeepAlive((*id).into()).try_into()?),
                 ))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
                 .await
+                .map_err(|_| {
+                    error!("timeout sending session ping message");
+                    TransportSessionError::Timeout
+                })?
                 .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?)
         } else {
             Err(SessionManagerError::NonExistingSession.into())
@@ -1215,9 +1222,17 @@ where
             };
 
             // Notify that a new incoming session has been created
-            if let Err(error) = new_session_notifier.send(incoming_session).await {
-                tracing::error!(%session_id, %error, "failed to notify about new incoming session");
-            }
+            new_session_notifier
+                .send(incoming_session)
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                .await
+                .unwrap_or_else(|_| {
+                    error!(%session_id, "timeout to notify about new incoming session");
+                    Ok(())
+                })
+                .unwrap_or_else(|error| {
+                    error!(%session_id, %error, "failed to notify about new incoming session");
+                });
 
             trace!(?session_id, "session notification sent");
 
@@ -1230,9 +1245,16 @@ where
 
             msg_sender
                 .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
                 .await
+                .map_err(|_| {
+                    error!(%session_id, "timeout sending session establishment message");
+                    TransportSessionError::Timeout
+                })?
                 .map_err(|e| {
-                    SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
+                    SessionManagerError::Other(format!(
+                        "failed to send session {session_id} establishment message: {e}"
+                    ))
                 })?;
 
             info!(%session_id, "new session established");
@@ -1254,7 +1276,12 @@ where
 
             msg_sender
                 .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
                 .await
+                .map_err(|_| {
+                    error!("timeout sending session error message");
+                    TransportSessionError::Timeout
+                })?
                 .map_err(|e| {
                     SessionManagerError::Other(format!("failed to send session establishment error message: {e}"))
                 })?;

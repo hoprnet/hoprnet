@@ -46,7 +46,7 @@ struct Sender<T> {
 
 impl<T> Sender<T>
 where
-    T: futures::Sink<(ApplicationDataOut, ResolvedTransportRouting)> + Clone + Send + Sync + 'static,
+    T: futures::Sink<(ResolvedTransportRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
 {
     #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
     async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
@@ -54,7 +54,7 @@ where
         pin_mut!(push_to_network);
         if push_to_network
             .as_mut()
-            .send((ApplicationDataOut::with_no_packet_info(message.try_into()?), path))
+            .send((path, ApplicationDataOut::with_no_packet_info(message.try_into()?)))
             .await
             .is_ok()
         {
@@ -91,7 +91,7 @@ impl Probe {
         move_up: Up,      // forward up non-probing messages from the network
     ) -> HashMap<HoprProbeProcess, hopr_async_runtime::AbortHandle>
     where
-        T: futures::Sink<(ApplicationDataOut, ResolvedTransportRouting)> + Clone + Send + Sync + 'static,
+        T: futures::Sink<(ResolvedTransportRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
         T::Error: Send,
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
         W: PeerDiscoveryFetch + ProbeStatusUpdate + Clone + Send + Sync + 'static,
@@ -370,7 +370,7 @@ mod tests {
 
     struct TestInterface {
         from_probing_up_rx: futures::channel::mpsc::Receiver<(HoprPseudonym, ApplicationDataIn)>,
-        from_probing_to_network_rx: futures::channel::mpsc::Receiver<(ApplicationDataOut, ResolvedTransportRouting)>,
+        from_probing_to_network_rx: futures::channel::mpsc::Receiver<(ResolvedTransportRouting, ApplicationDataOut)>,
         from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
         manual_probe_tx: futures::channel::mpsc::Sender<(PeerId, PingQueryReplier)>,
     }
@@ -388,7 +388,7 @@ mod tests {
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
 
         let (from_probing_to_network_tx, from_probing_to_network_rx) =
-            futures::channel::mpsc::channel::<(ApplicationDataOut, ResolvedTransportRouting)>(100);
+            futures::channel::mpsc::channel::<(ResolvedTransportRouting, ApplicationDataOut)>(100);
 
         let (from_network_to_probing_tx, from_network_to_probing_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
