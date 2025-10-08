@@ -155,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|v| usize::from_str(&v).ok())
             .or(avail_parallelism)
             .ok_or(anyhow::anyhow!(
-                "Could not determine the number of IO threads to use. Please set the HOPRD_NUM_CPU_THREADS \
+                "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
                  environment variable."
             ))?,
     );
