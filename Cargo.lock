@@ -5457,6 +5457,7 @@ dependencies = [
  "home",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-parallelize",
  "hoprd-api",
  "lazy_static",
  "opentelemetry",
