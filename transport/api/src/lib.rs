@@ -21,6 +21,8 @@ pub mod errors;
 pub mod helpers;
 pub mod network_notifier;
 
+pub mod traits;
+
 pub mod socket;
 
 use std::{
