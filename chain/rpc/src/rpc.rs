@@ -394,6 +394,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 
         let (node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) =
             multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
+
         let is_node_included_in_module =
             node_in_module_inclusion.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?;
         let is_module_enabled_in_safe =

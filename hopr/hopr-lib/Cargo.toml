@@ -32,6 +32,7 @@ prometheus = [
   "hopr-db-node/prometheus",
 ]
 capture = ["hopr-transport/capture"]
+fixed_rng = ["hopr-crypto-random/fixed_rng"]
 
 # === utility features ===
 utils_session = [ # utility session functionality for advanced interaction with hopr-lib
@@ -98,9 +99,14 @@ hopr-transport = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+env_logger = { workspace = true }
 hex-literal = { workspace = true }
 mockito = { workspace = true }
+once_cell = { workspace = true }
 parameterized = { workspace = true }
+rand = { workspace = true }
+rstest = { workspace = true }
+serial_test = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 test-log = { workspace = true }
