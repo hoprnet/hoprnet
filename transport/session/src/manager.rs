@@ -2089,7 +2089,7 @@ mod tests {
             });
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
         alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
 
         let alice_session = alice_mgr
@@ -2111,6 +2111,7 @@ mod tests {
             Err(TransportSessionError::Manager(SessionManagerError::Loopback))
         ));
 
+        drop(new_session_rx_alice);
         Ok(())
     }
 
