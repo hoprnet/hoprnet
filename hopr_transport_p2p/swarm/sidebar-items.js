@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["HoprSwarm"],"type":["TicketAggregationRequestType","TicketAggregationResponseType"]};

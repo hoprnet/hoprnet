@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprChannelsEventsEvents"],"fn":["deploy","deploy_builder","new"],"static":["BYTECODE","DEPLOYED_BYTECODE"],"struct":["ChannelBalanceDecreased","ChannelBalanceIncreased","ChannelClosed","ChannelOpened","DomainSeparatorUpdated","HoprChannelsEventsInstance","OutgoingChannelClosureInitiated","TicketRedeemed"]};
