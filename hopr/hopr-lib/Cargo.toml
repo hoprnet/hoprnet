@@ -105,6 +105,7 @@ once_cell = { workspace = true }
 parameterized = { workspace = true }
 rand = { workspace = true }
 rstest = { workspace = true }
+serial_test = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 test-log = { workspace = true }

@@ -2,16 +2,21 @@ mod common;
 
 use std::{ops::Mul, time::Duration};
 
+use anyhow::Context;
 use common::{
     fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
     hopr_tester::HoprTester,
 };
+use hopr_api::Address;
+use hopr_lib::ChannelId;
 use rstest::rstest;
+use serial_test::serial;
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
 #[rstest]
 #[tokio::test]
+#[serial]
 async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{HoprBalance, WxHOPR, XDai, XDaiBalance};
 
@@ -19,17 +24,20 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyho
     let safe_native = node
         .get_safe_balance::<XDai>()
         .await
-        .expect("should get safe xdai balance");
-    let native = node.get_balance::<XDai>().await.expect("should get node xdai balance");
+        .context("should get safe xdai balance")?;
+    let native = node
+        .get_balance::<XDai>()
+        .await
+        .context("should get node xdai balance")?;
     let safe_hopr = node
         .get_safe_balance::<WxHOPR>()
         .await
-        .expect("should get safe hopr balance");
+        .context("should get safe hopr balance")?;
     let hopr = node
         .get_balance::<WxHOPR>()
         .await
-        .expect("should get node hopr balance");
-    let safe_allowance = node.safe_allowance().await.expect("should get safe hopr allowance");
+        .context("should get node hopr balance")?;
+    let safe_allowance = node.safe_allowance().await.context("should get safe hopr allowance")?;
 
     assert_ne!(safe_native, XDaiBalance::zero());
     assert_ne!(native, XDaiBalance::zero());
@@ -42,20 +50,56 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyho
 
 #[rstest]
 #[tokio::test]
-async fn test_ping_peer_inside_cluster(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, dst] = exclusive_indexes::<2>();
+#[serial]
+async fn test_safe_and_module_shouldnt_change(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [idx] = exclusive_indexes::<1>();
+    let safe_address = cluster_fixture[idx].inner().get_safe_config();
 
-    cluster_fixture[src]
+    assert_eq!(
+        safe_address.module_address,
+        cluster_fixture[idx].safe_config.module_address
+    );
+    assert_eq!(safe_address.safe_address, cluster_fixture[idx].safe_config.safe_address);
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn test_get_public_node_is_not_empty(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [idx] = exclusive_indexes::<1>();
+
+    let config = cluster_fixture[idx]
         .inner()
-        .ping(&cluster_fixture[dst].peer_id())
+        .get_public_nodes()
         .await
-        .expect("failed to ping peer");
+        .context("should get public nodes")?;
+
+    assert!(!config.is_empty());
 
     Ok(())
 }
 
 #[rstest]
 #[tokio::test]
+#[serial]
+
+async fn test_ping_peer_inside_cluster(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [src, dst] = exclusive_indexes::<2>();
+
+    let _ = cluster_fixture[src]
+        .inner()
+        .ping(&cluster_fixture[dst].peer_id())
+        .await
+        .context("failed to ping peer")?;
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+
 async fn test_ping_self_should_fail(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [random_int] = exclusive_indexes::<1>();
     let res = cluster_fixture[random_int]
@@ -69,6 +113,8 @@ async fn test_ping_self_should_fail(#[future(awt)] cluster_fixture: ClusterGuard
 
 #[rstest]
 #[tokio::test]
+#[serial]
+
 async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{ChannelStatus, HoprBalance};
     use tokio::time::sleep;
@@ -79,7 +125,7 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
         cluster_fixture[src]
             .outgoing_channels_by_status(ChannelStatus::Open)
             .await
-            .expect("failed to get channels from src node")
+            .context("failed to get channels from src node")?
             .is_empty()
     );
 
@@ -90,13 +136,13 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
             FUNDING_AMOUNT.parse::<HoprBalance>()?,
         )
         .await
-        .expect("failed to open channel");
+        .context("failed to open channel")?;
 
     assert_eq!(
         cluster_fixture[src]
             .outgoing_channels_by_status(ChannelStatus::Open)
             .await
-            .expect("failed to get channels from src node")
+            .context("failed to get channels from src node")?
             .len(),
         1
     );
@@ -105,14 +151,14 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
         .inner()
         .close_channel_by_id(&channel.channel_id)
         .await
-        .expect("failed to put channel in PendingToClose state");
+        .context("failed to put channel in PendingToClose state")?;
 
     sleep(Duration::from_secs(2)).await;
 
     match cluster_fixture[src]
         .channel_from_hash(&channel.channel_id)
         .await
-        .expect("failed to get channel from id")
+        .context("failed to get channel from id")?
         .status
     {
         ChannelStatus::PendingToClose(_) => (),
@@ -124,6 +170,7 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
 
 #[rstest]
 #[tokio::test]
+#[serial]
 async fn test_channel_funding_should_be_visible_in_channel_stake(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
@@ -136,7 +183,7 @@ async fn test_channel_funding_should_be_visible_in_channel_stake(
         .inner()
         .open_channel(&(cluster_fixture[dst].address()), funding_amount)
         .await
-        .expect("failed to open channel");
+        .context("failed to open channel")?;
 
     let _ = cluster_fixture[src]
         .inner()
@@ -146,7 +193,7 @@ async fn test_channel_funding_should_be_visible_in_channel_stake(
     let updated_channel = cluster_fixture[src]
         .channel_from_hash(&channel.channel_id)
         .await
-        .expect("failed to retrieve channel by id");
+        .context("failed to retrieve channel by id")?;
 
     assert_eq!(updated_channel.balance, funding_amount.mul(2));
 
@@ -155,11 +202,181 @@ async fn test_channel_funding_should_be_visible_in_channel_stake(
 
 #[rstest]
 #[tokio::test]
+#[serial]
 async fn test_reset_ticket_statistics(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    use hopr_lib::{DestinationRouting, HoprBalance, RoutingOptions, Tag};
-    use hopr_primitive_types::bounded::BoundedVec;
+    use futures::AsyncWriteExt;
+    use hopr_lib::{ChannelId, HoprBalance, HoprSession};
 
     let [src, mid, dst] = exclusive_indexes::<3>();
+
+    let fw_channel = cluster_fixture[src]
+        .inner()
+        .open_channel(
+            &(cluster_fixture[mid].address()),
+            FUNDING_AMOUNT.parse::<HoprBalance>()?,
+        )
+        .await
+        .context("failed to open forward channel")?;
+
+    let bw_channel = cluster_fixture[dst]
+        .inner()
+        .open_channel(
+            &(cluster_fixture[mid].address()),
+            FUNDING_AMOUNT.parse::<HoprBalance>()?,
+        )
+        .await
+        .context("failed to open return channel")?;
+
+    let mut session: HoprSession = cluster_fixture[src]
+        .create_1_hop_session(&cluster_fixture[mid], &cluster_fixture[dst], None, None)
+        .await?;
+
+    const BUF_LEN: usize = 5000;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    let _ = tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")?;
+
+    let _ = cluster_fixture[mid]
+        .inner()
+        .tickets_in_channel(&fw_channel.channel_id)
+        .await
+        .context("failed to list tickets")?
+        .into_iter()
+        .count()
+        .ne(&0);
+
+    let _ = cluster_fixture[mid]
+        .inner()
+        .tickets_in_channel(&bw_channel.channel_id)
+        .await
+        .context("failed to list tickets")?
+        .into_iter()
+        .count()
+        .ne(&0);
+
+    let channels_with_pending_tickets = cluster_fixture[mid]
+        .inner()
+        .all_tickets()
+        .await
+        .context("failed to get all tickets")?
+        .into_iter()
+        .map(|t| t.channel_id)
+        .collect::<Vec<ChannelId>>();
+
+    assert!(channels_with_pending_tickets.contains(&fw_channel.channel_id));
+    assert!(channels_with_pending_tickets.contains(&bw_channel.channel_id));
+
+    let stats_before = cluster_fixture[mid]
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert_eq!(stats_before.winning_count, 1); // As winning prob is set to 1
+
+    cluster_fixture[mid]
+        .inner()
+        .reset_ticket_statistics()
+        .await
+        .context("failed to reset ticket statistics")?;
+
+    let stats_after = cluster_fixture[mid]
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert_ne!(stats_before, stats_after);
+    assert_eq!(stats_after.winning_count, 0);
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    use hopr_lib::HoprSession;
+
+    let [src, dst] = exclusive_indexes::<2>();
+    let _session: HoprSession = cluster_fixture[src]
+        .create_raw_0_hop_session(&cluster_fixture[dst])
+        .await?;
+
+    // TODO: check here that the destination sees the new session created
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    use hopr_lib::HoprSession;
+
+    let [src, mid, dst] = exclusive_indexes::<3>();
+    let _session: HoprSession = cluster_fixture[src]
+        .create_1_hop_session(&cluster_fixture[mid], &cluster_fixture[dst], None, None)
+        .await?;
+
+    // TODO: check here that the destination sees the new session created
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    use futures::AsyncWriteExt;
+    use hopr_lib::HoprSession;
+    use tokio::time::sleep;
+
+    let [src, dst] = exclusive_indexes::<2>();
+    let mut session: HoprSession = cluster_fixture[src]
+        .create_raw_0_hop_session(&cluster_fixture[dst])
+        .await?;
+
+    sleep(Duration::from_secs(2)).await;
+
+    cluster_fixture[src]
+        .inner()
+        .keep_alive_session(&session.id())
+        .await
+        .context("failed to keep alive session")?;
+
+    sleep(Duration::from_secs(2)).await;
+
+    session
+        .write_all(b"ping")
+        .await
+        .context("failed to write to session before session sunsets")?;
+
+    sleep(Duration::from_secs(2)).await;
+
+    let _ = session.write_all(b"ping").await.is_err();
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    use hopr_lib::{HoprBalance, HoprSession, SurbBalancerConfig};
+
+    let [src, mid, dst] = exclusive_indexes::<3>();
+    let exp_config = SurbBalancerConfig {
+        target_surb_buffer_size: 10,
+        max_surbs_per_sec: 100,
+        ..Default::default()
+    };
 
     let _ = cluster_fixture[src]
         .inner()
@@ -168,168 +385,192 @@ async fn test_reset_ticket_statistics(#[future(awt)] cluster_fixture: ClusterGua
             FUNDING_AMOUNT.parse::<HoprBalance>()?,
         )
         .await
-        .expect("failed to open channel");
+        .context("failed to open forward channel")?;
 
-    // TODO: replace with session
-    // cluster_fixture[src]
-    //     .inner()
-    //     .send_message(
-    //         b"Hello, HOPR!".to_vec().into(),
-    //         DestinationRouting::forward_only(
-    //             cluster_fixture[dst].address(),
-    //             RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
-    //                 cluster_fixture[mid].address(),
-    //             ))),
-    //         ),
-    //         Tag::Application(1024),
-    //     )
-    //     .await
-    //     .expect("failed to send 1-hop message");
-
-    let stats_before = cluster_fixture[mid]
+    let _ = cluster_fixture[dst]
         .inner()
-        .ticket_statistics()
+        .open_channel(
+            &(cluster_fixture[mid].address()),
+            FUNDING_AMOUNT.parse::<HoprBalance>()?,
+        )
         .await
-        .expect("failed to get ticket statistics");
+        .context("failed to open return channel")?;
 
-    assert_eq!(stats_before.winning_count, 1); // As winning prob is set to 1
+    let session: HoprSession = cluster_fixture[src]
+        .create_1_hop_session(&cluster_fixture[mid], &cluster_fixture[dst], None, Some(exp_config))
+        .await?;
 
-    cluster_fixture[mid]
+    let config = cluster_fixture[src]
         .inner()
-        .reset_ticket_statistics()
+        .get_session_surb_balancer_config(&session.id())
         .await
-        .expect("failed to reset ticket statistics");
+        .context("failed to get surb balancer config")?;
 
-    let stats_after = cluster_fixture[mid]
+    assert_eq!(config, Some(exp_config));
+
+    cluster_fixture[src]
         .inner()
-        .ticket_statistics()
+        .update_session_surb_balancer_config(&session.id(), SurbBalancerConfig::default())
         .await
-        .expect("failed to get ticket statistics");
+        .context("failed to update surb balancer config")?;
 
-    assert_ne!(stats_before, stats_after);
-    assert_eq!(stats_after.winning_count, 0);
+    let config = cluster_fixture[src]
+        .inner()
+        .get_session_surb_balancer_config(&session.id())
+        .await
+        .context("failed to get surb balancer config")?;
+
+    assert_eq!(config, Some(SurbBalancerConfig::default()));
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn test_announced_accounts(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [idx1, idx2] = exclusive_indexes::<2>();
+
+    let accounts_addresses_1 = cluster_fixture[idx1]
+        .inner()
+        .accounts_announced_on_chain()
+        .await
+        .context("failed to get announced accounts")?
+        .into_iter()
+        .map(|acc| acc.chain_addr)
+        .collect::<Vec<Address>>();
+
+    let accounts_addresses_2 = cluster_fixture[idx2]
+        .inner()
+        .accounts_announced_on_chain()
+        .await
+        .context("failed to get announced accounts")?
+        .into_iter()
+        .map(|acc| acc.chain_addr)
+        .collect::<Vec<Address>>();
+
+    assert!(accounts_addresses_1.contains(&cluster_fixture[idx1].address()));
+    assert!(accounts_addresses_1.contains(&cluster_fixture[idx2].address()));
+
+    assert_eq!(accounts_addresses_1, accounts_addresses_2);
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn test_channel_retrieval(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [src, ext, dst] = exclusive_indexes::<3>();
+
+    let channel = cluster_fixture[src]
+        .inner()
+        .open_channel(&(cluster_fixture[dst].address()), FUNDING_AMOUNT.parse()?)
+        .await
+        .context("failed to open channel")?;
+
+    let channel_by_parties = cluster_fixture[ext]
+        .inner()
+        .channel(&(cluster_fixture[src].address()), &cluster_fixture[dst].address())
+        .await
+        .context("failed to get channel by parties")?
+        .context("channel not found")?;
+
+    let channel_from_ids = cluster_fixture[ext]
+        .inner()
+        .channels_from(&(cluster_fixture[src].address()))
+        .await
+        .context("failed to get channels from src")?
+        .into_iter()
+        .map(|c| c.get_id())
+        .collect::<Vec<ChannelId>>();
+
+    let channel_to_ids = cluster_fixture[ext]
+        .inner()
+        .channels_to(&(cluster_fixture[dst].address()))
+        .await
+        .context("failed to get channels to dst")?
+        .into_iter()
+        .map(|c| c.get_id())
+        .collect::<Vec<ChannelId>>();
+
+    assert_eq!(channel_by_parties.get_id(), channel.channel_id);
+    assert!(channel_from_ids.contains(&channel.channel_id));
+    assert!(channel_to_ids.contains(&channel.channel_id));
 
     Ok(())
 }
 
 // #[rstest]
 // #[tokio::test]
-// #[cfg(feature = "session-client")]
-// async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
-//     use std::str::FromStr;
-
-//     use futures::AsyncReadExt;
-//     use hopr_lib::{
-//         RoutingOptions, SessionClientConfig, SessionTarget,
-//         prelude::{ConnectedUdpStream, UdpStreamParallelism},
-//     };
-//     use hopr_transport_session::{Capabilities, Capability, IpOrHost, SealedHost};
-//     use tokio::net::UdpSocket;
-//     let [src, dst] = exclusive_indexess::<2>();
-
-//     let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
-
-//     let mut session = cluster_fixture[src]
-//         .inner()
-//         .connect_to(
-//             cluster_fixture[dst].address(),
-//             SessionTarget::UdpStream(SealedHost::Plain(ip)),
-//             SessionClientConfig {
-//                 forward_path_options: RoutingOptions::Hops(0_u32.try_into()?),
-//                 return_path_options: RoutingOptions::Hops(0_u32.try_into()?),
-//                 capabilities: Capabilities::from(Capability::Segmentation),
-//                 pseudonym: None,
-//                 surb_management: None,
-//                 always_max_out_surbs: true,
-//             },
-//         )
-//         .await
-//         .expect("creating a session must succeed")
-//
-
-//     const BUF_LEN: usize = 16384;
-
-//     let listener = ConnectedUdpStream::builder()
-//         .with_buffer_size(BUF_LEN)
-//         .with_queue_size(512)
-//         .with_receiver_parallelism(UdpStreamParallelism::Auto)
-//         .build(("127.0.0.1", 0))?;
-
-//     let addr = *listener.bound_address();
-
-//     let msg: [u8; 9183] = hopr_crypto_random::random_bytes();
-//     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
-
-//     let w = sender.send_to(&msg[..8192], addr).await?;
-//     assert_eq!(8192, w);
-
-//     let w = sender.send_to(&msg[8192..], addr).await?;
-//     assert_eq!(991, w);
-
-//     let mut recv_msg = [0u8; 9183];
-//     session.read_exact(&mut recv_msg).await?;
-
-//     assert_eq!(recv_msg, msg);
-
+// async fn test_corrupted_channels_TODO(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+//     // TODO
 //     Ok(())
 // }
 
-// #[rstest]
-// #[tokio::test]
-// #[cfg(feature = "session-client")]
-// async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: &Vec<HoprTester>) -> anyhow::Result<()> {
-//     let [src, mid, dst] = exclusive_indexes::<3>();
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [src, dst] = exclusive_indexes::<2>();
 
-//     let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
+    let withdrawn_amount = "0.005 xDai".parse::<hopr_lib::XDaiBalance>()?;
 
-//     cluster_fixture[src]
-//         .inner()
-//         .open_channel(
-//             &(cluster_fixture[mid].address()),
-//             FUNDING_AMOUNT.parse::<HoprBalance>()?,
-//         )
-//         .await
-//         .expect("failed to open channel");
+    let initial_balance_src = cluster_fixture[src]
+        .get_balance::<hopr_lib::XDai>()
+        .await
+        .context("should get node xdai balance")?;
 
-//     let mut session = cluster_fixture[src]
-//         .inner()
-//         .connect_to(
-//             cluster_fixture[dst].address(),
-//             SessionTarget::UdpStream(SealedHost::Plain(ip)),
-//             SessionClientConfig {
-//                 forward_path_options: hopr_lib::RoutingOptions::Hops(1_u32.try_into()?),
-//                 return_path_options: hopr_lib::RoutingOptions::Hops(1_u32.try_into()?),
-//                 capabilities: Capabilities::from(Capability::Segmentation),
-//                 pseudonym: None,
-//                 surb_management: None,
-//                 always_max_out_surbs: true,
-//             },
-//         )
-//         .await
-//         .expect("creating a session must succeed");
+    let initial_balance_dst = cluster_fixture[dst]
+        .get_balance::<hopr_lib::XDai>()
+        .await
+        .context("should get node xdai balance")?;
 
-//     const BUF_LEN: usize = 16384;
+    let _ = cluster_fixture[src]
+        .inner()
+        .withdraw_native(cluster_fixture[dst].address(), withdrawn_amount)
+        .await
+        .context("failed to withdraw native")?;
 
-//     let listener = ConnectedUdpStream::builder()
-//         .with_buffer_size(BUF_LEN)
-//         .with_queue_size(512)
-//         .with_receiver_parallelism(UdpStreamParallelism::Auto)
-//         .build(("127.0.0.1", 0))?;
+    let final_balance_src = cluster_fixture[src]
+        .get_balance::<hopr_lib::XDai>()
+        .await
+        .context("should get node xdai balance")?;
 
-//     let addr = *listener.bound_address();
+    let final_balance_dst = cluster_fixture[dst]
+        .get_balance::<hopr_lib::XDai>()
+        .await
+        .context("should get node xdai balance")?;
 
-//     let msg: [u8; 9183] = hopr_crypto_random::random_bytes();
-//     let sender = UdpSocket::bind(("127.0.0.1", 0)).await?;
+    assert_eq!(final_balance_dst, initial_balance_dst + withdrawn_amount);
+    assert!(final_balance_src < initial_balance_src - withdrawn_amount); // account for gas
+    Ok(())
+}
 
-//     let w = sender.send_to(&msg[..8192], addr).await?;
-//     assert_eq!(8192, w);
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn test_peerid_and_chain_key_conversion(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [candidate, tester] = exclusive_indexes::<2>();
 
-//     let w = sender.send_to(&msg[8192..], addr).await?;
-//     assert_eq!(991, w);
+    let peer_id = cluster_fixture[candidate].peer_id();
+    let chain_key = cluster_fixture[candidate].address();
 
-//     let mut recv_msg = [0u8; 9183];
-//     session.read_exact(&mut recv_msg).await?;
-//     assert_eq!(recv_msg, msg);
+    let derived_chain_key = cluster_fixture[tester]
+        .inner()
+        .peerid_to_chain_key(&peer_id)
+        .await
+        .context("failed to convert peer id to chain key")?
+        .context("no chain key found for peer id")?;
 
-//     Ok(())
-// }
+    let derived_peer_id = cluster_fixture[tester]
+        .inner()
+        .chain_key_to_peerid(&chain_key)
+        .await
+        .context("failed to convert chain key to peer id")?
+        .context("no peer id found for chain key")?;
+
+    assert_eq!(chain_key, derived_chain_key);
+    assert_eq!(peer_id, derived_peer_id);
+
+    Ok(())
+}

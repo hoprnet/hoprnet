@@ -1,6 +1,6 @@
 use std::{str::FromStr, time::Duration};
 
-use alloy::primitives::U256;
+use alloy::{primitives::U256, providers::ext::AnvilApi};
 use hopr_lib::{Address, state::HoprState};
 use once_cell::sync::Lazy;
 use serde_json::json;
@@ -26,7 +26,7 @@ impl std::ops::Deref for ClusterGuard {
     }
 }
 
-static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
+// static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
 static CLUSTER_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 pub const SNAPSHOT_BASE: &str = "/tmp/hopr-tests";
@@ -46,39 +46,35 @@ pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
 }
 
 #[rstest::fixture]
-pub async fn chainenv_fixture() -> &'static TestChainEnv {
-    use hopr_chain_rpc::client::SnapshotRequestor;
+pub async fn chainenv_fixture() -> TestChainEnv {
+    // CHAINENV_FIXTURE
+    //     .get_or_init(|| async {
 
-    CHAINENV_FIXTURE
-        .get_or_init(|| async {
-            env_logger::init();
+    // create the all parent folder of SNAPSHOT_BASE
+    std::fs::create_dir_all(SNAPSHOT_BASE).expect("failed to create snapshot base directory");
 
-            match std::process::Command::new("pkill").arg("-f").arg("anvil").output() {
-                Ok(_) => {
-                    info!("Killed existing anvil instances");
-                }
-                Err(_) => {
-                    info!("No existing anvil instances found");
-                }
-            };
-
-            // create the all parent folder of SNAPSHOT_BASE
-            std::fs::create_dir_all(SNAPSHOT_BASE).expect("failed to create snapshot base directory");
-
-            let requestor_base = SnapshotRequestor::new(format!("{}/snapshot", SNAPSHOT_BASE).as_str())
-                .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
-                .load(true)
-                .await;
-            let block_time = Duration::from_secs(1);
-            let finality = 2;
-
-            deploy_test_environment(requestor_base, block_time, finality).await
-        })
-        .await
+    match std::process::Command::new("pkill").arg("-f").arg("anvil").output() {
+        Ok(_) => {
+            info!("Killed existing anvil instances");
+        }
+        Err(_) => {
+            info!("No existing anvil instances found");
+        }
+    };
+    let load_file = format!("{SNAPSHOT_BASE}/anvil");
+    let res = deploy_test_environment(Duration::from_secs(1), 2, None, Some(load_file.as_str())).await;
+    match res {
+        Ok(env) => env,
+        Err(e) => {
+            panic!("Failed to deploy test environment: {e}");
+        }
+    }
+    // })
+    // .await
 }
 
 #[rstest::fixture]
-pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> ClusterGuard {
+pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> ClusterGuard {
     use std::fs::read_to_string;
 
     use hopr_lib::ProtocolsConfig;
@@ -90,8 +86,10 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
     // Acquire the mutex lock to ensure exclusive access to the cluster
     let lock = CLUSTER_MUTEX.lock().await;
 
+    // Load or not load from snapshot
+    let load_state = std::path::Path::new(&format!("{SNAPSHOT_BASE}/anvil")).exists();
+
     // SWARM_N_FIXTURE
-    //     .get_or_init(|| async {
     let protocol_config = ProtocolsConfig::from_str(
         &read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
     )
@@ -103,11 +101,11 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
 
     // Setup SWARM_N safes
     let mut safes = Vec::with_capacity(SWARM_N);
-    if std::path::Path::new("/tmp/hopr-tests/load_addresses").exists() {
-        // read safe address and module from file /tmp/hopr-tests/node_i/safe_addresses.json
+    if load_state {
+        // read safe address and module from file {SNAPSHOT_BASE}/node_i/safe_addresses.json
         for i in 0..SWARM_N {
             let addresses: serde_json::Value = serde_json::from_str(
-                &std::fs::read_to_string(format!("/tmp/hopr-tests/node_{i}/safe_addresses.json"))
+                &std::fs::read_to_string(format!("{SNAPSHOT_BASE}/node_{i}/safe_addresses.json"))
                     .expect("failed to read safe addresses from file"),
             )
             .expect("failed to parse safe addresses from file");
@@ -133,6 +131,10 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
             };
 
             safes.push(safe);
+
+            // remove folders under SNAPSHOT_BASE/node_i
+            std::fs::remove_dir_all(format!("{SNAPSHOT_BASE}/node_{i}/index_db")).ok();
+            std::fs::remove_dir_all(format!("{SNAPSHOT_BASE}/node_{i}/node_db")).ok();
         }
     } else {
         for i in 0..SWARM_N {
@@ -147,13 +149,12 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
                 "safe": safe.safe_address.to_string(),
                 "module": safe.module_address.to_string(),
             });
-            std::fs::create_dir_all(format!("/tmp/hopr-tests/node_{i}")).expect("failed to create directory");
+            std::fs::create_dir_all(format!("{SNAPSHOT_BASE}/node_{i}")).expect("failed to create directory");
             let _ = std::fs::write(
-                format!("/tmp/hopr-tests/node_{i}/safe_addresses.json"),
+                format!("{SNAPSHOT_BASE}/node_{i}/safe_addresses.json"),
                 serde_json::to_string_pretty(&safe_addresses).unwrap(),
             );
-            let _ = std::fs::write(format!("/tmp/hopr-tests/load_addresses"), "")
-                .expect("failed to write safe addresses to file");
+
             safes.push(safe);
         }
     }
@@ -181,7 +182,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
                         endpoint.clone(),
                         moved_config,
                         3001 + i as u16,
-                        format!("/tmp/hopr-tests/node_{i}"),
+                        format!("{SNAPSHOT_BASE}/node_{i}"),
                         moved_safes[i].clone(),
                     )
                 })
@@ -192,6 +193,17 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
     }))
     .await;
 
+    let dump_state = !std::path::Path::new(&format!("{SNAPSHOT_BASE}/anvil")).exists();
+    if dump_state {
+        let state = chainenv_fixture
+            .provider
+            .anvil_dump_state()
+            .await
+            .expect("failed to dump anvil state");
+
+        std::fs::write(format!("{SNAPSHOT_BASE}/anvil"), state.as_ref()).expect("failed to write anvil state to file");
+    }
+
     // Run all nodes in parallel
     futures::future::join_all(hopr_instances.iter().map(|instance| instance.run())).await;
     // Wait for all nodes to reach the 'Running' state
@@ -201,6 +213,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: &TestChainEnv) -> 
             .map(|instance| wait_for_status(instance, &HoprState::Running)),
     )
     .await;
+
     // Wait for full mesh connectivity
     futures::future::join_all(hopr_instances.iter().map(|instance| wait_for_connectivity(instance))).await;
 
