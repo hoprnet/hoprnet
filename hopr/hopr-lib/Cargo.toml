@@ -15,7 +15,8 @@ crate-type = ["rlib"]
 default = []
 session-client = []
 session-server = []
-transport-quic = ["hopr-transport/transport-quic"]
+transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
+transport-use-quic = ["hopr-transport/p2p-transport-quic"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",

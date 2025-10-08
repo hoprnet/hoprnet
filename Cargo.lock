@@ -5174,7 +5174,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5318,7 +5318,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -5411,7 +5411,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.13.4"
+version = "0.13.5"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5462,6 +5462,7 @@ dependencies = [
  "home",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-parallelize",
  "hoprd-api",
  "lazy_static",
  "opentelemetry",
