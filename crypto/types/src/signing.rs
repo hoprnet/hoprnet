@@ -238,7 +238,7 @@ impl OffchainSignature {
         ed25519_dalek::hazmat::raw_sign::<Sha512>(&expanded_sk, msg, &verifying).into()
     }
 
-    /// Verify this signature of the given message and [OffchainPublicKey].
+    /// Verify this signature of the given message and [`OffchainPublicKey`].
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
         let sgn = ed25519_dalek::Signature::from_slice(&self.0)
             .expect("cannot fail: OffchainSignature always contains a valid signature");
