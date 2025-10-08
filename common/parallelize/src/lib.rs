@@ -29,11 +29,8 @@ pub mod cpu {
     pub use rayon;
 
     /// Initialize a `rayon` CPU thread pool with the given number of threads.
-    pub fn init_thread_pool(num_threads: usize) {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build_global()
-            .unwrap();
+    pub fn init_thread_pool(num_threads: usize) -> Result<(), rayon::ThreadPoolBuildError> {
+        rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global()
     }
 
     /// Spawn an awaitable non-blocking execution of the given blocking function on a `rayon` CPU thread pool.

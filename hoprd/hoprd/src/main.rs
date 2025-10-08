@@ -158,7 +158,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
                  environment variable."
             ))?,
-    );
+    )?;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
