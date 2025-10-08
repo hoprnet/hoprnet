@@ -11,7 +11,8 @@ crate-type = ["rlib"]
 
 [features]
 default = ["mixer-channel"]
-transport-quic = []
+p2p-announce-quic = []
+p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
