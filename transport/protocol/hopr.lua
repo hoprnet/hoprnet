@@ -5,7 +5,7 @@
 
     Installation:
         mkdir -p $HOME/.local/lib/wireshark/plugins/
-        cp hopr.lua $HOME/.local/lib/wireshark/plugins/
+        cp transport/protocol/hopr.lua $HOME/.local/lib/wireshark/plugins/
 --]]
 
 -- HOPR Start Protocol Lua dissector
@@ -782,7 +782,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
         local ack_subtree = ack_in_tree:add("Acknowledgement Data")
         ack_subtree:add(hopr_fields.ack_key, buffer(offset, 32))
         offset = offset + 32
-        ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 32))
+        ack_subtree:add(hopr_fields.ack_sig, buffer(offset, 64))
         offset = offset + 64
 
     elseif pkt_type == 4 then -- AcknowledgementOut

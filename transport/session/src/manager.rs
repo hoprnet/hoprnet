@@ -1069,6 +1069,8 @@ where
             None
         };
 
+        // If some of the following code throws an error, the allocated slot will be kept
+        // but will be later re-claimed when it expires.
         if let Some(session_id) = allocated_slot {
             debug!(%session_id, ?session_req, "assigned a new session");
 
@@ -1222,17 +1224,21 @@ where
             };
 
             // Notify that a new incoming session has been created
-            new_session_notifier
+            match new_session_notifier
                 .send(incoming_session)
                 .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
                 .await
-                .unwrap_or_else(|_| {
+            {
+                Err(_) => {
                     error!(%session_id, "timeout to notify about new incoming session");
-                    Ok(())
-                })
-                .unwrap_or_else(|error| {
+                    return Err(TransportSessionError::Timeout);
+                }
+                Ok(Err(error)) => {
                     error!(%session_id, %error, "failed to notify about new incoming session");
-                });
+                    return Err(SessionManagerError::Other(error.to_string()).into());
+                }
+                _ => {}
+            };
 
             trace!(?session_id, "session notification sent");
 
