@@ -427,13 +427,13 @@ mod tests {
         delay: Option<std::time::Duration>,
         pass_rate: f64,
         from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
-    ) -> impl Fn((ApplicationDataOut, ResolvedTransportRouting)) -> BoxFuture<'static, ()> {
+    ) -> impl Fn((ResolvedTransportRouting, ApplicationDataOut)) -> BoxFuture<'static, ()> {
         debug_assert!(
             (NO_PROBE_PASSES..=ALL_PROBES_PASS).contains(&pass_rate),
             "Pass rate must be between {NO_PROBE_PASSES} and {ALL_PROBES_PASS}"
         );
 
-        move |(data_out, path): (ApplicationDataOut, ResolvedTransportRouting)| -> BoxFuture<'static, ()> {
+        move |(path, data_out): (ResolvedTransportRouting, ApplicationDataOut)| -> BoxFuture<'static, ()> {
             let mut from_network_to_probing_tx = from_network_to_probing_tx.clone();
 
             Box::pin(async move {
