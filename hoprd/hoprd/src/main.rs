@@ -157,7 +157,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or(anyhow::anyhow!(
                 "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
                  environment variable."
-            ))?,
+            ))?
+            .max(1),
     )?;
 
     tokio::runtime::Builder::new_multi_thread()
@@ -170,14 +171,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .ok_or(anyhow::anyhow!(
                     "Could not determine the number of IO threads to use. Please set the HOPRD_NUM_IO_THREADS \
                      environment variable."
-                ))?,
+                ))?
+                .max(1),
         )
         .thread_name("hoprd")
         .thread_stack_size(
             std::env::var("HOPRD_THREAD_STACK_SIZE")
                 .ok()
                 .and_then(|v| usize::from_str(&v).ok())
-                .unwrap_or(10 * 1024 * 1024),
+                .unwrap_or(10 * 1024 * 1024)
+                .max(2 * 1024 * 1024),
         )
         .build()?
         .block_on(main_inner())
