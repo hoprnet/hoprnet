@@ -215,6 +215,8 @@ where
             async move {
                 let max_surbs = data.estimate_surbs_with_msg();
 
+                tracing::debug!(?routing, "resolving packet routing");
+
                 match planner.resolve_routing(data.data.total_len(), max_surbs, routing).await {
                     Ok((resolved, rem_surbs)) => {
                         // Set the SURB distress/out-of-SURBs flag if applicable.
@@ -240,6 +242,8 @@ where
                         }
 
                         data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
+
+                        tracing::debug!(?resolved, "resolved packet routing");
 
                         // The awaiter here is intentionally dropped,
                         // since we do not intend to be notified about packet delivery to the first hop
