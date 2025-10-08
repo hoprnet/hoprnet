@@ -20,6 +20,7 @@ runtime-tokio = [
   "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-probe/runtime-tokio",
 ]
+transport-quic = ["libp2p/quic"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -28,10 +29,9 @@ lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = [
   "noise",
   "macros",
-  "tcp",
   "autonat",
-  "quic",
   "dns",
+  "tcp",
   "yamux",
   "kad",
 ] }
