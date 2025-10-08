@@ -204,6 +204,9 @@ where
                     tracing::warn!("udp packet capture initialized to {desc}");
                     Box::new(udp_writer)
                 } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
+                    if let Err(_) = std::env::var("HOPR_CAPTURE_PATH_TRIGGER") {
+                        tracing::warn!("HOPR_CAPTURE_PATH_TRIGGER not set, packet capture won't start");
+                    }
                     tracing::warn!("pcap file packet capture initialized to {desc}");
                     Box::new(pcap_writer)
                 } else {

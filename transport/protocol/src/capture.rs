@@ -116,21 +116,26 @@ pub fn packet_capture_channel(
     let ah = spawn_as_abortable!(async move {
         pin_mut!(receiver);
         while let Some(packet) = receiver.next().await {
-            let writer = writer.clone();
-            match hopr_async_runtime::prelude::spawn_blocking(move || {
-                writer
-                    .lock()
-                    .map_err(|_| std::io::Error::other("lock poisoned"))
-                    .and_then(|mut w| w.write_packet(packet))
-            })
-            .await
-            .map_err(std::io::Error::other)
-            {
-                Err(error) | Ok(Err(error)) => {
-                    tracing::warn!(%error, "cannot capture more packets due to error");
-                    break;
+            if let Ok(start_capturing_path) = std::env::var("HOPR_CAPTURE_PATH_TRIGGER") {
+                let path = std::path::Path::new(&start_capturing_path);
+                if path.exists() {
+                    let writer = writer.clone();
+                    match hopr_async_runtime::prelude::spawn_blocking(move || {
+                        writer
+                            .lock()
+                            .map_err(|_| std::io::Error::other("lock poisoned"))
+                            .and_then(|mut w| w.write_packet(packet))
+                    })
+                    .await
+                    .map_err(std::io::Error::other)
+                    {
+                        Err(error) | Ok(Err(error)) => {
+                            tracing::warn!(%error, "cannot capture more packets due to error");
+                            break;
+                        }
+                        _ => {}
+                    }
                 }
-                _ => {}
             }
         }
     });
@@ -334,7 +339,9 @@ mod tests {
     async fn test_file_capture() -> anyhow::Result<()> {
         let me = *OffchainKeypair::random().public();
 
+        let path = std::path::Path::new("test.pcap");
         let (pcap, ah) = packet_capture_channel(Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?));
+        std::File::create("test.pcap")?.set_len(0)?; // Clear the file if it exists
         pin_mut!(pcap);
 
         let packet = IncomingPacket::Final {
@@ -373,7 +380,9 @@ mod tests {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: SeqIndicator::new_with_flags(1, true),
-            data: Box::new(hex!("474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a")),
+            data: Box::new(hex!(
+                "474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a"
+            )),
         });
 
         let packet = IncomingPacket::Final {
@@ -400,7 +409,9 @@ mod tests {
             frame_id: 2,
             seq_idx: 0,
             seq_flags: SeqIndicator::new_with_flags(10, false),
-            data: Box::new(hex!("474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a")),
+            data: Box::new(hex!(
+                "474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a"
+            )),
         });
 
         let packet = IncomingPacket::Final {
