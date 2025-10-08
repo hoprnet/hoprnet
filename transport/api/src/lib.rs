@@ -78,7 +78,7 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 use rand::seq::SliceRandom;
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{Instrument, debug, error, info, trace, warn};
 
 pub use crate::{
     config::HoprTransportConfig,
@@ -525,6 +525,7 @@ where
                         }
                     }
                 }
+                .in_current_span()
             })
             .merge(resolved_routing_msg_rx);
 
