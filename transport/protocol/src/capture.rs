@@ -339,9 +339,9 @@ mod tests {
     async fn test_file_capture() -> anyhow::Result<()> {
         let me = *OffchainKeypair::random().public();
 
-        let path = std::path::Path::new("test.pcap");
+        std::env::set_var("HOPR_CAPTURE_PATH_TRIGGER", "/tmp/start_capturing");
+        File::create("/tmp/start_capturing")?;
         let (pcap, ah) = packet_capture_channel(Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?));
-        std::File::create("test.pcap")?.set_len(0)?; // Clear the file if it exists
         pin_mut!(pcap);
 
         let packet = IncomingPacket::Final {
