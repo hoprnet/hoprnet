@@ -5,6 +5,7 @@ pragma abicoder v2;
 import { Script } from "forge-std/Script.sol";
 
 import { ERC1820RegistryFixtureTest } from "../test/utils/ERC1820Registry.sol";
+import { SafeSingletonFixtureTest } from "../test/utils/SafeSingleton.sol";
 import { PermittableTokenFixtureTest } from "../test/utils/PermittableToken.sol";
 import { NetworkConfig } from "./utils/NetworkConfig.s.sol";
 import { BoostUtilsLib } from "./utils/BoostUtilsLib.sol";
@@ -16,14 +17,17 @@ import { WinProb } from "src/WinningProbabilityOracle.sol";
  * before running this script.
  * @dev It reads the environment, netork and deployer internal key from env variables
  */
-contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtureTest, PermittableTokenFixtureTest {
+contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest, PermittableTokenFixtureTest {
     using BoostUtilsLib for address;
 
     bool internal isHoprChannelsDeployed;
     bool internal isHoprNetworkRegistryDeployed;
     address private owner;
 
-    function setUp() public override(ERC1820RegistryFixtureTest) { }
+    function setUp() public override(ERC1820RegistryFixtureTest, SafeSingletonFixtureTest) {
+        ERC1820RegistryFixtureTest.setUp();
+        SafeSingletonFixtureTest.setUp();
+    }
 
     function run() external {
         // 1. Network check
@@ -40,6 +44,8 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         } else {
             owner = COMM_MULTISIG_ADDRESS;
         }
+        // deploy safe suites if needed
+        deployEntireSafeSuite();
 
         // 2. Get deployer internal key.
         // Set to default when it's in development environment (uint for
@@ -93,6 +99,9 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         // 3.9. WinningProbabilityOracle, with a default value of 1.0
         _deployHoprWinningProbabilityOracle(deployerAddress, WinProb.wrap(type(uint56).max));
+
+        // 3.10. NodeSafeMigration contract
+        _deployNodeSafeMigration();
 
         // 4. update indexerStartBlockNumber
         // if both HoprChannels and HoprNetworkRegistry contracts are deployed, update the startup block number for
@@ -327,6 +336,25 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             currentNetworkDetail.addresses.announcements = deployCode(
                 "Announcements.sol:HoprAnnouncements",
                 abi.encode(currentNetworkDetail.addresses.nodeSafeRegistryAddress)
+            );
+        }
+    }
+
+    /**
+     * @dev deploy NodeSafeMigration contract
+     */
+    function _deployNodeSafeMigration() internal {
+        if (
+            currentEnvironmentType == EnvironmentType.LOCAL
+                || !isValidAddress(currentNetworkDetail.addresses.nodeSafeMigrationAddress)
+        ) {
+            // deploy HoprNodeSafeMigration contract
+            currentNetworkDetail.addresses.nodeSafeMigrationAddress = deployCode(
+                "NodeSafeMigration.sol:HoprNodeSafeMigration",
+                abi.encode(
+                    currentNetworkDetail.addresses.moduleImplementationAddress,
+                    currentNetworkDetail.addresses.nodeStakeV2FactoryAddress
+                )
             );
         }
     }

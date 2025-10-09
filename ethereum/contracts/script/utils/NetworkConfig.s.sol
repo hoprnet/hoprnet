@@ -23,11 +23,12 @@ contract NetworkConfig is Script {
         address moduleImplementationAddress;
         address networkRegistryContractAddress;
         address networkRegistryProxyContractAddress;
+        address nodeSafeMigrationAddress;
         address nodeSafeRegistryAddress;
         address nodeStakeV2FactoryAddress;
         address ticketPriceOracleContractAddress;
-        address winningProbabilityContractAddress;
         address tokenContractAddress;
+        address winningProbabilityContractAddress;
     }
 
     struct NetworkDetailIntermediate {
@@ -106,6 +107,7 @@ contract NetworkConfig is Script {
         addresses.serialize("module_implementation", networkDetail.addresses.moduleImplementationAddress);
         addresses.serialize("network_registry", networkDetail.addresses.networkRegistryContractAddress);
         addresses.serialize("network_registry_proxy", networkDetail.addresses.networkRegistryProxyContractAddress);
+        addresses.serialize("node_safe_migration", networkDetail.addresses.nodeSafeMigrationAddress);
         addresses.serialize("node_safe_registry", networkDetail.addresses.nodeSafeRegistryAddress);
         addresses.serialize("node_stake_v2_factory", networkDetail.addresses.nodeStakeV2FactoryAddress);
         addresses.serialize("ticket_price_oracle", networkDetail.addresses.ticketPriceOracleContractAddress);
@@ -180,6 +182,14 @@ contract NetworkConfig is Script {
                     '"module_implementation_address": "',
                     vm.toString(networkDetail.addresses.moduleImplementationAddress),
                     '"'
+                )
+            )
+        );
+        vm.writeLine(
+            filePath,
+            string(
+                abi.encodePacked(
+                    '"node_safe_migration_address": "', vm.toString(networkDetail.addresses.nodeSafeMigrationAddress), '"'
                 )
             )
         );

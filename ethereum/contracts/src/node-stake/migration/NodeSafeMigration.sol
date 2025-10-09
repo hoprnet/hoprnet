@@ -95,6 +95,7 @@ contract HoprNodeSafeMigration is HoprNodeSafeMigrationEvents, SafeMigration, Ex
     ) {
         require(hasCode(moduleSingleton), "Module Singleton is not deployed");
         MODULE_SINGLETON = moduleSingleton;
+        require(hasCode(nodeStakeFactory), "Node Stake Factory is not deployed");
         FACTORY_ADDRESS = nodeStakeFactory;
     }
 
