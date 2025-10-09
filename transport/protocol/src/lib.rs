@@ -218,7 +218,7 @@ where
         let start_capturing_path: Option<PathBuf> = std::env::var("HOPR_CAPTURE_PATH_TRIGGER").ok().map(PathBuf::from);
         if let Some(ref path) = start_capturing_path {
             tracing::info!(
-                "To start capturing packets, create the file by 'touch {}'",
+                "To start capturing packets, create it by running 'touch {}'",
                 path.display()
             );
         } else {
