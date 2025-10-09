@@ -117,7 +117,12 @@ pub fn packet_capture_channel(
     let ah = spawn_as_abortable!(async move {
         pin_mut!(receiver);
         while let Some(packet) = receiver.next().await {
-            if start_capturing_path.as_ref().filter(|p| p.exists()).is_some() {
+            if start_capturing_path.as_ref().filter(|p| {
+                match p.symlink_metadata() {
+                    Ok(meta) => meta.file_type().is_file(),
+                    Err(_) => false,
+                }
+            }).is_some() {
                 let writer = writer.clone();
                 match hopr_async_runtime::prelude::spawn_blocking(move || {
                     writer
