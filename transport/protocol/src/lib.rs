@@ -194,36 +194,37 @@ where
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
     }
 
-    #[cfg(feature = "capture")]
     let capture = {
-        use std::str::FromStr;
-        let writer: Box<dyn capture::PacketWriter + Send + 'static> = if let Ok(desc) =
-            std::env::var("HOPR_CAPTURE_PACKETS")
-        {
-            if let Ok(udp_writer) = std::net::SocketAddr::from_str(&desc)
-                .map_err(std::io::Error::other)
-                .and_then(capture::UdpPacketDump::new)
-            {
-                tracing::warn!("udp packet capture initialized to {desc}");
-                Box::new(udp_writer)
-            } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
-                match std::env::var("HOPR_CAPTURE_PATH_TRIGGER") {
-                    Ok(ref v) => tracing::info!(%v, "To start capturing packets, create a by 'touch {v}'"),
-                    Err(ref e) => {
-                        tracing::warn!(%e, "The env var 'HOPR_CAPTURE_PATH_TRIGGER' is not set, packet capture won't start")
-                    }
+        use std::{path::PathBuf, str::FromStr};
+        let writer: Box<dyn capture::PacketWriter + Send + 'static> =
+            if let Ok(desc) = std::env::var("HOPR_CAPTURE_PACKETS") {
+                if let Ok(udp_writer) = std::net::SocketAddr::from_str(&desc)
+                    .map_err(std::io::Error::other)
+                    .and_then(capture::UdpPacketDump::new)
+                {
+                    tracing::warn!("udp packet capture initialized to {desc}");
+                    Box::new(udp_writer)
+                } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
+                    tracing::info!("pcap file packet capture initialized to {desc}");
+                    Box::new(pcap_writer)
+                } else {
+                    tracing::error!(desc, "failed to create packet capture: invalid socket address or file");
+                    Box::new(capture::NullWriter)
                 }
-                tracing::info!("pcap file packet capture initialized to {desc}");
-                Box::new(pcap_writer)
             } else {
-                tracing::error!(desc, "failed to create packet capture: invalid socket address or file");
+                tracing::warn!("no packet capture specified");
                 Box::new(capture::NullWriter)
-            }
+            };
+        let start_capturing_path: Option<PathBuf> = std::env::var("HOPR_CAPTURE_PATH_TRIGGER").ok().map(PathBuf::from);
+        if let Some(ref path) = start_capturing_path {
+            tracing::info!(
+                "To start capturing packets, create the file by 'touch {}'",
+                path.display()
+            );
         } else {
-            tracing::warn!("no packet capture specified");
-            Box::new(capture::NullWriter)
+            tracing::warn!("The env var 'HOPR_CAPTURE_PATH_TRIGGER' is not set, packet capture won't start");
         };
-        let (capture, ah) = capture::packet_capture_channel(writer);
+        let (capture, ah) = capture::packet_capture_channel(writer, start_capturing_path);
         processes.insert(ProtocolProcesses::Capture, ah);
         capture
     };
