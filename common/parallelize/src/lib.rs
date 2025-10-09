@@ -53,11 +53,11 @@ pub mod cpu {
     ///
     /// Executed tasks are loaded using a FIFO (First In First Out) scheduling policy.
     #[cfg(feature = "rayon")]
-    pub async fn spawn_fifo_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
+    pub async fn spawn_fifo_blocking<R: Send + std::fmt::Debug + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn_fifo(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
-                .unwrap_or_else(|_| unreachable!())
+                .unwrap_or_else(|e| panic!("spawned fifo blocking process should be awaitable {:?}", e))
         });
         rx.await
             .expect("spawned fifo blocking process should be awaitable")
