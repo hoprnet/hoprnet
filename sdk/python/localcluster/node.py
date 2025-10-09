@@ -225,6 +225,7 @@ class Node:
             "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
             "HOPR_CAPTURE_PACKETS": self.dir.joinpath(f"capture_{self.id}.pcap"),
+            "HOPR_CAPTURE_PATH_TRIGGER": self.dir.joinpath(f"capture_trigger_{self.id}.txt"),
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 

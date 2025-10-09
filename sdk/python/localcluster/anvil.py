@@ -45,7 +45,7 @@ class Anvil:
                 stdout=f,
                 stderr=STDOUT,
                 cwd=PWD,
-            )
+            ).wait()
 
         logging.info(f"Anvil started with PID: {self.process_id}")
 

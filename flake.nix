@@ -333,7 +333,17 @@
             # lldb
             rust-bin.stable.latest.minimal
             valgrind
-            gnutar # Used to extract the pcap file from the docker container
+
+            # Networking tools to debug network issues
+            tcpdump
+            iproute2
+            netcat
+            iptables
+            bind
+            curl
+            iputils
+            nmap
+            nethogs
           ];
 
           dockerHoprdEntrypoint = pkgs.writeShellScriptBin "docker-entrypoint.sh" ''

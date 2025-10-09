@@ -1,10 +1,13 @@
 import logging
 from pathlib import Path
+import os
 
 from sdk.python.api.balance import Balance
 
 logging.basicConfig(format="%(asctime)s %(message)s")
-logging.getLogger().setLevel(logging.INFO)
+# Read desired log level from environment variable (default: INFO)
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.getLogger().setLevel(log_level)
 
 OPEN_CHANNEL_FUNDING_VALUE_HOPR = Balance("1000 wxHOPR")
 TICKET_PRICE_PER_HOP = Balance("100 wxHOPR")

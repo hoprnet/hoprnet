@@ -3,9 +3,13 @@
     It however does not dissect raw network packets, but works only with custom
     diagnostic capture format enabled using the "capture" feature on this crate.
 
-    Installation:
+    Installation Linux:
         mkdir -p $HOME/.local/lib/wireshark/plugins/
         cp transport/protocol/hopr.lua $HOME/.local/lib/wireshark/plugins/
+
+    Installation MacOS:
+        mkdir -p ~/.config/wireshark/plugins
+        cp transport/protocol/hopr.lua ~/.config/wireshark/plugins/
 --]]
 
 -- HOPR Start Protocol Lua dissector

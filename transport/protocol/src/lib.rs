@@ -196,7 +196,7 @@ where
 
     #[cfg(feature = "capture")]
     let capture = {
-        use std::str::FromStr;
+        use std::{path::PathBuf, str::FromStr};
         let writer: Box<dyn capture::PacketWriter + Send + 'static> =
             if let Ok(desc) = std::env::var("HOPR_CAPTURE_PACKETS") {
                 if let Ok(udp_writer) = std::net::SocketAddr::from_str(&desc)
@@ -206,7 +206,7 @@ where
                     tracing::warn!("udp packet capture initialized to {desc}");
                     Box::new(udp_writer)
                 } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
-                    tracing::warn!("pcap file packet capture initialized to {desc}");
+                    tracing::info!("pcap file packet capture initialized to {desc}");
                     Box::new(pcap_writer)
                 } else {
                     tracing::error!(desc, "failed to create packet capture: invalid socket address or file");
@@ -216,7 +216,16 @@ where
                 tracing::warn!("no packet capture specified");
                 Box::new(capture::NullWriter)
             };
-        let (capture, ah) = capture::packet_capture_channel(writer);
+        let start_capturing_path: Option<PathBuf> = std::env::var("HOPR_CAPTURE_PATH_TRIGGER").ok().map(PathBuf::from);
+        if let Some(ref path) = start_capturing_path {
+            tracing::info!(
+                "To start capturing packets, create it by running 'touch {}'",
+                path.display()
+            );
+        } else {
+            tracing::warn!("The env var 'HOPR_CAPTURE_PATH_TRIGGER' is not set, packet capture won't start");
+        };
+        let (capture, ah) = capture::packet_capture_channel(writer, start_capturing_path);
         processes.insert(ProtocolProcesses::Capture, ah);
         capture
     };
