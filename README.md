@@ -249,7 +249,7 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_SURB_RB_SIZE` - number of incoming SURBs the ring buffer can hold (default: 10 000)
 - `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
 - `HOPR_CAPTURE_PACKETS` - allow capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Note that `hoprd` must be built with the `capture` feature.
-- `HOPR_CAPTURE_PATH_TRIGGER` - Path used as trigger to start capturing customized HOPR packets. When there exists a file in that path, it will start capturing data. 
+- `HOPR_CAPTURE_PATH_TRIGGER` - path used as trigger to start capturing customized HOPR packets. When there exists a file in that path, it will start capturing data.
 - `HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS` - maximum number of concurrently processed incoming packets from all peers (default: 10)
 - `HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS` - maximum time (in milliseconds) to wait until a stream connection is established to a peer (default: `2000 ms`)
 - `HOPR_PACKET_PLANNER_CONCURRENCY` - maximum number of concurrently planned outgoing packets (default: `10`)
