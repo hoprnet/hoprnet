@@ -238,7 +238,7 @@ pub type WireChannels = (
 
 #[allow(dead_code)]
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ApplicationDataOut, ResolvedTransportRouting)>,
+    futures::channel::mpsc::UnboundedSender<(ResolvedTransportRouting, ApplicationDataOut)>,
     futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationDataIn)>,
 );
 
@@ -285,7 +285,7 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting)>();
+            futures::channel::mpsc::unbounded::<(ResolvedTransportRouting, ApplicationDataOut)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let opk: &OffchainKeypair = &PEERS[i];
@@ -472,7 +472,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
         };
 
         sender
-            .send((ApplicationDataOut::with_no_packet_info(test_msg.clone()), routing))
+            .send((routing, ApplicationDataOut::with_no_packet_info(test_msg.clone())))
             .await?;
 
         sent_packet_count += 1;
