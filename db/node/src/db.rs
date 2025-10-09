@@ -27,7 +27,7 @@ pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
 
 pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
-pub const MIN_SURB_RING_BUFFER_SIZE: usize = 1024;
+
 
 #[derive(Clone, Debug, validator::Validate, smart_default::SmartDefault)]
 pub struct HoprNodeDbConfig {
@@ -37,12 +37,6 @@ pub struct HoprNodeDbConfig {
     pub force_create: bool,
     #[default(Duration::from_secs(5))]
     pub log_slow_queries: Duration,
-    #[default(10_000)]
-    #[validate(range(min = MIN_SURB_RING_BUFFER_SIZE))]
-    pub surb_ring_buffer_size: usize,
-    #[default(1000)]
-    #[validate(range(min = 2))]
-    pub surb_distress_threshold: usize,
 }
 
 #[derive(Clone)]
@@ -58,13 +52,6 @@ pub struct HoprNodeDb {
 
 impl HoprNodeDb {
     pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprNodeDbConfig) -> Result<Self, NodeDbError> {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
-            lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
-            lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
-        }
-
         cfg.validate().map_err(|e| NodeDbError::Other(e.into()))?;
 
         fs::create_dir_all(directory).map_err(|e| NodeDbError::Other(e.into()))?;

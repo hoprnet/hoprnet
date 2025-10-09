@@ -596,6 +596,31 @@ impl HoprDbTicketOperations for HoprNodeDb {
 
         Ok(Ok::<_, NodeDbError>(updated)?)
     }
+
+    async fn insert_received_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), Self::Error> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let verified_ticket = ticket.ticket.verified_ticket().clone();
+
+        self.ticket_manager.insert_ticket(ticket).await?;
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                &["unredeemed"],
+                self.ticket_manager
+                    .unrealized_value(TicketSelector::new(
+                        verified_ticket.channel_id,
+                        verified_ticket.channel_epoch,
+                    ))
+                    .await?
+                    .amount()
+                    .as_u128() as f64,
+            );
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["winning_count"], 1.0f64);
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["losing_count"], 1.0f64);
+        }
+        Ok(())
+    }
 }
 
 impl HoprNodeDb {

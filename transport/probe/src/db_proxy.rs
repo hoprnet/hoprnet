@@ -1,9 +1,8 @@
 use async_trait::async_trait;
 use hopr_api::{
     chain::ChainKeyOperations,
-    db::{FoundSurb, HoprDbProtocolOperations},
 };
-
+use hopr_transport_protocol::{FoundSurb, SurbStore};
 use crate::traits::DbOperations;
 
 #[derive(Debug, Clone)]
@@ -21,13 +20,12 @@ impl<T, R> DbProxy<T, R> {
 #[async_trait]
 impl<T, R> DbOperations for DbProxy<T, R>
 where
-    T: HoprDbProtocolOperations + Clone + Send + Sync + 'static,
+    T: SurbStore + Clone + Send + Sync + 'static,
     R: ChainKeyOperations + Clone + Send + Sync + 'static,
 {
     type ChainError = R::Error;
-    type DbError = T::Error;
 
-    async fn find_surb(&self, matcher: hopr_network_types::types::SurbMatcher) -> Result<FoundSurb, T::Error> {
+    async fn find_surb(&self, matcher: hopr_network_types::types::SurbMatcher) -> Option<FoundSurb> {
         tracing::trace!(target: "db_proxy", ?matcher, "finding SURB with matcher");
         self.db.find_surb(matcher).await
     }
