@@ -36,7 +36,10 @@ telemetry = [
   "dep:opentelemetry_sdk",
   "dep:tracing-opentelemetry",
 ]
-transport-quic = ["hopr-lib/transport-quic"]
+transport-quic = [
+  "hopr-lib/transport-announce-quic",
+  "hopr-lib/transport-use-quic",
+]
 explicit-path = ["hoprd-api/explicit-path"]
 capture = ["hopr-lib/capture"]
 # To use profiling:
@@ -88,6 +91,7 @@ hopr-lib = { workspace = true, features = [
 ] }
 hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-parallelize = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 
 # Target-specific dependencies for memory allocators

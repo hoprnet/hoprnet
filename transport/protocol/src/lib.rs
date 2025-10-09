@@ -76,6 +76,7 @@ mod capture;
 use std::{collections::HashMap, time::Duration};
 
 use futures::{FutureExt, SinkExt, StreamExt};
+use futures_time::future::FutureExt as FuturesTimeExt;
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbProtocolOperations, IncomingPacket},
@@ -97,7 +98,8 @@ use crate::errors::PacketProcessingError;
 pub use crate::timer::execute_on_tick;
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
-const SLOW_OP_MS: u128 = 150;
+const SLOW_OP: std::time::Duration = std::time::Duration::from_millis(150);
+const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 
 pub type HoprBinaryCodec = crate::codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
 pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
@@ -203,12 +205,12 @@ pub async fn run_msg_ack_protocol<Db, R>(
     db: Db,
     resolver: R,
     wire_msg: (
-        impl futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + Sync + 'static,
-        impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
+        impl futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
+        impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     ),
     api: (
-        impl futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
-        impl futures::Stream<Item = (ApplicationDataOut, ResolvedTransportRouting)> + Send + Sync + 'static,
+        impl futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
+        impl futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
@@ -339,18 +341,21 @@ where
                                 .await
                             {
                                 Ok(ack_packet) => {
-                                    let now = std::time::Instant::now();
-                                    if msg_to_send_tx_clone
+                                    msg_to_send_tx_clone
                                         .send((ack_packet.next_hop.into(), ack_packet.data))
+                                        .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
                                         .await
-                                        .is_err()
-                                    {
-                                        tracing::error!("failed to forward an acknowledgement to the transport layer");
-                                    }
-                                    let elapsed = now.elapsed();
-                                    if elapsed.as_millis() > SLOW_OP_MS {
-                                        tracing::warn!(?elapsed, " msg_to_send_tx.send on ack took too long");
-                                    }
+                                        .unwrap_or_else(|_| {
+                                            tracing::error!(
+                                                "failed to forward an acknowledgement to the transport layer: timeout"
+                                            );
+                                            Ok(())
+                                        })
+                                        .unwrap_or_else(|_| {
+                                            tracing::error!(
+                                                "failed to forward an acknowledgement to the transport layer"
+                                            );
+                                        });
 
                                     #[cfg(feature = "capture")]
                                     let _ = capture.try_send(captured_packet);
@@ -379,7 +384,7 @@ where
         spawn_as_abortable!(async move {
             let _neverending = api
                 .1
-                .then_concurrent(|(data, routing)| {
+                .then_concurrent(|(routing, data)| {
                     let msg_processor = msg_processor_write.clone();
 
                     #[cfg(feature = "capture")]
@@ -479,7 +484,7 @@ where
                         let now = std::time::Instant::now();
                         let res = msg_processor.recv(peer_key, data).await;
                         let elapsed = now.elapsed();
-                        if elapsed.as_millis() > SLOW_OP_MS {
+                        if elapsed > SLOW_OP {
                             tracing::warn!(%peer, ?elapsed, "msg_processor.recv took too long");
                         }
 
@@ -495,15 +500,17 @@ where
                                 // Potentially adversarial behavior
                                 tracing::trace!(%peer, "not sending ack back on undecodable packet - possible adversarial behavior");
                             } else {
-                                let now = std::time::Instant::now();
-
-                                if let Err(error) = ack_out_tx.send((None, peer_key)).await {
-                                    tracing::error!(%error, "failed to send ack to the egress queue");
-                                }
-                                let elapsed = now.elapsed();
-                                if elapsed.as_millis() > SLOW_OP_MS {
-                                    tracing::warn!(%peer, ?elapsed, "ack_out.send on failed packet took too long");
-                                }
+                                ack_out_tx
+                                    .send((None, peer_key))
+                                    .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+                                    .await
+                                    .unwrap_or_else(|_| {
+                                        tracing::error!("failed to send ack to the egress queue: timeout");
+                                        Ok(())
+                                    })
+                                    .unwrap_or_else(|_| {
+                                        tracing::error!("failed to send ack to the egress queue");
+                                    });
                             }
                         }
 
@@ -566,14 +573,18 @@ where
                             ..
                         } => {
                             tracing::trace!(%previous_hop, "acknowledging ticket using received ack");
-                            let now = std::time::Instant::now();
-                            if let Err(error) = ticket_ack_tx_clone.send((ack, previous_hop)).await {
-                                tracing::error!(%error, "failed dispatching received acknowledgement to the ticket ack queue");
-                            }
-                            let elapsed = now.elapsed();
-                            if elapsed.as_millis() > SLOW_OP_MS {
-                                tracing::warn!(?elapsed," ack_tx.send took too long");
-                            }
+                            ticket_ack_tx_clone
+                                .send((ack, previous_hop))
+                                .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+                                .await
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("failed dispatching received acknowledgement to the ticket ack queue: timeout");
+                                    Ok(())
+                                })
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("failed dispatching received acknowledgement to the ticket ack queue");
+                                });
+
                             // We do not acknowledge back acknowledgements.
                             None
                         },
@@ -586,15 +597,17 @@ where
                             ..
                         } => {
                             // Send acknowledgement back
-                            tracing::trace!(%previous_hop, "acknowledging final packet back");
-                            let now = std::time::Instant::now();
-                            if let Err(error) = ack_out_tx.send((Some(ack_key), previous_hop)).await {
-                                tracing::error!(%error, "failed to send ack to the egress queue");
-                            }
-                            let elapsed = now.elapsed();
-                            if elapsed.as_millis() > SLOW_OP_MS {
-                                tracing::warn!(%previous_hop, ?elapsed, "ack_out.send on final packet took too long");
-                            }
+                            ack_out_tx
+                                .send((Some(ack_key), previous_hop))
+                                .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+                                .await
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("failed to send ack to the egress queue: timeout");
+                                    Ok(())
+                                })
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("failed to send ack to the egress queue");
+                                });
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             {
@@ -627,7 +640,12 @@ where
 
                             msg_to_send_tx
                                 .send((next_hop.into(), data))
+                                .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
                                 .await
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("failed to forward a packet to the transport layer: timeout");
+                                    Ok(())
+                                })
                                 .unwrap_or_else(|_| {
                                     tracing::error!("failed to forward a packet to the transport layer");
                                 });
@@ -642,14 +660,17 @@ where
 
                              // Send acknowledgement back
                             tracing::trace!(%previous_hop, "acknowledging forwarded packet back");
-                            let now = std::time::Instant::now();
-                            if let Err(error) = ack_out_tx.send((Some(ack_key), previous_hop)).await {
-                                tracing::error!(%error, "failed to send ack to the egress queue");
-                            }
-                            let elapsed = now.elapsed();
-                            if elapsed.as_millis() > SLOW_OP_MS {
-                                tracing::warn!(%previous_hop, ?elapsed, "ack_out.send on forwarded packet took too long");
-                            }
+                            ack_out_tx
+                                .send((Some(ack_key), previous_hop))
+                                .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+                                .await
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("failed to send ack to the egress queue: timeout");
+                                    Ok(())
+                                })
+                                .unwrap_or_else(|_| {
+                                    tracing::error!("failed to send ack to the egress queue");
+                                });
 
                             None
                         }

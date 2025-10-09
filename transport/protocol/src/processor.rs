@@ -737,39 +737,6 @@ where
     }
 }
 
-pub type SendMsgInput = (ApplicationDataOut, ResolvedTransportRouting);
-
-#[derive(Debug, Clone)]
-pub struct MsgSender<T>
-where
-    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + Unpin,
-{
-    tx: T,
-}
-
-impl<T> MsgSender<T>
-where
-    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + Unpin,
-{
-    pub fn new(tx: T) -> Self {
-        Self { tx }
-    }
-
-    /// Pushes a new packet into processing.
-    #[tracing::instrument(level = "trace", skip(self, data))]
-    pub async fn send_packet(
-        &self,
-        data: ApplicationDataOut,
-        routing: ResolvedTransportRouting,
-    ) -> Result<(), PacketError> {
-        self.tx
-            .clone()
-            .send((data, routing))
-            .await
-            .map_err(|_| TransportError("failed to send a message".into()))
-    }
-}
-
 /// Configuration parameters for the packet interaction.
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {

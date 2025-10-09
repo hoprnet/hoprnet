@@ -260,6 +260,9 @@ On top of the default configuration options generated for the command line, the 
 - `HOPRD_SESSION_ENTRY_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Entry node (defaults to number of CPU cores)
 - `HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Exit node (defaults to number of CPU cores)
 - `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
+- `HOPRD_NUM_CPU_THREADS` - sets the number of threads for CPU-bound tasks (default: number of CPU cores / 2)
+- `HOPRD_NUM_IO_THREADS` - sets the number of threads for IO-bound tasks (default: number of CPU cores / 2)
+- `HOPRD_THREAD_STACK_SIZE` - sets the thread stack size (default: 10 MB)
 
 ### Example execution
 
