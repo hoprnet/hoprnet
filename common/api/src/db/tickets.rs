@@ -374,6 +374,8 @@ pub trait HoprDbTicketOperations {
     ///
     /// Returns the number of updated ticket indices.
     async fn persist_outgoing_ticket_indices(&self) -> Result<usize, Self::Error>;
+
+    async fn insert_received_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), Self::Error>;
 }
 
 /// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.

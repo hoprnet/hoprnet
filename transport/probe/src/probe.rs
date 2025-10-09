@@ -286,12 +286,11 @@ mod tests {
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::db::FoundSurb;
     use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_network_types::prelude::SurbMatcher;
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
-
+    use hopr_transport_protocol::FoundSurb;
     use super::*;
 
     lazy_static::lazy_static!(
@@ -340,11 +339,10 @@ mod tests {
     #[async_trait]
     impl DbOperations for Cache {
         type ChainError = Infallible;
-        type DbError = Infallible;
 
-        async fn find_surb(&self, _matcher: SurbMatcher) -> Result<FoundSurb, Self::DbError> {
+        async fn find_surb(&self, _matcher: SurbMatcher) -> Option<FoundSurb> {
             // Mock implementation for testing purposes
-            Ok(FoundSurb {
+            Some(FoundSurb {
                 sender_id: HoprSenderId::random(),
                 surb: random_memory_violating_surb(),
                 remaining: 0,

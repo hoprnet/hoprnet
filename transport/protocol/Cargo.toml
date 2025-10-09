@@ -27,11 +27,13 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true }
+hex = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 pcap-file = { workspace = true, optional = true }
+ringbuffer = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }

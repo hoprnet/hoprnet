@@ -72,14 +72,16 @@ pub mod timer;
 /// Requires the `capture` feature to be enabled.
 #[cfg(feature = "capture")]
 mod capture;
+mod traits;
+mod surb_store;
+mod types;
 
 use std::{collections::HashMap, time::Duration};
-
-use futures::{FutureExt, SinkExt, StreamExt};
+use std::ops::Deref;
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use futures_time::future::FutureExt as FuturesTimeExt;
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
-    db::{HoprDbProtocolOperations, IncomingPacket},
 };
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::{HalfKey, OffchainPublicKey};
@@ -93,9 +95,15 @@ use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
-use hopr_api::db::{HoprDbTicketOperations, IncomingPacketError, OutgoingPacket};
-use crate::errors::PacketProcessingError;
+use hopr_api::db::HoprDbTicketOperations;
+use hopr_crypto_types::prelude::{ChainKeypair, OffchainKeypair};
+use crate::surb_store::MemorySurbStore;
 pub use crate::timer::execute_on_tick;
+use crate::traits::{PacketUnwrapping, PacketWrapping};
+use crate::types::{IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket};
+
+pub use traits::SurbStore;
+pub use types::FoundSurb;
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 const SLOW_OP: std::time::Duration = std::time::Duration::from_millis(150);
@@ -104,11 +112,11 @@ const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis
 pub type HoprBinaryCodec = crate::codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
 pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
 
-pub const TICKET_ACK_BUFFER_SIZE: usize = 1_000_000;
-pub const NUM_CONCURRENT_TICKET_ACK_PROCESSING: usize = 10;
+const TICKET_ACK_BUFFER_SIZE: usize = 1_000_000;
+const NUM_CONCURRENT_TICKET_ACK_PROCESSING: usize = 10;
 
-pub const ACK_OUT_BUFFER_SIZE: usize = 1_000_000;
-pub const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
+const ACK_OUT_BUFFER_SIZE: usize = 1_000_000;
+const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -122,43 +130,6 @@ lazy_static::lazy_static! {
         "hopr_replayed_packet_count",
         "The total count of replayed packets during the packet processing pipeline run",
     ).unwrap();
-}
-
-#[async_trait::async_trait]
-pub trait PacketWrapping {
-    type Input;
-    type Error;
-
-    async fn send(
-        &self,
-        data: ApplicationDataOut,
-        routing: ResolvedTransportRouting,
-    ) -> Result<OutgoingPacket, Self::Error>;
-
-    async fn send_ack(
-        &self,
-        ack: Acknowledgement,
-        destination: &OffchainPublicKey,
-    ) -> Result<OutgoingPacket, Self::Error>;
-}
-
-#[async_trait::async_trait]
-pub trait PacketUnwrapping {
-    type Packet;
-
-    type Error;
-
-    async fn recv(
-        &self,
-        peer: OffchainPublicKey,
-        data: Box<[u8]>,
-    ) -> Result<Self::Packet, IncomingPacketError<Self::Error>>;
-
-    async fn recv_ack(
-        &self,
-        peer: OffchainPublicKey,
-        ack: Acknowledgement,
-    ) -> Result<(), Self::Error>;
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -201,6 +172,7 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
 /// overlay on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db, R>(
+    (chain_key, packet_key): (ChainKeypair, OffchainKeypair),
     packet_cfg: processor::PacketInteractionConfig,
     db: Db,
     resolver: R,
@@ -217,10 +189,8 @@ where
     Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Clone + Send + Sync + 'static,
 {
-    let me = packet_cfg.packet_keypair.clone();
-
     #[cfg(feature = "capture")]
-    let me_pub = *hopr_crypto_types::keypairs::Keypair::public(&me);
+    let me_pub = *hopr_crypto_types::keypairs::Keypair::public(&packet_key);
 
     let mut processes = HashMap::new();
 
@@ -261,30 +231,27 @@ where
     let tbf = std::sync::Arc::new(parking_lot::Mutex::new(TagBloomFilter::default()));
 
     let (ticket_ack_tx, ticket_ack_rx) =
-        futures::channel::mpsc::channel::<(Acknowledgement, OffchainPublicKey)>(TICKET_ACK_BUFFER_SIZE);
+        futures::channel::mpsc::channel::<(OffchainPublicKey, Acknowledgement)>(TICKET_ACK_BUFFER_SIZE);
 
-    let db_clone = db.clone();
-    let resolver_clone = resolver.clone();
+    let hopr_packet_processor = processor::PacketProcessor::new(
+        db.clone(),
+        resolver.clone(),
+        MemorySurbStore::default(),
+        chain_key,
+        packet_key.clone(),
+        packet_cfg,
+    );
+
+    let ack_processor_in = hopr_packet_processor.clone();
     processes.insert(
         ProtocolProcesses::TicketAck,
         spawn_as_abortable!(ticket_ack_rx
-            .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(ack, sender)| {
-                let db = db_clone.clone();
-                let resolver = resolver_clone.clone();
-                async move {
-                    if let Ok(verified) = hopr_parallelize::cpu::spawn_blocking(move || ack.verify(&sender)).await {
-                        tracing::trace!(%sender, "received a valid acknowledgement");
-                            match db.handle_acknowledgement(verified, &resolver).await {
-                                Ok(_) => tracing::trace!(%sender, "successfully processed a known acknowledgement"),
-                                // Eventually, we do not care here if the acknowledgement does not belong to any
-                                // unacknowledged packets.
-                                Err(error) => tracing::trace!(%sender, %error, "valid acknowledgement is unknown or error occurred while processing it"),
-                            }
-                    } else {
-                        tracing::error!(%sender, "failed to verify signature on acknowledgement");
-                    }
-                }
-            })
+            .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, ack)|
+                ack_processor_in
+                    .recv_ack(peer, ack)
+                    .inspect_err(|error| tracing::error!(%error, "failed to acknowledge ticket"))
+                    .map(|_| ())
+            )
             .inspect(|_| tracing::warn!(task = "transport (protocol - ticket acknowledgement)", "long-running background task finished")))
     );
 
@@ -294,9 +261,8 @@ where
     #[cfg(feature = "capture")]
     let capture_clone = capture.clone();
 
-    let db_clone = db.clone();
-    let resolver_clone = resolver.clone();
-    let me_clone = me.clone();
+    let ack_processor_out = hopr_packet_processor.clone();
+    let packet_key_clone = packet_key.clone();
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
         ProtocolProcesses::AckOut,
@@ -305,9 +271,7 @@ where
                 .for_each_concurrent(
                     NUM_CONCURRENT_ACK_OUT_PROCESSING,
                     move |(maybe_ack_key, destination)| {
-                        let db = db_clone.clone();
-                        let resolver = resolver_clone.clone();
-                        let me = me_clone.clone();
+                        let packet_key = packet_key_clone.clone();
                         let mut msg_to_send_tx_clone = msg_to_send_tx.clone();
 
                         #[cfg(feature = "capture")]
@@ -316,14 +280,14 @@ where
                             #[cfg(feature = "capture")]
                             let (is_random, me_pub) = (
                                 maybe_ack_key.is_none(),
-                                *hopr_crypto_types::keypairs::Keypair::public(&me),
+                                *hopr_crypto_types::keypairs::Keypair::public(&packet_key),
                             );
 
                             // Sign acknowledgement with the given half-key or generate a signed random one
                             let ack = hopr_parallelize::cpu::spawn_blocking(move || {
                                 maybe_ack_key
-                                    .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &me))
-                                    .unwrap_or_else(|| VerifiedAcknowledgement::random(&me))
+                                    .map(|ack_key| VerifiedAcknowledgement::new(ack_key, &packet_key))
+                                    .unwrap_or_else(|| VerifiedAcknowledgement::random(&packet_key))
                             })
                             .await;
 
@@ -336,10 +300,7 @@ where
                             }
                             .into();
 
-                            match db
-                                .to_send_no_ack(ack.leak().as_ref().into(), destination, &resolver)
-                                .await
-                            {
+                            match ack_processor_out.send_ack(ack.leak(), &destination).await{
                                 Ok(ack_packet) => {
                                     msg_to_send_tx_clone
                                         .send((ack_packet.next_hop.into(), ack_packet.data))
@@ -372,8 +333,7 @@ where
         ),
     );
 
-    let msg_processor_read = processor::PacketProcessor::new(db.clone(), resolver.clone(), packet_cfg);
-    let msg_processor_write = msg_processor_read.clone();
+    let msg_processor_write = hopr_packet_processor.clone();
 
     #[cfg(feature = "capture")]
     let capture_clone = capture.clone();
@@ -392,7 +352,7 @@ where
                         (capture_clone.clone(), data.clone(), routing.count_return_paths() as u8);
 
                     async move {
-                        match PacketWrapping::send(&msg_processor, data, routing).await {
+                        match msg_processor.send_data(data, routing).await{
                             Ok(v) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
@@ -456,7 +416,7 @@ where
             let _neverending = wire_msg
                 .1
                 .then_concurrent(move |(peer, data)| {
-                    let msg_processor = msg_processor_read.clone();
+                    let msg_processor = hopr_packet_processor.clone();
                     let mut ack_out_tx = ack_out_tx_clone_1.clone();
                     let peer_id_key_cache = peer_id_cache.clone();
 
@@ -482,7 +442,7 @@ where
                         };
 
                         let now = std::time::Instant::now();
-                        let res = msg_processor.recv(peer_key, data).await;
+                        let res = msg_processor.recv_data(peer_key, data).await;
                         let elapsed = now.elapsed();
                         if elapsed > SLOW_OP {
                             tracing::warn!(%peer, ?elapsed, "msg_processor.recv took too long");
@@ -532,23 +492,17 @@ where
 
                     futures::future::ready(
                         if let Some(packet) = maybe_packet {
-                            match packet {
-                                IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
-                                IncomingPacket::Final { packet_tag, previous_hop,.. } |
-                                IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
-                                    // This operation has run-time of ~10 nanoseconds,
-                                    // and therefore does not need to be invoked via spawn_blocking
-                                    if tbf.lock().check_and_set(&packet_tag) {
-                                        tracing::warn!(%previous_hop, "replayed packet received");
+                            // This operation has run-time of ~10 nanoseconds,
+                            // and therefore does not need to be invoked via spawn_blocking
+                            if tbf.lock().check_and_set(packet.packet_tag()) {
+                                tracing::warn!(previous_hop = %packet.previous_hop(), "replayed packet received");
 
-                                        #[cfg(all(feature = "prometheus", not(test)))]
-                                        METRIC_REPLAYED_PACKET_COUNT.increment();
+                                #[cfg(all(feature = "prometheus", not(test)))]
+                                METRIC_REPLAYED_PACKET_COUNT.increment();
 
-                                        None
-                                    } else {
-                                        Some(packet)
-                                    }
-                                }
+                                None
+                            } else {
+                                Some(packet)
                             }
                         } else {
                             tracing::trace!("received empty packet");
@@ -567,14 +521,11 @@ where
                     async move {
 
                     match packet {
-                        IncomingPacket::Acknowledgement {
-                            previous_hop,
-                            ack,
-                            ..
-                        } => {
+                        IncomingPacket::Acknowledgement(ack) => {
+                            let IncomingAcknowledgementPacket { previous_hop, ack, .. } = *ack;
                             tracing::trace!(%previous_hop, "acknowledging ticket using received ack");
                             ticket_ack_tx_clone
-                                .send((ack, previous_hop))
+                                .send((previous_hop, ack))
                                 .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
                                 .await
                                 .unwrap_or_else(|_| {
@@ -588,14 +539,16 @@ where
                             // We do not acknowledge back acknowledgements.
                             None
                         },
-                        IncomingPacket::Final {
-                            previous_hop,
-                            sender,
-                            plain_text,
-                            ack_key,
-                            info,
-                            ..
-                        } => {
+                        IncomingPacket::Final(final_packet) => {
+                            let IncomingFinalPacket {
+                                previous_hop,
+                                sender,
+                                plain_text,
+                                ack_key,
+                                info,
+                                ..
+                            } = *final_packet;
+
                             // Send acknowledgement back
                             ack_out_tx
                                 .send((Some(ack_key), previous_hop))
@@ -616,13 +569,15 @@ where
 
                             Some((sender, plain_text, info))
                         }
-                        IncomingPacket::Forwarded {
-                            previous_hop,
-                            next_hop,
-                            data,
-                            ack_key,
-                            ..
-                        } => {
+                        IncomingPacket::Forwarded(fwd_packet) => {
+                            let IncomingForwardedPacket {
+                                previous_hop,
+                                next_hop,
+                                data,
+                                ack_key,
+                                ..
+                            } = *fwd_packet;
+
                             // First, relay the packet to the next hop
                             tracing::trace!(%previous_hop, %next_hop, "forwarding packet to the next hop");
 
