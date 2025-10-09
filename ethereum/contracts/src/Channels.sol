@@ -15,6 +15,7 @@ import { HoprMultiSig } from "./MultiSig.sol";
 import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
 uint256 constant INDEX_SNAPSHOT_INTERVAL = 1 days; // in seconds
+uint48 constant BASE_INDEX_OFFSET = 1; // minimum offset for aggregated tickets
 
 abstract contract HoprChannelsEvents {
     /**
@@ -66,7 +67,6 @@ abstract contract HoprChannelsEvents {
  * @notice The following imported types should be renamed:
  * - HoprChannels.Balance -> HoprChannelsType.Balance
  * - HoprChannels.TicketIndex -> HoprChannelsType.TicketIndex
- * - HoprChannels.TicketIndexOffset -> HoprChannelsType.TicketIndexOffset
  * - HoprChannels.ChannelEpoch -> HoprChannelsType.ChannelEpoch
  * - HoprChannels.Timestamp -> HoprChannelsType.Timestamp
  * - HoprChannels.WinProb -> HoprChannelsType.WinProb
@@ -76,7 +76,6 @@ abstract contract HoprChannelsEvents {
 abstract contract HoprChannelsType {
     type Balance is uint96;
     type TicketIndex is uint48;
-    type TicketIndexOffset is uint32;
     type ChannelEpoch is uint24;
     type Timestamp is uint32; // overflows in year 2105
     // Using IEEE 754 double precision -> 53 significant bits
@@ -213,7 +212,7 @@ contract HoprChannels is
     error InvalidVRFProof();
     error InsufficientChannelBalance();
     error TicketIsNotAWin();
-    error InvalidAggregatedTicketInterval();
+    error InvalidTicketIndex();
     error WrongToken();
     error InvalidTokenRecipient();
     error InvalidTokensReceivedUsage();
@@ -231,10 +230,6 @@ contract HoprChannels is
         // (uint48) highest channel.ticketIndex to accept when redeeming
         // ticket, used to aggregate tickets off-chain
         TicketIndex ticketIndex;
-        // (uint32) delta by which channel.ticketIndex gets increased when redeeming
-        // the ticket, should be set to 1 if ticket is not aggregated, and >1 if
-        // it is aggregated. Must never be <1.
-        TicketIndexOffset indexOffset;
         // (uint24) replay protection, invalidates all tickets once payment channel
         // gets closed
         ChannelEpoch epoch;
@@ -425,13 +420,12 @@ contract HoprChannels is
         }
 
         // Aggregatable Tickets - validity interval:
-        // A ticket has a base index and an offset. The offset must be > 0,
+        // A ticket has a base index. Redeeming it bumps the channel's ticket index by BASE_INDEX_OFFSET
         // while the base index must be >= the currently set ticket index in the
         // channel.
         uint48 baseIndex = TicketIndex.unwrap(redeemable.data.ticketIndex);
-        uint32 baseIndexOffset = TicketIndexOffset.unwrap(redeemable.data.indexOffset);
-        if (baseIndexOffset < 1 || baseIndex < TicketIndex.unwrap(spendingChannel.ticketIndex)) {
-            revert InvalidAggregatedTicketInterval();
+        if (baseIndex < TicketIndex.unwrap(spendingChannel.ticketIndex)) {
+            revert InvalidTicketIndex();
         }
 
         if (Balance.unwrap(spendingChannel.balance) < Balance.unwrap(redeemable.data.amount)) {
@@ -457,7 +451,7 @@ contract HoprChannels is
             revert InvalidTicketSignature();
         }
 
-        spendingChannel.ticketIndex = TicketIndex.wrap(baseIndex + baseIndexOffset);
+        spendingChannel.ticketIndex = TicketIndex.wrap(baseIndex + BASE_INDEX_OFFSET);
         spendingChannel.balance =
             Balance.wrap(Balance.unwrap(spendingChannel.balance) - Balance.unwrap(redeemable.data.amount));
         indexEvent(
@@ -872,22 +866,22 @@ contract HoprChannels is
     function _getTicketHash(RedeemableTicket calldata redeemable) public view returns (bytes32) {
         address challenge = HoprCrypto.scalarTimesBasepoint(redeemable.porSecret);
 
-        // TicketData is aligned to exactly 2 EVM words, from which channelId
-        // takes one. Removing channelId can thus be encoded in 1 EVM word.
+        // TicketData is aligned to approximately 2 EVM words, from which channelId
+        // takes one. Removing channelId can thus be encoded in less than 1 EVM word.
         //
         // Tickets get signed and transferred in packed encoding, consuming
-        // 148 bytes, including signature and challenge. Using tight encoding
+        // 144 bytes, including signature and challenge. Using tight encoding
         // for ticket hash unifies on-chain and off-chain usage of tickets.
-        uint256 secondPart = (uint256(Balance.unwrap(redeemable.data.amount)) << 160)
-            | (uint256(TicketIndex.unwrap(redeemable.data.ticketIndex)) << 112)
-            | (uint256(TicketIndexOffset.unwrap(redeemable.data.indexOffset)) << 80)
+        uint256 secondPart = (uint256(Balance.unwrap(redeemable.data.amount)) << 128)
+            | (uint256(TicketIndex.unwrap(redeemable.data.ticketIndex)) << 80)
             | (uint256(ChannelEpoch.unwrap(redeemable.data.epoch)) << 56) | uint256(WinProb.unwrap(redeemable.data.winProb));
 
         // Deviates from EIP712 due to computed property and non-standard struct property encoding
         // with efficient hashing.
+        // secondPart is encoded in compact form, in 28 bytes
         bytes32 hashStruct = EfficientHashLib.hash(
             bytes32(this.redeemTicket.selector),
-            keccak256(abi.encodePacked(redeemable.data.channelId, secondPart, challenge))
+            keccak256(abi.encodePacked(redeemable.data.channelId, uint224(secondPart), challenge))
         );
 
         // forge-lint: disable-next-line(asm-keccak256)

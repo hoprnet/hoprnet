@@ -4,7 +4,7 @@ pragma solidity >=0.6.0 <0.9.0;
 import { Test } from "forge-std/Test.sol";
 
 import { ERC1820RegistryFixtureTest } from "./utils/ERC1820Registry.sol";
-import { HoprChannels, HoprChannelsType, HoprChannelsEvents } from "../src/Channels.sol";
+import { BASE_INDEX_OFFSET, HoprChannels, HoprChannelsType, HoprChannelsEvents } from "../src/Channels.sol";
 import { HoprLedgerEvents } from "../src/Ledger.sol";
 import { CryptoUtils } from "./utils/Crypto.sol";
 import { HoprMultiSig } from "../src/MultiSig.sol";
@@ -915,7 +915,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -927,9 +926,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -946,7 +944,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
@@ -961,7 +958,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         HoprChannelsType.Channel memory tmpChannel = getChannelFromTuple(src, dest);
         tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
-        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + indexOffset);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceDecreased(redeemable.data.channelId, _unwrapChannel(tmpChannel));
@@ -978,7 +975,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         tmpChannel = getChannelFromTuple(src, dest);
         tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
-        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + indexOffset);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceDecreased(redeemable.data.channelId, _unwrapChannel(tmpChannel));
@@ -1000,7 +997,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         tmpChannel = getChannelFromTuple(src, dest);
         tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
-        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + indexOffset);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         // Now test Safe integration
         vm.expectEmit(true, false, false, true, address(hoprChannels));
@@ -1017,7 +1014,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
         tmpChannel = getChannelFromTuple(src, dest);
         tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
-        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + indexOffset);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceDecreased(redeemable.data.channelId, _unwrapChannel(tmpChannel));
@@ -1046,7 +1043,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         channelAmount = uint96(bound(channelAmount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         amount = uint96(bound(amount, MIN_USED_BALANCE, channelAmount));
-        uint32 indexOffset = uint32(1);
         uint48 maxTicketIndex = uint48(6);
         uint48 channelTicketIndex = uint48(1);
 
@@ -1064,7 +1060,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
@@ -1079,7 +1074,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         
         HoprChannelsType.Channel memory tmpChannel = getChannelFromTuple(src, dest);
         tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
-        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + indexOffset);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit TicketRedeemed(redeemable.data.channelId, _unwrapChannel(tmpChannel));
@@ -1087,7 +1082,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         hoprChannels.redeemTicket(redeemable, vrf);
 
         for (uint256 i = 1; i < uint256(maxTicketIndex - channelTicketIndex); i++) {
-            vm.expectRevert(HoprChannels.InvalidAggregatedTicketInterval.selector);
+            vm.expectRevert(HoprChannels.InvalidTicketIndex.selector);
             vm.prank(dest);
             hoprChannels.redeemTicket(redeemable, vrf);
         }
@@ -1102,7 +1097,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelBAAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1115,9 +1109,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelABAmount = uint96(bound(channelABAmount, amount, MAX_USED_BALANCE));
         channelBAAmount = uint96(bound(channelBAAmount, 0, type(uint96).max - amount));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1140,7 +1133,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
@@ -1151,7 +1143,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         HoprChannelsType.Channel memory abChannel = getChannelFromTuple(src, dest);
         abChannel.balance = HoprChannelsType.Balance.wrap(channelABAmount - amount);
-        abChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + indexOffset);
+        abChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
         HoprChannelsType.Channel memory baChannel = getChannelFromTuple(dest, src);
         baChannel.balance = HoprChannelsType.Balance.wrap(channelBAAmount + amount);
 
@@ -1179,7 +1171,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1191,9 +1182,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1209,7 +1199,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_0),
             porSecret
@@ -1236,7 +1225,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1247,9 +1235,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
         vm.assume(channelAmount < amount);
 
         address src = vm.addr(privKeyA);
@@ -1266,7 +1253,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_0),
             porSecret
@@ -1293,7 +1279,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1304,9 +1289,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
         vm.assume(privKeyA != privKeyB);
 
         address src = vm.addr(privKeyA);
@@ -1323,7 +1307,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
@@ -1350,7 +1333,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1362,9 +1344,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1380,7 +1361,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_0),
             porSecret
@@ -1411,7 +1391,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint48 channelTicketIndex
     )
         public
@@ -1422,9 +1401,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1440,7 +1418,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             1,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_0),
             porSecret
@@ -1465,7 +1442,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1477,9 +1453,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1495,7 +1470,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
@@ -1526,7 +1500,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1538,9 +1511,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1556,7 +1528,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
             HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
@@ -1588,75 +1559,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function testRevert_redeemTicketInvalidAggregatedTicket(
-        uint256 privKeyA,
-        uint256 privKeyB,
-        uint256 porSecret,
-        uint96 channelAmount,
-        uint96 amount,
-        uint48 maxTicketIndex,
-        uint32 indexOffset,
-        uint24 epoch,
-        uint48 channelTicketIndex
-    )
-        public
-    {
-        porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
-        privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
-        privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
-        vm.assume(privKeyA != privKeyB);
-        amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
-        channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
-
-        address src = vm.addr(privKeyA);
-        address dest = vm.addr(privKeyB);
-
-        _helperNoSafeSetMock(dest);
-        _helperTokenTransferMock(dest, amount);
-
-        RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
-            privKeyA,
-            privKeyB,
-            hoprChannels.domainSeparator(),
-            src,
-            dest,
-            amount,
-            maxTicketIndex,
-            indexOffset,
-            epoch,
-            HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
-            porSecret
-        );
-
-        hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
-        );
-
-        (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args);
-
-        redeemable.data.indexOffset = HoprChannelsType.TicketIndexOffset.wrap(0);
-
-        vm.startPrank(dest);
-
-        vm.expectRevert(HoprChannels.InvalidAggregatedTicketInterval.selector);
-        hoprChannels.redeemTicket(redeemable, vrf);
-
-        channelTicketIndex = uint48(bound(channelTicketIndex, 1, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, 0, channelTicketIndex));
-
-        hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
-        );
-
-        vm.expectRevert(HoprChannels.InvalidAggregatedTicketInterval.selector);
-        hoprChannels.redeemTicket(redeemable, vrf);
-
-        vm.clearMockedCalls();
-    }
 
     function test_tokensReceivedSingle(
         address operator,
