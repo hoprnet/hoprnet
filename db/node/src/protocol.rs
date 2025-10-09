@@ -614,14 +614,22 @@ impl HoprDbProtocolOperations for HoprNodeDb {
 
                 Ok(match incoming.ack_key {
                     None => {
-                        // The contained payload represents an Acknowledgement
+                        let num_acks =
+                            u16::from_be_bytes(incoming.plain_text[..size_of::<u16>()].try_into().map_err(|_| {
+                                IncomingPacketError::ProcessingError(NodeDbError::LogicalError(
+                                    "invalid ack number".into(),
+                                ))
+                            })?);
+
+                        // The contained payload represents Acknowledgements
                         IncomingPacket::Acknowledgement {
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
-                            ack: incoming
-                                .plain_text
-                                .as_ref()
-                                .try_into()
+                            acknowledgements: incoming.plain_text
+                                [size_of::<u16>()..size_of::<u16>() + num_acks as usize * Acknowledgement::SIZE]
+                                .chunks_exact(Acknowledgement::SIZE)
+                                .map(Acknowledgement::try_from)
+                                .collect::<Result<Vec<_>, _>>()
                                 .map_err(|e| IncomingPacketError::ProcessingError(NodeDbError::TypeError(e)))?,
                         }
                     }
