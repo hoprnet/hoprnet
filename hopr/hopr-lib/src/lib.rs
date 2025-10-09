@@ -393,10 +393,7 @@ impl Hopr {
     ) -> errors::Result<(
         hopr_transport::socket::HoprSocket<
             futures::channel::mpsc::Receiver<ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(
-                hopr_transport::ApplicationDataOut,
-                hopr_network_types::types::DestinationRouting,
-            )>,
+            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         >,
         HashMap<state::HoprLibProcesses, AbortHandle>,
     )> {

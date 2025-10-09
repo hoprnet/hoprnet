@@ -3,7 +3,7 @@ use thiserror::Error;
 /// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]
 pub enum TransportSessionError {
-    #[error("connection timed out")]
+    #[error("session operation timed out")]
     Timeout,
 
     #[error("incorrect data size")]
