@@ -194,6 +194,7 @@ where
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
     }
 
+    #[cfg(feature = "capture")]
     let capture = {
         use std::{path::PathBuf, str::FromStr};
         let writer: Box<dyn capture::PacketWriter + Send + 'static> =
