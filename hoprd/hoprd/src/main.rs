@@ -100,7 +100,6 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .build()
                     .tracer(env!("CARGO_PKG_NAME"));
                 info!(
-                    otel_service_name = %service_name,
                     otel_exporter = "otlp",
                     "OpenTelemetry tracing enabled"
                 );
