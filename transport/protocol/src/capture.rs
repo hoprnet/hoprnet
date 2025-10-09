@@ -117,22 +117,29 @@ pub fn packet_capture_channel(
     let ah = spawn_as_abortable!(async move {
         pin_mut!(receiver);
         while let Some(packet) = receiver.next().await {
-            if start_capturing_path.as_ref().filter(|p| p.exists()).is_some() {
-                let writer = writer.clone();
-                match hopr_async_runtime::prelude::spawn_blocking(move || {
-                    writer
-                        .lock()
-                        .map_err(|_| std::io::Error::other("lock poisoned"))
-                        .and_then(|mut w| w.write_packet(packet))
-                })
-                .await
-                .map_err(std::io::Error::other)
-                {
-                    Err(error) | Ok(Err(error)) => {
-                        tracing::warn!(%error, "cannot capture more packets due to error");
-                        break;
+            if let Some(path) = &start_capturing_path {
+                match (std::fs::symlink_metadata(path), std::fs::metadata(path)) {
+                    (Ok(lm), Ok(m)) if !lm.file_type().is_symlink() && m.is_file() => {
+                        let writer = writer.clone();
+                        match hopr_async_runtime::prelude::spawn_blocking(move || {
+                            writer
+                                .lock()
+                                .map_err(|_| std::io::Error::other("lock poisoned"))
+                                .and_then(|mut w| w.write_packet(packet))
+                        })
+                        .await
+                        .map_err(std::io::Error::other)
+                        {
+                            Err(error) | Ok(Err(error)) => {
+                                tracing::warn!(%error, "cannot capture more packets due to error");
+                                break;
+                            }
+                            _ => {}
+                        }
                     }
-                    _ => {}
+                    _ => {
+                        tracing::warn!(path = %path.display(), "capture trigger is not a regular file or inaccessible, skipping packet capture");
+                    }
                 }
             }
         }
