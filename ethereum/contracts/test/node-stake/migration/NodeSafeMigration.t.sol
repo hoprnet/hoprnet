@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/Test.sol";
-
+import { Test } from "forge-std/Test.sol";
 import { HoprNodeManagementModule } from "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
-import { HoprCapabilityPermissions } from "../../../src/node-stake/permissioned-module/CapabilityPermissions.sol";
 import { HoprNodeStakeFactory, HoprNodeStakeFactoryEvents } from "../../../src/node-stake/NodeStakeFactory.sol";
 import { HoprNodeSafeMigration, HoprNodeSafeMigrationEvents, IOwner } from "../../../src/node-stake/migration/NodeSafeMigration.sol";
 import { Enum, ISafe } from "../../../src/utils/ISafe.sol";
-import { IAvatar } from "../../../../src/interfaces/IAvatar.sol";
+import { IAvatar } from "../../../src/interfaces/IAvatar.sol";
 import { ERC1820RegistryFixtureTest } from "../../utils/ERC1820Registry.sol";
 import { SafeSuiteLibV141 } from "../../../src/utils/SafeSuiteLibV141.sol";
 import { SafeSuiteLibV150 } from "../../../src/utils/SafeSuiteLibV150.sol";
@@ -78,7 +76,7 @@ contract NodeSafeMigrationTest is Test, ERC1820RegistryFixtureTest, SafeSingleto
     /**
      * @dev preflight check if all the safe contracts are well set
      */
-    function test_SafeSuiteSetupForMigration() public {
+    function test_SafeSuiteSetupForMigration() public view {
         // there's code in Singleton contract
         assertTrue(hasSingletonContract());
         // there's code in ERC1820 contract

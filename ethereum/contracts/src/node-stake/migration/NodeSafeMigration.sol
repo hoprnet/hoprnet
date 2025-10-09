@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.8.0 <0.9.0;
 
-import "forge-std/Test.sol";
-
-import { Enum, Safe } from "safe-contracts-1.4.1/Safe.sol";
 import { Executor } from "safe-contracts-1.4.1/base/Executor.sol";
 import { ISafe, SafeMigration } from "safe-contracts-1.5.0/libraries/SafeMigration.sol";
 import { SafeSuiteLibV141 } from "../../utils/SafeSuiteLibV141.sol";
 import { SafeSuiteLibV150 } from "../../utils/SafeSuiteLibV150.sol";
-import { IAvatar } from "../../interfaces/IAvatar.sol";
+import { IAvatar, Enum } from "../../interfaces/IAvatar.sol";
 import { IHoprNodeStakeFactory } from "../NodeStakeFactory.sol";
 import { IHoprNodeManagementModule } from "../../interfaces/INodeManagementModule.sol";
 

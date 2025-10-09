@@ -210,6 +210,7 @@ abstract contract SafeSingletonFixtureTest is Test {
      * bytecode extracted from 0x29fcB43b46531BcA003ddC8FCB67FFE91900C762,
      * according to https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.4.1/safe_l2.json
      */
+    // forge-lint: disable-next-line(mixed-case-function)
     function deploySafeL2V141() internal contractIsNotDeployed(SafeSuiteLibV141.SAFE_SafeL2_ADDRESS) {
         // deployment code extracted from production contract
         bytes memory code =
@@ -223,6 +224,7 @@ abstract contract SafeSingletonFixtureTest is Test {
      * bytecode extracted from 0xEdd160fEBBD92E350D4D398fb636302fccd67C7e,
      * according to https://github.com/safe-global/safe-deployments/blob/main/src/assets/v1.5.0/safe_l2.json
      */
+    // forge-lint: disable-next-line(mixed-case-function)
     function deploySafeL2V150() internal contractIsNotDeployed(SafeSuiteLibV150.SAFE_SafeL2_ADDRESS) {
         // deployment code extracted from production contract
         bytes memory code =

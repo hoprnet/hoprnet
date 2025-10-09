@@ -53,6 +53,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
     Role internal role;
     // to indicate that this is a NodeManagementModule, to be compatible with v3.x network
+    // forge-lint: disable-next-line(screaming-snake-case-const)
     bool public constant isHoprNodeManagementModule = true;
 
     event SetMultisendAddress(address indexed multisendAddress);
