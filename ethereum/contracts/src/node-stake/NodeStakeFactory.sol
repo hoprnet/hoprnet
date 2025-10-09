@@ -105,7 +105,7 @@ contract HoprNodeStakeFactory is HoprNodeStakeFactoryEvents, Ownable2Step, IERC7
 
     // Safe library addresses. Defaults to SafeSuiteLibV141 constants, but can be updated by the owner
     SafeLibAddress public safeLibAddresses = SafeLibAddress({
-        safeAddress: SafeSuiteLibV141.SAFE_Safe_ADDRESS,
+        safeAddress: SafeSuiteLibV141.SAFE_SafeL2_ADDRESS,
         safeProxyFactoryAddress: SafeSuiteLibV141.SAFE_SafeProxyFactory_ADDRESS,
         fallbackHandlerAddress: SafeSuiteLibV150.SAFE_CompatibilityFallbackHandler_ADDRESS,
         multiSendAddress: SafeSuiteLibV141.SAFE_MultiSend_ADDRESS

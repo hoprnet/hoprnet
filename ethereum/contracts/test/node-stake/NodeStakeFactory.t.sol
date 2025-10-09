@@ -577,7 +577,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         return abi.encodeWithSignature("multiSend(bytes)", encodePacked);
     }
 
-        /**
+    /**
      * @dev when caller is owner of safe instance, prepare a signature and execute the transaction
      */
     function _helperSafeTxnToMultiSend(ISafe safeInstance, uint256 senderPrivateKey, uint256 nonce, bytes memory data) private {

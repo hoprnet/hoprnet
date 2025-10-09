@@ -4,6 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import "forge-std/Test.sol";
 
 import { Enum, Safe } from "safe-contracts-1.4.1/Safe.sol";
+import { Executor } from "safe-contracts-1.4.1/base/Executor.sol";
 import { ISafe, SafeMigration } from "safe-contracts-1.5.0/libraries/SafeMigration.sol";
 import { SafeSuiteLibV141 } from "../../utils/SafeSuiteLibV141.sol";
 import { SafeSuiteLibV150 } from "../../utils/SafeSuiteLibV150.sol";
@@ -53,7 +54,7 @@ abstract contract HoprNodeSafeMigrationEvents {
  *
  * The contract also supports migration of the module singleton address to a newer version.
  */
-contract HoprNodeSafeMigration is HoprNodeSafeMigrationEvents, SafeMigration {
+contract HoprNodeSafeMigration is HoprNodeSafeMigrationEvents, SafeMigration, Executor {
     // The address of the ERC1820 registry contract
     address internal constant ERC1820_ADDRESS = 0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24;
     /**
@@ -89,7 +90,7 @@ contract HoprNodeSafeMigration is HoprNodeSafeMigrationEvents, SafeMigration {
         address nodeStakeFactory
     ) SafeMigration(
         SafeSuiteLibV150.SAFE_SafeL2_ADDRESS,
-        SafeSuiteLibV150.SAFE_SafeL2_ADDRESS,
+        SafeSuiteLibV141.SAFE_SafeL2_ADDRESS,
         SafeSuiteLibV150.SAFE_CompatibilityFallbackHandler_ADDRESS
     ) {
         require(hasCode(moduleSingleton), "Module Singleton is not deployed");
@@ -116,7 +117,6 @@ contract HoprNodeSafeMigration is HoprNodeSafeMigrationEvents, SafeMigration {
         address oldModuleProxy,
         bytes32 defaultTarget,
         uint256 nonce,
-        address prevModule,
         address[] memory nodes
     ) public onlyDelegateCall onlyEnabledModule(oldModuleProxy) {
         // migrate the safe from v1.4.1 to v1.4.1 SafeL2, and set the fallback handler
@@ -130,11 +130,12 @@ contract HoprNodeSafeMigration is HoprNodeSafeMigrationEvents, SafeMigration {
             keccak256("ERC777TokensRecipient"),
             address(this)
         );
-        IAvatar(address(this)).execTransactionFromModule(
+        execute(
             ERC1820_ADDRESS,
             0,
             setInterfaceData,
-            Enum.Operation.Call
+            Enum.Operation.Call,
+            gasleft() - 2500
         );
 
         // deploy a new module contract
@@ -144,7 +145,7 @@ contract HoprNodeSafeMigration is HoprNodeSafeMigrationEvents, SafeMigration {
         // enable the newly deployed module
         IAvatar(address(this)).enableModule(newModuleProxy);
         // disable the old module
-        IAvatar(address(this)).disableModule(prevModule, oldModuleProxy);
+        IAvatar(address(this)).disableModule(newModuleProxy, oldModuleProxy);
 
         emit SafeAndModuleMigrationCompleted(address(this), oldModuleProxy, newModuleProxy);
     }
