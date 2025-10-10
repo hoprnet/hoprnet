@@ -39,7 +39,7 @@ pub enum NetworkRegistryStatus {
 
 /// Enumeration of HOPR chain events.
 #[allow(clippy::large_enum_variant)] // TODO: Refactor the large enum variant
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, strum::EnumTryAs)]
 pub enum ChainEventType {
     /// Peer on-chain announcement event.
     Announcement {

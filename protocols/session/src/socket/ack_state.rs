@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::{FutureExt, StreamExt, channel::mpsc::UnboundedSender};
+use futures::{FutureExt, StreamExt, channel::mpsc::Sender};
 use futures_time::stream::StreamExt as TimeStreamExt;
 use tracing::Instrument;
 
@@ -123,7 +123,7 @@ struct AcknowledgementStateContext<const C: usize> {
     outgoing_frame_retries_tx: SkipDelaySender<RetriedFrameId>,
     ack_tx: futures::channel::mpsc::Sender<FrameId>,
     inspector: FrameInspector,
-    ctl_tx: UnboundedSender<SessionMessage<C>>,
+    ctl_tx: Sender<SessionMessage<C>>,
 }
 
 #[cfg_attr(doc, aquamarine::aquamarine)]
@@ -469,7 +469,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             .into_iter()
             .try_for_each(|s| {
                 tracing::trace!(seg_id = %s.id(), "retransmit segment on request");
-                ctx.ctl_tx.unbounded_send(SessionMessage::Segment(s))
+                ctx.ctl_tx.try_send(SessionMessage::Segment(s))
             })
             .map_err(|e| SessionError::ProcessingError(e.to_string()))
     }
@@ -626,7 +626,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -671,7 +671,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -731,7 +731,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -764,7 +764,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -800,7 +800,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -840,7 +840,7 @@ mod tests {
         };
 
         let inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let mut state = AcknowledgementState::<MTU>::new("test", cfg);
         state.run(SocketComponents {
@@ -909,7 +909,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
@@ -955,7 +955,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
@@ -998,7 +998,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let segments = segment(hopr_crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
 
@@ -1063,7 +1063,7 @@ mod tests {
         };
 
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
-        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::channel(1024);
 
         let segments = segment(hopr_crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
 

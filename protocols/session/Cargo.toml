@@ -1,6 +1,6 @@
 [package]
 name = "hopr-protocol-session"
-version = "1.0.0"
+version = "1.0.2"
 edition = "2024"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementation of Session protocol according to HOPR RFC-0007"
@@ -30,7 +30,6 @@ futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
 hashbrown = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
-mimalloc = { workspace = true }
 pin-project = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
@@ -74,3 +73,7 @@ required-features = ["runtime-tokio"]
 [[bench]]
 name = "socket_bench"
 harness = false
+
+# Target-specific dependencies for memory allocators
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.6.0"

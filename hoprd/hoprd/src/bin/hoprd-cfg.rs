@@ -68,8 +68,8 @@ fn main() -> Result<(), hoprd::errors::HoprdError> {
             .into_string()
             .map_err(|_| hoprd::errors::HoprdError::ConfigError("file path not convertible".into()))?;
 
-        let yaml_configuration = hopr_platform::file::native::read_to_string(&cfg_path)
-            .map_err(|e| hoprd::errors::HoprdError::ConfigError(e.to_string()))?;
+        let yaml_configuration =
+            std::fs::read_to_string(&cfg_path).map_err(|e| hoprd::errors::HoprdError::ConfigError(e.to_string()))?;
 
         let cfg: HoprdConfig = serde_yaml::from_str(&yaml_configuration)
             .map_err(|e| hoprd::errors::HoprdError::SerializationError(e.to_string()))?;

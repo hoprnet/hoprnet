@@ -14,7 +14,6 @@ alloy = { workspace = true, default-features = false, features = [
 ] }
 # using own fork until the PR was merged
 clap = { workspace = true }
-mimalloc = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
@@ -43,3 +42,7 @@ tempfile = { workspace = true }
 env_logger = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
+
+# Target-specific dependencies for memory allocators
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.6.0"

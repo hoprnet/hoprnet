@@ -37,7 +37,7 @@
 //! #### Example use in Rust
 //!
 //! ```rust
-//! use hopr_metrics::metrics::*;
+//! use hopr_metrics::*;
 //!
 //! let metric_counter = SimpleCounter::new("test_counter", "Some testing counter").unwrap();
 //!
@@ -75,7 +75,9 @@
 //! println!("{:?}", gathered_metrics);
 //! ```
 
+mod guard;
 /// Contains definitions of metric types.
-pub mod metrics;
+mod metrics;
 
-pub use crate::metrics::*;
+pub use guard::*;
+pub use metrics::*;

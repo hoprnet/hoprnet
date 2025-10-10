@@ -44,12 +44,7 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
     let hopr = state.hopr.clone();
 
     match hopr.get_ticket_price().await {
-        Ok(Some(price)) => (StatusCode::OK, Json(TicketPriceResponse { price })).into_response(),
-        Ok(None) => (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            ApiErrorStatus::UnknownFailure("The ticket price is not available".into()),
-        )
-            .into_response(),
+        Ok(price) => (StatusCode::OK, Json(TicketPriceResponse { price })).into_response(),
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }

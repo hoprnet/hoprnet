@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-actions"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -14,15 +14,10 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-tokio = [
-  "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
   "hopr-chain-rpc/runtime-tokio",
 ]
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-chain-rpc/prometheus",
-  "hopr-db-sql/prometheus",
-]
+prometheus = ["dep:hopr-metrics", "hopr-chain-rpc/prometheus"]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
@@ -30,7 +25,6 @@ alloy = { workspace = true, default-features = false, features = [
   "json-rpc",
   "node-bindings",
 ] }
-async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
@@ -47,6 +41,7 @@ hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-api = { workspace = true }
 hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
@@ -61,3 +56,4 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }

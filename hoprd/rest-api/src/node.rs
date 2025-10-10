@@ -6,8 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, prelude::Hash};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -41,8 +40,8 @@ pub(crate) struct NodeVersionResponse {
         ),
         tag = "Node"
     )]
-pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let version = state.hopr.version();
+pub(super) async fn version() -> impl IntoResponse {
+    let version = hopr_lib::constants::APP_VERSION.to_string();
     (StatusCode::OK, Json(NodeVersionResponse { version })).into_response()
 }
 
@@ -495,14 +494,11 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let chain_config = hopr.chain_config();
     let safe_config = hopr.get_safe_config();
     let network = hopr.network();
-    let me_address = hopr.me_onchain();
 
     let indexer_state_info = match hopr.get_indexer_state().await {
         Ok(info) => info,
         Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     };
-
-    let is_eligible = hopr.is_allowed_to_access_network(either::Right(me_address)).await?;
 
     // If one channel or more are corrupted, we consider the indexer as corrupted.
     let is_indexer_corrupted = hopr
@@ -525,7 +521,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 hopr_node_safe_registry: chain_config.node_safe_registry,
                 hopr_management_module: chain_config.module_implementation,
                 hopr_node_safe: safe_config.safe_address,
-                is_eligible,
+                is_eligible: true,
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),
                 indexer_block: indexer_state_info.latest_block_number,
@@ -583,12 +579,12 @@ pub(super) async fn entry_nodes(State(state): State<Arc<InternalState>>) -> Resu
     match hopr.get_public_nodes().await {
         Ok(nodes) => {
             let mut body = HashMap::new();
-            for (peer_id, address, mas) in nodes.into_iter() {
+            for (_, address, mas) in nodes.into_iter() {
                 body.insert(
                     address.to_string(),
                     EntryNode {
                         multiaddrs: mas,
-                        is_eligible: hopr.is_allowed_to_access_network(either::Left(&peer_id)).await?,
+                        is_eligible: true,
                     },
                 );
             }

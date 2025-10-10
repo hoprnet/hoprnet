@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.13.1"
+version = "0.13.5"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -32,7 +32,6 @@ flagset = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
-mimalloc = { workspace = true }
 moka = { workspace = true }
 pid = { workspace = true }
 pin-project = { workspace = true }
@@ -76,3 +75,7 @@ ignored = ["serde_with"]
 [[bench]]
 name = "session_bench"
 harness = false
+
+# Target-specific dependencies for memory allocators
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.6.0"

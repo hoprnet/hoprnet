@@ -1,6 +1,6 @@
 [package]
 name = "hoprd"
-version = "3.0.0"
+version = "3.1.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR node executable."
@@ -16,20 +16,18 @@ default = [
   "telemetry",
   "explicit-path",
   "transport-quic",
+  "jemalloc-stats",
 ] # uses tokio by default because of axum
 prometheus = [
-  "dep:hopr-metrics",
-  "dep:lazy_static",
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
-  "hopr-network-types/prometheus",
+  "dep:hopr-metrics",
+  "dep:lazy_static",
 ]
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
-  "hopr-network-types/runtime-tokio",
-  "hopr-async-runtime/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
 ]
 telemetry = [
@@ -38,7 +36,10 @@ telemetry = [
   "dep:opentelemetry_sdk",
   "dep:tracing-opentelemetry",
 ]
-transport-quic = ["hopr-lib/transport-quic"]
+transport-quic = [
+  "hopr-lib/transport-announce-quic",
+  "hopr-lib/transport-use-quic",
+]
 explicit-path = ["hoprd-api/explicit-path"]
 capture = ["hopr-lib/capture"]
 # To use profiling:
@@ -47,16 +48,16 @@ capture = ["hopr-lib/capture"]
 prof = [
   "dep:console-subscriber",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
+jemalloc-stats = ["dep:tikv-jemalloc-ctl"]
 
 [dependencies]
 anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
 clap = { workspace = true }
+console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
 home = "0.5.11"
-lazy_static = { workspace = true, optional = true }
-mimalloc = { workspace = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -70,9 +71,6 @@ tokio-retry = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }
-
-console-subscriber = { workspace = true, optional = true }
-
 opentelemetry = { workspace = true, optional = true }
 opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "trace",
@@ -88,18 +86,23 @@ hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
   "session-server",
+  "utils_session",
+  "utils_parallel",
 ] }
 hoprd-api = { workspace = true }
-hopr-parallelize = { workspace = true }
-hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-network-types = { workspace = true }
-hopr-async-runtime = { workspace = true }
-hopr-crypto-random = { workspace = true }
+hopr-parallelize = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 
-[dev-dependencies]
-tempfile = { workspace = true }
+# Target-specific dependencies for memory allocators
+[target.'cfg(target_os = "linux")'.dependencies]
+tikv-jemallocator = "0.6.0"
+tikv-jemalloc-ctl = { version = "0.6.0", features = ["stats"], optional = true }
 
 [build-dependencies]
 vergen-gix = { workspace = true, features = ["build"] }
 anyhow = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+test-log = { workspace = true }

@@ -385,8 +385,6 @@ class TestWinProbWithSwarm:
         ):
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[mid].api.get_tickets_statistics()
-            unredeemed_value_before = statistics_before.unredeemed_value
-            rejected_value_before = statistics_before.rejected_value
 
             was_active = False
             try:
@@ -404,13 +402,13 @@ class TestWinProbWithSwarm:
 
                 # wait until the relay rejects the session establishment packet
                 await asyncio.wait_for(
-                    check_rejected_tickets_value(swarm7[mid], rejected_value_before + ticket_price / win_prob),
+                    check_rejected_tickets_value(swarm7[mid], statistics_before.rejected_value + ticket_price),
                     30.0,
                 )
 
                 # unredeemed value should not change on the relay
                 ticket_statistics = await swarm7[mid].api.get_tickets_statistics()
-                assert ticket_statistics.unredeemed_value == unredeemed_value_before
+                assert ticket_statistics.unredeemed_value == statistics_before.unredeemed_value
                 assert ticket_statistics.winning_count == statistics_before.winning_count
 
             assert was_active is False

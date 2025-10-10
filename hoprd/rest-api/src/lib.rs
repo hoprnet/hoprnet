@@ -19,13 +19,11 @@ pub(crate) mod env {
 }
 
 use std::{
-    collections::HashMap,
     error::Error,
     iter::once,
     sync::{Arc, atomic::AtomicU16},
 };
 
-use async_lock::RwLock;
 use axum::{
     Router,
     extract::Json,
@@ -33,8 +31,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
-use hopr_lib::{Address, Hopr, errors::HoprLibError};
-use hopr_network_types::prelude::IpProtocol;
+use hopr_lib::{Address, Hopr, errors::HoprLibError, utils::session::ListenerJoinHandles};
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use tokio::net::TcpListener;
@@ -53,7 +50,7 @@ use utoipa::{
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::{config::Auth, session::StoredSessionEntry};
+use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
@@ -63,11 +60,6 @@ pub(crate) struct AppState {
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
-
-pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry>>>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
@@ -111,7 +103,6 @@ pub(crate) struct InternalState {
         session::adjust_session,
         session::session_config,
         session::close_client,
-        tickets::aggregate_tickets_in_channel,
         tickets::redeem_all_tickets,
         tickets::redeem_tickets_in_channel,
         tickets::show_all_tickets,
@@ -297,10 +288,6 @@ async fn build_api(
                     "/channels/{channelId}/tickets/redeem",
                     post(tickets::redeem_tickets_in_channel),
                 )
-                .route(
-                    "/channels/{channelId}/tickets/aggregate",
-                    post(tickets::aggregate_tickets_in_channel),
-                )
                 .route("/tickets", get(tickets::show_all_tickets))
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
@@ -386,7 +373,6 @@ enum ApiErrorStatus {
     NotEnoughBalance,
     NotEnoughAllowance,
     ChannelAlreadyOpen,
-    ChannelNotOpen,
     UnsupportedFeature,
     Timeout,
     PingError(String),

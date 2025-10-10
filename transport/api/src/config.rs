@@ -106,7 +106,7 @@ impl Display for HostConfig {
 
 fn default_multiaddr_transport(port: u16) -> String {
     cfg_if::cfg_if! {
-        if #[cfg(feature = "transport-quic")] {
+        if #[cfg(all(feature = "p2p-announce-quic", feature = "p2p-transport-quic"))] {
             // In case we run on a Dappnode-like device, presumably behind NAT, we fall back to TCP
             // to circumvent issues with QUIC in such environments. To make this work reliably,
             // we would need proper NAT traversal support.
@@ -379,7 +379,7 @@ mod tests {
         });
     }
 
-    #[cfg(feature = "transport-quic")]
+    #[cfg(feature = "p2p-announce-quic")]
     #[test]
     fn test_multiaddress_on_non_dappnode_default() {
         temp_env::with_vars([("DAPPNODE", Some("false")), ("HOPRD_NAT", Some("false"))], || {
@@ -387,7 +387,7 @@ mod tests {
         });
     }
 
-    #[cfg(not(feature = "transport-quic"))]
+    #[cfg(not(feature = "p2p-announce-quic"))]
     #[test]
     fn test_multiaddress_on_non_dappnode_default() {
         assert_eq!(default_multiaddr_transport(1234), "tcp/1234");
@@ -400,7 +400,7 @@ mod tests {
         });
     }
 
-    #[cfg(feature = "transport-quic")]
+    #[cfg(feature = "p2p-announce-quic")]
     #[test]
     fn test_multiaddress_on_non_dappnode_not_uses_nat() {
         temp_env::with_var("HOPRD_NAT", Some("false"), || {
@@ -408,7 +408,7 @@ mod tests {
         });
     }
 
-    #[cfg(not(feature = "transport-quic"))]
+    #[cfg(not(feature = "p2p-announce-quic"))]
     #[test]
     fn test_multiaddress_on_non_dappnode_not_uses_nat() {
         temp_env::with_var("HOPRD_NAT", Some("false"), || {
@@ -416,7 +416,7 @@ mod tests {
         });
     }
 
-    #[cfg(feature = "transport-quic")]
+    #[cfg(feature = "p2p-announce-quic")]
     #[test]
     fn test_multiaddress_on_dappnode_not_uses_nat() {
         temp_env::with_vars([("DAPPNODE", Some("true")), ("HOPRD_NAT", Some("false"))], || {
@@ -424,7 +424,7 @@ mod tests {
         });
     }
 
-    #[cfg(not(feature = "transport-quic"))]
+    #[cfg(not(feature = "p2p-announce-quic"))]
     #[test]
     fn test_multiaddress_on_dappnode_not_uses_nat() {
         temp_env::with_vars([("DAPPNODE", Some("true")), ("HOPRD_NAT", Some("false"))], || {

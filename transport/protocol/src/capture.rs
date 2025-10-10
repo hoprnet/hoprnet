@@ -1,10 +1,10 @@
 use std::{borrow::Cow, fs::File};
 
 use futures::{StreamExt, pin_mut};
+use hopr_api::db::IncomingPacket;
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
-use hopr_crypto_packet::prelude::{PacketSignal, PacketSignals};
+use hopr_crypto_packet::prelude::PacketSignals;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_api::prelude::IncomingPacket;
 use hopr_internal_types::prelude::VerifiedAcknowledgement;
 use pcap_file::{
     DataLink,
@@ -313,6 +313,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
 mod tests {
     use futures::{SinkExt, pin_mut};
     use hex_literal::hex;
+    use hopr_crypto_packet::prelude::PacketSignal;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         prelude::{ChainKeypair, Keypair, OffchainKeypair, SimplePseudonym},
@@ -340,7 +341,7 @@ mod tests {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *OffchainKeypair::random().public(),
             sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new(10u64, &hex!("deadbeef")).to_bytes(),
+            plain_text: ApplicationData::new(10u64, &hex!("deadbeef"))?.to_bytes(),
             ack_key: HalfKey::random(),
             info: Default::default(),
         };
@@ -379,7 +380,7 @@ mod tests {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *OffchainKeypair::random().public(),
             sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
+            plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
             ack_key: HalfKey::random(),
             info: Default::default(),
         };
@@ -406,7 +407,7 @@ mod tests {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *OffchainKeypair::random().public(),
             sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
+            plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
             ack_key: HalfKey::random(),
             info: Default::default(),
         };
@@ -428,7 +429,7 @@ mod tests {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *OffchainKeypair::random().public(),
             sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
+            plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
             ack_key: HalfKey::random(),
             info: Default::default(),
         };
@@ -453,7 +454,7 @@ mod tests {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *OffchainKeypair::random().public(),
             sender: SimplePseudonym::random(),
-            plain_text: ApplicationData::new_from_owned(1024_u64, msg.into_encoded()).to_bytes(),
+            plain_text: ApplicationData::new(1024_u64, msg.into_encoded().into_vec())?.to_bytes(),
             ack_key: HalfKey::random(),
             info: Default::default(),
         };
@@ -511,11 +512,11 @@ mod tests {
             me,
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
-            data: ApplicationData::from(hopr_transport_probe::content::Message::Telemetry(PathTelemetry {
+            data: ApplicationData::try_from(hopr_transport_probe::content::Message::Telemetry(PathTelemetry {
                 id: hopr_crypto_random::random_bytes(),
                 path: hopr_crypto_random::random_bytes(),
                 timestamp: 123456789_u128,
-            }))
+            }))?
             .to_bytes()
             .to_vec()
             .into(),
@@ -532,9 +533,9 @@ mod tests {
             me,
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
-            data: ApplicationData::from(hopr_transport_probe::content::Message::Probe(
+            data: ApplicationData::try_from(hopr_transport_probe::content::Message::Probe(
                 NeighborProbe::random_nonce(),
-            ))
+            ))?
             .to_bytes()
             .to_vec()
             .into(),
@@ -551,9 +552,9 @@ mod tests {
             me,
             next_hop: *OffchainKeypair::random().public(),
             ack_challenge: hk.as_ref().into(),
-            data: ApplicationData::from(hopr_transport_probe::content::Message::Probe(NeighborProbe::Pong(
+            data: ApplicationData::try_from(hopr_transport_probe::content::Message::Probe(NeighborProbe::Pong(
                 hopr_crypto_random::random_bytes(),
-            )))
+            )))?
             .to_bytes()
             .to_vec()
             .into(),

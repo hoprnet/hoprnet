@@ -12,32 +12,32 @@ use crate::SessionId;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_metrics::metrics::MultiGauge =
-        hopr_metrics::metrics::MultiGauge::new(
+    static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_metrics::MultiGauge =
+        hopr_metrics::MultiGauge::new(
             "hopr_surb_balancer_target_error_estimate",
             "Target error estimation by the SURB balancer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CONTROL_OUTPUT: hopr_metrics::metrics::MultiGauge =
-        hopr_metrics::metrics::MultiGauge::new(
+    static ref METRIC_CONTROL_OUTPUT: hopr_metrics::MultiGauge =
+        hopr_metrics::MultiGauge::new(
             "hopr_surb_balancer_control_output",
             "Control output of the SURB balancer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CURRENT_BUFFER: hopr_metrics::metrics::MultiGauge =
-        hopr_metrics::metrics::MultiGauge::new(
+    static ref METRIC_CURRENT_BUFFER: hopr_metrics::MultiGauge =
+        hopr_metrics::MultiGauge::new(
             "hopr_surb_balancer_current_buffer_estimate",
             "Estimated number of SURBs in the buffer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_CURRENT_TARGET: hopr_metrics::metrics::MultiGauge =
-        hopr_metrics::metrics::MultiGauge::new(
+    static ref METRIC_CURRENT_TARGET: hopr_metrics::MultiGauge =
+        hopr_metrics::MultiGauge::new(
             "hopr_surb_balancer_current_buffer_target",
             "Current target (setpoint) number of SURBs in the buffer",
             &["session_id"]
     ).unwrap();
-    static ref METRIC_SURB_RATE: hopr_metrics::metrics::MultiGauge =
-        hopr_metrics::metrics::MultiGauge::new(
+    static ref METRIC_SURB_RATE: hopr_metrics::MultiGauge =
+        hopr_metrics::MultiGauge::new(
             "hopr_surb_balancer_surbs_rate",
             "Estimation of SURB rate per second (positive is buffer surplus, negative is buffer loss)",
             &["session_id"]
@@ -260,7 +260,17 @@ where
             abort_reg,
         );
 
-        let (level_tx, level_rx) = futures::channel::mpsc::unbounded();
+        let balancer_level_capacity = std::env::var("HOPR_INTERNAL_SESSION_BALANCER_LEVEL_CAPACITY")
+            .ok()
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .filter(|&c| c > 0)
+            .unwrap_or(32_768);
+
+        tracing::debug!(
+            capacity = balancer_level_capacity,
+            "Creating session balancer level channel"
+        );
+        let (mut level_tx, level_rx) = futures::channel::mpsc::channel(balancer_level_capacity);
         hopr_async_runtime::prelude::spawn(
             async move {
                 pin_mut!(sampling_stream);
@@ -286,9 +296,14 @@ where
                     let bounds_before_update = self.controller.bounds();
 
                     // Perform controller update (this internally samples the SurbFlowEstimator)
-                    // and send an update about the current level to the outgoing stream
+                    // and send an update about the current level to the outgoing stream.
+                    // If the other party has closed the stream, we don't care about the update.
                     let level = self.update(current_cfg.surb_decay.as_ref());
-                    let _ = level_tx.unbounded_send(level);
+                    if !level_tx.is_closed() {
+                        if let Err(error) = level_tx.try_send(level) {
+                            tracing::error!(%error, "cannot send balancer level update");
+                        }
+                    }
 
                     // See if the setpoint has been updated at the controller as a result
                     // of the update step, because some controllers (such as the SimpleBalancerController)

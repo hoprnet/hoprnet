@@ -40,12 +40,15 @@ on:
         type: string
         required: true
         description: 'Test name'
+        default: 'load-test'
       cluster_nodes:
         type: choice
         options:
           - core-rotsee
+          - gnosisvpn-staging
           - core-dufour
-          - uhttp
+          - ctdapp-rotsee
+          - demo-rotsee
           - team
         required: true
         description: 'Cluster of nodes to test'
@@ -75,24 +78,24 @@ on:
         description: 'Test duration in minutes'
       echo_service_replicas:
         type: number
-        default: 1
+        default: 3
         required: true
         description: 'Echo service replicas'
       payload_size:
         type: number
-        default: 10485760
+        default: 1048576
         required: true
         description: 'Payload size in bytes'
       download_throughput:
         type: number
-        default: 1048576
-        required: true
-        description: 'Download throughput in bytes per second'
-      upload_throughput:
-        type: number
         default: 524288
         required: true
-        description: 'Upload throughput in bytes per second'
+        description: 'Download throughput in bytes per second (0 means disabled scenario)'
+      upload_throughput:
+        type: number
+        default: 0
+        required: true
+        description: 'Upload throughput in bytes per second (0 means disabled scenario)'
 
 concurrency:
   group: load-tests
@@ -109,13 +112,29 @@ jobs:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
+      - name: Checkout hoprd-test repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+          repository: hoprnet/hoprd-test
+          ref: ${{ vars.K6_REPOSITORY_BRANCH_NAME || 'main' }}
+
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+        with:
+          google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
+          login-gke: 'true'
+          project: hopr-staging
       - name: Set environment variables
-        id: vars
         run: |
           if [ -z "${{ github.event.inputs.test_id }}" ]; then
             echo "The workflow is triggered by other pipeline"
             {
               echo "TESTID=${{ inputs.test_id }}"
+              echo "K6_EXECUTION_NAME=${{ inputs.test_id }}"
               echo "K6_CLUSTER_NODES=${{ inputs.cluster_nodes }}"
               echo "K6_TOPOLOGY_NAME=${{ inputs.topology }}"
               echo "K6_WORKLOAD_NAME=${{ inputs.workload }}"
@@ -129,6 +148,7 @@ jobs:
             echo "The workflow is triggered manually"
             {
               echo "TESTID=${{ github.event.inputs.test_id }}"
+              echo "K6_EXECUTION_NAME=${{ github.event.inputs.test_id }}"
               echo "K6_CLUSTER_NODES=${{ github.event.inputs.cluster_nodes }}"
               echo "K6_TOPOLOGY_NAME=${{ github.event.inputs.topology }}"
               echo "K6_WORKLOAD_NAME=${{ github.event.inputs.workload }}"
@@ -139,39 +159,25 @@ jobs:
               echo "K6_UPLOAD_THROUGHPUT=${{ github.event.inputs.upload_throughput }}"
             } >> $GITHUB_ENV
           fi
-
-      - name: Checkout hoprd-test repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-          repository: hoprnet/hoprd-test
-          ref: main # Use different branch if needed to test a new development
-
-      - name: Setup GCP
-        id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
-        with:
-          google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
-          login-artifact-registry: 'true'
-          install-sdk: 'true'
-          login-gke: 'true'
-          project: hopr-staging
-
-      - name: Setup NodeJs
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        with:
-          node-version: 22.19.0
-
-      - name: Get Hoprd Api token
-        id: token
-        run: |
-          hoprdApiToken=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${K6_CLUSTER_NODES}" -r '.data[$entry]' | base64 -d)
-          echo "HOPRD_API_TOKEN=${hoprdApiToken}" >> $GITHUB_ENV
+          if [[ "${{ inputs.download_throughput || github.event.inputs.download_throughput }}" -eq 0 ]]; then
+            echo "Download throughput is disabled"
+            echo "K6_SKIP_SCENARIO_DOWNLOAD=true" >> $GITHUB_ENV
+            echo "K6_DOWNLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
+          fi
+          if [[ "${{ inputs.upload_throughput || github.event.inputs.upload_throughput }}" -eq 0 ]]; then
+            echo "Upload throughput is disabled"
+            echo "K6_SKIP_SCENARIO_UPLOAD=true" >> $GITHUB_ENV
+            echo "K6_UPLOAD_THROUGHPUT=524288" >> $GITHUB_ENV
+          fi
+          K6_CLUSTER_NODES=${{ github.event.inputs.cluster_nodes || inputs.cluster_nodes }}
+          echo "Getting hoprd API token for cluster $K6_CLUSTER_NODES"
+          HOPRD_API_TOKEN=$(kubectl get secret -n k6-operator-system -o json hoprd-api-tokens | jq --arg entry "${K6_CLUSTER_NODES}" -r '.data[$entry]' | base64 -d)
+          echo "HOPRD_API_TOKEN=${HOPRD_API_TOKEN}" >> $GITHUB_ENV
 
       - name: Setup Load Testing environment
         run: |
-          npm install
-          npm run setup
+          yarn install --frozen-lockfile --production=false
+          yarn run setup
         working-directory: "./k6"
 
       - name: Run Load test

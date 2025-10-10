@@ -26,16 +26,17 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-db-api = { workspace = true }
+hopr-api = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
+hopr-network-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }

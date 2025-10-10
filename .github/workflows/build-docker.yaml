@@ -35,7 +35,7 @@ jobs:
     name: Docker
     runs-on: self-hosted-hoprnet-bigger
     # Skip hopr-pluto builds unless explicitly enabled via BUILD_HOPR_PLUTO_DOCKER variable
-    if: inputs.package != 'hopr-pluto' || vars.BUILD_HOPR_PLUTO_DOCKER == 'true'
+    if: inputs.package != 'hopr-pluto' || vars.BUILD_HOPR_PLUTO_DOCKER == 'true' || contains(github.event.pull_request.labels.*.name, 'build:hopr-pluto')
     timeout-minutes: 60
     steps:
       - name: Harden Runner

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::TryFutureExt;
+use futures::{StreamExt, TryFutureExt, stream::BoxStream};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_entity::{
     account, announcement,
@@ -10,7 +10,7 @@ use hopr_primitive_types::{
     errors::GeneralError,
     prelude::{Address, ToHex},
 };
-use multiaddr::Multiaddr;
+use multiaddr::{Multiaddr, PeerId};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
     Set, sea_query::Expr,
@@ -19,8 +19,7 @@ use sea_query::{Condition, IntoCondition, OnConflict};
 use tracing::instrument;
 
 use crate::{
-    HoprDbGeneralModelOperations, OptTx,
-    db::HoprDb,
+    HoprDbGeneralModelOperations, HoprIndexerDb, OptTx,
     errors::{DbSqlError, DbSqlError::MissingAccount, Result},
 };
 
@@ -96,9 +95,7 @@ pub trait HoprDbAccountOperations {
     /// This a unique account in the database that must always be present.
     async fn get_self_account<'a>(&'a self, tx: OptTx<'a>) -> Result<AccountEntry>;
 
-    /// Retrieves entries of accounts with routable address announcements (if `public_only` is `true`)
-    /// or about all accounts without routeable address announcements (if `public_only` is `false`).
-    async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>>;
+    async fn stream_accounts<'a>(&'a self, public_only: bool) -> Result<BoxStream<'a, AccountEntry>>;
 
     /// Inserts a new account entry to the database.
     /// Fails if such an entry already exists.
@@ -162,7 +159,7 @@ pub(crate) fn model_to_account_entry(
 }
 
 #[async_trait]
-impl HoprDbAccountOperations for HoprDb {
+impl HoprDbAccountOperations for HoprIndexerDb {
     async fn get_account<'a, T: Into<ChainOrPacketKey> + Send + Sync>(
         &'a self,
         tx: OptTx<'a>,
@@ -197,27 +194,23 @@ impl HoprDbAccountOperations for HoprDb {
             .ok_or(DbSqlError::MissingAccount)
     }
 
-    async fn get_accounts<'a>(&'a self, tx: OptTx<'a>, public_only: bool) -> Result<Vec<AccountEntry>> {
-        self.nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Account::find()
-                        .find_with_related(Announcement)
-                        .filter(if public_only {
-                            announcement::Column::Multiaddress.ne("")
-                        } else {
-                            Expr::value(1)
-                        })
-                        .order_by_desc(announcement::Column::AtBlock)
-                        .all(tx.as_ref())
-                        .await?
-                        .into_iter()
-                        .map(|(a, b)| model_to_account_entry(a, b))
-                        .collect()
-                })
+    async fn stream_accounts<'a>(&'a self, public_only: bool) -> Result<BoxStream<'a, AccountEntry>> {
+        // .stream() cannot do CROSS JOIN, so we need to collect it via .all() first
+        let accounts = Account::find()
+            .find_with_related(Announcement)
+            .filter(if public_only {
+                announcement::Column::Multiaddress.ne("")
+            } else {
+                Expr::value(1)
             })
-            .await
+            .order_by_desc(announcement::Column::AtBlock)
+            .all(self.index_db.read_only())
+            .await?
+            .into_iter()
+            .map(|(a, b)| model_to_account_entry(a, b))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(futures::stream::iter(accounts).boxed())
     }
 
     async fn insert_account<'a>(&'a self, tx: OptTx<'a>, account: AccountEntry) -> Result<()> {
@@ -459,6 +452,33 @@ impl HoprDbAccountOperations for HoprDb {
     }
 }
 
+impl HoprIndexerDb {
+    pub async fn resolve_packet_key(&self, onchain_key: &Address) -> Result<Option<OffchainPublicKey>> {
+        self.translate_key(None, *onchain_key)
+            .await?
+            .map(|k| k.try_into())
+            .inspect(|v: &std::result::Result<OffchainPublicKey, _>| {
+                if let Ok(offchain_pk) = v {
+                    tracing::trace!(
+                        peer = %Into::<PeerId>::into(offchain_pk),
+                        offchain_pk = offchain_pk.to_hex(),
+                        "found offchain key",
+                    );
+                }
+            })
+            .transpose()
+            .map_err(|_e| DbSqlError::LogicalError("failed to transpose the translated key".into()))
+    }
+
+    pub async fn resolve_chain_key(&self, offchain_key: &OffchainPublicKey) -> Result<Option<Address>> {
+        self.translate_key(None, *offchain_key)
+            .await?
+            .map(|k| k.try_into())
+            .transpose()
+            .map_err(|_e| DbSqlError::LogicalError("failed to transpose the translated key".into()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
@@ -473,7 +493,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_account_announcement() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -526,7 +546,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_allow_reannouncement() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -567,7 +587,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_insert_account_announcement_to_nonexisting_account() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -585,7 +605,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_allow_duplicate_announcement_per_different_accounts() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -636,7 +656,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_account() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let packet_1 = *OffchainKeypair::random().public();
         let chain_1 = ChainKeypair::random().public().to_address();
@@ -665,7 +685,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_fail_to_delete_nonexistent_account() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -680,7 +700,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_fail_on_duplicate_account_insert() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -712,7 +732,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_announcements() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let packet_1 = *OffchainKeypair::random().public();
         let chain_1 = ChainKeypair::random().public().to_address();
@@ -741,7 +761,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_fail_to_delete_nonexistent_account_announcements() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
 
@@ -756,7 +776,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_key() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -816,7 +836,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_translate_key_no_cache() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
@@ -877,8 +897,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_accounts() -> anyhow::Result<()> {
-        let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
+    async fn test_stream_accounts() -> anyhow::Result<()> {
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let chain_2 = ChainKeypair::random().public().to_address();
@@ -954,8 +974,8 @@ mod tests {
             })
             .await?;
 
-        let all_accounts = db.get_accounts(None, false).await?;
-        let public_only = db.get_accounts(None, true).await?;
+        let all_accounts = db.stream_accounts(false).await?.collect::<Vec<_>>().await;
+        let public_only = db.stream_accounts(true).await?.collect::<Vec<_>>().await;
 
         assert_eq!(3, all_accounts.len());
 
@@ -979,6 +999,168 @@ mod tests {
             acc_2.get_multiaddr().expect("should have a multiaddress").to_string()
         );
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_offchain_key_should_return_nothing_if_a_mapping_to_chain_key_does_not_exist() -> anyhow::Result<()>
+    {
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
+
+        let chain = ChainKeypair::random().public().to_address();
+
+        let actual_pk = db.resolve_packet_key(&chain).await?;
+        assert_eq!(actual_pk, None, "offchain key should not be present");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_chain_key_should_return_nothing_if_a_mapping_to_offchain_key_does_not_exist() -> anyhow::Result<()>
+    {
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
+
+        let packet = *OffchainKeypair::random().public();
+
+        let actual_ck = db.resolve_chain_key(&packet).await?;
+        assert_eq!(actual_ck, None, "chain key should not be present");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_chain_key_should_succeed_if_a_mapping_to_offchain_key_exists() -> anyhow::Result<()> {
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
+
+        // Inserting to the table directly to avoid cache
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = *OffchainKeypair::random().public();
+        let account_1 = hopr_db_entity::account::ActiveModel {
+            chain_key: Set(chain_1.to_hex()),
+            packet_key: Set(packet_1.to_hex()),
+            ..Default::default()
+        };
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = *OffchainKeypair::random().public();
+        let account_2 = hopr_db_entity::account::ActiveModel {
+            chain_key: Set(chain_2.to_hex()),
+            packet_key: Set(packet_2.to_hex()),
+            ..Default::default()
+        };
+
+        hopr_db_entity::account::Entity::insert_many([account_1, account_2])
+            .exec(db.index_db.read_write())
+            .await?;
+
+        let actual_ck = db.resolve_chain_key(&packet_1).await?;
+        assert_eq!(actual_ck, Some(chain_1), "chain keys must match");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_chain_key_should_succeed_if_a_mapping_to_offchain_key_exists_with_cache() -> anyhow::Result<()> {
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
+
+        // Inserting to the table via API to insert into cache as well
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = *OffchainKeypair::random().public();
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_1,
+                chain_addr: chain_1,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = *OffchainKeypair::random().public();
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_2,
+                chain_addr: chain_2,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
+
+        let actual_ck = db.resolve_chain_key(&packet_1).await?;
+        assert_eq!(actual_ck, Some(chain_1), "chain keys must match");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_offchain_key_should_succeed_if_a_mapping_to_chain_key_exists() -> anyhow::Result<()> {
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
+
+        // Inserting to the table directly to avoid cache
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = *OffchainKeypair::random().public();
+        let account_1 = hopr_db_entity::account::ActiveModel {
+            chain_key: Set(chain_1.to_hex()),
+            packet_key: Set(packet_1.to_hex()),
+            ..Default::default()
+        };
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = *OffchainKeypair::random().public();
+        let account_2 = hopr_db_entity::account::ActiveModel {
+            chain_key: Set(chain_2.to_hex()),
+            packet_key: Set(packet_2.to_hex()),
+            ..Default::default()
+        };
+
+        hopr_db_entity::account::Entity::insert_many([account_1, account_2])
+            .exec(db.index_db.read_write())
+            .await?;
+
+        let actual_pk = db.resolve_packet_key(&chain_2).await?;
+
+        assert_eq!(actual_pk, Some(packet_2), "packet keys must match");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_get_offchain_key_should_succeed_if_a_mapping_to_chain_key_exists_with_cache() -> anyhow::Result<()> {
+        let db = HoprIndexerDb::new_in_memory(ChainKeypair::random()).await?;
+
+        // Inserting to the table via API to insert into cache as well
+
+        let chain_1 = ChainKeypair::random().public().to_address();
+        let packet_1 = *OffchainKeypair::random().public();
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_1,
+                chain_addr: chain_1,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
+
+        let chain_2 = ChainKeypair::random().public().to_address();
+        let packet_2 = *OffchainKeypair::random().public();
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_2,
+                chain_addr: chain_2,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
+
+        let actual_pk = db.resolve_packet_key(&chain_2).await?;
+
+        assert_eq!(actual_pk, Some(packet_2), "packet keys must match");
         Ok(())
     }
 }

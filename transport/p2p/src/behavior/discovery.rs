@@ -5,14 +5,12 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use futures::stream::{BoxStream, Stream, StreamExt};
+use hopr_network_types::addr::is_public_address;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
     core::Endpoint,
-    swarm::{
-        CloseConnection, ConnectionDenied, ConnectionId, DialFailure, NetworkBehaviour, ToSwarm,
-        dummy::ConnectionHandler,
-    },
+    swarm::{ConnectionDenied, ConnectionId, DialFailure, NetworkBehaviour, ToSwarm, dummy::ConnectionHandler},
 };
 
 #[derive(Debug)]
@@ -36,7 +34,6 @@ pub struct Behaviour {
         >,
     >,
     bootstrap_peers: HashMap<PeerId, Vec<Multiaddr>>,
-    allowed_peers: HashSet<PeerId>,
     connected_peers: HashMap<PeerId, usize>,
 }
 
@@ -50,13 +47,8 @@ impl Behaviour {
             events: Box::pin(onchain_events.map(DiscoveryInput::Indexer)),
             bootstrap_peers: HashMap::new(),
             pending_events: VecDeque::new(),
-            allowed_peers: HashSet::new(),
             connected_peers: HashMap::new(),
         }
-    }
-
-    fn is_peer_connected(&self, peer: &PeerId) -> bool {
-        self.connected_peers.get(peer).map(|v| *v > 0).unwrap_or(false)
     }
 }
 
@@ -78,18 +70,13 @@ impl NetworkBehaviour for Behaviour {
         local_addr: &libp2p::Multiaddr,
         remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        let is_allowed = self.allowed_peers.contains(&peer);
-        tracing::trace!(%is_allowed, direction = "outbound", "Handling peer connection");
+        self.pending_events
+            .push_back(ToSwarm::GenerateEvent(Event::IncomingConnection(
+                peer,
+                remote_addr.clone(),
+            )));
 
-        if is_allowed {
-            self.pending_events
-                .push_back(ToSwarm::GenerateEvent(Event::IncomingConnection(
-                    peer,
-                    remote_addr.clone(),
-                )));
-        }
-
-        is_allowed.then_some(Self::ConnectionHandler {}).ok_or_else(|| {
+        Some(Self::ConnectionHandler {}).ok_or_else(|| {
             libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(format!(
                 "Connection from '{peer}' is not allowed"
             )))
@@ -112,20 +99,11 @@ impl NetworkBehaviour for Behaviour {
         effective_role: Endpoint,
     ) -> Result<Vec<Multiaddr>, ConnectionDenied> {
         if let Some(peer) = maybe_peer {
-            let is_allowed = self.allowed_peers.contains(&peer);
-            tracing::trace!(%is_allowed, direction = "inbound", "Handling peer connection");
-
-            if self.allowed_peers.contains(&peer) {
-                // inject the multiaddress of the peer for possible dial usage by stream protocols
-                return Ok(self
-                    .bootstrap_peers
-                    .get(&peer)
-                    .map_or(vec![], |addresses| addresses.clone()));
-            } else {
-                return Err(libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(
-                    format!("Connection to '{peer}' is not allowed"),
-                )));
-            }
+            // inject the multiaddress of the peer for possible dial usage by stream protocols
+            return Ok(self
+                .bootstrap_peers
+                .get(&peer)
+                .map_or(vec![], |addresses| addresses.clone()));
         }
 
         Ok(vec![])
@@ -202,52 +180,35 @@ impl NetworkBehaviour for Behaviour {
             return std::task::Poll::Ready(value);
         };
 
-        let poll_result = self.events.poll_next_unpin(cx).map(|e| match e {
-            Some(DiscoveryInput::Indexer(event)) => match event {
-                PeerDiscovery::Allow(peer) => {
-                    let inserted_into_allow_list = self.allowed_peers.insert(peer);
-
-                    let multiaddresses = self.bootstrap_peers.get(&peer);
-                    if let Some(multiaddresses) = multiaddresses {
-                        for address in multiaddresses {
-                            self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
-                                peer_id: peer,
-                                address: address.clone(),
-                            });
-                        }
-                    }
-
-                    tracing::debug!(%peer, state = "allow", inserted_into_allow_list, emitted_libp2p_address_announce = multiaddresses.is_some_and(|v| !v.is_empty()), "Network registry");
-                }
-                PeerDiscovery::Ban(peer) => {
-                    let was_allowed = self.allowed_peers.remove(&peer);
-                    let is_connected = self.is_peer_connected(&peer);
-
-                    if is_connected {
-                        self.pending_events.push_back(ToSwarm::CloseConnection {
-                            peer_id: peer,
-                            connection: CloseConnection::default(),
-                        });
-                    }
-
-                    tracing::debug!(%peer, state = "ban", was_allowed, will_close_active_connection = is_connected, "Network registry");
-                }
-                PeerDiscovery::Announce(peer, multiaddresses) => {
-                    if peer != self.me {
+        let poll_result = self.events.poll_next_unpin(cx).map(|e| {
+            if let Some(DiscoveryInput::Indexer(PeerDiscovery::Announce(peer, multiaddresses))) = e {
+                if peer != self.me {
+                        let multiaddress_count = multiaddresses.len();
                         tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");
 
-                        for multiaddress in &multiaddresses {
+                        // Filter out private addresses before adding to pending events and peer store
+                        let public_addresses: HashSet<_> = multiaddresses.into_iter()
+                            .filter(is_public_address)
+                            .collect();
+
+                        let filtered_count = multiaddress_count - public_addresses.len();
+                        if filtered_count > 0 {
+                            tracing::debug!(%peer, filtered_private_addresses = filtered_count, total_addresses = multiaddress_count, "Filtered out private addresses from announcement");
+                        }
+
+                        for multiaddress in &public_addresses {
                             self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
                                 peer_id: peer,
                                 address: multiaddress.clone(),
                             });
                         }
 
-                        self.bootstrap_peers.insert(peer, multiaddresses.clone());
+                        // Only store public addresses in bootstrap_peers
+                        if !public_addresses.is_empty() {
+                            self.bootstrap_peers.insert(peer, public_addresses.into_iter().collect::<Vec::<_>>());
+                        }
                     }
-                }
-            },
-            None => {}
+            }
         });
 
         if matches!(poll_result, std::task::Poll::Pending) {

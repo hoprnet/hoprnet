@@ -2,13 +2,20 @@ use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
 
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-use futures::{StreamExt, future::AbortHandle};
-use hopr_lib::{HoprKeys, HoprLibProcesses, IdentityRetrievalModes, ToHex};
+use futures::{
+    FutureExt, StreamExt,
+    future::{AbortHandle, abortable},
+};
+use hopr_lib::{HoprKeys, IdentityRetrievalModes, ToHex, state::HoprLibProcesses, utils::session::ListenerJoinHandles};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
-use hoprd_api::{ListenerJoinHandles, RestApiParameters, serve_api};
+use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
+
+#[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
+mod jemalloc_stats;
+
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -18,8 +25,9 @@ use {
 
 // Avoid musl's default allocator due to degraded performance
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[cfg(target_os = "linux")]
 #[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -132,13 +140,58 @@ impl std::fmt::Debug for HoprdProcesses {
     }
 }
 
-#[cfg_attr(feature = "runtime-tokio", tokio::main)]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(not(feature = "runtime-tokio"))]
+compile_error!("The 'runtime-tokio' feature must be enabled");
+
+#[cfg(feature = "runtime-tokio")]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Divide the available CPU parallelism by 2,
+    // since we want to use half of the available threads for IO-bound and half for CPU-bound tasks
+    let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
+
+    hopr_parallelize::cpu::init_thread_pool(
+        std::env::var("HOPRD_NUM_CPU_THREADS")
+            .ok()
+            .and_then(|v| usize::from_str(&v).ok())
+            .or(avail_parallelism)
+            .ok_or(anyhow::anyhow!(
+                "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
+                 environment variable."
+            ))?
+            .max(1),
+    )?;
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(
+            std::env::var("HOPRD_NUM_IO_THREADS")
+                .ok()
+                .and_then(|v| usize::from_str(&v).ok())
+                .or(avail_parallelism)
+                .ok_or(anyhow::anyhow!(
+                    "Could not determine the number of IO threads to use. Please set the HOPRD_NUM_IO_THREADS \
+                     environment variable."
+                ))?
+                .max(1),
+        )
+        .thread_name("hoprd")
+        .thread_stack_size(
+            std::env::var("HOPRD_THREAD_STACK_SIZE")
+                .ok()
+                .and_then(|v| usize::from_str(&v).ok())
+                .unwrap_or(10 * 1024 * 1024)
+                .max(2 * 1024 * 1024),
+        )
+        .build()?
+        .block_on(main_inner())
+}
+
+#[cfg(feature = "runtime-tokio")]
+async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
-    if hopr_crypto_random::is_rng_fixed() {
-        warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
-    }
+    #[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
+    let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
         warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
@@ -228,7 +281,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
 
-        processes.push(HoprdProcesses::RestApi(hopr_async_runtime::spawn_as_abortable!(
+        let (proc, abort_handle) = abortable(
             async move {
                 if let Err(e) = serve_api(RestApiParameters {
                     listener: api_listener,
@@ -243,7 +296,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     error!(error = %e, "the REST API server could not start")
                 }
             }
-        )));
+            .inspect(|_| tracing::warn!(task = "hoprd - REST API", "long-running background task finished")),
+        );
+        let _jh = tokio::spawn(proc);
+        processes.push(HoprdProcesses::RestApi(abort_handle));
     }
 
     let (_hopr_socket, hopr_processes) = node
