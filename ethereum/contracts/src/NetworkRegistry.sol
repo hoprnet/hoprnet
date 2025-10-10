@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import { AccessControlEnumerable } from "openzeppelin-contracts/access/AccessControlEnumerable.sol";
+import { AccessControlEnumerable } from "openzeppelin-contracts-5.4.0/access/extensions/AccessControlEnumerable.sol";
 import { IHoprNetworkRegistryRequirement } from "./interfaces/INetworkRegistryRequirement.sol";
 
 abstract contract HoprNetworkRegistryEvents {
@@ -72,6 +72,7 @@ contract HoprNetworkRegistry is AccessControlEnumerable, HoprNetworkRegistryEven
     error NotEnoughAllowanceToRegisterNode();
     error CannotOperateForNode(address nodeAddress);
     error ArrayLengthNotMatch();
+    error ZeroAddress(string reason);
 
     /**
      * @dev Network registry can be globally toggled. If `enabled === true`, only nodes registered
@@ -93,9 +94,21 @@ contract HoprNetworkRegistry is AccessControlEnumerable, HoprNetworkRegistryEven
      * @param _manager address of an additional manager
      */
     constructor(address _requirementImplementation, address _newOwner, address _manager) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _newOwner);
-        _setupRole(MANAGER_ROLE, _newOwner);
-        _setupRole(MANAGER_ROLE, _manager);
+        if (_requirementImplementation == address(0)) {
+            revert ZeroAddress({ reason: "_requirementImplementation must not be empty" });
+        }
+
+        if (_newOwner == address(0)) {
+            revert ZeroAddress({ reason: "_newOwner must not be empty" });
+        }
+
+        if (_manager == address(0)) {
+            revert ZeroAddress({ reason: "_manager must not be empty" });
+        }
+
+        _grantRole(DEFAULT_ADMIN_ROLE, _newOwner);
+        _grantRole(MANAGER_ROLE, _newOwner);
+        _grantRole(MANAGER_ROLE, _manager);
 
         requirementImplementation = IHoprNetworkRegistryRequirement(_requirementImplementation);
         enabled = true;

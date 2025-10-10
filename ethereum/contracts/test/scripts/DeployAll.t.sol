@@ -3,14 +3,17 @@ pragma solidity >=0.8.0 <0.9.0;
 
 import { Test } from "forge-std/Test.sol";
 
-import "../../script/DeployAll.s.sol";
-import "../utils/ERC1820Registry.sol";
+import { DeployAllContractsScript } from "../../script/DeployAll.s.sol";
+import { ERC1820RegistryFixtureTest } from "../utils/ERC1820Registry.sol";
+import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
 
-contract DeployAllTest is Test, ERC1820RegistryFixtureTest {
+contract DeployAllTest is Test, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest {
     DeployAllContractsScript public deployScriptContract;
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public override(ERC1820RegistryFixtureTest, SafeSingletonFixtureTest) {
+        // invoke super.setup() for ERC1820RegistryFixtureTest, SafeSingletonFixtureTest separately
+        ERC1820RegistryFixtureTest.setUp();
+        SafeSingletonFixtureTest.setUp();
     }
 
     function test_Run() public {

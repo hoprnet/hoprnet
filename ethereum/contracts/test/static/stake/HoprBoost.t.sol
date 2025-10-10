@@ -2,8 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import { Test, stdStorage, StdStorage } from "forge-std/Test.sol";
-
-import "../../../src/static/stake/HoprBoost.sol";
+import { HoprBoost, Strings } from "../../../src/static/stake/HoprBoost.sol";
 
 contract HoprBoostTest is Test {
     // to alter the storage
@@ -18,8 +17,8 @@ contract HoprBoostTest is Test {
     string[2] public types = ["hodlr", "testnet"];
     string[2] public ranks = ["gold", "silver"];
     uint256[3] public numerators = [317, 158, 200];
-    uint256 public DEFAULT_DDL = 1_627_387_200;
-    string public newBaseURI = "hoprboost.eth.limo/";
+    uint256 public constant DEFAULT_DDL = 1_627_387_200;
+    string public constant NEW_BASE_URI = "hoprboost.eth.limo/";
 
     /**
      * Manually import the errors and events
@@ -98,7 +97,7 @@ contract HoprBoostTest is Test {
             " is missing role ",
             Strings.toHexString(uint256(0), 32)
         ));
-        hoprBoost.updateBaseURI(newBaseURI);
+        hoprBoost.updateBaseURI(NEW_BASE_URI);
     }
 
     /**
@@ -106,10 +105,10 @@ contract HoprBoostTest is Test {
      */
     function test_SetBaseURI() public {
         _helperMintTokens();
-        assertEq(hoprBoost.tokenURI(0), _helperBuildURI("", types[0], ranks[0]));
+        assertEq(hoprBoost.tokenURI(0), _helperBuildUri("", types[0], ranks[0]));
         vm.prank(admin);
-        hoprBoost.updateBaseURI(newBaseURI);
-        assertEq(hoprBoost.tokenURI(0), _helperBuildURI(newBaseURI, types[0], ranks[0]));
+        hoprBoost.updateBaseURI(NEW_BASE_URI);
+        assertEq(hoprBoost.tokenURI(0), _helperBuildUri(NEW_BASE_URI, types[0], ranks[0]));
     }
 
     /**
@@ -216,7 +215,7 @@ contract HoprBoostTest is Test {
         hoprBoost.mint(accounts[0], types[0], ranks[0], numerators[0], DEFAULT_DDL);
     }
 
-    function _helperBuildURI(
+    function _helperBuildUri(
         string memory _base,
         string memory _type,
         string memory _rank

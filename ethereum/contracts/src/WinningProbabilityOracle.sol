@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import { Ownable2Step } from "openzeppelin-contracts/access/Ownable2Step.sol";
+import { Ownable2Step, Ownable } from "openzeppelin-contracts-5.4.0/access/Ownable2Step.sol";
 
 type WinProb is uint56;
 
@@ -52,8 +52,7 @@ contract HoprWinningProbabilityOracle is Ownable2Step, HoprWinningProbabilityOra
      * @param _newOwner Address of the new owner.
      * @param _initialWinProb Initial winning probability to set.
      */
-    constructor(address _newOwner, WinProb _initialWinProb) {
-        _transferOwnership(_newOwner);
+    constructor(address _newOwner, WinProb _initialWinProb) Ownable(_newOwner) {
         _setWinProb(_initialWinProb);
     }
 

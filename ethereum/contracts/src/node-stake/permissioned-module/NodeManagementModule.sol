@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
  * This contract follows the principle of `zodiac/core/Module.sol`
  * but implement differently in order to overwrite functionalities
  */
-import { Enum } from "safe-contracts/common/Enum.sol";
+import { Enum } from "safe-contracts-1.4.1/common/Enum.sol";
 import { SimplifiedModule } from "./SimplifiedModule.sol";
 import { HoprCapabilityPermissions, Role, GranularPermission } from "./CapabilityPermissions.sol";
 import { HoprChannels } from "../../Channels.sol";
@@ -46,24 +46,30 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     using TargetUtils for Target;
     using EnumerableTargetSet for TargetSet;
 
-    bool public constant isHoprNodeManagementModule = true;
+    string public constant override VERSION = "2.0.0";
+
     // address to send delegated multisend calls to
     address public multisend;
     // from HoprCapabilityPermissions. This module is a Role where members are NODE_CHAIN_KEYs
     Role internal role;
+    // to indicate that this is a NodeManagementModule, to be compatible with v3.x network
+    // forge-lint: disable-next-line(screaming-snake-case-const)
+    bool public constant isHoprNodeManagementModule = true;
 
     event SetMultisendAddress(address indexed multisendAddress);
     event NodeAdded(address indexed node);
     event NodeRemoved(address indexed node);
 
-    // when the contract has already been initialized
-    error AlreadyInitialized();
     // when a node is a member of the role
     error WithMembership();
     // Once module gets created, the ownership cannot be transferred
     error CannotChangeOwner();
     // when safe and multisend address are the same
     error SafeMultisendSameAddress();
+    // when failing to send eth to node
+    error FailedToSendEthToNode();
+    // when length of array is zero
+    error LengthIsZero();
 
     modifier nodeOnly() {
         if (!role.members[_msgSender()]) {
@@ -78,8 +84,8 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     }
 
     function initialize(bytes memory initParams) public initializer {
-        (address _safe, address _multisend, bytes32 _defaultTokenChannelsTarget) =
-            abi.decode(initParams, (address, address, bytes32));
+        (address _safe, address _multisend, bytes32 _defaultAnnouncementTarget, bytes32 _defaultTokenChannelsTarget) =
+            abi.decode(initParams, (address, address, bytes32, bytes32));
 
         // cannot accept a zero address as Safe or multisend contract
         if (_safe == address(0) || _multisend == address(0)) {
@@ -91,16 +97,17 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
             revert SafeMultisendSameAddress();
         }
 
-        // cannot setup again if it's been set up
-        if (owner() != address(0) || multisend != address(0)) {
-            revert AlreadyInitialized();
-        }
-
         // internally setTarget
         multisend = _multisend;
+
+        // scope announcement targets as token with few restrictions
+        if (_defaultAnnouncementTarget != bytes32(0)) {
+            HoprCapabilityPermissions.scopeTargetToken(role, Target.wrap(uint256(_defaultAnnouncementTarget)));
+        }
         _addChannelsAndTokenTarget(Target.wrap(uint256(_defaultTokenChannelsTarget)));
+
         // transfer ownership
-        _transferOwnership(_safe);
+        __Ownable_init_unchained(_safe);
         emit SetMultisendAddress(_multisend);
     }
 
@@ -139,10 +146,39 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
     /**
      * @dev Add a node to be able to execute this module, to the target
+     * @notice Payable function to allow nodes to send ETH along to fund the node with the transaction
      * @param nodeAddress address of node
      */
-    function addNode(address nodeAddress) external onlyOwner {
+    function addNode(address nodeAddress) external onlyOwner payable {
         _addNode(nodeAddress);
+        // fund the node with the transaction value
+        if (msg.value > 0) {
+            (bool success, ) = nodeAddress.call{ value: msg.value, gas: 0 }('');
+            require(success, FailedToSendEthToNode());
+        }
+    }
+
+    /**
+     * @dev Add multiple nodes to be able to execute this module, to the target
+     * @notice Payable function to allow nodes to send ETH along to fund the nodes with the transaction
+     * The value sent will be equally split among the nodes
+     * @param nodeAddresses array of addresses of nodes
+     */
+    function addNodes(address[] calldata nodeAddresses) external onlyOwner payable {
+        uint256 len = nodeAddresses.length;
+        uint256 totalValue = msg.value;
+        if (len == 0) {
+            revert LengthIsZero();
+        }
+        uint256 valuePerNode = totalValue / len;
+        for (uint256 i = 0; i < len; i++) {
+            _addNode(nodeAddresses[i]);
+            // fund the node with the transaction value
+            if (valuePerNode > 0) {
+                (bool success, ) = nodeAddresses[i].call{ value: valuePerNode, gas: 0 }('');
+                require(success, FailedToSendEthToNode());
+            }
+        }
     }
 
     /**
@@ -190,6 +226,35 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     }
 
     /**
+     * @dev Include multiple nodes as members, set their default SEND permissions
+     * @notice Payable function to allow nodes to send ETH along to fund the nodes with the transaction
+     * The value sent will be equally split among the nodes
+     * @param nodeAddresses array of addresses of nodes
+     */
+    function includeNodes(address[] calldata nodeAddresses) external onlyOwner payable {
+        uint256 len = nodeAddresses.length;
+        uint256 totalValue = msg.value;
+        if (len == 0) {
+            revert LengthIsZero();
+        }
+        uint256 valuePerNode = totalValue / len;
+        for (uint256 i = 0; i < len; i++) {
+            // add a node as a member
+            _addNode(nodeAddresses[i]);
+            // scope default capabilities
+            uint256 sendTargetBytes = uint256(uint160(nodeAddresses[i])) << 96 | 0x010203000000000000000000;
+            HoprCapabilityPermissions.scopeTargetSend(role, Target.wrap(sendTargetBytes));
+            // scope granular capabilities to send native tokens to itself
+            HoprCapabilityPermissions.scopeSendCapability(role, nodeAddresses[i], nodeAddresses[i], GranularPermission.ALLOW);
+            // fund the node with the transaction value
+            if (valuePerNode > 0) {
+                (bool success, ) = nodeAddresses[i].call{ value: valuePerNode, gas: 0 }('');
+                require(success, FailedToSendEthToNode());
+            }
+        }
+    }
+
+    /**
      * @dev Scopes the target address as a HoprChannels target
      * @param defaultTarget The default target with default permissions for CHANNELS target
      */
@@ -221,6 +286,9 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
 
     /**
      * @dev Revokes the target address from the scope
+     * @notice After removing a target, if the target contains some custom permissions,
+     * the customized granular permissions are not automatically removed.
+     * When the target gets added again to the module, all the previously added custom permissions are retained.
      * @param targetAddress The address of the target to be revoked.
      */
     function revokeTarget(address targetAddress) external onlyOwner {
@@ -374,7 +442,7 @@ contract HoprNodeManagementModule is SimplifiedModule, IHoprNodeManagementModule
     function _addChannelsAndTokenTarget(Target defaultTarget) private {
         // get channels andtokens contract
         address hoprChannelsAddress = defaultTarget.getTargetAddress();
-        address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).token());
+        address hoprTokenAddress = address(HoprChannels(hoprChannelsAddress).TOKEN());
 
         // add default scope for Channels TargetType, with the build target for hoprChannels address
         HoprCapabilityPermissions.scopeTargetChannels(role, defaultTarget.forceWriteTargetAddress(hoprChannelsAddress));

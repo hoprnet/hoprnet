@@ -37,8 +37,9 @@ contract HoprNetworkRegistryTest is Test, HoprNetworkRegistryEvents {
         _helperMockProxyReturns(allowances);
 
         for (uint256 i = 0; i < STAKING_ACCOUNTS_SIZE; i++) {
-            (, bytes memory returndataAllowance) =
+            (bool success, bytes memory returndataAllowance) =
                 proxy.staticcall(abi.encodeWithSignature("maxAllowedRegistrations(address)", vm.addr(i + 1)));
+            assertTrue(success);
             uint256 allowance = abi.decode(returndataAllowance, (uint256));
             assertEq(allowance, allowances[i]);
             // check eligibility

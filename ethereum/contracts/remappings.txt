@@ -1,7 +1,9 @@
-ds-test/=../../vendor/solidity/forge-std-1.8.1/lib/ds-test/src/
-forge-std/=../../vendor/solidity/forge-std-1.8.1/src/
+forge-std/=../../vendor/solidity/forge-std-1.10.0/src/
 openzeppelin-contracts-4.4.2/=../../vendor/solidity/openzeppelin-contracts-4.4.2/contracts/
-openzeppelin-contracts/=../../vendor/solidity/openzeppelin-contracts-4.9.2/contracts/
-safe-contracts/=../../vendor/solidity/safe-contracts-1.4.1/contracts/
-openzeppelin-contracts-upgradeable/=../../vendor/solidity/openzeppelin-contracts-upgradeable-4.9.2/contracts
+openzeppelin-contracts-5.4.0/=../../vendor/solidity/openzeppelin-contracts-upgradeable-5.4.0/lib/openzeppelin-contracts/contracts/
+safe-contracts-1.4.1/=../../vendor/solidity/safe-contracts-1.4.1/contracts/
+safe-contracts-1.5.0/=../../vendor/solidity/safe-contracts-1.5.0/contracts/
+openzeppelin-contracts-upgradeable-5.4.0/=../../vendor/solidity/openzeppelin-contracts-upgradeable-5.4.0/contracts/
 solcrypto=../../vendor/solidity/solcrypto/contracts/
+solady-0.1.24=../../vendor/solidity/solady-v0.1.24/src/
+@openzeppelin/=../../vendor/solidity/openzeppelin-contracts-upgradeable-5.4.0/lib/openzeppelin-contracts/

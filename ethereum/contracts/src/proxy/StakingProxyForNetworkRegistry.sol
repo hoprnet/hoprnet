@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
-import { Math } from "openzeppelin-contracts/utils/math/Math.sol";
+import { Ownable } from "openzeppelin-contracts-5.4.0/access/Ownable.sol";
+import { Math } from "openzeppelin-contracts-5.4.0/utils/math/Math.sol";
 import { IHoprNetworkRegistryRequirement } from "../interfaces/INetworkRegistryRequirement.sol";
 
 /**
@@ -69,14 +69,17 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
     error SameStakingThreshold();
     error NftRanksMismatch();
     error MaxRegistrationsMismatch();
+    error ZeroAddress(string reason);
 
     /**
      * @dev Set stake contract address, transfer ownership, and set the maximum registrations per
      * special NFT to the default value: upperbound of of uint256.
      */
-    constructor(address _stakeContract, address _newOwner, uint256 _minStake) {
+    constructor(address _stakeContract, address _newOwner, uint256 _minStake) Ownable(_newOwner) {
+        if (_stakeContract == address(0)) {
+            revert ZeroAddress({ reason: "_stakeContract must not be empty" });
+        }
         _updateStakeContract(_stakeContract);
-        _transferOwnership(_newOwner);
         stakeThreshold = _minStake;
         emit ThresholdUpdated(stakeThreshold);
     }
@@ -89,6 +92,11 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
      * @param account staker address that has a hopr nodes running
      */
     function maxAllowedRegistrations(address account) external view returns (uint256) {
+        // if threshold is 0, no one is eligible for self-registration
+        if (stakeThreshold == 0) {
+            return 0;
+        }
+
         uint256 allowedRegistration;
         // if the account owns a special NFT, requirement is fulfilled
         for (uint256 i = 0; i < specialNftTypeAndRank.length; i++) {
