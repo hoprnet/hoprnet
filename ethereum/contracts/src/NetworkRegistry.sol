@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import { AccessControlEnumerable } from "openzeppelin-contracts-4.9.2/access/AccessControlEnumerable.sol";
+import { AccessControlEnumerable } from "openzeppelin-contracts-5.4.0/access/extensions/AccessControlEnumerable.sol";
 import { IHoprNetworkRegistryRequirement } from "./interfaces/INetworkRegistryRequirement.sol";
 
 abstract contract HoprNetworkRegistryEvents {

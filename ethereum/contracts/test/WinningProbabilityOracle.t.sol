@@ -7,13 +7,9 @@ import {
     HoprWinningProbabilityOracle,
     HoprWinningProbabilityOracleEvents
 } from "../src/WinningProbabilityOracle.sol";
+import { Ownable2Step, Ownable } from "openzeppelin-contracts-5.4.0/access/Ownable2Step.sol";
 
-contract Ownable2StepEvents {
-    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-}
-
-contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracleEvents, Ownable2StepEvents {
+contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracleEvents {
     HoprWinningProbabilityOracle public oracle;
     address public owner;
 
@@ -43,7 +39,7 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracl
 
     function testRevert_setByNonOwnerFails() public {
         vm.prank(vm.addr(102));
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, vm.addr(102)));
         oracle.setWinProb(WinProb.wrap(0xffffffffffff00));
     }
 
@@ -76,13 +72,13 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracl
         // initiate the ownership transfer
         vm.prank(owner);
         vm.expectEmit(true, true, true, false, address(oracle));
-        emit OwnershipTransferStarted(owner, newOwner);
+        emit Ownable2Step.OwnershipTransferStarted(owner, newOwner);
         oracle.transferOwnership(newOwner);
 
         // complete the ownership transfer
         vm.prank(newOwner);
         vm.expectEmit(true, true, true, false, address(oracle));
-        emit OwnershipTransferred(owner, newOwner);
+        emit Ownable.OwnershipTransferred(owner, newOwner);
         oracle.acceptOwnership();
         assertEq(oracle.owner(), newOwner);
     }
@@ -96,7 +92,7 @@ contract TicketWinningProbabilityOracleTest is Test, HoprWinningProbabilityOracl
 
         // Attempt to accept ownership by an unauthorized address
         vm.prank(vm.addr(104));
-        vm.expectRevert("Ownable2Step: caller is not the new owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, vm.addr(104)));
         oracle.acceptOwnership();
     }
 }

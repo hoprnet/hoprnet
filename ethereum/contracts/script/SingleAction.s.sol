@@ -7,7 +7,7 @@ import { BoostUtilsLib } from "./utils/BoostUtilsLib.sol";
 import { Clearance, CapabilityPermission, Target, TargetType, TargetUtils, TargetPermission } from "../src/utils/TargetUtils.sol";
 import { HoprNetworkRegistry } from "../src/NetworkRegistry.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
-import { Enum, ISafe } from "../src/utils/ISafe.sol";
+import { Enum, IAvatar } from "../src/interfaces/IAvatar.sol";
 
 abstract contract IFactory {
     function clone(
@@ -449,8 +449,8 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             if (!included) {
                 bytes memory includeNodeData =
                     abi.encodeWithSignature("includeNode(uint256)", Target.unwrap(defaultNodeTargets[k]));
-                uint256 safeNonce = ISafe(payable(safe)).nonce();
-                _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, includeNodeData);
+                uint256 safeNonce = IAvatar(payable(safe)).nonce();
+                _helperSignSafeTxAsOwner(IAvatar(payable(safe)), module, safeNonce, includeNodeData);
             }
         }
     }
@@ -467,9 +467,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             "approve(address,uint256)", currentNetworkDetail.addresses.channelsContractAddress, type(uint256).max
         );
         _helperSignSafeTxAsOwner(
-            ISafe(payable(safe)),
+            IAvatar(payable(safe)),
             currentNetworkDetail.addresses.tokenContractAddress,
-            ISafe(payable(safe)).nonce(),
+            IAvatar(payable(safe)).nonce(),
             approveData
         );
     }
@@ -491,9 +491,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                 abi.encodeWithSelector(HoprNodeSafeRegistry.deregisterNodeBySafe.selector, nodeAddresses[i]);
 
             _helperSignSafeTxAsOwner(
-                ISafe(payable(safe)),
+                IAvatar(payable(safe)),
                 currentNetworkDetail.addresses.nodeSafeRegistryAddress,
-                ISafe(payable(safe)).nonce(),
+                IAvatar(payable(safe)).nonce(),
                 safeTxData
             );
         }
@@ -542,9 +542,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
                 return;
             }
             bytes memory scopeTargetData = abi.encodeWithSignature("scopeTargetToken(uint256)", Target.unwrap(target));
-            uint256 safeNonce = ISafe(payable(safe)).nonce();
+            uint256 safeNonce = IAvatar(payable(safe)).nonce();
 
-            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+            _helperSignSafeTxAsOwner(IAvatar(payable(safe)), module, safeNonce, scopeTargetData);
         } catch {
             // either it's an old module where tryGetTarget was not implemented, or the module is not valid
             emit log_string(
@@ -602,9 +602,9 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
             // or scope the target
             bytes memory scopeTargetData =
                 abi.encodeWithSignature("scopeTargetChannels(uint256)", Target.unwrap(target));
-            uint256 safeNonce = ISafe(payable(safe)).nonce();
+            uint256 safeNonce = IAvatar(payable(safe)).nonce();
 
-            _helperSignSafeTxAsOwner(ISafe(payable(safe)), module, safeNonce, scopeTargetData);
+            _helperSignSafeTxAsOwner(IAvatar(payable(safe)), module, safeNonce, scopeTargetData);
         } catch {
             // either it's an old module where tryGetTarget was not implemented, or the module is not valid
             emit log_string(
@@ -630,7 +630,7 @@ contract SingleActionFromPrivateKeyScript is Test, NetworkConfig {
     /**
      * @dev when caller is owner of safe instance, prepare a signature and execute the transaction
      */
-    function _helperSignSafeTxAsOwner(ISafe safe, address target, uint256 nonce, bytes memory data) private {
+    function _helperSignSafeTxAsOwner(IAvatar safe, address target, uint256 nonce, bytes memory data) private {
         bytes32 dataHash =
             safe.getTransactionHash(target, 0, data, Enum.Operation.Call, 0, 0, 0, address(0), msgSender, nonce);
 

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.30;
 
-import { Ownable } from "openzeppelin-contracts-4.9.2/access/Ownable.sol";
-import { Math } from "openzeppelin-contracts-4.9.2/utils/math/Math.sol";
+import { Ownable } from "openzeppelin-contracts-5.4.0/access/Ownable.sol";
+import { Math } from "openzeppelin-contracts-5.4.0/utils/math/Math.sol";
 import { IHoprNetworkRegistryRequirement } from "../interfaces/INetworkRegistryRequirement.sol";
 
 /**
@@ -75,12 +75,11 @@ contract HoprStakingProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, 
      * @dev Set stake contract address, transfer ownership, and set the maximum registrations per
      * special NFT to the default value: upperbound of of uint256.
      */
-    constructor(address _stakeContract, address _newOwner, uint256 _minStake) {
+    constructor(address _stakeContract, address _newOwner, uint256 _minStake) Ownable(_newOwner) {
         if (_stakeContract == address(0)) {
             revert ZeroAddress({ reason: "_stakeContract must not be empty" });
         }
         _updateStakeContract(_stakeContract);
-        _transferOwnership(_newOwner);
         stakeThreshold = _minStake;
         emit ThresholdUpdated(stakeThreshold);
     }

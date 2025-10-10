@@ -9,9 +9,9 @@ import { HoprNodeStakeFactory, HoprNodeStakeFactoryEvents } from "../../src/node
 import { Safe } from "safe-contracts-1.4.1/Safe.sol";
 import { SafeSuiteLibV141 } from "../../src/utils/SafeSuiteLibV141.sol";
 import { SafeSuiteLibV150 } from "../../src/utils/SafeSuiteLibV150.sol";
-import { Enum, ISafe } from "../../src/utils/ISafe.sol";
+import { Enum, IAvatar } from "../../src/interfaces/IAvatar.sol";
 import { SafeSingletonFixtureTest } from "../utils/SafeSingleton.sol";
-import { ClonesUpgradeable } from "openzeppelin-contracts-upgradeable-4.9.2/proxy/ClonesUpgradeable.sol";
+import { Clones } from "openzeppelin-contracts-5.4.0/proxy/Clones.sol";
 import { SafeProxyFactory } from "safe-contracts-1.4.1/proxies/SafeProxyFactory.sol";
 import { HoprToken } from "../../src/static/HoprToken.sol";
 import { ERC1820RegistryFixtureTest } from "../utils/ERC1820Registry.sol";
@@ -25,7 +25,7 @@ contract MaliciousModuleMock {
 }
 
 contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingletonFixtureTest, HoprNodeStakeFactoryEvents {
-    using ClonesUpgradeable for address;
+    using Clones for address;
     using TargetUtils for Target;
 
     HoprNodeManagementModule public moduleSingleton;
@@ -335,7 +335,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
         vm.expectEmit(true, false, false, true, address(factory));
         emit NewHoprNodeStakeModule(expectedModuleAddress4);
         // The first two Safe txns were used during the deployment of safe1
-        _helperSafeTxnToMultiSend(ISafe(safe1), 400, 0, safeTxData);
+        _helperSafeTxnToMultiSend(IAvatar(safe1), 400, 0, safeTxData);
 
         vm.stopPrank();
         vm.clearMockedCalls();
@@ -580,7 +580,7 @@ contract HoprNodeStakeFactoryTest is Test, ERC1820RegistryFixtureTest, SafeSingl
     /**
      * @dev when caller is owner of safe instance, prepare a signature and execute the transaction
      */
-    function _helperSafeTxnToMultiSend(ISafe safeInstance, uint256 senderPrivateKey, uint256 nonce, bytes memory data) private {
+    function _helperSafeTxnToMultiSend(IAvatar safeInstance, uint256 senderPrivateKey, uint256 nonce, bytes memory data) private {
         address sender = vm.addr(senderPrivateKey);
         bytes32 dataHash =
             safeInstance.getTransactionHash(SafeSuiteLibV141.SAFE_MultiSend_ADDRESS, 0, data, Enum.Operation.DelegateCall, 0, 0, 0, address(0), sender, nonce);

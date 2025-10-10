@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import { IHoprNetworkRegistryRequirement } from "../interfaces/INetworkRegistryRequirement.sol";
 import { HoprNodeSafeRegistry } from "../node-stake/NodeSafeRegistry.sol";
-import { AccessControlEnumerable } from "openzeppelin-contracts-4.9.2/access/AccessControlEnumerable.sol";
+import { AccessControlEnumerable } from "openzeppelin-contracts-5.4.0/access/extensions/AccessControlEnumerable.sol";
 
 /**
  * @dev Minimum interface for token contract

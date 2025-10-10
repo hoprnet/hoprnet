@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { HoprNodeManagementModule } from "../../../src/node-stake/permissioned-module/NodeManagementModule.sol";
 import { HoprNodeStakeFactory, HoprNodeStakeFactoryEvents } from "../../../src/node-stake/NodeStakeFactory.sol";
 import { HoprNodeSafeMigration, HoprNodeSafeMigrationEvents, IOwner } from "../../../src/node-stake/migration/NodeSafeMigration.sol";
-import { Enum, ISafe } from "../../../src/utils/ISafe.sol";
+import { Enum, IAvatar } from "../../../src/interfaces/IAvatar.sol";
 import { IAvatar } from "../../../src/interfaces/IAvatar.sol";
 import { ERC1820RegistryFixtureTest } from "../../utils/ERC1820Registry.sol";
 import { SafeSuiteLibV141 } from "../../../src/utils/SafeSuiteLibV141.sol";
@@ -148,7 +148,7 @@ contract NodeSafeMigrationTest is Test, ERC1820RegistryFixtureTest, SafeSingleto
         //     oldModuleProxy,
         //     newModuleProxyPrediction
         // );
-        _helperSafeTxnDelegateCall(address(migrationContract), ISafe(safeAddress), callerPrivateKey, data);
+        _helperSafeTxnDelegateCall(address(migrationContract), IAvatar(safeAddress), callerPrivateKey, data);
 
         // check the module is now upgraded to the new singleton
         assertEq(IOwner(address(newModuleProxyPrediction)).owner(), safeAddress); // new module is now owned by the safe
@@ -158,7 +158,7 @@ contract NodeSafeMigrationTest is Test, ERC1820RegistryFixtureTest, SafeSingleto
         vm.clearMockedCalls();
     }
 
-    function _helperSafeTxnDelegateCall(address to, ISafe safeInstance, uint256 senderPrivateKey, bytes memory data) private {
+    function _helperSafeTxnDelegateCall(address to, IAvatar safeInstance, uint256 senderPrivateKey, bytes memory data) private {
         address sender = vm.addr(senderPrivateKey);
         uint256 safeNonce = safeInstance.nonce();
         bytes32 dataHash =

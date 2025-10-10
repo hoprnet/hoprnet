@@ -8,7 +8,7 @@ import { BASE_INDEX_OFFSET, HoprChannels, HoprChannelsType, HoprChannelsEvents }
 import { HoprLedgerEvents } from "../src/Ledger.sol";
 import { CryptoUtils } from "./utils/Crypto.sol";
 import { HoprMultiSig } from "../src/MultiSig.sol";
-import { ERC777 } from "openzeppelin-contracts-4.9.2/token/ERC777/ERC777.sol";
+import { ERC777 } from "../src/static/openzeppelin-contracts/ERC777.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 import { HoprCrypto } from "../src/Crypto.sol";
 

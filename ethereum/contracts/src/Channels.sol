@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.7.0 <0.9.0;
 
-import { Multicall } from "openzeppelin-contracts-4.9.2/utils/Multicall.sol";
-import { IERC1820Registry } from "openzeppelin-contracts-4.9.2/utils/introspection/IERC1820Registry.sol";
-import { ERC1820Implementer } from "openzeppelin-contracts-4.9.2/utils/introspection/ERC1820Implementer.sol";
-import { IERC20 } from "openzeppelin-contracts-4.9.2/token/ERC20/IERC20.sol";
-import { IERC777Recipient } from "openzeppelin-contracts-4.9.2/token/ERC777/IERC777Recipient.sol";
-import { ECDSA } from "openzeppelin-contracts-4.9.2/utils/cryptography/ECDSA.sol";
+import { Multicall } from "openzeppelin-contracts-5.4.0/utils/Multicall.sol";
+import { IERC1820Registry } from "openzeppelin-contracts-5.4.0/interfaces/IERC1820Registry.sol";
+import { IERC20 } from "openzeppelin-contracts-5.4.0/token/ERC20/IERC20.sol";
+import { ECDSA } from "openzeppelin-contracts-5.4.0/utils/cryptography/ECDSA.sol";
 import { EfficientHashLib } from "solady-0.1.24/utils/EfficientHashLib.sol";
 
+import { IERC777Recipient } from "openzeppelin-contracts-5.4.0/interfaces/IERC777Recipient.sol";
 import { HoprCrypto } from "./Crypto.sol";
 import { HoprLedger } from "./Ledger.sol";
 import { HoprMultiSig } from "./MultiSig.sol";
@@ -172,7 +171,6 @@ abstract contract HoprChannelsType {
 contract HoprChannels is
     HoprChannelsType,
     IERC777Recipient,
-    ERC1820Implementer,
     Multicall,
     HoprLedger(INDEX_SNAPSHOT_INTERVAL),
     HoprMultiSig,

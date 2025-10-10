@@ -76,6 +76,22 @@ interface IAvatar {
         view
         returns (address[] memory array, address next);
 
+    function getTransactionHash(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        uint256 _nonce
+    )
+        external
+        view
+        returns (bytes32);
+
     /// @dev Allows to execute a Safe transaction confirmed by required number of owners.
     function execTransaction(
         address to,
@@ -89,4 +105,6 @@ interface IAvatar {
         address payable refundReceiver,
         bytes memory signatures
     ) external payable returns (bool);
+
+    function nonce() external returns (uint256);
 }

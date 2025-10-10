@@ -2,7 +2,7 @@
 pragma solidity >=0.6.0 <0.9.0;
 
 import { Test } from "forge-std/Test.sol";
-import { HoprTicketPriceOracle, HoprTicketPriceOracleEvents } from "../src/TicketPriceOracle.sol";
+import { HoprTicketPriceOracle, HoprTicketPriceOracleEvents, Ownable } from "../src/TicketPriceOracle.sol";
 
 contract TicketPriceOracleTest is Test, HoprTicketPriceOracleEvents {
     HoprTicketPriceOracle public oracle;
@@ -38,7 +38,7 @@ contract TicketPriceOracleTest is Test, HoprTicketPriceOracleEvents {
 
     function test_setAsNonOwnerFails() public {
         vm.prank(vm.addr(102));
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, vm.addr(102)));
         oracle.setTicketPrice(2);
     }
 

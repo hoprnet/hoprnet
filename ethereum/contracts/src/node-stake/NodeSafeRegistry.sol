@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import { ECDSA } from "openzeppelin-contracts-4.9.2/utils/cryptography/ECDSA.sol";
-import { Address } from "openzeppelin-contracts-4.9.2/utils/Address.sol";
+import { ECDSA } from "openzeppelin-contracts-5.4.0/utils/cryptography/ECDSA.sol";
 import { EfficientHashLib } from "solady-0.1.24/utils/EfficientHashLib.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {
@@ -47,8 +46,6 @@ abstract contract HoprNodeSafeRegistryEvents {
  * This contract is meant to be deployed as a standalone contract
  */
 contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
-    using Address for address;
-
     // Node already has mapped to Safe
     error NodeHasSafe();
 
@@ -162,7 +159,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
 
         // Verify that the signature is from nodeChainKeyAddress
-        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(registerHash, sig);
+        (address recovered, ECDSA.RecoverError error, ) = ECDSA.tryRecover(registerHash, sig);
         if (error != ECDSA.RecoverError.NoError || recovered != nodeChainKeyAddress) {
             revert NotValidSignatureFromNode();
         }
@@ -237,7 +234,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         }
 
         // Ensure that the node address is not a contract address
-        if (nodeChainKeyAddress.isContract()) {
+        if (nodeChainKeyAddress.code.length == 0) {
             revert NodeIsContract();
         }
 
