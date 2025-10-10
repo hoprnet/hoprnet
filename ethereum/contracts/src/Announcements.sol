@@ -3,7 +3,9 @@ pragma solidity 0.8.30;
 
 import { Multicall } from "openzeppelin-contracts-5.4.0/utils/Multicall.sol";
 import { HoprMultiSig } from "./MultiSig.sol";
+import { HoprLedger } from "./Ledger.sol";
 import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
+import { INDEX_SNAPSHOT_INTERVAL } from "./Channels.sol";
 import { MAX_KEY_ID, KeyId, EnumerableKeyBindingSet, KeyBindingSet, KeyBindingWithSignature } from "./utils/EnumerableKeyBindingSet.sol";
 
 error ZeroAddress(string reason);
@@ -64,7 +66,7 @@ abstract contract HoprAnnouncementsEvents {
  * By knowing the key id of a peer, a node can retrieve the off-chain keys and then the multiaddress base.
  */
 /// forge-lint:disable-next-item(mixed-case-variable)
-contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
+contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents, HoprLedger(INDEX_SNAPSHOT_INTERVAL) {
     using EnumerableKeyBindingSet for KeyBindingSet;
 
     // key bindings
@@ -238,6 +240,9 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
             ed25519_pub_key,
             selfAddress
         ));
+        indexEvent(
+            abi.encodePacked(KeyBinding.selector, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, selfAddress)
+        );
         emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, selfAddress);
     }
 
@@ -253,6 +258,7 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
             revert EmptyMultiaddr();
         }
         multiaddrOf[selfAddress] = baseMultiaddr;
+        indexEvent(abi.encodePacked(AddressAnnouncement.selector, selfAddress, baseMultiaddr));
         emit AddressAnnouncement(selfAddress, baseMultiaddr);
     }
 
@@ -261,6 +267,7 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
      */
     function _revokeInternal(address selfAddress) internal {
         delete multiaddrOf[selfAddress];
+        indexEvent(abi.encodePacked(RevokeAnnouncement.selector, selfAddress));
         emit RevokeAnnouncement(selfAddress);
     }
 }
