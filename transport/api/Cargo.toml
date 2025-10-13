@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition = "2021"
@@ -11,7 +11,8 @@ crate-type = ["rlib"]
 
 [features]
 default = ["mixer-channel"]
-transport-quic = []
+p2p-announce-quic = []
+p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-db-sql/runtime-tokio",

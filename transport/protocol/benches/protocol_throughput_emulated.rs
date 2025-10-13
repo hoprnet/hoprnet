@@ -2,7 +2,7 @@
 mod common;
 use common::{PEERS, PEERS_CHAIN, create_dbs, create_minimal_topology, random_packets_of_count, resolve_mock_path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::keypairs::Keypair;
@@ -10,7 +10,7 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
-use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig};
+use hopr_transport_protocol::processor::PacketInteractionConfig;
 use libp2p::PeerId;
 
 use crate::common::IndexerDbChainWrapper;
@@ -58,7 +58,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
                         let (api_send_tx, api_send_rx) =
-                            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting)>();
+                            futures::channel::mpsc::unbounded::<(ResolvedTransportRouting, ApplicationDataOut)>();
                         let (api_recv_tx, _api_recv_rx) =
                             futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
@@ -88,7 +88,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         .await
                         .expect("path must be constructible");
 
-                        let sender = MsgSender::new(api_send_tx);
                         let routing = ResolvedTransportRouting::Forward {
                             pseudonym: HoprPseudonym::random(),
                             forward_path: path,
@@ -98,12 +97,12 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let count = packets.len();
                         futures::stream::iter(packets)
                             .map(|packet| {
-                                let sender = sender.clone();
+                                let mut sender = api_send_tx.clone();
                                 let path = routing.clone();
 
                                 async move {
                                     sender
-                                        .send_packet(ApplicationDataOut::with_no_packet_info(packet), path.clone())
+                                        .send((path.clone(), ApplicationDataOut::with_no_packet_info(packet)))
                                         .await
                                 }
                             })

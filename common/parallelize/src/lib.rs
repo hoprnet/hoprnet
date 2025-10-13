@@ -24,9 +24,14 @@
 //!
 //! More information about parallization, execution and executors can be found in an excellent blog post [here](https://ryhl.io/blog/async-what-is-blocking/).
 
-/// Module for real thread pool based parallelization of CPU heavy blocking workloads.
+/// Module for real thread pool-based parallelization of CPU heavy blocking workloads.
 pub mod cpu {
     pub use rayon;
+
+    /// Initialize a `rayon` CPU thread pool with the given number of threads.
+    pub fn init_thread_pool(num_threads: usize) -> Result<(), rayon::ThreadPoolBuildError> {
+        rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global()
+    }
 
     /// Spawn an awaitable non-blocking execution of the given blocking function on a `rayon` CPU thread pool.
     ///

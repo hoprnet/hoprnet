@@ -15,7 +15,8 @@ crate-type = ["rlib"]
 default = []
 session-client = []
 session-server = []
-transport-quic = ["hopr-transport/transport-quic"]
+transport-announce-quic = ["hopr-transport/p2p-announce-quic"]
+transport-use-quic = ["hopr-transport/p2p-transport-quic"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
@@ -59,6 +60,7 @@ atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
 base64 = { workspace = true, optional = true }
 bytesize = { workspace = true, optional = true }
+cfg-if = { workspace = true }
 const_format = { workspace = true }
 dashmap = { workspace = true, optional = true }
 futures = { workspace = true }
