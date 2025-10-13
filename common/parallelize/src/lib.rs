@@ -24,25 +24,20 @@
 //!
 //! More information about parallization, execution and executors can be found in an excellent blog post [here](https://ryhl.io/blog/async-what-is-blocking/).
 
-/// Module for real thread pool-based parallelization of CPU heavy blocking workloads.
+/// Module for real thread pool based parallelization of CPU heavy blocking workloads.
 pub mod cpu {
     pub use rayon;
-
-    /// Initialize a `rayon` CPU thread pool with the given number of threads.
-    pub fn init_thread_pool(num_threads: usize) -> Result<(), rayon::ThreadPoolBuildError> {
-        rayon::ThreadPoolBuilder::new().num_threads(num_threads).build_global()
-    }
 
     /// Spawn an awaitable non-blocking execution of the given blocking function on a `rayon` CPU thread pool.
     ///
     /// The current thread pool uses a LIFO (Last In First Out) scheduling policy for the thread's queue, but
     /// FIFO (First In First Out) for stealing tasks from other threads.
     #[cfg(feature = "rayon")]
-    pub async fn spawn_blocking<R: Send + std::fmt::Debug + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
+    pub async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
-                .unwrap_or_else(|e| panic!("spawned blocking process should be awaitable {:?}", e))
+                .unwrap_or_else(|_| unreachable!())
         });
         rx.await
             .expect("spawned blocking process should be awaitable")
@@ -53,11 +48,11 @@ pub mod cpu {
     ///
     /// Executed tasks are loaded using a FIFO (First In First Out) scheduling policy.
     #[cfg(feature = "rayon")]
-    pub async fn spawn_fifo_blocking<R: Send + std::fmt::Debug + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
+    pub async fn spawn_fifo_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
         let (tx, rx) = futures::channel::oneshot::channel();
         rayon::spawn_fifo(|| {
             tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)))
-                .unwrap_or_else(|e| panic!("spawned fifo blocking process should be awaitable {:?}", e))
+                .unwrap_or_else(|_| unreachable!())
         });
         rx.await
             .expect("spawned fifo blocking process should be awaitable")
