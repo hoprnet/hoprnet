@@ -98,6 +98,43 @@ contract NodeSafeMigrationTest is Test, ERC1820RegistryFixtureTest, SafeSingleto
         assertEq(newFactory.safeVersion(), SafeSuiteLibV141.SAFE_VERSION);
     }
 
+    /**
+     * @dev test migrate the implementaiton of a module proxy
+     */
+    function test_MigrateModuleSingleton() public mockTokenChannel {
+        uint256 nonce = 0x01D;
+        uint256 callerPrivateKey = 0xca11e2;
+        address caller = vm.addr(callerPrivateKey);
+        address[] memory admins = new address[](1);
+        admins[0] = caller;
+        // use the old factory to deploy a module with an outdated implementation
+        vm.prank(caller);
+        (address oldModuleProxy, address payable safeAddress) = oldFactory.clone(
+            nonce,
+            OLD_DEFAULT_TARGET,
+            admins
+        );
+        assertEq(vm.load(address(oldModuleProxy), _IMPLEMENTATION_SLOT), bytes32(uint256(uint160(address(oldModuleSingleton)))));
+
+        // migrate the module implementation to a new one, using delegate call from the safe
+        bytes memory data = abi.encodeWithSelector(
+            migrationContract.migrateModuleSingleton.selector,
+            oldModuleProxy,
+            hex""
+        );
+
+        vm.prank(caller);
+        // vm.expectEmit(false, false, false, true, safeAddress);
+        // emit ChangedModuleImplementation(
+        //     oldModuleProxy
+        // );
+        _helperSafeTxnDelegateCall(address(migrationContract), IAvatar(safeAddress), callerPrivateKey, data);
+
+        // verify the current implementation address is indeed the latest one
+        assertEq(vm.load(address(oldModuleProxy), _IMPLEMENTATION_SLOT), bytes32(uint256(uint160(address(newModuleSingleton)))));
+        vm.clearMockedCalls();
+    }
+
     function test_MigrateNodeSafe() public mockTokenChannel {
         uint256 callerPrivateKey = 0xCAFE;
         address caller = vm.addr(callerPrivateKey);
@@ -154,6 +191,7 @@ contract NodeSafeMigrationTest is Test, ERC1820RegistryFixtureTest, SafeSingleto
         assertEq(IOwner(address(newModuleProxyPrediction)).owner(), safeAddress); // new module is now owned by the safe
         assertTrue(IAvatar(safeAddress).isModuleEnabled(address(newModuleProxyPrediction))); // new module is enabled in the safe
         assertFalse(IAvatar(safeAddress).isModuleEnabled(address(oldModuleProxy))); // old module is no longer enabled in the safe
+        assertEq(vm.load(address(newModuleProxyPrediction), _IMPLEMENTATION_SLOT), bytes32(uint256(uint160(address(newModuleSingleton)))));
 
         vm.clearMockedCalls();
     }

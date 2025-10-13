@@ -102,6 +102,47 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         MAX_USED_BALANCE = HoprChannelsType.Balance.unwrap(hoprChannels.MAX_USED_BALANCE());
     }
 
+    /**
+     * @dev test invariants of `Channels.sol` contract
+     */
+    function test_Constants() public {
+        // minimum balance accepted in channel funding
+        assertEq(HoprChannelsType.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()), 1);
+        // Maximum balance accepted in channel funding
+        assertEq(HoprChannelsType.Balance.unwrap(hoprChannels.MAX_USED_BALANCE()), 10 **25);
+        // current veersioning
+        string memory currentVersiosn = "2.0.0";
+        assertEq(hoprChannels.VERSION(), currentVersiosn);
+        // acceptable data payload size in ERC777 token send hook
+        assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(), 64); // 20 + 96/8 + 20 + 96/8 = 64
+        assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_SIZE(), 40); // 20 + 20
+    }
+
+    function testRevert_ConstructorError() public {
+        HoprChannels failedChannel;
+        // whwen notice period is too short
+        vm.expectRevert(HoprChannels.InvalidNoticePeriod.selector);
+        failedChannel = new HoprChannels(address(hoprToken), HoprChannelsType.Timestamp.wrap(0), hoprNodeSafeRegistry);
+
+        // when token address is zero
+        vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, "_token must not be empty"));
+        failedChannel = new HoprChannels(address(0), CLOSURE_NOTICE_PERIOD, hoprNodeSafeRegistry);
+
+        // when NodeSafeRegistry contract is zero
+        vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, "_safeRegistry must not be empty"));
+        failedChannel = new HoprChannels(address(hoprToken), CLOSURE_NOTICE_PERIOD, HoprNodeSafeRegistry(address(0)));
+        vm.clearMockedCalls();
+    }
+
+    function test_ViewCurrentBlockTimestamp() public {
+        uint256 mockTimestamp = 8765;
+        vm.warp(mockTimestamp);
+
+        HoprChannelsType.Timestamp currentTime = hoprChannels._currentBlockTimestamp();
+        assertEq(uint256(HoprChannelsType.Timestamp.unwrap(currentTime)), mockTimestamp);
+        vm.clearMockedCalls();
+    }
+
     function test_publicFunctions(
         address src,
         address dest,
