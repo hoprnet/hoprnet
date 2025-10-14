@@ -17,14 +17,13 @@
 
 pub mod config;
 pub mod content;
-mod db_proxy;
 pub mod errors;
 mod neighbors;
 pub mod ping;
 pub mod probe;
 pub mod traits;
 
-pub use crate::{config::ProbeConfig, db_proxy::DbProxy, probe::Probe};
+pub use crate::{config::ProbeConfig, probe::Probe};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprProbeProcess {
