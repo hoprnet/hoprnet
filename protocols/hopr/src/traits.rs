@@ -1,13 +1,11 @@
-use std::sync::Arc;
-use ringbuffer::RingBuffer;
 use hopr_crypto_packet::{HoprSurb, ReplyOpener};
-use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
+use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId, PacketSignals};
 use hopr_crypto_types::prelude::{HalfKeyChallenge, OffchainPublicKey};
 use hopr_internal_types::prelude::{Acknowledgement, HoprPseudonym};
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
-use hopr_protocol_app::prelude::ApplicationDataOut;
-use crate::errors::IncomingPacketError;
-use crate::types::{FoundSurb, OutgoingPacket};
+
+pub use crate::errors::IncomingPacketError;
+pub use crate::types::{FoundSurb, IncomingPacket, OutgoingPacket};
 
 #[async_trait::async_trait]
 pub trait SurbStore {
@@ -21,36 +19,37 @@ pub trait SurbStore {
 }
 
 #[async_trait::async_trait]
-pub trait PacketWrapping {
-    type Input;
-    type Error;
+pub trait PacketEncoder {
+    type Error: std::error::Error;
 
-    async fn send_data(
+    async fn encode<T: AsRef<[u8]> + Send, S: Into<PacketSignals> + Send>(
         &self,
-        data: ApplicationDataOut,
+        data: T,
         routing: ResolvedTransportRouting,
-    ) -> Result<OutgoingPacket, Self::Error>;
-
-    async fn send_ack(
-        &self,
-        ack: Acknowledgement,
-        destination: &OffchainPublicKey,
+        signals: S,
     ) -> Result<OutgoingPacket, Self::Error>;
 }
 
 #[async_trait::async_trait]
-pub trait PacketUnwrapping {
-    type Packet;
+pub trait PacketDecoder {
+    type Error: std::error::Error;
 
-    type Error;
-
-    async fn recv_data(
+    async fn decode_packet(
         &self,
         peer: OffchainPublicKey,
         data: Box<[u8]>,
-    ) -> Result<Self::Packet, IncomingPacketError<Self::Error>>;
+    ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
+}
 
-    async fn recv_ack(
+#[async_trait::async_trait]
+pub trait TicketProcessor {
+    type Error: std::error::Error;
+
+    async fn new_unacknowledged_ticket(
+        &self,
+    ) -> Result<(), Self::Error>;
+
+    async fn acknowledge_ticket(
         &self,
         peer: OffchainPublicKey,
         ack: Acknowledgement,

@@ -59,8 +59,6 @@ pub mod errors;
 // protocols
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
-/// processor for the protocol
-pub mod processor;
 
 /// Stream processing utilities
 pub mod stream;
@@ -72,9 +70,7 @@ pub mod timer;
 /// Requires the `capture` feature to be enabled.
 #[cfg(feature = "capture")]
 mod capture;
-mod traits;
-mod surb_store;
-mod types;
+
 
 use std::{collections::HashMap, time::Duration};
 use std::ops::Deref;
@@ -97,13 +93,8 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
 use hopr_api::db::HoprDbTicketOperations;
 use hopr_crypto_types::prelude::{ChainKeypair, OffchainKeypair};
-use crate::surb_store::MemorySurbStore;
+use hopr_protocol_hopr::{PacketDecoder, PacketEncoder, TicketProcessor};
 pub use crate::timer::execute_on_tick;
-use crate::traits::{PacketUnwrapping, PacketWrapping};
-use crate::types::{IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket};
-
-pub use traits::SurbStore;
-pub use types::FoundSurb;
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 const SLOW_OP: std::time::Duration = std::time::Duration::from_millis(150);
@@ -171,23 +162,23 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
 /// overlay on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
-pub async fn run_msg_ack_protocol<Db, R>(
+pub async fn run_msg_ack_protocol<C, D, T>(
     (chain_key, packet_key): (ChainKeypair, OffchainKeypair),
-    packet_cfg: processor::PacketInteractionConfig,
-    db: Db,
-    resolver: R,
     wire_msg: (
         impl futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     ),
+    codec: (C, D),
+    ticket_proc: T,
     api: (
         impl futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Send + 'static,
         impl futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
-    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
-    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Clone + Send + Sync + 'static,
+    C: PacketEncoder + Clone + Send + 'static,
+    D: PacketDecoder + Clone + Send + 'static,
+    T: TicketProcessor + Clone + Send + 'static,
 {
     #[cfg(feature = "capture")]
     let me_pub = *hopr_crypto_types::keypairs::Keypair::public(&packet_key);
@@ -233,22 +224,13 @@ where
     let (ticket_ack_tx, ticket_ack_rx) =
         futures::channel::mpsc::channel::<(OffchainPublicKey, Acknowledgement)>(TICKET_ACK_BUFFER_SIZE);
 
-    let hopr_packet_processor = processor::PacketProcessor::new(
-        db.clone(),
-        resolver.clone(),
-        MemorySurbStore::default(),
-        chain_key,
-        packet_key.clone(),
-        packet_cfg,
-    );
-
-    let ack_processor_in = hopr_packet_processor.clone();
+    let ticket_processor_acks = ticket_proc.clone();
     processes.insert(
         ProtocolProcesses::TicketAck,
         spawn_as_abortable!(ticket_ack_rx
             .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, move |(peer, ack)|
-                ack_processor_in
-                    .recv_ack(peer, ack)
+                ticket_processor_acks
+                    .acknowledge_ticket(peer, ack)
                     .inspect_err(|error| tracing::error!(%error, "failed to acknowledge ticket"))
                     .map(|_| ())
             )
@@ -261,7 +243,7 @@ where
     #[cfg(feature = "capture")]
     let capture_clone = capture.clone();
 
-    let ack_processor_out = hopr_packet_processor.clone();
+    let ack_encoder = codec.0.clone();
     let packet_key_clone = packet_key.clone();
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
@@ -300,6 +282,8 @@ where
                             }
                             .into();
 
+                            ack_encoder.
+
                             match ack_processor_out.send_ack(ack.leak(), &destination).await{
                                 Ok(ack_packet) => {
                                     msg_to_send_tx_clone
@@ -333,7 +317,6 @@ where
         ),
     );
 
-    let msg_processor_write = hopr_packet_processor.clone();
 
     #[cfg(feature = "capture")]
     let capture_clone = capture.clone();

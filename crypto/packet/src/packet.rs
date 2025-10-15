@@ -273,6 +273,18 @@ pub struct HoprIncomingPacket {
     pub signals: PacketSignals,
 }
 
+impl std::fmt::Debug for HoprIncomingPacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoprIncomingPacket")
+            .field("packet_tag", &self.packet_tag)
+            .field("ack_key", &self.ack_key)
+            .field("previous_hop", &self.previous_hop)
+            .field("sender", &self.sender)
+            .field("signals", &self.signals)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Represents a packet destined for another node.
 #[derive(Clone)]
 pub struct HoprOutgoingPacket {
@@ -284,6 +296,16 @@ pub struct HoprOutgoingPacket {
     pub next_hop: OffchainPublicKey,
     /// Acknowledgement challenge solved once the next hop sends us an acknowledgement.
     pub ack_challenge: HalfKeyChallenge,
+}
+
+impl std::fmt::Debug for HoprOutgoingPacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoprOutgoingPacket")
+            .field("ticket", &self.ticket)
+            .field("next_hop", &self.next_hop)
+            .field("ack_challenge", &self.ack_challenge)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Represents a [`HoprOutgoingPacket`] with additional forwarding information.
@@ -305,12 +327,26 @@ pub struct HoprForwardedPacket {
     pub path_pos: u8,
 }
 
+impl std::fmt::Debug for HoprForwardedPacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HoprForwardedPacket")
+            .field("outgoing", &self.outgoing)
+            .field("packet_tag", &self.packet_tag)
+            .field("ack_key", &self.ack_key)
+            .field("previous_hop", &self.previous_hop)
+            .field("own_key", &self.own_key)
+            .field("next_challenge", &self.next_challenge)
+            .field("path_pos", &self.path_pos)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Contains HOPR packet and its variants.
 ///
 /// See [`HoprIncomingPacket`], [`HoprForwardedPacket`] and [`HoprOutgoingPacket`] for details.
 ///
 /// The members are intentionally boxed to equalize the variant sizes.
-#[derive(Clone, strum::EnumTryAs, strum::EnumIs)]
+#[derive(Clone, Debug, strum::EnumTryAs, strum::EnumIs)]
 pub enum HoprPacket {
     /// The packet is intended for us
     Final(Box<HoprIncomingPacket>),

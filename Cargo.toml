@@ -34,6 +34,7 @@ members = [
   "misc/metrics",
   "misc/platform",
   "protocols/app",
+  "protocols/hopr",
   "protocols/session",
   "protocols/start",
   "transport/api",
@@ -265,6 +266,7 @@ hopr-parallelize = { path = "common/parallelize" }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-protocol-app = { path = "protocols/app" }
+hopr-protocol-hopr = { path = "protocols/hopr" }
 hopr-protocol-session = { path = "protocols/session" }
 hopr-protocol-start = { path = "protocols/start" }
 hopr-strategy = { path = "logic/strategy", default-features = false }

@@ -5083,6 +5083,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-protocol-hopr"
+version = "4.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "hex",
+ "hopr-api",
+ "hopr-crypto-packet",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-network-types",
+ "moka",
+ "parking_lot",
+ "ringbuffer",
+ "smart-default",
+ "strum 0.27.2",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-protocol-session"
 version = "1.0.2"
 dependencies = [
@@ -5353,7 +5375,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.11.3"
+version = "0.12.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5363,14 +5385,12 @@ dependencies = [
  "criterion",
  "futures",
  "futures-time",
- "hex",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-node",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -5380,6 +5400,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-protocol-app",
+ "hopr-protocol-hopr",
  "hopr-protocol-session",
  "hopr-protocol-start",
  "hopr-transport-bloom",
@@ -5392,7 +5413,6 @@ dependencies = [
  "moka",
  "parking_lot",
  "pcap-file",
- "ringbuffer",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",

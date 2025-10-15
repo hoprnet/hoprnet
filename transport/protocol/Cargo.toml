@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "0.11.3"
+version = "0.12.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -12,12 +12,10 @@ crate-type = ["rlib"]
 default = []
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
-  "hopr-db-node/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-path/prometheus",
-  "hopr-db-node/prometheus",
 ]
 capture = ["dep:pcap-file"]
 
@@ -27,13 +25,11 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true }
-hex = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 pcap-file = { workspace = true, optional = true }
-ringbuffer = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
@@ -52,7 +48,6 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
@@ -60,6 +55,7 @@ hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-protocol-hopr = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-transport-bloom = { workspace = true }
 hopr-transport-identity = { workspace = true }

@@ -2,13 +2,13 @@ use std::sync::Arc;
 use std::time::Duration;
 use moka::future::Cache;
 use moka::notification::RemovalCause;
+use ringbuffer::RingBuffer;
 use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
 use hopr_crypto_packet::{HoprSurb, ReplyOpener};
-use hopr_db_node::errors::NodeDbError;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::SurbMatcher;
+use crate::FoundSurb;
 use crate::traits::SurbStore;
-use crate::types::{FoundSurb, SurbRingBuffer};
 
 /// Configuration for the SURB cache.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, smart_default::SmartDefault)]
@@ -68,7 +68,7 @@ impl Default for MemorySurbStore {
     }
 }
 
-#[ async_trait::async_trait]
+#[async_trait::async_trait]
 impl SurbStore for MemorySurbStore {
     async fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb> {
         let pseudonym = matcher.pseudonym();
@@ -108,7 +108,7 @@ impl SurbStore for MemorySurbStore {
             .push(surbs)
     }
 
-    async fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
+    fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
         self.pseudonym_openers
             .get_with(sender_id.pseudonym(), move || {
                 moka::sync::Cache::builder()
@@ -116,7 +116,12 @@ impl SurbStore for MemorySurbStore {
                     .time_to_live(Duration::from_secs(3600))
                     .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
                         if cause != RemovalCause::Explicit {
-                            tracing::warn!(pseudonym = %sender_id.pseudonym(), surb_id = hex::encode(id.as_slice()), ?cause, "evicting reply opener for sender id");
+                            tracing::warn!(
+                                pseudonym = %sender_id.pseudonym(),
+                                surb_id = hex::encode(id.as_slice()),
+                                ?cause,
+                                "evicting reply opener for sender id"
+                            );
                         }
                     })
                     .max_capacity(100_000)
@@ -129,5 +134,134 @@ impl SurbStore for MemorySurbStore {
         self.pseudonym_openers
             .get(&sender_id.pseudonym())
             .and_then(|cache| cache.remove(&sender_id.surb_id()))
+    }
+}
+
+/// Represents a single SURB along with its ID popped from the [`SurbRingBuffer`].
+#[derive(Debug, Clone)]
+pub struct PoppedSurb<S> {
+    /// Complete SURB sender ID.
+    pub id: HoprSurbId,
+    /// The popped SURB.
+    pub surb: S,
+    /// Number of SURBs left in the RB after the pop.
+    pub remaining: usize,
+}
+
+/// Ring buffer containing SURBs along with their IDs.
+///
+/// All these SURBs usually belong to the same pseudonym and are therefore identified
+/// only by the [`HoprSurbId`].
+#[derive(Clone, Debug)]
+pub struct SurbRingBuffer<S>(Arc<parking_lot::Mutex<ringbuffer::AllocRingBuffer<(HoprSurbId, S)>>>);
+
+impl<S> SurbRingBuffer<S> {
+    pub fn new(capacity: usize) -> Self {
+        Self(Arc::new(parking_lot::Mutex::new(ringbuffer::AllocRingBuffer::new(capacity))))
+    }
+
+    /// Push all SURBs with their IDs into the RB.
+    ///
+    /// Returns the total number of elements in the RB after the push.
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, S)>>(&self, surbs: I) -> usize {
+        let mut rb = self.0.lock();
+        rb.extend(surbs);
+        rb.len()
+    }
+
+    /// Pop the latest SURB and its IDs from the RB.
+    pub fn pop_one(&self) -> Option<PoppedSurb<S>> {
+        let mut rb = self.0.lock();
+        let (id, surb) = rb.dequeue()?;
+        Some(PoppedSurb {
+            id,
+            surb,
+            remaining: rb.len(),
+        })
+    }
+
+    /// Check if the next SURB has the given ID and pop it from the RB.
+    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Option<PoppedSurb<S>> {
+        let mut rb = self.0.lock();
+
+        if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
+            let (id, surb) = rb.dequeue()?;
+            Some(PoppedSurb {
+                id,
+                surb,
+                remaining: rb.len(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn surb_ring_buffer_must_drop_items_when_capacity_is_reached() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(3);
+        rb.push([([1u8; 8], 0)]);
+        rb.push([([2u8; 8], 0)]);
+        rb.push([([3u8; 8], 0)]);
+        rb.push([([4u8; 8], 0)]);
+
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([2u8; 8], popped.id);
+        assert_eq!(2, popped.remaining);
+
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([3u8; 8], popped.id);
+        assert_eq!(1, popped.remaining);
+
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([4u8; 8], popped.id);
+        assert_eq!(0, popped.remaining);
+
+        assert!(rb.pop_one().is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn surb_ring_buffer_must_be_fifo() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5);
+
+        let len = rb.push([([1u8; 8], 0)]);
+        assert_eq!(1, len);
+
+        let len = rb.push([([2u8; 8], 0)]);
+        assert_eq!(2, len);
+
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([1u8; 8], popped.id);
+        assert_eq!(1, popped.remaining);
+
+        let popped = rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?;
+        assert_eq!([2u8; 8], popped.id);
+        assert_eq!(0, popped.remaining);
+
+        let len = rb.push([([1u8; 8], 0), ([2u8; 8], 0)]);
+        assert_eq!(2, len);
+
+        assert_eq!([1u8; 8], rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!([2u8; 8], rb.pop_one().ok_or(anyhow::anyhow!("expected pop"))?.id);
+
+        Ok(())
+    }
+
+    #[test]
+    fn surb_ring_buffer_must_not_pop_if_id_does_not_match() -> anyhow::Result<()> {
+        let rb = SurbRingBuffer::new(5);
+
+        rb.push([([1u8; 8], 0)]);
+
+        assert!(rb.pop_one_if_has_id(&[2u8; 8]).is_none());
+        assert_eq!([1u8; 8], rb.pop_one_if_has_id(&[1u8; 8]).ok_or(anyhow::anyhow!("expected pop"))?.id);
+
+        Ok(())
     }
 }

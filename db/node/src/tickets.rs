@@ -621,6 +621,10 @@ impl HoprDbTicketOperations for HoprNodeDb {
         }
         Ok(())
     }
+
+    async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, NodeDbError> {
+        self.ticket_manager.unrealized_value(selector).await
+    }
 }
 
 impl HoprNodeDb {

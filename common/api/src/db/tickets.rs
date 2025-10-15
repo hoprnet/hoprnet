@@ -376,6 +376,8 @@ pub trait HoprDbTicketOperations {
     async fn persist_outgoing_ticket_indices(&self) -> Result<usize, Self::Error>;
 
     async fn insert_received_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), Self::Error>;
+
+    async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, Self::Error>;
 }
 
 /// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.
