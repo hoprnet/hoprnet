@@ -1,6 +1,6 @@
 [package]
 name = "hopr-path"
-version = "0.8.4"
+version = "0.9.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Contains mixnet path construction and path selection logic"
