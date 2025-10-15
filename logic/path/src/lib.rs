@@ -8,7 +8,6 @@ pub mod selectors;
 
 use std::{
     fmt::{Display, Formatter},
-    hash::Hash,
     ops::Deref,
 };
 
@@ -24,35 +23,7 @@ use crate::{
     },
 };
 
-/// Represents a type that determines a hop on a [`Path`].
-#[allow(clippy::large_enum_variant)] // TODO: use CompactOffchainPublicKey
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, strum::EnumTryAs, strum::EnumIs)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum PathAddress {
-    Chain(Address),
-    Transport(OffchainPublicKey),
-}
-
-impl From<Address> for PathAddress {
-    fn from(value: Address) -> Self {
-        PathAddress::Chain(value)
-    }
-}
-
-impl From<OffchainPublicKey> for PathAddress {
-    fn from(value: OffchainPublicKey) -> Self {
-        PathAddress::Transport(value)
-    }
-}
-
-impl Display for PathAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PathAddress::Chain(addr) => write!(f, "{}", addr.to_hex()),
-            PathAddress::Transport(key) => write!(f, "{}", key.to_hex()),
-        }
-    }
-}
+pub(crate) type PathAddress = NodeId;
 
 /// Base implementation of an abstract path.
 pub trait Path<N>: Clone + Eq + PartialEq + Deref<Target = [N]> + IntoIterator<Item = N>
@@ -256,21 +227,27 @@ impl ValidatedPath {
         Self(TransportPath(vec![dst_key]), ChainPath(vec![dst_address]))
     }
 
-    /// Turns the given [`NonEmptyPath`] into a [`ValidatedPath`].
+    /// Turns the given `path` into a [`ValidatedPath`].
     ///
     /// This makes sure that all addresses and channels on the path exist
     /// and do resolve to the corresponding [`OffchainPublicKeys`](OffchainPublicKey) or
     /// [`Addresses`](Address).
+    ///
+    /// If the given path is empty or unresolvable, an error is returned.
     pub async fn new<N, P, O, R>(origin: O, path: P, cg: &ChannelGraph, resolver: &R) -> errors::Result<ValidatedPath>
     where
         N: Into<PathAddress> + Copy,
-        P: NonEmptyPath<N>,
+        P: Path<N>,
         O: Into<PathAddress>,
         R: PathAddressResolver,
     {
+        if path.is_empty() {
+            return Err(PathNotValid);
+        }
+
         let mut ticket_issuer = match origin.into() {
             PathAddress::Chain(addr) => addr,
-            PathAddress::Transport(key) => resolver
+            PathAddress::Offchain(key) => resolver
                 .resolve_chain_address(&key)
                 .await?
                 .ok_or(InvalidPeer(key.to_string()))?,
@@ -293,7 +270,7 @@ impl ValidatedPath {
                     addrs.push(*addr);
                     *addr
                 }
-                PathAddress::Transport(key) => {
+                PathAddress::Offchain(key) => {
                     let addr = resolver
                         .resolve_chain_address(key)
                         .await?
