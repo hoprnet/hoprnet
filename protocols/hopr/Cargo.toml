@@ -1,0 +1,30 @@
+[package]
+name = "hopr-protocol-hopr"
+version = "4.0.0"
+edition = "2024"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Contains implementation of the HOPR protocol as specified in RFC-0004 & RFC-0005"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[dependencies]
+async-trait = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+moka = { workspace = true }
+parking_lot = { workspace = true }
+ringbuffer = { workspace = true }
+strum = { workspace = true }
+smart-default = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+hopr-api = { workspace = true }
+hopr-crypto-packet = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-network-types = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
