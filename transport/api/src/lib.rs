@@ -21,8 +21,6 @@ pub mod errors;
 pub mod helpers;
 pub mod network_notifier;
 
-pub mod traits;
-
 pub mod socket;
 
 use std::{
@@ -545,7 +543,7 @@ where
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
-        let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
+        let probe = Probe::new(self.cfg.probe);
         for (k, v) in probe
             .continuously_scan(
                 (unresolved_routing_msg_tx.clone(), rx_from_protocol),

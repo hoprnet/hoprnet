@@ -91,7 +91,7 @@ pub struct PathTelemetry {
 
 impl PathTelemetry {
     pub const ID_SIZE: usize = 10;
-    pub const PATH_SIZE: usize = 10;
+    pub const PATH_SIZE: usize = 10;        // PeerId -> 32bytes? * (destination + 3 hops) = 128bytes
     pub const SIZE: usize = Self::ID_SIZE + Self::PATH_SIZE + size_of::<u128>();
 
     pub fn to_bytes(self) -> Box<[u8]> {

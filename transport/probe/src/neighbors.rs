@@ -1,52 +1,79 @@
 use async_stream::stream;
-use futures::Stream;
+use hopr_crypto_types::types::OffchainPublicKey;
 use libp2p_identity::PeerId;
 use rand::seq::SliceRandom;
 
-use crate::{config::ProbeConfig, traits::PeerDiscoveryFetch};
+use hopr_crypto_random::Randomizable;
+use hopr_internal_types::protocol::HoprPseudonym;
+use hopr_network_types::types::{DestinationRouting, RoutingOptions};
 
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_TIME_TO_PROBE: hopr_metrics::metrics::SimpleHistogram =
-        hopr_metrics::metrics::SimpleHistogram::new(
-            "hopr_probe_round_time_sec",
-            "Measures total time in seconds it takes to probe all nodes",
-            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0],
-        ).unwrap();
+use crate::{
+    config::ProbeConfig,
+    traits::{PeerDiscoveryFetch, TrafficGeneration},
+};
+
+pub struct ImmediateNeighborProber<T> {
+    cfg: ProbeConfig,
+    fetcher: T,
 }
 
-pub fn neighbors_to_probe<T>(fetcher: T, cfg: ProbeConfig) -> impl Stream<Item = PeerId>
+impl<T> ImmediateNeighborProber<T> {
+    pub fn new(cfg: ProbeConfig, fetcher: T) -> Self {
+        Self { cfg, fetcher }
+    }
+}
+
+impl<T> TrafficGeneration for ImmediateNeighborProber<T>
 where
     T: PeerDiscoveryFetch + Send + Sync + 'static,
 {
-    stream! {
-        let mut rng = hopr_crypto_random::rng();
-        loop {
-            let now = std::time::SystemTime::now();
+    fn build(
+        self,
+    ) -> (
+        impl futures::Stream<Item = DestinationRouting>,
+        impl futures::Sink<crate::errors::Result<crate::TrafficReturnedObservation>, Error = impl std::error::Error>,
+    ) {
+        // For each probe target a cached version of transport routing is stored
+        let cache_peer_routing: moka::future::Cache<PeerId, DestinationRouting> = moka::future::Cache::builder()
+            .time_to_live(std::time::Duration::from_secs(600))
+            .max_capacity(100_000)
+            .build();
 
-            let mut peers = fetcher.get_peers(now.checked_sub(cfg.recheck_threshold).unwrap_or(now)).await;
-            peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
+        let s = stream! {
+            let mut rng = hopr_crypto_random::rng();
+            loop {
+                let now = std::time::SystemTime::now();
 
-            #[cfg(all(feature = "prometheus", not(test)))]
-            let probe_round_timer = if peers.is_empty() { None } else { Some(hopr_metrics::histogram_start_measure!(METRIC_TIME_TO_PROBE)) };
+                let mut peers = self.fetcher.get_peers(now.checked_sub(self.cfg.recheck_threshold).unwrap_or(now)).await;
+                peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
 
-            for peer in peers {
-                yield peer;
+                for peer in peers {
+                    if let Ok(routing) = cache_peer_routing
+                        .try_get_with(peer, async move {
+                            Ok::<DestinationRouting, anyhow::Error>(DestinationRouting::Forward {
+                                destination: Box::new(OffchainPublicKey::from_peerid(&peer)?.into()),
+                                pseudonym: Some(HoprPseudonym::random()),
+                                forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
+                                return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
+                            })
+                        })
+                        .await {
+                            yield routing;
+                        }
+                }
+
+                hopr_async_runtime::prelude::sleep(self.cfg.interval).await;
             }
+        };
 
-            #[cfg(all(feature = "prometheus", not(test)))]
-            if let Some(probe_round_timer) = probe_round_timer {
-                METRIC_TIME_TO_PROBE.record_measure(probe_round_timer);
-            }
-
-            hopr_async_runtime::prelude::sleep(cfg.interval).await;
-        }
+        (s, futures::sink::drain())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use futures::{StreamExt, pin_mut};
+    use hopr_internal_types::NodeId;
     use tokio::time::timeout;
 
     use super::*;
@@ -59,7 +86,8 @@ mod tests {
         let mut fetcher = MockPeerDiscoveryFetch::new();
         fetcher.expect_get_peers().returning(|_| vec![]);
 
-        let stream = neighbors_to_probe(fetcher, Default::default());
+        let prober = ImmediateNeighborProber::new(Default::default(), fetcher);
+        let (stream, _sink) = prober.build();
         pin_mut!(stream);
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await.is_err());
@@ -68,7 +96,10 @@ mod tests {
     }
 
     lazy_static::lazy_static! {
-        static ref RANDOM_PEERS: Vec<PeerId> = (1..10).map(|_| PeerId::random()).collect::<Vec<_>>();
+        static ref RANDOM_PEERS: Vec<PeerId> = (1..10).map(|_| {
+            let peer: PeerId = OffchainPublicKey::from_privkey(&hopr_crypto_random::random_bytes::<32>()).unwrap().into();
+            peer
+        }).collect::<Vec<_>>();
     }
 
     #[tokio::test]
@@ -76,10 +107,27 @@ mod tests {
         let mut fetcher = MockPeerDiscoveryFetch::new();
         fetcher.expect_get_peers().returning(|_| RANDOM_PEERS.clone());
 
-        let stream = neighbors_to_probe(fetcher, Default::default());
+        let prober = ImmediateNeighborProber::new(Default::default(), fetcher);
+        let (stream, _sink) = prober.build();
         pin_mut!(stream);
 
-        let actual = timeout(TINY_TIMEOUT * 20, stream.take(RANDOM_PEERS.len()).collect::<Vec<_>>()).await?;
+        let actual = timeout(
+            TINY_TIMEOUT * 20,
+            stream
+                .take(RANDOM_PEERS.len())
+                .map(|routing| match routing {
+                    DestinationRouting::Forward { destination, .. } => {
+                        if let NodeId::Offchain(peer_key) = destination.as_ref() {
+                            PeerId::from(peer_key)
+                        } else {
+                            panic!("expected offchain destination, got chain address");
+                        }
+                    }
+                    _ => panic!("expected Forward routing"),
+                })
+                .collect::<Vec<_>>(),
+        )
+        .await?;
 
         assert_eq!(actual.len(), RANDOM_PEERS.len());
         assert!(!actual.iter().zip(RANDOM_PEERS.iter()).all(|(a, b)| a == b));
@@ -96,13 +144,16 @@ mod tests {
         };
 
         let mut fetcher = MockPeerDiscoveryFetch::new();
-        fetcher
-            .expect_get_peers()
-            .times(2)
-            .returning(|_| vec![PeerId::random()]);
+        fetcher.expect_get_peers().times(2).returning(|_| {
+            let peer: PeerId = OffchainPublicKey::from_privkey(&hopr_crypto_random::random_bytes::<32>())
+                .unwrap()
+                .into();
+            vec![peer]
+        });
         fetcher.expect_get_peers().returning(|_| vec![]);
 
-        let stream = neighbors_to_probe(fetcher, cfg);
+        let prober = ImmediateNeighborProber::new(cfg, fetcher);
+        let (stream, _sink) = prober.build();
         pin_mut!(stream);
 
         assert!(timeout(TINY_TIMEOUT, stream.next()).await?.is_some());
