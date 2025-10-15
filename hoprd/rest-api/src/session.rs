@@ -14,8 +14,9 @@ use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, HoprSession, HoprSessionId, HoprTransportError, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities,
-    SessionClientConfig, SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
+    Address, HoprSession, HoprSessionId, HoprTransportError, NodeId, SESSION_MTU, SURB_SIZE, ServiceId,
+    SessionCapabilities, SessionClientConfig, SessionManagerError, SessionTarget, SurbBalancerConfig,
+    TransportSessionError,
     errors::HoprLibError,
     utils::{
         futures::AsyncReadStreamer,
@@ -177,6 +178,7 @@ impl SessionWebsocketClientQueryRequest {
         #[cfg(feature = "explicit-path")]
         let path_options = if let Some(path) = self.path {
             // Explicit `path` will override `hops`
+            let path = path.into_iter().map(NodeId::from).collect::<Vec<_>>();
             hopr_lib::RoutingOptions::IntermediatePath(path.try_into()?)
         } else {
             hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?)
@@ -341,7 +343,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
     #[schema(value_type = Vec<String>)]
-    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<Address>),
+    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<NodeId>),
     Hops(usize),
 }
 
