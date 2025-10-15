@@ -35,7 +35,7 @@ fn to_pseudonym(path: &DestinationRouting) -> Option<HoprPseudonym> {
     match path {
         DestinationRouting::Forward { pseudonym, .. } => *pseudonym,
         DestinationRouting::Return(matcher) => match matcher {
-            hopr_network_types::types::SurbMatcher::Exact(_) => None,
+            hopr_network_types::types::SurbMatcher::Exact(sender_id) => Some(sender_id.pseudonym()),
             hopr_network_types::types::SurbMatcher::Pseudonym(pseudonym) => Some(*pseudonym),
         },
     }
@@ -101,12 +101,6 @@ impl Probe {
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
         let interval_between_rounds = self.cfg.interval;
-
-        // For each probe target a cached version of transport routing is stored
-        let cache_peer_routing: moka::future::Cache<PeerId, DestinationRouting> = moka::future::Cache::builder()
-            .time_to_live(std::time::Duration::from_secs(600))
-            .max_capacity(100_000)
-            .build();
 
         // Currently active probes
         let store_eviction = store.clone();
