@@ -5486,7 +5486,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.2.4"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "axum 0.8.6",
