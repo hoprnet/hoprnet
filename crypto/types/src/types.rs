@@ -478,6 +478,14 @@ impl Display for OffchainPublicKey {
     }
 }
 
+impl FromStr for OffchainPublicKey {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
+        Self::from_hex(s)
+    }
+}
+
 impl OffchainPublicKey {
     /// Tries to create the public key from a Ed25519 private key.
     /// The length must be exactly `ed25519_dalek::SECRET_KEY_LENGTH`.
