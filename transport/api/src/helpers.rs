@@ -105,11 +105,27 @@ where
         self.channel_graph.clone()
     }
 
+    async fn resolve_node_id_to_addr(&self, node_id: &NodeId) -> crate::errors::Result<Address> {
+        match node_id {
+            NodeId::Chain(addr) => Ok(*addr),
+            NodeId::Offchain(key) => self
+                .resolver
+                .packet_key_to_chain_key(key)
+                .await
+                .map_err(|e| {
+                    HoprTransportError::Other(format!("failed to resolve offchain key to chain key: {e}").into())
+                })?
+                .ok_or(HoprTransportError::Other(
+                    "failed to resolve offchain key to chain key: no chain key found".into(),
+                )),
+        }
+    }
+
     #[tracing::instrument(level = "trace", skip(self))]
     async fn resolve_path(
         &self,
-        source: Address,
-        destination: Address,
+        source: NodeId,
+        destination: NodeId,
         options: RoutingOptions,
     ) -> crate::errors::Result<ValidatedPath> {
         let cg = self.channel_graph.read_arc().await;
@@ -119,7 +135,7 @@ where
 
                 ValidatedPath::new(
                     source,
-                    ChainPath::new(path.into_iter().chain(std::iter::once(destination)))?,
+                    path.into_iter().chain(std::iter::once(destination)).collect::<Vec<_>>(),
                     &cg,
                     &ChainPathResolver(&self.resolver),
                 )
@@ -128,25 +144,26 @@ where
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
                 trace!(hops = 0, "resolving zero-hop path");
 
-                ValidatedPath::new(
-                    source,
-                    ChainPath::direct(destination),
-                    &cg,
-                    &ChainPathResolver(&self.resolver),
-                )
-                .await?
+                ValidatedPath::new(source, vec![destination], &cg, &ChainPathResolver(&self.resolver)).await?
             }
             RoutingOptions::Hops(hops) => {
                 trace!(%hops, "resolving path using hop count");
 
+                let dst = self.resolve_node_id_to_addr(&destination).await?;
+
                 let cp = self
                     .selector
-                    .select_path(source, destination, hops.into(), hops.into())
+                    .select_path(
+                        self.resolve_node_id_to_addr(&source).await?,
+                        dst,
+                        hops.into(),
+                        hops.into(),
+                    )
                     .await?;
 
                 ValidatedPath::new(
                     source,
-                    ChainPath::from_channel_path(cp, destination),
+                    ChainPath::from_channel_path(cp, dst),
                     &cg,
                     &ChainPathResolver(&self.resolver),
                 )
@@ -179,7 +196,7 @@ where
                 forward_options,
                 return_options,
             } => {
-                let forward_path = self.resolve_path(self.me, destination, forward_options).await?;
+                let forward_path = self.resolve_path(self.me.into(), *destination, forward_options).await?;
 
                 let return_paths = if let Some(return_options) = return_options {
                     // Safeguard for the correct number of SURBs
@@ -187,7 +204,7 @@ where
                     trace!(%destination, %num_possible_surbs, data_len = size_hint, max_surbs, "resolving packet return paths");
 
                     (0..num_possible_surbs)
-                        .map(|_| self.resolve_path(destination, self.me, return_options.clone()))
+                        .map(|_| self.resolve_path(*destination, self.me.into(), return_options.clone()))
                         .collect::<FuturesUnordered<_>>()
                         .try_collect::<Vec<ValidatedPath>>()
                         .await?
