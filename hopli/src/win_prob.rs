@@ -71,7 +71,7 @@ impl WinProbSubcommands {
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
         let hopr_win_prob = HoprWinningProbabilityOracle::new(
-            contract_addresses.addresses.win_prob_oracle.into(),
+            contract_addresses.addresses.winning_probability_oracle.into(),
             rpc_provider.clone(),
         );
 
@@ -101,7 +101,7 @@ impl WinProbSubcommands {
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
         let hopr_win_prob = HoprWinningProbabilityOracle::new(
-            contract_addresses.addresses.win_prob_oracle.into(),
+            contract_addresses.addresses.winning_probability_oracle.into(),
             rpc_provider.clone(),
         );
 

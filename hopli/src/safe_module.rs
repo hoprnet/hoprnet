@@ -395,7 +395,7 @@ impl SafeModuleSubcommands {
         // transfer safe ownership to actual admins
         // set desired threshold
         let hopr_stake_factory =
-            HoprNodeStakeFactory::new(contract_addresses.addresses.stake_factory.into(), rpc_provider.clone());
+            HoprNodeStakeFactory::new(contract_addresses.addresses.node_stake_v2_factory.into(), rpc_provider.clone());
 
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             hopr_stake_factory,
@@ -532,7 +532,7 @@ impl SafeModuleSubcommands {
         // 4. Remove node from network registry
         // 5. Include node to network registry
         let hopr_node_safe_registry =
-            HoprNodeSafeRegistry::new(contract_addresses.addresses.safe_registry.into(), rpc_provider.clone());
+            HoprNodeSafeRegistry::new(contract_addresses.addresses.node_safe_registry.into(), rpc_provider.clone());
         let safe = SafeSingleton::new(safe_addr, rpc_provider.clone());
 
         if !node_eth_addresses.is_empty() {
@@ -767,7 +767,7 @@ impl SafeModuleSubcommands {
             rpc_provider.clone(),
         );
         let node_safe_registry =
-            HoprNodeSafeRegistry::new(contract_addresses.addresses.safe_registry.into(), rpc_provider.clone());
+            HoprNodeSafeRegistry::new(contract_addresses.addresses.node_safe_registry.into(), rpc_provider.clone());
 
         // loop through all the nodes and debug
         for node in node_eth_addresses {
