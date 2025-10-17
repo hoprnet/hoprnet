@@ -22,7 +22,6 @@ runtime-tokio = [
   "hopr-network-types/runtime-tokio",
   "hopr-strategy/runtime-tokio",
   "hopr-transport/runtime-tokio",
-  "hopr-chain-api/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
@@ -80,7 +79,6 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-chain-api = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
@@ -106,8 +104,4 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 url = { workspace = true }
 
-hopr-chain-actions = { workspace = true, features = ["runtime-tokio"] }
-hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
-hopr-chain-indexer = { workspace = true, features = ["runtime-tokio"] }
-hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }

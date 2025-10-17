@@ -93,10 +93,6 @@ use hopr_api::{
     db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus, TicketSelector},
 };
 use hopr_async_runtime::prelude::spawn;
-pub use hopr_chain_api::config::{
-    Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
-};
-use hopr_chain_api::{HoprChain, HoprChainProcess, config::ChainNetworkConfig, errors::HoprChainError, wait_for_funds};
 use hopr_chain_types::ContractAddresses;
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use hopr_crypto_types::prelude::Hash;
@@ -166,10 +162,8 @@ pub struct Hopr {
     cfg: config::HoprLibConfig,
     state: Arc<state::AtomicHoprState>,
     transport_api: HoprTransport<HoprNodeDb, HoprChain>,
-    hopr_chain_api: HoprChain,
     node_db: HoprNodeDb,
     // objects that could be removed pending architectural cleanup ========
-    chain_cfg: ChainNetworkConfig,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
 }
