@@ -13,8 +13,6 @@ use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
 
-#[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
-mod jemalloc_stats;
 
 #[cfg(feature = "telemetry")]
 use {
@@ -24,10 +22,10 @@ use {
 };
 
 // Avoid musl's default allocator due to degraded performance
-// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+// Use mimalloc with secure feature for better performance
 #[cfg(target_os = "linux")]
 #[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -143,9 +141,6 @@ impl std::fmt::Debug for HoprdProcesses {
 #[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
-
-    #[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
-    let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
         warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");

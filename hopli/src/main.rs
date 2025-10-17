@@ -22,10 +22,10 @@ pub mod utils;
 pub mod win_prob;
 
 // Avoid musl's default allocator due to degraded performance
-// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+// Use mimalloc with secure feature for better performance
 #[cfg(target_os = "linux")]
 #[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

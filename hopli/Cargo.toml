@@ -45,4 +45,4 @@ hopr-crypto-random = { workspace = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.0"
+mimalloc = { workspace = true }
