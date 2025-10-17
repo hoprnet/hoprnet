@@ -148,63 +148,11 @@ pub enum PeerDiscovery {
     Announce(PeerId, Vec<Multiaddr>),
 }
 
-#[cfg(feature = "capture")]
-fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
-    use hopr_primitive_types::traits::BytesEncodable;
-    if raw_packet.len() >= hopr_internal_types::tickets::Ticket::SIZE {
-        &raw_packet[raw_packet.len() - hopr_internal_types::tickets::Ticket::SIZE..]
-    } else {
-        &[]
-    }
-}
-
-#[cfg(feature = "capture")]
-#[derive(Clone)]
-struct CaptureContext {
-    pub packet_capture: futures::channel::mpsc::Sender<capture::CapturedPacket>,
-    pub public_key: OffchainPublicKey,
-}
-
-#[cfg(feature = "capture")]
-impl CaptureContext {
-    pub fn new(public_key: OffchainPublicKey) -> (Self, hopr_async_runtime::AbortHandle) {
-        use std::str::FromStr;
-        let writer: Box<dyn capture::PacketWriter + Send + 'static> =
-            if let Ok(desc) = std::env::var("HOPR_CAPTURE_PACKETS") {
-                if let Ok(udp_writer) = std::net::SocketAddr::from_str(&desc)
-                    .map_err(std::io::Error::other)
-                    .and_then(capture::UdpPacketDump::new)
-                {
-                    tracing::warn!("udp packet capture initialized to {desc}");
-                    Box::new(udp_writer)
-                } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
-                    tracing::warn!("pcap file packet capture initialized to {desc}");
-                    Box::new(pcap_writer)
-                } else {
-                    tracing::error!(desc, "failed to create packet capture: invalid socket address or file");
-                    Box::new(capture::NullWriter)
-                }
-            } else {
-                tracing::warn!("no packet capture specified");
-                Box::new(capture::NullWriter)
-            };
-        let (packet_capture, ah) = capture::packet_capture_channel(writer);
-        (
-            Self {
-                packet_capture,
-                public_key,
-            },
-            ah,
-        )
-    }
-}
-
 /// Performs encoding of outgoing Application protocol packets into HOPR protocol outgoing packets.
 async fn start_outgoing_packet_pipeline<AppOut, E, WOut>(
     app_outgoing: AppOut,
     encoder: std::sync::Arc<E>,
     wire_outgoing: WOut,
-    #[cfg(feature = "capture")] capture: CaptureContext,
 ) where
     AppOut: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
     E: PacketEncoder + Send + 'static,
@@ -213,13 +161,6 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut>(
 {
     let res = app_outgoing
         .then_concurrent(|(routing, data)| {
-            #[cfg(feature = "capture")]
-            let (mut capture_clone, data_clone, num_surbs) = (
-                capture.packet_capture.clone(),
-                data.clone(),
-                routing.count_return_paths() as u8,
-            );
-
             let encoder = encoder.clone();
             async move {
                 match encoder
@@ -232,28 +173,12 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut>(
                     )
                     .await
                 {
-                    Ok(v) => {
+                    Ok(packet) => {
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        {
-                            METRIC_PACKET_COUNT.increment(&["sent"]);
-                        }
+                        METRIC_PACKET_COUNT.increment(&["sent"]);
 
-                        #[cfg(feature = "capture")]
-                        let _ = capture_clone.try_send(
-                            capture::PacketBeforeTransit::OutgoingPacket {
-                                me: capture.public_key,
-                                next_hop: v.next_hop,
-                                num_surbs,
-                                is_forwarded: false,
-                                data: data_clone.data.to_bytes().into_vec().into(),
-                                ack_challenge: v.ack_challenge.as_ref().into(),
-                                signals: data_clone.packet_info.unwrap_or_default().signals_to_destination,
-                                ticket: inspect_ticket_data_in_packet(&v.data).into(),
-                            }
-                            .into(),
-                        );
-
-                        Some((v.next_hop.into(), v.data))
+                        tracing::trace!(peer = %packet.next_hop, "protocol message out");
+                        Some((packet.next_hop.into(), packet.data))
                     }
                     Err(error) => {
                         tracing::error!(%error, "packet could not be wrapped for sending");
@@ -263,7 +188,6 @@ async fn start_outgoing_packet_pipeline<AppOut, E, WOut>(
             }
         })
         .filter_map(futures::future::ready)
-        .inspect(|(peer, _)| tracing::trace!(%peer, "protocol message out"))
         .map(Ok)
         .forward(wire_outgoing)
         .instrument(tracing::trace_span!("msg protocol processing - egress"))
@@ -297,7 +221,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
     wire_outgoing: WOut,
     ack_incoming: AckIn,
     app_incoming: AppIn,
-    #[cfg(feature = "capture")] capture: CaptureContext,
 ) where
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
@@ -320,9 +243,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
     let ack_outgoing_success = ack_outgoing.clone();
     let ack_outgoing_failure = ack_outgoing.clone();
 
-    #[cfg(feature = "capture")]
-    let capture_clone = capture.clone();
-
     let res = wire_incoming
         .then_concurrent(move |(peer, data)| {
             let decoder = decoder.clone();
@@ -330,12 +250,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
             let peer_id_key_cache = peer_id_cache.clone();
 
             tracing::trace!(%peer, "protocol message in");
-
-            #[cfg(feature = "capture")]
-            let (mut capture_clone, ticket_data_clone) = (
-                capture_clone.clone(),
-                inspect_ticket_data_in_packet(&data).to_vec(),
-            );
 
             async move {
                 // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
@@ -382,16 +296,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
                     }
                 }
 
-                #[cfg(feature = "capture")]
-                if let Ok(packet) = &res {
-                    let _ = capture_clone.packet_capture.try_send(capture::PacketBeforeTransit::IncomingPacket {
-                        me: capture.public_key,
-                        packet,
-                        ticket: ticket_data_clone.into(),
-                    }.into()
-                    );
-                }
-
                 res.ok()
             }
         })
@@ -421,9 +325,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
             )
         })*/
         .then_concurrent(move |packet| {
-            #[cfg(feature = "capture")]
-            let mut capture_clone = capture.clone();
-
             let ticket_proc = ticket_proc.clone();
             let mut wire_outgoing = wire_outgoing.clone();
             let mut ack_incoming = ack_incoming.clone();
@@ -462,10 +363,8 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
                             });
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        {
-                            METRIC_PACKET_COUNT.increment(&["received"]);
-                        }
-
+                        METRIC_PACKET_COUNT.increment(&["received"]);
+                        
                         Some((sender, plain_text, info))
                     }
                     IncomingPacket::Forwarded(fwd_packet) => {
@@ -487,18 +386,6 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
                         // First, relay the packet to the next hop
                         tracing::trace!(%previous_hop, %next_hop, "forwarding packet to the next hop");
 
-                        #[cfg(feature = "capture")]
-                        let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingPacket {
-                            me: capture_clone.public_key,
-                            next_hop,
-                            num_surbs: 0,
-                            is_forwarded: true,
-                            data: data.as_ref().into(),
-                            ack_challenge: Default::default(),
-                            signals: None.into(),
-                            ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
-                        }.into();
-
                         wire_outgoing
                             .send((next_hop.into(), data))
                             .await
@@ -507,12 +394,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
                             });
 
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        {
-                            METRIC_PACKET_COUNT.increment(&["forwarded"]);
-                        }
-
-                        #[cfg(feature = "capture")]
-                        let _ = capture_clone.packet_capture.try_send(captured_packet);
+                        METRIC_PACKET_COUNT.increment(&["forwarded"]);
 
                         // Send acknowledgement back
                         tracing::trace!(%previous_hop, "acknowledging forwarded packet back");
@@ -565,7 +447,6 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
     encoder: std::sync::Arc<E>,
     packet_key: OffchainKeypair,
     wire_outgoing: WOut,
-    #[cfg(feature = "capture")] capture: CaptureContext,
 ) where
     AckOut: futures::Stream<Item = (OffchainPublicKey, Option<HalfKey>)> + Send + 'static,
     E: PacketEncoder + Send + 'static,
@@ -580,13 +461,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                 let encoder = encoder.clone();
                 let mut wire_outgoing = wire_outgoing.clone();
 
-                #[cfg(feature = "capture")]
-                let mut capture = capture.clone();
-
                 async move {
-                    #[cfg(feature = "capture")]
-                    let is_random = maybe_ack_key.is_none();
-
                     // Sign acknowledgement with the given half-key or generate a signed random one
                     let ack = hopr_parallelize::cpu::spawn_blocking(move || {
                         maybe_ack_key
@@ -595,16 +470,7 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                     })
                         .await;
 
-                    #[cfg(feature = "capture")]
-                    let captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
-                        me: capture.public_key,
-                        ack,
-                        is_random,
-                        next_hop: destination,
-                    }
-                        .into();
-
-                    match encoder.encode_acknowledgement(ack.leak(), &destination).await {
+                    match encoder.encode_acknowledgement(ack, &destination).await {
                         Ok(ack_packet) => {
                             wire_outgoing
                                 .send((ack_packet.next_hop.into(), ack_packet.data))
@@ -612,9 +478,6 @@ async fn start_outgoing_ack_pipeline<AckOut, E, WOut>(
                                 .unwrap_or_else(|error| {
                                     tracing::error!(%error, "failed to forward an acknowledgement to the transport layer");
                                 });
-
-                            #[cfg(feature = "capture")]
-                            let _ = capture.packet_capture.try_send(captured_packet);
                         }
                         Err(error) => tracing::error!(%error, "failed to create ack packet"),
                     }
@@ -681,13 +544,6 @@ where
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
     }
 
-    #[cfg(feature = "capture")]
-    let capture = {
-        let (capture, ah) = CaptureContext::new(*hopr_crypto_types::keypairs::Keypair::public(&packet_key));
-        processes.insert(ProtocolProcesses::Capture, ah);
-        capture
-    };
-
     let (outgoing_ack_tx, outgoing_ack_rx) =
         futures::channel::mpsc::channel::<(OffchainPublicKey, Option<HalfKey>)>(ACK_OUT_BUFFER_SIZE);
 
@@ -698,8 +554,41 @@ where
 
     let incoming_ack_tx = incoming_ack_tx.with_timeout(QUEUE_SEND_TIMEOUT);
 
-    let encoder = std::sync::Arc::new(codec.0);
-    let decoder = std::sync::Arc::new(codec.1);
+    #[cfg(feature = "capture")]
+    let (encoder, decoder) = {
+        use std::str::FromStr;
+        let writer: Box<dyn capture::PacketWriter + Send + 'static> =
+            if let Ok(desc) = std::env::var("HOPR_CAPTURE_PACKETS") {
+                if let Ok(udp_writer) = std::net::SocketAddr::from_str(&desc)
+                    .map_err(std::io::Error::other)
+                    .and_then(capture::UdpPacketDump::new)
+                {
+                    tracing::warn!("udp packet capture initialized to {desc}");
+                    Box::new(udp_writer)
+                } else if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
+                    tracing::warn!("pcap file packet capture initialized to {desc}");
+                    Box::new(pcap_writer)
+                } else {
+                    tracing::error!(desc, "failed to create packet capture: invalid socket address or file");
+                    Box::new(capture::NullWriter)
+                }
+            } else {
+                tracing::warn!("no packet capture specified");
+                Box::new(capture::NullWriter)
+            };
+        let packet_key = *hopr_crypto_types::keypairs::Keypair::public(&packet_key);
+        let (sender, ah) = capture::packet_capture_channel(writer);
+        processes.insert(ProtocolProcesses::Capture, ah);
+
+        (
+            std::sync::Arc::new(capture::CapturePacketCodec::new(codec.0, packet_key, sender.clone())),
+            std::sync::Arc::new(capture::CapturePacketCodec::new(codec.1, packet_key, sender.clone())),
+        )
+    };
+
+    #[cfg(not(feature = "capture"))]
+    let (encoder, decoder) = (std::sync::Arc::new(codec.0), std::sync::Arc::new(codec.1));
+
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
     processes.insert(
@@ -708,8 +597,6 @@ where
             api.1,
             encoder.clone(),
             wire_msg.0.clone(),
-            #[cfg(feature = "capture")]
-            capture.clone(),
         )),
     );
 
@@ -723,8 +610,6 @@ where
             wire_msg.0.clone(),
             incoming_ack_tx.clone(),
             api.0,
-            #[cfg(feature = "capture")]
-            capture.clone(),
         )),
     );
 
@@ -735,8 +620,6 @@ where
             encoder.clone(),
             packet_key.clone(),
             wire_msg.0.clone(),
-            #[cfg(feature = "capture")]
-            capture.clone(),
         )),
     );
 

@@ -3,7 +3,10 @@ use hopr_crypto_packet::{
     prelude::{HoprSenderId, HoprSurbId, PacketSignals},
 };
 use hopr_crypto_types::prelude::{HalfKeyChallenge, OffchainPublicKey};
-use hopr_internal_types::prelude::{Acknowledgement, HoprPseudonym, Ticket, UnacknowledgedTicket};
+use hopr_internal_types::{
+    prelude::{Acknowledgement, HoprPseudonym, Ticket, UnacknowledgedTicket},
+    protocol::VerifiedAcknowledgement,
+};
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 
 pub use crate::{
@@ -35,7 +38,7 @@ pub trait PacketEncoder {
 
     async fn encode_acknowledgement(
         &self,
-        ack: Acknowledgement,
+        ack: VerifiedAcknowledgement,
         peer: &OffchainPublicKey,
     ) -> Result<OutgoingPacket, Self::Error>;
 }
