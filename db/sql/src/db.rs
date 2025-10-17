@@ -97,7 +97,7 @@ impl HoprIndexerDb {
         .await?;
 
         #[cfg(feature = "sqlite")]
-        let index_ro = Self::create_pool(
+        let index_ro: sqlx::Pool<sqlx::Sqlite> = Self::create_pool(
             cfg.clone(),
             directory.to_path_buf(),
             PoolOptions::new(),

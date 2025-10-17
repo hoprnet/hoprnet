@@ -55,6 +55,7 @@ lazy_static::lazy_static! {
 /// Uses a fixed mnemonic to make generated accounts deterministic.
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> alloy::node_bindings::AnvilInstance {
     let mut anvil = alloy::node_bindings::Anvil::new()
+        .port(8545u16)
         .mnemonic("gentle wisdom move brush express similar canal dune emotion series because parrot");
 
     if let Some(bt) = block_time {
