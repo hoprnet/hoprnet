@@ -102,9 +102,9 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "alloy"
-version = "1.0.38"
+version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b17c19591d57add4f0c47922877a48aae1f47074e3433436545f8948353b3bbb"
+checksum = "7f6cfe35f100bc496007c9a00f90b88bdf565f1421d4c707c9f07e0717e2aaad"
 dependencies = [
  "alloy-consensus",
  "alloy-contract",
@@ -4466,7 +4466,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-bindings"
-version = "0.2.0"
+version = "3.0.0"
+source = "git+https://github.com/hoprnet/contracts?tag=v3.0.0#a53aff60ff1b576fdf3e1da159320ec154737593"
 dependencies = [
  "alloy",
  "anyhow",
