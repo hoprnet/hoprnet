@@ -4271,7 +4271,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4351,7 +4351,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "alloy",
  "hex",
@@ -4364,6 +4364,7 @@ dependencies = [
  "libp2p-identity",
  "multiaddr",
  "serde",
+ "serde_with",
  "strum 0.27.2",
  "thiserror 2.0.17",
  "tracing",

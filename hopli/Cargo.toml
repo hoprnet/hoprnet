@@ -1,6 +1,6 @@
 [package]
 name = "hopli"
-version = "0.8.1"
+version = "0.9.0"
 edition = "2021"
 license = "GPL-3.0-only"
 
@@ -18,6 +18,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
 hex = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -28,13 +29,12 @@ rpassword = { workspace = true }
 url = { workspace = true }
 
 hopr-bindings = { workspace = true }
-hopr-chain-api = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-types = { workspace = true }
-hopr-chain-rpc = { workspace = true }
 hopr-crypto-keypair = { workspace = true, features = ["to-file"] }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+
 
 [dev-dependencies]
 anyhow = { workspace = true }
