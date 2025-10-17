@@ -3,12 +3,12 @@
 use std::str::FromStr;
 
 use SafeContract::SafeContractInstance;
-use alloy::{
+use hopr_bindings::exports::alloy::{
+    self,
     contract::{Error as ContractError, Result as ContractResult},
     hex::FromHexError,
     network::{ReceiptResponse, TransactionBuilder},
-    primitives,
-    primitives::{Address, Bytes, U256, address, aliases, keccak256},
+    primitives::{self, Address, Bytes, U256, address, aliases, keccak256},
     providers::{MULTICALL3_ADDRESS, MulticallError, PendingTransactionError},
     rpc::types::TransactionRequest,
     signers::{Signer, local::PrivateKeySigner},
@@ -454,7 +454,7 @@ pub fn get_create2_address(from: Address, salt: impl AsRef<[u8]>, init_code: imp
 sol!(
     #![sol(abi)]
     #![sol(rpc)]
-    // #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     contract SafeContract {
         function nonce() view returns (uint256);
         function getTransactionHash( address to, uint256 value, bytes calldata data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 _nonce) public view returns (bytes32);

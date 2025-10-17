@@ -72,7 +72,7 @@ impl super::Backend for TempDbBackend {
             channels
                 .insert(
                     channel_id,
-                    bincode::serde::encode_to_vec(&channel, BINCODE_CONFIGURATION)
+                    bincode::serde::encode_to_vec(channel, BINCODE_CONFIGURATION)
                         .map_err(|e| redb::Error::Corrupted(format!("channel encoding failed: {e}")))?,
                 )?
                 .map(|v| {

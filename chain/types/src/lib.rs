@@ -1,5 +1,4 @@
 //! This crate contains various on-chain related modules and types.
-
 use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
 

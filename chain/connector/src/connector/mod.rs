@@ -240,9 +240,9 @@ where
                         async move {
                             if let Ok((channel, _)) = &res {
                                 // Rather update the cached entry than invalidating it
-                                channel_by_id.insert(channel.get_id(), Some(channel.clone())).await;
+                                channel_by_id.insert(channel.get_id(), Some(*channel)).await;
                                 channel_by_parties
-                                    .insert(ChannelParties::from(channel), Some(channel.clone()))
+                                    .insert(ChannelParties::from(channel), Some(*channel))
                                     .await;
                             }
                             res.map(SubscribedEventType::Channel)

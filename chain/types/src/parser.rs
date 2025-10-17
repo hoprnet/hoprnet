@@ -1,9 +1,9 @@
-use alloy::{
-    consensus::Transaction,
-    eips::Decodable2718,
-    sol_types::{SolCall, SolType},
-};
 use hopr_bindings::{
+    exports::alloy::{
+        consensus::Transaction,
+        eips::Decodable2718,
+        sol_types::{SolCall, SolType},
+    },
     hopr_channels::HoprChannels::{
         closeIncomingChannelCall, closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall,
         finalizeOutgoingChannelClosureSafeCall, fundChannelCall, fundChannelSafeCall,
@@ -66,7 +66,7 @@ impl ParsedHoprChainAction {
         module: &Address,
         contract_addresses: &ContractAddresses,
     ) -> Result<(Self, Address), ChainTypesError> {
-        let tx = alloy::consensus::TxEnvelope::decode_2718_exact(signed_tx)
+        let tx = hopr_bindings::exports::alloy::consensus::TxEnvelope::decode_2718_exact(signed_tx)
             .map_err(|e| ChainTypesError::ParseError(e.into()))?
             .into_signed();
 

@@ -11,7 +11,8 @@ use std::{ops::Add, str::FromStr, sync::Arc};
 
 use IMulticall3Extract::IMulticall3ExtractInstance;
 use SafeSingleton::{SafeSingletonInstance, execTransactionCall, removeOwnerCall, setupCall};
-use alloy::{
+use hex_literal::hex;
+use hopr_bindings::exports::alloy::{
     network::TransactionBuilder,
     primitives::{Address, B256, Bytes, U256, keccak256, utils::format_units},
     providers::{
@@ -23,7 +24,6 @@ use alloy::{
     sol,
     sol_types::{SolCall, SolValue},
 };
-use hex_literal::hex;
 use hopr_bindings::{
     hopr_node_management_module::HoprNodeManagementModule::{
         HoprNodeManagementModuleInstance, addChannelsAndTokenTargetCall, includeNodeCall, removeNodeCall,
@@ -1193,7 +1193,7 @@ pub async fn debug_node_safe_module_setup_main<P: Provider>(
 mod tests {
     use std::vec;
 
-    use alloy::{
+    use hopr_bindings::exports::alloy::{
         contract::Result as ContractResult,
         network::{EthereumWallet, TransactionBuilder},
         primitives::address,
@@ -1221,10 +1221,10 @@ mod tests {
     >;
     /// Used for testing. Creates RPC client to the local Anvil instance.
     pub fn create_rpc_client_to_anvil(
-        anvil: &alloy::node_bindings::AnvilInstance,
+        anvil: &hopr_bindings::exports::alloy::node_bindings::AnvilInstance,
         signer: &hopr_crypto_types::keypairs::ChainKeypair,
     ) -> Arc<AnvilRpcClient> {
-        use alloy::{
+        use hopr_bindings::exports::alloy::{
             providers::ProviderBuilder, rpc::client::ClientBuilder, signers::local::PrivateKeySigner,
             transports::http::ReqwestTransport,
         };

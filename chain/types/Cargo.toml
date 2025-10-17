@@ -12,15 +12,11 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
-anyhow = { workspace = true }
-alloy = { workspace = true, default-features = false, features = [
-  "contract",
-  "node-bindings",
-] }
 async-trait = { workspace = true }
+anyhow = { workspace = true }
+hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
-hex-literal = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 strum = { workspace = true }

@@ -1,17 +1,18 @@
-pub use alloy::rpc::types::TransactionRequest;
-use alloy::{
-    consensus::TxEnvelope,
-    eips::Encodable2718,
-    network::{EthereumWallet, TransactionBuilder},
-    primitives::{
-        B256, U256,
-        aliases::{U24, U48, U56, U96},
-    },
-    signers::local::PrivateKeySigner,
-    sol,
-    sol_types::{SolCall, SolValue},
-};
+pub use hopr_bindings::exports::alloy::rpc::types::TransactionRequest;
 use hopr_bindings::{
+    exports::alloy::{
+        self,
+        consensus::TxEnvelope,
+        eips::Encodable2718,
+        network::{EthereumWallet, TransactionBuilder},
+        primitives::{
+            B256, U256,
+            aliases::{U24, U48, U56, U96},
+        },
+        signers::local::PrivateKeySigner,
+        sol,
+        sol_types::{SolCall, SolValue},
+    },
     hopr_channels::{
         HoprChannels::{
             RedeemableTicket as OnChainRedeemableTicket, TicketData, closeIncomingChannelCall,

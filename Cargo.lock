@@ -4427,7 +4427,6 @@ dependencies = [
 name = "hopli"
 version = "0.10.0"
 dependencies = [
- "alloy",
  "anyhow",
  "clap",
  "env_logger",
@@ -4492,7 +4491,7 @@ dependencies = [
 [[package]]
 name = "hopr-bindings"
 version = "4.0.0"
-source = "git+https://github.com/hoprnet/contracts?rev=0efd78c1#0efd78c15a936e482bcbee3b7eeafc7b1c7ed938"
+source = "git+https://github.com/hoprnet/contracts?rev=cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c#cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4500,6 +4499,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "strum 0.27.2",
 ]
 
 [[package]]
@@ -4541,7 +4541,6 @@ dependencies = [
 name = "hopr-chain-types"
 version = "0.10.0"
 dependencies = [
- "alloy",
  "anyhow",
  "async-trait",
  "bincode",
@@ -4798,6 +4797,7 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
+ "hopr-bindings",
  "hopr-chain-connector",
  "hopr-crypto-keypair",
  "hopr-crypto-random",
@@ -4903,6 +4903,7 @@ dependencies = [
  "float-cmp",
  "hex",
  "hex-literal",
+ "hopr-bindings",
  "lazy_static",
  "primitive-types 0.14.0",
  "regex",

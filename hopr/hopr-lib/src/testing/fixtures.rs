@@ -326,7 +326,9 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                     )
                     .await;
 
-                    let socket = instance.run(EchoServer::new()).await?;
+                    let socket = instance
+                        .run(None::<crate::DummyCoverTrafficType>, EchoServer::new())
+                        .await?;
                     anyhow::Ok((instance, socket))
                 });
 

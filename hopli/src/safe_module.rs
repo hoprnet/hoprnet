@@ -92,8 +92,8 @@
 //! ```
 use std::str::FromStr;
 
-use alloy::primitives::{Address, U256, utils::parse_units};
 use clap::{Parser, builder::RangedU64ValueParser};
+use hopr_bindings::exports::alloy::primitives::{Address, U256, utils::parse_units};
 use hopr_bindings::{
     hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory, hopr_token::HoprToken,
 };

@@ -41,16 +41,6 @@ members = [
 ]
 
 [workspace.dependencies]
-# Keep pinned to v1.0.42, which is also used by hopr-bindings and blokli.
-# If updated, also update blokli and hopr-bindings.
-alloy = { version = "=1.0.42", default-features = false, features = [
-  "essentials",
-  "json-rpc",
-  "node-bindings",
-  "contract",
-  "k256",
-  "std",
-] }
 ahash = "0.8.12"
 anyhow = "1.0.100"
 aquamarine = "0.6.0"
@@ -230,7 +220,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
-hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "0efd78c1" }
+hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c" }
 hopr-chain-connector = { path = "chain/connector" }
 hopr-chain-types = { path = "chain/types", default-features = false }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
