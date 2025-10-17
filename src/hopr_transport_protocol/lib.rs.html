@@ -1,0 +1,674 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `transport/protocol/src/lib.rs`."><title>lib.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-e56847b5.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hopr_transport_protocol" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0-nightly (7ac0330c6 2025-09-25)" data-channel="nightly" data-search-js="search-e256b49e.js" data-stringdex-js="stringdex-061df703.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hopr_transport_protocol/</div>lib.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic
+<a href=#2 id=2 data-nosnippet>2</a>//! layers.
+<a href=#3 id=3 data-nosnippet>3</a>//!
+<a href=#4 id=4 data-nosnippet>4</a>//! ## Contents
+<a href=#5 id=5 data-nosnippet>5</a>//!
+<a href=#6 id=6 data-nosnippet>6</a>//! Supported protocol configurations:
+<a href=#7 id=7 data-nosnippet>7</a>//!
+<a href=#8 id=8 data-nosnippet>8</a>//! - `mix`
+<a href=#9 id=9 data-nosnippet>9</a>//! - `ack`
+<a href=#10 id=10 data-nosnippet>10</a>//! - `heartbeat`
+<a href=#11 id=11 data-nosnippet>11</a>//! - `ticket_aggregation`
+<a href=#12 id=12 data-nosnippet>12</a>//!
+<a href=#13 id=13 data-nosnippet>13</a>//! Supported protocol processors:
+<a href=#14 id=14 data-nosnippet>14</a>//!
+<a href=#15 id=15 data-nosnippet>15</a>//! - `ticket_aggregation`
+<a href=#16 id=16 data-nosnippet>16</a>//!
+<a href=#17 id=17 data-nosnippet>17</a>//! ### `ticket_aggregation`
+<a href=#18 id=18 data-nosnippet>18</a>//!
+<a href=#19 id=19 data-nosnippet>19</a>//! Ticket aggregation processing mechanism is responsible for ingesting the ticket aggregation related requests:
+<a href=#20 id=20 data-nosnippet>20</a>//!
+<a href=#21 id=21 data-nosnippet>21</a>//! - `Receive(PeerId, U)`,
+<a href=#22 id=22 data-nosnippet>22</a>//! - `Reply(PeerId, std::result::Result&lt;Ticket, String&gt;, T)`,
+<a href=#23 id=23 data-nosnippet>23</a>//! - `Send(PeerId, Vec&lt;AcknowledgedTicket&gt;, TicketAggregationFinalizer)`,
+<a href=#24 id=24 data-nosnippet>24</a>//!
+<a href=#25 id=25 data-nosnippet>25</a>//! where `U` is the type of an aggregated ticket extractable (`ResponseChannel&lt;Result&lt;Ticket, String&gt;&gt;`) and `T`
+<a href=#26 id=26 data-nosnippet>26</a>//! represents a network negotiated identifier (`RequestId`).
+<a href=#27 id=27 data-nosnippet>27</a>//!
+<a href=#28 id=28 data-nosnippet>28</a>//! In broader context the protocol flow is as follows:
+<a href=#29 id=29 data-nosnippet>29</a>//!
+<a href=#30 id=30 data-nosnippet>30</a>//! 1. requesting ticket aggregation
+<a href=#31 id=31 data-nosnippet>31</a>//!
+<a href=#32 id=32 data-nosnippet>32</a>//!    - the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request
+<a href=#33 id=33 data-nosnippet>33</a>//!      containing the collection to aggregate `Vec&lt;AcknowledgedTicket&gt;` to peer B using the `Send` mechanism
+<a href=#34 id=34 data-nosnippet>34</a>//!
+<a href=#35 id=35 data-nosnippet>35</a>//! 2. responding to ticket aggregation
+<a href=#36 id=36 data-nosnippet>36</a>//!
+<a href=#37 id=37 data-nosnippet>37</a>//!    - peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation
+<a href=#38 id=38 data-nosnippet>38</a>//!      in the form of `std::result::Result&lt;Ticket, String&gt;` using the `Reply` mechanism
+<a href=#39 id=39 data-nosnippet>39</a>//!
+<a href=#40 id=40 data-nosnippet>40</a>//! 3. accepting the aggregated ticket
+<a href=#41 id=41 data-nosnippet>41</a>//!    - peer A receives the aggregated ticket using the `Receive` mechanism
+<a href=#42 id=42 data-nosnippet>42</a>//!
+<a href=#43 id=43 data-nosnippet>43</a>//! Furthermore, apart from the basic positive case scenario, standard mechanics of protocol communication apply:
+<a href=#44 id=44 data-nosnippet>44</a>//!
+<a href=#45 id=45 data-nosnippet>45</a>//! - the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which
+<a href=#46 id=46 data-nosnippet>46</a>//!   case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered
+<a href=#47 id=47 data-nosnippet>47</a>//! - the responder can fail to aggregate tickets in which case it replies with an error string describing the failure
+<a href=#48 id=48 data-nosnippet>48</a>//!   reason and it is the requester's responsibility to handle the negative case as well
+<a href=#49 id=49 data-nosnippet>49</a>//!   - in the absence of response, the requester will time out
+<a href=#50 id=50 data-nosnippet>50</a>
+<a href=#51 id=51 data-nosnippet>51</a>/// Coder and decoder for the transport binary protocol layer
+<a href=#52 id=52 data-nosnippet>52</a></span><span class="kw">mod </span>codec;
+<a href=#53 id=53 data-nosnippet>53</a>
+<a href=#54 id=54 data-nosnippet>54</a><span class="doccomment">/// Configuration of the protocol components.
+<a href=#55 id=55 data-nosnippet>55</a></span><span class="kw">pub mod </span>config;
+<a href=#56 id=56 data-nosnippet>56</a><span class="doccomment">/// Errors produced by the crate.
+<a href=#57 id=57 data-nosnippet>57</a></span><span class="kw">pub mod </span>errors;
+<a href=#58 id=58 data-nosnippet>58</a>
+<a href=#59 id=59 data-nosnippet>59</a><span class="comment">// protocols
+<a href=#60 id=60 data-nosnippet>60</a></span><span class="doccomment">/// `heartbeat` p2p protocol
+<a href=#61 id=61 data-nosnippet>61</a></span><span class="kw">pub mod </span>heartbeat;
+<a href=#62 id=62 data-nosnippet>62</a><span class="doccomment">/// processor for the protocol
+<a href=#63 id=63 data-nosnippet>63</a></span><span class="kw">pub mod </span>processor;
+<a href=#64 id=64 data-nosnippet>64</a>
+<a href=#65 id=65 data-nosnippet>65</a><span class="doccomment">/// Stream processing utilities
+<a href=#66 id=66 data-nosnippet>66</a></span><span class="kw">pub mod </span>stream;
+<a href=#67 id=67 data-nosnippet>67</a>
+<a href=#68 id=68 data-nosnippet>68</a><span class="kw">pub mod </span>timer;
+<a href=#69 id=69 data-nosnippet>69</a>
+<a href=#70 id=70 data-nosnippet>70</a><span class="doccomment">/// Allows capturing dissected HOPR packets before they are processed by the transport.
+<a href=#71 id=71 data-nosnippet>71</a>///
+<a href=#72 id=72 data-nosnippet>72</a>/// Requires the `capture` feature to be enabled.
+<a href=#73 id=73 data-nosnippet>73</a></span><span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#74 id=74 data-nosnippet>74</a></span><span class="kw">mod </span>capture;
+<a href=#75 id=75 data-nosnippet>75</a>
+<a href=#76 id=76 data-nosnippet>76</a><span class="kw">use </span>std::{collections::HashMap, time::Duration};
+<a href=#77 id=77 data-nosnippet>77</a>
+<a href=#78 id=78 data-nosnippet>78</a><span class="kw">use </span>futures::{FutureExt, SinkExt, StreamExt};
+<a href=#79 id=79 data-nosnippet>79</a><span class="kw">use </span>futures_time::future::FutureExt <span class="kw">as </span>FuturesTimeExt;
+<a href=#80 id=80 data-nosnippet>80</a><span class="kw">use </span>hopr_api::{
+<a href=#81 id=81 data-nosnippet>81</a>    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
+<a href=#82 id=82 data-nosnippet>82</a>    db::{HoprDbProtocolOperations, IncomingPacket},
+<a href=#83 id=83 data-nosnippet>83</a>};
+<a href=#84 id=84 data-nosnippet>84</a><span class="kw">use </span>hopr_async_runtime::spawn_as_abortable;
+<a href=#85 id=85 data-nosnippet>85</a><span class="kw">use </span>hopr_crypto_types::types::{HalfKey, OffchainPublicKey};
+<a href=#86 id=86 data-nosnippet>86</a><span class="kw">use </span>hopr_internal_types::{
+<a href=#87 id=87 data-nosnippet>87</a>    prelude::{Acknowledgement, HoprPseudonym},
+<a href=#88 id=88 data-nosnippet>88</a>    protocol::VerifiedAcknowledgement,
+<a href=#89 id=89 data-nosnippet>89</a>};
+<a href=#90 id=90 data-nosnippet>90</a><span class="kw">use </span>hopr_network_types::prelude::ResolvedTransportRouting;
+<a href=#91 id=91 data-nosnippet>91</a><span class="kw">use </span>hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
+<a href=#92 id=92 data-nosnippet>92</a><span class="kw">use </span>hopr_transport_bloom::TagBloomFilter;
+<a href=#93 id=93 data-nosnippet>93</a><span class="kw">use </span>hopr_transport_identity::{Multiaddr, PeerId};
+<a href=#94 id=94 data-nosnippet>94</a><span class="kw">use </span>rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+<a href=#95 id=95 data-nosnippet>95</a><span class="kw">use </span>tracing::Instrument;
+<a href=#96 id=96 data-nosnippet>96</a>
+<a href=#97 id=97 data-nosnippet>97</a><span class="kw">use </span><span class="kw">crate</span>::processor::{PacketUnwrapping, PacketWrapping};
+<a href=#98 id=98 data-nosnippet>98</a><span class="kw">pub use </span><span class="kw">crate</span>::timer::execute_on_tick;
+<a href=#99 id=99 data-nosnippet>99</a>
+<a href=#100 id=100 data-nosnippet>100</a><span class="kw">const </span>HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
+<a href=#101 id=101 data-nosnippet>101</a><span class="kw">const </span>SLOW_OP: std::time::Duration = std::time::Duration::from_millis(<span class="number">150</span>);
+<a href=#102 id=102 data-nosnippet>102</a><span class="kw">const </span>QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(<span class="number">50</span>);
+<a href=#103 id=103 data-nosnippet>103</a>
+<a href=#104 id=104 data-nosnippet>104</a><span class="kw">pub type </span>HoprBinaryCodec = <span class="kw">crate</span>::codec::FixedLengthCodec&lt;HOPR_PACKET_SIZE&gt;;
+<a href=#105 id=105 data-nosnippet>105</a><span class="kw">pub const </span>CURRENT_HOPR_MSG_PROTOCOL: <span class="kw-2">&amp;</span>str = <span class="string">"/hopr/mix/1.0.0"</span>;
+<a href=#106 id=106 data-nosnippet>106</a>
+<a href=#107 id=107 data-nosnippet>107</a><span class="kw">pub const </span>TICKET_ACK_BUFFER_SIZE: usize = <span class="number">1_000_000</span>;
+<a href=#108 id=108 data-nosnippet>108</a><span class="kw">pub const </span>NUM_CONCURRENT_TICKET_ACK_PROCESSING: usize = <span class="number">10</span>;
+<a href=#109 id=109 data-nosnippet>109</a>
+<a href=#110 id=110 data-nosnippet>110</a><span class="kw">pub const </span>ACK_OUT_BUFFER_SIZE: usize = <span class="number">1_000_000</span>;
+<a href=#111 id=111 data-nosnippet>111</a><span class="kw">pub const </span>NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = <span class="number">10</span>;
+<a href=#112 id=112 data-nosnippet>112</a>
+<a href=#113 id=113 data-nosnippet>113</a><span class="attr">#[cfg(all(feature = <span class="string">"prometheus"</span>, not(test)))]
+<a href=#114 id=114 data-nosnippet>114</a></span><span class="macro">lazy_static::lazy_static!</span> {
+<a href=#115 id=115 data-nosnippet>115</a>    <span class="comment">// packet
+<a href=#116 id=116 data-nosnippet>116</a>    </span><span class="kw">static </span><span class="kw-2">ref </span>METRIC_PACKET_COUNT:  hopr_metrics::MultiCounter =  hopr_metrics::MultiCounter::new(
+<a href=#117 id=117 data-nosnippet>117</a>        <span class="string">"hopr_packets_count"</span>,
+<a href=#118 id=118 data-nosnippet>118</a>        <span class="string">"Number of processed packets of different types (sent, received, forwarded)"</span>,
+<a href=#119 id=119 data-nosnippet>119</a>        <span class="kw-2">&amp;</span>[<span class="string">"type"</span>]
+<a href=#120 id=120 data-nosnippet>120</a>    ).unwrap();
+<a href=#121 id=121 data-nosnippet>121</a>    <span class="kw">static </span><span class="kw-2">ref </span>METRIC_REPLAYED_PACKET_COUNT: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
+<a href=#122 id=122 data-nosnippet>122</a>        <span class="string">"hopr_replayed_packet_count"</span>,
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="string">"The total count of replayed packets during the packet processing pipeline run"</span>,
+<a href=#124 id=124 data-nosnippet>124</a>    ).unwrap();
+<a href=#125 id=125 data-nosnippet>125</a>}
+<a href=#126 id=126 data-nosnippet>126</a>
+<a href=#127 id=127 data-nosnippet>127</a><span class="attr">#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
+<a href=#128 id=128 data-nosnippet>128</a></span><span class="kw">pub enum </span>ProtocolProcesses {
+<a href=#129 id=129 data-nosnippet>129</a>    <span class="attr">#[strum(to_string = <span class="string">"HOPR [msg] - ingress"</span>)]
+<a href=#130 id=130 data-nosnippet>130</a>    </span>MsgIn,
+<a href=#131 id=131 data-nosnippet>131</a>    <span class="attr">#[strum(to_string = <span class="string">"HOPR [msg] - egress"</span>)]
+<a href=#132 id=132 data-nosnippet>132</a>    </span>MsgOut,
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="attr">#[strum(to_string = <span class="string">"HOPR [ack] - egress"</span>)]
+<a href=#134 id=134 data-nosnippet>134</a>    </span>AckOut,
+<a href=#135 id=135 data-nosnippet>135</a>    <span class="attr">#[strum(to_string = <span class="string">"HOPR [ack] - ingress - ticket acknowledgement"</span>)]
+<a href=#136 id=136 data-nosnippet>136</a>    </span>TicketAck,
+<a href=#137 id=137 data-nosnippet>137</a>    <span class="attr">#[strum(to_string = <span class="string">"HOPR [msg] - mixer"</span>)]
+<a href=#138 id=138 data-nosnippet>138</a>    </span>Mixer,
+<a href=#139 id=139 data-nosnippet>139</a>    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#140 id=140 data-nosnippet>140</a>    #[strum(to_string = <span class="string">"packet capture"</span>)]
+<a href=#141 id=141 data-nosnippet>141</a>    </span>Capture,
+<a href=#142 id=142 data-nosnippet>142</a>}
+<a href=#143 id=143 data-nosnippet>143</a><span class="doccomment">/// Processed indexer generated events.
+<a href=#144 id=144 data-nosnippet>144</a></span><span class="attr">#[derive(Debug, Clone)]
+<a href=#145 id=145 data-nosnippet>145</a></span><span class="kw">pub enum </span>PeerDiscovery {
+<a href=#146 id=146 data-nosnippet>146</a>    Allow(PeerId),
+<a href=#147 id=147 data-nosnippet>147</a>    Ban(PeerId),
+<a href=#148 id=148 data-nosnippet>148</a>    Announce(PeerId, Vec&lt;Multiaddr&gt;),
+<a href=#149 id=149 data-nosnippet>149</a>}
+<a href=#150 id=150 data-nosnippet>150</a>
+<a href=#151 id=151 data-nosnippet>151</a><span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#152 id=152 data-nosnippet>152</a></span><span class="kw">fn </span>inspect_ticket_data_in_packet(raw_packet: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="kw-2">&amp;</span>[u8] {
+<a href=#153 id=153 data-nosnippet>153</a>    <span class="kw">use </span>hopr_primitive_types::traits::BytesEncodable;
+<a href=#154 id=154 data-nosnippet>154</a>    <span class="kw">if </span>raw_packet.len() &gt;= hopr_internal_types::tickets::Ticket::SIZE {
+<a href=#155 id=155 data-nosnippet>155</a>        <span class="kw-2">&amp;</span>raw_packet[raw_packet.len() - hopr_internal_types::tickets::Ticket::SIZE..]
+<a href=#156 id=156 data-nosnippet>156</a>    } <span class="kw">else </span>{
+<a href=#157 id=157 data-nosnippet>157</a>        <span class="kw-2">&amp;</span>[]
+<a href=#158 id=158 data-nosnippet>158</a>    }
+<a href=#159 id=159 data-nosnippet>159</a>}
+<a href=#160 id=160 data-nosnippet>160</a>
+<a href=#161 id=161 data-nosnippet>161</a><span class="doccomment">/// Run all processes responsible for handling the msg and acknowledgment protocols.
+<a href=#162 id=162 data-nosnippet>162</a>///
+<a href=#163 id=163 data-nosnippet>163</a>/// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
+<a href=#164 id=164 data-nosnippet>164</a>/// overlay on top of the `wire_msg` Stream or Sink.
+<a href=#165 id=165 data-nosnippet>165</a></span><span class="attr">#[allow(clippy::too_many_arguments)]
+<a href=#166 id=166 data-nosnippet>166</a></span><span class="kw">pub async fn </span>run_msg_ack_protocol&lt;Db, R&gt;(
+<a href=#167 id=167 data-nosnippet>167</a>    packet_cfg: processor::PacketInteractionConfig,
+<a href=#168 id=168 data-nosnippet>168</a>    db: Db,
+<a href=#169 id=169 data-nosnippet>169</a>    resolver: R,
+<a href=#170 id=170 data-nosnippet>170</a>    wire_msg: (
+<a href=#171 id=171 data-nosnippet>171</a>        <span class="kw">impl </span>futures::Sink&lt;(PeerId, Box&lt;[u8]&gt;)&gt; + Clone + Unpin + Send + <span class="lifetime">'static</span>,
+<a href=#172 id=172 data-nosnippet>172</a>        <span class="kw">impl </span>futures::Stream&lt;Item = (PeerId, Box&lt;[u8]&gt;)&gt; + Send + <span class="lifetime">'static</span>,
+<a href=#173 id=173 data-nosnippet>173</a>    ),
+<a href=#174 id=174 data-nosnippet>174</a>    api: (
+<a href=#175 id=175 data-nosnippet>175</a>        <span class="kw">impl </span>futures::Sink&lt;(HoprPseudonym, ApplicationDataIn)&gt; + Send + <span class="lifetime">'static</span>,
+<a href=#176 id=176 data-nosnippet>176</a>        <span class="kw">impl </span>futures::Stream&lt;Item = (ResolvedTransportRouting, ApplicationDataOut)&gt; + Send + <span class="lifetime">'static</span>,
+<a href=#177 id=177 data-nosnippet>177</a>    ),
+<a href=#178 id=178 data-nosnippet>178</a>) -&gt; HashMap&lt;ProtocolProcesses, hopr_async_runtime::AbortHandle&gt;
+<a href=#179 id=179 data-nosnippet>179</a><span class="kw">where
+<a href=#180 id=180 data-nosnippet>180</a>    </span>Db: HoprDbProtocolOperations + Clone + Send + Sync + <span class="lifetime">'static</span>,
+<a href=#181 id=181 data-nosnippet>181</a>    R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Clone + Send + Sync + <span class="lifetime">'static</span>,
+<a href=#182 id=182 data-nosnippet>182</a>{
+<a href=#183 id=183 data-nosnippet>183</a>    <span class="kw">let </span>me = packet_cfg.packet_keypair.clone();
+<a href=#184 id=184 data-nosnippet>184</a>
+<a href=#185 id=185 data-nosnippet>185</a>    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#186 id=186 data-nosnippet>186</a>    </span><span class="kw">let </span>me_pub = <span class="kw-2">*</span>hopr_crypto_types::keypairs::Keypair::public(<span class="kw-2">&amp;</span>me);
+<a href=#187 id=187 data-nosnippet>187</a>
+<a href=#188 id=188 data-nosnippet>188</a>    <span class="kw">let </span><span class="kw-2">mut </span>processes = HashMap::new();
+<a href=#189 id=189 data-nosnippet>189</a>
+<a href=#190 id=190 data-nosnippet>190</a>    <span class="attr">#[cfg(all(feature = <span class="string">"prometheus"</span>, not(test)))]
+<a href=#191 id=191 data-nosnippet>191</a>    </span>{
+<a href=#192 id=192 data-nosnippet>192</a>        <span class="comment">// Initialize the lazy statics here
+<a href=#193 id=193 data-nosnippet>193</a>        </span>lazy_static::initialize(<span class="kw-2">&amp;</span>METRIC_PACKET_COUNT);
+<a href=#194 id=194 data-nosnippet>194</a>        lazy_static::initialize(<span class="kw-2">&amp;</span>METRIC_REPLAYED_PACKET_COUNT);
+<a href=#195 id=195 data-nosnippet>195</a>    }
+<a href=#196 id=196 data-nosnippet>196</a>
+<a href=#197 id=197 data-nosnippet>197</a>    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#198 id=198 data-nosnippet>198</a>    </span><span class="kw">let </span>capture = {
+<a href=#199 id=199 data-nosnippet>199</a>        <span class="kw">use </span>std::{path::PathBuf, str::FromStr};
+<a href=#200 id=200 data-nosnippet>200</a>        <span class="kw">let </span>writer: Box&lt;<span class="kw">dyn </span>capture::PacketWriter + Send + <span class="lifetime">'static</span>&gt; =
+<a href=#201 id=201 data-nosnippet>201</a>            <span class="kw">if let </span><span class="prelude-val">Ok</span>(desc) = std::env::var(<span class="string">"HOPR_CAPTURE_PACKETS"</span>) {
+<a href=#202 id=202 data-nosnippet>202</a>                <span class="kw">if let </span><span class="prelude-val">Ok</span>(udp_writer) = std::net::SocketAddr::from_str(<span class="kw-2">&amp;</span>desc)
+<a href=#203 id=203 data-nosnippet>203</a>                    .map_err(std::io::Error::other)
+<a href=#204 id=204 data-nosnippet>204</a>                    .and_then(capture::UdpPacketDump::new)
+<a href=#205 id=205 data-nosnippet>205</a>                {
+<a href=#206 id=206 data-nosnippet>206</a>                    <span class="macro">tracing::warn!</span>(<span class="string">"udp packet capture initialized to {desc}"</span>);
+<a href=#207 id=207 data-nosnippet>207</a>                    Box::new(udp_writer)
+<a href=#208 id=208 data-nosnippet>208</a>                } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(pcap_writer) = std::fs::File::create(<span class="kw-2">&amp;</span>desc).and_then(capture::PcapPacketWriter::new) {
+<a href=#209 id=209 data-nosnippet>209</a>                    <span class="macro">tracing::info!</span>(<span class="string">"pcap file packet capture initialized to {desc}"</span>);
+<a href=#210 id=210 data-nosnippet>210</a>                    Box::new(pcap_writer)
+<a href=#211 id=211 data-nosnippet>211</a>                } <span class="kw">else </span>{
+<a href=#212 id=212 data-nosnippet>212</a>                    <span class="macro">tracing::error!</span>(desc, <span class="string">"failed to create packet capture: invalid socket address or file"</span>);
+<a href=#213 id=213 data-nosnippet>213</a>                    Box::new(capture::NullWriter)
+<a href=#214 id=214 data-nosnippet>214</a>                }
+<a href=#215 id=215 data-nosnippet>215</a>            } <span class="kw">else </span>{
+<a href=#216 id=216 data-nosnippet>216</a>                <span class="macro">tracing::warn!</span>(<span class="string">"no packet capture specified"</span>);
+<a href=#217 id=217 data-nosnippet>217</a>                Box::new(capture::NullWriter)
+<a href=#218 id=218 data-nosnippet>218</a>            };
+<a href=#219 id=219 data-nosnippet>219</a>        <span class="kw">let </span>start_capturing_path: <span class="prelude-ty">Option</span>&lt;PathBuf&gt; = std::env::var(<span class="string">"HOPR_CAPTURE_PATH_TRIGGER"</span>).ok().map(PathBuf::from);
+<a href=#220 id=220 data-nosnippet>220</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>path) = start_capturing_path {
+<a href=#221 id=221 data-nosnippet>221</a>            <span class="macro">tracing::info!</span>(
+<a href=#222 id=222 data-nosnippet>222</a>                <span class="string">"To start capturing packets, create it by running 'touch {}'"</span>,
+<a href=#223 id=223 data-nosnippet>223</a>                path.display()
+<a href=#224 id=224 data-nosnippet>224</a>            );
+<a href=#225 id=225 data-nosnippet>225</a>        } <span class="kw">else </span>{
+<a href=#226 id=226 data-nosnippet>226</a>            <span class="macro">tracing::warn!</span>(<span class="string">"The env var 'HOPR_CAPTURE_PATH_TRIGGER' is not set, packet capture won't start"</span>);
+<a href=#227 id=227 data-nosnippet>227</a>        };
+<a href=#228 id=228 data-nosnippet>228</a>        <span class="kw">let </span>(capture, ah) = capture::packet_capture_channel(writer, start_capturing_path);
+<a href=#229 id=229 data-nosnippet>229</a>        processes.insert(ProtocolProcesses::Capture, ah);
+<a href=#230 id=230 data-nosnippet>230</a>        capture
+<a href=#231 id=231 data-nosnippet>231</a>    };
+<a href=#232 id=232 data-nosnippet>232</a>
+<a href=#233 id=233 data-nosnippet>233</a>    <span class="kw">let </span>tbf = std::sync::Arc::new(parking_lot::Mutex::new(TagBloomFilter::default()));
+<a href=#234 id=234 data-nosnippet>234</a>
+<a href=#235 id=235 data-nosnippet>235</a>    <span class="kw">let </span>(ticket_ack_tx, ticket_ack_rx) =
+<a href=#236 id=236 data-nosnippet>236</a>        futures::channel::mpsc::channel::&lt;(Acknowledgement, OffchainPublicKey)&gt;(TICKET_ACK_BUFFER_SIZE);
+<a href=#237 id=237 data-nosnippet>237</a>
+<a href=#238 id=238 data-nosnippet>238</a>    <span class="kw">let </span>db_clone = db.clone();
+<a href=#239 id=239 data-nosnippet>239</a>    <span class="kw">let </span>resolver_clone = resolver.clone();
+<a href=#240 id=240 data-nosnippet>240</a>    processes.insert(
+<a href=#241 id=241 data-nosnippet>241</a>        ProtocolProcesses::TicketAck,
+<a href=#242 id=242 data-nosnippet>242</a>        <span class="macro">spawn_as_abortable!</span>(ticket_ack_rx
+<a href=#243 id=243 data-nosnippet>243</a>            .for_each_concurrent(NUM_CONCURRENT_TICKET_ACK_PROCESSING, <span class="kw">move </span>|(ack, sender)| {
+<a href=#244 id=244 data-nosnippet>244</a>                <span class="kw">let </span>db = db_clone.clone();
+<a href=#245 id=245 data-nosnippet>245</a>                <span class="kw">let </span>resolver = resolver_clone.clone();
+<a href=#246 id=246 data-nosnippet>246</a>                <span class="kw">async move </span>{
+<a href=#247 id=247 data-nosnippet>247</a>                    <span class="kw">if let </span><span class="prelude-val">Ok</span>(verified) = hopr_parallelize::cpu::spawn_blocking(<span class="kw">move </span>|| ack.verify(<span class="kw-2">&amp;</span>sender)).<span class="kw">await </span>{
+<a href=#248 id=248 data-nosnippet>248</a>                        <span class="macro">tracing::trace!</span>(%sender, <span class="string">"received a valid acknowledgement"</span>);
+<a href=#249 id=249 data-nosnippet>249</a>                            <span class="kw">match </span>db.handle_acknowledgement(verified, <span class="kw-2">&amp;</span>resolver).<span class="kw">await </span>{
+<a href=#250 id=250 data-nosnippet>250</a>                                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">tracing::trace!</span>(%sender, <span class="string">"successfully processed a known acknowledgement"</span>),
+<a href=#251 id=251 data-nosnippet>251</a>                                <span class="comment">// Eventually, we do not care here if the acknowledgement does not belong to any
+<a href=#252 id=252 data-nosnippet>252</a>                                // unacknowledged packets.
+<a href=#253 id=253 data-nosnippet>253</a>                                </span><span class="prelude-val">Err</span>(error) =&gt; <span class="macro">tracing::trace!</span>(%sender, %error, <span class="string">"valid acknowledgement is unknown or error occurred while processing it"</span>),
+<a href=#254 id=254 data-nosnippet>254</a>                            }
+<a href=#255 id=255 data-nosnippet>255</a>                    } <span class="kw">else </span>{
+<a href=#256 id=256 data-nosnippet>256</a>                        <span class="macro">tracing::error!</span>(%sender, <span class="string">"failed to verify signature on acknowledgement"</span>);
+<a href=#257 id=257 data-nosnippet>257</a>                    }
+<a href=#258 id=258 data-nosnippet>258</a>                }
+<a href=#259 id=259 data-nosnippet>259</a>            })
+<a href=#260 id=260 data-nosnippet>260</a>            .inspect(|<span class="kw">_</span>| <span class="macro">tracing::warn!</span>(task = <span class="string">"transport (protocol - ticket acknowledgement)"</span>, <span class="string">"long-running background task finished"</span>)))
+<a href=#261 id=261 data-nosnippet>261</a>    );
+<a href=#262 id=262 data-nosnippet>262</a>
+<a href=#263 id=263 data-nosnippet>263</a>    <span class="kw">let </span>(ack_out_tx, ack_out_rx) =
+<a href=#264 id=264 data-nosnippet>264</a>        futures::channel::mpsc::channel::&lt;(<span class="prelude-ty">Option</span>&lt;HalfKey&gt;, OffchainPublicKey)&gt;(ACK_OUT_BUFFER_SIZE);
+<a href=#265 id=265 data-nosnippet>265</a>
+<a href=#266 id=266 data-nosnippet>266</a>    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#267 id=267 data-nosnippet>267</a>    </span><span class="kw">let </span>capture_clone = capture.clone();
+<a href=#268 id=268 data-nosnippet>268</a>
+<a href=#269 id=269 data-nosnippet>269</a>    <span class="kw">let </span>db_clone = db.clone();
+<a href=#270 id=270 data-nosnippet>270</a>    <span class="kw">let </span>resolver_clone = resolver.clone();
+<a href=#271 id=271 data-nosnippet>271</a>    <span class="kw">let </span>me_clone = me.clone();
+<a href=#272 id=272 data-nosnippet>272</a>    <span class="kw">let </span>msg_to_send_tx = wire_msg.<span class="number">0</span>.clone();
+<a href=#273 id=273 data-nosnippet>273</a>    processes.insert(
+<a href=#274 id=274 data-nosnippet>274</a>        ProtocolProcesses::AckOut,
+<a href=#275 id=275 data-nosnippet>275</a>        <span class="macro">spawn_as_abortable!</span>(
+<a href=#276 id=276 data-nosnippet>276</a>            ack_out_rx
+<a href=#277 id=277 data-nosnippet>277</a>                .for_each_concurrent(
+<a href=#278 id=278 data-nosnippet>278</a>                    NUM_CONCURRENT_ACK_OUT_PROCESSING,
+<a href=#279 id=279 data-nosnippet>279</a>                    <span class="kw">move </span>|(maybe_ack_key, destination)| {
+<a href=#280 id=280 data-nosnippet>280</a>                        <span class="kw">let </span>db = db_clone.clone();
+<a href=#281 id=281 data-nosnippet>281</a>                        <span class="kw">let </span>resolver = resolver_clone.clone();
+<a href=#282 id=282 data-nosnippet>282</a>                        <span class="kw">let </span>me = me_clone.clone();
+<a href=#283 id=283 data-nosnippet>283</a>                        <span class="kw">let </span><span class="kw-2">mut </span>msg_to_send_tx_clone = msg_to_send_tx.clone();
+<a href=#284 id=284 data-nosnippet>284</a>
+<a href=#285 id=285 data-nosnippet>285</a>                        <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#286 id=286 data-nosnippet>286</a>                        </span><span class="kw">let </span><span class="kw-2">mut </span>capture = capture_clone.clone();
+<a href=#287 id=287 data-nosnippet>287</a>                        <span class="kw">async move </span>{
+<a href=#288 id=288 data-nosnippet>288</a>                            <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#289 id=289 data-nosnippet>289</a>                            </span><span class="kw">let </span>(is_random, me_pub) = (
+<a href=#290 id=290 data-nosnippet>290</a>                                maybe_ack_key.is_none(),
+<a href=#291 id=291 data-nosnippet>291</a>                                <span class="kw-2">*</span>hopr_crypto_types::keypairs::Keypair::public(<span class="kw-2">&amp;</span>me),
+<a href=#292 id=292 data-nosnippet>292</a>                            );
+<a href=#293 id=293 data-nosnippet>293</a>
+<a href=#294 id=294 data-nosnippet>294</a>                            <span class="comment">// Sign acknowledgement with the given half-key or generate a signed random one
+<a href=#295 id=295 data-nosnippet>295</a>                            </span><span class="kw">let </span>ack = hopr_parallelize::cpu::spawn_blocking(<span class="kw">move </span>|| {
+<a href=#296 id=296 data-nosnippet>296</a>                                maybe_ack_key
+<a href=#297 id=297 data-nosnippet>297</a>                                    .map(|ack_key| VerifiedAcknowledgement::new(ack_key, <span class="kw-2">&amp;</span>me))
+<a href=#298 id=298 data-nosnippet>298</a>                                    .unwrap_or_else(|| VerifiedAcknowledgement::random(<span class="kw-2">&amp;</span>me))
+<a href=#299 id=299 data-nosnippet>299</a>                            })
+<a href=#300 id=300 data-nosnippet>300</a>                            .<span class="kw">await</span>;
+<a href=#301 id=301 data-nosnippet>301</a>
+<a href=#302 id=302 data-nosnippet>302</a>                            <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#303 id=303 data-nosnippet>303</a>                            </span><span class="kw">let </span>captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingAck {
+<a href=#304 id=304 data-nosnippet>304</a>                                me: me_pub,
+<a href=#305 id=305 data-nosnippet>305</a>                                ack,
+<a href=#306 id=306 data-nosnippet>306</a>                                is_random,
+<a href=#307 id=307 data-nosnippet>307</a>                                next_hop: destination,
+<a href=#308 id=308 data-nosnippet>308</a>                            }
+<a href=#309 id=309 data-nosnippet>309</a>                            .into();
+<a href=#310 id=310 data-nosnippet>310</a>
+<a href=#311 id=311 data-nosnippet>311</a>                            <span class="kw">match </span>db
+<a href=#312 id=312 data-nosnippet>312</a>                                .to_send_no_ack(ack.leak().as_ref().into(), destination, <span class="kw-2">&amp;</span>resolver)
+<a href=#313 id=313 data-nosnippet>313</a>                                .<span class="kw">await
+<a href=#314 id=314 data-nosnippet>314</a>                            </span>{
+<a href=#315 id=315 data-nosnippet>315</a>                                <span class="prelude-val">Ok</span>(ack_packet) =&gt; {
+<a href=#316 id=316 data-nosnippet>316</a>                                    msg_to_send_tx_clone
+<a href=#317 id=317 data-nosnippet>317</a>                                        .send((ack_packet.next_hop.into(), ack_packet.data))
+<a href=#318 id=318 data-nosnippet>318</a>                                        .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+<a href=#319 id=319 data-nosnippet>319</a>                                        .<span class="kw">await
+<a href=#320 id=320 data-nosnippet>320</a>                                        </span>.unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#321 id=321 data-nosnippet>321</a>                                            <span class="macro">tracing::error!</span>(
+<a href=#322 id=322 data-nosnippet>322</a>                                                <span class="string">"failed to forward an acknowledgement to the transport layer: timeout"
+<a href=#323 id=323 data-nosnippet>323</a>                                            </span>);
+<a href=#324 id=324 data-nosnippet>324</a>                                            <span class="prelude-val">Ok</span>(())
+<a href=#325 id=325 data-nosnippet>325</a>                                        })
+<a href=#326 id=326 data-nosnippet>326</a>                                        .unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#327 id=327 data-nosnippet>327</a>                                            <span class="macro">tracing::error!</span>(
+<a href=#328 id=328 data-nosnippet>328</a>                                                <span class="string">"failed to forward an acknowledgement to the transport layer"
+<a href=#329 id=329 data-nosnippet>329</a>                                            </span>);
+<a href=#330 id=330 data-nosnippet>330</a>                                        });
+<a href=#331 id=331 data-nosnippet>331</a>
+<a href=#332 id=332 data-nosnippet>332</a>                                    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#333 id=333 data-nosnippet>333</a>                                    </span><span class="kw">let _ </span>= capture.try_send(captured_packet);
+<a href=#334 id=334 data-nosnippet>334</a>                                }
+<a href=#335 id=335 data-nosnippet>335</a>                                <span class="prelude-val">Err</span>(error) =&gt; <span class="macro">tracing::error!</span>(%error, <span class="string">"failed to create ack packet"</span>),
+<a href=#336 id=336 data-nosnippet>336</a>                            }
+<a href=#337 id=337 data-nosnippet>337</a>                        }
+<a href=#338 id=338 data-nosnippet>338</a>                    }
+<a href=#339 id=339 data-nosnippet>339</a>                )
+<a href=#340 id=340 data-nosnippet>340</a>                .inspect(|<span class="kw">_</span>| <span class="macro">tracing::warn!</span>(
+<a href=#341 id=341 data-nosnippet>341</a>                    task = <span class="string">"transport (protocol - ack outgoing)"</span>,
+<a href=#342 id=342 data-nosnippet>342</a>                    <span class="string">"long-running background task finished"
+<a href=#343 id=343 data-nosnippet>343</a>                </span>))
+<a href=#344 id=344 data-nosnippet>344</a>        ),
+<a href=#345 id=345 data-nosnippet>345</a>    );
+<a href=#346 id=346 data-nosnippet>346</a>
+<a href=#347 id=347 data-nosnippet>347</a>    <span class="kw">let </span>msg_processor_read = processor::PacketProcessor::new(db.clone(), resolver.clone(), packet_cfg);
+<a href=#348 id=348 data-nosnippet>348</a>    <span class="kw">let </span>msg_processor_write = msg_processor_read.clone();
+<a href=#349 id=349 data-nosnippet>349</a>
+<a href=#350 id=350 data-nosnippet>350</a>    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#351 id=351 data-nosnippet>351</a>    </span><span class="kw">let </span>capture_clone = capture.clone();
+<a href=#352 id=352 data-nosnippet>352</a>
+<a href=#353 id=353 data-nosnippet>353</a>    <span class="kw">let </span>msg_to_send_tx = wire_msg.<span class="number">0</span>.clone();
+<a href=#354 id=354 data-nosnippet>354</a>    processes.insert(
+<a href=#355 id=355 data-nosnippet>355</a>        ProtocolProcesses::MsgOut,
+<a href=#356 id=356 data-nosnippet>356</a>        <span class="macro">spawn_as_abortable!</span>(<span class="kw">async move </span>{
+<a href=#357 id=357 data-nosnippet>357</a>            <span class="kw">let </span>_neverending = api
+<a href=#358 id=358 data-nosnippet>358</a>                .<span class="number">1
+<a href=#359 id=359 data-nosnippet>359</a>                </span>.then_concurrent(|(routing, data)| {
+<a href=#360 id=360 data-nosnippet>360</a>                    <span class="kw">let </span>msg_processor = msg_processor_write.clone();
+<a href=#361 id=361 data-nosnippet>361</a>
+<a href=#362 id=362 data-nosnippet>362</a>                    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#363 id=363 data-nosnippet>363</a>                    </span><span class="kw">let </span>(<span class="kw-2">mut </span>capture_clone, data_clone, num_surbs) =
+<a href=#364 id=364 data-nosnippet>364</a>                        (capture_clone.clone(), data.clone(), routing.count_return_paths() <span class="kw">as </span>u8);
+<a href=#365 id=365 data-nosnippet>365</a>
+<a href=#366 id=366 data-nosnippet>366</a>                    <span class="kw">async move </span>{
+<a href=#367 id=367 data-nosnippet>367</a>                        <span class="kw">match </span>PacketWrapping::send(<span class="kw-2">&amp;</span>msg_processor, data, routing).<span class="kw">await </span>{
+<a href=#368 id=368 data-nosnippet>368</a>                            <span class="prelude-val">Ok</span>(v) =&gt; {
+<a href=#369 id=369 data-nosnippet>369</a>                                <span class="attr">#[cfg(all(feature = <span class="string">"prometheus"</span>, not(test)))]
+<a href=#370 id=370 data-nosnippet>370</a>                                </span>{
+<a href=#371 id=371 data-nosnippet>371</a>                                    METRIC_PACKET_COUNT.increment(<span class="kw-2">&amp;</span>[<span class="string">"sent"</span>]);
+<a href=#372 id=372 data-nosnippet>372</a>                                }
+<a href=#373 id=373 data-nosnippet>373</a>
+<a href=#374 id=374 data-nosnippet>374</a>                                <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#375 id=375 data-nosnippet>375</a>                                </span><span class="kw">let _ </span>= capture_clone.try_send(
+<a href=#376 id=376 data-nosnippet>376</a>                                    capture::PacketBeforeTransit::OutgoingPacket {
+<a href=#377 id=377 data-nosnippet>377</a>                                        me: me_pub,
+<a href=#378 id=378 data-nosnippet>378</a>                                        next_hop: v.next_hop,
+<a href=#379 id=379 data-nosnippet>379</a>                                        num_surbs,
+<a href=#380 id=380 data-nosnippet>380</a>                                        is_forwarded: <span class="bool-val">false</span>,
+<a href=#381 id=381 data-nosnippet>381</a>                                        data: data_clone.data.to_bytes().into_vec().into(),
+<a href=#382 id=382 data-nosnippet>382</a>                                        ack_challenge: v.ack_challenge.as_ref().into(),
+<a href=#383 id=383 data-nosnippet>383</a>                                        signals: data_clone.packet_info.unwrap_or_default().signals_to_destination,
+<a href=#384 id=384 data-nosnippet>384</a>                                        ticket: inspect_ticket_data_in_packet(<span class="kw-2">&amp;</span>v.data).into(),
+<a href=#385 id=385 data-nosnippet>385</a>                                    }
+<a href=#386 id=386 data-nosnippet>386</a>                                    .into(),
+<a href=#387 id=387 data-nosnippet>387</a>                                );
+<a href=#388 id=388 data-nosnippet>388</a>
+<a href=#389 id=389 data-nosnippet>389</a>                                <span class="prelude-val">Some</span>((v.next_hop.into(), v.data))
+<a href=#390 id=390 data-nosnippet>390</a>                            }
+<a href=#391 id=391 data-nosnippet>391</a>                            <span class="prelude-val">Err</span>(error) =&gt; {
+<a href=#392 id=392 data-nosnippet>392</a>                                <span class="macro">tracing::error!</span>(%error, <span class="string">"packet could not be wrapped for sending"</span>);
+<a href=#393 id=393 data-nosnippet>393</a>                                <span class="prelude-val">None
+<a href=#394 id=394 data-nosnippet>394</a>                            </span>}
+<a href=#395 id=395 data-nosnippet>395</a>                        }
+<a href=#396 id=396 data-nosnippet>396</a>                    }
+<a href=#397 id=397 data-nosnippet>397</a>                })
+<a href=#398 id=398 data-nosnippet>398</a>                .filter_map(futures::future::ready)
+<a href=#399 id=399 data-nosnippet>399</a>                .inspect(|(peer, <span class="kw">_</span>)| <span class="macro">tracing::trace!</span>(%peer, <span class="string">"protocol message out"</span>))
+<a href=#400 id=400 data-nosnippet>400</a>                .map(<span class="prelude-val">Ok</span>)
+<a href=#401 id=401 data-nosnippet>401</a>                .forward(msg_to_send_tx)
+<a href=#402 id=402 data-nosnippet>402</a>                .instrument(<span class="macro">tracing::trace_span!</span>(<span class="string">"msg protocol processing - egress"</span>))
+<a href=#403 id=403 data-nosnippet>403</a>                .inspect(|<span class="kw">_</span>| {
+<a href=#404 id=404 data-nosnippet>404</a>                    <span class="macro">tracing::warn!</span>(
+<a href=#405 id=405 data-nosnippet>405</a>                        task = <span class="string">"transport (protocol - msg egress)"</span>,
+<a href=#406 id=406 data-nosnippet>406</a>                        <span class="string">"long-running background task finished"
+<a href=#407 id=407 data-nosnippet>407</a>                    </span>)
+<a href=#408 id=408 data-nosnippet>408</a>                })
+<a href=#409 id=409 data-nosnippet>409</a>                .<span class="kw">await</span>;
+<a href=#410 id=410 data-nosnippet>410</a>        }),
+<a href=#411 id=411 data-nosnippet>411</a>    );
+<a href=#412 id=412 data-nosnippet>412</a>
+<a href=#413 id=413 data-nosnippet>413</a>    <span class="kw">let </span>ack_out_tx_clone_1 = ack_out_tx.clone();
+<a href=#414 id=414 data-nosnippet>414</a>    <span class="kw">let </span>ack_out_tx_clone_2 = ack_out_tx.clone();
+<a href=#415 id=415 data-nosnippet>415</a>
+<a href=#416 id=416 data-nosnippet>416</a>    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#417 id=417 data-nosnippet>417</a>    </span><span class="kw">let </span>capture_clone = capture.clone();
+<a href=#418 id=418 data-nosnippet>418</a>
+<a href=#419 id=419 data-nosnippet>419</a>    <span class="comment">// Create a cache for a CPU-intensive conversion PeerId -&gt; OffchainPublicKey
+<a href=#420 id=420 data-nosnippet>420</a>    </span><span class="kw">let </span>peer_id_cache: moka::future::Cache&lt;PeerId, OffchainPublicKey&gt; = moka::future::Cache::builder()
+<a href=#421 id=421 data-nosnippet>421</a>        .time_to_idle(Duration::from_secs(<span class="number">600</span>))
+<a href=#422 id=422 data-nosnippet>422</a>        .max_capacity(<span class="number">100_000</span>)
+<a href=#423 id=423 data-nosnippet>423</a>        .build();
+<a href=#424 id=424 data-nosnippet>424</a>
+<a href=#425 id=425 data-nosnippet>425</a>    processes.insert(
+<a href=#426 id=426 data-nosnippet>426</a>        ProtocolProcesses::MsgIn,
+<a href=#427 id=427 data-nosnippet>427</a>        <span class="macro">spawn_as_abortable!</span>(<span class="kw">async move </span>{
+<a href=#428 id=428 data-nosnippet>428</a>            <span class="kw">let </span>_neverending = wire_msg
+<a href=#429 id=429 data-nosnippet>429</a>                .<span class="number">1
+<a href=#430 id=430 data-nosnippet>430</a>                </span>.then_concurrent(<span class="kw">move </span>|(peer, data)| {
+<a href=#431 id=431 data-nosnippet>431</a>                    <span class="kw">let </span>msg_processor = msg_processor_read.clone();
+<a href=#432 id=432 data-nosnippet>432</a>                    <span class="kw">let </span><span class="kw-2">mut </span>ack_out_tx = ack_out_tx_clone_1.clone();
+<a href=#433 id=433 data-nosnippet>433</a>                    <span class="kw">let </span>peer_id_key_cache = peer_id_cache.clone();
+<a href=#434 id=434 data-nosnippet>434</a>
+<a href=#435 id=435 data-nosnippet>435</a>                    <span class="macro">tracing::trace!</span>(%peer, <span class="string">"protocol message in"</span>);
+<a href=#436 id=436 data-nosnippet>436</a>
+<a href=#437 id=437 data-nosnippet>437</a>                    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#438 id=438 data-nosnippet>438</a>                    </span><span class="kw">let </span>(<span class="kw-2">mut </span>capture_clone, ticket_data_clone) = (
+<a href=#439 id=439 data-nosnippet>439</a>                        capture.clone(),
+<a href=#440 id=440 data-nosnippet>440</a>                        inspect_ticket_data_in_packet(<span class="kw-2">&amp;</span>data).to_vec()
+<a href=#441 id=441 data-nosnippet>441</a>                    );
+<a href=#442 id=442 data-nosnippet>442</a>
+<a href=#443 id=443 data-nosnippet>443</a>                    <span class="kw">async move </span>{
+<a href=#444 id=444 data-nosnippet>444</a>                        <span class="comment">// Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
+<a href=#445 id=445 data-nosnippet>445</a>                        </span><span class="kw">let </span>peer_key = <span class="kw">match </span>peer_id_key_cache
+<a href=#446 id=446 data-nosnippet>446</a>                                .try_get_with_by_ref(<span class="kw-2">&amp;</span>peer, hopr_parallelize::cpu::spawn_fifo_blocking(<span class="kw">move </span>|| OffchainPublicKey::from_peerid(<span class="kw-2">&amp;</span>peer)))
+<a href=#447 id=447 data-nosnippet>447</a>                                .<span class="kw">await </span>{
+<a href=#448 id=448 data-nosnippet>448</a>                            <span class="prelude-val">Ok</span>(peer) =&gt; peer,
+<a href=#449 id=449 data-nosnippet>449</a>                            <span class="prelude-val">Err</span>(error) =&gt; {
+<a href=#450 id=450 data-nosnippet>450</a>                                <span class="comment">// There absolutely nothing we can do when the peer id is unparseable (e.g., non-ed25519 based)
+<a href=#451 id=451 data-nosnippet>451</a>                                </span><span class="macro">tracing::error!</span>(%peer, %error, <span class="string">"dropping packet - cannot convert peer id"</span>);
+<a href=#452 id=452 data-nosnippet>452</a>                                <span class="kw">return </span><span class="prelude-val">None</span>;
+<a href=#453 id=453 data-nosnippet>453</a>                            }
+<a href=#454 id=454 data-nosnippet>454</a>                        };
+<a href=#455 id=455 data-nosnippet>455</a>
+<a href=#456 id=456 data-nosnippet>456</a>                        <span class="kw">let </span>now = std::time::Instant::now();
+<a href=#457 id=457 data-nosnippet>457</a>                        <span class="kw">let </span>res = msg_processor.recv(peer_key, data).<span class="kw">await</span>;
+<a href=#458 id=458 data-nosnippet>458</a>                        <span class="kw">let </span>elapsed = now.elapsed();
+<a href=#459 id=459 data-nosnippet>459</a>                        <span class="kw">if </span>elapsed &gt; SLOW_OP {
+<a href=#460 id=460 data-nosnippet>460</a>                            <span class="macro">tracing::warn!</span>(%peer, <span class="question-mark">?</span>elapsed, <span class="string">"msg_processor.recv took too long"</span>);
+<a href=#461 id=461 data-nosnippet>461</a>                        }
+<a href=#462 id=462 data-nosnippet>462</a>
+<a href=#463 id=463 data-nosnippet>463</a>                        <span class="comment">// If there was an error caused by interpretation of the packet data,
+<a href=#464 id=464 data-nosnippet>464</a>                        // we must send a random acknowledgement back.
+<a href=#465 id=465 data-nosnippet>465</a>                        </span><span class="kw">if let </span><span class="prelude-val">Err</span>(error) = <span class="kw-2">&amp;</span>res {
+<a href=#466 id=466 data-nosnippet>466</a>                            <span class="macro">tracing::error!</span>(%peer, %error, <span class="string">"failed to process the received packet"</span>);
+<a href=#467 id=467 data-nosnippet>467</a>
+<a href=#468 id=468 data-nosnippet>468</a>                            <span class="comment">// Send random signed acknowledgement to give feedback to the sender
+<a href=#469 id=469 data-nosnippet>469</a>                            </span><span class="kw">if </span>error.is_undecodable() {
+<a href=#470 id=470 data-nosnippet>470</a>                                <span class="comment">// Do not send an ack back if the packet could not be decoded at all
+<a href=#471 id=471 data-nosnippet>471</a>                                // 
+<a href=#472 id=472 data-nosnippet>472</a>                                // Potentially adversarial behavior
+<a href=#473 id=473 data-nosnippet>473</a>                                </span><span class="macro">tracing::trace!</span>(%peer, <span class="string">"not sending ack back on undecodable packet - possible adversarial behavior"</span>);
+<a href=#474 id=474 data-nosnippet>474</a>                            } <span class="kw">else </span>{
+<a href=#475 id=475 data-nosnippet>475</a>                                ack_out_tx
+<a href=#476 id=476 data-nosnippet>476</a>                                    .send((<span class="prelude-val">None</span>, peer_key))
+<a href=#477 id=477 data-nosnippet>477</a>                                    .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+<a href=#478 id=478 data-nosnippet>478</a>                                    .<span class="kw">await
+<a href=#479 id=479 data-nosnippet>479</a>                                    </span>.unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#480 id=480 data-nosnippet>480</a>                                        <span class="macro">tracing::error!</span>(<span class="string">"failed to send ack to the egress queue: timeout"</span>);
+<a href=#481 id=481 data-nosnippet>481</a>                                        <span class="prelude-val">Ok</span>(())
+<a href=#482 id=482 data-nosnippet>482</a>                                    })
+<a href=#483 id=483 data-nosnippet>483</a>                                    .unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#484 id=484 data-nosnippet>484</a>                                        <span class="macro">tracing::error!</span>(<span class="string">"failed to send ack to the egress queue"</span>);
+<a href=#485 id=485 data-nosnippet>485</a>                                    });
+<a href=#486 id=486 data-nosnippet>486</a>                            }
+<a href=#487 id=487 data-nosnippet>487</a>                        }
+<a href=#488 id=488 data-nosnippet>488</a>
+<a href=#489 id=489 data-nosnippet>489</a>                        <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#490 id=490 data-nosnippet>490</a>                        </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(packet) = <span class="kw-2">&amp;</span>res {
+<a href=#491 id=491 data-nosnippet>491</a>                            <span class="kw">let _ </span>= capture_clone.try_send(capture::PacketBeforeTransit::IncomingPacket {
+<a href=#492 id=492 data-nosnippet>492</a>                                    me: me_pub,
+<a href=#493 id=493 data-nosnippet>493</a>                                    packet,
+<a href=#494 id=494 data-nosnippet>494</a>                                    ticket: ticket_data_clone.into(),
+<a href=#495 id=495 data-nosnippet>495</a>                                }.into()
+<a href=#496 id=496 data-nosnippet>496</a>                            );
+<a href=#497 id=497 data-nosnippet>497</a>                        }
+<a href=#498 id=498 data-nosnippet>498</a>
+<a href=#499 id=499 data-nosnippet>499</a>                        res.ok()
+<a href=#500 id=500 data-nosnippet>500</a>                    }
+<a href=#501 id=501 data-nosnippet>501</a>                })
+<a href=#502 id=502 data-nosnippet>502</a>                .filter_map(<span class="kw">move </span>|maybe_packet| {
+<a href=#503 id=503 data-nosnippet>503</a>                    <span class="kw">let </span>tbf = tbf.clone();
+<a href=#504 id=504 data-nosnippet>504</a>
+<a href=#505 id=505 data-nosnippet>505</a>                    futures::future::ready(
+<a href=#506 id=506 data-nosnippet>506</a>                        <span class="kw">if let </span><span class="prelude-val">Some</span>(packet) = maybe_packet {
+<a href=#507 id=507 data-nosnippet>507</a>                            <span class="kw">match </span>packet {
+<a href=#508 id=508 data-nosnippet>508</a>                                IncomingPacket::Acknowledgement { packet_tag, previous_hop, .. } |
+<a href=#509 id=509 data-nosnippet>509</a>                                IncomingPacket::Final { packet_tag, previous_hop,.. } |
+<a href=#510 id=510 data-nosnippet>510</a>                                IncomingPacket::Forwarded { packet_tag, previous_hop, .. } =&gt; {
+<a href=#511 id=511 data-nosnippet>511</a>                                    <span class="comment">// This operation has run-time of ~10 nanoseconds,
+<a href=#512 id=512 data-nosnippet>512</a>                                    // and therefore does not need to be invoked via spawn_blocking
+<a href=#513 id=513 data-nosnippet>513</a>                                    </span><span class="kw">if </span>tbf.lock().check_and_set(<span class="kw-2">&amp;</span>packet_tag) {
+<a href=#514 id=514 data-nosnippet>514</a>                                        <span class="macro">tracing::warn!</span>(%previous_hop, <span class="string">"replayed packet received"</span>);
+<a href=#515 id=515 data-nosnippet>515</a>
+<a href=#516 id=516 data-nosnippet>516</a>                                        <span class="attr">#[cfg(all(feature = <span class="string">"prometheus"</span>, not(test)))]
+<a href=#517 id=517 data-nosnippet>517</a>                                        </span>METRIC_REPLAYED_PACKET_COUNT.increment();
+<a href=#518 id=518 data-nosnippet>518</a>
+<a href=#519 id=519 data-nosnippet>519</a>                                        <span class="prelude-val">None
+<a href=#520 id=520 data-nosnippet>520</a>                                    </span>} <span class="kw">else </span>{
+<a href=#521 id=521 data-nosnippet>521</a>                                        <span class="prelude-val">Some</span>(packet)
+<a href=#522 id=522 data-nosnippet>522</a>                                    }
+<a href=#523 id=523 data-nosnippet>523</a>                                }
+<a href=#524 id=524 data-nosnippet>524</a>                            }
+<a href=#525 id=525 data-nosnippet>525</a>                        } <span class="kw">else </span>{
+<a href=#526 id=526 data-nosnippet>526</a>                            <span class="macro">tracing::trace!</span>(<span class="string">"received empty packet"</span>);
+<a href=#527 id=527 data-nosnippet>527</a>                            <span class="prelude-val">None
+<a href=#528 id=528 data-nosnippet>528</a>                        </span>}
+<a href=#529 id=529 data-nosnippet>529</a>                    )
+<a href=#530 id=530 data-nosnippet>530</a>                })
+<a href=#531 id=531 data-nosnippet>531</a>                .then_concurrent(<span class="kw">move </span>|packet| {
+<a href=#532 id=532 data-nosnippet>532</a>                    <span class="kw">let </span><span class="kw-2">mut </span>msg_to_send_tx = wire_msg.<span class="number">0</span>.clone();
+<a href=#533 id=533 data-nosnippet>533</a>
+<a href=#534 id=534 data-nosnippet>534</a>                    <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#535 id=535 data-nosnippet>535</a>                    </span><span class="kw">let </span><span class="kw-2">mut </span>capture_clone = capture_clone.clone();
+<a href=#536 id=536 data-nosnippet>536</a>
+<a href=#537 id=537 data-nosnippet>537</a>                    <span class="kw">let </span><span class="kw-2">mut </span>ticket_ack_tx_clone = ticket_ack_tx.clone();
+<a href=#538 id=538 data-nosnippet>538</a>                    <span class="kw">let </span><span class="kw-2">mut </span>ack_out_tx = ack_out_tx_clone_2.clone();
+<a href=#539 id=539 data-nosnippet>539</a>                    <span class="kw">async move </span>{
+<a href=#540 id=540 data-nosnippet>540</a>
+<a href=#541 id=541 data-nosnippet>541</a>                    <span class="kw">match </span>packet {
+<a href=#542 id=542 data-nosnippet>542</a>                        IncomingPacket::Acknowledgement {
+<a href=#543 id=543 data-nosnippet>543</a>                            previous_hop,
+<a href=#544 id=544 data-nosnippet>544</a>                            ack,
+<a href=#545 id=545 data-nosnippet>545</a>                            ..
+<a href=#546 id=546 data-nosnippet>546</a>                        } =&gt; {
+<a href=#547 id=547 data-nosnippet>547</a>                            <span class="macro">tracing::trace!</span>(%previous_hop, <span class="string">"acknowledging ticket using received ack"</span>);
+<a href=#548 id=548 data-nosnippet>548</a>                            ticket_ack_tx_clone
+<a href=#549 id=549 data-nosnippet>549</a>                                .send((ack, previous_hop))
+<a href=#550 id=550 data-nosnippet>550</a>                                .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+<a href=#551 id=551 data-nosnippet>551</a>                                .<span class="kw">await
+<a href=#552 id=552 data-nosnippet>552</a>                                </span>.unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#553 id=553 data-nosnippet>553</a>                                    <span class="macro">tracing::error!</span>(<span class="string">"failed dispatching received acknowledgement to the ticket ack queue: timeout"</span>);
+<a href=#554 id=554 data-nosnippet>554</a>                                    <span class="prelude-val">Ok</span>(())
+<a href=#555 id=555 data-nosnippet>555</a>                                })
+<a href=#556 id=556 data-nosnippet>556</a>                                .unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#557 id=557 data-nosnippet>557</a>                                    <span class="macro">tracing::error!</span>(<span class="string">"failed dispatching received acknowledgement to the ticket ack queue"</span>);
+<a href=#558 id=558 data-nosnippet>558</a>                                });
+<a href=#559 id=559 data-nosnippet>559</a>
+<a href=#560 id=560 data-nosnippet>560</a>                            <span class="comment">// We do not acknowledge back acknowledgements.
+<a href=#561 id=561 data-nosnippet>561</a>                            </span><span class="prelude-val">None
+<a href=#562 id=562 data-nosnippet>562</a>                        </span>},
+<a href=#563 id=563 data-nosnippet>563</a>                        IncomingPacket::Final {
+<a href=#564 id=564 data-nosnippet>564</a>                            previous_hop,
+<a href=#565 id=565 data-nosnippet>565</a>                            sender,
+<a href=#566 id=566 data-nosnippet>566</a>                            plain_text,
+<a href=#567 id=567 data-nosnippet>567</a>                            ack_key,
+<a href=#568 id=568 data-nosnippet>568</a>                            info,
+<a href=#569 id=569 data-nosnippet>569</a>                            ..
+<a href=#570 id=570 data-nosnippet>570</a>                        } =&gt; {
+<a href=#571 id=571 data-nosnippet>571</a>                            <span class="comment">// Send acknowledgement back
+<a href=#572 id=572 data-nosnippet>572</a>                            </span>ack_out_tx
+<a href=#573 id=573 data-nosnippet>573</a>                                .send((<span class="prelude-val">Some</span>(ack_key), previous_hop))
+<a href=#574 id=574 data-nosnippet>574</a>                                .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+<a href=#575 id=575 data-nosnippet>575</a>                                .<span class="kw">await
+<a href=#576 id=576 data-nosnippet>576</a>                                </span>.unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#577 id=577 data-nosnippet>577</a>                                    <span class="macro">tracing::error!</span>(<span class="string">"failed to send ack to the egress queue: timeout"</span>);
+<a href=#578 id=578 data-nosnippet>578</a>                                    <span class="prelude-val">Ok</span>(())
+<a href=#579 id=579 data-nosnippet>579</a>                                })
+<a href=#580 id=580 data-nosnippet>580</a>                                .unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#581 id=581 data-nosnippet>581</a>                                    <span class="macro">tracing::error!</span>(<span class="string">"failed to send ack to the egress queue"</span>);
+<a href=#582 id=582 data-nosnippet>582</a>                                });
+<a href=#583 id=583 data-nosnippet>583</a>
+<a href=#584 id=584 data-nosnippet>584</a>                            <span class="attr">#[cfg(all(feature = <span class="string">"prometheus"</span>, not(test)))]
+<a href=#585 id=585 data-nosnippet>585</a>                            </span>{
+<a href=#586 id=586 data-nosnippet>586</a>                                METRIC_PACKET_COUNT.increment(<span class="kw-2">&amp;</span>[<span class="string">"received"</span>]);
+<a href=#587 id=587 data-nosnippet>587</a>                            }
+<a href=#588 id=588 data-nosnippet>588</a>
+<a href=#589 id=589 data-nosnippet>589</a>                            <span class="prelude-val">Some</span>((sender, plain_text, info))
+<a href=#590 id=590 data-nosnippet>590</a>                        }
+<a href=#591 id=591 data-nosnippet>591</a>                        IncomingPacket::Forwarded {
+<a href=#592 id=592 data-nosnippet>592</a>                            previous_hop,
+<a href=#593 id=593 data-nosnippet>593</a>                            next_hop,
+<a href=#594 id=594 data-nosnippet>594</a>                            data,
+<a href=#595 id=595 data-nosnippet>595</a>                            ack_key,
+<a href=#596 id=596 data-nosnippet>596</a>                            ..
+<a href=#597 id=597 data-nosnippet>597</a>                        } =&gt; {
+<a href=#598 id=598 data-nosnippet>598</a>                            <span class="comment">// First, relay the packet to the next hop
+<a href=#599 id=599 data-nosnippet>599</a>                            </span><span class="macro">tracing::trace!</span>(%previous_hop, %next_hop, <span class="string">"forwarding packet to the next hop"</span>);
+<a href=#600 id=600 data-nosnippet>600</a>
+<a href=#601 id=601 data-nosnippet>601</a>                            <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#602 id=602 data-nosnippet>602</a>                            </span><span class="kw">let </span>captured_packet: capture::CapturedPacket = capture::PacketBeforeTransit::OutgoingPacket {
+<a href=#603 id=603 data-nosnippet>603</a>                                me: me_pub,
+<a href=#604 id=604 data-nosnippet>604</a>                                next_hop,
+<a href=#605 id=605 data-nosnippet>605</a>                                num_surbs: <span class="number">0</span>,
+<a href=#606 id=606 data-nosnippet>606</a>                                is_forwarded: <span class="bool-val">true</span>,
+<a href=#607 id=607 data-nosnippet>607</a>                                data: data.as_ref().into(),
+<a href=#608 id=608 data-nosnippet>608</a>                                ack_challenge: Default::default(),
+<a href=#609 id=609 data-nosnippet>609</a>                                signals: <span class="prelude-val">None</span>.into(),
+<a href=#610 id=610 data-nosnippet>610</a>                                ticket: inspect_ticket_data_in_packet(data.as_ref()).into()
+<a href=#611 id=611 data-nosnippet>611</a>                            }.into();
+<a href=#612 id=612 data-nosnippet>612</a>
+<a href=#613 id=613 data-nosnippet>613</a>                            msg_to_send_tx
+<a href=#614 id=614 data-nosnippet>614</a>                                .send((next_hop.into(), data))
+<a href=#615 id=615 data-nosnippet>615</a>                                .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+<a href=#616 id=616 data-nosnippet>616</a>                                .<span class="kw">await
+<a href=#617 id=617 data-nosnippet>617</a>                                </span>.unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#618 id=618 data-nosnippet>618</a>                                    <span class="macro">tracing::error!</span>(<span class="string">"failed to forward a packet to the transport layer: timeout"</span>);
+<a href=#619 id=619 data-nosnippet>619</a>                                    <span class="prelude-val">Ok</span>(())
+<a href=#620 id=620 data-nosnippet>620</a>                                })
+<a href=#621 id=621 data-nosnippet>621</a>                                .unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#622 id=622 data-nosnippet>622</a>                                    <span class="macro">tracing::error!</span>(<span class="string">"failed to forward a packet to the transport layer"</span>);
+<a href=#623 id=623 data-nosnippet>623</a>                                });
+<a href=#624 id=624 data-nosnippet>624</a>
+<a href=#625 id=625 data-nosnippet>625</a>                            <span class="attr">#[cfg(all(feature = <span class="string">"prometheus"</span>, not(test)))]
+<a href=#626 id=626 data-nosnippet>626</a>                            </span>{
+<a href=#627 id=627 data-nosnippet>627</a>                                METRIC_PACKET_COUNT.increment(<span class="kw-2">&amp;</span>[<span class="string">"forwarded"</span>]);
+<a href=#628 id=628 data-nosnippet>628</a>                            }
+<a href=#629 id=629 data-nosnippet>629</a>
+<a href=#630 id=630 data-nosnippet>630</a>                            <span class="attr">#[cfg(feature = <span class="string">"capture"</span>)]
+<a href=#631 id=631 data-nosnippet>631</a>                            </span><span class="kw">let _ </span>= capture_clone.try_send(captured_packet);
+<a href=#632 id=632 data-nosnippet>632</a>
+<a href=#633 id=633 data-nosnippet>633</a>                             <span class="comment">// Send acknowledgement back
+<a href=#634 id=634 data-nosnippet>634</a>                            </span><span class="macro">tracing::trace!</span>(%previous_hop, <span class="string">"acknowledging forwarded packet back"</span>);
+<a href=#635 id=635 data-nosnippet>635</a>                            ack_out_tx
+<a href=#636 id=636 data-nosnippet>636</a>                                .send((<span class="prelude-val">Some</span>(ack_key), previous_hop))
+<a href=#637 id=637 data-nosnippet>637</a>                                .timeout(futures_time::time::Duration::from(QUEUE_SEND_TIMEOUT))
+<a href=#638 id=638 data-nosnippet>638</a>                                .<span class="kw">await
+<a href=#639 id=639 data-nosnippet>639</a>                                </span>.unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#640 id=640 data-nosnippet>640</a>                                    <span class="macro">tracing::error!</span>(<span class="string">"failed to send ack to the egress queue: timeout"</span>);
+<a href=#641 id=641 data-nosnippet>641</a>                                    <span class="prelude-val">Ok</span>(())
+<a href=#642 id=642 data-nosnippet>642</a>                                })
+<a href=#643 id=643 data-nosnippet>643</a>                                .unwrap_or_else(|<span class="kw">_</span>| {
+<a href=#644 id=644 data-nosnippet>644</a>                                    <span class="macro">tracing::error!</span>(<span class="string">"failed to send ack to the egress queue"</span>);
+<a href=#645 id=645 data-nosnippet>645</a>                                });
+<a href=#646 id=646 data-nosnippet>646</a>
+<a href=#647 id=647 data-nosnippet>647</a>                            <span class="prelude-val">None
+<a href=#648 id=648 data-nosnippet>648</a>                        </span>}
+<a href=#649 id=649 data-nosnippet>649</a>                    }
+<a href=#650 id=650 data-nosnippet>650</a>                }})
+<a href=#651 id=651 data-nosnippet>651</a>                .filter_map(|maybe_data| futures::future::ready(
+<a href=#652 id=652 data-nosnippet>652</a>                    <span class="comment">// Create the ApplicationDataIn data structure for incoming data
+<a href=#653 id=653 data-nosnippet>653</a>                    </span>maybe_data
+<a href=#654 id=654 data-nosnippet>654</a>                        .and_then(|(sender, data, aux_info)| ApplicationData::try_from(data.as_ref())
+<a href=#655 id=655 data-nosnippet>655</a>                            .inspect_err(|error| <span class="macro">tracing::error!</span>(%sender, %error, <span class="string">"failed to decode application data"</span>))
+<a href=#656 id=656 data-nosnippet>656</a>                            .ok()
+<a href=#657 id=657 data-nosnippet>657</a>                            .map(|data| (sender, ApplicationDataIn {
+<a href=#658 id=658 data-nosnippet>658</a>                                data,
+<a href=#659 id=659 data-nosnippet>659</a>                                packet_info: IncomingPacketInfo {
+<a href=#660 id=660 data-nosnippet>660</a>                                    signals_from_sender: aux_info.packet_signals,
+<a href=#661 id=661 data-nosnippet>661</a>                                    num_saved_surbs: aux_info.num_surbs,
+<a href=#662 id=662 data-nosnippet>662</a>                                }
+<a href=#663 id=663 data-nosnippet>663</a>                            })))
+<a href=#664 id=664 data-nosnippet>664</a>                ))
+<a href=#665 id=665 data-nosnippet>665</a>                .map(<span class="prelude-val">Ok</span>)
+<a href=#666 id=666 data-nosnippet>666</a>                .forward(api.<span class="number">0</span>)
+<a href=#667 id=667 data-nosnippet>667</a>                .instrument(<span class="macro">tracing::trace_span!</span>(<span class="string">"msg protocol processing - ingress"</span>))
+<a href=#668 id=668 data-nosnippet>668</a>                .inspect(|<span class="kw">_</span>| <span class="macro">tracing::warn!</span>(task = <span class="string">"transport (protocol - msg ingress)"</span>, <span class="string">"long-running background task finished"</span>))
+<a href=#669 id=669 data-nosnippet>669</a>                .<span class="kw">await</span>;
+<a href=#670 id=670 data-nosnippet>670</a>        }),
+<a href=#671 id=671 data-nosnippet>671</a>    );
+<a href=#672 id=672 data-nosnippet>672</a>
+<a href=#673 id=673 data-nosnippet>673</a>    processes
+<a href=#674 id=674 data-nosnippet>674</a>}</code></pre></div></section></main></body></html>

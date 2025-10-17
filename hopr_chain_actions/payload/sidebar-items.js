@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_TX_GAS"],"fn":["convert_acknowledged_ticket","convert_vrf_parameters"],"struct":["BasicPayloadGenerator","SafePayloadGenerator"],"trait":["PayloadGenerator"]};

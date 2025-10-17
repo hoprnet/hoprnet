@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["channel_graph","errors","selectors"],"struct":["ChainPath","TransportPath","ValidatedPath"],"trait":["NonEmptyPath","Path","PathAddressResolver"],"type":["ChannelPath"]};
