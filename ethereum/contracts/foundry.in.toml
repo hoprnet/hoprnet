@@ -22,7 +22,7 @@ optimizer_runs = 200
 
 [rpc_endpoints]
 local = "http://localhost:8545"
-gnosis = "https://gnosis-provider.rpch.tech/"
+gnosis = "https://gnosis.publicnode.com/"
 
 [etherscan]
 gnosis = { key = "${ETHERSCAN_API_KEY}", url = "https://api.gnosisscan.io" }
@@ -37,7 +37,7 @@ eth_rpc_url = "http://localhost:8545" # cannot directly use profile.default.rpc_
 libraries = [
   "script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A",
 ]
-eth_rpc_url = "https://gnosis-provider.rpch.tech/"
+eth_rpc_url = "https://gnosis.publicnode.com/"
 
 # staging environment
 [profile.staging]
@@ -45,7 +45,7 @@ eth_rpc_url = "https://gnosis-provider.rpch.tech/"
 libraries = [
   "script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A",
 ]
-eth_rpc_url = "https://gnosis-provider.rpch.tech/"
+eth_rpc_url = "https://gnosis.publicnode.com/"
 
 # production environment
 [profile.production]
@@ -53,7 +53,7 @@ eth_rpc_url = "https://gnosis-provider.rpch.tech/"
 libraries = [
   "script/utils/BoostUtilsLib.sol:BoostUtilsLib:0x8197525557233031b110038Ae52dfC3C4A75567A",
 ]
-eth_rpc_url = "https://gnosis-provider.rpch.tech/"
+eth_rpc_url = "https://gnosis.publicnode.com/"
 
 [profile.ci]
 # disabled for now since the CI nodes are not powerful enough
@@ -70,3 +70,35 @@ number_underscore = "thousands"
 quote_style = "double"
 tab_width = 4
 wrap_comments = true
+
+[lint]
+ignore = [
+  # Ignore all the static contracts, as they are archived and won't be changed anymore
+  "src/static/stake/HoprBoost.sol",
+  "src/static/stake/IHoprBoost.sol",
+  "src/static/stake/HoprStake.sol",
+  "src/static/stake/HoprStake2.sol",
+  "src/static/stake/HoprStakeBase.sol",
+  "src/static/stake/HoprWhitehat.sol",
+  "src/static/stake/HoprStakeSeason3.sol",
+  "src/static/stake/HoprStakeSeason4.sol",
+  "src/static/stake/HoprStakeSeason5.sol",
+  "src/static/stake/HoprStakeSeason6.sol",
+  "src/static/stake/HoprStakeSeason7.sol",
+  "src/static/stake/HoprStakeSeason8.sol",
+  "src/static/openzeppelin-contracts/ERC777.sol",
+  "src/static/ERC777/ERC777Snapshot.sol",
+  "src/static/HoprForwarder.sol",
+  "src/static/HoprWrapper.sol",
+  "src/static/HoprToken.sol",
+  "src/static/HoprDistributor.sol",
+  "src/static/HoprWrapperProxy.sol",
+  "src/static/stake/mocks/ERC777Mock.sol",
+  "src/static/stake/mocks/ERC677Mock.sol"
+]
+
+exclude_lints = [
+  "unwrapped-modifier-logic",
+  "unsafe-typecast",
+  "unsafe-cheatcode",
+]

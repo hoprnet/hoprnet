@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8;
 
-import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
-import { IAvatar } from "../interfaces/IAvatar.sol";
-import { IHoprNodeManagementModule } from "../interfaces/INodeManagementModule.sol";
-import { Address } from "openzeppelin-contracts/utils/Address.sol";
+import { ECDSA } from "openzeppelin-contracts-5.4.0/utils/cryptography/ECDSA.sol";
+import { EfficientHashLib } from "solady-0.1.24/utils/EfficientHashLib.sol";
 
 abstract contract HoprNodeSafeRegistryEvents {
     /**
@@ -14,7 +12,7 @@ abstract contract HoprNodeSafeRegistryEvents {
     /**
      * Emitted once a safe and node pair gets deregistered
      */
-    event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
+    event DeregisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
     /**
      * Emitted once the domain separator is updated.
      */
@@ -48,8 +46,6 @@ abstract contract HoprNodeSafeRegistryEvents {
  * This contract is meant to be deployed as a standalone contract
  */
 contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
-    using Address for address;
-
     // Node already has mapped to Safe
     error NodeHasSafe();
 
@@ -95,7 +91,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     // start and end point for linked list of modules
     address private constant SENTINEL_MODULES = address(0x1);
     // page size of querying modules
-    uint256 private constant pageSize = 100;
+    uint256 private constant PAGE_SIZE = 100;
 
     /**
      * @dev Constructor function to initialize the contract state.
@@ -150,17 +146,20 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         // check adminKeyAddress has added HOPR tokens to the staking contract.
 
         // Compute the hash of the struct according to EIP712 guidelines
-        bytes32 hashStruct = keccak256(
-            abi.encode(
-                NODE_SAFE_TYPEHASH, safeAddress, nodeChainKeyAddress, _nodeToSafe[nodeChainKeyAddress].nodeSigNonce
-            )
+        // using assembly for gas optimization (-95 gas)
+        bytes32 hashStruct = EfficientHashLib.hash(
+            uint256(NODE_SAFE_TYPEHASH),
+            uint256(uint160(safeAddress)),
+            uint256(uint160(nodeChainKeyAddress)),
+            uint256(_nodeToSafe[nodeChainKeyAddress].nodeSigNonce)
         );
 
         // Build the typed digest for signature verification
+        /// forge-lint: disable-next-line(asm-keccak256)
         bytes32 registerHash = keccak256(abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, hashStruct));
 
         // Verify that the signature is from nodeChainKeyAddress
-        (address recovered, ECDSA.RecoverError error) = ECDSA.tryRecover(registerHash, sig);
+        (address recovered, ECDSA.RecoverError error, ) = ECDSA.tryRecover(registerHash, sig);
         if (error != ECDSA.RecoverError.NoError || recovered != nodeChainKeyAddress) {
             revert NotValidSignatureFromNode();
         }
@@ -172,6 +171,8 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
     /**
      * @dev Deregisters a Hopr node from its associated Safe and emits relevant events.
      * This function can only be called by the associated Safe.
+     * @notice This function does not perform additional checks on whether the node is
+     * registered in the active node management module.
      * @param nodeAddr The address of the Hopr node to be deregistered.
      */
     function deregisterNodeBySafe(address nodeAddr) external {
@@ -180,12 +181,9 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
             revert NotValidSafe();
         }
 
-        // Ensure that node is a member of the module
-        ensureNodeIsSafeModuleMember(msg.sender, nodeAddr);
-
         // Update the state and emit the event
         _nodeToSafe[nodeAddr].safeAddress = address(0);
-        emit DergisteredNodeSafe(msg.sender, nodeAddr);
+        emit DeregisteredNodeSafe(msg.sender, nodeAddr);
     }
 
     /**
@@ -203,16 +201,15 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
      * An event is emitted when the domain separator is updated
      */
     function updateDomainSeparator() public {
-        // following encoding guidelines of EIP712
-        bytes32 newDomainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("NodeSafeRegistry")),
-                keccak256(bytes(VERSION)),
-                block.chainid,
-                address(this)
-            )
+        // following encoding guidelines of EIP712, using assembly for gas optimization (-60 gas)
+        bytes32 newDomainSeparator = EfficientHashLib.hash(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes("NodeSafeRegistry")),
+            keccak256(bytes(VERSION)),
+            bytes32(block.chainid),
+            bytes32(uint256(uint160(address(this))))
         );
+
         if (newDomainSeparator != domainSeparator) {
             domainSeparator = newDomainSeparator;
             emit DomainSeparatorUpdated(domainSeparator);
@@ -221,6 +218,8 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
 
     /**
      * @dev Internal function to store a node-safe pair and emit relevant events.
+     * @notice This function does not perform additional checks on whether the node is
+     * registered in the active node management module.
      * @param safeAddress Address of safe
      * @param nodeChainKeyAddress Address of node
      */
@@ -235,7 +234,7 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         }
 
         // Ensure that the node address is not a contract address
-        if (nodeChainKeyAddress.isContract()) {
+        if (nodeChainKeyAddress.code.length == 0) {
             revert NodeIsContract();
         }
 
@@ -243,9 +242,6 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
         if (_nodeToSafe[nodeChainKeyAddress].safeAddress != address(0)) {
             revert NodeHasSafe();
         }
-
-        // ensure that node is a member of the (enabled) NodeManagementModule
-        ensureNodeIsSafeModuleMember(safeAddress, nodeChainKeyAddress);
 
         NodeSafeRecord storage record = _nodeToSafe[nodeChainKeyAddress];
 
@@ -255,33 +251,5 @@ contract HoprNodeSafeRegistry is HoprNodeSafeRegistryEvents {
 
         // update and emit event
         emit RegisteredNodeSafe(safeAddress, nodeChainKeyAddress);
-    }
-
-    /**
-     * @dev Ensure that the node address is a member of
-     * the enabled node management module of the safe
-     * @param safeAddress Address of safe
-     * @param nodeChainKeyAddress Address of node
-     */
-    function ensureNodeIsSafeModuleMember(address safeAddress, address nodeChainKeyAddress) internal view {
-        // nodeChainKeyAddress must be a member of the enabled node management module
-        address nextModule;
-        address[] memory modules;
-        // there may be many modules, loop through them. Stop at the end point of the linked list
-        while (nextModule != SENTINEL_MODULES) {
-            // get modules for safe
-            (modules, nextModule) = IAvatar(safeAddress).getModulesPaginated(SENTINEL_MODULES, pageSize);
-            for (uint256 i = 0; i < modules.length; i++) {
-                if (
-                    IHoprNodeManagementModule(modules[i]).isHoprNodeManagementModule()
-                        && IHoprNodeManagementModule(modules[i]).isNode(nodeChainKeyAddress)
-                ) {
-                    return;
-                }
-            }
-        }
-
-        // if nodeChainKeyAddress is not a member of a valid HoprNodeManagementModule to the safe, revert
-        revert NodeNotModuleMember();
     }
 }

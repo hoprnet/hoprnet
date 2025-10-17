@@ -4,11 +4,11 @@ pragma solidity >=0.6.0 <0.9.0;
 import { Test } from "forge-std/Test.sol";
 
 import { ERC1820RegistryFixtureTest } from "./utils/ERC1820Registry.sol";
-import { HoprChannels, HoprChannelsEvents } from "../src/Channels.sol";
+import { BASE_INDEX_OFFSET, HoprChannels, HoprChannelsType, HoprChannelsEvents } from "../src/Channels.sol";
 import { HoprLedgerEvents } from "../src/Ledger.sol";
 import { CryptoUtils } from "./utils/Crypto.sol";
 import { HoprMultiSig } from "../src/MultiSig.sol";
-import { ERC777 } from "openzeppelin-contracts/token/ERC777/ERC777.sol";
+import { ERC777 } from "../src/static/openzeppelin-contracts/ERC777.sol";
 import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 import { HoprCrypto } from "../src/Crypto.sol";
 
@@ -23,12 +23,12 @@ contract MyHoprChannels is HoprChannels {
     { }
 
     // Only for testing
-    function _storeChannelStatus(address src, address dest, HoprChannels.ChannelStatus status) public {
-        channels[_getChannelId(src, dest)] = HoprChannels.Channel(
-            HoprChannels.Balance.wrap(0),
-            HoprChannels.TicketIndex.wrap(0),
-            HoprChannels.Timestamp.wrap(0),
-            HoprChannels.ChannelEpoch.wrap(0),
+    function _storeChannelStatus(address src, address dest, HoprChannelsType.ChannelStatus status) public {
+        channels[_getChannelId(src, dest)] = HoprChannelsType.Channel(
+            HoprChannelsType.Balance.wrap(0),
+            HoprChannelsType.TicketIndex.wrap(0),
+            HoprChannelsType.Timestamp.wrap(0),
+            HoprChannelsType.ChannelEpoch.wrap(0),
             status
         );
     }
@@ -41,15 +41,15 @@ contract MyHoprChannels is HoprChannels {
         uint256 ticketIndex,
         uint256 closureTime,
         uint256 epoch,
-        HoprChannels.ChannelStatus status
+        HoprChannelsType.ChannelStatus status
     )
         public
     {
-        channels[_getChannelId(src, dest)] = HoprChannels.Channel(
-            HoprChannels.Balance.wrap(uint96(balance)),
-            HoprChannels.TicketIndex.wrap(uint48(ticketIndex)),
-            HoprChannels.Timestamp.wrap(uint32(closureTime)),
-            HoprChannels.ChannelEpoch.wrap(uint24(epoch)),
+        channels[_getChannelId(src, dest)] = HoprChannelsType.Channel(
+            HoprChannelsType.Balance.wrap(uint96(balance)),
+            HoprChannelsType.TicketIndex.wrap(uint48(ticketIndex)),
+            HoprChannelsType.Timestamp.wrap(uint32(closureTime)),
+            HoprChannelsType.ChannelEpoch.wrap(uint24(epoch)),
             status
         );
     }
@@ -59,7 +59,7 @@ contract MyHoprChannels is HoprChannels {
         delete channels[_getChannelId(src, dest)];
     }
 
-    function myValidateBalance(HoprChannels.Balance balance) public validateBalance(balance) { }
+    function myValidateBalance(HoprChannelsType.Balance balance) public validateBalance(balance) { }
 
     function myValidateChannelParties(
         address source,
@@ -71,11 +71,11 @@ contract MyHoprChannels is HoprChannels {
 }
 
 contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, HoprChannelsEvents, HoprLedgerEvents {
-    HoprChannels.Timestamp constant closureNoticePeriod = HoprChannels.Timestamp.wrap(15);
+    HoprChannelsType.Timestamp constant CLOSURE_NOTICE_PERIOD = HoprChannelsType.Timestamp.wrap(15);
 
     bytes32 constant PROOF_OF_RELAY_SECRET_0 = keccak256(abi.encodePacked("PROOF_OF_RELAY_SECRET_0"));
-    HoprChannels.WinProb constant WIN_PROB_100 = HoprChannels.WinProb.wrap(type(uint56).max);
-    HoprChannels.WinProb constant WIN_PROB_0 = HoprChannels.WinProb.wrap(type(uint56).min);
+    HoprChannelsType.WinProb constant WIN_PROB_100 = HoprChannelsType.WinProb.wrap(type(uint56).max);
+    HoprChannelsType.WinProb constant WIN_PROB_0 = HoprChannelsType.WinProb.wrap(type(uint56).min);
 
     // We can't use HoprToken because HoprToken and HoprChannels rely
     // on different versions of OpenZeppelin contracts which leads
@@ -85,7 +85,9 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
     MyHoprChannels public hoprChannels;
     HoprNodeSafeRegistry public hoprNodeSafeRegistry;
 
+    /// forge-lint:disable-next-line(mixed-case-variable)
     uint256 MIN_USED_BALANCE;
+    /// forge-lint:disable-next-line(mixed-case-variable)
     uint256 MAX_USED_BALANCE;
 
     function setUp() public virtual override {
@@ -94,10 +96,51 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         hoprToken = new ERC777("HOPR", "HOPR", new address[](0));
 
         hoprNodeSafeRegistry = new HoprNodeSafeRegistry();
-        hoprChannels = new MyHoprChannels(address(hoprToken), closureNoticePeriod, hoprNodeSafeRegistry);
+        hoprChannels = new MyHoprChannels(address(hoprToken), CLOSURE_NOTICE_PERIOD, hoprNodeSafeRegistry);
 
-        MIN_USED_BALANCE = HoprChannels.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1;
-        MAX_USED_BALANCE = HoprChannels.Balance.unwrap(hoprChannels.MAX_USED_BALANCE());
+        MIN_USED_BALANCE = HoprChannelsType.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()) + 1;
+        MAX_USED_BALANCE = HoprChannelsType.Balance.unwrap(hoprChannels.MAX_USED_BALANCE());
+    }
+
+    /**
+     * @dev test invariants of `Channels.sol` contract
+     */
+    function test_Constants() public {
+        // minimum balance accepted in channel funding
+        assertEq(HoprChannelsType.Balance.unwrap(hoprChannels.MIN_USED_BALANCE()), 1);
+        // Maximum balance accepted in channel funding
+        assertEq(HoprChannelsType.Balance.unwrap(hoprChannels.MAX_USED_BALANCE()), 10 **25);
+        // current veersioning
+        string memory currentVersiosn = "2.0.0";
+        assertEq(hoprChannels.VERSION(), currentVersiosn);
+        // acceptable data payload size in ERC777 token send hook
+        assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(), 64); // 20 + 96/8 + 20 + 96/8 = 64
+        assertEq(hoprChannels.ERC777_HOOK_FUND_CHANNEL_SIZE(), 40); // 20 + 20
+    }
+
+    function testRevert_ConstructorError() public {
+        HoprChannels failedChannel;
+        // whwen notice period is too short
+        vm.expectRevert(HoprChannels.InvalidNoticePeriod.selector);
+        failedChannel = new HoprChannels(address(hoprToken), HoprChannelsType.Timestamp.wrap(0), hoprNodeSafeRegistry);
+
+        // when token address is zero
+        vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, "_token must not be empty"));
+        failedChannel = new HoprChannels(address(0), CLOSURE_NOTICE_PERIOD, hoprNodeSafeRegistry);
+
+        // when NodeSafeRegistry contract is zero
+        vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, "_safeRegistry must not be empty"));
+        failedChannel = new HoprChannels(address(hoprToken), CLOSURE_NOTICE_PERIOD, HoprNodeSafeRegistry(address(0)));
+        vm.clearMockedCalls();
+    }
+
+    function test_ViewCurrentBlockTimestamp() public {
+        uint256 mockTimestamp = 8765;
+        vm.warp(mockTimestamp);
+
+        HoprChannelsType.Timestamp currentTime = hoprChannels._currentBlockTimestamp();
+        assertEq(uint256(HoprChannelsType.Timestamp.unwrap(currentTime)), mockTimestamp);
+        vm.clearMockedCalls();
     }
 
     function test_publicFunctions(
@@ -111,29 +154,29 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         public
     {
         assertEq(
-            HoprChannels.Timestamp.unwrap(hoprChannels.noticePeriodChannelClosure()),
-            HoprChannels.Timestamp.unwrap(closureNoticePeriod)
+            HoprChannelsType.Timestamp.unwrap(hoprChannels.NOTICE_PERIOD_CHANNEL_CLOSURE()),
+            HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD)
         );
-        assertEq(address(hoprChannels.token()), address(hoprToken));
+        assertEq(address(hoprChannels.TOKEN()), address(hoprToken));
 
-        hoprChannels._storeChannel(src, dest, balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannel(src, dest, balance, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.OPEN);
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
-                abi.encode(wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.OPEN))
+                abi.encode(_wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.OPEN))
             )
         );
 
         hoprChannels._storeChannel(
-            src, dest, balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            src, dest, balance, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE)
+                    _wrapChannel(balance, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE)
                 )
             )
         );
@@ -153,15 +196,15 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
     function testValidateBalance(uint96 amount) public {
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
 
-        hoprChannels.myValidateBalance(HoprChannels.Balance.wrap(amount));
+        hoprChannels.myValidateBalance(HoprChannelsType.Balance.wrap(amount));
     }
 
     function testRevert_validateBalance() public {
         vm.expectRevert(abi.encodeWithSelector(HoprChannels.InvalidBalance.selector));
-        hoprChannels.myValidateBalance(HoprChannels.Balance.wrap(0));
+        hoprChannels.myValidateBalance(HoprChannelsType.Balance.wrap(0));
 
         vm.expectRevert(abi.encodeWithSelector(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector));
-        hoprChannels.myValidateBalance(HoprChannels.Balance.wrap(uint96(MAX_USED_BALANCE) + 1));
+        hoprChannels.myValidateBalance(HoprChannelsType.Balance.wrap(uint96(MAX_USED_BALANCE) + 1));
     }
 
     function testValidateChannelParties(address source, address destination) public {
@@ -193,15 +236,28 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
         _helperTokenTransferFromMock(src, amount1);
 
-        vm.expectEmit(true, true, false, true, address(hoprChannels));
-        emit ChannelOpened(src, dest);
+        bytes32 channelId = keccak256(abi.encodePacked(src, dest));
+        assertEq(hoprChannels._getChannelId(src, dest), channelId);
+
+        vm.expectEmit(true, true, true, true, address(hoprChannels));
+        emit ChannelOpened(channelId, src, dest, _unwrapChannel(HoprChannelsType.Channel(
+            HoprChannelsType.Balance.wrap(uint96(amount1)),
+            HoprChannelsType.TicketIndex.wrap(uint48(0)),
+            HoprChannelsType.Timestamp.wrap(uint32(0)),
+            HoprChannelsType.ChannelEpoch.wrap(uint24(1)),
+            HoprChannelsType.ChannelStatus.OPEN
+        )));
 
         vm.startPrank(src);
-        hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount1));
+        hoprChannels.fundChannel(dest, HoprChannelsType.Balance.wrap(amount1));
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amount1, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amount1, 0, 0, 1, HoprChannelsType.ChannelStatus.OPEN)))
+        );
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(src, dest))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         vm.clearMockedCalls();
@@ -212,14 +268,24 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceIncreased(
-            hoprChannels._getChannelId(src, dest), HoprChannels.Balance.wrap(amount1 + amount2)
+            channelId, _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(amount1 + amount2)),
+                HoprChannelsType.TicketIndex.wrap(uint48(0)),
+                HoprChannelsType.Timestamp.wrap(uint32(0)),
+                HoprChannelsType.ChannelEpoch.wrap(uint24(1)),
+                HoprChannelsType.ChannelStatus.OPEN
+            ))
         );
 
-        hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount2));
+        hoprChannels.fundChannel(dest, HoprChannelsType.Balance.wrap(amount2));
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amount1 + amount2, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amount1 + amount2, 0, 0, 1, HoprChannelsType.ChannelStatus.OPEN)))
+        );
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(src, dest))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         vm.clearMockedCalls();
@@ -232,15 +298,26 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperOnlySafeMock(src, safeContract);
         _helperTokenTransferFromMock(safeContract, amount1);
 
-        vm.expectEmit(true, true, false, true, address(hoprChannels));
-        emit ChannelOpened(src, dest);
+        vm.expectEmit(true, true, true, true, address(hoprChannels));
+        emit ChannelOpened(channelId, src, dest, _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(amount1)),
+                HoprChannelsType.TicketIndex.wrap(uint48(0)),
+                HoprChannelsType.Timestamp.wrap(uint32(0)),
+                HoprChannelsType.ChannelEpoch.wrap(uint24(1)),
+                HoprChannelsType.ChannelStatus.OPEN
+            ))
+        );
 
         vm.startPrank(safeContract);
-        hoprChannels.fundChannelSafe(src, dest, HoprChannels.Balance.wrap(amount1));
+        hoprChannels.fundChannelSafe(src, dest, HoprChannelsType.Balance.wrap(amount1));
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amount1, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amount1, 0, 0, 1, HoprChannelsType.ChannelStatus.OPEN)))
+        );
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(src, dest))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         vm.clearMockedCalls();
@@ -250,14 +327,24 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceIncreased(
-            hoprChannels._getChannelId(src, dest), HoprChannels.Balance.wrap(amount1 + amount2)
+            channelId, _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(amount1 + amount2)),
+                HoprChannelsType.TicketIndex.wrap(uint48(0)),
+                HoprChannelsType.Timestamp.wrap(uint32(0)),
+                HoprChannelsType.ChannelEpoch.wrap(uint24(1)),
+                HoprChannelsType.ChannelStatus.OPEN
+            ))
         );
 
-        hoprChannels.fundChannelSafe(src, dest, HoprChannels.Balance.wrap(amount2));
+        hoprChannels.fundChannelSafe(src, dest, HoprChannelsType.Balance.wrap(amount2));
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amount1 + amount2, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amount1 + amount2, 0, 0, 1, HoprChannelsType.ChannelStatus.OPEN)))
+        );
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(src, dest))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         vm.clearMockedCalls();
@@ -275,7 +362,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.expectRevert(HoprChannels.TokenTransferFailed.selector);
 
         vm.prank(src);
-        hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount));
+        hoprChannels.fundChannel(dest, HoprChannelsType.Balance.wrap(amount));
 
         vm.clearMockedCalls();
 
@@ -286,7 +373,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.prank(safeContract);
         vm.expectRevert(HoprChannels.TokenTransferFailed.selector);
 
-        hoprChannels.fundChannelSafe(src, dest, HoprChannels.Balance.wrap(amount));
+        hoprChannels.fundChannelSafe(src, dest, HoprChannelsType.Balance.wrap(amount));
     }
 
     function testRevert_fundChannelInvalidBalance(address src, address dest) public {
@@ -295,10 +382,10 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
 
         vm.expectRevert(HoprChannels.InvalidBalance.selector);
-        hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(0));
+        hoprChannels.fundChannel(dest, HoprChannelsType.Balance.wrap(0));
 
         vm.expectRevert(HoprChannels.BalanceExceedsGlobalPerChannelAllowance.selector);
-        hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(uint96(MAX_USED_BALANCE) + 1));
+        hoprChannels.fundChannel(dest, HoprChannelsType.Balance.wrap(uint96(MAX_USED_BALANCE) + 1));
 
         vm.clearMockedCalls();
     }
@@ -311,7 +398,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         _helperNoSafeSetMock(src);
         _helperTokenTransferFromMock(src, amount);
-        hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.PENDING_TO_CLOSE);
+        hoprChannels._storeChannelStatus(src, dest, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE);
 
         vm.startPrank(src);
 
@@ -320,7 +407,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
                 HoprChannels.WrongChannelState.selector, "cannot fund a channel that will close soon"
             )
         );
-        hoprChannels.fundChannel(dest, HoprChannels.Balance.wrap(amount));
+        hoprChannels.fundChannel(dest, HoprChannelsType.Balance.wrap(amount));
 
         hoprChannels._removeChannel(src, dest);
         vm.clearMockedCalls();
@@ -334,16 +421,16 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.startPrank(src);
 
         vm.expectRevert(HoprChannels.SourceEqualsDestination.selector);
-        hoprChannels.fundChannel(src, HoprChannels.Balance.wrap(amount));
+        hoprChannels.fundChannel(src, HoprChannelsType.Balance.wrap(amount));
 
         vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, "destination must not be empty"));
-        hoprChannels.fundChannel(address(0), HoprChannels.Balance.wrap(amount));
+        hoprChannels.fundChannel(address(0), HoprChannelsType.Balance.wrap(amount));
 
         vm.stopPrank();
         vm.expectRevert(abi.encodeWithSelector(HoprChannels.ZeroAddress.selector, "source must not be empty"));
         vm.startPrank(address(0));
 
-        hoprChannels.fundChannel(src, HoprChannels.Balance.wrap(amount));
+        hoprChannels.fundChannel(src, HoprChannelsType.Balance.wrap(amount));
 
         vm.clearMockedCalls();
         vm.stopPrank();
@@ -361,20 +448,31 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != dest && safeContract != src && safeContract != dest);
 
-        hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannelsType.ChannelStatus.OPEN);
 
         _helperNoSafeSetMock(src);
         _helperTokenTransferMock(dest, amount);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelClosed(hoprChannels._getChannelId(dest, src));
-
+        emit ChannelClosed(hoprChannels._getChannelId(dest, src), _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(0)),
+                HoprChannelsType.TicketIndex.wrap(uint48(0)),
+                HoprChannelsType.Timestamp.wrap(uint32(0)),
+                HoprChannelsType.ChannelEpoch.wrap(uint24(1)),
+                HoprChannelsType.ChannelStatus.CLOSED
+            ))
+        );
         vm.prank(src);
         hoprChannels.closeIncomingChannel(dest);
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(dest, src))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, 1, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, 1, HoprChannelsType.ChannelStatus.CLOSED)))
+        );
+        bytes32 channelId = keccak256(abi.encodePacked(dest, src));
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(dest, src))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         vm.clearMockedCalls();
@@ -382,17 +480,27 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
 
         // Now let's assume there is a channel without funds
-        hoprChannels._storeChannel(dest, src, 0, ticketIndex, 0, 2, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannel(dest, src, 0, ticketIndex, 0, 2, HoprChannelsType.ChannelStatus.OPEN);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelClosed(hoprChannels._getChannelId(dest, src));
+        emit ChannelClosed(hoprChannels._getChannelId(dest, src), _unwrapChannel(HoprChannelsType.Channel(
+            HoprChannelsType.Balance.wrap(uint96(0)),
+            HoprChannelsType.TicketIndex.wrap(uint48(0)),
+            HoprChannelsType.Timestamp.wrap(uint32(0)),
+            HoprChannelsType.ChannelEpoch.wrap(uint24(2)),
+            HoprChannelsType.ChannelStatus.CLOSED
+        )));
 
         vm.prank(src);
         hoprChannels.closeIncomingChannel(dest);
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(dest, src))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, 2, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, 2, HoprChannelsType.ChannelStatus.CLOSED)))
+        );
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(dest, src))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         vm.clearMockedCalls();
@@ -404,17 +512,28 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperOnlySafeMock(src, safeContract);
         _helperTokenTransferMock(dest, amount);
 
-        hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannelsType.ChannelStatus.OPEN);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelClosed(hoprChannels._getChannelId(dest, src));
+        emit ChannelClosed(hoprChannels._getChannelId(dest, src), _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(0)),
+                HoprChannelsType.TicketIndex.wrap(uint48(0)),
+                HoprChannelsType.Timestamp.wrap(uint32(0)),
+                HoprChannelsType.ChannelEpoch.wrap(uint24(1)),
+                HoprChannelsType.ChannelStatus.CLOSED
+            ))
+        );
 
         vm.prank(safeContract);
         hoprChannels.closeIncomingChannelSafe(src, dest);
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(dest, src))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, 1, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, 1, HoprChannelsType.ChannelStatus.CLOSED)))
+        );
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(dest, src))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         vm.clearMockedCalls();
@@ -433,7 +552,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         _helperNoSafeSetMock(src);
 
-        hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.CLOSED);
+        hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannelsType.ChannelStatus.CLOSED);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -459,7 +578,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
         _helperNoTokenTransferMock(dest, amount);
 
-        hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannel(dest, src, amount, ticketIndex, 0, 1, HoprChannelsType.ChannelStatus.OPEN);
 
         vm.expectRevert(HoprChannels.TokenTransferFailed.selector);
         vm.prank(src);
@@ -482,13 +601,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         vm.assume(src != dest && safeContract != src && safeContract != dest);
 
-        HoprChannels.Timestamp closureTime =
-            HoprChannels.Timestamp.wrap(uint32(block.timestamp) + HoprChannels.Timestamp.unwrap(closureNoticePeriod));
+        HoprChannelsType.Timestamp closureTime =
+            HoprChannelsType.Timestamp.wrap(uint32(block.timestamp) + HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD));
         nextTimestamp = uint32(
             bound(
                 nextTimestamp,
                 uint32(block.timestamp),
-                uint32(type(uint32).max - HoprChannels.Timestamp.unwrap(closureNoticePeriod))
+                uint32(type(uint32).max - HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD))
             )
         );
 
@@ -496,10 +615,17 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         _helperNoSafeSetMock(src);
 
-        hoprChannels._storeChannel(src, dest, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannel(src, dest, amount, ticketIndex, 0, 1, HoprChannelsType.ChannelStatus.OPEN);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit OutgoingChannelClosureInitiated(hoprChannels._getChannelId(src, dest), closureTime);
+        emit OutgoingChannelClosureInitiated(hoprChannels._getChannelId(src, dest), _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(amount)),
+                HoprChannelsType.TicketIndex.wrap(uint48(ticketIndex)),
+                closureTime,
+                HoprChannelsType.ChannelEpoch.wrap(uint24(1)),
+                HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
+            ))
+        );
 
         vm.prank(src);
         hoprChannels.initiateOutgoingChannelClosure(dest);
@@ -508,15 +634,20 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(
+                    _wrapChannel(
                         amount,
                         ticketIndex,
-                        HoprChannels.Timestamp.unwrap(closureTime),
+                        HoprChannelsType.Timestamp.unwrap(closureTime),
                         1,
-                        HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+                        HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
                     )
                 )
             )
+        );
+        bytes32 channelId = keccak256(abi.encodePacked(src, dest));
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(src, dest))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         // let's try to extend closureTime, safe as it's done by ticket issuer
@@ -526,19 +657,19 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.prank(src);
         hoprChannels.initiateOutgoingChannelClosure(dest);
 
-        HoprChannels.Timestamp nextClosureTime =
-            HoprChannels.Timestamp.wrap(uint32(block.timestamp) + HoprChannels.Timestamp.unwrap(closureNoticePeriod));
+        HoprChannelsType.Timestamp nextClosureTime =
+            HoprChannelsType.Timestamp.wrap(uint32(block.timestamp) + HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD));
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(
+                    _wrapChannel(
                         amount,
                         ticketIndex,
-                        HoprChannels.Timestamp.unwrap(nextClosureTime),
+                        HoprChannelsType.Timestamp.unwrap(nextClosureTime),
                         1,
-                        HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+                        HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
                     )
                 )
             )
@@ -552,10 +683,16 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         _helperOnlySafeMock(src, safeContract);
 
-        hoprChannels._storeChannel(src, dest, amount, ticketIndex, 0, 1, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannel(src, dest, amount, ticketIndex, 0, 1, HoprChannelsType.ChannelStatus.OPEN);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit OutgoingChannelClosureInitiated(hoprChannels._getChannelId(src, dest), closureTime);
+        emit OutgoingChannelClosureInitiated(hoprChannels._getChannelId(src, dest), _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(amount)),
+                HoprChannelsType.TicketIndex.wrap(uint48(ticketIndex)),
+                closureTime,
+                HoprChannelsType.ChannelEpoch.wrap(uint24(1)),
+                HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
+            )));
 
         vm.prank(safeContract);
         hoprChannels.initiateOutgoingChannelClosureSafe(src, dest);
@@ -564,15 +701,19 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(
+                    _wrapChannel(
                         amount,
                         ticketIndex,
-                        HoprChannels.Timestamp.unwrap(closureTime),
+                        HoprChannelsType.Timestamp.unwrap(closureTime),
                         1,
-                        HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+                        HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
                     )
                 )
             )
+        );
+        assertEq(
+            keccak256(abi.encode(getChannelFromTuple(src, dest))),
+            keccak256(abi.encode(_expandChannel(hoprChannels.channelState(channelId))))
         );
 
         // let's try to extend closureTime, safe as it's done by ticket issuer
@@ -586,12 +727,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
             keccak256(
                 abi.encode(
-                    wrapChannel(
+                    _wrapChannel(
                         amount,
                         ticketIndex,
-                        HoprChannels.Timestamp.unwrap(nextClosureTime),
+                        HoprChannelsType.Timestamp.unwrap(nextClosureTime),
                         1,
-                        HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+                        HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
                     )
                 )
             )
@@ -612,7 +753,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         _helperNoSafeSetMock(src);
 
-        hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.CLOSED);
+        hoprChannels._storeChannelStatus(src, dest, HoprChannelsType.ChannelStatus.CLOSED);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -641,7 +782,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             bound(
                 closureTime,
                 block.timestamp,
-                uint32(type(uint32).max) - HoprChannels.Timestamp.unwrap(closureNoticePeriod) - 1
+                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) - 1
             )
         );
         vm.assume(src != address(0) && safeContract != address(0));
@@ -651,20 +792,29 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperTokenTransferMock(src, amount);
 
         hoprChannels._storeChannel(
-            src, dest, amount, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            src, dest, amount, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
-        vm.warp(closureTime + HoprChannels.Timestamp.unwrap(closureNoticePeriod) + 1);
+        vm.warp(closureTime + HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) + 1);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelClosed(hoprChannels._getChannelId(src, dest));
+        emit ChannelClosed(
+            hoprChannels._getChannelId(src, dest),
+            _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(0)),
+                HoprChannelsType.TicketIndex.wrap(uint48(0)),
+                HoprChannelsType.Timestamp.wrap(uint32(0)),
+                HoprChannelsType.ChannelEpoch.wrap(epoch),
+                HoprChannelsType.ChannelStatus.CLOSED
+            ))
+        );
 
         vm.prank(src);
         hoprChannels.finalizeOutgoingChannelClosure(dest);
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, epoch, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, epoch, HoprChannelsType.ChannelStatus.CLOSED)))
         );
 
         vm.clearMockedCalls();
@@ -675,20 +825,29 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperTokenTransferMock(safeContract, amount);
 
         hoprChannels._storeChannel(
-            src, dest, amount, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            src, dest, amount, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
-        vm.warp(closureTime + HoprChannels.Timestamp.unwrap(closureNoticePeriod) + 1);
+        vm.warp(closureTime + HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) + 1);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelClosed(hoprChannels._getChannelId(src, dest));
+        emit ChannelClosed(
+            hoprChannels._getChannelId(src, dest),
+            _unwrapChannel(HoprChannelsType.Channel(
+                HoprChannelsType.Balance.wrap(uint96(0)),
+                HoprChannelsType.TicketIndex.wrap(uint48(0)),
+                HoprChannelsType.Timestamp.wrap(uint32(0)),
+                HoprChannelsType.ChannelEpoch.wrap(epoch),
+                HoprChannelsType.ChannelStatus.CLOSED
+            ))
+        );
 
         vm.prank(safeContract);
         hoprChannels.finalizeOutgoingChannelClosureSafe(src, dest);
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(0, 0, 0, epoch, HoprChannels.ChannelStatus.CLOSED)))
+            keccak256(abi.encode(_wrapChannel(0, 0, 0, epoch, HoprChannelsType.ChannelStatus.CLOSED)))
         );
 
         vm.clearMockedCalls();
@@ -699,7 +858,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         _helperNoSafeSetMock(src);
 
-        hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.CLOSED);
+        hoprChannels._storeChannelStatus(src, dest, HoprChannelsType.ChannelStatus.CLOSED);
 
         vm.startPrank(src);
         vm.expectRevert(
@@ -707,7 +866,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
         hoprChannels.finalizeOutgoingChannelClosure(dest);
 
-        hoprChannels._storeChannelStatus(src, dest, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannelStatus(src, dest, HoprChannelsType.ChannelStatus.OPEN);
 
         vm.expectRevert(
             abi.encodeWithSelector(HoprChannels.WrongChannelState.selector, "channel state must be PENDING_TO_CLOSE")
@@ -733,7 +892,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             bound(
                 closureTime,
                 block.timestamp + 1,
-                uint32(type(uint32).max) - HoprChannels.Timestamp.unwrap(closureNoticePeriod) - 1
+                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) - 1
             )
         );
         vm.assume(src != dest);
@@ -741,7 +900,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperNoSafeSetMock(src);
 
         hoprChannels._storeChannel(
-            src, dest, amount, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            src, dest, amount, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
         vm.startPrank(src);
@@ -767,7 +926,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             bound(
                 closureTime,
                 block.timestamp + 1,
-                uint32(type(uint32).max) - HoprChannels.Timestamp.unwrap(closureNoticePeriod) - 1
+                uint32(type(uint32).max) - HoprChannelsType.Timestamp.unwrap(CLOSURE_NOTICE_PERIOD) - 1
             )
         );
         vm.assume(src != dest);
@@ -778,7 +937,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.warp(closureTime + 1);
 
         hoprChannels._storeChannel(
-            src, dest, amount, ticketIndex, closureTime, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            src, dest, amount, ticketIndex, closureTime, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
         vm.startPrank(src);
@@ -789,7 +948,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function test_redeemTicket(
+    function testFuzz_redeemTicket(
         uint256 privKeyA,
         uint256 privKeyB,
         address safeContract,
@@ -797,7 +956,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -809,9 +967,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -828,37 +985,44 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_100),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
         );
 
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
             CryptoUtils.getRedeemableTicket(args);
 
-        vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
+        HoprChannelsType.Channel memory tmpChannel = getChannelFromTuple(src, dest);
+        tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+        emit ChannelBalanceDecreased(redeemable.data.channelId, _unwrapChannel(tmpChannel));
+
+        vm.expectEmit(true, false, false, true, address(hoprChannels));
+        emit TicketRedeemed(redeemable.data.channelId, _unwrapChannel(tmpChannel));
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
 
         // Now let's assume the channel is PENDING_TO_CLOSE
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
-        vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
+        tmpChannel = getChannelFromTuple(src, dest);
+        tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+        emit ChannelBalanceDecreased(redeemable.data.channelId, _unwrapChannel(tmpChannel));
+
+        vm.expectEmit(true, false, false, true, address(hoprChannels));
+        emit TicketRedeemed(redeemable.data.channelId,_unwrapChannel(tmpChannel));
 
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
@@ -866,31 +1030,38 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         // Reset to test safe integration
         vm.clearMockedCalls();
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
         );
 
         _helperOnlySafeMock(dest, safeContract);
         _helperTokenTransferMock(safeContract, amount);
 
+        tmpChannel = getChannelFromTuple(src, dest);
+        tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
+
         // Now test Safe integration
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
+        emit ChannelBalanceDecreased(redeemable.data.channelId, _unwrapChannel(tmpChannel));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, _unwrapChannel(tmpChannel));
         vm.prank(safeContract);
         hoprChannels.redeemTicketSafe(dest, redeemable, vrf);
 
         // Now let's assume the channel is PENDING_TO_CLOSE
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
+        tmpChannel = getChannelFromTuple(src, dest);
+        tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelAmount - amount));
+        emit ChannelBalanceDecreased(redeemable.data.channelId, _unwrapChannel(tmpChannel));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, _unwrapChannel(tmpChannel));
 
         vm.prank(safeContract);
         hoprChannels.redeemTicketSafe(dest, redeemable, vrf);
@@ -913,7 +1084,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         channelAmount = uint96(bound(channelAmount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         amount = uint96(bound(amount, MIN_USED_BALANCE, channelAmount));
-        uint32 indexOffset = uint32(1);
         uint48 maxTicketIndex = uint48(6);
         uint48 channelTicketIndex = uint48(1);
 
@@ -931,31 +1101,35 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_100),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
         );
 
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
             CryptoUtils.getRedeemableTicket(args);
+        
+        HoprChannelsType.Channel memory tmpChannel = getChannelFromTuple(src, dest);
+        tmpChannel.balance = HoprChannelsType.Balance.wrap(channelAmount - amount);
+        tmpChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+        emit TicketRedeemed(redeemable.data.channelId, _unwrapChannel(tmpChannel));
         vm.prank(dest);
         hoprChannels.redeemTicket(redeemable, vrf);
 
         for (uint256 i = 1; i < uint256(maxTicketIndex - channelTicketIndex); i++) {
-            vm.expectRevert(HoprChannels.InvalidAggregatedTicketInterval.selector);
+            vm.expectRevert(HoprChannels.InvalidTicketIndex.selector);
             vm.prank(dest);
             hoprChannels.redeemTicket(redeemable, vrf);
         }
     }
 
+    /// forge-lint:disable-next-item(mixed-case-variable)
     function test_redeemTicket_bidirectional(
         uint256 privKeyA,
         uint256 privKeyB,
@@ -964,7 +1138,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelBAAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -977,9 +1150,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelABAmount = uint96(bound(channelABAmount, amount, MAX_USED_BALANCE));
         channelBAAmount = uint96(bound(channelBAAmount, 0, type(uint96).max - amount));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -988,10 +1160,10 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         _helperTokenTransferMock(dest, amount);
 
         hoprChannels._storeChannel(
-            src, dest, channelABAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            src, dest, channelABAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
         hoprChannels._storeChannel(
-            dest, src, channelBAAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.PENDING_TO_CLOSE
+            dest, src, channelBAAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.PENDING_TO_CLOSE
         );
 
         RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
@@ -1002,24 +1174,29 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_100),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
             CryptoUtils.getRedeemableTicket(args);
 
-        vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit ChannelBalanceDecreased(redeemable.data.channelId, HoprChannels.Balance.wrap(channelABAmount - amount));
+        HoprChannelsType.Channel memory abChannel = getChannelFromTuple(src, dest);
+        abChannel.balance = HoprChannelsType.Balance.wrap(channelABAmount - amount);
+        abChannel.ticketIndex = HoprChannelsType.TicketIndex.wrap(maxTicketIndex + BASE_INDEX_OFFSET);
+        HoprChannelsType.Channel memory baChannel = getChannelFromTuple(dest, src);
+        baChannel.balance = HoprChannelsType.Balance.wrap(channelBAAmount + amount);
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
-        emit TicketRedeemed(redeemable.data.channelId, HoprChannels.TicketIndex.wrap(maxTicketIndex + indexOffset));
+        emit ChannelBalanceDecreased(redeemable.data.channelId, _unwrapChannel(abChannel));
+
+        vm.expectEmit(true, false, false, true, address(hoprChannels));
+        emit TicketRedeemed(redeemable.data.channelId, _unwrapChannel(abChannel));
 
         vm.expectEmit(true, false, false, true, address(hoprChannels));
         emit ChannelBalanceIncreased(
-            hoprChannels._getChannelId(dest, src), HoprChannels.Balance.wrap(channelBAAmount + amount)
+            hoprChannels._getChannelId(dest, src), _unwrapChannel(baChannel)
         );
 
         vm.prank(dest);
@@ -1035,7 +1212,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1047,9 +1223,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1065,14 +1240,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_0),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_0),
             porSecret
         );
 
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
@@ -1092,7 +1266,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1103,9 +1276,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
         vm.assume(channelAmount < amount);
 
         address src = vm.addr(privKeyA);
@@ -1122,14 +1294,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_0),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_0),
             porSecret
         );
 
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
@@ -1149,7 +1320,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1160,9 +1330,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
         vm.assume(privKeyA != privKeyB);
 
         address src = vm.addr(privKeyA);
@@ -1179,14 +1348,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_100),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
         );
 
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
@@ -1206,7 +1374,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1218,9 +1385,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1236,14 +1402,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_0),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_0),
             porSecret
         );
 
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.CLOSED
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.CLOSED
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
@@ -1267,7 +1432,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint48 channelTicketIndex
     )
         public
@@ -1278,9 +1442,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1296,13 +1459,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             1,
-            HoprChannels.WinProb.unwrap(WIN_PROB_0),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_0),
             porSecret
         );
 
-        hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, 2, HoprChannels.ChannelStatus.OPEN);
+        hoprChannels._storeChannel(src, dest, channelAmount, channelTicketIndex, 0, 2, HoprChannelsType.ChannelStatus.OPEN);
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
             CryptoUtils.getRedeemableTicket(args);
@@ -1321,7 +1483,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1333,9 +1494,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1351,14 +1511,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_100),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
         );
 
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
@@ -1382,7 +1541,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         uint96 channelAmount,
         uint96 amount,
         uint48 maxTicketIndex,
-        uint32 indexOffset,
         uint24 epoch,
         uint48 channelTicketIndex
     )
@@ -1394,9 +1552,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(privKeyA != privKeyB);
         amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
         channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
+        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - BASE_INDEX_OFFSET - 1));
+        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - BASE_INDEX_OFFSET));
 
         address src = vm.addr(privKeyA);
         address dest = vm.addr(privKeyB);
@@ -1412,14 +1569,13 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
             dest,
             amount,
             maxTicketIndex,
-            indexOffset,
             epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_100),
+            HoprChannelsType.WinProb.unwrap(WIN_PROB_100),
             porSecret
         );
 
         hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
+            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannelsType.ChannelStatus.OPEN
         );
 
         (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
@@ -1433,8 +1589,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         } else {
             v = 27;
         }
-        HoprCrypto.CompactSignature memory tweaked_sig = toCompactSignature(v, r, s);
-        redeemable.signature.vs = tweaked_sig.vs;
+        HoprCrypto.CompactSignature memory tweakedSig = toCompactSignature(v, r, s);
+        redeemable.signature.vs = tweakedSig.vs;
 
         vm.prank(dest);
 
@@ -1444,75 +1600,6 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function testRevert_redeemTicketInvalidAggregatedTicket(
-        uint256 privKeyA,
-        uint256 privKeyB,
-        uint256 porSecret,
-        uint96 channelAmount,
-        uint96 amount,
-        uint48 maxTicketIndex,
-        uint32 indexOffset,
-        uint24 epoch,
-        uint48 channelTicketIndex
-    )
-        public
-    {
-        porSecret = bound(porSecret, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
-        privKeyA = bound(privKeyA, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
-        privKeyB = bound(privKeyB, 1, HoprCrypto.SECP256K1_FIELD_ORDER - 1);
-        vm.assume(privKeyA != privKeyB);
-        amount = uint96(bound(amount, MIN_USED_BALANCE, MAX_USED_BALANCE));
-        channelAmount = uint96(bound(channelAmount, amount, MAX_USED_BALANCE));
-        indexOffset = uint32(bound(indexOffset, 1, type(uint32).max));
-        channelTicketIndex = uint48(bound(channelTicketIndex, 0, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, channelTicketIndex + 1, type(uint48).max - indexOffset));
-
-        address src = vm.addr(privKeyA);
-        address dest = vm.addr(privKeyB);
-
-        _helperNoSafeSetMock(dest);
-        _helperTokenTransferMock(dest, amount);
-
-        RedeemTicketArgBuilder memory args = RedeemTicketArgBuilder(
-            privKeyA,
-            privKeyB,
-            hoprChannels.domainSeparator(),
-            src,
-            dest,
-            amount,
-            maxTicketIndex,
-            indexOffset,
-            epoch,
-            HoprChannels.WinProb.unwrap(WIN_PROB_100),
-            porSecret
-        );
-
-        hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
-        );
-
-        (HoprChannels.RedeemableTicket memory redeemable, HoprCrypto.VRFParameters memory vrf) =
-            CryptoUtils.getRedeemableTicket(args);
-
-        redeemable.data.indexOffset = HoprChannels.TicketIndexOffset.wrap(0);
-
-        vm.startPrank(dest);
-
-        vm.expectRevert(HoprChannels.InvalidAggregatedTicketInterval.selector);
-        hoprChannels.redeemTicket(redeemable, vrf);
-
-        channelTicketIndex = uint48(bound(channelTicketIndex, 1, type(uint48).max - indexOffset - 1));
-        maxTicketIndex = uint48(bound(maxTicketIndex, 0, channelTicketIndex));
-
-        hoprChannels._storeChannel(
-            src, dest, channelAmount, channelTicketIndex, 0, epoch, HoprChannels.ChannelStatus.OPEN
-        );
-
-        vm.expectRevert(HoprChannels.InvalidAggregatedTicketInterval.selector);
-        hoprChannels.redeemTicket(redeemable, vrf);
-
-        vm.clearMockedCalls();
-    }
 
     function test_tokensReceivedSingle(
         address operator,
@@ -1540,7 +1627,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amountA, 0, 0, 1, HoprChannelsType.ChannelStatus.OPEN)))
         );
 
         // from != src (called by Safe)
@@ -1555,7 +1642,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amountA, 0, 0, 1, HoprChannelsType.ChannelStatus.OPEN)))
         );
     }
 
@@ -1588,12 +1675,12 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(src, dest))),
-            keccak256(abi.encode(wrapChannel(amountA, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amountA, 0, 0, 1, HoprChannelsType.ChannelStatus.OPEN)))
         );
 
         assertEq(
             keccak256(abi.encode(getChannelFromTuple(dest, src))),
-            keccak256(abi.encode(wrapChannel(amountB, 0, 0, 1, HoprChannels.ChannelStatus.OPEN)))
+            keccak256(abi.encode(_wrapChannel(amountB, 0, 0, 1, HoprChannelsType.ChannelStatus.OPEN)))
         );
 
         vm.clearMockedCalls();
@@ -1712,8 +1799,8 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
         vm.assume(amountTooSmall < uint256(MIN_USED_BALANCE) - 1);
         amountTooLarge = bound(amountTooLarge, uint256(MAX_USED_BALANCE) + 1, type(uint96).max);
-        HoprChannels.Balance balanceTooSmall = HoprChannels.Balance.wrap(uint96(amountTooSmall));
-        HoprChannels.Balance balanceTooLarge = HoprChannels.Balance.wrap(uint96(amountTooLarge));
+        HoprChannelsType.Balance balanceTooSmall = HoprChannelsType.Balance.wrap(uint96(amountTooSmall));
+        HoprChannelsType.Balance balanceTooLarge = HoprChannelsType.Balance.wrap(uint96(amountTooLarge));
 
         vm.startPrank(address(hoprToken));
 
@@ -1785,7 +1872,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.assume(safeContract != src);
 
         address operator = address(0);
-        HoprChannels.Balance balance = HoprChannels.Balance.wrap(amount);
+        HoprChannelsType.Balance balance = HoprChannelsType.Balance.wrap(amount);
 
         vm.startPrank(address(hoprToken));
 
@@ -1972,34 +2059,99 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
     }
 
-    function wrapChannel(
+    function _wrapChannel(
         uint256 balance,
         uint256 ticketIndex,
         uint256 closureTime,
         uint256 epoch,
-        HoprChannels.ChannelStatus status
+        HoprChannelsType.ChannelStatus status
     )
         private
         pure
-        returns (HoprChannels.Channel memory)
+        returns (HoprChannelsType.Channel memory)
     {
-        return HoprChannels.Channel(
-            HoprChannels.Balance.wrap(uint96(balance)),
-            HoprChannels.TicketIndex.wrap(uint48(ticketIndex)),
-            HoprChannels.Timestamp.wrap(uint32(closureTime)),
-            HoprChannels.ChannelEpoch.wrap(uint24(epoch)),
+        return HoprChannelsType.Channel(
+            HoprChannelsType.Balance.wrap(uint96(balance)),
+            HoprChannelsType.TicketIndex.wrap(uint48(ticketIndex)),
+            HoprChannelsType.Timestamp.wrap(uint32(closureTime)),
+            HoprChannelsType.ChannelEpoch.wrap(uint24(epoch)),
             status
         );
     }
 
-    function getChannelFromTuple(address src, address dest) public view returns (HoprChannels.Channel memory) {
+    /**
+     * Unwraps the channel state from a Channel struct to a compact bytes32
+     *
+     * @param channel The state of the channel in its struct
+     * @return channelStorage The compact bytes32 format of channel State
+     */
+    function _unwrapChannel(HoprChannelsType.Channel memory channel) private pure returns (bytes32 channelStorage) {
+        assembly {
+            channelStorage := or(
+                or(
+                    shl(
+                        96, 
+                        mload(add(channel, 0x20)) // channel.ticketIndex
+                    ), // left shift index by 96
+                    mload(channel) // channelBalance
+                ), 
+                or(
+                    shl(
+                        144, 
+                        mload(add(channel, 0x40)) // channel.closureTime
+                    ), // left shift timestamp by 96 + 48
+                    or(
+                        shl(
+                            176, 
+                            mload(add(channel, 0x60)) // channel.epoch
+                        ), // left shift by 96 + 48 + 32,
+                        shl(
+                            200,
+                            mload(add(channel, 0x80)) // channel.status
+                        ) // left shift by 96 + 48 + 32 + 24
+                    )
+                )
+            )
+        }
+    }
+
+    /**
+     * Wraps the channel state into a Channel struct.
+     *
+     * @param state The compact bytes32 format of channel State
+     * @return channel The state of the channel in its struct
+     */
+    function _expandChannel(bytes32 state) public pure returns (HoprChannelsType.Channel memory channel) {
+        // Get the channel state from the storage slot
+        uint256 channelBalance;
+        uint256 ticketIndex;
+        uint256 closureTime;
+        uint256 epoch;
+        uint256 status;
+        assembly {
+            channelBalance := and(state, 0xffffffffffffffffffffffff)
+            ticketIndex := and(shr(96, state), 0xffffffffffff)
+            closureTime := and(shr(144, state), 0xffffffff)
+            epoch := and(shr(176, state), 0xffffff)
+            status := and(shr(200, state), 0xff)
+        }
+        return _wrapChannel(
+            channelBalance,
+            ticketIndex,
+            closureTime,
+            epoch,
+            HoprChannelsType.ChannelStatus(uint8(status))
+        );
+    }
+
+    function getChannelFromTuple(address src, address dest) public view returns (HoprChannelsType.Channel memory) {
         (
-            HoprChannels.Balance balance,
-            HoprChannels.TicketIndex ticketIndex,
-            HoprChannels.Timestamp closureTime,
-            HoprChannels.ChannelEpoch epoch,
-            HoprChannels.ChannelStatus status
+            HoprChannelsType.Balance balance,
+            HoprChannelsType.TicketIndex ticketIndex,
+            HoprChannelsType.Timestamp closureTime,
+            HoprChannelsType.ChannelEpoch epoch,
+            HoprChannelsType.ChannelStatus status
         ) = hoprChannels.channels(hoprChannels._getChannelId(src, dest));
-        return HoprChannels.Channel(balance, ticketIndex, closureTime, epoch, status);
+        return HoprChannelsType.Channel(balance, ticketIndex, closureTime, epoch, status);
     }
 }

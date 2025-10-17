@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { Test, stdError } from "forge-std/Test.sol";
-
-import "../mocks/TargetUtilsMock.sol";
+import { Clearance, CapabilityPermission, Target, TargetType, TargetPermission, TooManyCapabilities, PermissionNotFound } from "../../src/utils/TargetUtils.sol";
+import { TargetUtilsMock } from "../mocks/TargetUtilsMock.sol";
 
 contract TargetUtilsTest is Test {
     bytes32 private constant TARGET_ADDRESS_MASK = hex"ffffffffffffffffffffffffffffffffffffffff000000000000000000000000";
@@ -145,12 +145,7 @@ contract TargetUtilsTest is Test {
         asTargetType = uint8(bound(asTargetType, uint256(type(TargetType).min), uint256(type(TargetType).max)));
         TargetType newTargetType = TargetType(asTargetType);
         // get valid target
-        (
-            uint8 boundClearance,
-            uint8 boundTargetType,
-            uint8 boundTargetPermission,
-            uint8[] memory boundFunctionPermissions
-        ) = _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
+        _helperCreateValidTarget(targetAddress, clearance, targetType, targetPermission, functionPermissions);
         // force write
         Target newTarget = targetUtilsMock.forceWriteAsTargetType(newTargetType);
         TargetUtilsMock newTargetUtilsMock = new TargetUtilsMock();

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
 import { IHoprNetworkRegistryRequirement } from "../interfaces/INetworkRegistryRequirement.sol";
 import { HoprNodeSafeRegistry } from "../node-stake/NodeSafeRegistry.sol";
-import { AccessControlEnumerable } from "openzeppelin-contracts/access/AccessControlEnumerable.sol";
+import { AccessControlEnumerable } from "openzeppelin-contracts-5.4.0/access/extensions/AccessControlEnumerable.sol";
 
 /**
  * @dev Minimum interface for token contract
@@ -25,6 +25,7 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
     uint128 public snapshotBlockNumber;
 
     error SameValue();
+    error ZeroAddress(string reason);
 
     event ThresholdUpdated(uint256 indexed threshold);
     event SnapshotUpdated(uint128 indexed blockNumber);
@@ -38,9 +39,21 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
         address _token,
         address _nodeSafeRegistry
     ) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _owner);
-        _setupRole(MANAGER_ROLE, _owner);
-        _setupRole(MANAGER_ROLE, _manager);
+        if (_owner == address(0)) {
+            revert ZeroAddress({ reason: "_owner must not be empty" });
+        }
+        if (_manager == address(0)) {
+            revert ZeroAddress({ reason: "_manager must not be empty" });
+        }
+        if (_token == address(0)) {
+            revert ZeroAddress({ reason: "_token must not be empty" });
+        }
+        if (_nodeSafeRegistry == address(0)) {
+            revert ZeroAddress({ reason: "_nodeSafeRegistry must not be empty" });
+        }
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(MANAGER_ROLE, _owner);
+        _grantRole(MANAGER_ROLE, _manager);
         _updateStakeThreshold(_stakeThreshold);
         _updateSnapshotBlockNumber(_snapshotBlockNumber);
 
@@ -68,6 +81,10 @@ contract HoprSafeProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Acc
      * @param safeAddress node address
      */
     function maxAllowedRegistrations(address safeAddress) external view returns (uint256) {
+        // if threshold is 0, no one is eligible for self-registration
+        if (stakeThreshold == 0) {
+            return 0;
+        }
         return token.balanceOfAt(safeAddress, snapshotBlockNumber) / stakeThreshold;
     }
 

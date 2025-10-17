@@ -52,7 +52,7 @@ let
 
   envCase = triple: pkgsLocal.lib.strings.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] triple);
 
-  solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
+  solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_30;
 
   cargoTarget =
     if hostPlatform.config == "arm64-apple-darwin" then "aarch64-apple-darwin" else hostPlatform.config;

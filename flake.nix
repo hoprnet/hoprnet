@@ -8,7 +8,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.21.0";
     # pin it to a version which we are compatible with
-    foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
+    foundry.url = "github:shazow/foundry.nix/be409169ca05954e28cfd6206934bdaffe695c4a";
     solc.url = "github:hellwolf/solc.nix";
     pre-commit.url = "github:cachix/git-hooks.nix";
     treefmt-nix.url = "github:numtide/treefmt-nix";
@@ -60,7 +60,7 @@
           ];
           pkgs = import nixpkgs { inherit localSystem overlays; };
           buildPlatform = pkgs.stdenv.buildPlatform;
-          solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
+          solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_30;
           craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
           hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;

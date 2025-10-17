@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import { Test, console2 } from "forge-std/Test.sol";
+import { Test } from "forge-std/Test.sol";
 import { HoprChannelsEvents } from "../src/Channels.sol";
-import { HoprLedgerEvents, HoprLedger } from "../src/Ledger.sol";
-import { CryptoUtils } from "./utils/Crypto.sol";
+import { HoprLedger } from "../src/Ledger.sol";
 
 uint256 constant ONE_HOUR = 60 * 60 * 1000; // in milliseconds
 
@@ -62,7 +61,10 @@ contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChanne
         bytes28 currentRootHash = latestRoot.rootHash;
         uint32 currentBlockNumber = uint32(block.number);
 
+        uint256 beforeGas = gasleft();
         indexEvent(abi.encodePacked(ChannelOpened.selector));
+        // emit log_named_uint(key: "Gas used for indexing", val: 5871)
+        emit log_named_uint("Gas used for indexing", beforeGas - gasleft());
 
         // snapshot should be unchanged
         assertEq(initialRoot, latestSnapshotRoot.rootHash);

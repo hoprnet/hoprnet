@@ -6,7 +6,7 @@
  */
 pragma solidity ^0.8.0;
 
-import { Enum } from "safe-contracts/common/Enum.sol";
+import { Enum } from "safe-contracts-1.4.1/common/Enum.sol";
 
 interface IAvatar {
     function getOwners() external view returns (address[] memory);
@@ -23,7 +23,7 @@ interface IAvatar {
     /// @notice Must emit DisabledModule(address module) if successful.
     /// @param prevModule Address that pointed to the module to be removed in the linked list
     /// @param module Module to be removed.
-    function disableModule(address prevModule, address module) external;
+    function disableModule(address prevModule, address module) external; 
 
     /// @dev Allows a Module to execute a transaction.
     /// @notice Can only be called by an enabled module.
@@ -75,4 +75,36 @@ interface IAvatar {
         external
         view
         returns (address[] memory array, address next);
+
+    function getTransactionHash(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
+        uint256 _nonce
+    )
+        external
+        view
+        returns (bytes32);
+
+    /// @dev Allows to execute a Safe transaction confirmed by required number of owners.
+    function execTransaction(
+        address to,
+        uint256 value,
+        bytes calldata data,
+        Enum.Operation operation,
+        uint256 safeTxGas,
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address payable refundReceiver,
+        bytes memory signatures
+    ) external payable returns (bool);
+
+    function nonce() external returns (uint256);
 }

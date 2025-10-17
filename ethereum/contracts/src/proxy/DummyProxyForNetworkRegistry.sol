@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.19;
+pragma solidity 0.8.30;
 
-import { Ownable } from "openzeppelin-contracts/access/Ownable.sol";
+import { Ownable } from "openzeppelin-contracts-5.4.0/access/Ownable.sol";
 import { IHoprNetworkRegistryRequirement } from "../interfaces/INetworkRegistryRequirement.sol";
 
 /**
@@ -18,8 +18,7 @@ contract HoprDummyProxyForNetworkRegistry is IHoprNetworkRegistryRequirement, Ow
     event AccountDeregistered(address indexed account);
     event AllowAllAccountsEligible(bool isAllowed);
 
-    constructor(address newOwner) {
-        _transferOwnership(newOwner);
+    constructor(address newOwner) Ownable(newOwner) {
         isAllAllowed = false;
         emit AllowAllAccountsEligible(false);
     }

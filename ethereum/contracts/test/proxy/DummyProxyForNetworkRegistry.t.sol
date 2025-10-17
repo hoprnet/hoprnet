@@ -1,19 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import "../../src/proxy/DummyProxyForNetworkRegistry.sol";
-import "forge-std/Test.sol";
+import { HoprDummyProxyForNetworkRegistry, Ownable } from "../../src/proxy/DummyProxyForNetworkRegistry.sol";
+import { Test } from "forge-std/Test.sol";
 
 contract HoprDummyProxyForNetworkRegistryTest is Test {
     HoprDummyProxyForNetworkRegistry public hoprDummyProxyForNetworkRegistry;
     address public owner;
-
-    /**
-     * Manually import events
-     */
-    event AccountRegistered(address indexed account);
-    event AccountDeregistered(address indexed account);
-    event AllowAllAccountsEligible(bool isAllowed);
 
     function setUp() public virtual {
         owner = vm.addr(101); // make address(101) new owner
@@ -29,7 +22,7 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
         vm.assume(caller != owner);
         vm.prank(caller);
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, caller));
         hoprDummyProxyForNetworkRegistry.ownerAddAccount(account);
 
         vm.clearMockedCalls();
@@ -43,7 +36,7 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
         vm.prank(owner);
 
         vm.expectEmit(true, false, false, false, address(hoprDummyProxyForNetworkRegistry));
-        emit AccountRegistered(account);
+        emit HoprDummyProxyForNetworkRegistry.AccountRegistered(account);
         hoprDummyProxyForNetworkRegistry.ownerAddAccount(account);
 
         // max allowed registration is greater than current registered amount 1
@@ -79,7 +72,7 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
         assertEq(hoprDummyProxyForNetworkRegistry.isAllAllowed(), currentAllowAll);
         // update to the opposite value.
         vm.expectEmit(true, false, false, false, address(hoprDummyProxyForNetworkRegistry));
-        emit AllowAllAccountsEligible(!currentAllowAll);
+        emit HoprDummyProxyForNetworkRegistry.AllowAllAccountsEligible(!currentAllowAll);
         hoprDummyProxyForNetworkRegistry.updateAllowAll(!currentAllowAll);
         assertEq(hoprDummyProxyForNetworkRegistry.isAllAllowed(), !currentAllowAll);
     }
@@ -97,9 +90,9 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
         accounts[1] = account2;
 
         vm.expectEmit(true, false, false, false, address(hoprDummyProxyForNetworkRegistry));
-        emit AccountRegistered(account1);
+        emit HoprDummyProxyForNetworkRegistry.AccountRegistered(account1);
         vm.expectEmit(true, false, false, false, address(hoprDummyProxyForNetworkRegistry));
-        emit AccountRegistered(account2);
+        emit HoprDummyProxyForNetworkRegistry.AccountRegistered(account2);
         hoprDummyProxyForNetworkRegistry.ownerBatchAddAccounts(accounts);
 
         vm.clearMockedCalls();
@@ -115,7 +108,7 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
         hoprDummyProxyForNetworkRegistry.ownerAddAccount(account);
 
         vm.prank(caller);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, caller));
         hoprDummyProxyForNetworkRegistry.ownerRemoveAccount(account);
 
         vm.clearMockedCalls();
@@ -130,7 +123,7 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
         hoprDummyProxyForNetworkRegistry.ownerAddAccount(account);
 
         vm.expectEmit(true, false, false, false, address(hoprDummyProxyForNetworkRegistry));
-        emit AccountDeregistered(account);
+        emit HoprDummyProxyForNetworkRegistry.AccountDeregistered(account);
         hoprDummyProxyForNetworkRegistry.ownerRemoveAccount(account);
 
         vm.stopPrank();
@@ -150,7 +143,7 @@ contract HoprDummyProxyForNetworkRegistryTest is Test {
         accounts[1] = account2;
 
         vm.expectEmit(true, false, false, false, address(hoprDummyProxyForNetworkRegistry));
-        emit AccountDeregistered(account1);
+        emit HoprDummyProxyForNetworkRegistry.AccountDeregistered(account1);
         hoprDummyProxyForNetworkRegistry.ownerBatchRemoveAccounts(accounts);
 
         vm.clearMockedCalls();
