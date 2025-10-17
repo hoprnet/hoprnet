@@ -19,7 +19,6 @@ members = [
   "db/entity",
   "db/migration",
   "db/node",
-  "db/sql",
   "ethereum/bindings",
   "hopli",
   "hopr/hopr-lib",
@@ -99,6 +98,7 @@ hex-literal = "1.0.0"
 hickory-resolver = "0.25.2"
 http = "1.3.1"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
+hyper = { version = "1.7.0", features = ["client", "http2"]}
 k256 = { version = "0.13.4", features = [
   "arithmetic",
   "ecdh",
@@ -243,7 +243,6 @@ hopr-crypto-types = { path = "crypto/types", default-features = false }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
 hopr-db-node = { path = "db/node" }
-hopr-db-sql = { path = "db/sql" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }

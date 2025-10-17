@@ -15,7 +15,6 @@ p2p-announce-quic = []
 p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
@@ -76,7 +75,6 @@ hopr-transport-session = { workspace = true }
 [dev-dependencies]
 temp-env = { workspace = true }
 
-hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }

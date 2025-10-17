@@ -69,7 +69,6 @@ bimap = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
-hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }
