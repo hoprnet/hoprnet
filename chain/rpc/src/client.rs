@@ -920,8 +920,8 @@ mod tests {
         assert_ne!(contract_addrs.channels, Address::default());
         assert_ne!(contract_addrs.announcements, Address::default());
         assert_ne!(contract_addrs.network_registry, Address::default());
-        assert_ne!(contract_addrs.safe_registry, Address::default());
-        assert_ne!(contract_addrs.price_oracle, Address::default());
+        assert_ne!(contract_addrs.node_safe_registry, Address::default());
+        assert_ne!(contract_addrs.ticket_price_oracle, Address::default());
 
         Ok(())
     }
