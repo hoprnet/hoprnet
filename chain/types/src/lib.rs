@@ -122,13 +122,22 @@ where
                     provider.clone(),
                 ))
             },
-            safe_registry: HoprNodeSafeRegistryInstance::new(contract_addresses.node_safe_registry.into(), provider.clone()),
-            price_oracle: HoprTicketPriceOracleInstance::new(contract_addresses.ticket_price_oracle.into(), provider.clone()),
+            safe_registry: HoprNodeSafeRegistryInstance::new(
+                contract_addresses.node_safe_registry.into(),
+                provider.clone(),
+            ),
+            price_oracle: HoprTicketPriceOracleInstance::new(
+                contract_addresses.ticket_price_oracle.into(),
+                provider.clone(),
+            ),
             win_prob_oracle: HoprWinningProbabilityOracleInstance::new(
                 contract_addresses.winning_probability_oracle.into(),
                 provider.clone(),
             ),
-            stake_factory: HoprNodeStakeFactoryInstance::new(contract_addresses.node_stake_v2_factory.into(), provider.clone()),
+            stake_factory: HoprNodeStakeFactoryInstance::new(
+                contract_addresses.node_stake_v2_factory.into(),
+                provider.clone(),
+            ),
             module_implementation: HoprNodeManagementModuleInstance::new(
                 contract_addresses.module_implementation.into(),
                 provider.clone(),
