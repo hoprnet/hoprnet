@@ -231,19 +231,16 @@
             hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
 
-          hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
-            hoprdBuildArgs
-            // {
-              src = testSrc;
-              runTests = true;
-            }
-          );
+          hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            src = testSrc;
+            runTests = true;
+          });
 
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
               src = testSrc;
-              runTests = true;
+              runTestsWithCoverage = true;
               cargoExtraArgs = "-Z panic-abort-tests";
             }
           );
