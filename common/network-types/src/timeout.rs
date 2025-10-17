@@ -32,11 +32,11 @@ impl<I, S: futures::Sink<I>> futures::Sink<I> for TimeoutSink<S> {
         let mut this = self.project();
 
         // First, see if we can make progress on the inner sink.
-        match this.inner.poll_ready(cx).map_err(SinkTimeoutError::Inner)? {
-            Poll::Ready(_) => {
+        match this.inner.poll_ready(cx) {
+            Poll::Ready(res) => {
                 // The inner sink is ready, so we can clear the timer.
                 this.timer.set(None);
-                Poll::Ready(Ok(()))
+                Poll::Ready(res.map_err(SinkTimeoutError::Inner))
             }
             Poll::Pending => {
                 if this.timer.is_none() {
