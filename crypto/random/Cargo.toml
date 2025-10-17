@@ -2,6 +2,7 @@
 name = "hopr-crypto-random"
 version = "0.2.2"
 edition = "2021"
+license = "GPL-3.0-only"
 
 [features]
 default = []

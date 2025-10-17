@@ -4,10 +4,10 @@ use hopr_crypto_types::{crypto_traits::KeyIvInit, lioness::LionessBlake3ChaCha20
 use typenum::{U1022, Unsigned};
 
 // Avoid musl's default allocator due to degraded performance
-// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+// Use mimalloc with secure feature for better performance
 #[cfg(target_os = "linux")]
 #[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 const SAMPLE_SIZE: usize = 100_000;
 type BlockSize = U1022;

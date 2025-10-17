@@ -3,6 +3,7 @@ name = "hopr-crypto-types"
 version = "0.7.3"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
+license = "GPL-3.0-only"
 
 [features]
 rust-ecdsa = []
@@ -81,4 +82,4 @@ harness = false
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.0"
+mimalloc = { workspace = true }
