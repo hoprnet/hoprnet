@@ -87,8 +87,8 @@ use hopr_internal_types::{
 use hopr_network_types::{prelude::ResolvedTransportRouting, timeout::TimeoutSinkExt};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
 use hopr_protocol_hopr::{
-    IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, PacketDecoder,
-    PacketEncoder, TicketProcessor,
+    IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError,
+    PacketDecoder, PacketEncoder, TicketProcessor,
 };
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -241,11 +241,14 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
         .build();
 
     let ack_outgoing_success = ack_outgoing.clone();
-    let ack_outgoing_failure = ack_outgoing.clone();
+    let ack_outgoing_failure = ack_outgoing;
+    let ticket_proc_failure = ticket_proc.clone();
+    let ticket_proc_success = ticket_proc;
 
     let res = wire_incoming
         .then_concurrent(move |(peer, data)| {
             let decoder = decoder.clone();
+            let ticket_proc = ticket_proc_failure.clone();
             let mut ack_outgoing_failure = ack_outgoing_failure.clone();
             let peer_id_key_cache = peer_id_cache.clone();
 
@@ -277,26 +280,44 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
 
                 // If there was an error caused by interpretation of the packet data,
                 // we must send a random acknowledgement back.
-                if let Err(error) = &res {
-                    tracing::error!(%peer, %error, "failed to process the received packet");
-
-                    // Send random signed acknowledgement to give feedback to the sender
-                    if error.is_undecodable() {
+                match res {
+                    Ok(packet) => {
+                        tracing::trace!(%peer, "successfully decoded incoming packet");
+                        Some(packet)
+                    },
+                    Err(IncomingPacketError::Undecodable(error)) => {
                         // Do not send an ack back if the packet could not be decoded at all
                         //
                         // Potentially adversarial behavior
-                        tracing::trace!(%peer, "not sending ack back on undecodable packet - possible adversarial behavior");
-                    } else {
+                        tracing::trace!(%peer, %error, "not sending ack back on undecodable packet - possible adversarial behavior");
+                        None
+                    },
+                    Err(IncomingPacketError::ProcessingError(error)) => {
+                        tracing::error!(%peer, %error, "failed to process the decoded packet");
+                        // On this failure, we send back a random acknowledgement
                         ack_outgoing_failure
                             .send((peer_key, None))
                             .await
                             .unwrap_or_else(|error| {
                                 tracing::error!(%error, "failed to send ack to the egress queue");
                             });
+                        None
+                    },
+                    Err(IncomingPacketError::InvalidTicket(error)) => {
+                        tracing::error!(%peer, %error, "failed to validate ticket on the received packet");
+                        if let Err(error) = ticket_proc.reject_ticket(peer_key, *error.ticket).await {
+                            tracing::error!(%error, "failed to reject invalid ticket");
+                        }
+                        // On this failure, we send back a random acknowledgement
+                        ack_outgoing_failure
+                            .send((peer_key, None))
+                            .await
+                            .unwrap_or_else(|error| {
+                                tracing::error!(%error, "failed to send ack to the egress queue");
+                            });
+                        None
                     }
                 }
-
-                res.ok()
             }
         })
         .filter_map(futures::future::ready)
@@ -325,7 +346,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
             )
         })*/
         .then_concurrent(move |packet| {
-            let ticket_proc = ticket_proc.clone();
+            let ticket_proc = ticket_proc_success.clone();
             let mut wire_outgoing = wire_outgoing.clone();
             let mut ack_incoming = ack_incoming.clone();
             let mut ack_outgoing_success = ack_outgoing_success.clone();
@@ -364,7 +385,7 @@ async fn start_incoming_packet_pipeline<WIn, WOut, D, T, AckIn, AckOut, AppIn>(
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_PACKET_COUNT.increment(&["received"]);
-                        
+
                         Some((sender, plain_text, info))
                     }
                     IncomingPacket::Forwarded(fwd_packet) => {
@@ -547,12 +568,15 @@ where
     let (outgoing_ack_tx, outgoing_ack_rx) =
         futures::channel::mpsc::channel::<(OffchainPublicKey, Option<HalfKey>)>(ACK_OUT_BUFFER_SIZE);
 
-    let outgoing_ack_tx = outgoing_ack_tx.with_timeout(QUEUE_SEND_TIMEOUT);
-
     let (incoming_ack_tx, incoming_ack_rx) =
         futures::channel::mpsc::channel::<(OffchainPublicKey, Acknowledgement)>(TICKET_ACK_BUFFER_SIZE);
 
+    // Attach timeouts to all Sinks so that the pipelines are not blocked when
+    // some channel is not being timely processed
+    let (wire_out, wire_in) = (wire_msg.0.with_timeout(QUEUE_SEND_TIMEOUT), wire_msg.1);
+    let (app_out, app_in) = (api.0.with_timeout(QUEUE_SEND_TIMEOUT), api.1);
     let incoming_ack_tx = incoming_ack_tx.with_timeout(QUEUE_SEND_TIMEOUT);
+    let outgoing_ack_tx = outgoing_ack_tx.with_timeout(QUEUE_SEND_TIMEOUT);
 
     #[cfg(feature = "capture")]
     let (encoder, decoder) = {
@@ -594,22 +618,22 @@ where
     processes.insert(
         ProtocolProcesses::MsgOut,
         spawn_as_abortable!(start_outgoing_packet_pipeline(
-            api.1,
+            app_in,
             encoder.clone(),
-            wire_msg.0.clone(),
+            wire_out.clone(),
         )),
     );
 
     processes.insert(
         ProtocolProcesses::MsgIn,
         spawn_as_abortable!(start_incoming_packet_pipeline(
-            wire_msg.1,
-            decoder.clone(),
+            wire_in,
+            decoder,
             ticket_proc.clone(),
-            outgoing_ack_tx.clone(),
-            wire_msg.0.clone(),
-            incoming_ack_tx.clone(),
-            api.0,
+            outgoing_ack_tx,
+            wire_out.clone(),
+            incoming_ack_tx,
+            app_out,
         )),
     );
 
@@ -617,9 +641,9 @@ where
         ProtocolProcesses::AckOut,
         spawn_as_abortable!(start_outgoing_ack_pipeline(
             outgoing_ack_rx,
-            encoder.clone(),
+            encoder,
             packet_key.clone(),
-            wire_msg.0.clone(),
+            wire_out,
         )),
     );
 
