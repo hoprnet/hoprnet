@@ -299,8 +299,9 @@ opt-level = 1
 codegen-units = 1
 lto = "fat"
 panic = "abort"
-strip = true
 opt-level = 3
+debug = 2         # minimal debug info for memory profiling
+strip = false     # do not strip debug info
 
 # uses extended debug symbols for profiling but does not harm benchmarking performance
 [profile.bench]
