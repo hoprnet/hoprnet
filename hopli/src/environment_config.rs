@@ -30,12 +30,23 @@ use alloy::{
     transports::http::ReqwestTransport,
 };
 use clap::Parser;
-use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
+use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::utils::HelperErrors;
+
+/// Types of HOPR network environments.
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[serde(rename_all(deserialize = "lowercase"))]
+#[strum(serialize_all = "lowercase")]
+pub enum EnvironmentType {
+    Production,
+    Staging,
+    Development,
+    Local,
+}
 
 type SharedFillerChain = JoinFill<
     JoinFill<JoinFill<JoinFill<Identity, ChainIdFiller>, NonceFiller<CachedNonceManager>>, GasFiller>,
