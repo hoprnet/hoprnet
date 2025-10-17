@@ -55,6 +55,10 @@ pub struct IncomingForwardedPacket {
     pub previous_hop: OffchainPublicKey,
     pub next_hop: OffchainPublicKey,
     pub data: Box<[u8]>,
+    /// Challenge to be solved from the acknowledgement of the next hop.
+    pub ack_challenge: HalfKeyChallenge,
+    /// Ticket to be acknowledged by the next hop.
+    pub ticket: UnacknowledgedTicket,
     /// Acknowledgement payload to be sent to the previous hop
     pub ack_key: HalfKey,
 }
@@ -101,15 +105,15 @@ impl IncomingPacket {
         match self {
             IncomingPacket::Final(f) => &f.packet_tag,
             IncomingPacket::Forwarded(f) => &f.packet_tag,
-            IncomingPacket::Acknowledgement(f) => &f.packet_tag, 
+            IncomingPacket::Acknowledgement(f) => &f.packet_tag,
         }
     }
-    
+
     pub fn previous_hop(&self) -> &OffchainPublicKey {
         match self {
             IncomingPacket::Final(f) => &f.previous_hop,
             IncomingPacket::Forwarded(f) => &f.previous_hop,
-            IncomingPacket::Acknowledgement(f) => &f.previous_hop, 
+            IncomingPacket::Acknowledgement(f) => &f.previous_hop,
         }
     }
 }

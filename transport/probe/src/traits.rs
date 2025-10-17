@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use hopr_api::db::FoundSurb;
-use libp2p_identity::PeerId;
 use hopr_transport_protocol::FoundSurb;
+use libp2p_identity::PeerId;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]

@@ -1,14 +1,15 @@
-use std::sync::Arc;
-use std::time::Duration;
-use moka::future::Cache;
-use moka::notification::RemovalCause;
-use ringbuffer::RingBuffer;
-use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
-use hopr_crypto_packet::{HoprSurb, ReplyOpener};
+use std::{sync::Arc, time::Duration};
+
+use hopr_crypto_packet::{
+    HoprSurb, ReplyOpener,
+    prelude::{HoprSenderId, HoprSurbId},
+};
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::SurbMatcher;
-use crate::FoundSurb;
-use crate::traits::SurbStore;
+use moka::{future::Cache, notification::RemovalCause};
+use ringbuffer::RingBuffer;
+
+use crate::{FoundSurb, traits::SurbStore};
 
 /// Configuration for the SURB cache.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, smart_default::SmartDefault)]
@@ -57,7 +58,7 @@ impl MemorySurbStore {
                 // TODO: Expose this as a config option
                 .max_capacity(10_000)
                 .build(),
-            cfg
+            cfg,
         }
     }
 }
@@ -72,10 +73,7 @@ impl Default for MemorySurbStore {
 impl SurbStore for MemorySurbStore {
     async fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb> {
         let pseudonym = matcher.pseudonym();
-        let surbs_for_pseudonym = self
-            .surbs_per_pseudonym
-            .get(&pseudonym)
-            .await?;
+        let surbs_for_pseudonym = self.surbs_per_pseudonym.get(&pseudonym).await?;
 
         match matcher {
             SurbMatcher::Pseudonym(_) => surbs_for_pseudonym.pop_one().map(|popped_surb| FoundSurb {
@@ -87,13 +85,15 @@ impl SurbStore for MemorySurbStore {
             // and does not search the entire RB.
             // This is because the exact match use-case is suited only for situations
             // when there is a single SURB in the RB.
-            SurbMatcher::Exact(id) => surbs_for_pseudonym
-                .pop_one_if_has_id(&id.surb_id())
-                .map(|popped_surb| FoundSurb {
-                    sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
-                    surb: popped_surb.surb,
-                    remaining: popped_surb.remaining, // = likely 0
-                }),
+            SurbMatcher::Exact(id) => {
+                surbs_for_pseudonym
+                    .pop_one_if_has_id(&id.surb_id())
+                    .map(|popped_surb| FoundSurb {
+                        sender_id: HoprSenderId::from_pseudonym_and_id(&pseudonym, popped_surb.id),
+                        surb: popped_surb.surb,
+                        remaining: popped_surb.remaining, // = likely 0
+                    })
+            }
         }
     }
 
@@ -157,7 +157,9 @@ pub struct SurbRingBuffer<S>(Arc<parking_lot::Mutex<ringbuffer::AllocRingBuffer<
 
 impl<S> SurbRingBuffer<S> {
     pub fn new(capacity: usize) -> Self {
-        Self(Arc::new(parking_lot::Mutex::new(ringbuffer::AllocRingBuffer::new(capacity))))
+        Self(Arc::new(parking_lot::Mutex::new(ringbuffer::AllocRingBuffer::new(
+            capacity,
+        ))))
     }
 
     /// Push all SURBs with their IDs into the RB.
@@ -260,7 +262,12 @@ mod tests {
         rb.push([([1u8; 8], 0)]);
 
         assert!(rb.pop_one_if_has_id(&[2u8; 8]).is_none());
-        assert_eq!([1u8; 8], rb.pop_one_if_has_id(&[1u8; 8]).ok_or(anyhow::anyhow!("expected pop"))?.id);
+        assert_eq!(
+            [1u8; 8],
+            rb.pop_one_if_has_id(&[1u8; 8])
+                .ok_or(anyhow::anyhow!("expected pop"))?
+                .id
+        );
 
         Ok(())
     }

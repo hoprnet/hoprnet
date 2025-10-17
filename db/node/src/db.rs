@@ -27,8 +27,6 @@ pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
 
 pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
-
-
 #[derive(Clone, Debug, validator::Validate, smart_default::SmartDefault)]
 pub struct HoprNodeDbConfig {
     #[default(true)]

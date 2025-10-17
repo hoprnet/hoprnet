@@ -1,19 +1,19 @@
-use std::ops::{Mul, Sub};
-use std::sync::Arc;
-use std::sync::atomic::AtomicU64;
-use std::time::Duration;
-use futures::{Sink, SinkExt};
-use moka::future::Cache;
-use tracing::instrument;
-use hopr_api::{
-    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
+use std::{
+    ops::{Mul, Sub},
+    sync::{Arc, atomic::AtomicU64},
+    time::Duration,
 };
-use hopr_api::chain::KeyIdMapper;
-use hopr_api::db::{HoprDbTicketOperations, TicketSelector};
+
+use futures::{Sink, SinkExt};
+use hopr_api::{
+    chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues, KeyIdMapper},
+    db::{HoprDbTicketOperations, TicketSelector},
+};
 pub use hopr_crypto_packet::errors::PacketError;
-use hopr_crypto_packet::errors::PacketError::TransportError;
-use hopr_crypto_packet::errors::TicketValidationError;
-use hopr_crypto_packet::prelude::{validate_unacknowledged_ticket, HoprForwardedPacket, HoprPacket, HoprSenderId, PacketRouting};
+use hopr_crypto_packet::{
+    errors::{PacketError::TransportError, TicketValidationError},
+    prelude::{HoprForwardedPacket, HoprPacket, HoprSenderId, PacketRouting, validate_unacknowledged_ticket},
+};
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -22,10 +22,17 @@ use hopr_parallelize::cpu::spawn_fifo_blocking;
 use hopr_path::{Path, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
+use moka::future::Cache;
+use tracing::instrument;
 
-use crate::traits::{PacketUnwrapping, PacketWrapping, SurbStore};
-use crate::errors::{IncomingPacketError, PacketProcessorError};
-use crate::types::{AuxiliaryPacketInfo, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, OutgoingPacket};
+use crate::{
+    errors::{IncomingPacketError, PacketProcessorError},
+    traits::{PacketUnwrapping, PacketWrapping, SurbStore},
+    types::{
+        AuxiliaryPacketInfo, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
+        IncomingPacket, OutgoingPacket,
+    },
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -69,8 +76,8 @@ where
     R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync + Clone,
 {
-    type Input = ApplicationDataOut;
     type Error = PacketProcessorError;
+    type Input = ApplicationDataOut;
 
     #[tracing::instrument(level = "trace", skip(self, data), ret(Debug), err)]
     async fn send_data(
@@ -125,8 +132,7 @@ where
                 .map_err(|e| PacketProcessorError::ResolverError(e.into()))?
                 .ok_or_else(|| PacketProcessorError::ChannelNotFound(*self.chain_key.as_ref(), next_peer.clone()))?;
 
-            let (outgoing_ticket_win_prob, outgoing_ticket_price) =
-                self.determine_network_config().await?;
+            let (outgoing_ticket_win_prob, outgoing_ticket_price) = self.determine_network_config().await?;
 
             self.create_multihop_ticket(
                 channel,
@@ -135,7 +141,7 @@ where
                 outgoing_ticket_win_prob,
                 outgoing_ticket_price,
             )
-                .await?
+            .await?
         } else {
             TicketBuilder::zero_hop().direction(self.chain_key.as_ref(), &next_peer)
         };
@@ -167,12 +173,13 @@ where
         // Store the reply openers under the given SenderId
         // This is a no-op for reply packets
         openers.into_iter().for_each(|(surb_id, opener)| {
-            self.surb_store.insert_reply_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener);
+            self.surb_store
+                .insert_reply_opener(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener);
         });
 
-        let out = packet
-            .try_as_outgoing()
-            .ok_or(PacketProcessorError::InvalidState("cannot send out packet that is not outgoing"))?;
+        let out = packet.try_as_outgoing().ok_or(PacketProcessorError::InvalidState(
+            "cannot send out packet that is not outgoing",
+        ))?;
 
         self.unacked_tickets
             .insert(out.ack_challenge, PendingAcknowledgement::WaitingAsSender)
@@ -190,7 +197,11 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self, ack, destination), ret(Debug), err)]
-    async fn send_ack(&self, ack: Acknowledgement, destination: &OffchainPublicKey) -> Result<OutgoingPacket, Self::Error> {
+    async fn send_ack(
+        &self,
+        ack: Acknowledgement,
+        destination: &OffchainPublicKey,
+    ) -> Result<OutgoingPacket, Self::Error> {
         let next_peer = self
             .resolver
             .packet_key_to_chain_key(&destination)
@@ -226,9 +237,9 @@ where
         })
         .await?;
 
-        let out = packet
-            .try_as_outgoing()
-            .ok_or(PacketProcessorError::InvalidState("cannot send out packet that is not outgoing"))?;
+        let out = packet.try_as_outgoing().ok_or(PacketProcessorError::InvalidState(
+            "cannot send out packet that is not outgoing",
+        ))?;
 
         let mut transport_payload = Vec::with_capacity(HoprPacket::SIZE);
         transport_payload.extend_from_slice(out.packet.as_ref());
@@ -258,8 +269,8 @@ where
     R: ChainReadChannelOperations + ChainKeyOperations + ChainValues + Send + Sync,
     S: SurbStore + Send + Sync + Clone + 'static,
 {
-    type Packet = IncomingPacket;
     type Error = PacketProcessorError;
+    type Packet = IncomingPacket;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
     async fn recv_data(
@@ -276,8 +287,9 @@ where
                 surb_store.find_reply_opener(p)
             })
         })
-        .await.map_err(|e| IncomingPacketError::Undecodable(e.into()))?;
-        
+        .await
+        .map_err(|e| IncomingPacketError::Undecodable(e.into()))?;
+
         if start.elapsed() > SLOW_OP {
             tracing::warn!(
                 elapsed = ?start.elapsed(),
@@ -303,31 +315,35 @@ where
                 Ok(match incoming.ack_key {
                     None => {
                         // The contained payload represents an Acknowledgement
-                        IncomingPacket::Acknowledgement(IncomingAcknowledgementPacket {
+                        IncomingPacket::Acknowledgement(
+                            IncomingAcknowledgementPacket {
+                                packet_tag: incoming.packet_tag,
+                                previous_hop: incoming.previous_hop,
+                                ack: incoming
+                                    .plain_text
+                                    .as_ref()
+                                    .try_into()
+                                    .map_err(|e: GeneralError| IncomingPacketError::Undecodable(e.into()))?,
+                            }
+                            .into(),
+                        )
+                    }
+                    Some(ack_key) => IncomingPacket::Final(
+                        IncomingFinalPacket {
                             packet_tag: incoming.packet_tag,
                             previous_hop: incoming.previous_hop,
-                            ack: incoming
-                                .plain_text
-                                .as_ref()
-                                .try_into()
-                                .map_err(|e: GeneralError| IncomingPacketError::Undecodable(e.into()))?,
-                        }.into())
-                    }
-                    Some(ack_key) => IncomingPacket::Final(IncomingFinalPacket {
-                        packet_tag: incoming.packet_tag,
-                        previous_hop: incoming.previous_hop,
-                        sender: incoming.sender,
-                        plain_text: incoming.plain_text,
-                        ack_key,
-                        info,
-                    }.into()),
+                            sender: incoming.sender,
+                            plain_text: incoming.plain_text,
+                            ack_key,
+                            info,
+                        }
+                        .into(),
+                    ),
                 })
             }
             HoprPacket::Forwarded(fwd) => {
                 let start = std::time::Instant::now();
-                let validation_res = self
-                    .validate_and_replace_ticket(*fwd)
-                    .await;
+                let validation_res = self.validate_and_replace_ticket(*fwd).await;
                 if start.elapsed() > SLOW_OP {
                     tracing::warn!(
                         elapsed = ?start.elapsed(),
@@ -341,28 +357,32 @@ where
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        Ok(IncomingPacket::Forwarded(IncomingForwardedPacket {
-                            packet_tag: fwd.packet_tag,
-                            previous_hop: fwd.previous_hop,
-                            next_hop: fwd.outgoing.next_hop,
-                            data: payload.into_boxed_slice(),
-                            ack_key: fwd.ack_key,
-                        }.into()))
+                        Ok(IncomingPacket::Forwarded(
+                            IncomingForwardedPacket {
+                                packet_tag: fwd.packet_tag,
+                                previous_hop: fwd.previous_hop,
+                                next_hop: fwd.outgoing.next_hop,
+                                data: payload.into_boxed_slice(),
+                                ack_key: fwd.ack_key,
+                            }
+                            .into(),
+                        ))
                     }
                     Err(PacketProcessorError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
                         tracing::warn!(?rejected_ticket, %rejected_value, %error, "failure to validate during forwarding");
 
-                        self.db.mark_unsaved_ticket_rejected(&rejected_ticket)
+                        self.db
+                            .mark_unsaved_ticket_rejected(&rejected_ticket)
                             .await
                             .map_err(|e| {
-                                PacketProcessorError::TicketValidationError(
-                                    TicketValidationError {
-                                        reason: format!("during validation error '{error}' update another error occurred: {e}"),
-                                        ticket: rejected_ticket.clone().into(),
-                                    }
-                                )
+                                PacketProcessorError::TicketValidationError(TicketValidationError {
+                                    reason: format!(
+                                        "during validation error '{error}' update another error occurred: {e}"
+                                    ),
+                                    ticket: rejected_ticket.clone().into(),
+                                })
                             })
                             .map_err(IncomingPacketError::ProcessingError)?;
 
@@ -376,20 +396,22 @@ where
                     Err(e) => Err(IncomingPacketError::ProcessingError(e)),
                 }
             }
-            HoprPacket::Outgoing(_) => Err(IncomingPacketError::ProcessingError(PacketProcessorError::InvalidState("cannot be outgoing packet"))),
+            HoprPacket::Outgoing(_) => Err(IncomingPacketError::ProcessingError(
+                PacketProcessorError::InvalidState("cannot be outgoing packet"),
+            )),
         }
     }
 
+    // Becomes: acknowledge_ticket in TicketProcessor
     async fn recv_ack(&self, peer: OffchainPublicKey, ack: Acknowledgement) -> Result<(), Self::Error> {
-        let verified_ack = hopr_parallelize::cpu::spawn_blocking(move || {
-            ack.verify(&peer)
-        }).await?;
+        let verified_ack = hopr_parallelize::cpu::spawn_blocking(move || ack.verify(&peer)).await?;
 
         let result = self.find_ticket_to_acknowledge(&verified_ack).await?;
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
                 // If the ticket was a win, store it
-                self.db.insert_received_ticket(ack_ticket.as_ref().clone())
+                self.db
+                    .insert_received_ticket(ack_ticket.as_ref().clone())
                     .await
                     .map_err(|e| PacketProcessorError::NodeDbError(e.into()))?;
 
@@ -429,7 +451,7 @@ where
         surb_store: S,
         chain_key: ChainKeypair,
         packet_key: OffchainKeypair,
-        cfg: PacketInteractionConfig
+        cfg: PacketInteractionConfig,
     ) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
@@ -439,14 +461,16 @@ where
         }
 
         Self {
-            db, resolver, surb_store,
+            db,
+            resolver,
+            surb_store,
             unacked_tickets: Cache::builder()
                 .time_to_live(cfg.unack_ticket_timeout)
                 .max_capacity(cfg.max_unack_tickets as u64)
                 .build(),
             chain_key,
             packet_key,
-            cfg
+            cfg,
         }
     }
 
@@ -464,7 +488,7 @@ where
             ticket_price
                 .amount()
                 .mul(U256::from(current_path_pos - 1))
-                .div_f64(winning_prob.into())?
+                .div_f64(winning_prob.into())?,
         );
 
         if channel.balance.lt(&amount) {
@@ -514,7 +538,9 @@ where
 
         // Check: is the ticket in the packet really for the given channel?
         if !fwd.outgoing.ticket.channel_id.eq(&incoming_channel.get_id()) {
-            return Err(PacketProcessorError::InvalidState("ticket channel id does not match channel id of incoming packet"));
+            return Err(PacketProcessorError::InvalidState(
+                "ticket channel id does not match channel id of incoming packet",
+            ));
         }
 
         let domain_separator = self
@@ -536,19 +562,18 @@ where
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INCOMING_WIN_PROB.observe(fwd.outgoing.ticket.win_prob().as_f64());
 
-        let remaining_balance = incoming_channel
-            .balance
-            .sub(self.db.unrealized_value(TicketSelector::from(&incoming_channel)).await?);
+        let remaining_balance = incoming_channel.balance.sub(
+            self.db
+                .unrealized_value(TicketSelector::from(&incoming_channel))
+                .await?,
+        );
 
         // Here also the signature on the ticket gets validated,
         // so afterward we are sure the source of the `channel`
         // (which is equal to `previous_hop_addr`) has issued this
         // ticket.
         let start = std::time::Instant::now();
-        let win_prob = self
-            .resolver
-            .minimum_incoming_ticket_win_prob()
-            .await?;
+        let win_prob = self.resolver.minimum_incoming_ticket_win_prob().await?;
 
         let verified_incoming_ticket = spawn_fifo_blocking(move || {
             validate_unacknowledged_ticket(
@@ -560,7 +585,7 @@ where
                 &domain_separator,
             )
         })
-            .await?;
+        .await?;
 
         if start.elapsed() > SLOW_OP {
             tracing::warn!(elapsed = ?start.elapsed(), "validate_unacknowledged_ticket took too long");
@@ -589,10 +614,10 @@ where
                 .await?
                 .ok_or_else(|| PacketProcessorError::ChannelNotFound(*self.chain_key.as_ref(), next_hop_addr))?;
 
-            let (outgoing_ticket_win_prob, outgoing_ticket_price) =
-                self.determine_network_config()
-                    .await
-                    .map_err(IncomingPacketError::ProcessingError)?;
+            let (outgoing_ticket_win_prob, outgoing_ticket_price) = self
+                .determine_network_config()
+                .await
+                .map_err(IncomingPacketError::ProcessingError)?;
 
             // We currently take the maximum of the win prob from the incoming ticket
             // and the one configured on this node.
@@ -606,7 +631,7 @@ where
                 outgoing_ticket_win_prob,
                 outgoing_ticket_price,
             )
-                .await?
+            .await?
         } else {
             TicketBuilder::zero_hop().direction(self.chain_key.as_ref(), &next_hop_addr)
         };
@@ -625,9 +650,7 @@ where
         // This operation hits the cache unless the new value is fetched for the first time
         // NOTE: as opposed to the winning probability, the ticket price does not have
         // a reasonable default, and therefore the operation fails
-        let network_ticket_price = self.resolver
-            .minimum_ticket_price()
-            .await?;
+        let network_ticket_price = self.resolver.minimum_ticket_price().await?;
 
         let outgoing_ticket_price = self.cfg.outgoing_ticket_price.unwrap_or(network_ticket_price);
 
@@ -643,7 +666,11 @@ where
         // or 1 if the network value was not determined.
         // This code does not take the max from those, as it is the upper layer's responsibility
         // to ensure the configured value is not smaller than the network value.
-        let outgoing_ticket_win_prob = self.cfg.outgoing_ticket_win_prob.or(network_win_prob).unwrap_or_default(); // Absolute default WinningProbability is 1.0
+        let outgoing_ticket_win_prob = self
+            .cfg
+            .outgoing_ticket_win_prob
+            .or(network_win_prob)
+            .unwrap_or_default(); // Absolute default WinningProbability is 1.0
 
         Ok((outgoing_ticket_win_prob, outgoing_ticket_price))
     }
@@ -678,11 +705,7 @@ where
                 if maybe_channel_with_issuer
                     .is_some_and(|c| c.channel_epoch.as_u32() == unacknowledged.verified_ticket().channel_epoch)
                 {
-                    let domain_separator = self
-                        .resolver
-                        .domain_separators()
-                        .await?
-                        .channel;
+                    let domain_separator = self.resolver.domain_separators().await?.channel;
 
                     let chain_key = self.chain_key.clone();
                     hopr_parallelize::cpu::spawn_blocking(move || {
@@ -702,11 +725,11 @@ where
                             ))
                         }
                     })
-                        .await
+                    .await
                 } else {
                     Err(PacketProcessorError::ChannelNotFound(
                         *unacknowledged.ticket.verified_issuer(),
-                        *self.chain_key.as_ref()
+                        *self.chain_key.as_ref(),
                     ))
                 }
             }

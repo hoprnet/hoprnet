@@ -1,8 +1,7 @@
 use async_trait::async_trait;
-use hopr_api::{
-    chain::ChainKeyOperations,
-};
+use hopr_api::chain::ChainKeyOperations;
 use hopr_transport_protocol::{FoundSurb, SurbStore};
+
 use crate::traits::DbOperations;
 
 #[derive(Debug, Clone)]

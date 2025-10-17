@@ -291,6 +291,7 @@ mod tests {
     use hopr_network_types::prelude::SurbMatcher;
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
     use hopr_transport_protocol::FoundSurb;
+
     use super::*;
 
     lazy_static::lazy_static!(
