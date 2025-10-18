@@ -31,7 +31,7 @@ use hopr_transport_identity::{Multiaddr, PeerId};
 
 pub use timer::execute_on_tick;
 
-pub use pipeline::{run_hopr_packet_pipeline, PacketPipelineProcesses};
+pub use pipeline::{run_packet_pipeline, PacketPipelineProcesses, TicketEvent};
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 

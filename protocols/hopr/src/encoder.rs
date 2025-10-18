@@ -7,26 +7,18 @@ use hopr_network_types::prelude::*;
 use hopr_path::Path;
 use hopr_primitive_types::prelude::*;
 
-use crate::{OutgoingPacket, PacketEncoder, SurbStore, TicketTracker, errors::HoprProtocolError, TicketCreationError};
-
-#[derive(Clone, Debug, smart_default::SmartDefault)]
-pub struct HoprEncoderConfig {
-    pub outgoing_ticket_price: Option<HoprBalance>,
-    #[default(Some(WinningProbability::ALWAYS))]
-    pub outgoing_win_prob: Option<WinningProbability>,
-    pub channels_dst: Hash,
-}
+use crate::{OutgoingPacket, PacketEncoder, SurbStore, TicketTracker, errors::HoprProtocolError, TicketCreationError, HoprCodecConfig};
 
 pub struct HoprEncoder<R, S, T> {
     provider: R,
     surb_store: S,
     tracker: T,
     chain_key: ChainKeypair,
-    cfg: HoprEncoderConfig,
+    cfg: HoprCodecConfig,
 }
 
 impl<R, S, T> HoprEncoder<R, S, T> {
-    pub fn new(provider: R, surb_store: S, tracker: T, chain_key: ChainKeypair, cfg: HoprEncoderConfig) -> Self {
+    pub fn new(provider: R, surb_store: S, tracker: T, chain_key: ChainKeypair, cfg: HoprCodecConfig) -> Self {
         Self {
             provider,
             surb_store,

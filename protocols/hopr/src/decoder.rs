@@ -6,15 +6,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use crate::{AuxiliaryPacketInfo, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, TicketTracker, errors::HoprProtocolError, tbf::TagBloomFilter, TicketCreationError};
-
-#[derive(Clone, Debug, smart_default::SmartDefault)]
-pub struct HoprDecoderConfig {
-    pub outgoing_ticket_price: Option<HoprBalance>,
-    #[default(Some(WinningProbability::ALWAYS))]
-    pub outgoing_win_prob: Option<WinningProbability>,
-    pub channels_dst: Hash,
-}
+use crate::{AuxiliaryPacketInfo, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, TicketTracker, errors::HoprProtocolError, tbf::TagBloomFilter, TicketCreationError, HoprCodecConfig};
 
 pub struct HoprDecoder<R, S, T> {
     provider: R,
@@ -22,7 +14,7 @@ pub struct HoprDecoder<R, S, T> {
     tracker: T,
     packet_key: OffchainKeypair,
     chain_key: ChainKeypair,
-    cfg: HoprDecoderConfig,
+    cfg: HoprCodecConfig,
     tbf: parking_lot::Mutex<TagBloomFilter>,
     peer_id_cache: moka::future::Cache<PeerId, OffchainPublicKey>,
 }
@@ -38,7 +30,7 @@ where
         surb_store: S,
         tracker: T,
         (packet_key, chain_key): (OffchainKeypair, ChainKeypair),
-        cfg: HoprDecoderConfig,
+        cfg: HoprCodecConfig,
     ) -> Self {
         Self {
             provider,

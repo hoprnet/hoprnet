@@ -5231,7 +5231,6 @@ dependencies = [
  "pcap-file",
  "proc-macro-regex",
  "rand 0.8.5",
- "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
  "smart-default",

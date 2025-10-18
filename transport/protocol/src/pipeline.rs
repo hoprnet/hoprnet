@@ -418,7 +418,7 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
 /// overlay on top of the `wire_msg` Stream or Sink.
-pub async fn run_hopr_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
+pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     packet_key: OffchainKeypair,
     wire_msg: (WOut, WIn),
     codec: (C, D),

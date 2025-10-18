@@ -10,7 +10,6 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["mixer-channel"]
 p2p-announce-quic = []
 p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 runtime-tokio = [
@@ -31,8 +30,6 @@ prometheus = [
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
 ]
-mixer-stream = ["dep:rust-stream-ext-concurrent"]
-mixer-channel = []
 capture = ["dep:pcap-file"]
 
 [dependencies]
@@ -45,7 +42,6 @@ futures-time = { workspace = true }
 lazy_static = { workspace = true }
 proc-macro-regex = { workspace = true }
 pcap-file = { workspace = true, optional = true }
-rust-stream-ext-concurrent = { workspace = true, optional = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
