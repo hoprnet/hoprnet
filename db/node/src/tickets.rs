@@ -509,7 +509,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, NodeDbError> {
+    async fn increment_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, NodeDbError> {
         let old_value = self
             .get_outgoing_ticket_index(channel_id)
             .await?
@@ -520,9 +520,10 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>, NodeDbError> {
+    async fn get_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<Arc<AtomicU64>, NodeDbError> {
         let tkt_manager = self.ticket_manager.clone();
-
+        let channel_id = *channel_id;
+        
         Ok(self
             .caches
             .ticket_index

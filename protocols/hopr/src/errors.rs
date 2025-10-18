@@ -2,10 +2,13 @@ use hopr_api::Address;
 use hopr_crypto_packet::errors::TicketValidationError;
 use hopr_crypto_types::prelude::HalfKeyChallenge;
 use thiserror::Error;
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_internal_types::prelude::ChannelId;
+use hopr_primitive_types::balance::HoprBalance;
 
 /// Error that can occur when processing an incoming packet.
 #[derive(Debug, strum::EnumIs, strum::EnumTryAs, Error)]
-pub enum IncomingPacketError<E> {
+pub enum IncomingPacketError<E: std::error::Error> {
     /// Packet is not decodable.
     ///
     /// Such errors are fatal and therefore the packet cannot be acknowledged.
@@ -14,11 +17,20 @@ pub enum IncomingPacketError<E> {
     /// Packet is decodable but cannot be processed due to other reasons.
     ///
     /// Such errors are protocol-related and packets must be acknowledged.
-    #[error("packet is decodable, but cannot be processed: {0}")]
-    ProcessingError(E),
+    #[error("packet from {0} decodable, but cannot be processed: {1}")]
+    ProcessingError(OffchainPublicKey, E),
     /// Packet is decodable, but the ticket is invalid.
-    #[error("packet is decodable, but the ticket is invalid: {0}")]
-    InvalidTicket(TicketValidationError),
+    #[error("packet from {0} is decodable, but the ticket is invalid: {1}")]
+    InvalidTicket(OffchainPublicKey, TicketValidationError),
+}
+
+/// Error that can occur when creating a ticket.
+#[derive(Debug, strum::EnumIs, strum::EnumTryAs, Error)]
+pub enum TicketCreationError<E: std::error::Error> {
+    #[error("channel {0} does not have at least {1} to create a ticket")]
+    OutOfFunds(ChannelId, HoprBalance),
+    #[error("could not create ticket: {0}")]
+    Other(E)
 }
 
 #[derive(Error, Debug)]
@@ -26,8 +38,14 @@ pub enum HoprProtocolError {
     #[error("packet is in invalid state: {0}")]
     InvalidState(&'static str),
 
+    #[error("cannot decoded the sender address of the packet")]
+    InvalidSender,
+
     #[error("failed to resolve chain key or packet key")]
     KeyNotFound,
+
+    #[error("channel {0} does not have at least {1} to create a ticket")]
+    OutOfFunds(ChannelId, HoprBalance),
 
     #[error("packet replay detected")]
     Replay,
@@ -40,6 +58,9 @@ pub enum HoprProtocolError {
 
     #[error("chain resolver error: {0}")]
     ResolverError(anyhow::Error),
+
+    #[error("ticket tracker error: {0}")]
+    TicketTrackerError(anyhow::Error),
 
     #[error(transparent)]
     TicketValidationError(#[from] TicketValidationError),

@@ -12,7 +12,6 @@ crate-type = ["rlib"]
 default = []
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
-capture = ["dep:pcap-file"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -23,7 +22,6 @@ hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
-pcap-file = { workspace = true, optional = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_with = { workspace = true }
@@ -64,11 +62,7 @@ hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }
-hopr-protocol-session = { workspace = true, features = ["session-types"] }
-hopr-protocol-start = { workspace = true }
-hopr-transport-session = { workspace = true }
 hopr-transport-mixer = { workspace = true }
-hopr-transport-probe = { workspace = true }
 
 [[bench]]
 name = "protocol_throughput_emulated"

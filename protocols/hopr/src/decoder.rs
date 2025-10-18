@@ -1,15 +1,12 @@
 use std::ops::{Mul, Sub};
-
+use std::time::Duration;
 use hopr_api::chain::*;
 use hopr_crypto_packet::{errors::TicketValidationError, prelude::*};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use crate::{
-    AuxiliaryPacketInfo, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket,
-    IncomingPacketError, PacketDecoder, SurbStore, TicketTracker, errors::HoprProtocolError, tbf::TagBloomFilter,
-};
+use crate::{AuxiliaryPacketInfo, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, TicketTracker, errors::HoprProtocolError, tbf::TagBloomFilter, TicketCreationError};
 
 #[derive(Clone, Debug, smart_default::SmartDefault)]
 pub struct HoprDecoderConfig {
@@ -27,6 +24,7 @@ pub struct HoprDecoder<R, S, T> {
     chain_key: ChainKeypair,
     cfg: HoprDecoderConfig,
     tbf: parking_lot::Mutex<TagBloomFilter>,
+    peer_id_cache: moka::future::Cache<PeerId, OffchainPublicKey>,
 }
 
 impl<R, S, T> HoprDecoder<R, S, T>
@@ -50,6 +48,10 @@ where
             cfg,
             tracker,
             tbf: parking_lot::Mutex::new(TagBloomFilter::default()),
+            peer_id_cache: moka::future::Cache::builder()
+                .time_to_idle(Duration::from_secs(600))
+                .max_capacity(100_000)
+                .build(),
         }
     }
 
@@ -98,7 +100,9 @@ where
 
         let remaining_balance = incoming_channel.balance.sub(
             self.tracker
-                .incoming_channel_unrealized_balance(incoming_channel.get_id()),
+                .incoming_channel_unrealized_balance(incoming_channel.get_id(), incoming_channel.channel_epoch.as_u32())
+                .await
+                .map_err(|e| HoprProtocolError::TicketTrackerError(e.into()))?,
         );
 
         // Here also the signature on the ticket gets validated,
@@ -162,7 +166,10 @@ where
                 fwd.path_pos,
                 outgoing_ticket_win_prob,
                 outgoing_ticket_price,
-            )?
+            ).await.map_err(|e| match e {
+                TicketCreationError::OutOfFunds(id, a) => HoprProtocolError::OutOfFunds(id, a),
+                e => HoprProtocolError::TicketTrackerError(e.into()),
+            })?
         } else {
             TicketBuilder::zero_hop().direction(self.chain_key.as_ref(), &next_hop_addr)
         };
@@ -192,9 +199,21 @@ where
 
     async fn decode(
         &self,
-        previous_hop: OffchainPublicKey,
+        sender: PeerId,
         data: Box<[u8]>,
     ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+        // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
+        let previous_hop = match self.peer_id_cache
+            .try_get_with_by_ref(&sender, hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender)))
+            .await {
+            Ok(peer) => peer,
+            Err(error) => {
+                // There absolutely nothing we can do when the peer id is unparseable (e.g., non-ed25519 based)
+                tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
+                return Err(IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender))
+            }
+        };
+
         let offchain_keypair = self.packet_key.clone();
         let surb_store = self.surb_store.clone();
         let mapper = self.provider.key_id_mapper_ref().clone();
@@ -215,7 +234,7 @@ where
             // This operation has run-time of ~10 nanoseconds,
             // and therefore does not need to be invoked via spawn_blocking
             if self.tbf.lock().check_and_set(tag) {
-                return Err(IncomingPacketError::ProcessingError(HoprProtocolError::Replay));
+                return Err(IncomingPacketError::ProcessingError(previous_hop, HoprProtocolError::Replay));
             }
         }
 
@@ -240,7 +259,7 @@ where
                             IncomingAcknowledgementPacket {
                                 packet_tag: incoming.packet_tag,
                                 previous_hop: incoming.previous_hop,
-                                ack: incoming
+                                received_ack: incoming
                                     .plain_text
                                     .as_ref()
                                     .try_into()
@@ -269,8 +288,8 @@ where
                         .await
                         .map_err(|error| match error {
                             // Distinguish ticket validation errors so that they can get extra treatment later
-                            HoprProtocolError::TicketValidationError(e) => IncomingPacketError::InvalidTicket(e),
-                            e => IncomingPacketError::ProcessingError(e),
+                            HoprProtocolError::TicketValidationError(e) => IncomingPacketError::InvalidTicket(previous_hop, e),
+                            e => IncomingPacketError::ProcessingError(previous_hop, e),
                         })?;
 
                 let mut payload = Vec::with_capacity(HoprPacket::SIZE);
@@ -290,7 +309,7 @@ where
                     .into(),
                 ))
             }
-            HoprPacket::Outgoing(_) => Err(IncomingPacketError::ProcessingError(HoprProtocolError::InvalidState(
+            HoprPacket::Outgoing(_) => Err(IncomingPacketError::ProcessingError(previous_hop, HoprProtocolError::InvalidState(
                 "cannot be outgoing packet",
             ))),
         }

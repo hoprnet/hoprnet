@@ -1,25 +1,15 @@
 use std::ops::Mul;
-
-use hopr_crypto_packet::{
-    HoprSurb, ReplyOpener,
-    prelude::{HoprSenderId, HoprSurbId, PacketSignals},
-};
-use hopr_crypto_types::prelude::{HalfKeyChallenge, OffchainPublicKey};
-use hopr_internal_types::{
-    channels::ChannelEntry,
-    prelude::{
-        Acknowledgement, ChannelId, HoprPseudonym, RedeemableTicket, TicketBuilder, UnacknowledgedTicket,
-        WinningProbability,
-    },
-    protocol::VerifiedAcknowledgement,
-};
-use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
-use hopr_primitive_types::prelude::{GeneralError, HoprBalance, U256, UnitaryFloatOps};
+use hopr_crypto_packet::prelude::*;
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 pub use crate::{
     errors::IncomingPacketError,
-    types::{FoundSurb, IncomingPacket, OutgoingPacket},
+    types::{FoundSurb, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
 };
+use crate::TicketCreationError;
 
 #[async_trait::async_trait]
 pub trait SurbStore {
@@ -34,7 +24,7 @@ pub trait SurbStore {
 
 #[async_trait::async_trait]
 pub trait PacketEncoder {
-    type Error: std::error::Error + Send + Sync;
+    type Error: std::error::Error + Send + Sync + 'static;
 
     async fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
         &self,
@@ -52,28 +42,19 @@ pub trait PacketEncoder {
 
 #[async_trait::async_trait]
 pub trait PacketDecoder {
-    type Error: std::error::Error + Send + Sync;
+    type Error: std::error::Error + Send + Sync + 'static;
 
     async fn decode(
         &self,
-        peer: OffchainPublicKey,
+        sender: PeerId,
         data: Box<[u8]>,
     ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
-}
-
-/// Determines the result of how an acknowledgement was resolved.
-#[derive(Debug)]
-pub enum ResolvedAcknowledgement {
-    /// The acknowledgement resulted in a winning ticket.
-    RelayingWin(Box<RedeemableTicket>),
-    /// The acknowledgement resulted in a losing ticket.
-    RelayingLoss(ChannelId),
 }
 
 /// Performs necessary processing of unacknowledged tickets.
 #[async_trait::async_trait]
 pub trait UnacknowledgedTicketProcessor {
-    type Error: std::error::Error + Send + Sync;
+    type Error: std::error::Error + Send + Sync + 'static;
 
     async fn insert_unacknowledged_ticket(
         &self,
@@ -91,43 +72,44 @@ pub trait UnacknowledgedTicketProcessor {
 
 /// Allows tracking ticket indices of outgoing channels and
 /// unrealized balances of incoming channels.
+#[async_trait::async_trait]
 pub trait TicketTracker {
+    type Error: std::error::Error + Send + Sync + 'static;
+
     /// Gets the next ticket index for an outgoing ticket for the given channel.
-    fn next_outgoing_ticket_index(&self, channel_id: &ChannelId) -> u64;
+    async fn next_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, Self::Error>;
 
     /// Retrieves the unrealized balance of the given channel.
     ///
     /// This allows guarding from situations where the ticket issuer issues more tickets
     /// than there's balance in the given channel.
-    fn incoming_channel_unrealized_balance(&self, channel_id: &ChannelId) -> HoprBalance;
+    async fn incoming_channel_unrealized_balance(&self, channel_id: &ChannelId, epoch: u32) -> Result<HoprBalance, Self::Error>;
 
     /// Convenience function that allows creating multi-hop tickets.
-    fn create_multihop_ticket(
+    async fn create_multihop_ticket(
         &self,
         channel: &ChannelEntry,
         current_path_pos: u8,
         winning_prob: WinningProbability,
         ticket_price: HoprBalance,
-    ) -> Result<TicketBuilder, GeneralError> {
+    ) -> Result<TicketBuilder, TicketCreationError<Self::Error>> {
         // The next ticket is worth: price * remaining hop count / winning probability
         let amount = HoprBalance::from(
             ticket_price
                 .amount()
                 .mul(U256::from(current_path_pos - 1))
-                .div_f64(winning_prob.into())?,
+                .div_f64(winning_prob.into())
+                .expect("winning probability is always less than or equal to 1"),
         );
 
         if channel.balance.lt(&amount) {
-            return Err(GeneralError::NonSpecificError(format!(
-                "{channel} is out of funds: {} < {amount}",
-                channel.balance
-            )));
+            return Err(TicketCreationError::OutOfFunds(*channel.get_id(),amount))
         }
 
         let ticket_builder = TicketBuilder::default()
             .channel_id(*channel.get_id())
             .balance(amount)
-            .index(self.next_outgoing_ticket_index(channel.get_id()))
+            .index(self.next_outgoing_ticket_index(channel.get_id()).await.map_err(TicketCreationError::Other)?)
             .win_prob(winning_prob)
             .channel_epoch(channel.channel_epoch.as_u32());
 

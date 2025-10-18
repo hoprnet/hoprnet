@@ -1,3 +1,4 @@
+use futures::TryFutureExt;
 use hopr_api::chain::*;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
@@ -6,7 +7,7 @@ use hopr_network_types::prelude::*;
 use hopr_path::Path;
 use hopr_primitive_types::prelude::*;
 
-use crate::{OutgoingPacket, PacketEncoder, SurbStore, TicketTracker, errors::HoprProtocolError};
+use crate::{OutgoingPacket, PacketEncoder, SurbStore, TicketTracker, errors::HoprProtocolError, TicketCreationError};
 
 #[derive(Clone, Debug, smart_default::SmartDefault)]
 pub struct HoprEncoderConfig {
@@ -104,12 +105,18 @@ where
                 .await
                 .map_err(|e| HoprProtocolError::ResolverError(e.into()))?;
 
-            self.tracker.create_multihop_ticket(
-                &channel,
-                num_hops as u8,
-                outgoing_ticket_win_prob,
-                outgoing_ticket_price,
-            )?
+            self.tracker
+                .create_multihop_ticket(
+                    &channel,
+                    num_hops as u8,
+                    outgoing_ticket_win_prob,
+                    outgoing_ticket_price,
+                )
+                .await
+                .map_err(|e| match e {
+                    TicketCreationError::OutOfFunds(id, a) => HoprProtocolError::OutOfFunds(id, a),
+                    e => HoprProtocolError::TicketTrackerError(e.into()),
+                })?
         } else {
             TicketBuilder::zero_hop().direction(self.chain_key.as_ref(), &next_peer)
         };

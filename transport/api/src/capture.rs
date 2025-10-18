@@ -1,7 +1,6 @@
 use std::{
     borrow::Cow,
     fs::File,
-    time::{Duration, Instant},
 };
 
 use futures::{StreamExt, pin_mut};
@@ -94,66 +93,30 @@ impl PacketWriter for PcapPacketWriter {
     }
 }
 
-/// A [`PacketWriter`] that sends captured packets over UDP socket.
-pub struct UdpPacketDump(std::net::UdpSocket);
-
-impl UdpPacketDump {
-    pub fn new(addr: std::net::SocketAddr) -> std::io::Result<Self> {
-        let sock = std::net::UdpSocket::bind(("0.0.0.0", 0))?;
-        sock.connect(addr)?;
-        Ok(Self(sock))
-    }
-}
-
-impl PacketWriter for UdpPacketDump {
-    fn write_packet(&mut self, packet: CapturedPacket) -> std::io::Result<()> {
-        let mut sent = 0;
-        let data = packet.data;
-        while sent < data.len() {
-            sent += self.0.send(&data[sent..])?;
-        }
-        Ok(())
-    }
-}
-
 /// Creates a queue that processes captured packets into a [`PacketWriter`].
 pub fn packet_capture_channel(
     writer: Box<dyn PacketWriter + Send>,
-    start_capturing_path: Option<std::path::PathBuf>,
 ) -> (futures::channel::mpsc::Sender<CapturedPacket>, AbortHandle) {
     let (sender, receiver) = futures::channel::mpsc::channel(20_000);
-    let check_interval = Duration::from_secs(5);
-    let mut last_check = Instant::now() - check_interval;
-    let mut capture_enabled = false;
     let writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
     let ah = spawn_as_abortable!(async move {
         pin_mut!(receiver);
         while let Some(packet) = receiver.next().await {
-            if let Some(ref path) = start_capturing_path {
-                // refresh the check if interval elapsed
-                if last_check.elapsed() >= check_interval {
-                    capture_enabled = path.exists();
-                    last_check = Instant::now();
+            let writer = writer.clone();
+            match hopr_async_runtime::prelude::spawn_blocking(move || {
+                writer
+                    .lock()
+                    .map_err(|_| std::io::Error::other("lock poisoned"))
+                    .and_then(|mut w| w.write_packet(packet))
+            })
+            .await
+            .map_err(std::io::Error::other)
+            {
+                Err(error) | Ok(Err(error)) => {
+                    tracing::warn!(%error, "cannot capture more packets due to error");
+                    break;
                 }
-
-                if capture_enabled {
-                    let writer = writer.clone();
-                    match hopr_async_runtime::prelude::spawn_blocking(move || {
-                        writer
-                            .lock()
-                            .map_err(|_| std::io::Error::other("lock poisoned"))
-                            .and_then(|mut w| w.write_packet(packet))
-                    })
-                    .await
-                    .map_err(std::io::Error::other)
-                    {
-                        Err(error) | Ok(Err(error)) => {
-                            tracing::warn!(%error, "cannot capture more packets due to error");
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
+                _ => {}
             }
         }
     });
@@ -170,7 +133,7 @@ enum PacketType {
 }
 
 /// Represents a customized dissection of a HOPR packet before it goes into the transport.
-pub enum PacketBeforeTransit<'a> {
+enum PacketBeforeTransit<'a> {
     OutgoingPacket {
         me: OffchainPublicKey,
         next_hop: OffchainPublicKey,
@@ -305,7 +268,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 let IncomingAcknowledgementPacket {
                     packet_tag,
                     previous_hop,
-                    ack,
+                    received_ack: ack,
                 } = ack_packet.as_ref();
                 out.push(PacketType::InAck as u8);
                 out.extend_from_slice(packet_tag);
@@ -420,7 +383,7 @@ impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
 impl<C: PacketEncoder + Send + Sync> PacketEncoder for CapturePacketCodec<C> {
     type Error = C::Error;
 
-    async fn encode_packet<T: AsRef<[u8]> + Send, S: Into<PacketSignals> + Send>(
+    async fn encode_packet<T: AsRef<[u8]> + Send + 'static, S: Into<PacketSignals> + Send + 'static>(
         &self,
         data: T,
         routing: ResolvedTransportRouting,
@@ -502,7 +465,6 @@ mod tests {
         File::create("/tmp/start_capturing")?;
         let (pcap, ah) = packet_capture_channel(
             Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?),
-            Some(std::path::PathBuf::from("/tmp/start_capturing")),
         );
         pin_mut!(pcap);
 
@@ -626,7 +588,7 @@ mod tests {
             IncomingAcknowledgementPacket {
                 packet_tag: hopr_crypto_random::random_bytes(),
                 previous_hop: *kp.public(),
-                ack: VerifiedAcknowledgement::random(&kp).leak(),
+                received_ack: VerifiedAcknowledgement::random(&kp).leak(),
             }
             .into(),
         );
@@ -642,8 +604,8 @@ mod tests {
                 next_hop: *OffchainKeypair::random().public(),
                 data: Box::new([0x08]),
                 ack_challenge: HalfKeyChallenge::default(),
-                ticket: ticket.into_unacknowledged(HalfKey::random()),
-                ack_key: HalfKey::random(),
+                received_ticket: ticket.into_unacknowledged(HalfKey::random()),
+                ack_key_prev_hop: HalfKey::random(),
             }
             .into(),
         );

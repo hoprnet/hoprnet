@@ -362,12 +362,12 @@ pub trait HoprDbTicketOperations {
     /// Increments the outgoing ticket index in the given channel ID and returns the value before incrementing.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0 and incremented.
-    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, Self::Error>;
+    async fn increment_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, Self::Error>;
 
     /// Gets the current outgoing ticket index for the given channel id.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>, Self::Error>;
+    async fn get_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<Arc<AtomicU64>, Self::Error>;
 
     /// Compares outgoing ticket indices in the cache with the stored values
     /// and updates the stored value where changed.

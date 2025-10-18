@@ -1,12 +1,8 @@
 use hopr_api::chain::ChainReadChannelOperations;
-use hopr_crypto_types::prelude::{ChainKeypair, HalfKeyChallenge, Hash, OffchainPublicKey};
-use hopr_internal_types::{
-    channels::ChannelId,
-    prelude::{Acknowledgement, CoreTypesError, UnacknowledgedTicket},
-};
-use hopr_primitive_types::balance::HoprBalance;
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
 
-use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketTracker, UnacknowledgedTicketProcessor};
+use crate::{HoprProtocolError, ResolvedAcknowledgement, UnacknowledgedTicketProcessor};
 
 #[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct HoprTicketProcessorConfig {
@@ -97,7 +93,7 @@ where
             // turns it into a redeemable ticket.
             match ack_ticket.into_redeemable(&chain_key, &domain_separator) {
                 Ok(redeemable) => {
-                    tracing::trace!(%issuer_channel, "found winning ticket");
+                    tracing::debug!(%issuer_channel, "found winning ticket");
                     Ok(ResolvedAcknowledgement::RelayingWin(Box::new(redeemable)))
                 }
                 Err(CoreTypesError::TicketNotWinning) => {
@@ -111,20 +107,5 @@ where
             }
         })
         .await
-    }
-}
-
-pub struct HoprTicketTracker {
-}
-
-impl HoprTicketTracker {}
-
-impl TicketTracker for HoprTicketTracker {
-    fn next_outgoing_ticket_index(&self, _channel_id: &ChannelId) -> u64 {
-        todo!()
-    }
-
-    fn incoming_channel_unrealized_balance(&self, _channel_id: &ChannelId) -> HoprBalance {
-        todo!()
     }
 }

@@ -32,13 +32,19 @@ pub struct AuxiliaryPacketInfo {
     pub num_surbs: usize,
 }
 
-/// An incoming packet for us.
+/// An incoming packet with a payload intended for us.
 pub struct IncomingFinalPacket {
+    /// Packet tag.
     pub packet_tag: PacketTag,
+    /// Offchain public key of the previous hop.
     pub previous_hop: OffchainPublicKey,
+    /// Sender pseudonym.
     pub sender: HoprPseudonym,
+    /// Plain text payload of the packet.
     pub plain_text: Box<[u8]>,
+    /// Acknowledgement to be sent to the previous hop.
     pub ack_key: HalfKey,
+    /// Miscellaneous information about the packet.
     pub info: AuxiliaryPacketInfo,
 }
 
@@ -54,14 +60,19 @@ impl std::fmt::Debug for IncomingFinalPacket {
     }
 }
 
+/// Incoming packet that must be forwarded.
 pub struct IncomingForwardedPacket {
+    /// Packet tag.
     pub packet_tag: PacketTag,
+    /// Offchain public key of the previous hop.
     pub previous_hop: OffchainPublicKey,
+    /// Offchain public key of the next hop.
     pub next_hop: OffchainPublicKey,
+    /// Data to be forwarded to the next hop.
     pub data: Box<[u8]>,
-    /// Challenge to be solved from the acknowledgement of the next hop.
+    /// Challenge to be solved from the acknowledgement received from the next hop.
     pub ack_challenge: HalfKeyChallenge,
-    /// Ticket to be acknowledged by the next hop.
+    /// Ticket to be acknowledged by solving the `ack_challenge`.
     pub received_ticket: UnacknowledgedTicket,
     /// Acknowledgement payload to be sent to the previous hop
     pub ack_key_prev_hop: HalfKey,
@@ -73,15 +84,21 @@ impl std::fmt::Debug for IncomingForwardedPacket {
             .field("packet_tag", &self.packet_tag)
             .field("previous_hop", &self.previous_hop)
             .field("next_hop", &self.next_hop)
-            .field("ack_key", &self.ack_key_prev_hop)
+            .field("received_ticket", &self.received_ticket)
+            .field("ack_challenge", &self.ack_challenge)
+            .field("ack_key_prev_hop", &self.ack_key_prev_hop)
             .finish_non_exhaustive()
     }
 }
 
+/// Incoming packet that represents an acknowledgement of a delivered packet.
 pub struct IncomingAcknowledgementPacket {
+    /// Packet tag.
     pub packet_tag: PacketTag,
+    /// Offchain public key of the previous hop which sent the acknowledgement.
     pub previous_hop: OffchainPublicKey,
-    pub ack: Acknowledgement,
+    /// Unverified acknowledgement.
+    pub received_ack: Acknowledgement,
 }
 
 impl std::fmt::Debug for IncomingAcknowledgementPacket {
@@ -89,11 +106,12 @@ impl std::fmt::Debug for IncomingAcknowledgementPacket {
         f.debug_struct("IncomingAcknowledgementPacket")
             .field("packet_tag", &self.packet_tag)
             .field("previous_hop", &self.previous_hop)
-            .field("ack", &self.ack)
+            .field("ack", &self.received_ack)
             .finish()
     }
 }
 
+/// Incoming HOPR packet.
 #[derive(Debug)]
 pub enum IncomingPacket {
     /// Packet is intended for us
@@ -131,4 +149,13 @@ pub struct FoundSurb {
     pub surb: HoprSurb,
     /// Number of SURBs remaining in the ring buffer with the same pseudonym.
     pub remaining: usize,
+}
+
+/// Determines the result of how an acknowledgement was resolved.
+#[derive(Debug)]
+pub enum ResolvedAcknowledgement {
+    /// The acknowledgement resulted in a winning ticket.
+    RelayingWin(Box<RedeemableTicket>),
+    /// The acknowledgement resulted in a losing ticket.
+    RelayingLoss(ChannelId),
 }

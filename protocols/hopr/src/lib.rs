@@ -11,6 +11,10 @@ pub use decoder::{HoprDecoder, HoprDecoderConfig};
 pub use encoder::{HoprEncoder, HoprEncoderConfig};
 pub use errors::*;
 pub use surb_store::{MemorySurbStore, SurbStoreConfig};
-pub use ticket_processing::{HoprTicketProcessor, HoprTicketProcessorConfig, HoprTicketTracker};
+pub use ticket_processing::{HoprTicketProcessor, HoprTicketProcessorConfig};
 pub use traits::*;
 pub use types::*;
+
+pub mod prelude {
+    pub use super::*;
+}
