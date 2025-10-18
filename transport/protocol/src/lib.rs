@@ -86,11 +86,7 @@ use hopr_internal_types::{
 };
 use hopr_network_types::{prelude::ResolvedTransportRouting, timeout::TimeoutSinkExt};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
-use hopr_protocol_hopr::{
-    HoprDecoderConfig, HoprEncoderConfig, HoprTicketProcessorConfig, IncomingAcknowledgementPacket,
-    IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError, PacketDecoder, PacketEncoder,
-    ResolvedAcknowledgement, UnacknowledgedTicketProcessor,
-};
+use hopr_protocol_hopr::{HoprDecoderConfig, HoprEncoder, HoprEncoderConfig, HoprTicketProcessorConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError, MemorySurbStore, PacketDecoder, PacketEncoder, ResolvedAcknowledgement, SurbStoreConfig, UnacknowledgedTicketProcessor};
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
@@ -145,14 +141,17 @@ pub enum ProtocolProcesses {
 #[derive(Debug, Clone)]
 pub enum PeerDiscovery {
     Allow(PeerId),
-    Ban(PeerId),
     Announce(PeerId, Vec<Multiaddr>),
 }
 
+/// Ticket events emitted from the packet processing pipeline.
 #[derive(Debug, Clone)]
 pub enum TicketEvent {
+    /// A winning ticket was received.
     WinningTicket(Box<RedeemableTicket>),
+    /// A losing ticket was received.
     LosingTicket(ChannelId),
+    /// A ticket has been rejected.
     RejectedTicket(Box<Ticket>),
 }
 
@@ -545,12 +544,6 @@ async fn start_incoming_ack_pipeline<AckIn, T, TEvt>(
         task = "transport (protocol - ticket acknowledgement)",
         "long-running background task finished"
     );
-}
-
-pub struct HoprProtocolPipelineConfig {
-    pub encoder_cfg: HoprEncoderConfig,
-    pub decoder_cfg: HoprDecoderConfig,
-    pub ticket_cfg: HoprTicketProcessorConfig,
 }
 
 /// Run all processes responsible for handling the msg and acknowledgment protocols.

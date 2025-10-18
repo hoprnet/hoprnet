@@ -114,7 +114,8 @@ where
     }
 }
 
-pub struct HoprTicketTracker {}
+pub struct HoprTicketTracker {
+}
 
 impl HoprTicketTracker {}
 
