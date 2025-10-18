@@ -38,7 +38,6 @@ members = [
   "protocols/session",
   "protocols/start",
   "transport/api",
-  "transport/bloom",
   "transport/identity",
   "transport/mixer",
   "transport/network",
@@ -107,6 +106,7 @@ hex-literal = "1.0.0"
 hickory-resolver = "0.25.2"
 http = "1.3.1"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
+insta = "1.43.2"
 k256 = { version = "0.13.4", features = [
   "arithmetic",
   "ecdh",
@@ -270,7 +270,6 @@ hopr-protocol-session = { path = "protocols/session" }
 hopr-protocol-start = { path = "protocols/start" }
 hopr-strategy = { path = "logic/strategy", default-features = false }
 hopr-transport = { path = "transport/api" }
-hopr-transport-bloom = { path = "transport/bloom" }
 hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }

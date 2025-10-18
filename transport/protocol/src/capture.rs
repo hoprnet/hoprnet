@@ -278,8 +278,8 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                     previous_hop,
                     next_hop,
                     data,
-                    ticket,
-                    ack_key,
+                    received_ticket: ticket,
+                    ack_key_prev_hop: ack_key,
                     ..
                 } = fwd_packet.as_ref();
                 let ticket = ticket.verified_ticket().clone().into_encoded();

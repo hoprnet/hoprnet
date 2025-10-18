@@ -1,4 +1,4 @@
-use hopr_api::{Address, chain::HoprBalance};
+use hopr_api::Address;
 use hopr_crypto_packet::errors::TicketValidationError;
 use hopr_crypto_types::prelude::HalfKeyChallenge;
 use thiserror::Error;
@@ -22,15 +22,15 @@ pub enum IncomingPacketError<E> {
 }
 
 #[derive(Error, Debug)]
-pub enum PacketProcessorError {
+pub enum HoprProtocolError {
     #[error("packet is in invalid state: {0}")]
     InvalidState(&'static str),
 
     #[error("failed to resolve chain key or packet key")]
     KeyNotFound,
 
-    #[error("channel with counterparty {0} is below {1}")]
-    OutOfFunds(Address, HoprBalance),
+    #[error("packet replay detected")]
+    Replay,
 
     #[error("failed to find channel {0} -> {1}")]
     ChannelNotFound(Address, Address),
@@ -41,8 +41,8 @@ pub enum PacketProcessorError {
     #[error("chain resolver error: {0}")]
     ResolverError(anyhow::Error),
 
-    #[error("node db error: {0}")]
-    NodeDbError(anyhow::Error),
+    #[error(transparent)]
+    TicketValidationError(#[from] TicketValidationError),
 
     #[error(transparent)]
     CoreTypesError(#[from] hopr_internal_types::errors::CoreTypesError),
@@ -52,7 +52,4 @@ pub enum PacketProcessorError {
 
     #[error(transparent)]
     GeneralError(#[from] hopr_primitive_types::errors::GeneralError),
-
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
 }

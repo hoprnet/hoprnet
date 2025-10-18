@@ -21,7 +21,29 @@ pub struct SurbStoreConfig {
     /// considered low ("SURB distress").
     #[default(500)]
     pub distress_threshold: usize,
+
+    #[default(10_000)]
+    pub max_opener_pseudonyms: usize,
+
+    #[default(100_000)]
+    pub max_openers_per_pseudonym: usize,
+
+    #[default(10_000)]
+    pub max_surbs_per_pseudonym: usize,
+
+    #[default(Duration::from_secs(600))]
+    pub surbs_per_pseudonym_lifetime: Duration,
+
+    #[default(Duration::from_secs(3600))]
+    pub reply_opener_lifetime: Duration,
 }
+
+const MINIMUM_SURB_LIFETIME: Duration = Duration::from_secs(30);
+const MINIMUM_OPENER_PSEUDONYMS: usize = 1000;
+const MINIMUM_OPENERS_PER_PSEUDONYM: usize = 1000;
+const MINIMUM_SURBS_PER_PSEUDONYM: usize = 1000;
+const MINIMUM_OPENER_LIFETIME: Duration = Duration::from_secs(60);
+const MIN_SURB_RB_CAPACITY: usize = 1024;
 
 #[derive(Clone)]
 pub struct MemorySurbStore {
@@ -37,26 +59,22 @@ impl MemorySurbStore {
             // in a cascade fashion, allowing the entire batches (by Pseudonym) to be evicted
             // if not used.
             pseudonym_openers: moka::sync::Cache::builder()
-                // TODO: Expose this as a config option
-                .time_to_idle(Duration::from_secs(600))
+                .time_to_idle(cfg.surbs_per_pseudonym_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|sender_id, _reply_opener, cause| {
                     tracing::warn!(?sender_id, ?cause, "evicting reply opener for pseudonym");
                 })
-                // TODO: Expose this as a config option
-                .max_capacity(10_000)
+                .max_capacity(cfg.max_opener_pseudonyms.max(MINIMUM_OPENER_PSEUDONYMS) as u64)
                 .build(),
             // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
             // For each Pseudonym, there's an RB of SURBs and their IDs.
             surbs_per_pseudonym: Cache::builder()
-                // TODO: Expose this as a config option
-                .time_to_idle(Duration::from_secs(600))
+                .time_to_idle(cfg.surbs_per_pseudonym_lifetime.max(MINIMUM_SURB_LIFETIME))
                 .eviction_policy(moka::policy::EvictionPolicy::lru())
                 .eviction_listener(|pseudonym, _reply_opener, cause| {
                     tracing::warn!(%pseudonym, ?cause, "evicting surb for pseudonym");
                 })
-                // TODO: Expose this as a config option
-                .max_capacity(10_000)
+                .max_capacity(cfg.max_surbs_per_pseudonym.max(MINIMUM_SURBS_PER_PSEUDONYM) as u64)
                 .build(),
             cfg,
         }
@@ -101,7 +119,7 @@ impl SurbStore for MemorySurbStore {
         self.surbs_per_pseudonym
             .entry_by_ref(&pseudonym)
             .or_insert_with(futures::future::lazy(|_| {
-                SurbRingBuffer::new(self.cfg.rb_capacity.max(1024))
+                SurbRingBuffer::new(self.cfg.rb_capacity.max(MIN_SURB_RB_CAPACITY))
             }))
             .await
             .value()
@@ -109,11 +127,12 @@ impl SurbStore for MemorySurbStore {
     }
 
     fn insert_reply_opener(&self, sender_id: HoprSenderId, opener: ReplyOpener) {
+        let opener_lifetime = self.cfg.reply_opener_lifetime.max(MINIMUM_OPENER_LIFETIME);
+        let max_openers_per_pseudonym = self.cfg.max_opener_pseudonyms.max(MINIMUM_OPENERS_PER_PSEUDONYM);
         self.pseudonym_openers
             .get_with(sender_id.pseudonym(), move || {
                 moka::sync::Cache::builder()
-                    // TODO: Expose this as a config option
-                    .time_to_live(Duration::from_secs(3600))
+                    .time_to_live(opener_lifetime)
                     .eviction_listener(move |id: Arc<HoprSurbId>, _, cause| {
                         if cause != RemovalCause::Explicit {
                             tracing::warn!(
@@ -124,7 +143,7 @@ impl SurbStore for MemorySurbStore {
                             );
                         }
                     })
-                    .max_capacity(100_000)
+                    .max_capacity(max_openers_per_pseudonym as u64)
                     .build()
             })
             .insert(sender_id.surb_id(), opener);

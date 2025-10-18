@@ -4449,11 +4449,11 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-types",
  "hopr-internal-types",
- "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
  "multiaddr",
  "strum 0.27.2",
+ "tracing",
 ]
 
 [[package]]
@@ -5089,13 +5089,18 @@ version = "4.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bloomfilter",
+ "criterion",
  "futures",
  "hex",
  "hopr-api",
  "hopr-crypto-packet",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-network-types",
+ "hopr-parallelize",
+ "hopr-path",
  "hopr-primitive-types",
  "moka",
  "parking_lot",
@@ -5232,18 +5237,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "validator",
-]
-
-[[package]]
-name = "hopr-transport-bloom"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "bloomfilter",
- "criterion",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "tracing",
 ]
 
 [[package]]
@@ -5405,7 +5398,6 @@ dependencies = [
  "hopr-protocol-hopr",
  "hopr-protocol-session",
  "hopr-protocol-start",
- "hopr-transport-bloom",
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-probe",
@@ -5413,7 +5405,6 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "moka",
- "parking_lot",
  "pcap-file",
  "rust-stream-ext-concurrent",
  "serde",

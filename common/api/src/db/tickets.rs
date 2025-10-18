@@ -132,7 +132,7 @@ impl TicketSelector {
     /// Convenience version on [`TicketSelector::also_on_channel`] that accepts a [`ChannelEntry`].
     #[must_use]
     pub fn also_on_channel_entry(self, entry: &ChannelEntry) -> Self {
-        self.also_on_channel(entry.get_id(), entry.channel_epoch)
+        self.also_on_channel(*entry.get_id(), entry.channel_epoch)
     }
 
     /// Sets the selector to match only tickets on the given `channel_id` and `epoch`.
@@ -263,7 +263,7 @@ impl From<&RedeemableTicket> for TicketSelector {
 impl From<&ChannelEntry> for TicketSelector {
     fn from(value: &ChannelEntry) -> Self {
         Self {
-            channel_identifiers: vec![(value.get_id(), value.channel_epoch)],
+            channel_identifiers: vec![(*value.get_id(), value.channel_epoch)],
             index: TicketIndexSelector::None,
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),

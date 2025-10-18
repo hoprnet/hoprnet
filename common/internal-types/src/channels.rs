@@ -104,8 +104,8 @@ impl ChannelEntry {
     }
 
     /// Generates the channel ID using the source and destination address
-    pub fn get_id(&self) -> ChannelId {
-        self.id
+    pub fn get_id(&self) -> &ChannelId {
+        &self.id
     }
 
     /// Checks if the closure time of this channel has passed.

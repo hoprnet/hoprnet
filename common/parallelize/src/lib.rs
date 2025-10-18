@@ -22,7 +22,7 @@
 //! 3. use a `thread`
 //!    - used typically when a blocking operation keeps running forever
 //!
-//! More information about parallization, execution and executors can be found in an excellent blog post [here](https://ryhl.io/blog/async-what-is-blocking/).
+//! More information about parallelization, execution and executors can be found in an excellent blog post [here](https://ryhl.io/blog/async-what-is-blocking/).
 
 /// Module for real thread pool-based parallelization of CPU heavy blocking workloads.
 pub mod cpu {

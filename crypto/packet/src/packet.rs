@@ -356,6 +356,17 @@ pub enum HoprPacket {
     Outgoing(Box<HoprOutgoingPacket>),
 }
 
+impl HoprPacket {
+    /// Returns the [`PacketTag`] of forwarded or final packets, or `None` for outgoing packets.
+    pub fn packet_tag(&self) -> Option<&PacketTag> {
+        match self {
+            HoprPacket::Final(packet) => Some(&packet.packet_tag),
+            HoprPacket::Forwarded(packet) => Some(&packet.packet_tag),
+            HoprPacket::Outgoing(_) => None,
+        }
+    }
+}
+
 impl Display for HoprPacket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {

@@ -11,6 +11,7 @@ license = "GPL-3.0-only"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bloomfilter = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 moka = { workspace = true }
@@ -23,10 +24,17 @@ tracing = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-crypto-packet = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }
+hopr-parallelize = { workspace = true, features = ["rayon"] }
+hopr-path = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
+criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+
+[[bench]]
+name = "bloom_filter"
+harness = false

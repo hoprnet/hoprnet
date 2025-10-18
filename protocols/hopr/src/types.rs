@@ -2,10 +2,13 @@ use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 
-/// Packet that is being sent out by us
+/// Packet that is being sent out by us.
 pub struct OutgoingPacket {
+    /// Offchain public key of the next hop.
     pub next_hop: OffchainPublicKey,
+    /// Challenge to be solved from the acknowledgement of the next hop.
     pub ack_challenge: HalfKeyChallenge,
+    /// Encoded HOPR packet.
     pub data: Box<[u8]>,
 }
 
@@ -29,6 +32,7 @@ pub struct AuxiliaryPacketInfo {
     pub num_surbs: usize,
 }
 
+/// An incoming packet for us.
 pub struct IncomingFinalPacket {
     pub packet_tag: PacketTag,
     pub previous_hop: OffchainPublicKey,
@@ -58,9 +62,9 @@ pub struct IncomingForwardedPacket {
     /// Challenge to be solved from the acknowledgement of the next hop.
     pub ack_challenge: HalfKeyChallenge,
     /// Ticket to be acknowledged by the next hop.
-    pub ticket: UnacknowledgedTicket,
+    pub received_ticket: UnacknowledgedTicket,
     /// Acknowledgement payload to be sent to the previous hop
-    pub ack_key: HalfKey,
+    pub ack_key_prev_hop: HalfKey,
 }
 
 impl std::fmt::Debug for IncomingForwardedPacket {
@@ -69,7 +73,7 @@ impl std::fmt::Debug for IncomingForwardedPacket {
             .field("packet_tag", &self.packet_tag)
             .field("previous_hop", &self.previous_hop)
             .field("next_hop", &self.next_hop)
-            .field("ack_key", &self.ack_key)
+            .field("ack_key", &self.ack_key_prev_hop)
             .finish_non_exhaustive()
     }
 }
