@@ -4448,11 +4448,11 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-types",
  "hopr-internal-types",
- "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
  "multiaddr",
  "strum 0.27.2",
+ "tracing",
 ]
 
 [[package]]
@@ -4977,6 +4977,7 @@ dependencies = [
  "cfg-if",
  "flume",
  "futures",
+ "futures-time",
  "hickory-resolver",
  "hopr-async-runtime",
  "hopr-crypto-packet",
@@ -5083,6 +5084,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-protocol-hopr"
+version = "4.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bloomfilter",
+ "criterion",
+ "futures",
+ "hex",
+ "hopr-api",
+ "hopr-crypto-packet",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-network-types",
+ "hopr-parallelize",
+ "hopr-path",
+ "hopr-primitive-types",
+ "moka",
+ "parking_lot",
+ "ringbuffer",
+ "smart-default",
+ "strum 0.27.2",
+ "thiserror 2.0.17",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-protocol-session"
 version = "1.0.2"
 dependencies = [
@@ -5176,6 +5205,7 @@ dependencies = [
  "cfg-if",
  "futures",
  "futures-concurrency",
+ "futures-time",
  "hopr-api",
  "hopr-async-runtime",
  "hopr-chain-types",
@@ -5189,6 +5219,7 @@ dependencies = [
  "hopr-path",
  "hopr-primitive-types",
  "hopr-protocol-app",
+ "hopr-protocol-hopr",
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-network",
@@ -5197,6 +5228,7 @@ dependencies = [
  "hopr-transport-protocol",
  "hopr-transport-session",
  "lazy_static",
+ "pcap-file",
  "proc-macro-regex",
  "rand 0.8.5",
  "rust-stream-ext-concurrent",
@@ -5208,18 +5240,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "validator",
-]
-
-[[package]]
-name = "hopr-transport-bloom"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "bloomfilter",
- "criterion",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "tracing",
 ]
 
 [[package]]
@@ -5333,6 +5353,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-protocol-app",
+ "hopr-transport-protocol",
  "lazy_static",
  "libp2p-identity",
  "mockall",
@@ -5352,7 +5373,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.11.3"
+version = "0.12.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5368,7 +5389,6 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-node",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
@@ -5378,18 +5398,12 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-protocol-app",
- "hopr-protocol-session",
- "hopr-protocol-start",
- "hopr-transport-bloom",
+ "hopr-protocol-hopr",
  "hopr-transport-identity",
  "hopr-transport-mixer",
- "hopr-transport-probe",
- "hopr-transport-session",
  "lazy_static",
  "libp2p",
  "moka",
- "parking_lot",
- "pcap-file",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",

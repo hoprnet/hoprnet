@@ -22,6 +22,8 @@ pub mod helpers;
 pub mod network_notifier;
 
 pub mod socket;
+mod capture;
+mod pipeline;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -39,7 +41,7 @@ use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
-    db::{HoprDbPeersOperations, HoprDbProtocolOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
+    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
 use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -64,7 +66,6 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
-use hopr_transport_protocol::processor::PacketInteractionConfig;
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
@@ -79,7 +80,7 @@ use rand::seq::SliceRandom;
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, info, trace, warn};
-
+use hopr_protocol_hopr::{HoprDecoderConfig, HoprEncoderConfig, MemorySurbStore, SurbStoreConfig};
 pub use crate::{
     config::HoprTransportConfig,
     helpers::{PeerEligibility, TicketStatistics},
@@ -103,8 +104,8 @@ lazy_static::lazy_static! {
 pub enum HoprTransportProcess {
     #[strum(to_string = "component responsible for the transport medium (libp2p swarm)")]
     Medium,
-    #[strum(to_string = "HOPR protocol ({0})")]
-    Protocol(hopr_transport_protocol::ProtocolProcesses),
+    #[strum(to_string = "HOPR packet pipeline ({0})")]
+    Protocol(hopr_transport_protocol::PacketPipelineProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
     #[strum(to_string = "network probing sub-process: {0}")]
@@ -132,7 +133,7 @@ pub struct HoprTransport<Db, R> {
 
 impl<Db, R> HoprTransport<Db, R>
 where
-    Db: HoprDbTicketOperations + HoprDbPeersOperations + HoprDbProtocolOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbTicketOperations + HoprDbPeersOperations + Clone + Send + Sync + 'static,
     R: ChainReadChannelOperations
         + ChainReadAccountOperations
         + ChainKeyOperations
@@ -244,7 +245,7 @@ where
             .await;
 
         // Calculate the minimum capacity based on public nodes (each node can generate 2 messages)
-        // plus 100 as additional buffer
+        // plus 100 as an additional buffer
         let minimum_capacity = public_nodes.len().saturating_mul(2).saturating_add(100);
 
         let internal_discovery_updates_capacity = std::env::var("HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY")
@@ -361,7 +362,6 @@ where
                                 + ((1.0f64 - weight) * hopr_transport_mixer::channel::METRIC_MIXER_AVERAGE_DELAY.get()),
                         );
                     }
-
                     v
                 }
             });
@@ -528,6 +528,32 @@ where
                 .in_current_span()
             })
             .merge(resolved_routing_msg_rx);
+
+
+        let hopr_packet_encoder = HoprEncoder::new();
+
+        #[cfg(feature = "capture")]
+        let (encoder, decoder) = {
+            let writer: Box<dyn capture::PacketWriter + Send + 'static> =
+                if let Ok(desc) = std::env::var("HOPR_CAPTURE_PACKETS") {
+                    if let Ok(pcap_writer) = std::fs::File::create(&desc).and_then(capture::PcapPacketWriter::new) {
+                        warn!("pcap file packet capture initialized to {desc}");
+                        Box::new(pcap_writer)
+                    } else {
+                        error!(desc, "failed to create packet capture: invalid socket address or file");
+                        Box::new(capture::NullWriter)
+                    }
+                } else {
+                    warn!("no packet capture specified");
+                    Box::new(capture::NullWriter)
+                };
+
+            let (sender, ah) = capture::packet_capture_channel(writer);
+            (
+                Arc::new(capture::CapturePacketCodec::new(codec.0, *self.me.public(), sender.clone())),
+                Arc::new(capture::CapturePacketCodec::new(codec.1, *self.me.public(), sender.clone())),
+            )
+        };
 
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,

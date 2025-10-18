@@ -615,7 +615,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
     offset = offset + 1
 
     -- Process based on packet type
-    if pkt_type == 0 then -- IncomingPacket
+    if pkt_type == 0 then -- FinalPacket
         if length < 1 + 16 + 32 + 32 + 10 + 32 + 2 + 8 then
             subtree:add_expert_info(PI_MALFORMED, PI_ERROR, "Packet too short for FinalPacket")
             return
@@ -649,9 +649,7 @@ function hopr_proto.dissector(buffer, pinfo, tree)
 
         final_tree:add(hopr_fields.ack_key, buffer(offset, 32))
         offset = offset + 32
-
-        offset = dissect_ticket(buffer, final_tree, offset)
-
+        
         final_tree:add(hopr_fields.dst_flags, buffer(offset, 1):uint())
         offset = offset + 1
 

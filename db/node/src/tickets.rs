@@ -509,7 +509,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn increment_outgoing_ticket_index(&self, channel_id: Hash) -> Result<u64, NodeDbError> {
+    async fn increment_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, NodeDbError> {
         let old_value = self
             .get_outgoing_ticket_index(channel_id)
             .await?
@@ -520,9 +520,10 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(old_value)
     }
 
-    async fn get_outgoing_ticket_index(&self, channel_id: Hash) -> Result<Arc<AtomicU64>, NodeDbError> {
+    async fn get_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<Arc<AtomicU64>, NodeDbError> {
         let tkt_manager = self.ticket_manager.clone();
-
+        let channel_id = *channel_id;
+        
         Ok(self
             .caches
             .ticket_index
@@ -595,6 +596,35 @@ impl HoprDbTicketOperations for HoprNodeDb {
         }
 
         Ok(Ok::<_, NodeDbError>(updated)?)
+    }
+
+    async fn insert_received_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), Self::Error> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        let verified_ticket = ticket.ticket.verified_ticket().clone();
+
+        self.ticket_manager.insert_ticket(ticket).await?;
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                &["unredeemed"],
+                self.ticket_manager
+                    .unrealized_value(TicketSelector::new(
+                        verified_ticket.channel_id,
+                        verified_ticket.channel_epoch,
+                    ))
+                    .await?
+                    .amount()
+                    .as_u128() as f64,
+            );
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["winning_count"], 1.0f64);
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["losing_count"], 1.0f64);
+        }
+        Ok(())
+    }
+
+    async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, NodeDbError> {
+        self.ticket_manager.unrealized_value(selector).await
     }
 }
 
