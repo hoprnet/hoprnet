@@ -77,11 +77,9 @@ pub use hopr_transport_session::{
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use rand::seq::SliceRandom;
-#[cfg(feature = "mixer-stream")]
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, info, trace, warn};
-use hopr_protocol_hopr::{HoprCodecConfig, HoprDecoderConfig, HoprEncoderConfig, HoprTicketProcessorConfig, MemorySurbStore, SurbStoreConfig};
-use hopr_transport_protocol::TicketEvent;
+use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, MemorySurbStore, SurbStoreConfig};
+pub use hopr_transport_protocol::TicketEvent;
 pub use crate::{
     config::HoprTransportConfig,
     helpers::{PeerEligibility, TicketStatistics},
@@ -90,12 +88,6 @@ use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportErr
 use crate::pipeline::HoprPacketPipelineConfig;
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
-
-#[cfg(any(
-    all(feature = "mixer-channel", feature = "mixer-stream"),
-    all(not(feature = "mixer-channel"), not(feature = "mixer-stream"))
-))]
-compile_error!("Exactly one of the 'mixer-channel' or 'mixer-stream' features must be specified");
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -219,9 +211,10 @@ where
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
-    pub async fn run<S>(
+    pub async fn run<S, T>(
         &self,
         discovery_updates: S,
+        ticket_events: T,
         on_incoming_session: Sender<IncomingSession>,
     ) -> crate::errors::Result<(
         HoprSocket<
@@ -232,6 +225,8 @@ where
     )>
     where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
+        T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
+        T::Error: std::fmt::Display
     {
         info!("Loading initial peers from the chain");
         let public_nodes = self
@@ -504,12 +499,11 @@ where
             surb_cfg: SurbStoreConfig::default()
         };
 
-        let (ticket_events_tx, ticket_events_rx) = futures::channel::mpsc::channel::<TicketEvent>(10_000);
         for (k, v) in pipeline::run_hopr_packet_pipeline(
             (self.me.clone(), self.me_onchain.clone()),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
-            ticket_events_tx,
+            ticket_events,
             self.resolver.clone(),
             self.db.clone(),
             hopr_pipeline_cfg,
