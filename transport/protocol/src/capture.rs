@@ -179,7 +179,7 @@ pub enum PacketBeforeTransit<'a> {
     OutgoingAck {
         me: OffchainPublicKey,
         next_hop: OffchainPublicKey,
-        ack: VerifiedAcknowledgement,
+        acks: Vec<VerifiedAcknowledgement>,
         is_random: bool,
     },
     IncomingPacket {
@@ -224,7 +224,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
             PacketBeforeTransit::OutgoingAck {
                 me,
                 next_hop,
-                ack,
+                acks,
                 is_random,
             } => {
                 out.push(PacketType::OutAck as u8);
@@ -235,7 +235,9 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(next_hop.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
                 out.push(if is_random { 1 } else { 0 });
-                out.extend_from_slice(ack.leak().as_ref());
+                out.extend((acks.len() as u16).to_be_bytes());
+                acks.into_iter()
+                    .for_each(|ack| out.extend_from_slice(ack.leak().as_ref()));
                 direction = PacketDirection::Outgoing;
             }
             PacketBeforeTransit::IncomingPacket {
@@ -299,7 +301,7 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                     IncomingPacket::Acknowledgement {
                         packet_tag,
                         previous_hop,
-                        ack,
+                        acknowledgements,
                     },
                 ..
             } => {
@@ -311,7 +313,10 @@ impl<'a> From<PacketBeforeTransit<'a>> for CapturedPacket {
                 out.extend_from_slice(me.as_ref());
                 out.extend_from_slice(me.to_peerid_str().as_bytes());
                 out.push(0); // Add null terminator to the string
-                out.extend_from_slice(ack.as_ref());
+                out.extend((acknowledgements.len() as u16).to_be_bytes());
+                acknowledgements
+                    .iter()
+                    .for_each(|ack| out.extend_from_slice(ack.as_ref()));
             }
         }
 
@@ -499,7 +504,10 @@ mod tests {
         let packet = IncomingPacket::Acknowledgement {
             packet_tag: hopr_crypto_random::random_bytes(),
             previous_hop: *kp.public(),
-            ack: VerifiedAcknowledgement::random(&kp).leak(),
+            acknowledgements: vec![
+                VerifiedAcknowledgement::random(&kp).leak(),
+                VerifiedAcknowledgement::random(&kp).leak(),
+            ],
         };
 
         let _ = pcap
@@ -709,7 +717,10 @@ mod tests {
         let packet = PacketBeforeTransit::OutgoingAck {
             me,
             next_hop: *kp.public(),
-            ack: VerifiedAcknowledgement::random(&kp),
+            acks: vec![
+                VerifiedAcknowledgement::random(&kp),
+                VerifiedAcknowledgement::random(&kp),
+            ],
             is_random: false,
         };
 
@@ -718,7 +729,10 @@ mod tests {
         let packet = PacketBeforeTransit::OutgoingAck {
             me,
             next_hop: *kp.public(),
-            ack: VerifiedAcknowledgement::random(&kp),
+            acks: vec![
+                VerifiedAcknowledgement::random(&kp),
+                VerifiedAcknowledgement::random(&kp),
+            ],
             is_random: true,
         };
 

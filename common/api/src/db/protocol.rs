@@ -150,11 +150,11 @@ pub enum IncomingPacket {
         /// Acknowledgement payload to be sent to the previous hop
         ack_key: HalfKey,
     },
-    /// The packet contains an acknowledgement of a delivered packet.
+    /// The packet contains an acknowledgement(s) of a delivered packet.
     Acknowledgement {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
-        ack: Acknowledgement,
+        acknowledgements: Vec<Acknowledgement>,
     },
 }
 
