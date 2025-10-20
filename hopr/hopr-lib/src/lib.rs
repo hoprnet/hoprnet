@@ -120,9 +120,7 @@ pub use hopr_transport::{
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
-use hopr_transport::{
-    ChainKeypair, HoprTransport, HoprTransportConfig, OffchainKeypair, PeerDiscovery, execute_on_tick,
-};
+use hopr_transport::{ChainKeypair, HoprTransport, HoprTransportConfig, OffchainKeypair, PeerDiscovery, execute_on_tick, TicketEvent};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -645,9 +643,7 @@ impl Hopr {
             );
         }
 
-        // notifier on acknowledged ticket reception
-        let multi_strategy_ack_ticket = self.multistrategy.clone();
-
+        // received ticket events processing
         let ack_ticket_channel_capacity = std::env::var("HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY")
             .ok()
             .and_then(|s| s.trim().parse::<usize>().ok())
@@ -656,29 +652,42 @@ impl Hopr {
 
         debug!(
             capacity = ack_ticket_channel_capacity,
-            "Creating acknowledged ticket channel"
+            "creating ticket event channel"
         );
-        let (on_ack_tkt_tx, mut on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
-        self.node_db.start_ticket_processing(Some(on_ack_tkt_tx))?;
+        let (on_ticket_event_tx, mut on_ticket_event_rx) = channel::<TicketEvent>(ack_ticket_channel_capacity);
+        self.node_db.start_ticket_processing(None)?;
 
+        let node_db = self.node_db.clone();
+        let strategies = self.multistrategy.clone();
         processes.insert(
-            state::HoprLibProcesses::OnReceivedAcknowledgement,
-            hopr_async_runtime::spawn_as_abortable!(async move {
-                while let Some(ack) = on_ack_tkt_rx.next().await {
-                    if let Err(error) = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
-                        &*multi_strategy_ack_ticket,
-                        &ack,
-                    )
-                    .await
-                    {
-                        error!(%error, "Failed to process acknowledged winning ticket with the strategy");
+            state::HoprLibProcesses::OnTicketEvent,
+            hopr_async_runtime::spawn_as_abortable!({
+                async move {
+                    while let Some(event) = on_ticket_event_rx.next().await {
+                        match event {
+                            TicketEvent::WinningTicket(redeemable_ticket) => {
+                                tracing::info!(%redeemable_ticket, "received redeemable ticket");
+                                if let Err(error) = node_db.insert_received_ticket(redeemable_ticket.clone()).await {
+                                    tracing::error!(%error, "failed to store redeemable ticket into the db");
+                                }
+                                 if let Err(error) = strategies.on_acknowledged_winning_ticket(&redeemable_ticket).await {
+                                    tracing::error!(%error, "failed to process acknowledged winning ticket with the strategy");
+                                }
+                            },
+                            TicketEvent::RejectedTicket(rejected_ticket) => {
+                                tracing::warn!(%rejected_ticket, "received rejected ticket");
+                                if let Err(error) = node_db.mark_unsaved_ticket_rejected(*rejected_ticket).await {
+                                    tracing::error!(%error, "failed to mark ticket as rejected");
+                                }
+                            }
+                        }
                     }
-                }
 
-                tracing::warn!(
-                    task = %state::HoprLibProcesses::OnReceivedAcknowledgement,
-                    "long-running background task finished"
-                )
+                    tracing::warn!(
+                        task = %state::HoprLibProcesses::OnTicketEvent,
+                        "long-running background task finished"
+                    )
+                }
             }),
         );
 
@@ -726,7 +735,11 @@ impl Hopr {
         }
 
         info!("Starting transport");
-        let (hopr_socket, transport_processes) = self.transport_api.run(indexer_peer_update_rx, session_tx).await?;
+        let (hopr_socket, transport_processes) = self.transport_api.run(
+            indexer_peer_update_rx,
+            on_ticket_event_tx,
+            session_tx
+        ).await?;
         for (id, proc) in transport_processes.into_iter() {
             processes.insert(id.into(), proc);
         }

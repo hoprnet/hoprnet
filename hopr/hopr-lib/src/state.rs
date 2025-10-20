@@ -38,8 +38,8 @@ pub enum HoprLibProcesses {
     OutgoingOnchainActionQueue,
     #[strum(to_string = "flush operation of outgoing ticket indices to the DB")]
     TicketIndexFlush,
-    #[strum(to_string = "on received ack ticket trigger")]
-    OnReceivedAcknowledgement,
+    #[strum(to_string = "on received ticket event (winning or rejected)")]
+    OnTicketEvent,
 }
 
 impl HoprLibProcesses {
