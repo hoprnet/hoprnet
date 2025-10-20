@@ -4,6 +4,7 @@ use alloy::{
     hex::FromHexError,
     primitives::{Address, keccak256},
     providers::{MulticallError, PendingTransactionError},
+    transports::TransportErrorKind,
 };
 use hopr_crypto_keypair::errors::KeyPairError;
 use thiserror::Error;
@@ -105,7 +106,7 @@ pub enum HelperErrors {
 
     /// Error with HTTP Json RPC provider
     #[error(transparent)]
-    RpcError(#[from] hopr_chain_rpc::errors::RpcError),
+    RpcTransportError(#[from] alloy::rpc::json_rpc::RpcError<TransportErrorKind>),
 
     /// Fail to make a multicall
     #[error(transparent)]
