@@ -183,7 +183,7 @@ where
                 provider.send_transaction(tx.clone()).await?.watch().await?;
                 // 2. Use the funded deployer wallet to deploy Multicall3 with a signed txn
                 provider
-                    .send_raw_transaction(&MULTICALL3_DEPLOY_CODE)
+                    .send_raw_transaction(MULTICALL3_DEPLOY_CODE)
                     .await?
                     .watch()
                     .await?;
