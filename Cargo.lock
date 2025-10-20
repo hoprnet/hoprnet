@@ -4944,6 +4944,7 @@ dependencies = [
  "hopr-transport-session",
  "human-bandwidth",
  "lazy_static",
+ "mockall",
  "mockito",
  "once_cell",
  "parameterized",

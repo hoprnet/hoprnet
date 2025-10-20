@@ -90,12 +90,20 @@ impl HoprTester {
         &self.instance
     }
 
-    pub async fn run(&self) -> anyhow::Result<()> {
-        match self.instance.run().await {
-            Ok(_) => (),
-            Err(e) => return Err(e.into()),
-        }
-        Ok(())
+    pub async fn run<
+        #[cfg(feature = "session-server")] T: hopr_lib::traits::session::HoprSessionServer + Clone + Send + 'static,
+    >(
+        &self,
+        #[cfg(feature = "session-server")] server: T,
+    ) -> anyhow::Result<()> {
+        Ok(self
+            .instance
+            .run(
+                #[cfg(feature = "session-server")]
+                server,
+            )
+            .await
+            .map(|_| ())?)
     }
 
     pub async fn get_balance<C: Currency + Send>(&self) -> Option<Balance<C>> {

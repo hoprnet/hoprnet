@@ -73,6 +73,19 @@ pub async fn chainenv_fixture() -> TestChainEnv {
     // .await
 }
 
+mockall::mock! {
+    pub SessionServer {}
+
+    impl Clone for SessionServer {
+        fn clone(&self) -> Self;
+    }
+
+    #[async_trait::async_trait]
+    impl hopr_lib::traits::session::HoprSessionServer for SessionServer {
+        async fn process(&self, session: hopr_lib::IncomingSession) -> std::result::Result<(), hopr_lib::errors::HoprLibError>;
+    }
+}
+
 #[rstest::fixture]
 pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> ClusterGuard {
     use std::fs::read_to_string;
@@ -205,7 +218,12 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     }
 
     // Run all nodes in parallel
-    futures::future::join_all(hopr_instances.iter().map(|instance| instance.run())).await;
+    futures::future::join_all(
+        hopr_instances
+            .iter()
+            .map(|instance| instance.run(MockSessionServer::new())),
+    )
+    .await;
     // Wait for all nodes to reach the 'Running' state
     futures::future::join_all(
         hopr_instances

@@ -101,6 +101,7 @@ hopr-transport = { workspace = true }
 anyhow = { workspace = true }
 env_logger = { workspace = true }
 hex-literal = { workspace = true }
+mockall = { workspace = true }
 mockito = { workspace = true }
 once_cell = { workspace = true }
 parameterized = { workspace = true }
