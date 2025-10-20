@@ -84,6 +84,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_protocol(opentelemetry_otlp::Protocol::Grpc)
                     .with_timeout(std::time::Duration::from_secs(5))
                     .build()?;
+                let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into());
 
                 let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder()
                     .with_batch_exporter(exporter)
@@ -93,14 +94,16 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_max_attributes_per_span(16)
                     .with_resource(
                         opentelemetry_sdk::Resource::builder()
-                            .with_service_name(
-                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
-                            )
+                            .with_service_name(service_name.to_string())
                             .build(),
                     )
                     .build()
                     .tracer(env!("CARGO_PKG_NAME"));
-
+                info!(
+                    otel_service_name = %service_name,
+                    otel_exporter = "otlp",
+                    "OpenTelemetry tracing enabled"
+                );
                 telemetry = Some(tracing_opentelemetry::layer().with_tracer(tracer))
             }
             _ => {}

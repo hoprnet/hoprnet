@@ -651,7 +651,7 @@ where
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
         let forward_routing = DestinationRouting::Forward {
-            destination,
+            destination: Box::new(destination.into()),
             pseudonym: Some(pseudonym), // Session must use a fixed pseudonym already
             forward_options: cfg.forward_path_options.clone(),
             return_options: cfg.return_path_options.clone().into(),
@@ -1455,7 +1455,7 @@ mod tests {
             .withf(move |peer, data| {
                 info!("alice sends {}", data.data.application_tag);
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -1515,7 +1515,7 @@ mod tests {
                 .try_as_segment()
                 .expect("must be a segment")
                 .is_terminating()
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -1637,7 +1637,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -1834,7 +1834,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -1950,7 +1950,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -2042,7 +2042,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 // But the message is again processed by Alice due to Loopback
@@ -2138,7 +2138,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(|_, _| Box::pin(async { Ok(()) }));
 
@@ -2189,7 +2189,7 @@ mod tests {
             .in_sequence(&mut open_sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -2241,7 +2241,7 @@ mod tests {
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::KeepAlive)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -2273,7 +2273,7 @@ mod tests {
                 .and_then(|m| m.try_as_segment())
                 .map(|s| s.is_terminating())
                 .unwrap_or(false)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();

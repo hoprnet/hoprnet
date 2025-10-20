@@ -34,27 +34,38 @@ pub mod errors;
 pub mod utils;
 
 /// Holds addresses of all smart contracts.
+#[serde_with::serde_as]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ContractAddresses {
     /// Token contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub token: Address,
     /// Channels contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub channels: Address,
     /// Announcements contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub announcements: Address,
     /// Network registry contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub network_registry: Address,
     /// Network registry proxy contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub network_registry_proxy: Address,
     /// Safe registry contract
-    pub safe_registry: Address,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub node_safe_registry: Address,
     /// Price oracle contract
-    pub price_oracle: Address,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub ticket_price_oracle: Address,
     /// Minimum ticket winning probability contract
-    pub win_prob_oracle: Address,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub winning_probability_oracle: Address,
     /// Stake factory contract
-    pub stake_factory: Address,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub node_stake_v2_factory: Address,
     /// Node management module contract (can be zero if safe is not used)
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub module_implementation: Address,
 }
 
@@ -115,13 +126,22 @@ where
                     provider.clone(),
                 ))
             },
-            safe_registry: HoprNodeSafeRegistryInstance::new(contract_addresses.safe_registry.into(), provider.clone()),
-            price_oracle: HoprTicketPriceOracleInstance::new(contract_addresses.price_oracle.into(), provider.clone()),
-            win_prob_oracle: HoprWinningProbabilityOracleInstance::new(
-                contract_addresses.win_prob_oracle.into(),
+            safe_registry: HoprNodeSafeRegistryInstance::new(
+                contract_addresses.node_safe_registry.into(),
                 provider.clone(),
             ),
-            stake_factory: HoprNodeStakeFactoryInstance::new(contract_addresses.stake_factory.into(), provider.clone()),
+            price_oracle: HoprTicketPriceOracleInstance::new(
+                contract_addresses.ticket_price_oracle.into(),
+                provider.clone(),
+            ),
+            win_prob_oracle: HoprWinningProbabilityOracleInstance::new(
+                contract_addresses.winning_probability_oracle.into(),
+                provider.clone(),
+            ),
+            stake_factory: HoprNodeStakeFactoryInstance::new(
+                contract_addresses.node_stake_v2_factory.into(),
+                provider.clone(),
+            ),
             module_implementation: HoprNodeManagementModuleInstance::new(
                 contract_addresses.module_implementation.into(),
                 provider.clone(),
@@ -296,10 +316,10 @@ where
             announcements: Into::<Address>::into(*instances.announcements.address()),
             network_registry: Into::<Address>::into(*instances.network_registry.address()),
             network_registry_proxy: instances.network_registry_proxy.address(),
-            safe_registry: Into::<Address>::into(*instances.safe_registry.address()),
-            price_oracle: Into::<Address>::into(*instances.price_oracle.address()),
-            win_prob_oracle: Into::<Address>::into(*instances.win_prob_oracle.address()),
-            stake_factory: Into::<Address>::into(*instances.stake_factory.address()),
+            node_safe_registry: Into::<Address>::into(*instances.safe_registry.address()),
+            ticket_price_oracle: Into::<Address>::into(*instances.price_oracle.address()),
+            winning_probability_oracle: Into::<Address>::into(*instances.win_prob_oracle.address()),
+            node_stake_v2_factory: Into::<Address>::into(*instances.stake_factory.address()),
             module_implementation: Into::<Address>::into(*instances.module_implementation.address()),
         }
     }

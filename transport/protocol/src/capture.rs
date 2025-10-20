@@ -1,4 +1,8 @@
-use std::{borrow::Cow, fs::File};
+use std::{
+    borrow::Cow,
+    fs::File,
+    time::{Duration, Instant},
+};
 
 use futures::{StreamExt, pin_mut};
 use hopr_api::db::IncomingPacket;
@@ -110,31 +114,44 @@ impl PacketWriter for UdpPacketDump {
 /// Creates a queue that processes captured packets into a [`PacketWriter`].
 pub fn packet_capture_channel(
     writer: Box<dyn PacketWriter + Send>,
+    start_capturing_path: Option<std::path::PathBuf>,
 ) -> (futures::channel::mpsc::Sender<CapturedPacket>, AbortHandle) {
     let (sender, receiver) = futures::channel::mpsc::channel(20_000);
+    let check_interval = Duration::from_secs(5);
+    let mut last_check = Instant::now() - check_interval;
+    let mut capture_enabled = false;
     let writer = std::sync::Arc::new(std::sync::Mutex::new(writer));
     let ah = spawn_as_abortable!(async move {
         pin_mut!(receiver);
         while let Some(packet) = receiver.next().await {
-            let writer = writer.clone();
-            match hopr_async_runtime::prelude::spawn_blocking(move || {
-                writer
-                    .lock()
-                    .map_err(|_| std::io::Error::other("lock poisoned"))
-                    .and_then(|mut w| w.write_packet(packet))
-            })
-            .await
-            .map_err(std::io::Error::other)
-            {
-                Err(error) | Ok(Err(error)) => {
-                    tracing::warn!(%error, "cannot capture more packets due to error");
-                    break;
+            if let Some(ref path) = start_capturing_path {
+                // refresh the check if interval elapsed
+                if last_check.elapsed() >= check_interval {
+                    capture_enabled = path.exists();
+                    last_check = Instant::now();
                 }
-                _ => {}
+
+                if capture_enabled {
+                    let writer = writer.clone();
+                    match hopr_async_runtime::prelude::spawn_blocking(move || {
+                        writer
+                            .lock()
+                            .map_err(|_| std::io::Error::other("lock poisoned"))
+                            .and_then(|mut w| w.write_packet(packet))
+                    })
+                    .await
+                    .map_err(std::io::Error::other)
+                    {
+                        Err(error) | Ok(Err(error)) => {
+                            tracing::warn!(%error, "cannot capture more packets due to error");
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     });
-
     (sender, ah)
 }
 
@@ -334,7 +351,11 @@ mod tests {
     async fn test_file_capture() -> anyhow::Result<()> {
         let me = *OffchainKeypair::random().public();
 
-        let (pcap, ah) = packet_capture_channel(Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?));
+        File::create("/tmp/start_capturing")?;
+        let (pcap, ah) = packet_capture_channel(
+            Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?),
+            Some(std::path::PathBuf::from("/tmp/start_capturing")),
+        );
         pin_mut!(pcap);
 
         let packet = IncomingPacket::Final {
@@ -373,7 +394,9 @@ mod tests {
             frame_id: 1,
             seq_idx: 0,
             seq_flags: SeqIndicator::new_with_flags(1, true),
-            data: Box::new(hex!("474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a")),
+            data: Box::new(hex!(
+                "474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a"
+            )),
         });
 
         let packet = IncomingPacket::Final {
@@ -400,7 +423,9 @@ mod tests {
             frame_id: 2,
             seq_idx: 0,
             seq_flags: SeqIndicator::new_with_flags(10, false),
-            data: Box::new(hex!("474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a")),
+            data: Box::new(hex!(
+                "474554202f20485454502f312e310d0a486f73743a207777772e6578616d706c652e636f6d0d0a557365722d4167656e743a206375726c2f382e372e310d0a4163636570743a202a2f2a0d0a0d0a"
+            )),
         });
 
         let packet = IncomingPacket::Final {

@@ -88,7 +88,7 @@ on:
         description: 'Payload size in bytes'
       download_throughput:
         type: number
-        default: 524288
+        default: 65536 # Baseline: 64kB/s # 512kbps
         required: true
         description: 'Download throughput in bytes per second (0 means disabled scenario)'
       upload_throughput:

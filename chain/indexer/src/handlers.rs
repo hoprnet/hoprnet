@@ -993,16 +993,16 @@ where
         } else if log.address.eq(&self.addresses.token) {
             let event = HoprTokenEvents::decode_log(&primitive_log)?;
             self.on_token_event(tx, event.data, is_synced).await
-        } else if log.address.eq(&self.addresses.safe_registry) {
+        } else if log.address.eq(&self.addresses.node_safe_registry) {
             let event = HoprNodeSafeRegistryEvents::decode_log(&primitive_log)?;
             self.on_node_safe_registry_event(tx, event.data, is_synced).await
         } else if log.address.eq(&self.addresses.module_implementation) {
             let event = HoprNodeManagementModuleEvents::decode_log(&primitive_log)?;
             self.on_node_management_module_event(tx, event.data, is_synced).await
-        } else if log.address.eq(&self.addresses.price_oracle) {
+        } else if log.address.eq(&self.addresses.ticket_price_oracle) {
             let event = HoprTicketPriceOracleEvents::decode_log(&primitive_log)?;
             self.on_ticket_price_oracle_event(tx, event.data, is_synced).await
-        } else if log.address.eq(&self.addresses.win_prob_oracle) {
+        } else if log.address.eq(&self.addresses.winning_probability_oracle) {
             let event = HoprWinningProbabilityOracleEvents::decode_log(&primitive_log)?;
             self.on_ticket_winning_probability_oracle_event(tx, event.data, is_synced)
                 .await
@@ -1031,9 +1031,9 @@ where
             self.addresses.channels,
             self.addresses.module_implementation,
             self.addresses.network_registry,
-            self.addresses.price_oracle,
-            self.addresses.win_prob_oracle,
-            self.addresses.safe_registry,
+            self.addresses.ticket_price_oracle,
+            self.addresses.winning_probability_oracle,
+            self.addresses.node_safe_registry,
             self.addresses.token,
         ]
     }
@@ -1055,11 +1055,11 @@ where
             crate::constants::topics::module_implementation()
         } else if contract.eq(&self.addresses.network_registry) {
             crate::constants::topics::network_registry()
-        } else if contract.eq(&self.addresses.price_oracle) {
+        } else if contract.eq(&self.addresses.ticket_price_oracle) {
             crate::constants::topics::ticket_price_oracle()
-        } else if contract.eq(&self.addresses.win_prob_oracle) {
+        } else if contract.eq(&self.addresses.winning_probability_oracle) {
             crate::constants::topics::winning_prob_oracle()
-        } else if contract.eq(&self.addresses.safe_registry) {
+        } else if contract.eq(&self.addresses.node_safe_registry) {
             crate::constants::topics::node_safe_registry()
         } else {
             panic!("use of unsupported contract address: {contract}");
@@ -1225,12 +1225,12 @@ mod tests {
                 token: *TOKEN_ADDR,
                 network_registry: *NETWORK_REGISTRY_ADDR,
                 network_registry_proxy: Default::default(),
-                safe_registry: *NODE_SAFE_REGISTRY_ADDR,
+                node_safe_registry: *NODE_SAFE_REGISTRY_ADDR,
                 announcements: *ANNOUNCEMENTS_ADDR,
                 module_implementation: *SAFE_MANAGEMENT_MODULE_ADDR,
-                price_oracle: *TICKET_PRICE_ORACLE_ADDR,
-                win_prob_oracle: *WIN_PROB_ORACLE_ADDR,
-                stake_factory: Default::default(),
+                ticket_price_oracle: *TICKET_PRICE_ORACLE_ADDR,
+                winning_probability_oracle: *WIN_PROB_ORACLE_ADDR,
+                node_stake_v2_factory: Default::default(),
             }),
             chain_key: SELF_CHAIN_KEY.clone(),
             safe_address: *STAKE_ADDRESS,
@@ -2812,7 +2812,7 @@ mod tests {
         let encoded_data = ().abi_encode();
 
         let safe_registered_log = SerializableLog {
-            address: handlers.addresses.safe_registry,
+            address: handlers.addresses.node_safe_registry,
             topics: vec![
                 hopr_bindings::hoprnodesaferegistry::HoprNodeSafeRegistry::RegisteredNodeSafe::SIGNATURE_HASH.into(),
                 // RegisteredNodeSafeFilter::signature().into(),
@@ -2852,7 +2852,7 @@ mod tests {
         let encoded_data = ().abi_encode();
 
         let safe_registered_log = SerializableLog {
-            address: handlers.addresses.safe_registry,
+            address: handlers.addresses.node_safe_registry,
             topics: vec![
                 hopr_bindings::hoprnodesaferegistry::HoprNodeSafeRegistry::DergisteredNodeSafe::SIGNATURE_HASH.into(),
                 // DergisteredNodeSafeFilter::signature().into(),
@@ -2893,7 +2893,7 @@ mod tests {
         let encoded_data = (U256::from(1u64), U256::from(123u64)).abi_encode();
 
         let price_change_log = SerializableLog {
-            address: handlers.addresses.price_oracle,
+            address: handlers.addresses.ticket_price_oracle,
             topics: vec![
                 hopr_bindings::hoprticketpriceoracle::HoprTicketPriceOracle::TicketPriceUpdated::SIGNATURE_HASH.into(),
                 // TicketPriceUpdatedFilter::signature().into()
@@ -2942,7 +2942,7 @@ mod tests {
             .abi_encode();
 
         let win_prob_change_log = SerializableLog {
-            address: handlers.addresses.win_prob_oracle,
+            address: handlers.addresses.winning_probability_oracle,
             topics: vec![
                 hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::WinProbUpdated::SIGNATURE_HASH.into()],
             data: encoded_data,
@@ -3050,7 +3050,7 @@ mod tests {
             .abi_encode();
 
         let win_prob_change_log = SerializableLog {
-            address: handlers.addresses.win_prob_oracle,
+            address: handlers.addresses.winning_probability_oracle,
             topics: vec![
                 hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::WinProbUpdated::SIGNATURE_HASH.into(),
             ],
