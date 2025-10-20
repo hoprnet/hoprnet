@@ -1595,6 +1595,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "blokli-client"
+version = "0.1.0"
+dependencies = [
+ "cynic",
+ "cynic-codegen",
+ "eventsource-client",
+ "futures",
+ "hyper 1.7.0",
+ "insta",
+ "smart-default",
+ "thiserror 2.0.17",
+ "url",
+]
+
+[[package]]
 name = "bloomfilter"
 version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4450,21 +4465,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-chain-client"
+name = "hopr-chain-connector"
 version = "0.1.0"
 dependencies = [
- "cynic",
- "cynic-codegen",
- "eventsource-client",
+ "blokli-client",
  "hopr-api",
  "hopr-chain-types",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
- "hyper 1.7.0",
- "insta",
- "moka",
- "petgraph",
 ]
 
 [[package]]
