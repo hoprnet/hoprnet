@@ -73,7 +73,7 @@ bytesize = { version = "2.0.1", features = ["serde"] }
 bytes = "1.10.1"
 cfg_eval = "0.1.2"
 cfg-if = "1.0.3"
-chrono = { version = "0.4.42", default-features = false }
+chrono = { version = "0.4.42", default-features = false, features = ["std", "clock"] }
 clap = { version = "4.5.48", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"

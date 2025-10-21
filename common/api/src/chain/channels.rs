@@ -4,13 +4,13 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream::BoxStream};
-use hopr_internal_types::prelude::ChannelStatus;
+use hopr_internal_types::prelude::{generate_channel_id, ChannelStatus};
 pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatusDiscriminants};
 use hopr_primitive_types::prelude::Address;
 pub use hopr_primitive_types::prelude::HoprBalance;
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub use chrono::Utc;
-
+use strum::IntoDiscriminant;
 use crate::chain::ChainReceipt;
 
 /// Selector for channels.
@@ -70,6 +70,35 @@ impl ChannelSelector {
         self.closure_time_range = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }
+
+    pub fn satisfies(&self, entry: &ChannelEntry) -> bool {
+        if let Some(source) = &self.source {
+            if entry.source != *source {
+                return false;
+            }
+        }
+
+        if let Some(dst) = &self.destination {
+            if entry.destination != *dst {
+                return false;
+            }
+        }
+
+        if !self.allowed_states.is_empty() {
+            if !self.allowed_states.contains(&entry.status.discriminant()) {
+                return false;
+            }
+        }
+
+        if let ChannelStatus::PendingToClose(time) = &entry.status {
+            let time = DateTime::from(*time);
+            if !self.closure_time_range.contains(&time) {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 /// On-chain read operations regarding channels.
@@ -81,7 +110,9 @@ pub trait ChainReadChannelOperations {
     fn me(&self) -> &Address;
 
     /// Returns a single channel given `src` and `dst`.
-    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error>;
+    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+        self.channel_by_id(&generate_channel_id(src, dst)).await
+    }
 
     /// Returns a single channel given `channel_id`.
     async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error>;

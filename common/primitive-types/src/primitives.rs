@@ -289,7 +289,7 @@ impl PartialOrd<Self> for SerializableLog {
 }
 
 /// Identifier of public keys.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct KeyIdent<const N: usize = 4>(#[serde(with = "serde_bytes")] [u8; N]);
 
 impl<const N: usize> Display for KeyIdent<N> {

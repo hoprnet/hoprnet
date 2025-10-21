@@ -1398,7 +1398,6 @@ mod tests {
         RootProvider,
     >;
     /// Used for testing. Creates RPC client to the local Anvil instance.
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn create_rpc_client_to_anvil(
         anvil: &alloy::node_bindings::AnvilInstance,
         signer: &hopr_crypto_types::keypairs::ChainKeypair,
