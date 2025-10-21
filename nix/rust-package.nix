@@ -21,6 +21,7 @@
   rev,
   runClippy ? false,
   runTests ? false,
+  runTestsWithCoverage ? false,
   runBench ? false,
   solcDefault,
   src,
@@ -31,6 +32,9 @@ let
   # `buildPlatform` is the platform we are compiling on
   buildPlatform = stdenv.buildPlatform;
   hostPlatform = stdenv.hostPlatform;
+
+  # Add cargo-llvm-cov as a dependency
+  cargoLlvmCov = pkgs.cargo-llvm-cov;
 
   # The target interpreter is used to patch the interpreter in the binary
   targetInterpreter =
@@ -130,7 +134,20 @@ let
   };
 
   sharedArgs =
-    if runTests then
+    if runTestsWithCoverage then
+      sharedArgsBase
+      // {
+        cargoTestExtraArgs = "--workspace -F runtime-tokio";
+        doCheck = true;
+        LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
+        RUST_BACKTRACE = "full";
+        nativeBuildInputs = sharedArgsBase.nativeBuildInputs ++ [ cargoLlvmCov ]; # add llvm-cov
+        postBuild = ''
+          # Generate coverage report
+          cargo llvm-cov --workspace --lcov --output-path lcov.info --features "runtime-tokio"
+        '';
+    }
+    else if runTests then
       sharedArgsBase
       // {
         cargoTestExtraArgs = "--workspace -F runtime-tokio";
@@ -182,7 +199,9 @@ let
   };
 
   builder =
-    if runTests then
+    if runTestsWithCoverage then
+      craneLib.cargoTest # Use cargoTest for coverage
+    else if runTests then
       craneLib.cargoTest
     else if runClippy then
       craneLib.cargoClippy
