@@ -502,7 +502,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let mut server = mockito::Server::new_async().await;
@@ -558,7 +558,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
@@ -602,7 +602,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
@@ -664,7 +664,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
@@ -708,7 +708,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         // Deploy contracts
@@ -752,7 +752,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         // Deploy contracts
@@ -844,7 +844,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let node_address: H160 = chain_key_0.public().to_address().into();
 
@@ -935,7 +935,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let node_address: H160 = chain_key_0.public().to_address().into();
 
