@@ -88,7 +88,7 @@ where
 }
 
 /// Holds instances to contracts.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContractInstances<P> {
     pub token: HoprTokenInstance<P>,
     pub channels: HoprChannelsInstance<P>,

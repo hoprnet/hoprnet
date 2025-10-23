@@ -74,9 +74,10 @@ pub fn create_provider_to_anvil_with_snapshot(
 
 /// Represents a HOPR environment deployment into Anvil.
 #[allow(unused)]
+#[derive(Clone)]
 pub struct TestChainEnv {
     /// Running Anvil instance
-    pub anvil: AnvilInstance,
+    pub anvil: Arc<AnvilInstance>,
     /// Anvil Provider
     pub provider: Arc<AnvilRpcClient>,
     /// Private key of smart contracts deployer
@@ -124,7 +125,7 @@ pub async fn deploy_test_environment(
                 .collect(),
             contract_addresses: None,
             contract_instances: None,
-            anvil,
+            anvil: anvil.into(),
             provider,
         })
     } else {
@@ -152,7 +153,7 @@ pub async fn deploy_test_environment(
                 .collect(),
             contract_addresses: Some(ContractAddresses::from(&contract_instances)),
             contract_instances: Some(contract_instances),
-            anvil,
+            anvil: anvil.into(),
             provider,
         })
     }

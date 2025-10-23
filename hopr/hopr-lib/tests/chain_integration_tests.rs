@@ -3,6 +3,7 @@ mod common;
 use std::{env, path::Path, time::Duration};
 
 use alloy::primitives::{B256, U256};
+use anyhow::Context;
 use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
@@ -134,7 +135,13 @@ async fn start_node_chain_logic(
     let eth_client = RpcEthereumClient::new(rpc_ops_out, RpcEthereumClientConfig::default());
     let tx_exec = EthereumTransactionExecutor::new(
         eth_client,
-        SafePayloadGenerator::new(chain_key, chain_env.contract_addresses, safe_cfg.module_address),
+        SafePayloadGenerator::new(
+            chain_key,
+            chain_env
+                .contract_addresses
+                .ok_or(anyhow::anyhow!("failed to get contract addresses"))?,
+            safe_cfg.module_address,
+        ),
     );
 
     // Actions
@@ -161,7 +168,9 @@ async fn start_node_chain_logic(
 
     // Indexer
     let chain_log_handler = ContractEventHandlers::new(
-        chain_env.contract_addresses,
+        chain_env
+            .contract_addresses
+            .ok_or(anyhow::anyhow!("failed to get contract addresses"))?,
         safe_cfg.safe_address,
         chain_key.clone(),
         index_db.clone(),
@@ -237,7 +246,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let finality = 2;
 
-    let chain_env = deploy_test_environment(requestor_base, block_time, finality).await;
+    let chain_env = deploy_test_environment(block_time, finality, Some(requestor_base), None).await?;
 
     let mut safe_cfgs = [NodeSafeConfig::default(); 2];
     safe_cfgs[0] = onboard_node(&chain_env, &alice_chain_key, U256::from(10_u32), U256::from(10_000_u32)).await;
@@ -245,12 +254,23 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     sleep((1 + finality) * block_time).await;
 
-    let domain_separator: Hash = (*chain_env.contract_instances.channels.domainSeparator().call().await?).into();
+    let domain_separator: Hash = (*chain_env
+        .clone()
+        .contract_instances
+        .ok_or(anyhow::anyhow!("failed to get contract instances"))?
+        .channels
+        .domainSeparator()
+        .call()
+        .await?)
+        .into();
 
     let rpc_cfg = RpcOperationsConfig {
         chain_id: chain_env.anvil.chain_id(),
         finality,
-        contract_addrs: chain_env.contract_addresses,
+        contract_addrs: chain_env
+            .clone()
+            .contract_addresses
+            .ok_or(anyhow::anyhow!("failed to get contract addresses"))?,
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
         max_block_range_fetch_size: 100,
@@ -272,7 +292,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         &alice_offchain_key,
         requestor_alice_rx,
         requestor_alice_tx,
-        &chain_env,
+        &chain_env.clone(),
         safe_cfgs[0],
         rpc_cfg.clone(),
         actions_cfg,
@@ -288,7 +308,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         &bob_offchain_key,
         requestor_bob_rx,
         requestor_bob_tx,
-        &chain_env,
+        &chain_env.clone(),
         safe_cfgs[1],
         rpc_cfg,
         actions_cfg,
@@ -603,14 +623,18 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should contain a channel from Bob");
 
     let on_chain_channel_bob_alice_balance = chain_env
+        .clone()
         .contract_instances
+        .ok_or(anyhow::anyhow!("failed to get contract addresses"))?
         .channels
         .channels(B256::from_slice(channel_bob_alice.get_id().as_ref()))
         .call()
         .await?
         .balance;
     let on_chain_channel_alice_bob_balance = chain_env
+        .clone()
         .contract_instances
+        .ok_or(anyhow::anyhow!("failed to get contract addresses"))?
         .channels
         .channels(B256::from_slice(channel_alice_bob.get_id().as_ref()))
         .call()
@@ -707,11 +731,13 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             ),
         )
         .await
-        .expect("db call should not fail")
-        .expect("should contain a channel from Alice");
+        .context("db call should not fail")?
+        .context("should contain a channel from Alice")?;
 
     let on_chain_channel_bob_alice_balance = chain_env
+        .clone()
         .contract_instances
+        .ok_or(anyhow::anyhow!("failed to get contract instances"))?
         .channels
         .channels(B256::from_slice(channel_bob_alice.get_id().as_ref())) // .channels(channel_bob_alice.get_id().into())
         .call()
@@ -719,7 +745,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .balance;
 
     let on_chain_channel_alice_bob_balance = chain_env
+        .clone()
         .contract_instances
+        .ok_or(anyhow::anyhow!("failed to get contract instances"))?
         .channels
         .channels(B256::from_slice(channel_alice_bob.get_id().as_ref()))
         // .channels(channel_alice_bob.get_id().into())

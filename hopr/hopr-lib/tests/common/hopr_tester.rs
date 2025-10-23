@@ -180,7 +180,7 @@ impl HoprTester {
         surb_management: Option<SurbBalancerConfig>,
     ) -> anyhow::Result<HoprSession> {
         let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
-        let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address())));
+        let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address().into())));
 
         let session = self
             .inner()
