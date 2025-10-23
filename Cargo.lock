@@ -5031,7 +5031,6 @@ dependencies = [
  "lazy_static",
  "mockall",
  "mockito",
- "once_cell",
  "parameterized",
  "rand 0.8.5",
  "rstest",
@@ -8523,7 +8522,7 @@ dependencies = [
  "regex",
  "relative-path",
  "rustc_version 0.4.1",
- "syn 2.0.106",
+ "syn 2.0.107",
  "unicode-ident",
 ]
 

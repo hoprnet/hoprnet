@@ -2,12 +2,9 @@ use std::{str::FromStr, time::Duration};
 
 use alloy::{primitives::U256, providers::ext::AnvilApi};
 use hopr_lib::{Address, state::HoprState};
-use once_cell::sync::Lazy;
+use lazy_static::lazy_static;
 use serde_json::json;
-use tokio::{
-    sync::{Mutex, OnceCell},
-    time::sleep,
-};
+use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
 
 use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, hopr_tester::HoprTester, onboard_node};
@@ -27,7 +24,9 @@ impl std::ops::Deref for ClusterGuard {
 }
 
 // static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
-static CLUSTER_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+lazy_static! {
+    static ref CLUSTER_MUTEX: Mutex<()> = Mutex::new(());
+}
 
 pub const SNAPSHOT_BASE: &str = "/tmp/hopr-tests";
 pub const PATH_TO_PROTOCOL_CONFIG: &str = "tests/protocol-config-anvil.json";
@@ -47,20 +46,20 @@ pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
 
 #[rstest::fixture]
 pub async fn chainenv_fixture() -> TestChainEnv {
-    // CHAINENV_FIXTURE
-    //     .get_or_init(|| async {
-
     // create the all parent folder of SNAPSHOT_BASE
     std::fs::create_dir_all(SNAPSHOT_BASE).expect("failed to create snapshot base directory");
 
-    match std::process::Command::new("pkill").arg("-f").arg("anvil").output() {
-        Ok(_) => {
-            info!("Killed existing anvil instances");
-        }
-        Err(_) => {
-            info!("No existing anvil instances found");
-        }
-    };
+    if std::process::Command::new("pkill")
+        .arg("-f")
+        .arg("anvil")
+        .output()
+        .is_ok()
+    {
+        info!("Killed existing anvil instances");
+    } else {
+        info!("No existing anvil instances found");
+    }
+
     let load_file = format!("{SNAPSHOT_BASE}/anvil");
     let res = deploy_test_environment(Duration::from_secs(1), 2, None, Some(load_file.as_str())).await;
     match res {
