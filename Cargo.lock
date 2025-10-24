@@ -4492,7 +4492,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "alloy",
  "anyhow",
