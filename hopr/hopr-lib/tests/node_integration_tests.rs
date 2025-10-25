@@ -170,6 +170,7 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
 
 #[rstest]
 #[tokio::test]
+#[test_log::test]
 #[serial]
 async fn test_channel_funding_should_be_visible_in_channel_stake(
     #[future(awt)] cluster_fixture: ClusterGuard,
@@ -177,7 +178,7 @@ async fn test_channel_funding_should_be_visible_in_channel_stake(
     use hopr_lib::HoprBalance;
 
     let [src, dst] = exclusive_indexes::<2>();
-    let funding_amount = FUNDING_AMOUNT.parse::<HoprBalance>()?;
+    let funding_amount: HoprBalance = FUNDING_AMOUNT.parse()?;
 
     let channel = cluster_fixture[src]
         .inner()

@@ -203,7 +203,7 @@ const SNAPSHOT_BOB_RX: &str = "tests/snapshots/indexer_snapshot_bob_in";
 #[tokio::test]
 async fn integration_test_indexer() -> anyhow::Result<()> {
     let block_time = Duration::from_secs(1);
-    let anvil = create_anvil(Some(block_time), Some(8545u16));
+    let anvil = create_anvil(Some(block_time), None);
 
     let alice_chain_key = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
     let bob_chain_key = ChainKeypair::from_secret(anvil.keys()[2].to_bytes().as_ref())?;
