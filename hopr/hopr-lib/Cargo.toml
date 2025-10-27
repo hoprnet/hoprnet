@@ -118,4 +118,8 @@ hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-indexer = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
-hopr-lib = { workspace = true, features = ["runtime-tokio", "session-server", "session-client"] }
+hopr-lib = { workspace = true, features = [
+  "runtime-tokio",
+  "session-server",
+  "session-client",
+] }
