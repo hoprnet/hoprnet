@@ -110,10 +110,10 @@ pub async fn deploy_test_environment(
         let state = std::fs::read(f).context("failed to read anvil state from file")?;
         let state_bytes: Bytes = Bytes::from(state);
 
-        let _ = provider
+        provider
             .anvil_load_state(state_bytes)
             .await
-            .context("failed to load anvil state from file");
+            .context("failed to load anvil state from file")?;
 
         Ok(TestChainEnv {
             contract_deployer,

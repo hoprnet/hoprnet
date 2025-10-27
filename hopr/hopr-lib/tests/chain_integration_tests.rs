@@ -634,7 +634,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let on_chain_channel_alice_bob_balance = chain_env
         .clone()
         .contract_instances
-        .ok_or(anyhow::anyhow!("failed to get contract addresses"))?
+        .ok_or(anyhow::anyhow!("failed to get contract instances"))?
         .channels
         .channels(B256::from_slice(channel_alice_bob.get_id().as_ref()))
         .call()

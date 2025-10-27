@@ -1,6 +1,7 @@
 use std::{str::FromStr, time::Duration};
 
 use alloy::{primitives::U256, providers::ext::AnvilApi};
+use futures_time::future::FutureExt as _;
 use hopr_lib::{Address, state::HoprState};
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -224,15 +225,18 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     )
     .await;
     // Wait for all nodes to reach the 'Running' state
-    futures::future::join_all(
-        hopr_instances
-            .iter()
-            .map(|instance| wait_for_status(instance, &HoprState::Running)),
-    )
+    futures::future::join_all(hopr_instances.iter().map(|instance| {
+        wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(120))
+    }))
     .await;
 
     // Wait for full mesh connectivity
-    futures::future::join_all(hopr_instances.iter().map(|instance| wait_for_connectivity(instance))).await;
+    futures::future::join_all(
+        hopr_instances
+            .iter()
+            .map(|instance| wait_for_connectivity(instance).timeout(futures_time::time::Duration::from_secs(120))),
+    )
+    .await;
 
     ClusterGuard {
         cluster: hopr_instances,
