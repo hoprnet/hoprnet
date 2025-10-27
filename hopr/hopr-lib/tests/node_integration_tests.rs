@@ -170,7 +170,6 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
 
 #[rstest]
 #[tokio::test]
-#[test_log::test]
 #[serial]
 async fn test_channel_funding_should_be_visible_in_channel_stake(
     #[future(awt)] cluster_fixture: ClusterGuard,
@@ -204,6 +203,7 @@ async fn test_channel_funding_should_be_visible_in_channel_stake(
 #[rstest]
 #[tokio::test]
 #[serial]
+#[test_log::test]
 async fn test_reset_ticket_statistics(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use futures::AsyncWriteExt;
     use hopr_lib::{ChannelId, HoprBalance, HoprSession};

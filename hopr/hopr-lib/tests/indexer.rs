@@ -161,8 +161,8 @@ async fn start_node_chain_logic(
         pin_mut!(sce_rx);
 
         while let Some(sce) = sce_rx.next().await {
-            let _ = action_state.match_and_resolve(&sce).await;
-            // debug!("{:?}: expectations resolved {:?}", sce, res);
+            let _res = action_state.match_and_resolve(&sce).await;
+            tracing::trace!("{:?}: expectations resolved {:?}", sce, _res);
         }
     }));
 
@@ -333,9 +333,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .actions
         .register_safe_by_node(safe_cfgs[0].safe_address)
         .await
-        .expect("should submit safe registration tx")
+        .context("should submit safe registration tx")?
         .await
-        .expect("should confirm safe registration");
+        .context("should confirm safe registration")?;
 
     assert!(
         matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == safe_cfgs[0].safe_address),
@@ -348,9 +348,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .actions
         .register_safe_by_node(safe_cfgs[1].safe_address)
         .await
-        .expect("should submit safe registration tx")
+        .context("should submit safe registration tx")?
         .await
-        .expect("should confirm safe registration");
+        .context("should confirm safe registration")?;
 
     assert!(
         matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == safe_cfgs[1].safe_address),
@@ -364,9 +364,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .actions
         .announce(&[maddr.clone()], &alice_node.offchain_key)
         .await
-        .expect("should submit announcement tx")
+        .context("should submit announcement tx")?
         .await
-        .expect("should confirm announcement");
+        .context("should confirm announcement")?;
 
     assert!(
         matches!(confirmation.event,
@@ -388,9 +388,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .actions
         .announce(&[maddr.clone()], &bob_node.offchain_key)
         .await
-        .expect("should submit announcement tx")
+        .context("should submit announcement tx")?
         .await
-        .expect("should confirm announcement");
+        .context("should confirm announcement")?;
 
     assert!(
         matches!(confirmation.event,
@@ -450,9 +450,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .actions
         .open_channel(bob_chain_key.public().to_address(), initial_channel_funds)
         .await
-        .expect("should submit channel open tx")
+        .context("should submit channel open tx")?
         .await
-        .expect("should confirm open channel");
+        .context("should confirm open channel")?;
 
     // Delay the fetch, so that channel increase can be processed first
     sleep(Duration::from_millis(100)).await;
@@ -467,8 +467,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             ),
         )
         .await
-        .expect("db call should not fail")
-        .expect("should contain a channel to Bob");
+        .context("db call should not fail")?
+        .context("should contain a channel to Bob")?;
 
     match confirmation.event {
         Some(ChainEventType::ChannelOpened(channel)) => {
@@ -495,9 +495,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .actions
         .fund_channel(channel_alice_bob.get_id(), funding_amount)
         .await
-        .expect("should submit fund channel tx")
+        .context("should submit fund channel tx")?
         .await
-        .expect("should confirm fund channel");
+        .context("should confirm fund channel")?;
 
     match confirmation.event {
         Some(ChainEventType::ChannelBalanceIncreased(channel, amount)) => {
@@ -525,8 +525,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             ),
         )
         .await
-        .expect("db call should not fail")
-        .expect("should contain a channel to Bob");
+        .context("db call should not fail")?
+        .context("should contain a channel to Bob")?;
 
     let channel_alice_bob_seen_by_bob = bob_node
         .index_db
@@ -538,8 +538,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             ),
         )
         .await
-        .expect("db call should not fail")
-        .expect("should contain a channel from Alice");
+        .context("db call should not fail")?
+        .context("should contain a channel from Alice")?;
 
     assert_eq!(
         channel_alice_bob.get_id(),
@@ -558,9 +558,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .actions
         .open_channel(alice_chain_key.public().to_address(), incoming_funding_amount)
         .await
-        .expect("should submit incoming channel open tx")
+        .context("should submit incoming channel open tx")?
         .await
-        .expect("should confirm open incoming channel");
+        .context("should confirm open incoming channel")?;
 
     match confirmation.event {
         Some(ChainEventType::ChannelOpened(channel)) => {
@@ -589,8 +589,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             ),
         )
         .await
-        .expect("db call should not fail")
-        .expect("should contain a channel to Bob");
+        .context("db call should not fail")?
+        .context("should contain a channel to Bob")?;
 
     let ticket_price = HoprBalance::from(1);
 
@@ -601,7 +601,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .node_db
         .stream_tickets(Some(channel_alice_bob_seen_by_bob.into()))
         .await
-        .expect("get ack ticket call on Alice's db must not fail")
+        .context("get ack ticket call on Alice's db must not fail")?
         .collect::<Vec<_>>()
         .await;
 
@@ -619,8 +619,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             ),
         )
         .await
-        .expect("db call should not fail")
-        .expect("should contain a channel from Bob");
+        .context("db call should not fail")?
+        .context("should contain a channel from Bob")?;
 
     let on_chain_channel_bob_alice_balance = chain_env
         .clone()
@@ -665,10 +665,10 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             .actions
             .redeem_tickets(TicketSelector::from(&channel_alice_bob))
             .await
-            .expect("should submit redeem action"),
+            .context("should submit redeem action")?,
     )
     .await
-    .expect("should redeem all tickets");
+    .context("should redeem all tickets")?;
 
     assert_eq!(1, confirmations.len(), "Bob should redeem a single ticket");
 
@@ -679,7 +679,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
                 channel_alice_bob.get_id(),
                 "channel in the DB must match the confirmed action"
             );
-            let ack_ticket = ack_ticket.clone().expect("event must contain ack ticket");
+            let ack_ticket = ack_ticket.clone().context("event must contain ack ticket")?;
             assert_eq!(
                 ack_ticket.verified_ticket().channel_id,
                 channel_alice_bob.get_id(),
@@ -698,7 +698,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .node_db
         .stream_tickets(Some(channel_bob_alice.into()))
         .await
-        .expect("get ack ticket call on Alice's db must not fail")
+        .context("get ack ticket call on Alice's db must not fail")?
         .collect::<Vec<_>>()
         .await;
 
@@ -718,8 +718,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             ),
         )
         .await
-        .expect("db call should not fail")
-        .expect("should contain a channel from Alice");
+        .context("db call should not fail")?
+        .context("should contain a channel from Alice")?;
 
     let channel_alice_bob = alice_node
         .index_db
@@ -789,9 +789,9 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .actions
         .close_channel(channel_alice_bob.clone())
         .await
-        .expect("should submit channel close tx")
+        .context("should submit channel close tx")?
         .await
-        .expect("should confirm close channel");
+        .context("should confirm close channel")?;
 
     match confirmation.event {
         Some(ChainEventType::ChannelClosureInitiated(channel)) => {
@@ -805,8 +805,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
                     ),
                 )
                 .await
-                .expect("db call should not fail")
-                .expect("should contain a channel to Bob");
+                .context("db call should not fail")?
+                .context("should contain a channel to Bob")?;
 
             assert_eq!(
                 channel.get_id(),
@@ -829,8 +829,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
             ),
         )
         .await
-        .expect("must get channel")
-        .expect("channel to bob must exist");
+        .context("must get channel")?
+        .context("channel to bob must exist")?;
 
     assert!(
         matches!(channel_alice_bob.status, ChannelStatus::PendingToClose(_)),

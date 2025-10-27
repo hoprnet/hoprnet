@@ -13,6 +13,8 @@ use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, hopr_
 /// A guard that holds a reference to the cluster and ensures exclusive access
 pub struct ClusterGuard {
     pub cluster: Vec<HoprTester>,
+    #[allow(dead_code)]
+    pub chain_env: TestChainEnv, // the object lives to hold the final reference to the anvil provider
     _lock: tokio::sync::MutexGuard<'static, ()>,
 }
 
@@ -88,10 +90,6 @@ mockall::mock! {
 
 #[rstest::fixture]
 pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> ClusterGuard {
-    use std::fs::read_to_string;
-
-    use hopr_lib::ProtocolsConfig;
-
     if !(3..=9).contains(&SWARM_N) {
         panic!("SWARM_N must be between 3 and 9");
     }
@@ -103,8 +101,8 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     let load_state = std::path::Path::new(&format!("{SNAPSHOT_BASE}/anvil")).exists();
 
     // SWARM_N_FIXTURE
-    let protocol_config = ProtocolsConfig::from_str(
-        &read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
+    let protocol_config = hopr_lib::ProtocolsConfig::from_str(
+        &std::fs::read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
     )
     .expect("failed to parse protocol config");
 
@@ -240,6 +238,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
 
     ClusterGuard {
         cluster: hopr_instances,
+        chain_env: chainenv_fixture,
         _lock: lock,
     }
 }
