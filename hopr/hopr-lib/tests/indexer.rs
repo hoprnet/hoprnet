@@ -199,7 +199,14 @@ const SNAPSHOT_ALICE_RX: &str = "tests/snapshots/indexer_snapshot_alice_in";
 const SNAPSHOT_BOB_TX: &str = "tests/snapshots/indexer_snapshot_bob_out";
 const SNAPSHOT_BOB_RX: &str = "tests/snapshots/indexer_snapshot_bob_in";
 
-// #[tracing_test::traced_test]
+/// Test plan:
+/// - Register Safe for both nodes
+/// - Announce both nodes
+/// - Open channel to Bob
+/// - Fund channel to Bob
+/// - Open channel to Alice
+/// - Redeem ticket in the channel
+/// - Close channel to Bob
 #[tokio::test]
 async fn integration_test_indexer() -> anyhow::Result<()> {
     let block_time = Duration::from_secs(1);
@@ -317,16 +324,6 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     .await?;
 
     info!("======== STARTING TEST ========");
-
-    // ----------------
-    // Test plan:
-    // Register Safe for both nodes
-    // Announce both nodes
-    // Open channel to Bob
-    // Fund channel to Bob
-    // Open channel to Alice
-    // Redeem ticket in the channel
-    // Close channel to Bob
 
     // Register Safe Alice
     let confirmation = alice_node

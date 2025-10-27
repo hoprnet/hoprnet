@@ -18,6 +18,7 @@ use hopr_primitive_types::prelude::*;
 use tokio::time::sleep;
 use tracing::info;
 
+pub mod dummies;
 pub mod fixtures;
 pub mod hopr_tester;
 

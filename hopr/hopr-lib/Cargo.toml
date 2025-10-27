@@ -110,6 +110,7 @@ rstest = { workspace = true }
 serial_test = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["compat"] }
 test-log = { workspace = true }
 url = { workspace = true }
 

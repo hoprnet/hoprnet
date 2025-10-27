@@ -2,13 +2,16 @@ use std::{str::FromStr, time::Duration};
 
 use alloy::{primitives::U256, providers::ext::AnvilApi};
 use futures_time::future::FutureExt as _;
-use hopr_lib::{Address, state::HoprState};
 use lazy_static::lazy_static;
 use serde_json::json;
 use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
 
-use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, hopr_tester::HoprTester, onboard_node};
+use hopr_lib::{Address, state::HoprState};
+
+use crate::common::{
+    NodeSafeConfig, TestChainEnv, deploy_test_environment, dummies::EchoServer, hopr_tester::HoprTester, onboard_node,
+};
 
 /// A guard that holds a reference to the cluster and ensures exclusive access
 pub struct ClusterGuard {
@@ -26,7 +29,6 @@ impl std::ops::Deref for ClusterGuard {
     }
 }
 
-// static CHAINENV_FIXTURE: Lazy<OnceCell<TestChainEnv>> = Lazy::new(|| OnceCell::const_new());
 lazy_static! {
     static ref CLUSTER_MUTEX: Mutex<()> = Mutex::new(());
 }
@@ -70,21 +72,6 @@ pub async fn chainenv_fixture() -> TestChainEnv {
         Err(e) => {
             panic!("Failed to deploy test environment: {e}");
         }
-    }
-    // })
-    // .await
-}
-
-mockall::mock! {
-    pub SessionServer {}
-
-    impl Clone for SessionServer {
-        fn clone(&self) -> Self;
-    }
-
-    #[async_trait::async_trait]
-    impl hopr_lib::traits::session::HoprSessionServer for SessionServer {
-        async fn process(&self, session: hopr_lib::IncomingSession) -> std::result::Result<(), hopr_lib::errors::HoprLibError>;
     }
 }
 
@@ -216,12 +203,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     }
 
     // Run all nodes in parallel
-    futures::future::join_all(
-        hopr_instances
-            .iter()
-            .map(|instance| instance.run(MockSessionServer::new())),
-    )
-    .await;
+    futures::future::join_all(hopr_instances.iter().map(|instance| instance.run(EchoServer::new()))).await;
     // Wait for all nodes to reach the 'Running' state
     futures::future::join_all(hopr_instances.iter().map(|instance| {
         wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(120))
