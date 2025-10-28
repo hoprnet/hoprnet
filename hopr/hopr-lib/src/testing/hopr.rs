@@ -116,6 +116,8 @@ impl TestedHopr {
 ///
 /// Cleans up the opened channels on drop.
 pub struct ChannelGuard {
+    /// Prepared for the implementation of Drop and closing
+    #[allow(dead_code)]
     channels: Vec<(Arc<Hopr>, Hash)>,
 }
 
@@ -145,23 +147,5 @@ impl ChannelGuard {
         }
 
         Ok(Self { channels })
-    }
-}
-
-impl Drop for ChannelGuard {
-    fn drop(&mut self) {
-        let channels = std::mem::take(&mut self.channels);
-
-        futures::executor::block_on(async move {
-            for (hopr, channel_hash) in channels {
-                if let Ok(Some(channel)) = hopr.channel_from_hash(&channel_hash).await {
-                    if channel.status != ChannelStatus::Closed {
-                        if let Err(e) = hopr.close_channel_by_id(&channel_hash).await {
-                            tracing::error!("failed to close channel {channel_hash:?}: {e}");
-                        }
-                    }
-                }
-            }
-        });
     }
 }

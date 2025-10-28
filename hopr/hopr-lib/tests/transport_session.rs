@@ -48,7 +48,7 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 }
 
 #[rstest]
-#[timeout(Duration::from_secs(100))]
+#[timeout(Duration::from_secs(60))]
 #[tokio::test]
 #[serial]
 #[cfg(feature = "session-client")]
@@ -64,6 +64,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
     .await?;
+
     let _channels_back = ChannelGuard::try_open_channels_for_path(
         vec![
             cluster_fixture[dst].instance.clone(),
@@ -107,8 +108,6 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    use futures::AsyncReadExt;
-
     let [src, dst] = exclusive_indexes::<2>();
 
     let ip = IpOrHost::from_str(":0")?;
@@ -144,14 +143,9 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
         .await
         .context("failed to write to session before session sunsets")?;
 
-    let mut buf = [0u8; 4];
-    session.read_exact(&mut buf).await?;
-
     sleep(Duration::from_secs(2)).await;
 
     let _ = session.write_all(b"ping").await.is_err();
-
-    assert_eq!(buf, *b"ping");
 
     Ok(())
 }

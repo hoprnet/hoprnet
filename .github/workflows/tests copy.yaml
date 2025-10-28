@@ -1,0 +1,70 @@
+---
+#################################################################################
+# Pipeline triggered on every pull request to run unit and smoke tests
+#################################################################################
+name: Test - WIP
+
+env:
+  RUST_BACKTRACE: "1"
+  FOUNDRY_PROFILE: ci
+
+on:
+  merge_group:
+    types: [checks_requested]
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: ${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.workflow }}-wip
+  cancel-in-progress: true
+
+jobs:
+  tests-unit:
+    name: Unit Tests
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    env:
+      CI: "true"
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Run unit tests
+        run: nix develop -c cargo test --lib --bin 
+
+  tests-integration:
+    name: Integration Tests
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    env:
+      CI: "true"
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Run Integration tests
+        run: nix develop -c cargo test --test '*' -- --test-threads=1

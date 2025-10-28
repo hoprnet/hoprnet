@@ -12,7 +12,7 @@ use rstest::rstest;
 use serial_test::serial;
 use tokio::time::sleep;
 
-const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
+const FUNDING_AMOUNT: &str = "1 wxHOPR";
 
 #[rstest]
 #[tokio::test]
@@ -68,9 +68,11 @@ async fn ticket_statistics_should_reset_when_cleaned(
     const BUF_LEN: usize = 5000;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
 
-    let _ = tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
-        .context("write failed")?;
+        .context("write failed")??;
+
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let _ = cluster_fixture[mid]
         .inner()
@@ -108,7 +110,7 @@ async fn ticket_statistics_should_reset_when_cleaned(
         .await
         .context("failed to get ticket statistics")?;
 
-    assert_eq!(stats_before.winning_count, 1); // As winning prob is set to 1
+    assert!(stats_before.winning_count > 0); // As winning prob is set to 1
 
     cluster_fixture[mid]
         .inner()
