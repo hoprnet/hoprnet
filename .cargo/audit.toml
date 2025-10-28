@@ -6,6 +6,7 @@ ignore = [
   "RUSTSEC-2023-0071", # 'rsa' dependency in 'sqlx' [unfixed]
   "RUSTSEC-2024-0388", # 'derivative' in 'alloy' [unmaintained],
   "RUSTSEC-2025-0052", # 'async-std' in 'async-tar' [unmaintained]
+  "RUSTSEC-2025-0073", # alloy-dyn-abi in 'alloy'
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
