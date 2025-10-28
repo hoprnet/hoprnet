@@ -11,7 +11,9 @@ use crate::{
     Address, ProtocolsConfig,
     state::HoprState,
     testing::{
-        NodeSafeConfig, TestChainEnv, deploy_test_environment, dummies::EchoServer, hopr::TestedHopr, onboard_node,
+        chain::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node},
+        dummies::EchoServer,
+        hopr::TestedHopr,
     },
 };
 

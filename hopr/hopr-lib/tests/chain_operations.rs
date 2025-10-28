@@ -203,13 +203,6 @@ async fn test_channel_retrieval(#[future(awt)] cluster_fixture: ClusterGuard) ->
     Ok(())
 }
 
-// #[rstest]
-// #[tokio::test]
-// async fn test_corrupted_channels_TODO(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-//     // TODO
-//     Ok(())
-// }
-
 #[rstest]
 #[tokio::test]
 #[serial]

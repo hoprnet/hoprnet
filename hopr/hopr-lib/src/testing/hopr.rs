@@ -1,21 +1,17 @@
-use std::{str::FromStr, time::Duration};
+use std::{sync::Arc, time::Duration};
 
-use crate::{
-    Address, ChannelEntry, ChannelStatus, Hopr, HoprSession, PeerId, ProtocolsConfig, RoutingOptions,
-    SessionClientConfig, SessionTarget, SurbBalancerConfig, prelude,
-};
+use crate::testing::chain::NodeSafeConfig;
+use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, ProtocolsConfig, prelude};
 use anyhow::Context;
+use hopr_api::chain::HoprBalance;
 use hopr_crypto_types::{
     keypairs::ChainKeypair,
     prelude::{Keypair, OffchainKeypair},
 };
-use hopr_primitive_types::bounded::BoundedVec;
-use hopr_transport::session::{Capabilities, IpOrHost, SealedHost};
-
-use crate::testing::NodeSafeConfig;
+use hopr_transport::Hash;
 
 pub struct TestedHopr {
-    instance: Hopr,
+    pub instance: Arc<Hopr>,
     pub safe_config: NodeSafeConfig,
 }
 
@@ -82,7 +78,7 @@ impl TestedHopr {
         .expect(format!("failed to create hopr instance on port {host_port}").as_str());
 
         Self {
-            instance,
+            instance: std::sync::Arc::new(instance),
             safe_config: safe,
         }
     }
@@ -114,55 +110,56 @@ impl TestedHopr {
     }
 }
 
-pub async fn create_raw_0_hop_session(src: &TestedHopr, dst: &TestedHopr) -> anyhow::Result<HoprSession> {
-    let ip = IpOrHost::from_str(":0")?;
-
-    let session = src
-        .inner()
-        .connect_to(
-            dst.address(),
-            SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            SessionClientConfig {
-                forward_path_options: RoutingOptions::Hops(0_u32.try_into()?),
-                return_path_options: RoutingOptions::Hops(0_u32.try_into()?),
-                capabilities: Capabilities::empty(),
-                pseudonym: None,
-                surb_management: None,
-                always_max_out_surbs: false,
-            },
-        )
-        .await
-        .expect("creating a session must succeed");
-
-    Ok(session)
+/// Guard for opening and closing the channels in a HOPR network.
+///
+/// Cleans up the opened channels on drop.
+pub struct ChannelGuard {
+    channels: Vec<(Arc<Hopr>, Hash)>,
 }
 
-pub async fn create_1_hop_session(
-    src: &TestedHopr,
-    mid: &TestedHopr,
-    dst: &TestedHopr,
-    capabilities: Option<Capabilities>,
-    surb_management: Option<SurbBalancerConfig>,
-) -> anyhow::Result<HoprSession> {
-    let ip = IpOrHost::from_str(":0")?;
-    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address().into())));
+impl ChannelGuard {
+    #[must_use]
+    pub async fn try_open_channels_for_path<I, T>(path: I, funding: HoprBalance) -> anyhow::Result<Self>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Arc<Hopr>>,
+    {
+        let mut channels = vec![];
 
-    let session = src
-        .inner()
-        .connect_to(
-            dst.address(),
-            SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            SessionClientConfig {
-                forward_path_options: routing.clone(),
-                return_path_options: routing,
-                capabilities: capabilities.unwrap_or_default(),
-                pseudonym: None,
-                surb_management,
-                always_max_out_surbs: false,
-            },
-        )
-        .await
-        .context("creating a session must succeed")?;
+        let path: Vec<Arc<Hopr>> = path.into_iter().map(|item| item.into()).collect();
+        let path_len = path.len();
 
-    Ok(session)
+        // no need for a channel to the last node from previous to last
+        for window in path.into_iter().take(path_len - 1).collect::<Vec<_>>().windows(2) {
+            let src = &window[0];
+            let dst = &window[1];
+
+            let channel = src
+                .open_channel(&dst.me_onchain(), funding)
+                .await
+                .context("opening channel must succeed")?;
+
+            channels.push((src.clone(), channel.channel_id));
+        }
+
+        Ok(Self { channels })
+    }
+}
+
+impl Drop for ChannelGuard {
+    fn drop(&mut self) {
+        let channels = std::mem::take(&mut self.channels);
+
+        futures::executor::block_on(async move {
+            for (hopr, channel_hash) in channels {
+                if let Ok(Some(channel)) = hopr.channel_from_hash(&channel_hash).await {
+                    if channel.status != ChannelStatus::Closed {
+                        if let Err(e) = hopr.close_channel_by_id(&channel_hash).await {
+                            tracing::error!("failed to close channel {channel_hash:?}: {e}");
+                        }
+                    }
+                }
+            }
+        });
+    }
 }

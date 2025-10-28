@@ -34,7 +34,7 @@ use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use tokio::fs;
 use tracing::info;
 
-use hopr_lib::testing::{
+use hopr_lib::testing::chain::{
     NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
 };
 

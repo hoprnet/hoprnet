@@ -1,12 +1,17 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
+use futures::AsyncWriteExt;
+use hopr_primitive_types::bounded::BoundedVec;
+use hopr_transport::session::{IpOrHost, SealedHost};
 use rstest::rstest;
 use serial_test::serial;
+use tokio::time::sleep;
 
-use hopr_lib::testing::{
-    fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
-    hopr::create_1_hop_session,
+use hopr_lib::{ChannelId, HoprBalance};
+use hopr_lib::{
+    RoutingOptions, SessionClientConfig, SessionTarget,
+    testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
 };
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
@@ -18,9 +23,6 @@ const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 async fn ticket_statistics_should_reset_when_cleaned(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    use futures::AsyncWriteExt;
-    use hopr_lib::{ChannelId, HoprBalance, HoprSession};
-
     let [src, mid, dst] = exclusive_indexes::<3>();
 
     let fw_channel = cluster_fixture[src]
@@ -41,14 +43,29 @@ async fn ticket_statistics_should_reset_when_cleaned(
         .await
         .context("failed to open return channel")?;
 
-    let mut session: HoprSession = create_1_hop_session(
-        &cluster_fixture[src],
-        &cluster_fixture[mid],
-        &cluster_fixture[dst],
-        None,
-        None,
-    )
-    .await?;
+    sleep(std::time::Duration::from_secs(3)).await;
+
+    let ip = IpOrHost::from_str(":0")?;
+    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
+        cluster_fixture[mid].address().into(),
+    )));
+
+    let mut session = cluster_fixture[src]
+        .inner()
+        .connect_to(
+            cluster_fixture[dst].address(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            SessionClientConfig {
+                forward_path_options: routing.clone(),
+                return_path_options: routing,
+                capabilities: Default::default(),
+                pseudonym: None,
+                surb_management: None,
+                always_max_out_surbs: false,
+            },
+        )
+        .await
+        .context("creating a session must succeed")?;
 
     const BUF_LEN: usize = 5000;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
