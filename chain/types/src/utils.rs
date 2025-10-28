@@ -53,11 +53,9 @@ lazy_static::lazy_static! {
 /// Otherwise, a new block is mined per transaction.
 ///
 /// Uses a fixed mnemonic to make generated accounts deterministic.
-pub fn create_anvil(block_time: Option<std::time::Duration>, port: Option<u16>) -> alloy::node_bindings::AnvilInstance {
-    let anvil = alloy::node_bindings::Anvil::new()
+pub fn create_anvil(block_time: Option<std::time::Duration>) -> alloy::node_bindings::AnvilInstance {
+    let mut anvil = alloy::node_bindings::Anvil::new()
         .mnemonic("gentle wisdom move brush express similar canal dune emotion series because parrot");
-
-    let mut anvil = if let Some(port) = port { anvil.port(port) } else { anvil };
 
     if let Some(bt) = block_time {
         anvil = anvil.block_time(bt.as_secs());

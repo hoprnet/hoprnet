@@ -907,7 +907,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_client_should_deploy_contracts_via_reqwest() -> anyhow::Result<()> {
-        let anvil = create_anvil(None, None);
+        let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
         let signer_chain_key = ChainKeypair::from_secret(signer.to_bytes().as_ref())?;
 
@@ -935,7 +935,7 @@ mod tests {
     async fn test_client_should_get_block_number() -> anyhow::Result<()> {
         let block_time = Duration::from_millis(1100);
 
-        let anvil = create_anvil(Some(block_time), None);
+        let anvil = create_anvil(Some(block_time));
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
         let transport_client = ReqwestTransport::new(anvil.endpoint_url());
@@ -962,7 +962,7 @@ mod tests {
     async fn test_client_should_get_block_number_with_metrics_without_retry() -> anyhow::Result<()> {
         let block_time = Duration::from_secs(1);
 
-        let anvil = create_anvil(Some(block_time), None);
+        let anvil = create_anvil(Some(block_time));
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
         let transport_client = ReqwestTransport::new(anvil.endpoint_url());
@@ -1000,7 +1000,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_client_should_fail_on_malformed_request() -> anyhow::Result<()> {
-        let anvil = create_anvil(None, None);
+        let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
         let transport_client = ReqwestTransport::new(anvil.endpoint_url());
@@ -1362,7 +1362,7 @@ mod tests {
         let block_time = Duration::from_millis(1100);
         let snapshot_file = NamedTempFile::new()?;
 
-        let anvil = create_anvil(Some(block_time), None);
+        let anvil = create_anvil(Some(block_time));
 
         {
             let mut last_number = 0;
@@ -1437,7 +1437,7 @@ mod tests {
             .expect(0)
             .create();
 
-        let anvil = create_anvil(None, None);
+        let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
         let transport_client = ReqwestTransport::new(anvil.endpoint_url());
@@ -1484,7 +1484,7 @@ mod tests {
             .expect(1)
             .create();
 
-        let anvil = create_anvil(None, None);
+        let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
         let transport_client = ReqwestTransport::new(anvil.endpoint_url());

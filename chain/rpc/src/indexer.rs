@@ -369,7 +369,7 @@ mod tests {
     #[tokio::test]
     async fn test_should_get_block_number() -> anyhow::Result<()> {
         let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let transport_client = ReqwestTransport::new(anvil.endpoint_url());
@@ -407,7 +407,7 @@ mod tests {
 
         let expected_block_time = Duration::from_secs(1);
 
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
@@ -540,7 +540,7 @@ mod tests {
 
         let expected_block_time = Duration::from_secs(1);
 
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time), None);
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 

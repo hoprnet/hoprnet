@@ -594,7 +594,7 @@ mod tests {
     async fn test_announce() -> anyhow::Result<()> {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56")?;
 
-        let anvil = hopr_chain_types::utils::create_anvil(None, None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
 
@@ -636,7 +636,7 @@ mod tests {
 
     #[tokio::test]
     async fn redeem_ticket() -> anyhow::Result<()> {
-        let anvil = hopr_chain_types::utils::create_anvil(None, None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &chain_key_alice);
@@ -704,7 +704,7 @@ mod tests {
 
     #[tokio::test]
     async fn withdraw_token() -> anyhow::Result<()> {
-        let anvil = hopr_chain_types::utils::create_anvil(None, None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &chain_key_alice);
