@@ -2,14 +2,18 @@ use std::{str::FromStr, time::Duration};
 
 use alloy::{primitives::U256, providers::ext::AnvilApi};
 use futures_time::future::FutureExt as _;
-use hopr_lib::{Address, state::HoprState};
 use lazy_static::lazy_static;
 use serde_json::json;
 use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
 
-use crate::common::{
-    NodeSafeConfig, TestChainEnv, deploy_test_environment, dummies::EchoServer, hopr_tester::HoprTester, onboard_node,
+use crate::{
+    Address, ProtocolsConfig,
+    state::HoprState,
+    testing::{
+        NodeSafeConfig, TestChainEnv, deploy_test_environment, dummies::EchoServer, hopr_tester::HoprTester,
+        onboard_node,
+    },
 };
 
 /// A guard that holds a reference to the cluster and ensures exclusive access
@@ -59,7 +63,7 @@ pub async fn chainenv_fixture() -> TestChainEnv {
         .output()
         .is_ok()
     {
-        info!("Killed existing anvil instances");
+        info!("Terminating existing anvil instances");
     } else {
         info!("No existing anvil instances found");
     }
@@ -87,7 +91,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     let load_state = std::path::Path::new(&format!("{SNAPSHOT_BASE}/anvil")).exists();
 
     // SWARM_N_FIXTURE
-    let protocol_config = hopr_lib::ProtocolsConfig::from_str(
+    let protocol_config = ProtocolsConfig::from_str(
         &std::fs::read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
     )
     .expect("failed to parse protocol config");

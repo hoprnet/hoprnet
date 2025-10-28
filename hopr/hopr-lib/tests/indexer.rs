@@ -1,10 +1,7 @@
-mod common;
-
 use std::{env, path::Path, time::Duration};
 
 use alloy::primitives::{B256, U256};
 use anyhow::Context;
-use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
 use hopr_api::db::{HoprDbTicketOperations, TicketSelector};
@@ -37,7 +34,9 @@ use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use tokio::fs;
 use tracing::info;
 
-use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node};
+use hopr_lib::testing::{
+    NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
+};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket(

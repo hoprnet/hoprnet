@@ -5027,7 +5027,6 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-strategy",
  "hopr-transport",
- "hopr-transport-session",
  "human-bandwidth",
  "lazy_static",
  "mockall",

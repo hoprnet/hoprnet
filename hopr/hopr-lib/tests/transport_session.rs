@@ -7,8 +7,7 @@ use rstest::rstest;
 use serial_test::serial;
 use tokio::time::sleep;
 
-mod common;
-use common::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
+use hopr_lib::testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
@@ -31,6 +30,7 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[tokio::test]
 #[serial]
 #[cfg(feature = "session-client")]
+#[test_log::test]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = exclusive_indexes::<3>();
     let _session: HoprSession = cluster_fixture[src]

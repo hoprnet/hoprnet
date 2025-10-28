@@ -32,6 +32,9 @@ pub mod traits;
 /// Functionality related to the HOPR node state.
 pub mod state;
 
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
+
 /// Re-exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {

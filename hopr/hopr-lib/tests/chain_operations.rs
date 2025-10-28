@@ -5,8 +5,7 @@ use hopr_lib::ChannelId;
 use rstest::rstest;
 use serial_test::serial;
 
-mod common;
-use common::{
+use hopr_lib::testing::{
     fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
     hopr_tester::HoprTester,
 };

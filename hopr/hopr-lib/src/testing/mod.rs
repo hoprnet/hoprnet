@@ -6,7 +6,7 @@ use alloy::{
 };
 use alloy::{primitives::Bytes, providers::ext::AnvilApi};
 use anyhow::Context;
-use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor, SnapshotRequestorLayer};
 use hopr_chain_types::{
     ContractAddresses, ContractInstances,
     utils::{
@@ -30,7 +30,6 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
     anvil: &alloy::node_bindings::AnvilInstance,
 ) -> RpcClient {
     use alloy::rpc::client::ClientBuilder;
-    use hopr_chain_rpc::client::SnapshotRequestorLayer;
 
     let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
@@ -51,7 +50,7 @@ pub fn create_provider_to_anvil_with_snapshot(
         rpc::client::ClientBuilder,
         signers::local::PrivateKeySigner,
     };
-    use hopr_chain_rpc::client::SnapshotRequestorLayer;
+    // use hopr_chain_rpc::client::SnapshotRequestorLayer;
     use hopr_crypto_types::keypairs::Keypair;
 
     let wallet = PrivateKeySigner::from_slice(signer.secret().as_ref()).expect("failed to construct wallet");

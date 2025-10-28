@@ -1,17 +1,18 @@
 use std::{str::FromStr, time::Duration};
 
+use crate::{
+    Address, Balance, ChannelEntry, ChannelStatus, Currency, Hopr, HoprBalance, HoprSession, PeerId, ProtocolsConfig,
+    RoutingOptions, SessionClientConfig, SessionTarget, SurbBalancerConfig, prelude,
+};
+use anyhow::Context;
 use hopr_crypto_types::{
     keypairs::ChainKeypair,
     prelude::{Keypair, OffchainKeypair},
 };
-use hopr_lib::{
-    Address, Balance, ChannelEntry, ChannelStatus, Currency, Hopr, HoprBalance, HoprSession, PeerId, RoutingOptions,
-    SessionClientConfig, SessionTarget, SurbBalancerConfig, prelude,
-};
 use hopr_primitive_types::bounded::BoundedVec;
-use hopr_transport_session::{Capabilities, IpOrHost, SealedHost};
+use hopr_transport::session::{Capabilities, IpOrHost, SealedHost};
 
-use crate::common::NodeSafeConfig;
+use crate::testing::NodeSafeConfig;
 
 pub struct HoprTester {
     instance: Hopr,
@@ -22,37 +23,37 @@ impl HoprTester {
     pub fn new(
         chain_keys: ChainKeypair,
         anvil_endpoint: String,
-        protocol_config: hopr_lib::ProtocolsConfig,
+        protocol_config: ProtocolsConfig,
         host_port: u16,
         db_path: String,
         safe: NodeSafeConfig,
     ) -> Self {
         let instance = Hopr::new(
-            hopr_lib::config::HoprLibConfig {
-                probe: hopr_lib::config::ProbeConfig {
+            crate::config::HoprLibConfig {
+                probe: crate::config::ProbeConfig {
                     timeout: Duration::from_secs(2),
                     max_parallel_probes: 10,
                     recheck_threshold: Duration::from_secs(1),
                     ..Default::default()
                 },
-                network_options: hopr_lib::config::NetworkConfig {
+                network_options: crate::config::NetworkConfig {
                     ignore_timeframe: Duration::from_secs(0),
                     ..Default::default()
                 },
-                chain: hopr_lib::config::Chain {
+                chain: crate::config::Chain {
                     protocols: protocol_config,
                     provider: Some(anvil_endpoint.into()),
                     ..Default::default()
                 },
-                host: hopr_lib::config::HostConfig {
-                    address: hopr_lib::config::HostType::default(),
+                host: crate::config::HostConfig {
+                    address: crate::config::HostType::default(),
                     port: host_port,
                 },
-                db: hopr_lib::config::Db {
+                db: crate::config::Db {
                     data: db_path.into(),
                     ..Default::default()
                 },
-                safe_module: hopr_lib::config::SafeModule {
+                safe_module: crate::config::SafeModule {
                     safe_address: safe.safe_address,
                     module_address: safe.module_address,
                     ..Default::default()
@@ -65,7 +66,7 @@ impl HoprTester {
                     )],
                     ..Default::default()
                 },
-                transport: hopr_lib::config::TransportConfig {
+                transport: crate::config::TransportConfig {
                     prefer_local_addresses: true,
                     announce_local_addresses: true,
                 },
@@ -91,7 +92,7 @@ impl HoprTester {
     }
 
     pub async fn run<
-        #[cfg(feature = "session-server")] T: hopr_lib::traits::session::HoprSessionServer + Clone + Send + 'static,
+        #[cfg(feature = "session-server")] T: crate::traits::session::HoprSessionServer + Clone + Send + 'static,
     >(
         &self,
         #[cfg(feature = "session-server")] server: T,
@@ -150,7 +151,7 @@ impl HoprTester {
     }
 
     pub async fn create_raw_0_hop_session(&self, dst: &HoprTester) -> anyhow::Result<HoprSession> {
-        let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
+        let ip = IpOrHost::from_str(":0")?;
 
         let session = self
             .inner()
@@ -179,7 +180,7 @@ impl HoprTester {
         capabilities: Option<Capabilities>,
         surb_management: Option<SurbBalancerConfig>,
     ) -> anyhow::Result<HoprSession> {
-        let ip = IpOrHost::from_str(":0").expect("invalid IpOrHost");
+        let ip = IpOrHost::from_str(":0")?;
         let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address().into())));
 
         let session = self
@@ -197,7 +198,7 @@ impl HoprTester {
                 },
             )
             .await
-            .expect("creating a session must succeed");
+            .context("creating a session must succeed")?;
 
         Ok(session)
     }

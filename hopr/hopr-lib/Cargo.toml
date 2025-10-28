@@ -45,9 +45,17 @@ utils_session = [ # utility session functionality for advanced interaction with 
   "dep:tokio-stream",
 ]
 utils_futures = [] # utility futures for async adapters
-utils_parallel = [ # utility parallelization functionality
+utils_parallel = [] # utility parallelization functionality
 
-]
+testing = [
+  "dep:anyhow",
+  "dep:futures-time",
+  "dep:rand",
+  "dep:rstest",
+  "dep:tokio",
+  "dep:tokio-util",
+  "dep:hopr-chain-rpc",
+] # testing related functionality
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
@@ -55,6 +63,7 @@ alloy = { workspace = true, default-features = false, features = [
   "json-rpc",
   "node-bindings",
 ] }
+anyhow = { workspace = true, optional = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
@@ -74,14 +83,18 @@ serde_with = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
+rand = { workspace = true, optional = true }
+rstest = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-stream = { workspace = true, optional = true }
+tokio-util = { workspace = true, features = ["compat"], optional = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-api = { workspace = true }
+hopr-chain-rpc = { workspace = true, optional = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
@@ -98,19 +111,16 @@ hopr-strategy = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
+anyhow = { workspace = true}
 env_logger = { workspace = true }
-futures-time = { workspace = true }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
 mockito = { workspace = true }
 parameterized = { workspace = true }
-rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
-tokio-util = { workspace = true, features = ["compat"] }
 test-log = { workspace = true }
 url = { workspace = true }
 
@@ -119,9 +129,9 @@ hopr-chain-api = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-indexer = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
-hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",
   "session-client",
+  "testing"
 ] }

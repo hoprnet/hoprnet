@@ -4,8 +4,7 @@ use anyhow::Context;
 use rstest::rstest;
 use serial_test::serial;
 
-mod common;
-use common::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
+use hopr_lib::testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
