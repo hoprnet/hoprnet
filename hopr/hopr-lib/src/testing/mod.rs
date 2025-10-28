@@ -20,7 +20,7 @@ use tracing::info;
 
 pub mod dummies;
 pub mod fixtures;
-pub mod hopr_tester;
+pub mod hopr;
 
 /// Used for testing. Creates RPC client to the local Anvil instance.
 #[allow(dead_code)]

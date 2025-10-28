@@ -8,6 +8,8 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 use hopr_lib::testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
+use hopr_lib::testing::hopr::create_1_hop_session;
+use hopr_lib::testing::hopr::create_raw_0_hop_session;
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
@@ -17,9 +19,7 @@ const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 #[cfg(feature = "session-client")]
 async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = exclusive_indexes::<2>();
-    let _session: HoprSession = cluster_fixture[src]
-        .create_raw_0_hop_session(&cluster_fixture[dst])
-        .await?;
+    let _session: HoprSession = create_raw_0_hop_session(&cluster_fixture[src], &cluster_fixture[dst]).await?;
 
     // TODO: check here that the destination sees the new session created
 
@@ -33,9 +33,14 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[test_log::test]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = exclusive_indexes::<3>();
-    let _session: HoprSession = cluster_fixture[src]
-        .create_1_hop_session(&cluster_fixture[mid], &cluster_fixture[dst], None, None)
-        .await?;
+    let _session: HoprSession = create_1_hop_session(
+        &cluster_fixture[src],
+        &cluster_fixture[mid],
+        &cluster_fixture[dst],
+        None,
+        None,
+    )
+    .await?;
 
     // TODO: check here that the destination sees the new session created
 
@@ -48,9 +53,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[cfg(feature = "session-client")]
 async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = exclusive_indexes::<2>();
-    let mut session: HoprSession = cluster_fixture[src]
-        .create_raw_0_hop_session(&cluster_fixture[dst])
-        .await?;
+    let mut session: HoprSession = create_raw_0_hop_session(&cluster_fixture[src], &cluster_fixture[dst]).await?;
 
     sleep(Duration::from_secs(2)).await;
 
@@ -104,9 +107,14 @@ async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: Clust
         .await
         .context("failed to open return channel")?;
 
-    let session: HoprSession = cluster_fixture[src]
-        .create_1_hop_session(&cluster_fixture[mid], &cluster_fixture[dst], None, Some(exp_config))
-        .await?;
+    let session: HoprSession = create_1_hop_session(
+        &cluster_fixture[src],
+        &cluster_fixture[mid],
+        &cluster_fixture[dst],
+        None,
+        Some(exp_config),
+    )
+    .await?;
 
     let config = cluster_fixture[src]
         .inner()

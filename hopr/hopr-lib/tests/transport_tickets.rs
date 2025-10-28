@@ -4,7 +4,10 @@ use anyhow::Context;
 use rstest::rstest;
 use serial_test::serial;
 
-use hopr_lib::testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
+use hopr_lib::testing::{
+    fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+    hopr::create_1_hop_session,
+};
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
@@ -38,9 +41,14 @@ async fn ticket_statistics_should_reset_when_cleaned(
         .await
         .context("failed to open return channel")?;
 
-    let mut session: HoprSession = cluster_fixture[src]
-        .create_1_hop_session(&cluster_fixture[mid], &cluster_fixture[dst], None, None)
-        .await?;
+    let mut session: HoprSession = create_1_hop_session(
+        &cluster_fixture[src],
+        &cluster_fixture[mid],
+        &cluster_fixture[dst],
+        None,
+        None,
+    )
+    .await?;
 
     const BUF_LEN: usize = 5000;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();

@@ -11,21 +11,20 @@ use crate::{
     Address, ProtocolsConfig,
     state::HoprState,
     testing::{
-        NodeSafeConfig, TestChainEnv, deploy_test_environment, dummies::EchoServer, hopr_tester::HoprTester,
-        onboard_node,
+        NodeSafeConfig, TestChainEnv, deploy_test_environment, dummies::EchoServer, hopr::TestedHopr, onboard_node,
     },
 };
 
 /// A guard that holds a reference to the cluster and ensures exclusive access
 pub struct ClusterGuard {
-    pub cluster: Vec<HoprTester>,
+    pub cluster: Vec<TestedHopr>,
     #[allow(dead_code)]
     pub chain_env: TestChainEnv, // the object lives to hold the final reference to the anvil provider
     _lock: tokio::sync::MutexGuard<'static, ()>,
 }
 
 impl std::ops::Deref for ClusterGuard {
-    type Target = Vec<HoprTester>;
+    type Target = Vec<TestedHopr>;
 
     fn deref(&self) -> &Self::Target {
         &self.cluster
@@ -163,7 +162,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     assert!(safes.len() == SWARM_N);
 
     // Setup SWARM_N nodes
-    let hopr_instances: Vec<HoprTester> = futures::future::join_all((0..SWARM_N).map(|i| {
+    let hopr_instances: Vec<TestedHopr> = futures::future::join_all((0..SWARM_N).map(|i| {
         let moved_keys = onchain_keys.clone();
         let moved_safes = safes.clone();
         let moved_config = protocol_config.clone();
@@ -178,7 +177,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
                     .expect("Failed to build Tokio runtime");
 
                 rt.block_on(async {
-                    HoprTester::new(
+                    TestedHopr::new(
                         moved_keys[i].clone(),
                         endpoint.clone(),
                         moved_config,
@@ -206,7 +205,12 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     }
 
     // Run all nodes in parallel
-    futures::future::join_all(hopr_instances.iter().map(|instance| instance.run(EchoServer::new()))).await;
+    futures::future::join_all(
+        hopr_instances
+            .iter()
+            .map(|instance| instance.inner().run(EchoServer::new())),
+    )
+    .await;
     // Wait for all nodes to reach the 'Running' state
     futures::future::join_all(hopr_instances.iter().map(|instance| {
         wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(120))
@@ -228,7 +232,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     }
 }
 
-async fn wait_for_connectivity(instance: &HoprTester) {
+async fn wait_for_connectivity(instance: &TestedHopr) {
     info!("Waiting for full connectivity");
     loop {
         let peers = instance
@@ -244,7 +248,7 @@ async fn wait_for_connectivity(instance: &HoprTester) {
     }
 }
 
-async fn wait_for_status(instance: &HoprTester, expected_status: &HoprState) {
+async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState) {
     info!(
         "Waiting for node {} to reach status {:?}",
         instance.address(),

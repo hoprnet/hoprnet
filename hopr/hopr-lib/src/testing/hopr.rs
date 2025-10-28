@@ -1,8 +1,8 @@
 use std::{str::FromStr, time::Duration};
 
 use crate::{
-    Address, Balance, ChannelEntry, ChannelStatus, Currency, Hopr, HoprBalance, HoprSession, PeerId, ProtocolsConfig,
-    RoutingOptions, SessionClientConfig, SessionTarget, SurbBalancerConfig, prelude,
+    Address, ChannelEntry, ChannelStatus, Hopr, HoprSession, PeerId, ProtocolsConfig, RoutingOptions,
+    SessionClientConfig, SessionTarget, SurbBalancerConfig, prelude,
 };
 use anyhow::Context;
 use hopr_crypto_types::{
@@ -14,12 +14,12 @@ use hopr_transport::session::{Capabilities, IpOrHost, SealedHost};
 
 use crate::testing::NodeSafeConfig;
 
-pub struct HoprTester {
+pub struct TestedHopr {
     instance: Hopr,
     pub safe_config: NodeSafeConfig,
 }
 
-impl HoprTester {
+impl TestedHopr {
     pub fn new(
         chain_keys: ChainKeypair,
         anvil_endpoint: String,
@@ -91,43 +91,6 @@ impl HoprTester {
         &self.instance
     }
 
-    pub async fn run<
-        #[cfg(feature = "session-server")] T: crate::traits::session::HoprSessionServer + Clone + Send + 'static,
-    >(
-        &self,
-        #[cfg(feature = "session-server")] server: T,
-    ) -> anyhow::Result<()> {
-        Ok(self
-            .instance
-            .run(
-                #[cfg(feature = "session-server")]
-                server,
-            )
-            .await
-            .map(|_| ())?)
-    }
-
-    pub async fn get_balance<C: Currency + Send>(&self) -> Option<Balance<C>> {
-        match self.instance.get_balance().await {
-            Ok(balance) => Some(balance),
-            Err(_) => None,
-        }
-    }
-
-    pub async fn get_safe_balance<C: Currency + Send>(&self) -> Option<Balance<C>> {
-        match self.instance.get_safe_balance().await {
-            Ok(balance) => Some(balance),
-            Err(_) => None,
-        }
-    }
-
-    pub async fn safe_allowance(&self) -> Option<HoprBalance> {
-        match self.instance.safe_allowance().await {
-            Ok(allowance) => Some(allowance),
-            Err(_) => None,
-        }
-    }
-
     pub fn address(&self) -> Address {
         self.instance.me_onchain()
     }
@@ -149,57 +112,57 @@ impl HoprTester {
             Err(_) => None,
         }
     }
+}
 
-    pub async fn create_raw_0_hop_session(&self, dst: &HoprTester) -> anyhow::Result<HoprSession> {
-        let ip = IpOrHost::from_str(":0")?;
+pub async fn create_raw_0_hop_session(src: &TestedHopr, dst: &TestedHopr) -> anyhow::Result<HoprSession> {
+    let ip = IpOrHost::from_str(":0")?;
 
-        let session = self
-            .inner()
-            .connect_to(
-                dst.address(),
-                SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                SessionClientConfig {
-                    forward_path_options: RoutingOptions::Hops(0_u32.try_into()?),
-                    return_path_options: RoutingOptions::Hops(0_u32.try_into()?),
-                    capabilities: Capabilities::empty(),
-                    pseudonym: None,
-                    surb_management: None,
-                    always_max_out_surbs: false,
-                },
-            )
-            .await
-            .expect("creating a session must succeed");
+    let session = src
+        .inner()
+        .connect_to(
+            dst.address(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            SessionClientConfig {
+                forward_path_options: RoutingOptions::Hops(0_u32.try_into()?),
+                return_path_options: RoutingOptions::Hops(0_u32.try_into()?),
+                capabilities: Capabilities::empty(),
+                pseudonym: None,
+                surb_management: None,
+                always_max_out_surbs: false,
+            },
+        )
+        .await
+        .expect("creating a session must succeed");
 
-        Ok(session)
-    }
+    Ok(session)
+}
 
-    pub async fn create_1_hop_session(
-        &self,
-        mid: &HoprTester,
-        dst: &HoprTester,
-        capabilities: Option<Capabilities>,
-        surb_management: Option<SurbBalancerConfig>,
-    ) -> anyhow::Result<HoprSession> {
-        let ip = IpOrHost::from_str(":0")?;
-        let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address().into())));
+pub async fn create_1_hop_session(
+    src: &TestedHopr,
+    mid: &TestedHopr,
+    dst: &TestedHopr,
+    capabilities: Option<Capabilities>,
+    surb_management: Option<SurbBalancerConfig>,
+) -> anyhow::Result<HoprSession> {
+    let ip = IpOrHost::from_str(":0")?;
+    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address().into())));
 
-        let session = self
-            .inner()
-            .connect_to(
-                dst.address(),
-                SessionTarget::UdpStream(SealedHost::Plain(ip)),
-                SessionClientConfig {
-                    forward_path_options: routing.clone(),
-                    return_path_options: routing,
-                    capabilities: capabilities.unwrap_or_default(),
-                    pseudonym: None,
-                    surb_management: surb_management,
-                    always_max_out_surbs: false,
-                },
-            )
-            .await
-            .context("creating a session must succeed")?;
+    let session = src
+        .inner()
+        .connect_to(
+            dst.address(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            SessionClientConfig {
+                forward_path_options: routing.clone(),
+                return_path_options: routing,
+                capabilities: capabilities.unwrap_or_default(),
+                pseudonym: None,
+                surb_management,
+                always_max_out_surbs: false,
+            },
+        )
+        .await
+        .context("creating a session must succeed")?;
 
-        Ok(session)
-    }
+    Ok(session)
 }

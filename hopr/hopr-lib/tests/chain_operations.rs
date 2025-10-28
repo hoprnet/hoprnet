@@ -7,7 +7,7 @@ use serial_test::serial;
 
 use hopr_lib::testing::{
     fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
-    hopr_tester::HoprTester,
+    hopr::TestedHopr,
 };
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
@@ -18,24 +18,32 @@ const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{HoprBalance, WxHOPR, XDai, XDaiBalance};
 
-    let node: &HoprTester = &cluster_fixture[0];
+    let node: &TestedHopr = &cluster_fixture[0];
     let safe_native = node
+        .inner()
         .get_safe_balance::<XDai>()
         .await
         .context("should get safe xdai balance")?;
     let native = node
+        .inner()
         .get_balance::<XDai>()
         .await
         .context("should get node xdai balance")?;
     let safe_hopr = node
+        .inner()
         .get_safe_balance::<WxHOPR>()
         .await
         .context("should get safe hopr balance")?;
     let hopr = node
+        .inner()
         .get_balance::<WxHOPR>()
         .await
         .context("should get node hopr balance")?;
-    let safe_allowance = node.safe_allowance().await.context("should get safe hopr allowance")?;
+    let safe_allowance = node
+        .inner()
+        .safe_allowance()
+        .await
+        .context("should get safe hopr allowance")?;
 
     assert_ne!(safe_native, XDaiBalance::zero());
     assert_ne!(native, XDaiBalance::zero());
@@ -211,11 +219,13 @@ async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> a
     let withdrawn_amount = "0.005 xDai".parse::<hopr_lib::XDaiBalance>()?;
 
     let initial_balance_src = cluster_fixture[src]
+        .inner()
         .get_balance::<hopr_lib::XDai>()
         .await
         .context("should get node xdai balance")?;
 
     let initial_balance_dst = cluster_fixture[dst]
+        .inner()
         .get_balance::<hopr_lib::XDai>()
         .await
         .context("should get node xdai balance")?;
@@ -227,11 +237,13 @@ async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> a
         .context("failed to withdraw native")?;
 
     let final_balance_src = cluster_fixture[src]
+        .inner()
         .get_balance::<hopr_lib::XDai>()
         .await
         .context("should get node xdai balance")?;
 
     let final_balance_dst = cluster_fixture[dst]
+        .inner()
         .get_balance::<hopr_lib::XDai>()
         .await
         .context("should get node xdai balance")?;
