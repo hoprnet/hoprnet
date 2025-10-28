@@ -56,7 +56,7 @@ pub type HoprSphinxSuite = Ed25519Suite;
 pub struct HoprSphinxHeaderSpec;
 
 impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
-    type KeyId = KeyIdent<4>;
+    type KeyId = HoprKeyIdent;
     type PRG = hopr_crypto_types::primitives::ChaCha20;
     type PacketReceiverData = types::HoprSenderId;
     type Pseudonym = HoprPseudonym;
@@ -66,6 +66,9 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
 
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
 }
+
+/// Type alias for 32-bit HOPR Offchain Public Key Identifier.
+pub type HoprKeyIdent = KeyIdent<4>;
 
 /// Single Use Reply Block representation for HOPR protocol.
 pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;

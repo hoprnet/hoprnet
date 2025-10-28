@@ -40,34 +40,10 @@ pub struct AccountEntry {
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,
     pub entry_type: AccountType,
-    pub published_at: u32,
+    pub key_id: KeyIdent<4>,
 }
 
 impl AccountEntry {
-    /// Gets the block number of the announcement if this peer ID has been announced.
-    pub fn updated_at(&self) -> Option<u32> {
-        match &self.entry_type {
-            AccountType::NotAnnounced => None,
-            AccountType::Announced { updated_block, .. } => Some(*updated_block),
-        }
-    }
-
-    /// Returns the computed key ID for this account.
-    // TODO: change this to use assigned ID from the SC in the next version
-    pub fn key_id(&self) -> KeyIdent<4> {
-        let id_hash = Hash::create(&[
-            self.public_key.as_ref(),
-            self.chain_addr.as_ref(),
-            &self.published_at.to_be_bytes(),
-        ]);
-
-        u32::from_be_bytes(
-            id_hash.as_ref()[0..std::mem::size_of::<u32>()]
-                .try_into()
-                .expect("4 byte must fit into u32"),
-        )
-        .into()
-    }
 
     /// Is the node announced?
     pub fn has_announced(&self) -> bool {
@@ -126,7 +102,7 @@ mod tests {
         let ae1 = AccountEntry {
             public_key,
             chain_addr,
-            published_at: 1,
+            key_id: 1.into(),
             entry_type: Announced {
                 multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse::<Multiaddr>()?,
                 updated_block: 1,
@@ -134,7 +110,7 @@ mod tests {
         };
 
         assert!(ae1.has_announced());
-        assert_eq!(1, ae1.updated_at().expect("should be present"));
+
         assert!(!ae1.contains_routing_info());
 
         Ok(())
@@ -148,7 +124,7 @@ mod tests {
         let ae1 = AccountEntry {
             public_key,
             chain_addr,
-            published_at: 1,
+            key_id: 1.into(),
             entry_type: Announced {
                 multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
                     .parse::<Multiaddr>()?,
@@ -157,9 +133,7 @@ mod tests {
         };
 
         assert!(ae1.has_announced());
-        assert_eq!(1, ae1.updated_at().expect("should be present"));
         assert!(ae1.contains_routing_info());
-        assert_eq!("0x4e1ddc66", ae1.key_id().to_hex());
 
         Ok(())
     }
@@ -172,12 +146,11 @@ mod tests {
         let ae1 = AccountEntry {
             public_key,
             chain_addr,
-            published_at: 0,
+            key_id: 0.into(),
             entry_type: NotAnnounced,
         };
 
         assert!(!ae1.has_announced());
-        assert!(ae1.updated_at().is_none());
         assert!(!ae1.contains_routing_info());
 
         Ok(())

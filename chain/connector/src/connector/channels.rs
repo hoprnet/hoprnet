@@ -1,24 +1,59 @@
+use blokli_client::api::BlokliQueryClient;
+use blokli_client::api::v1::ChannelFilter;
 use futures::future::BoxFuture;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt};
 use hopr_api::chain::{ChainReceipt, ChannelSelector};
+use hopr_crypto_types::prelude::Keypair;
 use hopr_internal_types::channels::{ChannelEntry, ChannelId, ChannelStatus};
+use hopr_internal_types::prelude::{generate_channel_id, ChannelParties};
 use hopr_primitive_types::balance::HoprBalance;
 use hopr_primitive_types::prelude::Address;
-use crate::connector::{HoprBlockchainConnector, OnchainDataStorage};
+use crate::connector::{ HoprBlockchainConnector};
+use crate::connector::backend::Backend;
 use crate::errors::ConnectorError;
 use crate::payload::{sign_payload, PayloadGenerator};
 
+
 #[async_trait::async_trait]
-impl<T: OnchainDataStorage + Send + Sync> hopr_api::chain::ChainReadChannelOperations for  HoprBlockchainConnector<T> {
+impl<B> hopr_api::chain::ChainReadChannelOperations for  HoprBlockchainConnector<B>
+where
+    B: Backend + Send + Sync + 'static
+{
     type Error = ConnectorError;
 
     fn me(&self) -> &Address {
-        todo!()
+        self.chain_key.public().as_ref()
     }
 
     async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
-        self.backend.lock()
+        let channel_id = *channel_id;
+        let backend = self.backend.clone();
+        Ok(self.channel_by_id.try_get_with_by_ref(&channel_id, async move {
+            match hopr_async_runtime::prelude::spawn_blocking(move || {
+                backend.get_channel_by_id(&channel_id)
+            }).await {
+                Ok(Ok(value)) => Ok(value),
+                Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
+                Err(e) => Err(ConnectorError::BackendError(e.into())),
+            }
+        }).await?)
+    }
+
+    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+        let backend = self.backend.clone();
+        let src = *src;
+        let dst = *dst;
+        Ok(self.channel_by_parties.try_get_with(ChannelParties::new(src, dst), async move {
+            match hopr_async_runtime::prelude::spawn_blocking(move || {
+                let channel_id = generate_channel_id(&src, &dst);
+                backend.get_channel_by_id(&channel_id)
+            }).await {
+                Ok(Ok(value)) => Ok(value),
+                Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
+                Err(e) => Err(ConnectorError::BackendError(e.into())),
+            }
+        }).await?)
     }
 
     async fn stream_channels<'a>(&'a self, selector: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
@@ -27,7 +62,7 @@ impl<T: OnchainDataStorage + Send + Sync> hopr_api::chain::ChainReadChannelOpera
 }
 
 #[async_trait::async_trait]
-impl<T: OnchainDataStorage + Send + Sync> hopr_api::chain::ChainWriteChannelOperations for HoprBlockchainConnector<T> {
+impl<B> hopr_api::chain::ChainWriteChannelOperations for HoprBlockchainConnector<B> {
     type Error = ConnectorError;
 
     async fn open_channel<'a>(&'a self, dst: &'a Address, amount: HoprBalance) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
