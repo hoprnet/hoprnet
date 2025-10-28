@@ -71,7 +71,7 @@ where
                 Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
                 Err(e) => Err(ConnectorError::BackendError(e.into())),
             }
-        })?)
+        }).await?)
     }
 
     async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
@@ -85,7 +85,7 @@ where
                 Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
                 Err(e) => Err(ConnectorError::BackendError(e.into())),
             }
-        })?)
+        }).await?)
     }
 
     fn key_id_mapper_ref(&self) -> &Self::Mapper {

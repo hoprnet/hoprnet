@@ -1,18 +1,20 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::future::BoxFuture;
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use futures::stream::BoxStream;
 use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr};
-use hopr_crypto_types::keypairs::OffchainKeypair;
-use hopr_crypto_types::prelude::{Keypair, OffchainPublicKey};
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::account::AccountEntry;
 use hopr_primitive_types::prelude::*;
+use crate::connector::backend::Backend;
 use crate::connector::HoprBlockchainConnector;
 use crate::errors::ConnectorError;
 use crate::payload::{sign_payload, PayloadGenerator};
 
 #[async_trait::async_trait]
-impl<B> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<B> {
+impl<B> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<B>
+where
+    B: Backend + Send + Sync + 'static {
     type Error = ConnectorError;
 
     async fn node_balance<C: Currency>(&self) -> Result<Balance<C>, Self::Error> {
@@ -56,7 +58,27 @@ impl<B> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<
     }
 
     async fn stream_accounts<'a>(&'a self, selector: AccountSelector) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
-        todo!()
+        let accounts = self.graph.lock().node_weights().copied().collect::<Vec<_>>();
+        let backend = self.backend.clone();
+        Ok(futures::stream::iter(accounts)
+            .filter_map(move |account_id| {
+                let backend = backend.clone();
+                let selector = selector.clone();
+                async move {
+                    match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_id(&account_id)).await {
+                        Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
+                        Ok(Err(error)) => {
+                            tracing::error!(%error, %account_id, "backend error when looking up account");
+                            None
+                        },
+                        Err(error) => {
+                            tracing::error!(%error, %account_id, "join error when looking up account");
+                            None
+                        },
+                    }
+                }
+            })
+            .boxed())
     }
 
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error> {
@@ -65,7 +87,7 @@ impl<B> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<
 }
 
 #[async_trait::async_trait]
-impl<B> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<B> {
+impl<B: Send + Sync> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<B> {
     type Error = ConnectorError;
 
     async fn announce(&self, multiaddrs: &[Multiaddr], key: &OffchainKeypair) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>> {

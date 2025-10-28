@@ -4,7 +4,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 
 pub trait Backend {
-    type Error: std::error::Error;
+    type Error: std::error::Error + Send + Sync + 'static;
 
     fn insert_account(&self, entry: AccountEntry) -> Result<(), Self::Error>;
 

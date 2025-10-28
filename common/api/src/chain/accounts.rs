@@ -70,6 +70,28 @@ pub struct AccountSelector {
     pub offchain_key: Option<OffchainPublicKey>,
 }
 
+impl AccountSelector {
+    pub fn satisfies(&self, account: &AccountEntry) -> bool {
+        if self.public_only && !account.has_announced() {
+            return false;
+        }
+        
+        if let Some(chain_key) = &self.chain_key {
+            if &account.chain_addr != chain_key {
+                return false;
+            }
+        }
+        
+        if let Some(packet_key) = &self.offchain_key {
+            if &account.public_key != packet_key {
+                return false;
+            }
+        }
+        
+        true
+    }
+}
+
 /// Chain operations that read on-chain node accounts.
 #[async_trait::async_trait]
 pub trait ChainReadAccountOperations {
