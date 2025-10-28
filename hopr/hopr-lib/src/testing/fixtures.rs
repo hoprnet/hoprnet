@@ -190,10 +190,12 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
                 })
             })
             .join()
-            .expect("Thread panicked")
         }
     }))
-    .await;
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()
+    .expect("One or more threads panicked");
 
     let dump_state = !std::path::Path::new(&format!("{SNAPSHOT_BASE}/anvil")).exists();
     if dump_state {
@@ -214,18 +216,26 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     )
     .await;
     // Wait for all nodes to reach the 'Running' state
-    futures::future::join_all(hopr_instances.iter().map(|instance| {
+    let res = futures::future::join_all(hopr_instances.iter().map(|instance| {
         wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(120))
     }))
     .await;
 
+    for r in res {
+        r.expect("status wait failed");
+    }
+
     // Wait for full mesh connectivity
-    futures::future::join_all(
+    let res = futures::future::join_all(
         hopr_instances
             .iter()
             .map(|instance| wait_for_connectivity(instance).timeout(futures_time::time::Duration::from_secs(120))),
     )
     .await;
+
+    for r in res {
+        r.expect("connectivity wait failed");
+    }
 
     ClusterGuard {
         cluster: hopr_instances,

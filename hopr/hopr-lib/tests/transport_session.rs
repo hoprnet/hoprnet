@@ -54,7 +54,10 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[cfg(feature = "session-client")]
 #[test_log::test]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    use futures_time::future::FutureExt as _;
+
     let [src, mid, dst] = exclusive_indexes::<3>();
+
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         vec![
             cluster_fixture[src].instance.clone(),
@@ -96,6 +99,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
                 always_max_out_surbs: false,
             },
         )
+        .timeout(futures_time::time::Duration::from_secs(30))
         .await?;
 
     // TODO: check here that the destination sees the new session created

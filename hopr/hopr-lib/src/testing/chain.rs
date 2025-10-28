@@ -216,16 +216,19 @@ pub async fn onboard_node(
     .expect("could not add announcement to module");
 
     // Fund the node's Safe with native tokens and HOPR token
-    let _ = hopr_chain_types::utils::fund_node(safe, fund_native, fund_hopr, contract_instances.token.clone()).await;
+    hopr_chain_types::utils::fund_node(safe, fund_native, fund_hopr, contract_instances.token.clone())
+        .await
+        .expect("safe funding should succeed");
 
     // Fund node's address with 10 native tokens
-    let _ = hopr_chain_types::utils::fund_node(
+    hopr_chain_types::utils::fund_node(
         node_chain_key.public().to_address(),
         fund_native,
         U256::from(0_u32),
         contract_instances.token.clone(),
     )
-    .await;
+    .await
+    .expect("node funding should succeed");
 
     // Approve token transfer for HOPR Channels contract
     approve_channel_transfer_from_safe(

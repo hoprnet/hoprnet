@@ -44,7 +44,7 @@ jobs:
           persist-credentials: false
 
       - name: Run unit tests
-        run: nix develop -c cargo test --lib --bin 
+        run: nix develop -c cargo test --lib
 
   tests-integration:
     name: Integration Tests
