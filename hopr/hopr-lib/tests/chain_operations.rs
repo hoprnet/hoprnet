@@ -1,10 +1,9 @@
 use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
+use hopr_lib::ChannelId;
 use rstest::rstest;
 use serial_test::serial;
-
-use hopr_lib::ChannelId;
 
 mod common;
 use common::{

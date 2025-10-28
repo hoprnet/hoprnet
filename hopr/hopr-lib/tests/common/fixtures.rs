@@ -2,12 +2,11 @@ use std::{str::FromStr, time::Duration};
 
 use alloy::{primitives::U256, providers::ext::AnvilApi};
 use futures_time::future::FutureExt as _;
+use hopr_lib::{Address, state::HoprState};
 use lazy_static::lazy_static;
 use serde_json::json;
 use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
-
-use hopr_lib::{Address, state::HoprState};
 
 use crate::common::{
     NodeSafeConfig, TestChainEnv, deploy_test_environment, dummies::EchoServer, hopr_tester::HoprTester, onboard_node,

@@ -1,8 +1,7 @@
 use anyhow::Context;
+use hopr_lib::Address;
 use rstest::rstest;
 use serial_test::serial;
-
-use hopr_lib::Address;
 
 mod common;
 use common::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};

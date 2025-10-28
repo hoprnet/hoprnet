@@ -1,11 +1,11 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use futures::AsyncWriteExt;
+use hopr_lib::{Address, HoprBalance, HoprSession, SurbBalancerConfig};
 use rstest::rstest;
 use serial_test::serial;
-use std::time::Duration;
 use tokio::time::sleep;
-
-use hopr_lib::{Address, HoprBalance, HoprSession, SurbBalancerConfig};
 
 mod common;
 use common::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
