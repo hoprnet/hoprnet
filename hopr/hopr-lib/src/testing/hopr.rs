@@ -1,7 +1,5 @@
 use std::{sync::Arc, time::Duration};
 
-use crate::testing::chain::NodeSafeConfig;
-use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, ProtocolsConfig, prelude};
 use anyhow::Context;
 use hopr_api::chain::HoprBalance;
 use hopr_crypto_types::{
@@ -9,6 +7,10 @@ use hopr_crypto_types::{
     prelude::{Keypair, OffchainKeypair},
 };
 use hopr_transport::Hash;
+
+use crate::{
+    Address, ChannelEntry, ChannelStatus, Hopr, PeerId, ProtocolsConfig, prelude, testing::chain::NodeSafeConfig,
+};
 
 pub struct TestedHopr {
     pub instance: Arc<Hopr>,

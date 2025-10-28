@@ -2,17 +2,15 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
 use futures::AsyncWriteExt;
+use hopr_lib::{
+    ChannelId, HoprBalance, RoutingOptions, SessionClientConfig, SessionTarget,
+    testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+};
 use hopr_primitive_types::bounded::BoundedVec;
 use hopr_transport::session::{IpOrHost, SealedHost};
 use rstest::rstest;
 use serial_test::serial;
 use tokio::time::sleep;
-
-use hopr_lib::{ChannelId, HoprBalance};
-use hopr_lib::{
-    RoutingOptions, SessionClientConfig, SessionTarget,
-    testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
-};
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 

@@ -1,9 +1,10 @@
 use anyhow::Context;
-use hopr_lib::Address;
+use hopr_lib::{
+    Address,
+    testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+};
 use rstest::rstest;
 use serial_test::serial;
-
-use hopr_lib::testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
 
 #[rstest]
 #[tokio::test]

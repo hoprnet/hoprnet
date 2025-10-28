@@ -29,14 +29,13 @@ use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_db_sql::{logs::HoprDbLogOperations, prelude::*};
 use hopr_internal_types::prelude::*;
+use hopr_lib::testing::chain::{
+    NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
+};
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use tokio::fs;
 use tracing::info;
-
-use hopr_lib::testing::chain::{
-    NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
-};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket(

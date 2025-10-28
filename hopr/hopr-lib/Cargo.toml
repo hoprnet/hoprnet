@@ -111,7 +111,7 @@ hopr-strategy = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true}
+anyhow = { workspace = true }
 env_logger = { workspace = true }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
@@ -133,5 +133,5 @@ hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",
   "session-client",
-  "testing"
+  "testing",
 ] }

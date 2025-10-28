@@ -2,19 +2,18 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
 use futures::AsyncWriteExt;
-use hopr_lib::{HoprBalance, SurbBalancerConfig};
+use hopr_lib::{
+    HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget, SurbBalancerConfig,
+    exports::transport::session::{IpOrHost, SealedHost},
+    testing::{
+        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+        hopr::ChannelGuard,
+    },
+};
+use hopr_primitive_types::bounded::BoundedVec;
 use rstest::rstest;
 use serial_test::serial;
 use tokio::time::sleep;
-
-use hopr_primitive_types::bounded::BoundedVec;
-
-use hopr_lib::exports::transport::session::{IpOrHost, SealedHost};
-use hopr_lib::testing::{
-    fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
-    hopr::ChannelGuard,
-};
-use hopr_lib::{RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget};
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
@@ -49,6 +48,7 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 }
 
 #[rstest]
+#[timeout(Duration::from_secs(100))]
 #[tokio::test]
 #[serial]
 #[cfg(feature = "session-client")]

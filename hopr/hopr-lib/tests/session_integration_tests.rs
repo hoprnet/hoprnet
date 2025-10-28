@@ -2,10 +2,12 @@ use futures::StreamExt;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_lib::exports::transport::session::{
-    Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, transfer_session,
+use hopr_lib::{
+    ApplicationDataIn, ApplicationDataOut,
+    exports::transport::session::{
+        Capabilities, Capability, HoprSession, HoprSessionConfig, SessionId, transfer_session,
+    },
 };
-use hopr_lib::{ApplicationDataIn, ApplicationDataOut};
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use parameterized::parameterized;

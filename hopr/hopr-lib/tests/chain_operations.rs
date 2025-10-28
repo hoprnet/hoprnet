@@ -1,14 +1,15 @@
 use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
-use hopr_lib::ChannelId;
+use hopr_lib::{
+    ChannelId,
+    testing::{
+        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+        hopr::TestedHopr,
+    },
+};
 use rstest::rstest;
 use serial_test::serial;
-
-use hopr_lib::testing::{
-    fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
-    hopr::TestedHopr,
-};
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
