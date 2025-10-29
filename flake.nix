@@ -231,15 +231,16 @@
             hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
 
-          hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
+          hopr-test-unit = rust-builder-local.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
               src = testSrc;
               runTests = true;
+              cargoExtraArgs = "--lib";
             }
           );
 
-          hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
+          hopr-test-unit-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
               src = testSrc;
@@ -978,7 +979,7 @@
               hopli-profile-docker
               ;
             inherit hopli-candidate;
-            inherit hopr-test hopr-test-nightly;
+            inherit hopr-test-unit hopr-test-unit-nightly;
             inherit anvil-docker pluto-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;

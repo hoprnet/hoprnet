@@ -44,7 +44,7 @@ jobs:
           persist-credentials: false
 
       - name: Run unit tests
-        run: nix develop -c cargo test --lib
+        run: nix build -L .#hopr-test-unit
 
   tests-integration:
     name: Integration Tests
@@ -98,9 +98,9 @@ jobs:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Run unit tests nightly
+      - name: Run unit tests with nightly
         run: |
-          nix build -L .#hopr-test-nightly
+          nix build -L .#hopr-test-unit-nightly
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger
