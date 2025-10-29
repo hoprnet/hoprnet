@@ -47,7 +47,7 @@ jobs:
         run: nix develop -c cargo test --lib
 
   tests-integration:
-    name: Unit Tests
+    name: Integration Tests
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     env:
