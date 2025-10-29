@@ -1307,9 +1307,9 @@ dependencies = [
 
 [[package]]
 name = "async-tar"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a42f905d4f623faf634bbd1e001e84e0efc24694afa64be9ad239bf6ca49e1f8"
+checksum = "d1937db2d56578aa3919b9bdb0e5100693fd7d1c0f145c53eb81fbb03e217550"
 dependencies = [
  "async-std",
  "filetime",
@@ -3354,9 +3354,9 @@ dependencies = [
 
 [[package]]
 name = "generic-array"
-version = "1.3.4"
+version = "1.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "985a5578ebdb02351d484a77fb27e7cb79272f1ba9bc24692d8243c3cfe40660"
+checksum = "eaf57c49a95fd1fe24b90b3033bee6dc7e8f1288d51494cb44e627c295e38542"
 dependencies = [
  "rustversion",
  "serde_core",
@@ -4492,7 +4492,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4793,7 +4793,7 @@ dependencies = [
 name = "hopr-crypto-random"
 version = "0.2.2"
 dependencies = [
- "generic-array 1.3.4",
+ "generic-array 1.3.5",
  "rand 0.8.5",
 ]
 
@@ -4806,7 +4806,7 @@ dependencies = [
  "bincode",
  "curve25519-dalek",
  "elliptic-curve",
- "generic-array 1.3.4",
+ "generic-array 1.3.5",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -4836,7 +4836,7 @@ dependencies = [
  "curve25519-dalek",
  "digest 0.10.7",
  "ed25519-dalek",
- "generic-array 1.3.4",
+ "generic-array 1.3.5",
  "hex",
  "hex-literal",
  "hopr-crypto-random",
@@ -5001,6 +5001,7 @@ dependencies = [
  "cfg-if",
  "const_format",
  "dashmap",
+ "env_logger",
  "futures",
  "futures-time",
  "hex-literal",
@@ -5017,6 +5018,7 @@ dependencies = [
  "hopr-db-node",
  "hopr-db-sql",
  "hopr-internal-types",
+ "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
@@ -5025,21 +5027,25 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-strategy",
  "hopr-transport",
- "hopr-transport-session",
  "human-bandwidth",
  "lazy_static",
+ "mockall",
  "mockito",
  "parameterized",
+ "rand 0.8.5",
+ "rstest",
  "serde",
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "serial_test",
  "smart-default",
  "strum 0.27.2",
  "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tracing",
  "url",
  "validator",
@@ -8366,6 +8372,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
+name = "relative-path"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
+
+[[package]]
 name = "reqwest"
 version = "0.12.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8484,6 +8496,35 @@ dependencies = [
  "spki",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "rstest"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
+dependencies = [
+ "futures-timer",
+ "futures-util",
+ "rstest_macros",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version 0.4.1",
+ "syn 2.0.107",
+ "unicode-ident",
 ]
 
 [[package]]
@@ -9263,9 +9304,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "3.15.0"
+version = "3.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6093cd8c01b25262b84927e0f7151692158fab02d961e04c979d3903eba7ecc5"
+checksum = "aa66c845eee442168b2c8134fec70ac50dc20e760769c8ba0ad1319ca1959b04"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -9282,9 +9323,9 @@ dependencies = [
 
 [[package]]
 name = "serde_with_macros"
-version = "3.15.0"
+version = "3.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7e6c180db0816026a61afa1cff5344fb7ebded7e4d3062772179f2501481c27"
+checksum = "b91a903660542fced4e99881aa481bdbaec1634568ee02e0b8bd57c64cb38955"
 dependencies = [
  "darling 0.21.3",
  "proc-macro2",

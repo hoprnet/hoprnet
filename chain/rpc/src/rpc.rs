@@ -394,6 +394,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 
         let (node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) =
             multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
+
         let is_node_included_in_module =
             node_in_module_inclusion.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?;
         let is_module_enabled_in_safe =
@@ -443,8 +444,8 @@ mod tests {
 
     use alloy::{
         network::{Ethereum, TransactionBuilder},
-        primitives::{U256, address},
-        providers::Provider,
+        primitives::{Bytes, U256, address},
+        providers::{MULTICALL3_ADDRESS, Provider},
         rpc::{client::ClientBuilder, types::TransactionRequest},
         transports::{http::ReqwestTransport, layers::RetryBackoffLayer},
     };
@@ -454,6 +455,7 @@ mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
     use primitive_types::H160;
+    use tracing::debug;
 
     use crate::{
         HoprRpcOperations, PendingTransaction,
@@ -481,6 +483,16 @@ mod tests {
 
     /// Deploy a MULTICALL contract into Anvil local chain for testing
     pub async fn deploy_multicall3_to_anvil<P: Provider>(provider: &P) -> Result<()> {
+        // check if the multicall3 contract is already deployed. If deployed, skip all
+        let code = provider.get_code_at(MULTICALL3_ADDRESS).await?;
+        if code != Bytes::default() {
+            debug!(
+                "Multicall3 contract is already deployed at address {:?}",
+                MULTICALL3_ADDRESS
+            );
+            return Ok(());
+        }
+
         // Fund Multicall3 deployer and deploy ERC1820Registry
         let tx = TransactionRequest::default()
             .with_to(*MULTICALL3_DEPLOYER_ADDRESS)
