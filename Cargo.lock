@@ -4492,7 +4492,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "alloy",
  "anyhow",
@@ -5001,6 +5001,7 @@ dependencies = [
  "cfg-if",
  "const_format",
  "dashmap",
+ "env_logger",
  "futures",
  "futures-time",
  "hex-literal",
@@ -5017,6 +5018,7 @@ dependencies = [
  "hopr-db-node",
  "hopr-db-sql",
  "hopr-internal-types",
+ "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
@@ -5025,21 +5027,25 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-strategy",
  "hopr-transport",
- "hopr-transport-session",
  "human-bandwidth",
  "lazy_static",
+ "mockall",
  "mockito",
  "parameterized",
+ "rand 0.8.5",
+ "rstest",
  "serde",
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "serial_test",
  "smart-default",
  "strum 0.27.2",
  "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tracing",
  "url",
  "validator",
@@ -8366,6 +8372,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
+name = "relative-path"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
+
+[[package]]
 name = "reqwest"
 version = "0.12.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8484,6 +8496,35 @@ dependencies = [
  "spki",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "rstest"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
+dependencies = [
+ "futures-timer",
+ "futures-util",
+ "rstest_macros",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version 0.4.1",
+ "syn 2.0.107",
+ "unicode-ident",
 ]
 
 [[package]]
