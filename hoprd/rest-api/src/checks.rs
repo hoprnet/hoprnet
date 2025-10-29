@@ -6,6 +6,14 @@ use hopr_lib::{Health, state::HoprState};
 use crate::AppState;
 
 /// Check whether the node is started.
+///
+/// # Behavior
+///
+/// Returns 200 OK when the node is in `HoprState::Running`.
+/// Returns 412 PRECONDITION_FAILED when the node is in any other state
+/// (Uninitialized, Initializing, Indexing, Starting).
+///
+/// This endpoint checks only the running state, not network connectivity.
 #[utoipa::path(
         get,
         path = "/startedz",
@@ -23,6 +31,18 @@ pub(super) async fn startedz(State(state): State<Arc<AppState>>) -> impl IntoRes
 /// Check whether the node is **ready** to accept connections.
 ///
 /// Ready means that the node is running and has at least minimal connectivity.
+///
+/// # Behavior
+///
+/// Both conditions must be true for 200 OK:
+/// 1. Node must be in Running state (`HoprState::Running`)
+/// 2. Network must be minimally connected (`Health::Orange`, `Health::Yellow`, or `Health::Green`)
+///
+/// Returns 412 PRECONDITION_FAILED if either condition is false:
+/// - Node not running (any other `HoprState`)
+/// - Node running but network not minimally connected (`Health::Unknown` or `Health::Red`)
+///
+/// This endpoint is used by Kubernetes readiness probes to determine if the pod should receive traffic.
 #[utoipa::path(
         get,
         path = "/readyz",
@@ -40,6 +60,20 @@ pub(super) async fn readyz(State(state): State<Arc<AppState>>) -> impl IntoRespo
 /// Check whether the node is **healthy**.
 ///
 /// Healthy means that the node is running and has at least minimal connectivity.
+///
+/// # Behavior
+///
+/// Both conditions must be true for 200 OK:
+/// 1. Node must be in Running state (`HoprState::Running`)
+/// 2. Network must be minimally connected (`Health::Orange`, `Health::Yellow`, or `Health::Green`)
+///
+/// Returns 412 PRECONDITION_FAILED if either condition is false:
+/// - Node not running (any other `HoprState`)
+/// - Node running but network not minimally connected (`Health::Unknown` or `Health::Red`)
+///
+/// This endpoint is used by Kubernetes liveness probes to determine if the pod should be restarted.
+///
+/// Note: Currently `healthyz` and `readyz` have identical behavior.
 #[utoipa::path(
         get,
         path = "/healthyz",
@@ -54,6 +88,10 @@ pub(super) async fn healthyz(State(state): State<Arc<AppState>>) -> impl IntoRes
     eval_precondition(is_running(state.clone()) && is_minimally_connected(state).await)
 }
 
+/// Check if the node has minimal network connectivity.
+///
+/// Returns `true` if the network health is `Orange`, `Yellow`, or `Green`.
+/// Returns `false` if the network health is `Unknown` or `Red`.
 #[inline]
 async fn is_minimally_connected(state: Arc<AppState>) -> bool {
     matches!(
@@ -62,11 +100,19 @@ async fn is_minimally_connected(state: Arc<AppState>) -> bool {
     )
 }
 
+/// Check if the node is in the Running state.
+///
+/// Returns `true` only when `HoprState::Running`.
+/// Returns `false` for all other states (Uninitialized, Initializing, Indexing, Starting).
 #[inline]
 fn is_running(state: Arc<AppState>) -> bool {
     matches!(state.hopr.status(), HoprState::Running)
 }
 
+/// Evaluate a precondition and return the appropriate HTTP response.
+///
+/// Returns 200 OK if `precondition` is `true`.
+/// Returns 412 PRECONDITION_FAILED if `precondition` is `false`.
 #[inline]
 fn eval_precondition(precondition: bool) -> impl IntoResponse {
     if precondition {
@@ -106,5 +152,26 @@ pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoRe
             }
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that eval_precondition returns 200 OK when the precondition is true
+    #[test]
+    fn test_eval_precondition_true_returns_ok() {
+        let response = eval_precondition(true);
+        let (parts, _) = response.into_response().into_parts();
+        assert_eq!(parts.status, StatusCode::OK);
+    }
+
+    /// Test that eval_precondition returns 412 PRECONDITION_FAILED when the precondition is false
+    #[test]
+    fn test_eval_precondition_false_returns_precondition_failed() {
+        let response = eval_precondition(false);
+        let (parts, _) = response.into_response().into_parts();
+        assert_eq!(parts.status, StatusCode::PRECONDITION_FAILED);
     }
 }
