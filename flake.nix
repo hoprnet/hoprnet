@@ -240,7 +240,7 @@
             }
           );
 
-          hopr-test-unit-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
+          hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
               src = testSrc;
@@ -979,7 +979,7 @@
               hopli-profile-docker
               ;
             inherit hopli-candidate;
-            inherit hopr-test-unit hopr-test-unit-nightly;
+            inherit hopr-test-unit hopr-test-nightly;
             inherit anvil-docker pluto-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;

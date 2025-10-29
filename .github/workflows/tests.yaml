@@ -44,7 +44,7 @@ jobs:
           persist-credentials: false
 
       - name: Run unit tests
-        run: nix build -L .#hopr-test-unit
+        run: nix develop -c cargo test --lib
 
   tests-integration:
     name: Integration Tests
@@ -100,7 +100,7 @@ jobs:
 
       - name: Run unit tests with nightly
         run: |
-          nix build -L .#hopr-test-unit-nightly
+          nix build -L .#hopr-test-nightly
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger
