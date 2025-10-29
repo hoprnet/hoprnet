@@ -44,7 +44,30 @@ jobs:
           persist-credentials: false
 
       - name: Run unit tests
-        run: nix build -L .#hopr-test
+        run: nix develop -c cargo test --lib
+
+  tests-integration:
+    name: Unit Tests
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    env:
+      CI: "true"
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Run integration tests
+        run: nix develop -c cargo test --test '*' -- --test-threads=1
 
   tests-unit-nightly:
     name: Unit Tests Nightly

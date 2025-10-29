@@ -244,7 +244,7 @@
             // {
               src = testSrc;
               runTests = true;
-              cargoExtraArgs = "-Z panic-abort-tests";
+              cargoExtraArgs = "-Z panic-abort-tests --lib";
             }
           );
 
