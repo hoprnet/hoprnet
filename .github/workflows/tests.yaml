@@ -47,7 +47,7 @@ jobs:
         run: nix develop -c cargo test --lib
 
   tests-integration:
-    name: Unit Tests
+    name: Integration Tests
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     env:
@@ -98,7 +98,7 @@ jobs:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Run unit tests nightly
+      - name: Run unit tests with nightly
         run: |
           nix build -L .#hopr-test-nightly
 
