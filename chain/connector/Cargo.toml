@@ -7,15 +7,15 @@ edition = "2024"
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
-alloy = {workspace = true}
+ahash = "0.8.12"
+alloy = { workspace = true}
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 blokli-client = { workspace = true }
 futures = { workspace = true }
-either = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
-petgraph = { workspace = true, features = ["rayon", "stable_graph"] }
+petgraph = { workspace = true, features = ["rayon", "graphmap"] }
 redb = "3.1.0"
 strum = { workspace = true }
 thiserror = { workspace = true }

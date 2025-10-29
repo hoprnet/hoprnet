@@ -105,16 +105,7 @@ pub trait ChainReadAccountOperations {
 
     /// Returns the native or token currency Safe allowance.
     async fn safe_allowance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
-
-    /// Returns account entry given the on-chain `address`.
-    async fn find_account_by_address(&self, address: &Address) -> Result<Option<AccountEntry>, Self::Error>;
-
-    /// Returns account entry given the off-chain `packet_key`.
-    async fn find_account_by_packet_key(
-        &self,
-        packet_key: &OffchainPublicKey,
-    ) -> Result<Option<AccountEntry>, Self::Error>;
-
+    
     /// Validates the node's Safe setup.
     async fn check_node_safe_module_status(&self) -> Result<bool, Self::Error>;
 

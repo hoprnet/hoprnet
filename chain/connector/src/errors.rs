@@ -16,8 +16,8 @@ pub enum ConnectorError {
     #[error("channel {0} does not exist")]
     ChannelDoesNotExist(ChannelId),
 
-    #[error("type conversion error")]
-    TypeConversion,
+    #[error("type conversion error: {0}")]
+    TypeConversion(String),
 
     #[error("backend error: {0}")]
     BackendError(anyhow::Error),

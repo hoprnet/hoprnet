@@ -1,24 +1,24 @@
 use blokli_client::api::BlokliQueryClient;
-use blokli_client::api::v1::ChannelFilter;
 use futures::future::BoxFuture;
 use futures::stream::BoxStream;
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use hopr_api::chain::{ChainReceipt, ChannelSelector};
 use hopr_crypto_types::prelude::Keypair;
 use hopr_internal_types::channels::{ChannelEntry, ChannelId, ChannelStatus, ChannelStatusDiscriminants};
 use hopr_internal_types::prelude::{generate_channel_id, ChannelParties};
 use hopr_primitive_types::balance::HoprBalance;
 use hopr_primitive_types::prelude::Address;
-use crate::connector::{ HoprBlockchainConnector};
-use crate::connector::backend::Backend;
+
+use crate::connector::{Backend, HoprBlockchainConnector};
 use crate::errors::ConnectorError;
 use crate::payload::{sign_payload, PayloadGenerator};
 
 
 #[async_trait::async_trait]
-impl<B> hopr_api::chain::ChainReadChannelOperations for  HoprBlockchainConnector<B>
+impl<B,C> hopr_api::chain::ChainReadChannelOperations for  HoprBlockchainConnector<B, C>
 where
-    B: Backend + Send + Sync + 'static
+    B: Backend + Send + Sync + 'static,
+    C: Send + Sync
 {
     type Error = ConnectorError;
 
@@ -31,6 +31,7 @@ where
         let src = *src;
         let dst = *dst;
         Ok(self.channel_by_parties.try_get_with(ChannelParties::new(src, dst), async move {
+            tracing::warn!(%src, %dst, "cache miss on channel_by_parties");
             match hopr_async_runtime::prelude::spawn_blocking(move || {
                 let channel_id = generate_channel_id(&src, &dst);
                 backend.get_channel_by_id(&channel_id)
@@ -46,6 +47,7 @@ where
         let channel_id = *channel_id;
         let backend = self.backend.clone();
         Ok(self.channel_by_id.try_get_with_by_ref(&channel_id, async move {
+            tracing::warn!(%channel_id, "cache miss on channel_by_id");
             match hopr_async_runtime::prelude::spawn_blocking(move || {
                 backend.get_channel_by_id(&channel_id)
             }).await {
@@ -63,12 +65,13 @@ where
             return Err(ConnectorError::InvalidArguments("cannot stream closed channels"));
         }
 
-        let channels = self.graph.lock().edge_weights().copied().collect::<Vec<_>>();
+        let channels = self.graph.read().all_edges().map(|(_,_, e)| e).copied().collect::<Vec<_>>();
         let backend = self.backend.clone();
         Ok(futures::stream::iter(channels)
             .filter_map(move |channel_id| {
                 let backend = backend.clone();
                 let selector = selector.clone();
+                // This avoids the cache on purpose so it does not get spammed
                 async move {
                     match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_channel_by_id(&channel_id)).await {
                         Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
@@ -88,7 +91,11 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B: Send + Sync> hopr_api::chain::ChainWriteChannelOperations for HoprBlockchainConnector<B> {
+impl<B, C> hopr_api::chain::ChainWriteChannelOperations for HoprBlockchainConnector<B, C>
+where
+    B: Send + Sync,
+    C: BlokliQueryClient + Send + Sync + 'static
+{
     type Error = ConnectorError;
 
     async fn open_channel<'a>(&'a self, dst: &'a Address, amount: HoprBalance) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {

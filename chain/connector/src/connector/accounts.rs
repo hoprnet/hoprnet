@@ -6,46 +6,39 @@ use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiadd
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::account::AccountEntry;
 use hopr_primitive_types::prelude::*;
-use crate::connector::backend::Backend;
-use crate::connector::HoprBlockchainConnector;
+
+use crate::connector::{Backend, HoprBlockchainConnector};
 use crate::errors::ConnectorError;
 use crate::payload::{sign_payload, PayloadGenerator};
 
 #[async_trait::async_trait]
-impl<B> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<B>
+impl<B, C> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<B, C>
 where
-    B: Backend + Send + Sync + 'static {
+    B: Backend + Send + Sync + 'static,
+    C: BlokliQueryClient + Send + Sync + 'static {
     type Error = ConnectorError;
 
-    async fn node_balance<C: Currency>(&self) -> Result<Balance<C>, Self::Error> {
-        if C::is::<WxHOPR>() {
+    async fn node_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
+        if Cy::is::<WxHOPR>() {
             Ok(self.client.query_native_balance(&self.chain_key.public().to_address().into()).await?.balance.0.parse()?)
-        } else if C::is::<XDai>() {
+        } else if Cy::is::<XDai>() {
             Ok(self.client.query_token_balance(&self.chain_key.public().to_address().into()).await?.balance.0.parse()?)
         } else {
             Err(ConnectorError::InvalidState("unsupported currency"))
         }
     }
 
-    async fn safe_balance<C: Currency>(&self) -> Result<Balance<C>, Self::Error> {
-        if C::is::<WxHOPR>() {
+    async fn safe_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
+        if Cy::is::<WxHOPR>() {
             Ok(self.client.query_native_balance(&self.safe_address.into()).await?.balance.0.parse()?)
-        } else if C::is::<XDai>() {
+        } else if Cy::is::<XDai>() {
             Ok(self.client.query_token_balance(&self.safe_address.into()).await?.balance.0.parse()?)
         } else {
             Err(ConnectorError::InvalidState("unsupported currency"))
         }
     }
 
-    async fn safe_allowance<C: Currency>(&self) -> Result<Balance<C>, Self::Error> {
-        todo!()
-    }
-
-    async fn find_account_by_address(&self, address: &Address) -> Result<Option<AccountEntry>, Self::Error> {
-        todo!()
-    }
-
-    async fn find_account_by_packet_key(&self, packet_key: &OffchainPublicKey) -> Result<Option<AccountEntry>, Self::Error> {
+    async fn safe_allowance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
         todo!()
     }
 
@@ -58,12 +51,13 @@ where
     }
 
     async fn stream_accounts<'a>(&'a self, selector: AccountSelector) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
-        let accounts = self.graph.lock().node_weights().copied().collect::<Vec<_>>();
+        let accounts = self.graph.read().nodes().collect::<Vec<_>>();
         let backend = self.backend.clone();
         Ok(futures::stream::iter(accounts)
             .filter_map(move |account_id| {
                 let backend = backend.clone();
                 let selector = selector.clone();
+                // This avoids the cache on purpose so it does not get spammed
                 async move {
                     match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_id(&account_id)).await {
                         Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
@@ -82,19 +76,22 @@ where
     }
 
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error> {
-        todo!()
+        Ok(self.stream_accounts(selector).await?.count().await)
     }
 }
 
 #[async_trait::async_trait]
-impl<B: Send + Sync> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<B> {
+impl<B,C> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<B, C>
+where
+    B: Send + Sync,
+    C: BlokliTransactionClient + Send + Sync + 'static {
     type Error = ConnectorError;
 
     async fn announce(&self, multiaddrs: &[Multiaddr], key: &OffchainKeypair) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>> {
         todo!()
     }
 
-    async fn withdraw<C: Currency + Send>(&self, balance: Balance<C>, recipient: &Address) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
+    async fn withdraw<Cy: Currency + Send>(&self, balance: Balance<Cy>, recipient: &Address) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
         let payload = self.payload_generator.transfer(*recipient, balance)?;
         let signed_payload = sign_payload(payload, &self.chain_key).await?;
         let receipt = self.client.submit_transaction(&signed_payload).await.map_err(ConnectorError::from)?;
