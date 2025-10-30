@@ -126,7 +126,7 @@ FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast \
 
 // This deploys contract to staging environment and verifies contracts on Gnosisscan
 FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast \
-   --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" \
+   --verify --verifier etherscan --verifier-url "https://api.etherscan.io/v2/api?chainid=100" \
    --delay 30 --chain 100 --etherscan-api-key "${ETHERSCAN_API_KEY}" \
    --use <specify_if_other_than_that_in_config> \
    script/DeployAll.s.sol:DeployAllContractsScript

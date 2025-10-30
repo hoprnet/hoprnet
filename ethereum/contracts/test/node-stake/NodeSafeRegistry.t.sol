@@ -2,11 +2,9 @@
 pragma solidity >=0.8.0 <0.9.0;
 
 import { HoprNodeSafeRegistry, HoprNodeSafeRegistryEvents } from "../../src/node-stake/NodeSafeRegistry.sol";
-import { PrecompileUtils } from "../utils/Precompiles.sol";
 import { ECDSA } from "openzeppelin-contracts/utils/cryptography/ECDSA.sol";
 import { Address } from "openzeppelin-contracts/utils/Address.sol";
 import { Test } from "forge-std/Test.sol";
-
 import { Address } from "openzeppelin-contracts/utils/Address.sol";
 
 // proxy contract to manipulate storage
@@ -35,14 +33,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node can actively register a node
      */
     function testFuzz_RegisterSafeByNode(address safeAddress, address nodeAddress) public {
+        assumeNotPrecompile(safeAddress);
+        assumeNotPrecompile(nodeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
+            !Address.isContract(safeAddress)
                 && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
                 && safeAddress != vm.addr(303)
         );
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(nodeAddress) && !Address.isContract(nodeAddress)
-                && nodeAddress != address(0) && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry)
+            !Address.isContract(nodeAddress) && nodeAddress != address(0) && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry)
                 && nodeAddress != vm.addr(303)
         );
         vm.assume(safeAddress != nodeAddress);
@@ -60,8 +59,9 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      */
     function testFuzz_RegisterSafeWithNodeSig(uint256 nodePrivateKey, address safeAddress) public {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
+        assumeNotPrecompile(safeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
+            !Address.isContract(safeAddress)
                 && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
                 && safeAddress != vm.addr(303)
         );
@@ -74,8 +74,9 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         uint256 nodeSigNonce = nodeSafeRegistry.nodeSigNonce(nodeChainKeyAddress);
         (address nodeAddress, bytes memory sig) =
             _helperBuildSig(nodePrivateKey, safeAddress, nodeChainKeyAddress, nodeSigNonce);
+        assumeNotPrecompile(nodeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(nodeAddress) && !Address.isContract(nodeAddress)
+            !Address.isContract(nodeAddress)
                 && nodeAddress != address(0) && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry)
                 && nodeAddress != vm.addr(303)
         );
@@ -98,8 +99,9 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     function testRevert_RegisterSafeWithNodeSigNonceReused(uint256 nodePrivateKey, address safeAddress) public {
         nodePrivateKey = bound(nodePrivateKey, 1, 1e36);
         vm.assume(!Address.isContract(vm.addr(nodePrivateKey)));
+        assumeNotPrecompile(safeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
+            !Address.isContract(safeAddress)
                 && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
                 && safeAddress != vm.addr(303)
         );
@@ -135,13 +137,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node fail to register a node due to it's registered
      */
     function testRevert_FailToRegisterSafeByNodeDueToRegistered(address safeAddress, address nodeAddress) public {
+        assumeNotPrecompile(safeAddress);
+        assumeNotPrecompile(nodeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
+            !Address.isContract(safeAddress)
                 && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
                 && safeAddress != vm.addr(303)
         );
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(nodeAddress) && !Address.isContract(nodeAddress)
+            !Address.isContract(nodeAddress)
                 && nodeAddress != address(0) && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry)
                 && nodeAddress != vm.addr(303)
         );
@@ -161,8 +165,9 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node fail to register a node due to the provided safe address is zero
      */
     function testRevert_FailToRegisterSafeByNodeDueToSafeAddressZero(address nodeAddress) public {
+        assumeNotPrecompile(nodeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(nodeAddress) && !Address.isContract(nodeAddress)
+            !Address.isContract(nodeAddress)
                 && nodeAddress != address(0) && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry)
                 && nodeAddress != vm.addr(303)
         );
@@ -182,8 +187,9 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node fail to register a node due to the provided node address is zero
      */
     function testRevert_FailToRegisterSafeByNodeDueToNodeAddressZero(address safeAddress) public {
+        assumeNotPrecompile(safeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
+            !Address.isContract(safeAddress)
                 && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
                 && safeAddress != vm.addr(303)
         );
@@ -203,14 +209,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev node fail to register a node due to the provided node address is a contract
      */
     function testRevert_FailToRegisterSafeByNodeDueToNodeIsContract(address safeAddress, address nodeAddress) public {
+        assumeNotPrecompile(safeAddress);
+        assumeNotPrecompile(nodeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
+            !Address.isContract(safeAddress)
                 && !Address.isContract(safeAddress) && safeAddress != address(0) && safeAddress != address(this)
                 && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
         );
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(nodeAddress) && !Address.isContract(nodeAddress)
-                && !Address.isContract(nodeAddress) && nodeAddress != address(0) && nodeAddress != address(this)
+            !Address.isContract(nodeAddress) && nodeAddress != address(0) && nodeAddress != address(this)
                 && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
         );
 
@@ -235,14 +242,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
     )
         public
     {
+        assumeNotPrecompile(safeAddress);
+        assumeNotPrecompile(nodeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
+            !Address.isContract(safeAddress)
                 && !Address.isContract(safeAddress) && safeAddress != address(0) && safeAddress != address(this)
                 && safeAddress != address(nodeSafeRegistry) && safeAddress != vm.addr(303)
         );
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(nodeAddress) && !Address.isContract(nodeAddress)
-                && !Address.isContract(nodeAddress) && nodeAddress != address(0) && nodeAddress != address(this)
+            !Address.isContract(nodeAddress) && nodeAddress != address(0) && nodeAddress != address(this)
                 && nodeAddress != address(nodeSafeRegistry) && nodeAddress != vm.addr(303)
         );
         vm.assume(safeAddress != nodeAddress);
@@ -261,13 +269,15 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev safe can deregister a node by the safe
      */
     function testFuzz_DeregisterNodeBySafe(address safeAddress, address nodeAddress) public {
+        assumeNotPrecompile(safeAddress);
+        assumeNotPrecompile(nodeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
+            !Address.isContract(safeAddress)
                 && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
                 && safeAddress != vm.addr(303)
         );
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(nodeAddress) && !Address.isContract(nodeAddress)
+            !Address.isContract(nodeAddress) && nodeAddress != address(0) && nodeAddress != address(this)
                 && nodeAddress != address(0) && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry)
                 && nodeAddress != vm.addr(303)
         );
@@ -289,14 +299,14 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
      * @dev cannot deregister a random address
      */
     function testRevert_DeregisterNodeBySafeDueToNotValidSafe(address safeAddress, address nodeAddress) public {
+        assumeNotPrecompile(safeAddress);
+        assumeNotPrecompile(nodeAddress);
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(safeAddress) && !Address.isContract(safeAddress)
-                && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
+            !Address.isContract(safeAddress) && safeAddress != address(0) && safeAddress != address(this) && safeAddress != address(nodeSafeRegistry)
                 && safeAddress != vm.addr(303)
         );
         vm.assume(
-            !PrecompileUtils.isPrecompileAddress(nodeAddress) && !Address.isContract(nodeAddress)
-                && nodeAddress != address(0) && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry)
+            !Address.isContract(nodeAddress) && nodeAddress != address(0) && nodeAddress != address(this) && nodeAddress != address(nodeSafeRegistry)
                 && nodeAddress != vm.addr(303)
         );
         vm.assume(safeAddress != nodeAddress);
