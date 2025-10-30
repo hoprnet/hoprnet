@@ -13,12 +13,13 @@ pub mod utils;
 
 #[cfg(feature = "capture")]
 pub mod capture;
+mod timeout;
 
 #[doc(hidden)]
 pub mod prelude {
     pub use libp2p_identity::PeerId;
 
-    pub use crate::types::*;
     #[cfg(feature = "runtime-tokio")]
-    pub use crate::udp::*;
+    pub use super::udp::*;
+    pub use super::{timeout::*, types::*};
 }

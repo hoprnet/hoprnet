@@ -111,8 +111,14 @@ where
     <C as Decoder>::Item: Clone + Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
-    let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(10_000);
-    let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(10_000);
+    let capacity = std::env::var("HOPR_INTERNAL_PROCESS_STREAM_CHANNEL_CAPACITY")
+        .ok()
+        .and_then(|s| s.trim().parse::<usize>().ok())
+        .filter(|&c| c >= 1024)
+        .unwrap_or(1_000_000);
+
+    let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(capacity);
+    let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(capacity);
 
     let cache_out = moka::future::Cache::builder()
         .max_capacity(2000)

@@ -238,6 +238,7 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
 - `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
 - `HOPR_INTERNAL_PROTOCOL_BIDIRECTIONAL_CHANNEL_CAPACITY` - the maximum capacity of HOPR messages processed by the node
+- `HOPR_INTERNAL_PROCESS_STREAM_CHANNEL_CAPACITY` - capacity of the libp2p stream channel handler
 - `HOPR_INTERNAL_SESSION_CTL_CHANNEL_CAPACITY` - the maximum capacity of the session control channel
 - `HOPR_INTERNAL_SESSION_INCOMING_CAPACITY` - the maximum capacity of the queue storing unprocessed incoming and outgoing messages inside a session
 - `HOPR_INTERNAL_SESSION_BALANCER_LEVEL_CAPACITY` - the maximum capacity of the session balancer

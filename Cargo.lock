@@ -5061,13 +5061,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "1.0.2"
+version = "1.1.2"
 dependencies = [
  "anyhow",
  "arrayvec",
  "cfg-if",
  "flume",
  "futures",
+ "futures-time",
  "hickory-resolver",
  "hopr-async-runtime",
  "hopr-crypto-packet",

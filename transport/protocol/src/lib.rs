@@ -76,6 +76,7 @@ mod capture;
 use std::{collections::HashMap, time::Duration};
 
 use futures::{FutureExt, SinkExt, StreamExt};
+use futures_time::future::FutureExt as FuturesTimeExt;
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::{HalfKey, OffchainPublicKey};
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
@@ -83,7 +84,7 @@ use hopr_internal_types::{
     prelude::{Acknowledgement, HoprPseudonym},
     protocol::VerifiedAcknowledgement,
 };
-use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_network_types::prelude::{ResolvedTransportRouting, TimeoutSinkExt};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
 use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
@@ -158,6 +159,8 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
     }
 }
 
+const PIPELINE_CHANNEL_TIMEOUT: Duration = Duration::from_millis(200);
+
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
@@ -228,6 +231,8 @@ where
     let (ticket_ack_tx, ticket_ack_rx) =
         futures::channel::mpsc::channel::<(Acknowledgement, OffchainPublicKey)>(TICKET_ACK_BUFFER_SIZE);
 
+    let ticket_ack_tx = ticket_ack_tx.with_timeout(PIPELINE_CHANNEL_TIMEOUT);
+
     let db_clone = db.clone();
     processes.insert(
         ProtocolProcesses::TicketAck,
@@ -253,6 +258,8 @@ where
 
     let (ack_out_tx, ack_out_rx) =
         futures::channel::mpsc::channel::<(Option<HalfKey>, OffchainPublicKey)>(ACK_OUT_BUFFER_SIZE);
+
+    let ack_out_tx = ack_out_tx.with_timeout(PIPELINE_CHANNEL_TIMEOUT);
 
     #[cfg(feature = "capture")]
     let capture_clone = capture.clone();
@@ -347,7 +354,15 @@ where
                         (capture_clone.clone(), data.clone(), routing.count_return_paths() as u8);
 
                     async move {
-                        match PacketWrapping::send(&msg_processor, data, routing).await {
+                        let Ok(res) = PacketWrapping::send(&msg_processor, data, routing)
+                            .timeout(futures_time::time::Duration::from(PIPELINE_CHANNEL_TIMEOUT))
+                            .await
+                        else {
+                            tracing::error!("outgoing packet dropped due to timeout");
+                            return None;
+                        };
+
+                        match res {
                             Ok(v) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
@@ -438,7 +453,16 @@ where
                         };
 
                         let now = std::time::Instant::now();
-                        let res = msg_processor.recv(peer_key, data).await.map_err(move |e| (peer, e));
+                        let Ok(res) = msg_processor
+                                .recv(peer_key, data)
+                                .timeout(futures_time::time::Duration::from(PIPELINE_CHANNEL_TIMEOUT))
+                                .await else {
+                            error!(%peer, "incoming packet dropped due to timeout");
+                            return None;
+                        };
+
+                        let res = res.map_err(move |e| (peer, e));
+
                         let elapsed = now.elapsed();
                         if elapsed.as_millis() > SLOW_OP_MS {
                             warn!(%peer, ?elapsed, "msg_processor.recv took too long");
