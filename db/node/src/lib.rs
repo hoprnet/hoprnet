@@ -1,9 +1,5 @@
 mod db;
-
 mod peers;
-
-mod protocol;
-
 mod tickets;
 
 mod cache;
