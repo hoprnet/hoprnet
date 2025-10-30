@@ -5267,7 +5267,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.13.4"
+version = "0.13.5"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5450,7 +5450,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.11.3"
+version = "0.11.4"
 dependencies = [
  "anyhow",
  "async-trait",
