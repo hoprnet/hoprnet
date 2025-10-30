@@ -50,6 +50,7 @@ impl<I, S: futures::Sink<I>> futures::Sink<I> for TimeoutSink<S> {
                 // If a timer is present, poll it as well
                 if let Some(timer) = this.timer.as_mut().as_pin_mut() {
                     futures::ready!(timer.poll(cx));
+                    this.timer.set(None);
                     // The timer has expired, so we won't poll the inner sink again
                     // and return an error.
                     Poll::Ready(Err(SinkTimeoutError::Timeout))

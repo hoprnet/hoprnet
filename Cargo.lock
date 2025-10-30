@@ -5061,7 +5061,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "1.1.2"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "arrayvec",

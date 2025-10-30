@@ -90,7 +90,7 @@ use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, error, trace, warn};
-
+use hopr_crypto_packet::errors::PacketError;
 use crate::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 pub use crate::{processor::DEFAULT_PRICE_PER_PACKET, timer::execute_on_tick};
 
@@ -359,6 +359,7 @@ where
                             .await
                         else {
                             tracing::error!("outgoing packet dropped due to timeout");
+                            finalizer.finalize(Err(PacketError::PacketConstructionError("timeout during construction".into())));
                             return None;
                         };
 
