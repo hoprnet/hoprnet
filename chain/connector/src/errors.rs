@@ -16,8 +16,14 @@ pub enum ConnectorError {
     #[error("channel {0} does not exist")]
     ChannelDoesNotExist(ChannelId),
 
+    #[error("channel {0} is closed")]
+    ChannelClosed(ChannelId),
+
     #[error("type conversion error: {0}")]
     TypeConversion(String),
+
+    #[error("transaction timed out while waiting for confirmation")]
+    TransactionTimeout,
 
     #[error("backend error: {0}")]
     BackendError(anyhow::Error),
@@ -31,6 +37,12 @@ pub enum ConnectorError {
     #[error(transparent)]
     GeneralError(#[from] hopr_primitive_types::errors::GeneralError),
 
-    #[error("error while signing transaction payload: {0}")]
-    SigningError(anyhow::Error),
+    #[error(transparent)]
+    ChainTypesError(#[from] hopr_chain_types::errors::ChainTypesError),
+    
+    #[error(transparent)]
+    CoreTypesError(#[from] hopr_internal_types::errors::CoreTypesError),
+
+    #[error("undefined error: {0}")]
+    OtherError(anyhow::Error),
 }

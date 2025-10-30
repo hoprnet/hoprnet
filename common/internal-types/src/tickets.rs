@@ -1018,6 +1018,20 @@ impl PartialEq for RedeemableTicket {
     }
 }
 
+impl Eq for RedeemableTicket {}
+
+impl PartialOrd for RedeemableTicket {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for RedeemableTicket {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.ticket.cmp(&other.ticket)
+    }
+}
+
 impl Display for RedeemableTicket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "redeemable {}", self.ticket)

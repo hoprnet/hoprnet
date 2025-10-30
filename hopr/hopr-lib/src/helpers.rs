@@ -9,7 +9,7 @@ use hopr_strategy::strategy::MultiStrategy;
 use tracing::info;
 
 use crate::{
-    exports::{chain::types::chain_events::ChainEventType, transport::PeerDiscovery},
+    exports::{chain::types::chain_events::ChainEvent, transport::PeerDiscovery},
     prelude::Address,
 };
 
@@ -41,15 +41,15 @@ where
 
                 async move {
                     match event.event_type {
-                        ChainEventType::Announcement{peer, multiaddresses, ..} => {
+                        ChainEvent::Announcement{peer, multiaddresses, ..} => {
                             Some(vec![PeerDiscovery::Announce(peer, multiaddresses)])
                         }
-                        ChainEventType::ChannelOpened(channel) |
-                        ChainEventType::ChannelClosureInitiated(channel) |
-                        ChainEventType::ChannelClosed(channel) |
-                        ChainEventType::ChannelBalanceIncreased(channel, _) | // needed ?
-                        ChainEventType::ChannelBalanceDecreased(channel, _) | // needed ?
-                        ChainEventType::TicketRedeemed(channel, _) => {   // needed ?
+                        ChainEvent::ChannelOpened(channel) |
+                        ChainEvent::ChannelClosureInitiated(channel) |
+                        ChainEvent::ChannelClosed(channel) |
+                        ChainEvent::ChannelBalanceIncreased(channel, _) | // needed ?
+                        ChainEvent::ChannelBalanceDecreased(channel, _) | // needed ?
+                        ChainEvent::TicketRedeemed(channel, _) => {   // needed ?
                             let maybe_direction = channel.direction(&me_onchain);
 
                             let change = channel_graph
@@ -88,11 +88,11 @@ where
 
                             None
                         }
-                        ChainEventType::NetworkRegistryUpdate(address, allowed) => {
+                        ChainEvent::NetworkRegistryUpdate(address, allowed) => {
                             info!(%address, ?allowed, "network registry update received as a no-op");
                             None
                         }
-                        ChainEventType::NodeSafeRegistered(safe_address) =>  {
+                        ChainEvent::NodeSafeRegistered(safe_address) =>  {
                             info!(%safe_address, "Node safe registered");
                             None
                         }

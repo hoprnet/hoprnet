@@ -1,8 +1,15 @@
 use std::str::FromStr;
-use hopr_internal_types::account::{AccountEntry, AccountType};
-use hopr_internal_types::channels::ChannelStatus;
-use hopr_internal_types::prelude::ChannelEntry;
+use std::time::Duration;
+use blokli_client::api::{BlokliTransactionClient};
+use hopr_api::chain::ChainReceipt;
+use hopr_crypto_types::prelude::Hash;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::ToHex;
+use futures::TryFutureExt;
+
 use crate::errors::ConnectorError;
+
+const CLIENT_TX_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(crate) fn model_to_account_entry(model: blokli_client::api::types::Account) -> Result<AccountEntry, ConnectorError> {
     Ok(AccountEntry {
@@ -44,4 +51,17 @@ pub(crate) fn model_to_graph_entry(model: blokli_client::api::types::OpenedChann
         (model.channel.epoch as u32).into()
     );
     Ok((src, dst, channel))
+}
+
+pub(crate) fn track_transaction<'a, B: BlokliTransactionClient + Send + Sync + 'static>(client: &'a B, tx_id: blokli_client::api::TxId)
+    -> Result<impl futures::Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
+    Ok(client
+        .track_transaction(tx_id, CLIENT_TX_TIMEOUT)
+        .map_err(ConnectorError::from)
+        .and_then(|tx| futures::future::ready(
+            tx.transaction_hash
+                .ok_or(ConnectorError::ClientError(blokli_client::errors::ErrorKind::NoData.into()))
+                .and_then(|hash| Hash::from_hex(&hash.0).map_err(ConnectorError::from))
+        )))
+
 }

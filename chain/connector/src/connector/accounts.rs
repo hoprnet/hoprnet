@@ -3,19 +3,23 @@ use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
 use futures::stream::BoxStream;
 use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr};
+use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::account::AccountEntry;
 use hopr_primitive_types::prelude::*;
 
-use crate::connector::{Backend, HoprBlockchainConnector};
+use crate::backend::Backend;
+use crate::connector::{HoprBlockchainConnector};
+use crate::connector::utils::track_transaction;
 use crate::errors::ConnectorError;
-use crate::payload::{sign_payload, PayloadGenerator};
 
 #[async_trait::async_trait]
-impl<B, C> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<B, C>
+impl<B, C, P> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<B, C, P>
 where
     B: Backend + Send + Sync + 'static,
-    C: BlokliQueryClient + Send + Sync + 'static {
+    C: BlokliQueryClient + Send + Sync + 'static,
+    P: Send + Sync + 'static
+{
     type Error = ConnectorError;
 
     async fn node_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
@@ -39,14 +43,6 @@ where
     }
 
     async fn safe_allowance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
-        todo!()
-    }
-
-    async fn check_node_safe_module_status(&self) -> Result<bool, Self::Error> {
-        todo!()
-    }
-
-    async fn can_register_with_safe(&self, safe_address: &Address) -> Result<bool, Self::Error> {
         todo!()
     }
 
@@ -81,10 +77,12 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B,C> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<B, C>
+impl<B,C,P> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<B, C, P>
 where
     B: Send + Sync,
-    C: BlokliTransactionClient + Send + Sync + 'static {
+    C: BlokliTransactionClient + Send + Sync + 'static,
+    P: PayloadGenerator + Send + Sync + 'static
+{
     type Error = ConnectorError;
 
     async fn announce(&self, multiaddrs: &[Multiaddr], key: &OffchainKeypair) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>> {
@@ -92,13 +90,22 @@ where
     }
 
     async fn withdraw<Cy: Currency + Send>(&self, balance: Balance<Cy>, recipient: &Address) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
-        let payload = self.payload_generator.transfer(*recipient, balance)?;
-        let signed_payload = sign_payload(payload, &self.chain_key).await?;
-        let receipt = self.client.submit_transaction(&signed_payload).await.map_err(ConnectorError::from)?;
-        Ok(futures::future::always_ready(move || Ok(ChainReceipt::from(receipt))).boxed())
+        let signed_payload = self.payload_generator
+            .transfer(*recipient, balance)?
+            .sign_and_encode_to_eip2718(&self.chain_key)
+            .await?;
+
+        let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;
+        Ok(track_transaction(self.client.as_ref(), tx_id)?.boxed())
     }
 
     async fn register_safe(&self, safe_address: &Address) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
-        todo!()
+        let signed_payload = self.payload_generator
+            .register_safe_by_node(*safe_address)?
+            .sign_and_encode_to_eip2718(&self.chain_key)
+            .await?;
+
+        let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;
+        Ok(track_transaction(self.client.as_ref(), tx_id)?.boxed())
     }
 }

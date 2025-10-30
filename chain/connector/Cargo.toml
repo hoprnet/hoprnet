@@ -7,10 +7,11 @@ edition = "2024"
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
-ahash = "0.8.12"
-alloy = { workspace = true}
+ahash = { workspace = true }
 anyhow = { workspace = true }
+async-broadcast = { workspace = true }
 async-trait = { workspace = true }
+bincode = { workspace = true }
 blokli-client = { workspace = true }
 futures = { workspace = true }
 moka = { workspace = true }
@@ -25,10 +26,9 @@ url = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-bindings = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true }
+hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]

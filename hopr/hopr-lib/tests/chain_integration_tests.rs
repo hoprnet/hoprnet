@@ -26,7 +26,7 @@ use hopr_chain_rpc::{
     client::SnapshotRequestor,
     rpc::{RpcOperations, RpcOperationsConfig},
 };
-use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType, utils::create_anvil};
+use hopr_chain_types::{ContractAddresses, chain_events::ChainEvent, utils::create_anvil};
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_db_sql::{logs::HoprDbLogOperations, prelude::*};
@@ -318,7 +318,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should confirm safe registration");
 
     assert!(
-        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == safe_cfgs[0].safe_address),
+        matches!(confirmation.event, Some(ChainEvent::NodeSafeRegistered(reg_safe)) if reg_safe == safe_cfgs[0].safe_address),
         "confirmed safe address must match"
     );
     info!("--> Alice's Safe has been registered");
@@ -333,7 +333,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should confirm safe registration");
 
     assert!(
-        matches!(confirmation.event, Some(ChainEventType::NodeSafeRegistered(reg_safe)) if reg_safe == safe_cfgs[1].safe_address),
+        matches!(confirmation.event, Some(ChainEvent::NodeSafeRegistered(reg_safe)) if reg_safe == safe_cfgs[1].safe_address),
         "confirmed safe address must match"
     );
     info!("--> Bob's Safe has been registered");
@@ -350,7 +350,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     assert!(
         matches!(confirmation.event,
-            Some(ChainEventType::Announcement{ peer, address, multiaddresses })
+            Some(ChainEvent::Announcement{ peer, address, multiaddresses })
             if peer == alice_node.offchain_key.public().into() &&
             address == alice_chain_key.public().to_address() &&
             multiaddresses.contains(&maddr)
@@ -374,7 +374,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     assert!(
         matches!(confirmation.event,
-            Some(ChainEventType::Announcement{ peer, address, multiaddresses })
+            Some(ChainEvent::Announcement{ peer, address, multiaddresses })
             if peer == bob_node.offchain_key.public().into() &&
             address == bob_chain_key.public().to_address() &&
             multiaddresses.contains(&maddr)
@@ -451,7 +451,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should contain a channel to Bob");
 
     match confirmation.event {
-        Some(ChainEventType::ChannelOpened(channel)) => {
+        Some(ChainEvent::ChannelOpened(channel)) => {
             assert_eq!(
                 channel.get_id(),
                 channel_alice_bob.get_id(),
@@ -480,7 +480,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should confirm fund channel");
 
     match confirmation.event {
-        Some(ChainEventType::ChannelBalanceIncreased(channel, amount)) => {
+        Some(ChainEvent::ChannelBalanceIncreased(channel, amount)) => {
             assert_eq!(
                 channel.get_id(),
                 channel_alice_bob.get_id(),
@@ -543,7 +543,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should confirm open incoming channel");
 
     match confirmation.event {
-        Some(ChainEventType::ChannelOpened(channel)) => {
+        Some(ChainEvent::ChannelOpened(channel)) => {
             assert_eq!(
                 channel.get_id(),
                 generate_channel_id(
@@ -649,7 +649,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     assert_eq!(1, confirmations.len(), "Bob should redeem a single ticket");
 
     match &confirmations.first().unwrap().event {
-        Some(ChainEventType::TicketRedeemed(channel, ack_ticket)) => {
+        Some(ChainEvent::TicketRedeemed(channel, ack_ticket)) => {
             assert_eq!(
                 channel.get_id(),
                 channel_alice_bob.get_id(),
@@ -766,7 +766,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("should confirm close channel");
 
     match confirmation.event {
-        Some(ChainEventType::ChannelClosureInitiated(channel)) => {
+        Some(ChainEvent::ChannelClosureInitiated(channel)) => {
             let closing_channel_in_db = alice_node
                 .index_db
                 .get_channel_by_id(

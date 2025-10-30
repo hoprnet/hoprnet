@@ -18,16 +18,12 @@ impl Display for AccountType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             Self::NotAnnounced => {
-                write!(f, "Not announced")
+                write!(f, "not announced")
             }
             Self::Announced {
                 multiaddr,
                 updated_block,
-            } => f
-                .debug_struct("AccountType")
-                .field("MultiAddr", multiaddr)
-                .field("UpdatedAt", updated_block)
-                .finish(),
+            } => write!(f, "announced as {multiaddr} at block {updated_block}"),
         }
     }
 }
@@ -76,6 +72,12 @@ impl AccountEntry {
     /// - the IP of a PRN has changed, e.g. due to relocation
     pub fn update(&mut self, new_entry_type: AccountType) {
         self.entry_type = new_entry_type;
+    }
+}
+
+impl Display for AccountEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "account {} ({}:{}) {}", self.key_id, self.chain_addr, self.public_key.to_peerid_str(), self.entry_type)
     }
 }
 

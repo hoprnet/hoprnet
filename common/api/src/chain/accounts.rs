@@ -105,12 +105,6 @@ pub trait ChainReadAccountOperations {
 
     /// Returns the native or token currency Safe allowance.
     async fn safe_allowance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
-    
-    /// Validates the node's Safe setup.
-    async fn check_node_safe_module_status(&self) -> Result<bool, Self::Error>;
-
-    /// Checks if the given safe address can be registered with the current node.
-    async fn can_register_with_safe(&self, safe_address: &Address) -> Result<bool, Self::Error>;
 
     /// Returns on-chain node accounts with the given [`AccountSelector`].
     async fn stream_accounts<'a>(

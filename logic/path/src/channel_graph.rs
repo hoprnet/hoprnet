@@ -723,7 +723,7 @@ mod tests {
                     assert_eq!(ChannelStatus::Open, left, "previous status does not match");
                     assert_eq!(ChannelStatus::PendingToClose(ts), right, "new status does not match");
                 }
-                ChannelChange::CurrentBalance { left, right } => {
+                ChannelChange::Balance { left, right } => {
                     assert_eq!(HoprBalance::from(1), left, "previous balance does not match");
                     assert_eq!(HoprBalance::zero(), right, "new balance does not match");
                 }
@@ -769,7 +769,7 @@ mod tests {
                     );
                     assert_eq!(ChannelStatus::Closed, right, "new status does not match");
                 }
-                ChannelChange::CurrentBalance { left, right } => {
+                ChannelChange::Balance { left, right } => {
                     assert_eq!(HoprBalance::from(1), left, "previous balance does not match");
                     assert_eq!(HoprBalance::zero(), right, "new balance does not match");
                 }

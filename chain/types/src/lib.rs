@@ -22,12 +22,18 @@ use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
 
-pub mod actions;
 pub mod chain_events;
 pub mod constants;
 pub mod errors;
+pub mod payload;
 // Various (mostly testing related) utility functions
 pub mod utils;
+
+pub mod prelude {
+    pub use super::{ContractAddresses, ContractInstances};
+    pub use super::payload::{PayloadGenerator, SafePayloadGenerator, SignableTransaction, BasicPayloadGenerator};
+    pub use super::chain_events::ChainEvent;
+}
 
 /// Holds addresses of all smart contracts.
 #[serde_with::serde_as]

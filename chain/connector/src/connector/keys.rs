@@ -2,7 +2,8 @@ use hopr_api::chain::{HoprKeyIdent, HoprSphinxHeaderSpec, HoprSphinxSuite};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_primitive_types::prelude::Address;
 
-use crate::connector::{Backend, HoprBlockchainConnector};
+use crate::backend::Backend;
+use crate::connector::{HoprBlockchainConnector};
 use crate::errors::ConnectorError;
 
 
@@ -56,10 +57,11 @@ where
 
 
 #[async_trait::async_trait]
-impl<B, C> hopr_api::chain::ChainKeyOperations for HoprBlockchainConnector<B, C>
+impl<B, C, P> hopr_api::chain::ChainKeyOperations for HoprBlockchainConnector<B, C, P>
 where
     B: Backend + Send + Sync + 'static,
-    C: Send + Sync
+    C: Send + Sync,
+    P: Send + Sync
 {
     type Error = ConnectorError;
     type Mapper = HoprKeyMapper<B>;

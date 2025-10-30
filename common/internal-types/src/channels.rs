@@ -24,6 +24,22 @@ pub enum ChannelStatus {
     PendingToClose(SystemTime),
 }
 
+impl ChannelStatus {
+    /// Checks if is [`ChannelStatus::PendingToClose`] and the closure time has elapsed.
+    ///
+    /// Otherwise, also:
+    ///
+    /// - Returns `false` if it is [`ChannelStatus::Open`].
+    /// - Returns `true` if it is [`ChannelStatus::Closed`].
+    pub fn closure_time_elapsed(&self, current_time: &SystemTime) -> bool {
+        match self {
+            ChannelStatus::Closed => true,
+            ChannelStatus::Open => false,
+            ChannelStatus::PendingToClose(closure_time) => closure_time <= current_time,
+        }
+    }
+}
+
 // Cannot use #[repr(u8)] due to PendingToClose
 impl From<ChannelStatus> for i8 {
     fn from(value: ChannelStatus) -> Self {
@@ -145,17 +161,15 @@ impl ChannelEntry {
     }
 
     /// Checks if the closure time of this channel has passed.
+    ///
     /// Also returns `false` if the channel closure has not been initiated (it is in `Open` state).
     /// Returns also `true`, if the channel is in `Closed` state.
     pub fn closure_time_passed(&self, current_time: SystemTime) -> bool {
-        match self.status {
-            ChannelStatus::Open => false,
-            ChannelStatus::PendingToClose(closure_time) => closure_time <= current_time,
-            ChannelStatus::Closed => true,
-        }
+        self.status.closure_time_elapsed(&current_time)
     }
 
     /// Calculates the remaining channel closure grace period.
+    ///
     /// Returns `None` if the channel closure has not been initiated yet (channel is in `Open` state).
     pub fn remaining_closure_time(&self, current_time: SystemTime) -> Option<Duration> {
         match self.status {
@@ -197,6 +211,14 @@ impl ChannelEntry {
             None
         }
     }
+
+    /// Makes a diff of this channel (left) and the `other` channel (right).
+    /// The channels must have the same ID.
+    ///
+    /// See [`ChannelChange`]
+    pub fn diff(&self, other: &Self) -> Vec<ChannelChange> {
+        ChannelChange::diff_channels(self, other)
+    }
 }
 
 impl Display for ChannelEntry {
@@ -211,51 +233,41 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
 }
 
 /// Lists possible changes on a channel entry update
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, strum::Display)]
 pub enum ChannelChange {
     /// Channel status has changed
+    #[strum(to_string = "status change: {left} -> {right}")]
     Status { left: ChannelStatus, right: ChannelStatus },
 
     /// Channel balance has changed
-    CurrentBalance { left: HoprBalance, right: HoprBalance },
+    #[strum(to_string = "balance change: {left} -> {right}")]
+    Balance { left: HoprBalance, right: HoprBalance },
 
     /// Channel epoch has changed
+    #[strum(to_string = "epoch change: {left} -> {right}")]
     Epoch { left: u32, right: u32 },
 
     /// Ticket index has changed
+    #[strum(to_string = "ticket index change: {left} -> {right}")]
     TicketIndex { left: u64, right: u64 },
 }
 
-impl Display for ChannelChange {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ChannelChange::Status { left, right } => {
-                write!(f, "Status: {left} -> {right}")
-            }
-
-            ChannelChange::CurrentBalance { left, right } => {
-                write!(f, "Balance: {left} -> {right}")
-            }
-
-            ChannelChange::Epoch { left, right } => {
-                write!(f, "Epoch: {left} -> {right}")
-            }
-
-            ChannelChange::TicketIndex { left, right } => {
-                write!(f, "TicketIndex: {left} -> {right}")
-            }
-        }
-    }
-}
 
 impl ChannelChange {
-    /// Compares the two given channels and returns a vector of `ChannelChange`s
-    /// Both channels must have the same ID (source,destination and direction) to be comparable using this function.
+    /// Compares the two given channels and returns a vector of [`ChannelChange`]s.
+    ///
+    /// Both channels must have the same ID (source, destination and direction) to be comparable using this function.
     /// The function panics if `left` and `right` do not have equal ids.
-    /// Note that only some fields are tracked for changes, and therefore an empty vector returned
-    /// does not imply the two `ChannelEntry` instances are equal.
+    ///
+    /// If an empty vector is returned, it implies that both channels are equal.
     pub fn diff_channels(left: &ChannelEntry, right: &ChannelEntry) -> Vec<Self> {
         assert_eq!(left.id, right.id, "must have equal ids"); // misuse
+
+        // Short-circuit if both channels are equal, avoiding unnecessary allocations
+        if left == right {
+            return Vec::with_capacity(0);
+        }
+
         let mut ret = Vec::with_capacity(4);
         if left.status != right.status {
             ret.push(ChannelChange::Status {
@@ -265,7 +277,7 @@ impl ChannelChange {
         }
 
         if left.balance != right.balance {
-            ret.push(ChannelChange::CurrentBalance {
+            ret.push(ChannelChange::Balance {
                 left: left.balance,
                 right: right.balance,
             });

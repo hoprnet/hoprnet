@@ -87,7 +87,7 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
             return Ok(());
         }
 
-        if let ChannelChange::CurrentBalance { right: new, .. } = change {
+        if let ChannelChange::Balance { right: new, .. } = change {
             if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
                 info!(%channel, balance = %channel.balance, threshold = %self.cfg.min_stake_threshold,
                     "stake on channel is below threshold",
@@ -179,7 +179,7 @@ mod tests {
         afs.on_own_channel_changed(
             &c1,
             ChannelDirection::Outgoing,
-            ChannelChange::CurrentBalance {
+            ChannelChange::Balance {
                 left: HoprBalance::zero(),
                 right: c1.balance,
             },
@@ -189,7 +189,7 @@ mod tests {
         afs.on_own_channel_changed(
             &c2,
             ChannelDirection::Outgoing,
-            ChannelChange::CurrentBalance {
+            ChannelChange::Balance {
                 left: HoprBalance::zero(),
                 right: c2.balance,
             },
@@ -199,7 +199,7 @@ mod tests {
         afs.on_own_channel_changed(
             &c3,
             ChannelDirection::Outgoing,
-            ChannelChange::CurrentBalance {
+            ChannelChange::Balance {
                 left: HoprBalance::zero(),
                 right: c3.balance,
             },
