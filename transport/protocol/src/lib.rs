@@ -78,6 +78,7 @@ use std::{collections::HashMap, time::Duration};
 use futures::{FutureExt, SinkExt, StreamExt};
 use futures_time::future::FutureExt as FuturesTimeExt;
 use hopr_async_runtime::spawn_as_abortable;
+use hopr_crypto_packet::errors::PacketError;
 use hopr_crypto_types::types::{HalfKey, OffchainPublicKey};
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
 use hopr_internal_types::{
@@ -90,7 +91,7 @@ use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, error, trace, warn};
-use hopr_crypto_packet::errors::PacketError;
+
 use crate::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 pub use crate::{processor::DEFAULT_PRICE_PER_PACKET, timer::execute_on_tick};
 
@@ -359,7 +360,9 @@ where
                             .await
                         else {
                             tracing::error!("outgoing packet dropped due to timeout");
-                            finalizer.finalize(Err(PacketError::PacketConstructionError("timeout during construction".into())));
+                            finalizer.finalize(Err(PacketError::PacketConstructionError(
+                                "timeout during construction".into(),
+                            )));
                             return None;
                         };
 
