@@ -49,7 +49,7 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
         C: BlokliSubscriptionClient + BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
         P: PayloadGenerator + Send + Sync + 'static
 {
-    pub fn new(chain_key: ChainKeypair, client: C, backend: B, payload_generator: P) -> Self {
+    pub fn new(chain_key: ChainKeypair, safe_address: Address, client: C, backend: B, payload_generator: P) -> Self {
         let backend = std::sync::Arc::new(backend);
         let (mut events_tx, events_rx) = async_broadcast::broadcast(1024);
         events_tx.set_overflow(true);
@@ -59,7 +59,7 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
         Self {
             payload_generator: std::sync::Arc::new(payload_generator),
             chain_key,
-            safe_address: Default::default(),
+            safe_address,
             client: std::sync::Arc::new(client),
             graph: std::sync::Arc::new(parking_lot::RwLock::new(
                 DiGraphMap::with_capacity_and_hasher(

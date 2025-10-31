@@ -43,6 +43,9 @@ pub enum ConnectorError {
     #[error(transparent)]
     CoreTypesError(#[from] hopr_internal_types::errors::CoreTypesError),
 
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
+
     #[error("undefined error: {0}")]
     OtherError(anyhow::Error),
 }

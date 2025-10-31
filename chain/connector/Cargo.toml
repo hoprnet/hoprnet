@@ -13,6 +13,7 @@ async-broadcast = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true }
 blokli-client = { workspace = true }
+dashmap = {workspace = true }
 futures = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }

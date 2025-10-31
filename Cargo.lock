@@ -4576,6 +4576,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "blokli-client",
+ "dashmap",
  "futures",
  "hex-literal",
  "hopr-api",
