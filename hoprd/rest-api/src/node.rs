@@ -51,13 +51,7 @@ pub(super) async fn version() -> impl IntoResponse {
     path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
     description = "Get the configuration of the running node",
     responses(
-        (status = 200, description = "Fetched node configuration", body = HashMap<String, String>, example = json!({
-        "network": "anvil-localhost",
-        "provider": "http://127.0.0.1:8545",
-        "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
-        "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
-        "...": "..."
-        })),
+        (status = 200, description = "Fetched node configuration", content_type = "application/yaml", body = String, example = "network: anvil-localhost\nprovider: http://127.0.0.1:8545\n"),
         (status = 401, description = "Invalid authorization token.", body = ApiError),
     ),
     security(
@@ -67,7 +61,7 @@ pub(super) async fn version() -> impl IntoResponse {
     tag = "Configuration"
     )]
 pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
+    (StatusCode::OK, axum_yaml::Yaml(state.hoprd_cfg.clone())).into_response()
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
