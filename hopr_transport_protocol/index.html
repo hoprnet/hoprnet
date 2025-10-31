@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic layers."><title>hopr_transport_protocol - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-e56847b5.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="hopr_transport_protocol" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0-nightly (7ac0330c6 2025-09-25)" data-channel="nightly" data-search-js="search-e256b49e.js" data-stringdex-js="stringdex-061df703.js" data-settings-js="settings-c38705f0.js" ><script src="../static.files/storage-e2aeef58.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate hopr_transport_protocol</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../hopr_transport_protocol/index.html">hopr_<wbr>transport_<wbr>protocol</a><span class="version">0.11.4</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#contents" title="Contents">Contents</a><ul><li><a href="#ticket_aggregation" title="`ticket_aggregation`"><code>ticket_aggregation</code></a></li></ul></li></ul><h3><a href="#reexports">Crate Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>hopr_<wbr>transport_<wbr>protocol</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/hopr_transport_protocol/lib.rs.html#1-687">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic
+layers.</p>
+<h3 id="contents"><a class="doc-anchor" href="#contents">§</a>Contents</h3>
+<p>Supported protocol configurations:</p>
+<ul>
+<li><code>mix</code></li>
+<li><code>ack</code></li>
+<li><code>heartbeat</code></li>
+<li><code>ticket_aggregation</code></li>
+</ul>
+<p>Supported protocol processors:</p>
+<ul>
+<li><code>ticket_aggregation</code></li>
+</ul>
+<h4 id="ticket_aggregation"><a class="doc-anchor" href="#ticket_aggregation">§</a><code>ticket_aggregation</code></h4>
+<p>Ticket aggregation processing mechanism is responsible for ingesting the ticket aggregation related requests:</p>
+<ul>
+<li><code>Receive(PeerId, U)</code>,</li>
+<li><code>Reply(PeerId, std::result::Result&lt;Ticket, String&gt;, T)</code>,</li>
+<li><code>Send(PeerId, Vec&lt;AcknowledgedTicket&gt;, TicketAggregationFinalizer)</code>,</li>
+</ul>
+<p>where <code>U</code> is the type of an aggregated ticket extractable (<code>ResponseChannel&lt;Result&lt;Ticket, String&gt;&gt;</code>) and <code>T</code>
+represents a network negotiated identifier (<code>RequestId</code>).</p>
+<p>In broader context the protocol flow is as follows:</p>
+<ol>
+<li>
+<p>requesting ticket aggregation</p>
+<ul>
+<li>the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request
+containing the collection to aggregate <code>Vec&lt;AcknowledgedTicket&gt;</code> to peer B using the <code>Send</code> mechanism</li>
+</ul>
+</li>
+<li>
+<p>responding to ticket aggregation</p>
+<ul>
+<li>peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation
+in the form of <code>std::result::Result&lt;Ticket, String&gt;</code> using the <code>Reply</code> mechanism</li>
+</ul>
+</li>
+<li>
+<p>accepting the aggregated ticket</p>
+<ul>
+<li>peer A receives the aggregated ticket using the <code>Receive</code> mechanism</li>
+</ul>
+</li>
+</ol>
+<p>Furthermore, apart from the basic positive case scenario, standard mechanics of protocol communication apply:</p>
+<ul>
+<li>the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which
+case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered</li>
+<li>the responder can fail to aggregate tickets in which case it replies with an error string describing the failure
+reason and it is the requester’s responsibility to handle the negative case as well
+<ul>
+<li>in the absence of response, the requester will time out</li>
+</ul>
+</li>
+</ul>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.DEFAULT_PRICE_PER_PACKET"><code>pub use crate::processor::<a class="struct" href="processor/struct.DEFAULT_PRICE_PER_PACKET.html" title="struct hopr_transport_protocol::processor::DEFAULT_PRICE_PER_PACKET">DEFAULT_PRICE_PER_PACKET</a>;</code></dt><dt id="reexport.execute_on_tick"><code>pub use crate::timer::<a class="fn" href="timer/fn.execute_on_tick.html" title="fn hopr_transport_protocol::timer::execute_on_tick">execute_on_tick</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="config/index.html" title="mod hopr_transport_protocol::config">config</a></dt><dd>Configuration of the protocol components.</dd><dt><a class="mod" href="errors/index.html" title="mod hopr_transport_protocol::errors">errors</a></dt><dd>Errors produced by the crate.</dd><dt><a class="mod" href="heartbeat/index.html" title="mod hopr_transport_protocol::heartbeat">heartbeat</a></dt><dd><code>heartbeat</code> p2p protocol</dd><dt><a class="mod" href="processor/index.html" title="mod hopr_transport_protocol::processor">processor</a></dt><dd>processor for the protocol</dd><dt><a class="mod" href="stream/index.html" title="mod hopr_transport_protocol::stream">stream</a></dt><dd>Stream processing utilities
+Infrastructure supporting converting a collection of [<code>PeerId</code>] split <code>libp2p_stream</code> managed
+individual peer-to-peer <code>libp2p::swarm::Stream</code>s.</dd><dt><a class="mod" href="timer/index.html" title="mod hopr_transport_protocol::timer">timer</a></dt></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.PeerDiscovery.html" title="enum hopr_transport_protocol::PeerDiscovery">Peer<wbr>Discovery</a></dt><dd>Processed indexer generated events.</dd><dt><a class="enum" href="enum.ProtocolProcesses.html" title="enum hopr_transport_protocol::ProtocolProcesses">Protocol<wbr>Processes</a></dt></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.ACK_OUT_BUFFER_SIZE.html" title="constant hopr_transport_protocol::ACK_OUT_BUFFER_SIZE">ACK_<wbr>OUT_<wbr>BUFFER_<wbr>SIZE</a></dt><dt><a class="constant" href="constant.CURRENT_HOPR_MSG_PROTOCOL.html" title="constant hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL">CURRENT_<wbr>HOPR_<wbr>MSG_<wbr>PROTOCOL</a></dt><dt><a class="constant" href="constant.NUM_CONCURRENT_ACK_OUT_PROCESSING.html" title="constant hopr_transport_protocol::NUM_CONCURRENT_ACK_OUT_PROCESSING">NUM_<wbr>CONCURRENT_<wbr>ACK_<wbr>OUT_<wbr>PROCESSING</a></dt><dt><a class="constant" href="constant.NUM_CONCURRENT_TICKET_ACK_PROCESSING.html" title="constant hopr_transport_protocol::NUM_CONCURRENT_TICKET_ACK_PROCESSING">NUM_<wbr>CONCURRENT_<wbr>TICKET_<wbr>ACK_<wbr>PROCESSING</a></dt><dt><a class="constant" href="constant.TICKET_ACK_BUFFER_SIZE.html" title="constant hopr_transport_protocol::TICKET_ACK_BUFFER_SIZE">TICKET_<wbr>ACK_<wbr>BUFFER_<wbr>SIZE</a></dt></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.run_msg_ack_protocol.html" title="fn hopr_transport_protocol::run_msg_ack_protocol">run_<wbr>msg_<wbr>ack_<wbr>protocol</a></dt><dd>Run all processes responsible for handling the msg and acknowledgment protocols.</dd></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.HoprBinaryCodec.html" title="type hopr_transport_protocol::HoprBinaryCodec">Hopr<wbr>Binary<wbr>Codec</a></dt></dl></section></div></main></body></html>
