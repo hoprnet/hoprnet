@@ -1,9 +1,7 @@
 use std::error::Error;
-use std::todo;
-use chrono::format::Item;
 use futures::future::BoxFuture;
 pub use hopr_internal_types::prelude::RedeemableTicket;
-use crate::{chain::ChainReceipt, db::TicketSelector};
+use crate::chain::ChainReceipt;
 
 /// On-chain write operations with tickets.
 #[async_trait::async_trait]

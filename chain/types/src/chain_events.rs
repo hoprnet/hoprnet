@@ -38,7 +38,7 @@ pub enum ChainEvent {
     /// If the channel is a node's own, it also contains the ticket that has been redeemed.
     TicketRedeemed(ChannelEntry, Option<Box<VerifiedTicket>>),
     /// Ticket redemption on the node's own channel failed.
-    RedeemFailed(ChannelEntry, Box<VerifiedTicket>),
+    RedeemFailed(ChannelEntry, String, Box<VerifiedTicket>),
     /// Safe has been registered with the node.
     NodeSafeRegistered(Address),
 }
@@ -58,7 +58,7 @@ impl Display for ChainEvent {
             ChainEvent::ChannelBalanceDecreased(c, _) => write!(f, "channel decrease balance event {}", c.get_id()),
             ChainEvent::TicketRedeemed(c, _) => write!(f, "ticket redeem event in channel {}", c.get_id()),
             ChainEvent::NodeSafeRegistered(s) => write!(f, "safe registered event {s}"),
-            ChainEvent::RedeemFailed(c, _) => write!(f, "ticket redeem failed in channel {}", c.get_id()),
+            ChainEvent::RedeemFailed(c, r, _) => write!(f, "ticket redeem failed in channel {} due to {r}", c.get_id()),
         }
     }
 }

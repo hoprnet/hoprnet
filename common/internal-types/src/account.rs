@@ -36,6 +36,7 @@ pub struct AccountEntry {
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,
     pub entry_type: AccountType,
+    pub safe_address: Option<Address>,
     pub key_id: KeyIdent<4>,
 }
 
@@ -77,7 +78,7 @@ impl AccountEntry {
 
 impl Display for AccountEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "account {} ({}:{}) {}", self.key_id, self.chain_addr, self.public_key.to_peerid_str(), self.entry_type)
+        write!(f, "account {} ({}:{}) (safe: {:?}) {}", self.key_id, self.chain_addr, self.public_key.to_peerid_str(), self.safe_address,  self.entry_type)
     }
 }
 

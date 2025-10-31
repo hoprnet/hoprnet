@@ -4,7 +4,7 @@ use blokli_client::api::{BlokliTransactionClient};
 use hopr_api::chain::ChainReceipt;
 use hopr_crypto_types::prelude::Hash;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::ToHex;
+use hopr_primitive_types::prelude::{Address, ToHex};
 use futures::TryFutureExt;
 
 use crate::errors::ConnectorError;
@@ -24,6 +24,7 @@ pub(crate) fn model_to_account_entry(model: blokli_client::api::types::Account) 
         } else {
             AccountType::NotAnnounced
         },
+        safe_address: model.safe_address.map(|addr| Address::from_hex(&addr)).transpose()?,
     })
 }
 

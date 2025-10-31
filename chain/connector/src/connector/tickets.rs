@@ -47,9 +47,9 @@ where
                     let _ = event_tx.broadcast_direct(ChainEvent::TicketRedeemed(channel, Some(ticket.ticket.into()))).await;
                     Ok(hash)
                 }
-                Err(e) => {
-                    let _ = event_tx.broadcast_direct(ChainEvent::RedeemFailed(channel, ticket.ticket.into())).await;
-                    Err(e)
+                Err(error) => {
+                    let _ = event_tx.broadcast_direct(ChainEvent::RedeemFailed(channel, format!("reason: {error}"), ticket.ticket.into())).await;
+                    Err(error)
                 },
             }
         });

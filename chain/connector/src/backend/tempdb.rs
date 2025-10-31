@@ -117,3 +117,15 @@ impl super::Backend for TempDbBackend {
             .map_err(|e| redb::Error::Corrupted(format!("channel decoding failed: {e}")))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::backend::tests::test_backend;
+    use super::*;
+
+    #[test]
+    fn test_tempdb() -> anyhow::Result<()> {
+        let backend = TempDbBackend::new()?;
+        test_backend(backend)
+    }
+}

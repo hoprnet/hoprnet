@@ -124,15 +124,22 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                             let event_tx = event_tx.clone();
                             async move {
                                 match res {
-                                    Ok((new, _)) => {
+                                    Ok((new, old)) => {
                                         tracing::trace!(%new, "account inserted");
                                         // We only track public accounts as events
                                         if new.has_announced() {
+                                            tracing::info!(account = %new, "new announcement");
                                             let _ = event_tx.broadcast_direct(ChainEvent::Announcement {
                                                 peer: new.public_key.into(),
                                                 address: new.chain_addr,
                                                 multiaddresses: new.get_multiaddr().into_iter().collect(),
                                             }).await;
+                                        }
+                                        if let Some(safe_addr) = new.safe_address {
+                                            tracing::info!(account = %new, "registered safe address");
+                                            if old.is_none_or(|a| a.safe_address.is_none()) {
+                                                let _ = event_tx.broadcast_direct(ChainEvent::NodeSafeRegistered(safe_addr)).await;
+                                            }
                                         }
                                     },
                                     Err(error) => {
@@ -191,18 +198,23 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                                             tracing::trace!(id = %new.get_id(), %change, "channel updated");
                                             match change {
                                                 ChannelChange::Status { left: ChannelStatus::Open, right: ChannelStatus::PendingToClose(_) } => {
+                                                    tracing::info!(id = %new.get_id(), "channel pending to close");
                                                     let _ = event_tx.broadcast_direct(ChainEvent::ChannelClosureInitiated(new.clone())).await;
                                                 }
                                                 ChannelChange::Status {left: ChannelStatus::PendingToClose(_), right: ChannelStatus::Closed} => {
+                                                    tracing::info!(id = %new.get_id(), "channel closed");
                                                     let _ = event_tx.broadcast_direct(ChainEvent::ChannelClosed(new.clone())).await;
                                                 }
                                                 ChannelChange::Status { left: ChannelStatus::Closed, right: ChannelStatus::Open } => {
+                                                    tracing::info!(id = %new.get_id(), "channel reopened");
                                                     let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new.clone())).await;
                                                 }
                                                 ChannelChange::Balance { left, right } => {
                                                     if left > right {
+                                                        tracing::info!(id = %new.get_id(), "channel balance decreased");
                                                         let _ = event_tx.broadcast_direct(ChainEvent::ChannelBalanceDecreased(new.clone(), left - right)).await;
                                                     } else {
+                                                        tracing::info!(id = %new.get_id(), "channel balance increased");
                                                         let _ = event_tx.broadcast_direct(ChainEvent::ChannelBalanceIncreased(new.clone(), right - left)).await;
                                                     }
                                                 }
@@ -210,6 +222,7 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                                                 // Ticket redemption events on own channels must be tracked via redeem transaction tracking, as it
                                                 // the event must also include the ticket that has been redeemed.
                                                 ChannelChange::TicketIndex { .. }  if new.direction(&me).is_none() => {
+                                                    tracing::info!(id = %new.get_id(), "ticket redeemed on foreign channel");
                                                     let _ = event_tx.broadcast_direct(ChainEvent::TicketRedeemed(new.clone(), None)).await;
                                                 }
                                                 _ => {}
@@ -217,7 +230,7 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                                         }
                                     },
                                     Ok((new, None))  => {
-                                        tracing::trace!(id = %new.get_id(), "channel inserted");
+                                        tracing::info!(id = %new.get_id(), "channel opened");
                                         let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new.clone())).await;
                                     },
                                     Err(error) => {
