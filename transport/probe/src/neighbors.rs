@@ -3,44 +3,72 @@ use futures::Stream;
 use libp2p_identity::PeerId;
 use rand::seq::SliceRandom;
 
-use crate::{config::ProbeConfig, traits::PeerDiscoveryFetch};
+use hopr_crypto_random::Randomizable;
+use hopr_internal_types::protocol::HoprPseudonym;
+use hopr_network_types::types::{DestinationRouting, RoutingOptions};
+use hopr_primitive_types::prelude::Address;
 
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_TIME_TO_PROBE: hopr_metrics::metrics::SimpleHistogram =
-        hopr_metrics::metrics::SimpleHistogram::new(
-            "hopr_probe_round_time_sec",
-            "Measures total time in seconds it takes to probe all nodes",
-            vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0],
-        ).unwrap();
+use crate::{
+    config::ProbeConfig,
+    traits::{PeerDiscoveryFetch, TrafficGeneration},
+};
+
+pub struct ImmediateNeighborProber<T> {
+    cfg: ProbeConfig,
+    me: (PeerId, Address),
+    fetcher: T,
 }
 
-pub fn neighbors_to_probe<T>(fetcher: T, cfg: ProbeConfig) -> impl Stream<Item = PeerId>
+impl<T> ImmediateNeighborProber<T> {
+    pub fn new(cfg: ProbeConfig, me: (PeerId, Address), fetcher: T) -> Self {
+        Self { cfg, me, fetcher }
+    }
+}
+
+impl<T> TrafficGeneration for ImmediateNeighborProber<T>
 where
     T: PeerDiscoveryFetch + Send + Sync + 'static,
 {
-    stream! {
-        let mut rng = hopr_crypto_random::rng();
-        loop {
-            let now = std::time::SystemTime::now();
+    fn build(
+        self,
+    ) -> (
+        impl futures::Stream<Item = DestinationRouting>,
+        impl futures::Sink<crate::errors::Result<crate::TrafficReturnedObservation>, Error = impl std::error::Error>,
+    ) {
+        // For each probe target a cached version of transport routing is stored
+        let cache_peer_routing: moka::future::Cache<PeerId, DestinationRouting> = moka::future::Cache::builder()
+            .time_to_live(std::time::Duration::from_secs(600))
+            .max_capacity(100_000)
+            .build();
 
-            let mut peers = fetcher.get_peers(now.checked_sub(cfg.recheck_threshold).unwrap_or(now)).await;
-            peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
+        let s = stream! {
+            let mut rng = hopr_crypto_random::rng();
+            loop {
+                let now = std::time::SystemTime::now();
 
-            #[cfg(all(feature = "prometheus", not(test)))]
-            let probe_round_timer = if peers.is_empty() { None } else { Some(hopr_metrics::histogram_start_measure!(METRIC_TIME_TO_PROBE)) };
+                let mut peers = self.fetcher.get_peers(now.checked_sub(self.cfg.recheck_threshold).unwrap_or(now)).await;
+                peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
 
-            for peer in peers {
-                yield peer;
+                for peer in peers {
+                    if let Ok(routing) = cache_peer_routing
+                        .try_get_with(peer, async move {
+                            Ok::<DestinationRouting, anyhow::Error>(DestinationRouting::Forward {
+                                destination: self.me.1,     // TODO: convert peer_id to address
+                                pseudonym: Some(HoprPseudonym::random()),
+                                forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
+                                return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
+                            })
+                        })
+                        .await {
+                            yield routing;
+                        }
+                }
+
+                hopr_async_runtime::prelude::sleep(self.cfg.interval).await;
             }
+        };
 
-            #[cfg(all(feature = "prometheus", not(test)))]
-            if let Some(probe_round_timer) = probe_round_timer {
-                METRIC_TIME_TO_PROBE.record_measure(probe_round_timer);
-            }
-
-            hopr_async_runtime::prelude::sleep(cfg.interval).await;
-        }
+        (s, futures::sink::drain())
     }
 }
 
