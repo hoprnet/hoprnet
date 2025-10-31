@@ -24,7 +24,7 @@ pub mod network_notifier;
 pub mod socket;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{Arc, OnceLock},
     time::Duration,
 };
@@ -55,7 +55,7 @@ use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, Randomiz
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
-pub use hopr_transport_identity::{Multiaddr, PeerId};
+pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network};
 use hopr_transport_p2p::HoprSwarm;
@@ -75,7 +75,6 @@ pub use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
-use rand::seq::SliceRandom;
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, info, trace, warn};
@@ -306,14 +305,12 @@ where
             "Initializing swarm with peers from chain"
         );
 
-        let mut addresses: HashSet<Multiaddr> = HashSet::new();
         for node_entry in public_nodes {
             if let AccountType::Announced { multiaddr, .. } = node_entry.entry_type {
                 let peer: PeerId = node_entry.public_key.into();
                 let multiaddresses = vec![multiaddr];
 
                 debug!(%peer, ?multiaddresses, "Using initial public node");
-                addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
                     .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
@@ -369,21 +366,8 @@ where
             (tx, rx)
         };
 
-        let mut transport_layer =
+        let transport_layer =
             HoprSwarm::new((&self.me).into(), discovery_updates, self.my_multiaddresses.clone()).await;
-
-        if let Some(port) = self.cfg.protocol.autonat_port {
-            transport_layer.run_nat_server(port);
-        }
-
-        if addresses.is_empty() {
-            warn!("No addresses found in the database, not dialing any NAT servers");
-        } else {
-            info!(num_addresses = addresses.len(), "Found addresses from the database");
-            let mut randomized_addresses: Vec<_> = addresses.into_iter().collect();
-            randomized_addresses.shuffle(&mut rand::thread_rng());
-            transport_layer.dial_nat_server(randomized_addresses);
-        }
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
