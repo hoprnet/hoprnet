@@ -458,6 +458,12 @@ impl TryFrom<[u8; OffchainPublicKey::SIZE]> for OffchainPublicKey {
     }
 }
 
+impl From<OffchainPublicKey> for [u8; OffchainPublicKey::SIZE] {
+    fn from(value: OffchainPublicKey) -> Self {
+        value.compressed.0
+    }
+}
+
 impl From<OffchainPublicKey> for PeerId {
     fn from(value: OffchainPublicKey) -> Self {
         let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.compressed.as_bytes())
