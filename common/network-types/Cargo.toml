@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "1.0.2"
+version = "1.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition = "2021"
@@ -32,6 +32,7 @@ arrayvec = { workspace = true }
 cfg-if = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true }
 hickory-resolver = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }

@@ -5061,13 +5061,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "1.0.2"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "arrayvec",
  "cfg-if",
  "flume",
  "futures",
+ "futures-time",
  "hickory-resolver",
  "hopr-async-runtime",
  "hopr-crypto-packet",
@@ -5266,7 +5267,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.13.4"
+version = "0.13.5"
 dependencies = [
  "async-lock 3.4.1",
  "async-trait",
@@ -5449,7 +5450,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.11.3"
+version = "0.11.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5610,7 +5611,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "axum 0.8.4",

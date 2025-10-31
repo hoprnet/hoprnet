@@ -303,7 +303,7 @@ where
         let internal_discovery_updates_capacity = std::env::var("HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY")
             .ok()
             .and_then(|s| s.trim().parse::<usize>().ok())
-            .filter(|&c| c > 0)
+            .filter(|&c| c >= 2048)
             .unwrap_or(2048)
             .max(minimum_capacity);
 
@@ -579,7 +579,7 @@ where
             std::env::var("HOPR_INTERNAL_PROTOCOL_BIDIRECTIONAL_CHANNEL_CAPACITY")
                 .ok()
                 .and_then(|s| s.trim().parse::<usize>().ok())
-                .filter(|&c| c > 0)
+                .filter(|&c| c >= 16_384)
                 .unwrap_or(16_384);
 
         debug!(
@@ -618,7 +618,7 @@ where
         let manual_ping_channel_capacity = std::env::var("HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY")
             .ok()
             .and_then(|s| s.trim().parse::<usize>().ok())
-            .filter(|&c| c > 0)
+            .filter(|&c| c >= 128)
             .unwrap_or(128);
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);

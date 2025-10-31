@@ -226,18 +226,19 @@ On top of the default configuration options generated for the command line, the 
 - `HOPRD_USE_OPENTELEMETRY` - enable the OpenTelemetry output for this node
 - `OTEL_SERVICE_NAME` - the name of this node for the OpenTelemetry service
 - `HOPR_INTERNAL_CHAIN_DISCOVERY_CHANNEL_CAPACITY` - the maximum capacity of the channel for chain generated discovery signals for the p2p transport
-- `HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY` - the maximum capacity of the transport component handling chain discovery events
+- `HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY` - the maximum capacity of the transport component handling chain discovery events (default 2048, minimum 2048)
 - `HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY` - the maximum capacity of the acknowledged ticket processing queue
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
 - `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
 - `HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS` - cutoff duration from now to not retain the peers with older records in the peers database (e.g. after a restart)
 - `HOPR_INTERNAL_REST_API_MAX_CONCURRENT_WEBSOCKET_COUNT` - the maximum number of concurrent websocket opened through the REST API
-- `HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY` - the maximum capacity of awaiting manual ping queue
+- `HOPR_INTERNAL_MANUAL_PING_CHANNEL_CAPACITY` - the maximum capacity of awaiting manual ping queue (default 128, minimum 128)
 - `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
 - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
 - `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
-- `HOPR_INTERNAL_PROTOCOL_BIDIRECTIONAL_CHANNEL_CAPACITY` - the maximum capacity of HOPR messages processed by the node
+- `HOPR_INTERNAL_PROTOCOL_BIDIRECTIONAL_CHANNEL_CAPACITY` - the maximum capacity of HOPR messages processed by the node (default 16384, minimum 16384)
+- `HOPR_INTERNAL_PROCESS_STREAM_CHANNEL_CAPACITY` - capacity of the libp2p stream channel handler (default 1 000 000, minimum 1024)
 - `HOPR_INTERNAL_SESSION_CTL_CHANNEL_CAPACITY` - the maximum capacity of the session control channel
 - `HOPR_INTERNAL_SESSION_INCOMING_CAPACITY` - the maximum capacity of the queue storing unprocessed incoming and outgoing messages inside a session
 - `HOPR_INTERNAL_SESSION_BALANCER_LEVEL_CAPACITY` - the maximum capacity of the session balancer
