@@ -24,9 +24,9 @@ where
 
     async fn node_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
         if Cy::is::<WxHOPR>() {
-            Ok(self.client.query_native_balance(&self.chain_key.public().to_address().into()).await?.balance.0.parse()?)
-        } else if Cy::is::<XDai>() {
             Ok(self.client.query_token_balance(&self.chain_key.public().to_address().into()).await?.balance.0.parse()?)
+        } else if Cy::is::<XDai>() {
+            Ok(self.client.query_native_balance(&self.chain_key.public().to_address().into()).await?.balance.0.parse()?)
         } else {
             Err(ConnectorError::InvalidState("unsupported currency"))
         }
@@ -34,16 +34,22 @@ where
 
     async fn safe_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
         if Cy::is::<WxHOPR>() {
-            Ok(self.client.query_native_balance(&self.safe_address.into()).await?.balance.0.parse()?)
-        } else if Cy::is::<XDai>() {
             Ok(self.client.query_token_balance(&self.safe_address.into()).await?.balance.0.parse()?)
+        } else if Cy::is::<XDai>() {
+            Ok(self.client.query_native_balance(&self.safe_address.into()).await?.balance.0.parse()?)
         } else {
             Err(ConnectorError::InvalidState("unsupported currency"))
         }
     }
 
     async fn safe_allowance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
-        todo!()
+        if Cy::is::<WxHOPR>() {
+            Ok(self.client.query_safe_allowance(&self.safe_address.into()).await?.allowance.0.parse()?)
+        } else if Cy::is::<XDai>() {
+            Err(ConnectorError::InvalidState("cannot query allowance on xDai"))
+        } else {
+            Err(ConnectorError::InvalidState("unsupported currency"))
+        }
     }
 
     async fn stream_accounts<'a>(&'a self, selector: AccountSelector) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
