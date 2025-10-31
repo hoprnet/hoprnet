@@ -85,7 +85,7 @@ use hopr_internal_types::{
     prelude::{Acknowledgement, HoprPseudonym},
     protocol::VerifiedAcknowledgement,
 };
-use hopr_network_types::prelude::{ResolvedTransportRouting, TimeoutSinkExt};
+use hopr_network_types::prelude::{ResolvedTransportRouting, TimeoutSinkExt, TimeoutStreamExt};
 use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, IncomingPacketInfo};
 use hopr_transport_bloom::TagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
@@ -267,7 +267,7 @@ where
 
     let db_clone = db.clone();
     let me_clone = me.clone();
-    let msg_to_send_tx = wire_msg.0.clone();
+    let msg_to_send_tx = wire_msg.0.clone().with_timeout(PIPELINE_CHANNEL_TIMEOUT);
     processes.insert(
         ProtocolProcesses::AckOut,
         spawn_as_abortable!(
@@ -308,12 +308,11 @@ where
                             match db.to_send_no_ack(ack.leak().as_ref().into(), destination).await {
                                 Ok(ack_packet) => {
                                     let now = std::time::Instant::now();
-                                    if msg_to_send_tx_clone
+                                    if let Err(error) = msg_to_send_tx_clone
                                         .send((ack_packet.next_hop.into(), ack_packet.data))
                                         .await
-                                        .is_err()
                                     {
-                                        error!("failed to forward an acknowledgement to the transport layer");
+                                        error!(%error, "failed to forward an acknowledgement to the transport layer");
                                     }
                                     let elapsed = now.elapsed();
                                     if elapsed.as_millis() > SLOW_OP_MS {
@@ -341,7 +340,7 @@ where
     #[cfg(feature = "capture")]
     let capture_clone = capture.clone();
 
-    let msg_to_send_tx = wire_msg.0.clone();
+    let msg_to_send_tx = wire_msg.0.clone().with_timeout(PIPELINE_CHANNEL_TIMEOUT);
     processes.insert(
         ProtocolProcesses::MsgOut,
         spawn_as_abortable!(async move {
@@ -401,7 +400,10 @@ where
                 .filter_map(futures::future::ready)
                 .inspect(|(peer, _)| trace!(%peer, "protocol message out"))
                 .map(Ok)
-                .forward(msg_to_send_tx)
+                .forward_to_timeout(msg_to_send_tx.sink_map_err(|error| {
+                    tracing::error!(%error, "protocol message out pipeline encountered an error");
+                    error
+                }))
                 .instrument(tracing::trace_span!("msg protocol processing - egress"))
                 .inspect(|_| {
                     tracing::warn!(
@@ -544,7 +546,7 @@ where
                     )
                 })
                 .then_concurrent(move |packet| {
-                    let mut msg_to_send_tx = wire_msg.0.clone();
+                    let mut msg_to_send_tx = wire_msg.0.clone().with_timeout(PIPELINE_CHANNEL_TIMEOUT);
 
                     #[cfg(feature = "capture")]
                     let mut capture_clone = capture_clone.clone();
@@ -627,8 +629,8 @@ where
                             msg_to_send_tx
                                 .send((next_hop.into(), data))
                                 .await
-                                .unwrap_or_else(|_| {
-                                    error!("failed to forward a packet to the transport layer");
+                                .unwrap_or_else(|error| {
+                                    error!(%error, "failed to forward a packet to the transport layer");
                                 });
 
                             #[cfg(all(feature = "prometheus", not(test)))]
@@ -669,7 +671,12 @@ where
                             })))
                 ))
                 .map(Ok)
-                .forward(api.0)
+                .forward_to_timeout(api.0
+                    .with_timeout(PIPELINE_CHANNEL_TIMEOUT)
+                    .sink_map_err(|error|{
+                        tracing::error!(%error, "msg protocol processing ingress pipeline encountered an error");
+                        error
+                    }))
                 .instrument(tracing::trace_span!("msg protocol processing - ingress"))
                 .inspect(|_| tracing::warn!(task = "transport (protocol - msg ingress)", "long-running background task finished"))
                 .await;
