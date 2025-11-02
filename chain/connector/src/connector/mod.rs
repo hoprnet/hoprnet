@@ -34,13 +34,20 @@ pub struct HoprBlockchainConnector<B, C, P> {
     connection_handles: Vec<AbortHandle>,
     events: std::sync::Arc<EventsChannel>,
 
-    // Caches
+    // KeyId <-> OffchainPublicKey mapping
     mapper: keys::HoprKeyMapper<B>,
+    // Fast retrieval of chain keys by address
     chain_to_packet: moka::future::Cache<Address, Option<OffchainPublicKey>, ahash::RandomState>,
+    // Fast retrieval of packet keys by chain key
     packet_to_chain: moka::future::Cache<OffchainPublicKey, Option<Address>, ahash::RandomState>,
+    // Fast retrieval of channel entries by id
     channel_by_id: moka::future::Cache<ChannelId, Option<ChannelEntry>, ahash::RandomState>,
+    // Fast retrieval of channel entries by parties
     channel_by_parties: moka::future::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
+    // Contains only the chain info structure
     values: moka::future::Cache<u32, blokli_client::api::types::ChainInfo>,
+    // Holds all the tickets which were submitted for redeeming
+    redeeming_tickets: moka::future::Cache<TicketId, Box<VerifiedTicket>, ahash::RandomState>,
 }
 
 impl<B, C, P> HoprBlockchainConnector<B, C, P>
@@ -94,6 +101,9 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
             values: moka::future::CacheBuilder::new(1)
                 .time_to_live(Duration::from_secs(600))
                 .build(),
+            redeeming_tickets: moka::future::CacheBuilder::new(2048)
+                .time_to_live(Duration::from_secs(600))
+                .build_with_hasher(ahash::RandomState::default()),
         }
     }
 
@@ -128,7 +138,7 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                                         tracing::trace!(%new, "account inserted");
                                         // We only track public accounts as events
                                         if new.has_announced() {
-                                            tracing::info!(account = %new, "new announcement");
+                                            tracing::debug!(account = %new, "new announcement");
                                             let _ = event_tx.broadcast_direct(ChainEvent::Announcement {
                                                 peer: new.public_key.into(),
                                                 address: new.chain_addr,
@@ -136,8 +146,10 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                                             }).await;
                                         }
                                         if let Some(safe_addr) = new.safe_address {
-                                            tracing::info!(account = %new, "registered safe address");
-                                            if old.is_none_or(|a| a.safe_address.is_none()) {
+                                            // We only emit this event when there was an account previously,
+                                            // but it didn't have a safe address yet.
+                                            if old.is_some_and(|a| a.safe_address.is_none()) {
+                                                tracing::debug!(account = %new, "registered safe address");
                                                 let _ = event_tx.broadcast_direct(ChainEvent::NodeSafeRegistered(safe_addr)).await;
                                             }
                                         }
@@ -170,6 +182,7 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
         let backend = self.backend.clone();
         let event_tx = self.events.0.clone();
         let me = self.chain_key.public().to_address();
+        let redeeming_tickets = self.redeeming_tickets.clone();
         hopr_async_runtime::prelude::spawn(async move {
             match client.subscribe_graph() {
                 Ok(stream) => {
@@ -191,6 +204,7 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                         })
                         .for_each(|res| {
                             let event_tx = event_tx.clone();
+                            let redeeming_tickets = redeeming_tickets.clone();
                             async move {
                                 match res {
                                     Ok((new, Some(changes))) => {
@@ -198,39 +212,58 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                                             tracing::trace!(id = %new.get_id(), %change, "channel updated");
                                             match change {
                                                 ChannelChange::Status { left: ChannelStatus::Open, right: ChannelStatus::PendingToClose(_) } => {
-                                                    tracing::info!(id = %new.get_id(), "channel pending to close");
+                                                    tracing::debug!(id = %new.get_id(), "channel pending to close");
                                                     let _ = event_tx.broadcast_direct(ChainEvent::ChannelClosureInitiated(new.clone())).await;
                                                 }
                                                 ChannelChange::Status {left: ChannelStatus::PendingToClose(_), right: ChannelStatus::Closed} => {
-                                                    tracing::info!(id = %new.get_id(), "channel closed");
+                                                    tracing::debug!(id = %new.get_id(), "channel closed");
                                                     let _ = event_tx.broadcast_direct(ChainEvent::ChannelClosed(new.clone())).await;
                                                 }
                                                 ChannelChange::Status { left: ChannelStatus::Closed, right: ChannelStatus::Open } => {
-                                                    tracing::info!(id = %new.get_id(), "channel reopened");
+                                                    tracing::debug!(id = %new.get_id(), "channel reopened");
                                                     let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new.clone())).await;
                                                 }
                                                 ChannelChange::Balance { left, right } => {
                                                     if left > right {
-                                                        tracing::info!(id = %new.get_id(), "channel balance decreased");
+                                                        tracing::debug!(id = %new.get_id(), "channel balance decreased");
                                                         let _ = event_tx.broadcast_direct(ChainEvent::ChannelBalanceDecreased(new.clone(), left - right)).await;
                                                     } else {
-                                                        tracing::info!(id = %new.get_id(), "channel balance increased");
+                                                        tracing::debug!(id = %new.get_id(), "channel balance increased");
                                                         let _ = event_tx.broadcast_direct(ChainEvent::ChannelBalanceIncreased(new.clone(), right - left)).await;
                                                     }
                                                 }
-                                                // This way we track ticket redemptions on other channels as well.
-                                                // Ticket redemption events on own channels must be tracked via redeem transaction tracking, as it
-                                                // the event must also include the ticket that has been redeemed.
-                                                ChannelChange::TicketIndex { .. }  if new.direction(&me).is_none() => {
-                                                    tracing::info!(id = %new.get_id(), "ticket redeemed on foreign channel");
-                                                    let _ = event_tx.broadcast_direct(ChainEvent::TicketRedeemed(new.clone(), None)).await;
+                                                // Ticket index can wrap (left > right) on a channel re-open,
+                                                // but we're not interested in that here
+                                                ChannelChange::TicketIndex { left, right } if left < right => {
+                                                    match new.direction(&me) {
+                                                        Some(ChannelDirection::Incoming) => {
+                                                            if let Some(redeemed_ticket) = redeeming_tickets.remove(&TicketId {
+                                                                id: new.get_id(),
+                                                                epoch: new.channel_epoch.as_u32(),
+                                                                index: right,
+                                                            }).await {
+                                                                tracing::debug!(id = %new.get_id(), "ticket redeemed on own channel");
+                                                                let _ = event_tx.broadcast_direct(ChainEvent::TicketRedeemed(new.clone(), Some(redeemed_ticket))).await;
+                                                            } else {
+                                                                tracing::error!("got ticket redemption event on ticket that's no longer in the redemption cache");
+                                                            }
+                                                        },
+                                                        Some(ChannelDirection::Outgoing) => {
+                                                            tracing::debug!(id = %new.get_id(), "counterparty has redeemed ticket on our channel");
+                                                            let _ = event_tx.broadcast_direct(ChainEvent::TicketRedeemed(new.clone(), None)).await;
+                                                        },
+                                                        None => {
+                                                            tracing::debug!(id = %new.get_id(), "ticket redeemed on foreign channel");
+                                                            let _ = event_tx.broadcast_direct(ChainEvent::TicketRedeemed(new.clone(), None)).await;
+                                                        }
+                                                    }
                                                 }
                                                 _ => {}
                                             }
                                         }
                                     },
                                     Ok((new, None))  => {
-                                        tracing::info!(id = %new.get_id(), "channel opened");
+                                        tracing::debug!(id = %new.get_id(), "channel opened");
                                         let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new.clone())).await;
                                     },
                                     Err(error) => {

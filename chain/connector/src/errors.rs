@@ -12,7 +12,10 @@ pub enum ConnectorError {
 
     #[error("account {0} does not exist")]
     AccountDoesNotExist(HoprKeyIdent),
-    
+
+    #[error("errors occured while sending multiple tickets for redemption")]
+    BatchRedemptionFailed,
+
     #[error("channel {0} does not exist")]
     ChannelDoesNotExist(ChannelId),
 

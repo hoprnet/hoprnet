@@ -13,6 +13,7 @@ use crate::{
     errors::CoreTypesError,
     prelude::{CoreTypesError::InvalidInputData, generate_channel_id},
 };
+use crate::prelude::ChannelId;
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -256,6 +257,30 @@ pub(crate) fn check_ticket_win(
     u64::from_be_bytes(computed_ticket_luck) <= win_prob.as_luck()
 }
 
+/// A ticket is uniquely identified by its channel id, ticket index and epoch.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct TicketId {
+    pub id: ChannelId,
+    pub epoch: u32,
+    pub index: u64,
+}
+
+impl Display for TicketId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ticket #{}, epoch {} in channel {}", self.index, self.epoch, self.id)
+    }
+}
+
+impl From<&Ticket> for TicketId {
+    fn from(value: &Ticket) -> Self {
+        Self {
+            id: value.channel_id,
+            epoch: value.channel_epoch,
+            index: value.index,
+        }
+    }
+}
+
 /// Builder for [Ticket] and [VerifiedTicket].
 ///
 /// A new builder is created via [TicketBuilder::default] or [TicketBuilder::zero_hop].
@@ -270,8 +295,6 @@ pub struct TicketBuilder {
     #[default = 0]
     index: u64,
     #[default = 1]
-    index_offset: u32,
-    #[default = 1]
     channel_epoch: u32,
     win_prob: WinningProbability,
     challenge: Option<EthereumChallenge>,
@@ -285,11 +308,19 @@ impl TicketBuilder {
         Self {
             index: 0,
             amount: Some(U256::zero()),
-            index_offset: 1,
             win_prob: WinningProbability::NEVER,
             channel_epoch: 0,
             ..Default::default()
         }
+    }
+
+    /// Initializes the builder for a ticket with the given [`TicketId`].
+    #[must_use]
+    pub fn from_id(ticket_id: &TicketId) -> Self {
+        Self::default()
+            .channel_id(ticket_id.id)
+            .index(ticket_id.index)
+            .channel_epoch(ticket_id.epoch)
     }
 
     /// Sets channel id based on the `source` and `destination`.
@@ -340,15 +371,6 @@ impl TicketBuilder {
     #[must_use]
     pub fn index(mut self, index: u64) -> Self {
         self.index = index;
-        self
-    }
-
-    /// Sets the index offset.
-    /// Must be greater or equal 1.
-    /// Defaults to 1.
-    #[must_use]
-    pub fn index_offset(mut self, index_offset: u32) -> Self {
-        self.index_offset = index_offset;
         self
     }
 
@@ -421,17 +443,10 @@ impl TicketBuilder {
             return Err(InvalidInputData("cannot hold channel epoch larger than 2^24".into()));
         }
 
-        if self.index_offset < 1 {
-            return Err(InvalidInputData(
-                "ticket index offset must be greater or equal to 1".into(),
-            ));
-        }
-
         Ok(Ticket {
             channel_id: self.channel_id.ok_or(InvalidInputData("missing channel id".into()))?,
             amount,
             index: self.index,
-            index_offset: self.index_offset,
             encoded_win_prob: self.win_prob.into(),
             channel_epoch: self.channel_epoch,
             challenge: self
@@ -472,7 +487,6 @@ impl From<&Ticket> for TicketBuilder {
             amount: None,
             balance: Some(value.amount),
             index: value.index,
-            index_offset: value.index_offset,
             channel_epoch: value.channel_epoch,
             win_prob: value.encoded_win_prob.into(),
             challenge: Some(value.challenge),
@@ -520,10 +534,6 @@ pub struct Ticket {
     /// Ticket index.
     /// Always between 0 and 2^48.
     pub index: u64, // 48 bits
-    /// Ticket index offset.
-    /// Always between 1 and 2^32.
-    /// For normal tickets this is always equal to 1, for aggregated this is always > 1.
-    pub index_offset: u32, // 32 bits
     /// Encoded winning probability represented via 56-bit number.
     pub encoded_win_prob: EncodedWinProb, // 56 bits
     /// Epoch of the channel this ticket belongs to.
@@ -543,17 +553,7 @@ impl PartialOrd for Ticket {
 
 impl Ord for Ticket {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Ordering:
-        // [channel_id][channel_epoch][ticket_index]
-        match self.channel_id.cmp(&other.channel_id) {
-            Ordering::Equal => match self.channel_epoch.cmp(&other.channel_epoch) {
-                Ordering::Equal => self.index.cmp(&other.index),
-                Ordering::Greater => Ordering::Greater,
-                Ordering::Less => Ordering::Less,
-            },
-            Ordering::Greater => Ordering::Greater,
-            Ordering::Less => Ordering::Less,
-        }
+        TicketId::from(self).cmp(&TicketId::from(other))
     }
 }
 
@@ -561,8 +561,8 @@ impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ticket #{}, amount {}, offset {}, epoch {} in channel {}",
-            self.index, self.amount, self.index_offset, self.channel_epoch, self.channel_id
+            "ticket #{}, amount {}, epoch {} in channel {}",
+            self.index, self.amount, self.channel_epoch, self.channel_id
         )
     }
 }
@@ -582,9 +582,6 @@ impl Ticket {
         // Ticket index can go only up to 2^48
         ret[offset..offset + 6].copy_from_slice(&self.index.to_be_bytes()[2..8]);
         offset += 6;
-
-        ret[offset..offset + 4].copy_from_slice(&self.index_offset.to_be_bytes());
-        offset += 4;
 
         // Channel epoch can go only up to 2^24
         ret[offset..offset + 3].copy_from_slice(&self.channel_epoch.to_be_bytes()[1..4]);
@@ -637,13 +634,6 @@ impl Ticket {
         } else {
             Err(self.into())
         }
-    }
-
-    /// Returns true if this ticket aggregates multiple tickets.
-    #[inline]
-    pub fn is_aggregated(&self) -> bool {
-        // Aggregated tickets have always an index offset > 1
-        self.index_offset > 1
     }
 
     /// Returns the decoded winning probability of the ticket
@@ -709,7 +699,6 @@ impl TryFrom<&[u8]> for Ticket {
                 .channel_id(channel_id)
                 .amount(U256::from_big_endian(&amount))
                 .index(u64::from_be_bytes(index))
-                .index_offset(u32::from_be_bytes(index_offset))
                 .channel_epoch(u32::from_be_bytes(channel_epoch))
                 .win_prob(win_prob)
                 .eth_challenge(challenge)
@@ -754,7 +743,7 @@ impl VerifiedTicket {
     ///
     /// ## Winning probability
     /// Each ticket specifies a probability, given as an integer in
-    /// [0, 2^56 - 1] where 0 -> 0% and 2^56 - 1 -> 100% win
+    /// `[0, 2^56-1]` where 0 -> 0% and 2^56 - 1 -> 100% win
     /// probability. If the ticket's luck value is greater than
     /// the stated probability, it is considered a winning ticket.
     pub fn is_winning(&self, response: &Response, chain_keypair: &ChainKeypair, domain_separator: &Hash) -> bool {
@@ -1010,6 +999,10 @@ impl RedeemableTicket {
     pub fn verified_ticket(&self) -> &Ticket {
         self.ticket.verified_ticket()
     }
+
+    /// Gets the [`TicketId`] of the ticket.
+    #[inline]
+    pub fn ticket_id(&self) -> TicketId { TicketId::from(self.ticket.verified_ticket()) }
 }
 
 impl PartialEq for RedeemableTicket {
@@ -1260,7 +1253,6 @@ pub mod tests {
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .balance(1.into())
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .eth_challenge(Default::default())
@@ -1283,7 +1275,6 @@ pub mod tests {
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .balance(1.into())
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .eth_challenge(Default::default())
@@ -1306,7 +1297,6 @@ pub mod tests {
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .balance(1.into())
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .eth_challenge(Default::default())
@@ -1349,7 +1339,6 @@ pub mod tests {
             .direction(&pk.public().to_address(), counterparty)
             .amount(price_per_packet.div_f64(win_prob)? * U256::from(path_pos))
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(4)
             .eth_challenge(challenge.unwrap_or_default())
@@ -1427,7 +1416,6 @@ pub mod tests {
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
             .balance(1.into())
             .index(0)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(resp.to_challenge()?)

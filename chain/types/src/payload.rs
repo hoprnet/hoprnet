@@ -574,7 +574,7 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
                 channelId: B256::from_slice(off_chain.verified_ticket().channel_id.as_ref()),
                 amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), /* Extract only the last 12 bytes (lowest 96 bits) */
                 ticketIndex: U48::from_be_slice(&off_chain.verified_ticket().index.to_be_bytes()[8 - 6..]),
-                indexOffset: off_chain.verified_ticket().index_offset,
+                indexOffset: 1,
                 epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),
                 winProb: U56::from_be_slice(&off_chain.verified_ticket().encoded_win_prob),
             },
@@ -722,7 +722,6 @@ mod tests {
             .addresses(&chain_key_alice, &chain_key_bob)
             .amount(1)
             .index(1)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(response.to_challenge()?)

@@ -110,6 +110,7 @@ mod tests {
                 multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse::<Multiaddr>()?,
                 updated_block: 1,
             },
+            safe_address: None,
         };
 
         assert!(ae1.has_announced());
@@ -133,6 +134,7 @@ mod tests {
                     .parse::<Multiaddr>()?,
                 updated_block: 1,
             },
+            safe_address: None,
         };
 
         assert!(ae1.has_announced());
@@ -151,6 +153,7 @@ mod tests {
             chain_addr,
             key_id: 0.into(),
             entry_type: NotAnnounced,
+            safe_address: None,
         };
 
         assert!(!ae1.has_announced());

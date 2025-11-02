@@ -83,6 +83,7 @@ pub(crate) mod tests {
                 multiaddr: "/ip4/1.2.3.4/tcp/1234".parse()?,
                 updated_block: 0,
             },
+            safe_address: Some(Address::new(&[3u8; 32])),
             key_id: 3.into(),
         };
 

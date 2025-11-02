@@ -6,7 +6,6 @@ use hopr_api::{
     chain::ChainKeyOperations,
     db::{FoundSurb, HoprDbProtocolOperations},
 };
-use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::OffchainPublicKey};
 use hopr_internal_types::prelude::*;
@@ -30,15 +29,6 @@ lazy_static::lazy_static! {
 pub enum PeerEligibility {
     Eligible,
     Ineligible,
-}
-
-impl From<NetworkRegistryStatus> for PeerEligibility {
-    fn from(value: NetworkRegistryStatus) -> Self {
-        match value {
-            NetworkRegistryStatus::Allowed => Self::Eligible,
-            NetworkRegistryStatus::Denied => Self::Ineligible,
-        }
-    }
 }
 
 /// Ticket statistics data exposed by the ticket mechanism.

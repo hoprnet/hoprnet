@@ -1,8 +1,7 @@
-use std::collections::BTreeSet;
-use std::collections::hash_map::Entry;
 use blokli_client::api::BlokliTransactionClient;
 use futures::future::BoxFuture;
-use futures::{FutureExt, TryFutureExt};
+use futures::{FutureExt, StreamExt};
+use futures::stream::FuturesUnordered;
 use hopr_api::chain::{ChainReadChannelOperations, ChainReceipt};
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
@@ -39,47 +38,40 @@ where
             .await?;
 
         let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;
-        let event_tx = self.events.0.clone();
-        let client = self.client.clone();
-        let jh = hopr_async_runtime::prelude::spawn(async move {
-            match track_transaction(client.as_ref(), tx_id)?.await {
-                Ok(hash) => {
-                    let _ = event_tx.broadcast_direct(ChainEvent::TicketRedeemed(channel, Some(ticket.ticket.into()))).await;
-                    Ok(hash)
-                }
-                Err(error) => {
-                    let _ = event_tx.broadcast_direct(ChainEvent::RedeemFailed(channel, format!("reason: {error}"), ticket.ticket.into())).await;
-                    Err(error)
-                },
-            }
-        });
+        let tracker = track_transaction(self.client.as_ref(), tx_id)?.boxed();
 
-        Ok(jh.map_err(|e| ConnectorError::OtherError(e.into()))
-            .and_then(|res| futures::future::ready(res))
-            .boxed())
+        let ticket_id = TicketId::from(ticket.verified_ticket());
+        self.redeeming_tickets.insert(ticket_id, ticket.ticket.into()).await;
+        tracing::debug!(%ticket_id, "ticket sent for redemption");
+
+        Ok(tracker)
     }
 
-    async fn redeem_tickets(&self, tickets: Vec<RedeemableTicket>) -> Result<BoxFuture<'_, Vec<Result<ChainReceipt, Self::Error>>>, Self::Error> {
-        let mut tickets_by_channels = std::collections::HashMap::<ChannelId, BTreeSet<RedeemableTicket>>::new();
-        for ticket in tickets {
-            if let Some(channel) = self.channel_by_id(&ticket.ticket.verified_ticket().channel_id).await? {
-                if &channel.destination != self.chain_key.public().as_ref() {
-                    return Err(ConnectorError::InvalidArguments("ticket is not for this node"));
-                }
+    async fn redeem_tickets(&self, mut tickets: Vec<RedeemableTicket>) -> Result<BoxFuture<'_, Vec<Result<ChainReceipt, Self::Error>>>, Self::Error> {
+        // Make sure we redeem the tickets in the correct order and per channel
+        tickets.sort();
+        tickets.dedup();
 
-                match tickets_by_channels.entry(ticket.ticket.verified_ticket().channel_id) {
-                    Entry::Occupied(mut set) => {
-                        set.get_mut().insert(ticket);
-                    }
-                    Entry::Vacant(v) => {
-                        v.insert(BTreeSet::from([ticket]));
-                    }
+        // Send the tickets for redemption
+        let futures = FuturesUnordered::new();
+        for ticket in tickets {
+            let ticket_id = TicketId::from(ticket.verified_ticket());
+            match self.redeem_ticket(ticket.clone()).await {
+                Ok(tracker) => {
+                    self.redeeming_tickets.insert(ticket_id, ticket.ticket.into()).await;
+                    tracing::debug!(%ticket_id, "ticket sent for redemption");
+                    futures.push(tracker);
                 }
-            } else {
-                return Err(ConnectorError::ChannelDoesNotExist(ticket.ticket.verified_ticket().channel_id));
+                Err(error) => {
+                    tracing::error!(%error, %ticket_id, "error sending ticket for redeeming");
+                }
             }
         }
 
-        todo!()
+        if futures.is_empty() {
+            Err(ConnectorError::BatchRedemptionFailed)
+        } else {
+            Ok(futures.collect().boxed())
+        }
     }
 }
