@@ -67,6 +67,8 @@ where
     type Mapper = HoprKeyMapper<B>;
 
     async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
+        self.check_connection_state()?;
+
         let backend = self.backend.clone();
         let chain_key = *chain;
         Ok(self.chain_to_packet.try_get_with_by_ref(&chain_key, async move {
@@ -82,6 +84,8 @@ where
     }
 
     async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
+        self.check_connection_state()?;
+
         let backend = self.backend.clone();
         let packet_key = *packet;
         Ok(self.packet_to_chain.try_get_with_by_ref(&packet_key, async move {

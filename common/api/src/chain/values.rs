@@ -17,6 +17,7 @@ pub struct DomainSeparators {
 
 /// Retrieves various on-chain information.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainValues {
     type Error: Error + Send + Sync + 'static;
     /// Retrieves the domain separators of HOPR smart contracts.

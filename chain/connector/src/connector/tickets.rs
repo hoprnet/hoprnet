@@ -23,6 +23,8 @@ where
     type Error = ConnectorError;
 
     async fn redeem_ticket(&self, ticket: RedeemableTicket) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        self.check_connection_state()?;
+        
         let channel = self.channel_by_id(&ticket.ticket.verified_ticket().channel_id)
             .await?
             .ok_or(ConnectorError::ChannelDoesNotExist(ticket.ticket.verified_ticket().channel_id))?;
@@ -48,6 +50,8 @@ where
     }
 
     async fn redeem_tickets(&self, mut tickets: Vec<RedeemableTicket>) -> Result<BoxFuture<'_, Vec<Result<ChainReceipt, Self::Error>>>, Self::Error> {
+        self.check_connection_state()?;
+        
         // Make sure we redeem the tickets in the correct order and per channel
         tickets.sort();
         tickets.dedup();

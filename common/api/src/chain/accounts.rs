@@ -33,6 +33,7 @@ impl<E: std::error::Error> std::error::Error for AnnouncementError<E> {}
 
 /// On-chain write operations regarding on-chain node accounts.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainWriteAccountOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
@@ -94,6 +95,7 @@ impl AccountSelector {
 
 /// Chain operations that read on-chain node accounts.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainReadAccountOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 

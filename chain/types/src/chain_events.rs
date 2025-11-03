@@ -5,7 +5,6 @@
 //! See `chain-actions` and `chain-indexer` crates for details.
 use std::fmt::{Display, Formatter};
 
-use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use libp2p_identity::PeerId;

@@ -103,6 +103,7 @@ impl ChannelSelector {
 
 /// On-chain read operations regarding channels.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainReadChannelOperations {
     type Error: Error + Send + Sync + 'static;
 

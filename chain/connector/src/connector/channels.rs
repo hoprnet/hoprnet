@@ -28,6 +28,8 @@ where
     }
 
     async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+        self.check_connection_state()?;
+        
         let backend = self.backend.clone();
         let src = *src;
         let dst = *dst;
@@ -45,6 +47,8 @@ where
     }
 
     async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
+        self.check_connection_state()?;
+        
         let channel_id = *channel_id;
         let backend = self.backend.clone();
         Ok(self.channel_by_id.try_get_with_by_ref(&channel_id, async move {
@@ -60,6 +64,8 @@ where
     }
 
     async fn stream_channels<'a>(&'a self, selector: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
+        self.check_connection_state()?;
+        
         // Note: Since the graph does not contain Closed channels, they cannot
         // be selected if requested via the ChannelSelector.
         if selector.allowed_states.contains(&ChannelStatusDiscriminants::Closed) {
@@ -101,6 +107,8 @@ where
     type Error = ConnectorError;
 
     async fn open_channel<'a>(&'a self, dst: &'a Address, amount: HoprBalance) -> Result<BoxFuture<'a, Result<(ChannelId, ChainReceipt), Self::Error>>, Self::Error> {
+        self.check_connection_state()?;
+        
         let id = generate_channel_id(self.chain_key.public().as_ref(), dst);
         let signed_payload = self.payload_generator
             .fund_channel(*dst, amount)?
@@ -116,6 +124,8 @@ where
     }
 
     async fn fund_channel<'a>(&'a self, channel_id: &'a ChannelId, amount: HoprBalance) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        self.check_connection_state()?;
+        
         use hopr_api::chain::ChainReadChannelOperations;
         
         let channel = self.channel_by_id(channel_id).await?.ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
@@ -129,6 +139,8 @@ where
     }
 
     async fn close_channel<'a>(&'a self, channel_id: &'a ChannelId) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error> {
+        self.check_connection_state()?;
+        
         use hopr_api::chain::ChainReadChannelOperations;
 
         let channel = self.channel_by_id(channel_id).await?.ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;

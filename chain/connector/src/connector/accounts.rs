@@ -23,6 +23,8 @@ where
     type Error = ConnectorError;
 
     async fn node_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
+        self.check_connection_state()?;
+
         if Cy::is::<WxHOPR>() {
             Ok(self.client.query_token_balance(&self.chain_key.public().to_address().into()).await?.balance.0.parse()?)
         } else if Cy::is::<XDai>() {
@@ -33,6 +35,8 @@ where
     }
 
     async fn safe_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
+        self.check_connection_state()?;
+
         if Cy::is::<WxHOPR>() {
             Ok(self.client.query_token_balance(&self.safe_address.into()).await?.balance.0.parse()?)
         } else if Cy::is::<XDai>() {
@@ -43,6 +47,8 @@ where
     }
 
     async fn safe_allowance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
+        self.check_connection_state()?;
+
         if Cy::is::<WxHOPR>() {
             Ok(self.client.query_safe_allowance(&self.safe_address.into()).await?.allowance.0.parse()?)
         } else if Cy::is::<XDai>() {
@@ -53,6 +59,8 @@ where
     }
 
     async fn stream_accounts<'a>(&'a self, selector: AccountSelector) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
+        self.check_connection_state()?;
+
         let accounts = self.graph.read().nodes().collect::<Vec<_>>();
         let backend = self.backend.clone();
         Ok(futures::stream::iter(accounts)
@@ -78,6 +86,8 @@ where
     }
 
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error> {
+        self.check_connection_state()?;
+
         Ok(self.stream_accounts(selector).await?.count().await)
     }
 }
@@ -92,10 +102,14 @@ where
     type Error = ConnectorError;
 
     async fn announce(&self, multiaddrs: &[Multiaddr], key: &OffchainKeypair) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>> {
+        //self.check_connection_state()?;
+
         todo!()
     }
 
     async fn withdraw<Cy: Currency + Send>(&self, balance: Balance<Cy>, recipient: &Address) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        self.check_connection_state()?;
+
         let signed_payload = self.payload_generator
             .transfer(*recipient, balance)?
             .sign_and_encode_to_eip2718(&self.chain_key)
@@ -106,6 +120,8 @@ where
     }
 
     async fn register_safe(&self, safe_address: &Address) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
+        self.check_connection_state()?;
+
         let signed_payload = self.payload_generator
             .register_safe_by_node(*safe_address)?
             .sign_and_encode_to_eip2718(&self.chain_key)

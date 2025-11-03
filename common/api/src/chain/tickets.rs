@@ -5,6 +5,7 @@ use crate::chain::ChainReceipt;
 
 /// On-chain write operations with tickets.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainWriteTicketOperations {
     type Error: Error + Send + Sync + 'static;
     /// Redeems a single ticket on-chain.

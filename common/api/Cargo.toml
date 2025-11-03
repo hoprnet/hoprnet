@@ -10,6 +10,7 @@ license = "GPL-3.0-only"
 
 [dependencies]
 async-trait = { workspace = true }
+auto_impl = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
 multiaddr = { workspace = true }

@@ -1,6 +1,7 @@
 pub use hopr_chain_types::chain_events::ChainEvent;
 
 /// Allows subscribing to on-chain events.
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainEvents {
     type Error: std::error::Error + Send + Sync;
 

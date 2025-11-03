@@ -29,6 +29,8 @@ where
     type Error = ConnectorError;
 
     async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
+        self.check_connection_state()?;
+
         let info = self.query_cached_chain_info()
             .await?;
 
@@ -42,6 +44,8 @@ where
     }
 
     async fn minimum_incoming_ticket_win_prob(&self) -> Result<WinningProbability, Self::Error> {
+        self.check_connection_state()?;
+
         Ok(WinningProbability::try_from_f64(self
             .query_cached_chain_info()
             .await?
@@ -50,10 +54,14 @@ where
     }
 
     async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
+        self.check_connection_state()?;
+
         Ok(self.query_cached_chain_info().await?.ticket_price.0.parse()?)
     }
 
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
+        self.check_connection_state()?;
+        
         Ok(Duration::from_millis(self.query_cached_chain_info().await?
             .channel_closure_grace_period
             .ok_or(ConnectorError::InvalidState("channel closure grace period not found"))?
