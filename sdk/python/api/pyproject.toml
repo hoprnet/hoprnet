@@ -3,9 +3,12 @@ name = "sdk-api"
 version = "1.1.0"
 requires-python = ">=3.14.0,<3.15"
 dependencies = [
-  "aiohttp>=3.13.1",
+  "aiohttp>=3.13.2",
   "api-lib>=0.0.4",
   "base58>=2.1.1",
-  "cryptography>=45.0.7",
+  "cryptography>=46.0.3",
   "PyNaCl>=1.6.0",
 ]
+
+[tool.setuptools]
+py-modules = []
