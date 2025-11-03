@@ -1,6 +1,7 @@
 //! This crate contains various on-chain related modules and types.
 use alloy::{
-    contract::Result as ContractResult, network::TransactionBuilder, primitives, rpc::types::TransactionRequest,
+    contract::Result as ContractResult, network::TransactionBuilder, primitives, providers::MULTICALL3_ADDRESS,
+    rpc::types::TransactionRequest,
 };
 use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
 use hopr_bindings::{
@@ -21,6 +22,9 @@ use hopr_bindings::{
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
+
+use crate::constants::{ETH_VALUE_FOR_MULTICALL3_DEPLOYER, MULTICALL3_DEPLOY_CODE, MULTICALL3_DEPLOYER};
 
 pub mod chain_events;
 pub mod constants;
@@ -90,7 +94,7 @@ where
 }
 
 /// Holds instances to contracts.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContractInstances<P> {
     pub token: HoprTokenInstance<P>,
     pub channels: HoprChannelsInstance<P>,
@@ -154,6 +158,7 @@ where
     /// Deploys testing environment (with dummy network registry proxy) via the given provider.
     async fn inner_deploy_common_contracts_for_testing(provider: P, deployer: &ChainKeypair) -> ContractResult<Self> {
         {
+            debug!("deploying ERC1820 registry...");
             // Fund 1820 deployer and deploy ERC1820Registry
             let tx = TransactionRequest::default()
                 .with_to(ERC_1820_DEPLOYER)
@@ -162,13 +167,36 @@ where
             // Sequentially executing the following transactions:
             // 1. Fund the deployer wallet
             provider.send_transaction(tx.clone()).await?.watch().await?;
-            // 2. Use the fundedd deployer wallet to deploy ERC1820Registry with a signed txn
+            // 2. Use the funded deployer wallet to deploy ERC1820Registry with a signed txn
             provider
                 .send_raw_transaction(&ERC_1820_REGISTRY_DEPLOY_CODE)
                 .await?
                 .watch()
                 .await?;
         }
+
+        {
+            debug!("deploying Multicall3...");
+            // Fund Multicall3 deployer and deploy Multicall3
+            let multicall3_code = provider.get_code_at(MULTICALL3_ADDRESS).await?;
+            if multicall3_code.is_empty() {
+                // Fund Multicall3 deployer and deploy ERC1820Registry
+                let tx = TransactionRequest::default()
+                    .with_to(MULTICALL3_DEPLOYER)
+                    .with_value(ETH_VALUE_FOR_MULTICALL3_DEPLOYER);
+                // Sequentially executing the following transactions:
+                // 1. Fund the deployer wallet
+                provider.send_transaction(tx.clone()).await?.watch().await?;
+                // 2. Use the funded deployer wallet to deploy Multicall3 with a signed txn
+                provider
+                    .send_raw_transaction(MULTICALL3_DEPLOY_CODE)
+                    .await?
+                    .watch()
+                    .await?;
+            }
+        }
+
+        debug!("deploying contracts...");
 
         // Get deployer address
         let self_address = deployer.public().to_address().into();

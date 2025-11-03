@@ -32,6 +32,9 @@ pub mod traits;
 /// Functionality related to the HOPR node state.
 pub mod state;
 
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
+
 /// Re-exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {
@@ -377,7 +380,6 @@ impl<Chain: HoprChainApi + Clone> Hopr<Chain> {
         // Once we are able to query the chain,
         // check if the ticket price is configured correctly.
         let network_min_ticket_price = self.hopr_chain_api.minimum_ticket_price().await?;
-
         let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::GeneralError(format!(
@@ -385,7 +387,6 @@ impl<Chain: HoprChainApi + Clone> Hopr<Chain> {
                  {configured_ticket_price:?} < {network_min_ticket_price}"
             )))
         }
-
         // Once we are able to query the chain,
         // check if the winning probability is configured correctly.
         let network_min_win_prob = self.hopr_chain_api.minimum_incoming_ticket_win_prob().await?;
