@@ -15,6 +15,7 @@ bincode = { workspace = true }
 blokli-client = { workspace = true }
 dashmap = {workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }

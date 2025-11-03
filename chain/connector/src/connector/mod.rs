@@ -1,6 +1,8 @@
 use std::time::Duration;
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use blokli_client::errors::BlokliClientError;
+use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use futures_time::future::FutureExt as FuturesTimeExt;
 use petgraph::prelude::DiGraphMap;
 use hopr_api::chain::HoprKeyIdent;
 use hopr_async_runtime::AbortHandle;
@@ -107,16 +109,18 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
         }
     }
 
-    async fn connect_accounts(&self) -> Result<AbortHandle, ConnectorError> {
+    async fn connect_accounts(&self, min_accounts: usize, sync_timeout: std::time::Duration) -> Result<AbortHandle, ConnectorError> {
         let (accounts_connected_tx, accounts_connected_rx) = futures::channel::oneshot::channel();
         let client = self.client.clone();
         let mapper = self.mapper.clone();
         let event_tx = self.events.0.clone();
+        let (abort_handle, abort_reg) = futures::future::AbortHandle::new_pair();
+        let mut accounts_connected_tx = Some(accounts_connected_tx);
+        let mut counter = 0_usize;
         hopr_async_runtime::prelude::spawn(async move {
             match client.subscribe_accounts(None) {
                 Ok(stream) => {
-                    let (stream, handle) = futures::stream::abortable(stream);
-                    let _ = accounts_connected_tx.send(Ok(handle));
+                    let stream = futures::stream::Abortable::new(stream, abort_reg);
                     stream
                         .map_err(ConnectorError::from)
                         .try_filter_map(|account| futures::future::ready(model_to_account_entry(account).map(Some)))
@@ -129,6 +133,15 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                             })
                                 .map_err(|e| ConnectorError::BackendError(e.into()))
                                 .and_then(|res| futures::future::ready(res.map_err(|e| ConnectorError::BackendError(e.into()))))
+                        })
+                        .inspect_ok(move |_| {
+                            if accounts_connected_tx.is_some() {
+                                counter += 1;
+                                if counter >= min_accounts {
+                                    tracing::debug!(%min_accounts, "reached minimum account threshold");
+                                    let _ = accounts_connected_tx.take().unwrap().send(Ok(()));
+                                }
+                            }
                         })
                         .for_each(|res| {
                             let event_tx = event_tx.clone();
@@ -164,14 +177,35 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                     tracing::warn!("account subscription ended");
                 }
                 Err(error) => {
-                    let _ = accounts_connected_tx.send(Err(error));
+                    if let Some(accounts_connected_tx) = accounts_connected_tx.take() {
+                        let _ = accounts_connected_tx.send(Err(error));
+                    }
                 },
             }
         });
 
         accounts_connected_rx
-            .map_err(|_| ConnectorError::InvalidState("cannot notify account connection"))
-            .and_then(|res| futures::future::ready(res.map_err(ConnectorError::from)))
+            .timeout(futures_time::time::Duration::from(sync_timeout))
+            .map(|res| match res {
+                Ok(Ok(Ok(_))) => {
+                    tracing::debug!("connected to accounts");
+                    Ok(abort_handle)
+                },
+                Ok(Ok(Err(error))) => {
+                    tracing::error!(%error, "failed create accounts stream");
+                    Err(ConnectorError::from(error))
+                },
+                Ok(Err(_)) => {
+                    // This should never happen
+                    abort_handle.abort();
+                    Err(ConnectorError::InvalidState("failed to notify account connection"))
+                }
+                Err(_) => {
+                    abort_handle.abort();
+                    tracing::debug!("account stream aborted due to timeout");
+                    Err(ConnectorError::ConnectionTimeout)
+                }
+            })
             .await
     }
 

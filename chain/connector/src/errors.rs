@@ -25,6 +25,9 @@ pub enum ConnectorError {
     #[error("type conversion error: {0}")]
     TypeConversion(String),
 
+    #[error("timeout while waiting for the graph to be synced")]
+    ConnectionTimeout,
+
     #[error("transaction timed out while waiting for confirmation")]
     TransactionTimeout,
 
