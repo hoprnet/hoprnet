@@ -11,6 +11,9 @@ dependencies = [
   "requests>=2.32.3",
 ]
 
+[tool.setuptools]
+py-modules = []
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 asyncio_mode = "auto"

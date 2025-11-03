@@ -9,3 +9,6 @@ dependencies = [
   "cryptography>=46.0.3",
   "PyNaCl>=1.6.0",
 ]
+
+[tool.setuptools]
+py-modules = []
