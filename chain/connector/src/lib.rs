@@ -5,15 +5,22 @@ pub mod errors;
 pub use connector::{HoprBlockchainConnector};
 pub use backend::{Backend, InMemoryBackend, TempDbBackend};
 
+/// Re-exports of the `blokli_client` crate.
+pub mod blokli_client {
+    pub use blokli_client::{BlokliClient, api::{BlokliTransactionClient, BlokliQueryClient, BlokliSubscriptionClient}};
+}
+
 use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::prelude::ChainKeypair;
 use hopr_primitive_types::prelude::Address;
 
+/// Type alias for a [`HoprBlockchainConnector`] that uses a [`TempDbBackend`] and a [`blokli_client::BlokliClient`].
 pub type HoprBlokliConnector = HoprBlockchainConnector<TempDbBackend, blokli_client::BlokliClient, hopr_chain_types::payload::SafePayloadGenerator>;
 
-pub fn create_hopr_blokli_connector(
+/// Convenience function to create [`HoprBlokliConnector`] with own contract addresses.
+pub fn create_trustless_hopr_blokli_connector(
     chain_key: &ChainKeypair,
-    blokli_url: &str,
+    client: blokli_client::BlokliClient,
     safe_address: Address,
     module_address: Address,
     contracts: ContractAddresses,
@@ -22,10 +29,17 @@ pub fn create_hopr_blokli_connector(
         chain_key, contracts, module_address
     );
 
-    let client = blokli_client::BlokliClient::new(
-          blokli_url.parse().map_err(|_| errors::ConnectorError::InvalidArguments("invalid blokli url"))?,
-          blokli_client::BlokliClientConfig::default()
-    );
-
     Ok(HoprBlockchainConnector::new(chain_key.clone(), safe_address, client, TempDbBackend::new()?, payload_gen))
+}
+
+/// Convenience function to create [`HoprBlokliConnector`] with contract addresses retrieved from the given `client`.
+///
+/// This instantiation explicitly trusts the contract address information retrieved from the [`blokli_client::BlokliClient`].
+pub async fn create_trustful_hopr_blokli_connector(
+    chain_key: &ChainKeypair,
+    client: blokli_client::BlokliClient,
+    safe_address: Address,
+    module_address: Address,
+) -> Result<HoprBlokliConnector, errors::ConnectorError> {
+    todo!()
 }

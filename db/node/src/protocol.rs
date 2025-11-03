@@ -766,7 +766,6 @@ impl HoprNodeDb {
             .direction(&self.me_address, &destination)
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
-            .index_offset(1) // unaggregated always have index_offset == 1
             .win_prob(winning_prob)
             .channel_epoch(channel.channel_epoch.as_u32());
 

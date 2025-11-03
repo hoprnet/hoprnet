@@ -120,7 +120,9 @@ use hopr_transport::{
     ChainKeypair, HoprTransport, HoprTransportConfig, OffchainKeypair, PeerDiscovery, execute_on_tick,
 };
 use tracing::{debug, error, info, trace, warn};
-
+use hopr_api::chain::HoprChainApi;
+use hopr_chain_connector::blokli_client::BlokliClient;
+use hopr_chain_connector::HoprBlokliConnector;
 use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
@@ -157,20 +159,21 @@ lazy_static::lazy_static! {
 /// that manual interaction is unnecessary.
 ///
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
-pub struct Hopr {
+pub struct Hopr<Chain> {
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<state::AtomicHoprState>,
-    transport_api: HoprTransport<HoprNodeDb, HoprChain>,
+    transport_api: HoprTransport<HoprNodeDb, Chain>,
     node_db: HoprNodeDb,
+    hopr_chain_api: Chain,
     // objects that could be removed pending architectural cleanup ========
-    channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
 }
 
-impl Hopr {
+impl<Chain: HoprChainApi + Clone> Hopr<Chain> {
     pub fn new(
         mut cfg: config::HoprLibConfig,
+        hopr_chain_api: Chain,
         me: &OffchainKeypair,
         me_onchain: &ChainKeypair,
     ) -> crate::errors::Result<Self> {
@@ -219,62 +222,12 @@ impl Hopr {
         };
         let node_db = futures::executor::block_on(HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
 
-        if let Some(provider) = &cfg.chain.provider {
-            info!(provider, "Creating chain components using the custom provider");
-        } else {
-            info!("Creating chain components using the default provider");
-        }
-        let resolved_environment = hopr_chain_api::config::ChainNetworkConfig::new(
-            &cfg.chain.network,
-            crate::constants::APP_VERSION_COERCED,
-            cfg.chain.provider.as_deref(),
-            cfg.chain.max_rpc_requests_per_sec,
-            &mut cfg.chain.protocols,
-        )
-        .map_err(|e| HoprLibError::GeneralError(format!("Failed to resolve blockchain environment: {e}")))?;
-
-        let contract_addresses = ContractAddresses::from(&resolved_environment);
-        info!(
-            myself = me_onchain.public().to_hex(),
-            contract_addresses = ?contract_addresses,
-            "Resolved contract addresses",
-        );
-
         let my_multiaddresses = vec![multiaddress];
 
         let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(
             me_onchain.public().to_address(),
             ChannelGraphConfig::default(),
         )));
-
-        // TODO (4.0): replace this with new implementation that follows the chain traits from the hopr-api crate
-        let hopr_chain_api = hopr_chain_api::HoprChain::new(
-            me_onchain.clone(),
-            resolved_environment.clone(),
-            node_db.clone(),
-            &cfg.db.data,
-            cfg.safe_module.module_address,
-            ContractAddresses {
-                announcements: resolved_environment.announcements,
-                channels: resolved_environment.channels,
-                token: resolved_environment.token,
-                ticket_price_oracle: resolved_environment.ticket_price_oracle,
-                winning_probability_oracle: resolved_environment.winning_probability_oracle,
-                network_registry: resolved_environment.network_registry,
-                network_registry_proxy: resolved_environment.network_registry_proxy,
-                node_stake_v2_factory: resolved_environment.node_stake_v2_factory,
-                node_safe_registry: resolved_environment.node_safe_registry,
-                module_implementation: resolved_environment.module_implementation,
-            },
-            cfg.safe_module.safe_address,
-            hopr_chain_api::IndexerConfig {
-                start_block_number: resolved_environment.channel_contract_deploy_block as u64,
-                fast_sync: cfg.chain.fast_sync,
-                enable_logs_snapshot: cfg.chain.enable_logs_snapshot,
-                logs_snapshot_url: cfg.chain.logs_snapshot_url.clone(),
-                data_directory: cfg.db.data.clone(),
-            },
-        )?;
 
         let hopr_transport_api = HoprTransport::new(
             me,
@@ -324,8 +277,6 @@ impl Hopr {
             transport_api: hopr_transport_api,
             hopr_chain_api,
             node_db,
-            chain_cfg: resolved_environment,
-            channel_graph,
             multistrategy: multi_strategy,
         })
     }
@@ -358,20 +309,12 @@ impl Hopr {
         self.cfg.safe_module.clone()
     }
 
-    pub fn chain_config(&self) -> ChainNetworkConfig {
-        self.chain_cfg.clone()
-    }
-
     pub fn config(&self) -> &config::HoprLibConfig {
         &self.cfg
     }
 
     pub fn get_provider(&self) -> String {
-        self.cfg
-            .chain
-            .provider
-            .clone()
-            .unwrap_or(self.chain_cfg.chain.default_provider.clone())
+        todo!()
     }
 
     #[inline]
@@ -437,10 +380,10 @@ impl Hopr {
 
         let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
-            return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
+            return Err(HoprLibError::GeneralError(format!(
                 "configured outgoing ticket price is lower than the network minimum ticket price: \
                  {configured_ticket_price:?} < {network_min_ticket_price}"
-            ))));
+            )))
         }
 
         // Once we are able to query the chain,
@@ -452,10 +395,10 @@ impl Hopr {
                 .and_then(|c| WinningProbability::try_from(c).ok())
                 .is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
         {
-            return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
+            return Err(HoprLibError::GeneralError(format!(
                 "configured outgoing ticket winning probability is lower than the network minimum winning \
                  probability: {configured_win_prob:?} < {network_min_win_prob}"
-            ))));
+            )));
         }
 
         self.state.store(state::HoprState::Indexing, Ordering::Relaxed);
@@ -487,11 +430,12 @@ impl Hopr {
         let (indexer_peer_update_tx, indexer_peer_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(chain_discovery_events_capacity);
 
+        // TODO: make sure we wait for the initial graph to be synced, so that we do not subscribe to events prior to that
+
         let indexer_event_pipeline = helpers::chain_events_to_transport_events(
             self.hopr_chain_api.subscribe()?,
             self.me_onchain(),
             self.multistrategy.clone(),
-            self.channel_graph.clone(),
             self.node_db.clone(),
         );
 

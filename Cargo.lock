@@ -4851,6 +4851,7 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
+ "hopr-chain-connector",
  "hopr-chain-types",
  "hopr-crypto-keypair",
  "hopr-crypto-random",

@@ -29,7 +29,7 @@ pub enum HoprLibError {
     TransportError(#[from] hopr_transport::errors::HoprTransportError),
 
     #[error(transparent)]
-    ChainApi(#[from] hopr_chain_api::errors::HoprChainError),
+    ChainConnectorError(#[from] hopr_chain_connector::errors::ConnectorError),
 
     #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),

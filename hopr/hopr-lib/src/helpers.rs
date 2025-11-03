@@ -26,21 +26,19 @@ pub fn chain_events_to_transport_events<StreamIn>(
     event_stream: StreamIn,
     me_onchain: Address,
     multi_strategy: Arc<MultiStrategy>,
-    channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     db: HoprNodeDb,
 ) -> impl Stream<Item = PeerDiscovery> + Send + 'static
 where
-    StreamIn: Stream<Item = SignificantChainEvent> + Send + 'static,
+    StreamIn: Stream<Item = ChainEvent> + Send + 'static,
 {
     Box::pin(
         event_stream
             .filter_map(move |event| {
                 let multi_strategy = multi_strategy.clone();
-                let channel_graph = channel_graph.clone();
                 let db = db.clone();
 
                 async move {
-                    match event.event_type {
+                    match event {
                         ChainEvent::Announcement{peer, multiaddresses, ..} => {
                             Some(vec![PeerDiscovery::Announce(peer, multiaddresses)])
                         }
@@ -51,11 +49,6 @@ where
                         ChainEvent::ChannelBalanceDecreased(channel, _) | // needed ?
                         ChainEvent::TicketRedeemed(channel, _) => {   // needed ?
                             let maybe_direction = channel.direction(&me_onchain);
-
-                            let change = channel_graph
-                                .write_arc()
-                                .await
-                                .update_channel(channel);
 
                             db.invalidate_unrealized_value(&channel).await;
 
@@ -88,14 +81,11 @@ where
 
                             None
                         }
-                        ChainEvent::NetworkRegistryUpdate(address, allowed) => {
-                            info!(%address, ?allowed, "network registry update received as a no-op");
-                            None
-                        }
                         ChainEvent::NodeSafeRegistered(safe_address) =>  {
                             info!(%safe_address, "Node safe registered");
                             None
                         }
+                        ChainEvent::RedeemFailed(_, _, _) => {}
                     }
                 }
             })
