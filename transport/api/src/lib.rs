@@ -40,7 +40,7 @@ use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbPeersOperations, HoprDbProtocolOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
-use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
+use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable, ProcessList};
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -214,7 +214,7 @@ where
             futures::channel::mpsc::Receiver<ApplicationDataIn>,
             futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         >,
-        HashMap<HoprTransportProcess, AbortHandle>,
+        ProcessList<HoprTransportProcess>
     )>
     where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
@@ -310,7 +310,7 @@ where
             }
         }
 
-        let mut processes: HashMap<HoprTransportProcess, AbortHandle> = HashMap::new();
+        let mut processes = ProcessList::<HoprTransportProcess>::default(); 
 
         let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
             channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);

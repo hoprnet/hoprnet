@@ -20,15 +20,9 @@ pub enum HoprLibError {
 
     #[error(transparent)]
     StatusError(#[from] HoprStatusError),
-
-    #[error(transparent)]
-    DbError(#[from] hopr_db_node::errors::NodeDbError),
-
+    
     #[error(transparent)]
     TransportError(#[from] hopr_transport::errors::HoprTransportError),
-
-    #[error(transparent)]
-    ChainConnectorError(#[from] hopr_chain_connector::errors::ConnectorError),
 
     #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),

@@ -4505,9 +4505,11 @@ dependencies = [
 
 [[package]]
 name = "hopr-async-runtime"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
+ "auto_impl",
  "futures",
+ "indexmap 2.12.0",
  "tokio",
 ]
 
@@ -4814,7 +4816,6 @@ dependencies = [
  "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-node",
  "hopr-internal-types",
  "hopr-lib",
  "hopr-metrics",
@@ -4823,7 +4824,6 @@ dependencies = [
  "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
- "hopr-strategy",
  "hopr-transport",
  "hopr-transport-session",
  "human-bandwidth",
@@ -5338,17 +5338,19 @@ name = "hoprd"
 version = "4.0.0"
 dependencies = [
  "anyhow",
- "async-lock 3.4.1",
  "async-signal",
  "clap",
  "console-subscriber",
  "dashmap",
  "futures",
  "home",
+ "hopr-async-runtime",
  "hopr-chain-connector",
+ "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
  "hopr-parallelize",
+ "hopr-strategy",
  "hoprd-api",
  "lazy_static",
  "opentelemetry",

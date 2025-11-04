@@ -85,6 +85,19 @@ impl std::fmt::Debug for Identity {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
+#[serde(deny_unknown_fields)]
+pub struct Db {
+    /// Path to the directory containing the database
+    #[serde(default)]
+    pub data: String,
+    #[serde(default = "just_true")]
+    #[default = true]
+    pub initialize: bool,
+    #[serde(default)]
+    pub force_initialize: bool,
+}
+
 /// The main configuration object of the entire node.
 ///
 /// The configuration is composed of individual configuration of corresponding
@@ -103,6 +116,10 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub identity: Identity,
+    /// Configuration of the underlying database engine
+    #[validate(nested)]
+    #[serde(default)]
+    pub db: Db,
     /// Configuration relevant for the API of the node
     #[validate(nested)]
     #[serde(default)]
@@ -114,6 +131,14 @@ pub struct HoprdConfig {
     /// Blokli provider to connect to.
     #[validate(url)]
     pub provider: Option<String>,
+    /// Configuration of underlying node behavior in the form strategies
+    ///
+    /// Strategies represent automatically executable behavior performed by
+    /// the node given pre-configured triggers.
+    #[validate(nested)]
+    #[serde(default = "hopr_strategy::hopr_default_strategies")]
+    #[default(hopr_strategy::hopr_default_strategies())]
+    pub strategy: hopr_strategy::StrategyConfig,
 }
 
 impl From<HoprdConfig> for HoprLibConfig {

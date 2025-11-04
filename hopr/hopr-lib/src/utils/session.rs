@@ -32,12 +32,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info};
-use hopr_chain_connector::HoprBlokliConnector;
+use hopr_async_runtime::Abortable;
+
 use crate::{
     Address, Hopr, HoprSession, HoprSessionId, SURB_SIZE, ServiceId, SessionClientConfig, SessionTarget,
     errors::HoprLibError, transfer_session,
 };
-use crate::state::Abortable;
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -191,11 +191,15 @@ impl std::fmt::Display for ListenerId {
 pub struct ListenerJoinHandles(pub DashMap<ListenerId, StoredSessionEntry>);
 
 impl Abortable for ListenerJoinHandles {
-    fn abort_process(&self) {
+    fn abort_task(&self) {
         self.0.alter_all(|_, v| {
             v.abort_handle.abort();
             v
         });
+    }
+
+    fn was_aborted(&self) -> bool {
+        self.0.iter().all(|v| v.abort_handle.is_aborted())
     }
 }
 
@@ -207,12 +211,12 @@ pub struct SessionPool {
 impl SessionPool {
     pub const MAX_SESSION_POOL_SIZE: usize = 5;
 
-    pub async fn new(
+    pub async fn new<Chain, Db>(
         size: usize,
         dst: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-        hopr: Arc<Hopr<Arc<HoprBlokliConnector>>>,
+        hopr: Arc<Hopr<Chain, Db>>,
     ) -> Result<Self, String> {
         let pool = Arc::new(std::sync::Mutex::new(VecDeque::with_capacity(size)));
         let hopr_clone = hopr.clone();
@@ -294,10 +298,10 @@ impl Drop for SessionPool {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_tcp_client_binding(
+pub async fn create_tcp_client_binding<Chain, Db>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Arc<HoprBlokliConnector>>>,
+    hopr: Arc<Hopr<Chain, Db>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
@@ -463,10 +467,10 @@ pub enum BindError {
     UnknownFailure(String),
 }
 
-pub async fn create_udp_client_binding(
+pub async fn create_udp_client_binding<Chain, Db>(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr<Arc<HoprBlokliConnector>>>,
+    hopr: Arc<Hopr<Chain, Db>>,
     open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,

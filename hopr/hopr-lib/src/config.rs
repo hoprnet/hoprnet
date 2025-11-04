@@ -1,5 +1,4 @@
 use hopr_primitive_types::prelude::*;
-pub use hopr_strategy::StrategyConfig;
 use hopr_transport::config::SessionGlobalConfig;
 pub use hopr_transport::config::{
     HostConfig, HostType, NetworkConfig, ProbeConfig, ProtocolConfig, TransportConfig, validate_external_host,
@@ -54,18 +53,7 @@ fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
-#[serde(deny_unknown_fields)]
-pub struct Db {
-    /// Path to the directory containing the database
-    #[serde(default)]
-    pub data: String,
-    #[serde(default = "just_true")]
-    #[default = true]
-    pub initialize: bool,
-    #[serde(default)]
-    pub force_initialize: bool,
-}
+
 
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct HoprLibConfig {
@@ -78,18 +66,6 @@ pub struct HoprLibConfig {
     /// Determines whether the node should be advertised publicly on-chain.
     #[serde(default)]
     pub publish: bool,
-    /// Configuration of the underlying database engine
-    #[validate(nested)]
-    #[serde(default)]
-    pub db: Db,
-    /// Configuration of underlying node behavior in the form strategies
-    ///
-    /// Strategies represent automatically executable behavior performed by
-    /// the node given pre-configured triggers.
-    #[validate(nested)]
-    #[serde(default = "hopr_strategy::hopr_default_strategies")]
-    #[default(hopr_strategy::hopr_default_strategies())]
-    pub strategy: StrategyConfig,
     /// Configuration of the protocol heartbeat mechanism
     #[validate(nested)]
     #[serde(default)]

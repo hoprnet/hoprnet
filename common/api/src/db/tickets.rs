@@ -279,6 +279,7 @@ pub enum TicketMarker {
 
 /// Database operations for tickets.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait HoprDbTicketOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 

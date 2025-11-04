@@ -20,15 +20,12 @@ transport-use-quic = ["hopr-transport/p2p-transport-quic"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
-  "hopr-strategy/runtime-tokio",
   "hopr-transport/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
-  "hopr-strategy/prometheus",
-  "hopr-db-node/prometheus",
 ]
 capture = ["hopr-transport/capture"]
 fixed_rng = ["hopr-crypto-random/fixed_rng"]
@@ -94,7 +91,6 @@ hopr-chain-types = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
@@ -102,7 +98,6 @@ hopr-path = { workspace = true, features = ["serde"] }
 hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
-hopr-strategy = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]

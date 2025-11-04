@@ -21,6 +21,7 @@ default = [
 prometheus = [
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
+  "hopr-strategy/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
 ]
@@ -29,6 +30,8 @@ runtime-tokio = [
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
+  "hopr-strategy/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio"
 ]
 telemetry = [
   "dep:opentelemetry",
@@ -52,7 +55,6 @@ jemalloc-stats = ["dep:tikv-jemalloc-ctl"]
 
 [dependencies]
 anyhow = { workspace = true }
-async-lock = { workspace = true }
 async-signal = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
@@ -85,6 +87,8 @@ opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
 hopr-chain-connector = { workspace = true }
+hopr-db-node = { workspace = true }
+hopr-strategy = { workspace = true }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
