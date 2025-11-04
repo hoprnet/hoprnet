@@ -428,16 +428,13 @@ impl<S, T> Clone for SessionManager<S, T> {
     }
 }
 
+const EXTERNAL_SEND_TIMEOUT: Duration = Duration::from_millis(200);
+
 impl<S, T> SessionManager<S, T>
 where
     S: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + Unpin + 'static,
+    T: futures::Sink<IncomingSession> + Clone + Send + Sync + Unpin + 'static,
     S::Error: std::error::Error + Send + Sync + Clone + 'static,
-    T: futures::Sink<IncomingSession, Error = futures::channel::mpsc::SendError>
-        + Unpin
-        + Clone
-        + Send
-        + Sync
-        + 'static,
     T::Error: std::error::Error + Send + Sync + Clone + 'static,
 {
     /// Creates a new instance given the [`config`](SessionManagerConfig).
@@ -654,7 +651,7 @@ where
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
         let forward_routing = DestinationRouting::Forward {
-            destination,
+            destination: Box::new(destination.into()),
             pseudonym: Some(pseudonym), // Session must use a fixed pseudonym already
             forward_options: cfg.forward_path_options.clone(),
             return_options: cfg.return_path_options.clone().into(),
@@ -667,7 +664,12 @@ where
                 forward_routing.clone(),
                 ApplicationDataOut::with_no_packet_info(start_session_msg.try_into()?),
             ))
+            .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
             .await
+            .map_err(|_| {
+                error!(challenge, %pseudonym, %destination, "timeout sending session request message");
+                TransportSessionError::Timeout
+            })?
             .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?;
 
         // The timeout is given by the number of hops requested
@@ -869,14 +871,14 @@ where
                 "internal error: sender has been closed without completing the session establishment".into(),
             )
             .into()),
-            Ok(Err(e)) => {
+            Ok(Err(error)) => {
                 // The other side did not allow us to establish a session
                 error!(
-                    challenge = e.challenge,
-                    error = ?e,
+                    challenge = error.challenge,
+                    ?error,
                     "the other party rejected the session initiation with error"
                 );
-                Err(TransportSessionError::Rejected(e.reason))
+                Err(TransportSessionError::Rejected(error.reason))
             }
             Err(_) => {
                 // Timeout waiting for a session establishment
@@ -905,7 +907,12 @@ where
                     session_data.routing_opts.clone(),
                     ApplicationDataOut::with_no_packet_info(HoprStartProtocol::KeepAlive((*id).into()).try_into()?),
                 ))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
                 .await
+                .map_err(|_| {
+                    error!("timeout sending session ping message");
+                    TransportSessionError::Timeout
+                })?
                 .map_err(|e| TransportSessionError::PacketSendingError(e.to_string()))?)
         } else {
             Err(SessionManagerError::NonExistingSession.into())
@@ -1062,6 +1069,8 @@ where
             None
         };
 
+        // If some of the following code throws an error, the allocated slot will be kept
+        // but will be later re-claimed when it expires.
         if let Some(session_id) = allocated_slot {
             debug!(%session_id, ?session_req, "assigned a new session");
 
@@ -1215,9 +1224,21 @@ where
             };
 
             // Notify that a new incoming session has been created
-            if let Err(error) = new_session_notifier.send(incoming_session).await {
-                tracing::error!(%session_id, %error, "failed to notify about new incoming session");
-            }
+            match new_session_notifier
+                .send(incoming_session)
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
+                .await
+            {
+                Err(_) => {
+                    error!(%session_id, "timeout to notify about new incoming session");
+                    return Err(TransportSessionError::Timeout);
+                }
+                Ok(Err(error)) => {
+                    error!(%session_id, %error, "failed to notify about new incoming session");
+                    return Err(SessionManagerError::Other(error.to_string()).into());
+                }
+                _ => {}
+            };
 
             trace!(?session_id, "session notification sent");
 
@@ -1230,9 +1251,16 @@ where
 
             msg_sender
                 .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
                 .await
+                .map_err(|_| {
+                    error!(%session_id, "timeout sending session establishment message");
+                    TransportSessionError::Timeout
+                })?
                 .map_err(|e| {
-                    SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
+                    SessionManagerError::Other(format!(
+                        "failed to send session {session_id} establishment message: {e}"
+                    ))
                 })?;
 
             info!(%session_id, "new session established");
@@ -1254,7 +1282,12 @@ where
 
             msg_sender
                 .send((reply_routing, ApplicationDataOut::with_no_packet_info(data.try_into()?)))
+                .timeout(futures_time::time::Duration::from(EXTERNAL_SEND_TIMEOUT))
                 .await
+                .map_err(|_| {
+                    error!("timeout sending session error message");
+                    TransportSessionError::Timeout
+                })?
                 .map_err(|e| {
                     SessionManagerError::Other(format!("failed to send session establishment error message: {e}"))
                 })?;
@@ -1422,7 +1455,7 @@ mod tests {
             .withf(move |peer, data| {
                 info!("alice sends {}", data.data.application_tag);
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -1482,7 +1515,7 @@ mod tests {
                 .try_as_segment()
                 .expect("must be a segment")
                 .is_terminating()
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -1604,7 +1637,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -1801,7 +1834,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -1917,7 +1950,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -2009,7 +2042,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 // But the message is again processed by Alice due to Loopback
@@ -2056,7 +2089,7 @@ mod tests {
             });
 
         // Start Alice
-        let (new_session_tx_alice, _) = futures::channel::mpsc::channel(1024);
+        let (new_session_tx_alice, new_session_rx_alice) = futures::channel::mpsc::channel(1024);
         alice_mgr.start(mock_packet_planning(alice_transport), new_session_tx_alice)?;
 
         let alice_session = alice_mgr
@@ -2078,6 +2111,7 @@ mod tests {
             Err(TransportSessionError::Manager(SessionManagerError::Loopback))
         ));
 
+        drop(new_session_rx_alice);
         Ok(())
     }
 
@@ -2104,7 +2138,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(|_, _| Box::pin(async { Ok(()) }));
 
@@ -2155,7 +2189,7 @@ mod tests {
             .in_sequence(&mut open_sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -2207,7 +2241,7 @@ mod tests {
             //.in_sequence(&mut sequence)
             .withf(move |peer, data| {
                 msg_type(data, StartProtocolDiscriminants::KeepAlive)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();
@@ -2239,7 +2273,7 @@ mod tests {
                 .and_then(|m| m.try_as_segment())
                 .map(|s| s.is_terminating())
                 .unwrap_or(false)
-                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination.as_ref() == &bob_peer.into())
             })
             .returning(move |_, data| {
                 let bob_mgr_clone = bob_mgr_clone.clone();

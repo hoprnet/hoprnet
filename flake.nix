@@ -231,11 +231,12 @@
             hoprdBuildArgs // { cargoExtraArgs = "-F capture"; }
           );
 
-          hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (
+          hopr-test-unit = rust-builder-local.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs
             // {
               src = testSrc;
               runTests = true;
+              cargoExtraArgs = "--lib";
             }
           );
 
@@ -244,7 +245,7 @@
             // {
               src = testSrc;
               runTests = true;
-              cargoExtraArgs = "-Z panic-abort-tests";
+              cargoExtraArgs = "-Z panic-abort-tests --lib";
             }
           );
 
@@ -333,7 +334,17 @@
             # lldb
             rust-bin.stable.latest.minimal
             valgrind
-            gnutar # Used to extract the pcap file from the docker container
+
+            # Networking tools to debug network issues
+            tcpdump
+            iproute2
+            netcat
+            iptables
+            bind
+            curl
+            iputils
+            nmap
+            nethogs
           ];
 
           dockerHoprdEntrypoint = pkgs.writeShellScriptBin "docker-entrypoint.sh" ''
@@ -968,7 +979,7 @@
               hopli-profile-docker
               ;
             inherit hopli-candidate;
-            inherit hopr-test hopr-test-nightly;
+            inherit hopr-test-unit hopr-test-nightly;
             inherit anvil-docker pluto-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;

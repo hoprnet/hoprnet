@@ -32,6 +32,9 @@ pub mod traits;
 /// Functionality related to the HOPR node state.
 pub mod state;
 
+#[cfg(any(feature = "testing", test))]
+pub mod testing;
+
 /// Re-exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {
@@ -264,12 +267,12 @@ impl Hopr {
                 announcements: resolved_environment.announcements,
                 channels: resolved_environment.channels,
                 token: resolved_environment.token,
-                price_oracle: resolved_environment.ticket_price_oracle,
-                win_prob_oracle: resolved_environment.winning_probability_oracle,
+                ticket_price_oracle: resolved_environment.ticket_price_oracle,
+                winning_probability_oracle: resolved_environment.winning_probability_oracle,
                 network_registry: resolved_environment.network_registry,
                 network_registry_proxy: resolved_environment.network_registry_proxy,
-                stake_factory: resolved_environment.node_stake_v2_factory,
-                safe_registry: resolved_environment.node_safe_registry,
+                node_stake_v2_factory: resolved_environment.node_stake_v2_factory,
+                node_safe_registry: resolved_environment.node_safe_registry,
                 module_implementation: resolved_environment.module_implementation,
             },
             cfg.safe_module.safe_address,
@@ -393,10 +396,7 @@ impl Hopr {
     ) -> errors::Result<(
         hopr_transport::socket::HoprSocket<
             futures::channel::mpsc::Receiver<ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(
-                hopr_transport::ApplicationDataOut,
-                hopr_network_types::types::DestinationRouting,
-            )>,
+            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         >,
         HashMap<state::HoprLibProcesses, AbortHandle>,
     )> {
@@ -443,7 +443,6 @@ impl Hopr {
         // Once we are able to query the chain,
         // check if the ticket price is configured correctly.
         let network_min_ticket_price = self.hopr_chain_api.minimum_ticket_price().await?;
-
         let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
@@ -451,7 +450,6 @@ impl Hopr {
                  {configured_ticket_price:?} < {network_min_ticket_price}"
             ))));
         }
-
         // Once we are able to query the chain,
         // check if the winning probability is configured correctly.
         let network_min_win_prob = self.hopr_chain_api.minimum_incoming_ticket_win_prob().await?;

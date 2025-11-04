@@ -17,7 +17,7 @@ pub struct HoprSocket<T, U> {
 impl<T, U> From<(T, U)> for HoprSocket<T, U>
 where
     T: Stream<Item = ApplicationDataIn> + Send + 'static,
-    U: Sink<(ApplicationDataOut, DestinationRouting)> + Send + Clone + 'static,
+    U: Sink<(DestinationRouting, ApplicationDataOut)> + Send + Clone + 'static,
 {
     fn from(value: (T, U)) -> Self {
         Self {
@@ -30,7 +30,7 @@ where
 impl<T, U> HoprSocket<T, U>
 where
     T: Stream<Item = ApplicationDataIn> + Send + 'static,
-    U: Sink<(ApplicationDataOut, DestinationRouting)> + Send + Clone + 'static,
+    U: Sink<(DestinationRouting, ApplicationDataOut)> + Send + Clone + 'static,
 {
     pub fn reader(self) -> T {
         self.rx

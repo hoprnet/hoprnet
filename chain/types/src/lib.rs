@@ -1,6 +1,7 @@
 //! This crate contains various on-chain related modules and types.
 use alloy::{
-    contract::Result as ContractResult, network::TransactionBuilder, primitives, rpc::types::TransactionRequest,
+    contract::Result as ContractResult, network::TransactionBuilder, primitives, providers::MULTICALL3_ADDRESS,
+    rpc::types::TransactionRequest,
 };
 use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
 use hopr_bindings::{
@@ -21,6 +22,9 @@ use hopr_bindings::{
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
+
+use crate::constants::{ETH_VALUE_FOR_MULTICALL3_DEPLOYER, MULTICALL3_DEPLOY_CODE, MULTICALL3_DEPLOYER};
 
 pub mod actions;
 pub mod chain_events;
@@ -30,27 +34,38 @@ pub mod errors;
 pub mod utils;
 
 /// Holds addresses of all smart contracts.
+#[serde_with::serde_as]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ContractAddresses {
     /// Token contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub token: Address,
     /// Channels contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub channels: Address,
     /// Announcements contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub announcements: Address,
     /// Network registry contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub network_registry: Address,
     /// Network registry proxy contract
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub network_registry_proxy: Address,
     /// Safe registry contract
-    pub safe_registry: Address,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub node_safe_registry: Address,
     /// Price oracle contract
-    pub price_oracle: Address,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub ticket_price_oracle: Address,
     /// Minimum ticket winning probability contract
-    pub win_prob_oracle: Address,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub winning_probability_oracle: Address,
     /// Stake factory contract
-    pub stake_factory: Address,
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub node_stake_v2_factory: Address,
     /// Node management module contract (can be zero if safe is not used)
+    #[serde_as(as = "serde_with::DisplayFromStr")]
     pub module_implementation: Address,
 }
 
@@ -73,7 +88,7 @@ where
 }
 
 /// Holds instances to contracts.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContractInstances<P> {
     pub token: HoprTokenInstance<P>,
     pub channels: HoprChannelsInstance<P>,
@@ -111,13 +126,22 @@ where
                     provider.clone(),
                 ))
             },
-            safe_registry: HoprNodeSafeRegistryInstance::new(contract_addresses.safe_registry.into(), provider.clone()),
-            price_oracle: HoprTicketPriceOracleInstance::new(contract_addresses.price_oracle.into(), provider.clone()),
-            win_prob_oracle: HoprWinningProbabilityOracleInstance::new(
-                contract_addresses.win_prob_oracle.into(),
+            safe_registry: HoprNodeSafeRegistryInstance::new(
+                contract_addresses.node_safe_registry.into(),
                 provider.clone(),
             ),
-            stake_factory: HoprNodeStakeFactoryInstance::new(contract_addresses.stake_factory.into(), provider.clone()),
+            price_oracle: HoprTicketPriceOracleInstance::new(
+                contract_addresses.ticket_price_oracle.into(),
+                provider.clone(),
+            ),
+            win_prob_oracle: HoprWinningProbabilityOracleInstance::new(
+                contract_addresses.winning_probability_oracle.into(),
+                provider.clone(),
+            ),
+            stake_factory: HoprNodeStakeFactoryInstance::new(
+                contract_addresses.node_stake_v2_factory.into(),
+                provider.clone(),
+            ),
             module_implementation: HoprNodeManagementModuleInstance::new(
                 contract_addresses.module_implementation.into(),
                 provider.clone(),
@@ -128,6 +152,7 @@ where
     /// Deploys testing environment (with dummy network registry proxy) via the given provider.
     async fn inner_deploy_common_contracts_for_testing(provider: P, deployer: &ChainKeypair) -> ContractResult<Self> {
         {
+            debug!("deploying ERC1820 registry...");
             // Fund 1820 deployer and deploy ERC1820Registry
             let tx = TransactionRequest::default()
                 .with_to(ERC_1820_DEPLOYER)
@@ -136,13 +161,36 @@ where
             // Sequentially executing the following transactions:
             // 1. Fund the deployer wallet
             provider.send_transaction(tx.clone()).await?.watch().await?;
-            // 2. Use the fundedd deployer wallet to deploy ERC1820Registry with a signed txn
+            // 2. Use the funded deployer wallet to deploy ERC1820Registry with a signed txn
             provider
                 .send_raw_transaction(&ERC_1820_REGISTRY_DEPLOY_CODE)
                 .await?
                 .watch()
                 .await?;
         }
+
+        {
+            debug!("deploying Multicall3...");
+            // Fund Multicall3 deployer and deploy Multicall3
+            let multicall3_code = provider.get_code_at(MULTICALL3_ADDRESS).await?;
+            if multicall3_code.is_empty() {
+                // Fund Multicall3 deployer and deploy ERC1820Registry
+                let tx = TransactionRequest::default()
+                    .with_to(MULTICALL3_DEPLOYER)
+                    .with_value(ETH_VALUE_FOR_MULTICALL3_DEPLOYER);
+                // Sequentially executing the following transactions:
+                // 1. Fund the deployer wallet
+                provider.send_transaction(tx.clone()).await?.watch().await?;
+                // 2. Use the funded deployer wallet to deploy Multicall3 with a signed txn
+                provider
+                    .send_raw_transaction(MULTICALL3_DEPLOY_CODE)
+                    .await?
+                    .watch()
+                    .await?;
+            }
+        }
+
+        debug!("deploying contracts...");
 
         // Get deployer address
         let self_address = deployer.public().to_address().into();
@@ -268,10 +316,10 @@ where
             announcements: Into::<Address>::into(*instances.announcements.address()),
             network_registry: Into::<Address>::into(*instances.network_registry.address()),
             network_registry_proxy: instances.network_registry_proxy.address(),
-            safe_registry: Into::<Address>::into(*instances.safe_registry.address()),
-            price_oracle: Into::<Address>::into(*instances.price_oracle.address()),
-            win_prob_oracle: Into::<Address>::into(*instances.win_prob_oracle.address()),
-            stake_factory: Into::<Address>::into(*instances.stake_factory.address()),
+            node_safe_registry: Into::<Address>::into(*instances.safe_registry.address()),
+            ticket_price_oracle: Into::<Address>::into(*instances.price_oracle.address()),
+            winning_probability_oracle: Into::<Address>::into(*instances.win_prob_oracle.address()),
+            node_stake_v2_factory: Into::<Address>::into(*instances.stake_factory.address()),
             module_implementation: Into::<Address>::into(*instances.module_implementation.address()),
         }
     }

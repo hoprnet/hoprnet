@@ -45,7 +45,7 @@ use crate::{
 
 pub mod auto_funding;
 pub mod auto_redeeming;
-mod channel_finalizer;
+pub mod channel_finalizer;
 pub mod errors;
 pub mod strategy;
 

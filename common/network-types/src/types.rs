@@ -7,12 +7,9 @@ use std::{
 use hickory_resolver::name_server::ConnectionProvider;
 use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_random::Randomizable;
-use hopr_internal_types::prelude::HoprPseudonym;
+use hopr_internal_types::{NodeId, prelude::HoprPseudonym};
 pub use hopr_path::ValidatedPath;
-use hopr_primitive_types::{
-    bounded::{BoundedSize, BoundedVec},
-    prelude::Address,
-};
+use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
 use libp2p_identity::PeerId;
 
 use crate::errors::NetworkTypeError;
@@ -289,7 +286,7 @@ impl std::fmt::Display for SealedHost {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RoutingOptions {
     /// A fixed intermediate path consisting of at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`] hops.
-    IntermediatePath(BoundedVec<Address, { RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
+    IntermediatePath(BoundedVec<NodeId, { RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
     /// Random intermediate path with at least the given number of hops,
     /// but at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`].
     Hops(BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
@@ -359,11 +356,11 @@ impl From<&HoprPseudonym> for SurbMatcher {
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumIs)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DestinationRouting {
-    /// Forward routing using the destination address and path,
+    /// Forward routing using the destination node and path,
     /// with a possible return path.
     Forward {
-        /// The destination address.
-        destination: Address,
+        /// The destination node.
+        destination: Box<NodeId>,
         /// Our pseudonym shown to the destination.
         ///
         /// If not given, it will be resolved as random.
@@ -381,9 +378,9 @@ pub enum DestinationRouting {
 
 impl DestinationRouting {
     /// Shortcut for routing that does not create any SURBs for a return path.
-    pub fn forward_only(destination: Address, forward_options: RoutingOptions) -> Self {
+    pub fn forward_only<T: Into<NodeId>>(destination: T, forward_options: RoutingOptions) -> Self {
         Self::Forward {
-            destination,
+            destination: Box::new(destination.into()),
             pseudonym: None,
             forward_options,
             return_options: None,

@@ -82,6 +82,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_protocol(opentelemetry_otlp::Protocol::Grpc)
                     .with_timeout(std::time::Duration::from_secs(5))
                     .build()?;
+                let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into());
 
                 let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder()
                     .with_batch_exporter(exporter)
@@ -91,14 +92,16 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_max_attributes_per_span(16)
                     .with_resource(
                         opentelemetry_sdk::Resource::builder()
-                            .with_service_name(
-                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
-                            )
+                            .with_service_name(service_name.to_string())
                             .build(),
                     )
                     .build()
                     .tracer(env!("CARGO_PKG_NAME"));
-
+                info!(
+                    otel_service_name = %service_name,
+                    otel_exporter = "otlp",
+                    "OpenTelemetry tracing enabled"
+                );
                 telemetry = Some(tracing_opentelemetry::layer().with_tracer(tracer))
             }
             _ => {}
@@ -138,8 +141,54 @@ impl std::fmt::Debug for HoprdProcesses {
     }
 }
 
-#[cfg_attr(feature = "runtime-tokio", tokio::main)]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(not(feature = "runtime-tokio"))]
+compile_error!("The 'runtime-tokio' feature must be enabled");
+
+#[cfg(feature = "runtime-tokio")]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Divide the available CPU parallelism by 2,
+    // since we want to use half of the available threads for IO-bound and half for CPU-bound tasks
+    let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
+
+    hopr_parallelize::cpu::init_thread_pool(
+        std::env::var("HOPRD_NUM_CPU_THREADS")
+            .ok()
+            .and_then(|v| usize::from_str(&v).ok())
+            .or(avail_parallelism)
+            .ok_or(anyhow::anyhow!(
+                "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
+                 environment variable."
+            ))?
+            .max(1),
+    )?;
+
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(
+            std::env::var("HOPRD_NUM_IO_THREADS")
+                .ok()
+                .and_then(|v| usize::from_str(&v).ok())
+                .or(avail_parallelism)
+                .ok_or(anyhow::anyhow!(
+                    "Could not determine the number of IO threads to use. Please set the HOPRD_NUM_IO_THREADS \
+                     environment variable."
+                ))?
+                .max(1),
+        )
+        .thread_name("hoprd")
+        .thread_stack_size(
+            std::env::var("HOPRD_THREAD_STACK_SIZE")
+                .ok()
+                .and_then(|v| usize::from_str(&v).ok())
+                .unwrap_or(10 * 1024 * 1024)
+                .max(2 * 1024 * 1024),
+        )
+        .build()?
+        .block_on(main_inner())
+}
+
+#[cfg(feature = "runtime-tokio")]
+async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 
     if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {

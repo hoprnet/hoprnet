@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-types"
-version = "0.7.2"
+version = "0.7.3"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
 license = "GPL-3.0-only"
@@ -46,7 +46,7 @@ sha3 = { workspace = true }
 subtle = { workspace = true }
 thiserror = { workspace = true }
 typenum = { workspace = true }
-zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 
 hopr-crypto-random = { workspace = true }
 hopr-primitive-types = { workspace = true }

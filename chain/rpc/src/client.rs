@@ -22,7 +22,7 @@ use std::{
 };
 
 /// as GasOracleMiddleware middleware is migrated to GasFiller
-use alloy::eips::eip1559::Eip1559Estimation;
+use alloy::{eips::eip1559::Eip1559Estimation, providers::layers::AnvilProvider};
 use alloy::{
     network::{EthereumWallet, Network, TransactionBuilder},
     primitives::utils::parse_units,
@@ -848,7 +848,7 @@ pub type AnvilRpcClient = FillProvider<
         JoinFill<Identity, JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>>,
         WalletFiller<EthereumWallet>,
     >,
-    RootProvider,
+    AnvilProvider<RootProvider>,
 >;
 /// Used for testing. Creates RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
@@ -857,7 +857,9 @@ pub fn create_rpc_client_to_anvil(
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> Arc<AnvilRpcClient> {
     use alloy::{
-        providers::ProviderBuilder, rpc::client::ClientBuilder, signers::local::PrivateKeySigner,
+        providers::{ProviderBuilder, layers::AnvilLayer},
+        rpc::client::ClientBuilder,
+        signers::local::PrivateKeySigner,
         transports::http::ReqwestTransport,
     };
     use hopr_crypto_types::keypairs::Keypair;
@@ -868,7 +870,10 @@ pub fn create_rpc_client_to_anvil(
 
     let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 
-    let provider = ProviderBuilder::new().wallet(wallet).connect_client(rpc_client);
+    let provider = ProviderBuilder::new()
+        .layer(AnvilLayer::default())
+        .wallet(wallet)
+        .connect_client(rpc_client);
 
     Arc::new(provider)
 }
@@ -920,8 +925,8 @@ mod tests {
         assert_ne!(contract_addrs.channels, Address::default());
         assert_ne!(contract_addrs.announcements, Address::default());
         assert_ne!(contract_addrs.network_registry, Address::default());
-        assert_ne!(contract_addrs.safe_registry, Address::default());
-        assert_ne!(contract_addrs.price_oracle, Address::default());
+        assert_ne!(contract_addrs.node_safe_registry, Address::default());
+        assert_ne!(contract_addrs.ticket_price_oracle, Address::default());
 
         Ok(())
     }

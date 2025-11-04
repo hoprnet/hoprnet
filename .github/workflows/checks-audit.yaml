@@ -12,6 +12,7 @@ on:
       source_branch:
         required: true
         type: string
+
 concurrency:
   group: ${{ inputs.source_branch || github.ref_name }}-audit
   cancel-in-progress: true
