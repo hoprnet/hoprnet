@@ -32,15 +32,25 @@
 //!       funding_amount: 20
 //! ```
 
-use std::str::FromStr;
+use std::{ops::Sub, str::FromStr, time::Duration};
 
+use futures::{StreamExt, pin_mut};
+use futures_concurrency::stream::Merge;
+use hopr_api::chain::ChainEvent;
+use hopr_internal_types::{
+    channels::ChannelStatus,
+    prelude::{AcknowledgedTicket, ChannelChange},
+};
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
 use crate::{
-    Strategy::AutoRedeeming, auto_funding::AutoFundingStrategyConfig, auto_redeeming::AutoRedeemingStrategyConfig,
-    channel_finalizer::ClosureFinalizerStrategyConfig, strategy::MultiStrategyConfig,
+    Strategy::AutoRedeeming,
+    auto_funding::AutoFundingStrategyConfig,
+    auto_redeeming::AutoRedeemingStrategyConfig,
+    channel_finalizer::ClosureFinalizerStrategyConfig,
+    strategy::{MultiStrategyConfig, SingularStrategy},
 };
 
 pub mod auto_funding;
@@ -68,7 +78,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
         on_fail_continue: true,
         allow_recursive: false,
-        execution_interval: 60,
+        execution_interval: Duration::from_secs(60),
         strategies: vec![
             // AutoFunding(AutoFundingStrategyConfig {
             // min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
@@ -81,6 +91,145 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             }),
         ],
     }
+}
+
+enum StrategyEvent {
+    Tick,
+    ChainEvent(ChainEvent),
+    AckTicket(AcknowledgedTicket),
+}
+
+/// Streams [`ChainEvents`](ChainEvent), [`AcknowledgedTickets`](AcknowledgedTicket) and `tick` at regular time
+/// intervals as events into the given `strategy`.
+pub fn stream_events_to_strategy_with_tick<C, T, S>(
+    strategy: std::sync::Arc<S>,
+    chain_events: C,
+    ticket_events: T,
+    tick: std::time::Duration,
+    me: Address,
+) -> hopr_async_runtime::AbortHandle
+where
+    C: futures::stream::Stream<Item = ChainEvent> + Send + 'static,
+    T: futures::stream::Stream<Item = AcknowledgedTicket> + Send + 'static,
+    S: SingularStrategy + Send + Sync + 'static,
+{
+    let tick_stream = futures_time::stream::interval(tick.into()).map(|_| StrategyEvent::Tick);
+    let chain_stream = chain_events.map(StrategyEvent::ChainEvent).fuse();
+    let ticket_stream = ticket_events.map(StrategyEvent::AckTicket).fuse();
+
+    let (stream, abort_handle) = futures::stream::abortable((tick_stream, chain_stream, ticket_stream).merge());
+    hopr_async_runtime::prelude::spawn(async move {
+        pin_mut!(stream);
+        while let Some(event) = stream.next().await {
+            match event {
+                StrategyEvent::Tick => {
+                    if let Err(error) = strategy.on_tick().await {
+                        tracing::error!(%error, "error while notifying tick to strategy");
+                    }
+                }
+                StrategyEvent::ChainEvent(chain_event) => {
+                    // TODO: rework strategies so that they can react directly to `ChainEvent`s and avoid the following
+                    // conversion to `ChannelChange`
+                    match chain_event {
+                        ChainEvent::ChannelOpened(channel) => {
+                            if let Some(dir) = channel.direction(&me) {
+                                let _ = strategy
+                                    .on_own_channel_changed(
+                                        &channel,
+                                        dir,
+                                        ChannelChange::Status {
+                                            left: ChannelStatus::Closed,
+                                            right: ChannelStatus::Open,
+                                        },
+                                    )
+                                    .await;
+                            }
+                        }
+                        ChainEvent::ChannelClosureInitiated(channel) => {
+                            if let Some(dir) = channel.direction(&me) {
+                                let _ = strategy
+                                    .on_own_channel_changed(
+                                        &channel,
+                                        dir,
+                                        ChannelChange::Status {
+                                            left: ChannelStatus::Open,
+                                            right: channel.status,
+                                        },
+                                    )
+                                    .await;
+                            }
+                        }
+                        ChainEvent::ChannelClosed(channel) => {
+                            if let Some(dir) = channel.direction(&me) {
+                                let _ = strategy
+                                    .on_own_channel_changed(
+                                        &channel,
+                                        dir,
+                                        ChannelChange::Status {
+                                            left: ChannelStatus::PendingToClose(
+                                                std::time::SystemTime::now().sub(Duration::from_secs(30)),
+                                            ),
+                                            right: ChannelStatus::Closed,
+                                        },
+                                    )
+                                    .await;
+                            }
+                        }
+                        ChainEvent::ChannelBalanceIncreased(channel, diff) => {
+                            if let Some(dir) = channel.direction(&me) {
+                                let _ = strategy
+                                    .on_own_channel_changed(
+                                        &channel,
+                                        dir,
+                                        ChannelChange::Balance {
+                                            left: channel.balance - diff,
+                                            right: channel.balance,
+                                        },
+                                    )
+                                    .await;
+                            }
+                        }
+                        ChainEvent::ChannelBalanceDecreased(channel, diff) => {
+                            if let Some(dir) = channel.direction(&me) {
+                                let _ = strategy
+                                    .on_own_channel_changed(
+                                        &channel,
+                                        dir,
+                                        ChannelChange::Balance {
+                                            left: channel.balance + diff,
+                                            right: channel.balance,
+                                        },
+                                    )
+                                    .await;
+                            }
+                        }
+                        ChainEvent::TicketRedeemed(channel, _) => {
+                            if let Some(dir) = channel.direction(&me) {
+                                let _ = strategy
+                                    .on_own_channel_changed(
+                                        &channel,
+                                        dir,
+                                        ChannelChange::TicketIndex {
+                                            left: channel.ticket_index.as_u64() - 1,
+                                            right: channel.ticket_index.as_u64(),
+                                        },
+                                    )
+                                    .await;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                StrategyEvent::AckTicket(ack_ticket) => {
+                    if let Err(error) = strategy.on_acknowledged_winning_ticket(&ack_ticket).await {
+                        tracing::error!(%error, "error while notifying new winning ticket to strategy");
+                    }
+                }
+            }
+        }
+    });
+
+    abort_handle
 }
 
 impl Default for Strategy {

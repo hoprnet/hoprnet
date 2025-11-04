@@ -29,7 +29,6 @@ use std::{
     time::Duration,
 };
 
-use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
     FutureExt, SinkExt, StreamExt,
@@ -51,7 +50,7 @@ pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
-use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
+use hopr_path::selectors::NoPathSelector;
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
@@ -64,8 +63,8 @@ use hopr_transport_probe::{
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
+pub use hopr_transport_protocol::PeerDiscovery;
 use hopr_transport_protocol::processor::PacketInteractionConfig;
-pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
@@ -80,10 +79,7 @@ use rand::seq::SliceRandom;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, info, trace, warn};
 
-pub use crate::{
-    config::HoprTransportConfig,
-    helpers::{PeerEligibility, TicketStatistics},
-};
+pub use crate::{config::HoprTransportConfig, helpers::TicketStatistics};
 use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, socket::HoprSocket};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
@@ -111,8 +107,9 @@ pub enum HoprTransportProcess {
     Probing(hopr_transport_probe::HoprProbeProcess),
 }
 
+// TODO (4.1): implement path selector based on probing
 /// Currently used implementation of [`PathSelector`](hopr_path::selectors::PathSelector).
-type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
+type CurrentPathSelector = NoPathSelector;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
@@ -148,7 +145,6 @@ where
         cfg: HoprTransportConfig,
         db: Db,
         resolver: R,
-        channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
         let me_peerid: PeerId = me.into();
@@ -169,15 +165,7 @@ where
                 me_chain_addr,
                 db.clone(),
                 resolver.clone(),
-                CurrentPathSelector::new(
-                    channel_graph.clone(),
-                    DfsPathSelectorConfig {
-                        node_score_threshold: cfg.network.node_score_auto_path_threshold,
-                        max_first_hop_latency: cfg.network.max_first_hop_latency_threshold,
-                        ..Default::default()
-                    },
-                ),
-                channel_graph.clone(),
+                CurrentPathSelector::default(),
             ),
             my_multiaddresses,
             smgr: SessionManager::new(SessionManagerConfig {
@@ -210,7 +198,7 @@ where
         }
     }
 
-    /// Execute all processes of the [`crate::HoprTransport`] object.
+    /// Execute all processes of the [`HoprTransport`] object.
     ///
     /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`],
     /// [`crate::HoprTransportProcess::BloomFilterSave`], [`crate::HoprTransportProcess::Swarm`] and session-related
@@ -221,7 +209,7 @@ where
         &self,
         discovery_updates: S,
         on_incoming_session: Sender<IncomingSession>,
-    ) -> crate::errors::Result<(
+    ) -> errors::Result<(
         HoprSocket<
             futures::channel::mpsc::Receiver<ApplicationDataIn>,
             futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
@@ -572,11 +560,7 @@ where
             .continuously_scan(
                 (resolved_routing_msg_tx, rx_from_protocol),
                 manual_ping_rx,
-                network_notifier::ProbeNetworkInteractions::new(
-                    self.network.clone(),
-                    self.resolver.clone(),
-                    self.path_planner.channel_graph(),
-                ),
+                network_notifier::ProbeNetworkInteractions::new(self.network.clone()),
                 DbProxy::new(self.db.clone(), self.resolver.clone()),
                 tx_from_probing,
             )

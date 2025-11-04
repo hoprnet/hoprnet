@@ -1,13 +1,15 @@
-use redb::{ReadableDatabase, TableDefinition};
 use hopr_api::chain::HoprKeyIdent;
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_internal_types::account::AccountEntry;
-use hopr_internal_types::channels::{ChannelEntry, ChannelId};
+use hopr_internal_types::{
+    account::AccountEntry,
+    channels::{ChannelEntry, ChannelId},
+};
 use hopr_primitive_types::prelude::{Address, BytesRepresentable};
+use redb::{ReadableDatabase, TableDefinition};
 
 #[derive(Clone)]
 pub struct TempDbBackend {
-    db: std::sync::Arc<redb::Database>
+    db: std::sync::Arc<redb::Database>,
 }
 
 impl TempDbBackend {
@@ -17,7 +19,6 @@ impl TempDbBackend {
         Ok(Self {
             db: std::sync::Arc::new(redb::Database::create(file.path()).map_err(std::io::Error::other)?),
         })
-
     }
 }
 
@@ -46,8 +47,14 @@ impl super::Backend for TempDbBackend {
 
             let mut accounts = write_tx.open_table(ACCOUNTS_TABLE_DEF)?;
             accounts
-                .insert(u32::from(entry.key_id), bincode::serde::encode_to_vec(entry, BINCODE_CONFIGURATION).map_err(|e| redb::Error::Corrupted(format!("account encoding failed: {e}")))?)?
-                .map(|v| bincode::serde::decode_from_slice::<AccountEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0))
+                .insert(
+                    u32::from(entry.key_id),
+                    bincode::serde::encode_to_vec(entry, BINCODE_CONFIGURATION)
+                        .map_err(|e| redb::Error::Corrupted(format!("account encoding failed: {e}")))?,
+                )?
+                .map(|v| {
+                    bincode::serde::decode_from_slice::<AccountEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0)
+                })
                 .transpose()
                 .map_err(|e| redb::Error::Corrupted(format!("account decoding failed: {e}")))?
         };
@@ -60,8 +67,15 @@ impl super::Backend for TempDbBackend {
         let old_value = {
             let mut channels = write_tx.open_table(CHANNELS_TABLE_DEF)?;
             let channel_id: [u8; ChannelId::SIZE] = channel.get_id().into();
-            channels.insert(channel_id, bincode::serde::encode_to_vec(channel, BINCODE_CONFIGURATION).map_err(|e| redb::Error::Corrupted(format!("channel encoding failed: {e}")))?)?
-                .map(|v| bincode::serde::decode_from_slice::<ChannelEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0))
+            channels
+                .insert(
+                    channel_id,
+                    bincode::serde::encode_to_vec(channel, BINCODE_CONFIGURATION)
+                        .map_err(|e| redb::Error::Corrupted(format!("channel encoding failed: {e}")))?,
+                )?
+                .map(|v| {
+                    bincode::serde::decode_from_slice::<ChannelEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0)
+                })
                 .transpose()
                 .map_err(|e| redb::Error::Corrupted(format!("account decoding failed: {e}")))?
         };
@@ -72,11 +86,13 @@ impl super::Backend for TempDbBackend {
     fn get_account_by_id(&self, id: &HoprKeyIdent) -> Result<Option<AccountEntry>, Self::Error> {
         let read_tx = self.db.begin_read()?;
         let accounts = read_tx.open_table(ACCOUNTS_TABLE_DEF)?;
-        accounts.get(u32::from(*id))?
-            .map(|v| bincode::serde::decode_from_slice::<AccountEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0))
+        accounts
+            .get(u32::from(*id))?
+            .map(|v| {
+                bincode::serde::decode_from_slice::<AccountEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0)
+            })
             .transpose()
             .map_err(|e| redb::Error::Corrupted(format!("account decoding failed: {e}")))
-
     }
 
     fn get_account_by_key(&self, key: &OffchainPublicKey) -> Result<Option<AccountEntry>, Self::Error> {
@@ -111,8 +127,11 @@ impl super::Backend for TempDbBackend {
         let read_tx = self.db.begin_read()?;
         let accounts = read_tx.open_table(CHANNELS_TABLE_DEF)?;
         let id: [u8; ChannelId::SIZE] = (*id).into();
-        accounts.get(id)?
-            .map(|v| bincode::serde::decode_from_slice::<ChannelEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0))
+        accounts
+            .get(id)?
+            .map(|v| {
+                bincode::serde::decode_from_slice::<ChannelEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0)
+            })
             .transpose()
             .map_err(|e| redb::Error::Corrupted(format!("channel decoding failed: {e}")))
     }
@@ -120,8 +139,8 @@ impl super::Backend for TempDbBackend {
 
 #[cfg(test)]
 mod tests {
-    use crate::backend::tests::test_backend;
     use super::*;
+    use crate::backend::tests::test_backend;
 
     #[test]
     fn test_tempdb() -> anyhow::Result<()> {

@@ -200,7 +200,7 @@ impl TicketSelector {
         self.state = None;
         self
     }
-    
+
     /// Returns this instance with a winning probability range bounds set.
     #[must_use]
     pub fn with_winning_probability<T: RangeBounds<WinningProbability>>(mut self, range: T) -> Self {
@@ -218,27 +218,27 @@ impl TicketSelector {
 
 impl From<&AcknowledgedTicket> for TicketSelector {
     fn from(value: &AcknowledgedTicket) -> Self {
-        Self {
-            channel_identifiers: vec![(
-                value.verified_ticket().channel_id,
-                value.verified_ticket().channel_epoch.into(),
-            )],
-            index: TicketIndexSelector::Single(value.verified_ticket().index),
-            win_prob: (Bound::Unbounded, Bound::Unbounded),
-            amount: (Bound::Unbounded, Bound::Unbounded),
-            state: Some(value.status),
-        }
+        Self::from(value.verified_ticket())
     }
 }
 
 impl From<&RedeemableTicket> for TicketSelector {
     fn from(value: &RedeemableTicket) -> Self {
+        Self::from(value.verified_ticket())
+    }
+}
+
+impl From<&VerifiedTicket> for TicketSelector {
+    fn from(value: &VerifiedTicket) -> Self {
+        Self::from(value.verified_ticket())
+    }
+}
+
+impl From<&Ticket> for TicketSelector {
+    fn from(value: &Ticket) -> Self {
         Self {
-            channel_identifiers: vec![(
-                value.verified_ticket().channel_id,
-                value.verified_ticket().channel_epoch.into(),
-            )],
-            index: TicketIndexSelector::Single(value.verified_ticket().index),
+            channel_identifiers: vec![(value.channel_id, value.channel_epoch.into())],
+            index: TicketIndexSelector::Single(value.index),
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
             state: None,
@@ -273,6 +273,9 @@ pub enum TicketMarker {
     Rejected,
     Neglected,
 }
+
+// TODO: modify the API, so that it returns RedeemableTicket instead of AcknowledgedTicket (requires extensive DB
+// refactoring) - see #7616
 
 /// Database operations for tickets.
 #[async_trait::async_trait]

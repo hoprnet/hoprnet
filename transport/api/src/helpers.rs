@@ -1,9 +1,6 @@
-use std::sync::Arc;
-
-use async_lock::RwLock;
 use futures::{TryStreamExt, stream::FuturesUnordered};
 use hopr_api::{
-    chain::ChainKeyOperations,
+    chain::{ChainKeyOperations, ChainReadChannelOperations},
     db::{FoundSurb, HoprDbProtocolOperations},
 };
 use hopr_crypto_packet::prelude::*;
@@ -25,12 +22,6 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum PeerEligibility {
-    Eligible,
-    Ineligible,
-}
-
 /// Ticket statistics data exposed by the ticket mechanism.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
@@ -45,7 +36,6 @@ pub struct TicketStatistics {
 pub(crate) struct PathPlanner<Db, R, S> {
     db: Db,
     resolver: R,
-    channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     selector: S,
     me: Address,
 }
@@ -53,7 +43,7 @@ pub(crate) struct PathPlanner<Db, R, S> {
 struct ChainPathResolver<'c, R>(&'c R);
 
 #[async_trait::async_trait]
-impl<'c, R: ChainKeyOperations + Sync> PathAddressResolver for ChainPathResolver<'c, R> {
+impl<'c, R: ChainKeyOperations + ChainReadChannelOperations + Sync> PathAddressResolver for ChainPathResolver<'c, R> {
     async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError> {
         self.0
             .chain_key_to_packet_key(address)
@@ -67,32 +57,28 @@ impl<'c, R: ChainKeyOperations + Sync> PathAddressResolver for ChainPathResolver
             .await
             .map_err(|e| PathError::UnknownPeer(format!("{key}: {e}")))
     }
+
+    async fn get_channel(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, PathError> {
+        self.0
+            .channel_by_parties(src, dst)
+            .await
+            .map_err(|e| PathError::MissingChannel(src.to_string(), format!("{dst}: {e}")))
+    }
 }
 
 impl<Db, R, S> PathPlanner<Db, R, S>
 where
     Db: HoprDbProtocolOperations + Send + Sync + 'static,
-    R: ChainKeyOperations + Send + Sync + 'static,
+    R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
-    pub(crate) fn new(
-        me: Address,
-        db: Db,
-        resolver: R,
-        selector: S,
-        channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
-    ) -> Self {
+    pub(crate) fn new(me: Address, db: Db, resolver: R, selector: S) -> Self {
         Self {
             db,
             resolver,
-            channel_graph,
             selector,
             me,
         }
-    }
-
-    pub(crate) fn channel_graph(&self) -> Arc<RwLock<hopr_path::channel_graph::ChannelGraph>> {
-        self.channel_graph.clone()
     }
 
     async fn resolve_node_id_to_addr(&self, node_id: &NodeId) -> crate::errors::Result<Address> {
@@ -118,7 +104,6 @@ where
         destination: NodeId,
         options: RoutingOptions,
     ) -> crate::errors::Result<ValidatedPath> {
-        let cg = self.channel_graph.read_arc().await;
         let path = match options {
             RoutingOptions::IntermediatePath(path) => {
                 trace!(?path, "resolving a specific path");
@@ -126,7 +111,6 @@ where
                 ValidatedPath::new(
                     source,
                     path.into_iter().chain(std::iter::once(destination)).collect::<Vec<_>>(),
-                    &cg,
                     &ChainPathResolver(&self.resolver),
                 )
                 .await?
@@ -134,7 +118,7 @@ where
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
                 trace!(hops = 0, "resolving zero-hop path");
 
-                ValidatedPath::new(source, vec![destination], &cg, &ChainPathResolver(&self.resolver)).await?
+                ValidatedPath::new(source, vec![destination], &ChainPathResolver(&self.resolver)).await?
             }
             RoutingOptions::Hops(hops) => {
                 trace!(%hops, "resolving path using hop count");
@@ -154,7 +138,6 @@ where
                 ValidatedPath::new(
                     source,
                     ChainPath::from_channel_path(cp, dst),
-                    &cg,
                     &ChainPathResolver(&self.resolver),
                 )
                 .await?

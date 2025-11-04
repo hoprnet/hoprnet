@@ -94,7 +94,7 @@ impl IntoCondition for WrappedTicketSelector {
         if let Some(state) = self.0.state {
             expr = expr.and(ticket::Column::State.eq(state as u8))
         }
-        
+
         // Win prob lower bound
         expr = match self.0.win_prob.0 {
             Bound::Included(gte) => expr.and(ticket::Column::WinningProbability.gte(gte.as_encoded().to_vec())),

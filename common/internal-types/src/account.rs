@@ -41,7 +41,6 @@ pub struct AccountEntry {
 }
 
 impl AccountEntry {
-
     /// Is the node announced?
     pub fn has_announced(&self) -> bool {
         matches!(self.entry_type, AccountType::Announced { .. })
@@ -78,7 +77,15 @@ impl AccountEntry {
 
 impl Display for AccountEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "account {} ({}:{}) (safe: {:?}) {}", self.key_id, self.chain_addr, self.public_key.to_peerid_str(), self.safe_address,  self.entry_type)
+        write!(
+            f,
+            "account {} ({}:{}) (safe: {:?}) {}",
+            self.key_id,
+            self.chain_addr,
+            self.public_key.to_peerid_str(),
+            self.safe_address,
+            self.entry_type
+        )
     }
 }
 

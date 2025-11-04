@@ -1,7 +1,5 @@
 //! This Rust crate contains all the path construction and path selection algorithms in the HOPR mixnet.
 
-/// Defines the graph of HOPR payment channels.
-pub mod channel_graph;
 pub mod errors;
 /// Implements different path selectors in the [`ChannelGraph`].
 pub mod selectors;
@@ -15,12 +13,9 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use crate::{
-    channel_graph::ChannelGraph,
-    errors::{
-        PathError,
-        PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid},
-    },
+use crate::errors::{
+    PathError,
+    PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid},
 };
 
 pub(crate) type PathAddress = NodeId;
@@ -205,7 +200,8 @@ impl Path<Address> for ChainPath {
 
 impl NonEmptyPath<Address> for ChainPath {}
 
-/// Allows resolution of [`OffchainPublicKey`] for a given [`Address`] or vice versa.
+/// Allows resolution of [`OffchainPublicKey`] for a given [`Address`] or vice versa
+/// and retrieval of [`ChannelEntry`] based on the parties.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait PathAddressResolver {
@@ -213,6 +209,8 @@ pub trait PathAddressResolver {
     async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError>;
     /// Resolve [`Address`] from the given [`OffchainPublicKey`]
     async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError>;
+    /// Resolve [`ChannelEntry`] based on the given `src` and `dst` addresses.
+    async fn get_channel(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, PathError>;
 }
 
 /// Represents [`NonEmptyPath`] that has been resolved and validated.
@@ -234,12 +232,12 @@ impl ValidatedPath {
     /// [`Addresses`](Address).
     ///
     /// If the given path is empty or unresolvable, an error is returned.
-    pub async fn new<N, P, O, R>(origin: O, path: P, cg: &ChannelGraph, resolver: &R) -> errors::Result<ValidatedPath>
+    pub async fn new<N, P, O, R>(origin: O, path: P, resolver: &R) -> errors::Result<ValidatedPath>
     where
         N: Into<PathAddress> + Copy,
         P: Path<N>,
         O: Into<PathAddress>,
-        R: PathAddressResolver,
+        R: PathAddressResolver + Send,
     {
         if path.is_empty() {
             return Err(PathNotValid);
@@ -288,8 +286,9 @@ impl ValidatedPath {
 
             // Check if the channel is opened, if not the last hop
             if i < num_hops - 1 {
-                let channel = cg
+                let channel = resolver
                     .get_channel(&ticket_issuer, &ticket_receiver)
+                    .await?
                     .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
 
                 if channel.status != ChannelStatus::Open {
@@ -389,36 +388,49 @@ pub(crate) mod tests {
         peers
     }
 
-    #[async_trait]
-    impl PathAddressResolver for bimap::BiMap<OffchainPublicKey, Address> {
-        async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError> {
-            Ok(self.get_by_right(address).copied())
-        }
-
-        async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError> {
-            Ok(self.get_by_left(key).copied())
-        }
-    }
-
     pub fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
         ChannelEntry::new(src, dst, 1.into(), 1u32.into(), status, 1u32.into())
     }
 
-    fn create_graph_and_resolver_entries(me: Address) -> (ChannelGraph, Vec<(OffchainPublicKey, Address)>) {
-        let addrs = sorted_peers();
+    struct DummyResolver(Vec<ChannelEntry>);
 
-        let ts = SystemTime::now().add(Duration::from_secs(10));
+    impl DummyResolver {
+        pub fn new(me: Address) -> (Self, Vec<(OffchainPublicKey, Address)>) {
+            let addrs = sorted_peers();
 
-        // Channels: 0 -> 1 -> 2 -> 3 -> 4, 4 /> 0, 3 -> 1
-        let mut cg = ChannelGraph::new(me, Default::default());
-        cg.update_channel(dummy_channel(addrs[0].1, addrs[1].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[1].1, addrs[2].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[2].1, addrs[3].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[3].1, addrs[4].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[3].1, addrs[1].1, ChannelStatus::Open));
-        cg.update_channel(dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose(ts)));
+            let ts = SystemTime::now().add(Duration::from_secs(10));
 
-        (cg, addrs)
+            // Channels: 0 -> 1 -> 2 -> 3 -> 4, 4 /> 0, 3 -> 1
+            let cg = vec![
+                dummy_channel(addrs[0].1, addrs[1].1, ChannelStatus::Open),
+                dummy_channel(addrs[1].1, addrs[2].1, ChannelStatus::Open),
+                dummy_channel(addrs[2].1, addrs[3].1, ChannelStatus::Open),
+                dummy_channel(addrs[3].1, addrs[4].1, ChannelStatus::Open),
+                dummy_channel(addrs[3].1, addrs[1].1, ChannelStatus::Open),
+                dummy_channel(addrs[4].1, addrs[0].1, ChannelStatus::PendingToClose(ts)),
+            ];
+
+            (Self(cg), addrs)
+        }
+    }
+
+    #[async_trait]
+    impl PathAddressResolver for DummyResolver {
+        async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError> {
+            Ok(PATH_ADDRS.get_by_right(address).copied())
+        }
+
+        async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError> {
+            Ok(PATH_ADDRS.get_by_left(key).copied())
+        }
+
+        async fn get_channel(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, PathError> {
+            Ok(self
+                .0
+                .iter()
+                .find(|c| c.source == *src && c.destination == *dst)
+                .cloned())
+        }
     }
 
     #[test]
@@ -439,7 +451,7 @@ pub(crate) mod tests {
     #[parameterized(hops = { 1, 2, 3 })]
     #[parameterized_macro(tokio::test)]
     async fn validated_path_multi_hop_validation(hops: usize) -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 2 -> 3 -> 4
         let chain_path = ChainPath::new(peers.iter().skip(1).take(hops + 1).map(|(_, a)| *a))?;
@@ -447,7 +459,7 @@ pub(crate) mod tests {
         assert_eq!(hops + 1, chain_path.num_hops(), "must be a {hops} hop path");
         ensure!(!chain_path.contains_cycle(), "must not be cyclic");
 
-        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg)
             .await
             .context(format!("must be valid {hops} hop path"))?;
 
@@ -479,16 +491,16 @@ pub(crate) mod tests {
     #[parameterized(hops = { 1, 2, 3 })]
     #[parameterized_macro(tokio::test)]
     async fn validated_path_revalidation_should_be_identity(hops: usize) -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 2 -> 3 -> 4
         let chain_path = ChainPath::new(peers.iter().skip(1).take(hops + 1).map(|(_, a)| *a))?;
 
-        let validated_1 = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+        let validated_1 = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg)
             .await
             .context(format!("must be valid {hops} hop path"))?;
 
-        let validated_2 = ValidatedPath::new(ADDRESSES[0], validated_1.clone(), &cg, PATH_ADDRS.deref())
+        let validated_2 = ValidatedPath::new(ADDRESSES[0], validated_1.clone(), &cg)
             .await
             .context(format!("must be valid {hops} hop path"))?;
 
@@ -500,7 +512,7 @@ pub(crate) mod tests {
     #[parameterized(hops = { 2, 3 })]
     #[parameterized_macro(tokio::test)]
     async fn validated_path_must_allow_cyclic(hops: usize) -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 2 -> 3 -> 1
         let chain_path = ChainPath::new(
@@ -515,7 +527,7 @@ pub(crate) mod tests {
         assert_eq!(hops + 1, chain_path.num_hops(), "must be a {hops} hop path");
         assert!(chain_path.contains_cycle(), "must be cyclic");
 
-        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg)
             .await
             .context(format!("must be valid {hops} hop path"))?;
 
@@ -552,12 +564,12 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn validated_path_should_allow_zero_hop_with_non_existing_channel() -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 0 -> 3 (channel 0 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[3].1])?;
 
-        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg)
             .await
             .context("must be valid path")?;
 
@@ -568,12 +580,12 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn validated_path_should_allow_zero_hop_with_non_open_channel() -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 4 -> 0 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[0].1])?;
 
-        let validated = ValidatedPath::new(ADDRESSES[4], chain_path.clone(), &cg, PATH_ADDRS.deref())
+        let validated = ValidatedPath::new(ADDRESSES[4], chain_path.clone(), &cg)
             .await
             .context("must be valid path")?;
 
@@ -584,12 +596,12 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn validated_path_should_allow_non_existing_channel_for_last_hop() -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 3 (channel 1 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[1].1, peers[3].1])?;
 
-        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg)
             .await
             .context("must be valid path")?;
 
@@ -600,12 +612,12 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn validated_path_should_allow_non_open_channel_for_the_last_hop() -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 3 -> 4 -> 0 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[4].1, peers[0].1])?;
 
-        let validated = ValidatedPath::new(ADDRESSES[3], chain_path.clone(), &cg, PATH_ADDRS.deref())
+        let validated = ValidatedPath::new(ADDRESSES[3], chain_path.clone(), &cg)
             .await
             .context("must be valid path")?;
 
@@ -616,15 +628,13 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn validated_path_should_fail_for_non_open_channel_not_in_the_last_hop() -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 4 -> 0 -> 1 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[0].1, peers[1].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[4], chain_path, &cg, PATH_ADDRS.deref())
-                .await
-                .is_err(),
+            ValidatedPath::new(ADDRESSES[4], chain_path, &cg).await.is_err(),
             "path must not be constructible"
         );
 
@@ -632,9 +642,7 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[4].1, peers[0].1, peers[1].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[3], chain_path, &cg, PATH_ADDRS.deref())
-                .await
-                .is_err(),
+            ValidatedPath::new(ADDRESSES[3], chain_path, &cg).await.is_err(),
             "path must not be constructible"
         );
 
@@ -642,9 +650,7 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[3].1, peers[4].1, peers[0].1, peers[1].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[2], chain_path, &cg, PATH_ADDRS.deref())
-                .await
-                .is_err(),
+            ValidatedPath::new(ADDRESSES[2], chain_path, &cg).await.is_err(),
             "path must not be constructible"
         );
 
@@ -653,15 +659,13 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn validated_path_should_fail_for_non_existing_channel_not_in_the_last_hop() -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 0 -> 3 -> 4 (channel 0 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[3].1, peers[4].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref())
-                .await
-                .is_err(),
+            ValidatedPath::new(ADDRESSES[0], chain_path, &cg).await.is_err(),
             "path must not be constructible"
         );
 
@@ -669,9 +673,7 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[1].1, peers[3].1, peers[0].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref())
-                .await
-                .is_err(),
+            ValidatedPath::new(ADDRESSES[0], chain_path, &cg).await.is_err(),
             "path must not be constructible"
         );
 
@@ -679,9 +681,7 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[1].1, peers[2].1, peers[2].1, peers[0].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref())
-                .await
-                .is_err(),
+            ValidatedPath::new(ADDRESSES[0], chain_path, &cg).await.is_err(),
             "path must not be constructible"
         );
 
@@ -690,7 +690,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn validated_path_should_not_allow_simple_loops() -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 1 -> 2
         let chain_path = ChainPath::new([peers[1].1, peers[1].1, peers[2].1])?;
@@ -698,9 +698,7 @@ pub(crate) mod tests {
         assert!(chain_path.contains_cycle(), "path must contain a cycle");
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref())
-                .await
-                .is_err(),
+            ValidatedPath::new(ADDRESSES[0], chain_path, &cg).await.is_err(),
             "path must not be constructible"
         );
 
@@ -709,14 +707,14 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn validated_path_should_allow_long_cycles() -> anyhow::Result<()> {
-        let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
+        let (cg, peers) = DummyResolver::new(ADDRESSES[0]);
 
         // path 0 -> 1 -> 2 -> 3 -> 1 -> 2
         let chain_path = ChainPath::new([peers[1].1, peers[2].1, peers[3].1, peers[1].1, peers[2].1])?;
 
         assert!(chain_path.contains_cycle(), "path must contain a cycle");
 
-        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg)
             .await
             .context("must be valid path")?;
 

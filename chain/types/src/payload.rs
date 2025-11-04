@@ -4,24 +4,23 @@
 //! is translated into a [`TransactionRequest`] that can be submitted on-chain.
 //!
 //! There are two main implementations:
-//! - [`BasicPayloadGenerator`] which implements generation of a direct EIP1559 transaction payload. This is currently not
-//!   used by a HOPR node.
+//! - [`BasicPayloadGenerator`] which implements generation of a direct EIP1559 transaction payload. This is currently
+//!   not used by a HOPR node.
 //! - [`SafePayloadGenerator`] which implements generation of a payload that embeds the transaction data into the SAFE
 //!   transaction. This is currently the main mode of HOPR node operation.
 
 use alloy::{
-    network::TransactionBuilder,
+    consensus::TxEnvelope,
+    eips::Encodable2718,
+    network::{EthereumWallet, TransactionBuilder},
     primitives::{
         B256, U256,
         aliases::{U24, U48, U56, U96},
     },
     rpc::types::TransactionRequest,
+    signers::local::PrivateKeySigner,
     sol_types::SolCall,
 };
-use alloy::consensus::TxEnvelope;
-use alloy::eips::Encodable2718;
-use alloy::network::EthereumWallet;
-use alloy::signers::local::PrivateKeySigner;
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{
         announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
@@ -39,12 +38,14 @@ use hopr_bindings::{
     hoprnodesaferegistry::HoprNodeSafeRegistry::{deregisterNodeBySafeCall, registerSafeByNodeCall},
     hoprtoken::HoprToken::{approveCall, transferCall},
 };
-
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use crate::ContractAddresses;
-use crate::errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError};
+
+use crate::{
+    ContractAddresses,
+    errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError},
+};
 
 type Result<T> = std::result::Result<T, crate::errors::ChainTypesError>;
 
@@ -63,7 +64,9 @@ pub trait SignableTransaction {
 #[async_trait::async_trait]
 impl SignableTransaction for TransactionRequest {
     async fn sign_and_encode_to_eip2718(self, chain_keypair: &ChainKeypair) -> Result<Box<[u8]>> {
-        let signer: EthereumWallet = PrivateKeySigner::from_slice(chain_keypair.secret().as_ref()).map_err(|e| SigningError(e.into()))?.into();
+        let signer: EthereumWallet = PrivateKeySigner::from_slice(chain_keypair.secret().as_ref())
+            .map_err(|e| SigningError(e.into()))?
+            .into();
         let signed: TxEnvelope = self.build(&signer).await.map_err(|e| SigningError(e.into()))?;
 
         Ok(signed.encoded_2718().into_boxed_slice())
@@ -119,7 +122,7 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
         data: call_data.into(),
         operation: Operation::Call as u8,
     }
-        .abi_encode()
+    .abi_encode()
 }
 
 fn approve_tx(spender: Address, amount: HoprBalance) -> TransactionRequest {
@@ -128,7 +131,7 @@ fn approve_tx(spender: Address, amount: HoprBalance) -> TransactionRequest {
             spender: spender.into(),
             value: U256::from_be_bytes(amount.amount().to_be_bytes()),
         }
-            .abi_encode(),
+        .abi_encode(),
     )
 }
 
@@ -141,7 +144,7 @@ fn transfer_tx<C: Currency>(destination: Address, amount: Balance<C>) -> Transac
                 recipient: destination.into(),
                 amount: amount_u256,
             }
-                .abi_encode(),
+            .abi_encode(),
         )
     } else if XDai::is::<C>() {
         tx.with_value(amount_u256)
@@ -155,7 +158,7 @@ fn register_safe_tx(safe_addr: Address) -> TransactionRequest {
         registerSafeByNodeCall {
             safeAddr: safe_addr.into(),
         }
-            .abi_encode(),
+        .abi_encode(),
     )
 }
 
@@ -203,12 +206,12 @@ impl PayloadGenerator for BasicPayloadGenerator {
                     ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
                     baseMultiaddr: announcement.multiaddress().to_string(),
                 }
-                    .abi_encode()
+                .abi_encode()
             }
             None => announceCall {
                 baseMultiaddr: announcement.multiaddress().to_string(),
             }
-                .abi_encode(),
+            .abi_encode(),
         };
 
         let tx = TransactionRequest::default()
@@ -228,7 +231,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
                     account: dest.into(),
                     amount: U96::from_be_slice(&amount.amount().to_be_bytes()[32 - 12..]),
                 }
-                    .abi_encode(),
+                .abi_encode(),
             )
             .with_to(self.contract_addrs.channels.into());
         Ok(tx)
@@ -257,7 +260,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
                 initiateOutgoingChannelClosureCall {
                     destination: destination.into(),
                 }
-                    .abi_encode(),
+                .abi_encode(),
             )
             .with_to(self.contract_addrs.channels.into());
         Ok(tx)
@@ -275,7 +278,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
                 finalizeOutgoingChannelClosureCall {
                     destination: destination.into(),
                 }
-                    .abi_encode(),
+                .abi_encode(),
             )
             .with_to(self.contract_addrs.channels.into());
         Ok(tx)
@@ -367,13 +370,13 @@ impl PayloadGenerator for SafePayloadGenerator {
                     ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
                     baseMultiaddr: announcement.multiaddress().to_string(),
                 }
-                    .abi_encode()
+                .abi_encode()
             }
             None => announceSafeCall {
                 selfAddress: self.me.into(),
                 baseMultiaddr: announcement.multiaddress().to_string(),
             }
-                .abi_encode(),
+            .abi_encode(),
         };
 
         let tx = TransactionRequest::default()
@@ -384,7 +387,7 @@ impl PayloadGenerator for SafePayloadGenerator {
                     data: call_data.into(),
                     operation: Operation::Call as u8,
                 }
-                    .abi_encode(),
+                .abi_encode(),
             )
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
@@ -408,7 +411,7 @@ impl PayloadGenerator for SafePayloadGenerator {
             account: dest.into(),
             amount: U96::from_be_slice(&amount.amount().to_be_bytes()[32 - 12..]),
         }
-            .abi_encode();
+        .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
@@ -427,7 +430,7 @@ impl PayloadGenerator for SafePayloadGenerator {
             selfAddress: self.me.into(),
             source: source.into(),
         }
-            .abi_encode();
+        .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
@@ -448,7 +451,7 @@ impl PayloadGenerator for SafePayloadGenerator {
             selfAddress: self.me.into(),
             destination: destination.into(),
         }
-            .abi_encode();
+        .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
@@ -469,7 +472,7 @@ impl PayloadGenerator for SafePayloadGenerator {
             selfAddress: self.me.into(),
             destination: destination.into(),
         }
-            .abi_encode();
+        .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
@@ -494,7 +497,7 @@ impl PayloadGenerator for SafePayloadGenerator {
             redeemable,
             params,
         }
-            .abi_encode();
+        .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
@@ -518,7 +521,7 @@ impl PayloadGenerator for SafePayloadGenerator {
                 deregisterNodeBySafeCall {
                     nodeAddr: self.me.into(),
                 }
-                    .abi_encode(),
+                .abi_encode(),
             )
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
@@ -591,20 +594,25 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-    use std::sync::Arc;
-    use alloy::{primitives::U256, providers::Provider};
-    use alloy::network::EthereumWallet;
-    use alloy::providers::fillers::{BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller};
-    use alloy::providers::{Identity, RootProvider};
+    use std::{str::FromStr, sync::Arc};
+
+    use alloy::{
+        network::EthereumWallet,
+        primitives::U256,
+        providers::{
+            Identity, Provider, RootProvider,
+            fillers::{BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
+        },
+    };
     use anyhow::Context;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::HoprBalance;
     use multiaddr::Multiaddr;
-    use crate::ContractInstances;
+
     use super::{BasicPayloadGenerator, PayloadGenerator};
+    use crate::ContractInstances;
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
@@ -704,7 +712,7 @@ mod tests {
             contract_instances.channels.clone(),
             U256::from(1_u128),
         )
-            .await;
+        .await;
 
         // Fund Bob's node
         let _ = crate::utils::fund_node(
@@ -713,7 +721,7 @@ mod tests {
             U256::from(10_u128),
             contract_instances.token.clone(),
         )
-            .await;
+        .await;
 
         let response = Response::try_from(RESPONSE_TO_CHALLENGE.as_ref())?;
 

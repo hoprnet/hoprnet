@@ -2,10 +2,7 @@ use hopr_api::chain::{HoprKeyIdent, HoprSphinxHeaderSpec, HoprSphinxSuite};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_primitive_types::prelude::Address;
 
-use crate::backend::Backend;
-use crate::connector::{HoprBlockchainConnector};
-use crate::errors::ConnectorError;
-
+use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
 pub struct HoprKeyMapper<B> {
     pub(crate) id_to_key: moka::sync::Cache<HoprKeyIdent, Option<OffchainPublicKey>, ahash::RandomState>,
@@ -25,7 +22,8 @@ impl<B> Clone for HoprKeyMapper<B> {
 
 impl<B> hopr_api::chain::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for HoprKeyMapper<B>
 where
-    B: Backend + Send + Sync + 'static {
+    B: Backend + Send + Sync + 'static,
+{
     fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<HoprKeyIdent> {
         self.key_to_id.get_with_by_ref(key, || {
             tracing::warn!(%key, "cache miss on map_key_to_id");
@@ -55,13 +53,12 @@ where
     }
 }
 
-
 #[async_trait::async_trait]
 impl<B, C, P> hopr_api::chain::ChainKeyOperations for HoprBlockchainConnector<B, C, P>
 where
     B: Backend + Send + Sync + 'static,
     C: Send + Sync,
-    P: Send + Sync
+    P: Send + Sync,
 {
     type Error = ConnectorError;
     type Mapper = HoprKeyMapper<B>;
@@ -71,16 +68,19 @@ where
 
         let backend = self.backend.clone();
         let chain_key = *chain;
-        Ok(self.chain_to_packet.try_get_with_by_ref(&chain_key, async move {
-            tracing::warn!(%chain_key, "cache miss on chain_key_to_packet_key");
-            match hopr_async_runtime::prelude::spawn_blocking(move || {
-                backend.get_account_by_address(&chain_key)
-            }).await {
-                Ok(Ok(value)) => Ok(value.map(|account| account.public_key)),
-                Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
-                Err(e) => Err(ConnectorError::BackendError(e.into())),
-            }
-        }).await?)
+        Ok(self
+            .chain_to_packet
+            .try_get_with_by_ref(&chain_key, async move {
+                tracing::warn!(%chain_key, "cache miss on chain_key_to_packet_key");
+                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_address(&chain_key))
+                    .await
+                {
+                    Ok(Ok(value)) => Ok(value.map(|account| account.public_key)),
+                    Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
+                    Err(e) => Err(ConnectorError::BackendError(e.into())),
+                }
+            })
+            .await?)
     }
 
     async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
@@ -88,16 +88,18 @@ where
 
         let backend = self.backend.clone();
         let packet_key = *packet;
-        Ok(self.packet_to_chain.try_get_with_by_ref(&packet_key, async move {
-            tracing::warn!(%packet_key, "cache miss on packet_key_to_chain_key");
-            match hopr_async_runtime::prelude::spawn_blocking(move || {
-                backend.get_account_by_key(&packet_key)
-            }).await {
-                Ok(Ok(value)) => Ok(value.map(|account| account.chain_addr)),
-                Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
-                Err(e) => Err(ConnectorError::BackendError(e.into())),
-            }
-        }).await?)
+        Ok(self
+            .packet_to_chain
+            .try_get_with_by_ref(&packet_key, async move {
+                tracing::warn!(%packet_key, "cache miss on packet_key_to_chain_key");
+                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_key(&packet_key)).await
+                {
+                    Ok(Ok(value)) => Ok(value.map(|account| account.chain_addr)),
+                    Ok(Err(e)) => Err(ConnectorError::BackendError(e.into())),
+                    Err(e) => Err(ConnectorError::BackendError(e.into())),
+                }
+            })
+            .await?)
     }
 
     fn key_id_mapper_ref(&self) -> &Self::Mapper {

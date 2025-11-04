@@ -34,9 +34,11 @@ pub mod payload;
 pub mod utils;
 
 pub mod prelude {
-    pub use super::{ContractAddresses, ContractInstances};
-    pub use super::payload::{PayloadGenerator, SafePayloadGenerator, SignableTransaction, BasicPayloadGenerator};
-    pub use super::chain_events::ChainEvent;
+    pub use super::{
+        ContractAddresses, ContractInstances,
+        chain_events::ChainEvent,
+        payload::{BasicPayloadGenerator, PayloadGenerator, SafePayloadGenerator, SignableTransaction},
+    };
 }
 
 /// Holds addresses of all smart contracts.

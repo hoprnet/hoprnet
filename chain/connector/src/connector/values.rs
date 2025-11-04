@@ -1,4 +1,5 @@
 use std::time::Duration;
+
 use blokli_client::api::BlokliQueryClient;
 use futures::TryFutureExt;
 use hopr_api::chain::DomainSeparators;
@@ -6,16 +7,19 @@ use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
-use crate::connector::HoprBlockchainConnector;
-use crate::errors::ConnectorError;
+use crate::{connector::HoprBlockchainConnector, errors::ConnectorError};
 
-impl<B,C, P> HoprBlockchainConnector<B,C, P>
-where B: Send + Sync,
-      C: BlokliQueryClient + Send + Sync + 'static,
-      P: Send + Sync
+impl<B, C, P> HoprBlockchainConnector<B, C, P>
+where
+    B: Send + Sync,
+    C: BlokliQueryClient + Send + Sync + 'static,
+    P: Send + Sync,
 {
     async fn query_cached_chain_info(&self) -> Result<blokli_client::api::types::ChainInfo, ConnectorError> {
-        Ok(self.values.try_get_with(0, self.client.query_chain_info().map_err(ConnectorError::from)).await?)
+        Ok(self
+            .values
+            .try_get_with(0, self.client.query_chain_info().map_err(ConnectorError::from))
+            .await?)
     }
 }
 
@@ -31,25 +35,32 @@ where
     async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
         self.check_connection_state()?;
 
-        let info = self.query_cached_chain_info()
-            .await?;
+        let info = self.query_cached_chain_info().await?;
 
         Ok(DomainSeparators {
-            ledger: Hash::from_hex(&info.ledger_dst
-                .ok_or(ConnectorError::InvalidState("ledger DST not found"))?
+            ledger: Hash::from_hex(
+                &info
+                    .ledger_dst
+                    .ok_or(ConnectorError::InvalidState("ledger DST not found"))?,
             )?,
-            safe_registry: Hash::from_hex(&info.safe_registry_dst.ok_or(ConnectorError::InvalidState("safe registry DST not found"))?)?,
-            channel: Hash::from_hex(&info.channel_dst.ok_or(ConnectorError::InvalidState("channel DST not found"))?)?,
+            safe_registry: Hash::from_hex(
+                &info
+                    .safe_registry_dst
+                    .ok_or(ConnectorError::InvalidState("safe registry DST not found"))?,
+            )?,
+            channel: Hash::from_hex(
+                &info
+                    .channel_dst
+                    .ok_or(ConnectorError::InvalidState("channel DST not found"))?,
+            )?,
         })
     }
 
     async fn minimum_incoming_ticket_win_prob(&self) -> Result<WinningProbability, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(WinningProbability::try_from_f64(self
-            .query_cached_chain_info()
-            .await?
-            .min_ticket_winning_probability
+        Ok(WinningProbability::try_from_f64(
+            self.query_cached_chain_info().await?.min_ticket_winning_probability,
         )?)
     }
 
@@ -61,13 +72,15 @@ where
 
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
         self.check_connection_state()?;
-        
-        Ok(Duration::from_millis(self.query_cached_chain_info().await?
-            .channel_closure_grace_period
-            .ok_or(ConnectorError::InvalidState("channel closure grace period not found"))?
-            .0
-            .parse()
-            .map_err(|_| ConnectorError::TypeConversion("channel closure grace period not a number".into()))?
+
+        Ok(Duration::from_millis(
+            self.query_cached_chain_info()
+                .await?
+                .channel_closure_grace_period
+                .ok_or(ConnectorError::InvalidState("channel closure grace period not found"))?
+                .0
+                .parse()
+                .map_err(|_| ConnectorError::TypeConversion("channel closure grace period not a number".into()))?,
         ))
     }
 }

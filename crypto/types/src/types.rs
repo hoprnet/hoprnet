@@ -133,6 +133,7 @@ impl Challenge {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HalfKey(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
+#[allow(deprecated)] // Until the dependency updates to newer versions of `generic-array`
 impl Default for HalfKey {
     fn default() -> Self {
         let mut ret = Self([0u8; Self::SIZE]);
@@ -766,6 +767,7 @@ impl Display for Response {
     }
 }
 
+#[allow(deprecated)] // Until the dependency updates to newer versions of `generic-array`
 impl Response {
     /// Converts this response to the PoR challenge by turning the non-zero scalar
     /// represented by this response into a secp256k1 curve point (public key).

@@ -1,6 +1,6 @@
-use thiserror::Error;
 use hopr_api::chain::HoprKeyIdent;
 use hopr_internal_types::prelude::ChannelId;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ConnectorError {
@@ -36,7 +36,7 @@ pub enum ConnectorError {
 
     #[error(transparent)]
     CacheError(#[from] std::sync::Arc<Self>),
-    
+
     #[error(transparent)]
     ClientError(#[from] blokli_client::errors::BlokliClientError),
 
@@ -45,7 +45,7 @@ pub enum ConnectorError {
 
     #[error(transparent)]
     ChainTypesError(#[from] hopr_chain_types::errors::ChainTypesError),
-    
+
     #[error(transparent)]
     CoreTypesError(#[from] hopr_internal_types::errors::CoreTypesError),
 

@@ -1,4 +1,3 @@
-pub use hopr_chain_api::errors::{ChainActionsError, HoprChainError};
 use thiserror::Error;
 
 use crate::state::HoprState;
@@ -33,6 +32,12 @@ pub enum HoprLibError {
 
     #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),
+
+    #[error(transparent)]
+    NetworkTypeError(#[from] hopr_network_types::errors::NetworkTypeError),
+
+    #[error(transparent)]
+    Other(anyhow::Error),
 }
 
 pub type Result<T> = std::result::Result<T, HoprLibError>;

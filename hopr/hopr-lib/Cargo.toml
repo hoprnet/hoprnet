@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "3.1.0"
+version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
@@ -38,7 +38,6 @@ utils_session = [ # utility session functionality for advanced interaction with 
   "dep:base64",
   "dep:bytesize",
   "dep:dashmap",
-  "dep:futures-time",
   "dep:human-bandwidth",
   "dep:tokio",
   "dep:tokio-stream",
@@ -47,8 +46,6 @@ utils_futures = [] # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
 testing = [
-  "dep:anyhow",
-  "dep:futures-time",
   "dep:rand",
   "dep:rstest",
   "dep:tokio",
@@ -61,7 +58,7 @@ alloy = { workspace = true, default-features = false, features = [
   "json-rpc",
   "node-bindings",
 ] }
-anyhow = { workspace = true, optional = true }
+anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
@@ -72,7 +69,8 @@ cfg-if = { workspace = true }
 const_format = { workspace = true }
 dashmap = { workspace = true, optional = true }
 futures = { workspace = true }
-futures-time = { workspace = true, optional = true }
+futures-time = { workspace = true }
+futures-concurrency = { workspace = true }
 human-bandwidth = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 tracing = { workspace = true }
@@ -123,8 +121,8 @@ url = { workspace = true }
 
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = [
-    "runtime-tokio",
-    "session-server",
-    "session-client",
-    "testing",
+  "runtime-tokio",
+  "session-server",
+  "session-client",
+  "testing",
 ] }

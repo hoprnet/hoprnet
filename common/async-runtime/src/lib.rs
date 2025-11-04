@@ -9,7 +9,7 @@ pub use futures::future::AbortHandle;
 pub mod prelude {
     pub use futures::future::{AbortHandle, abortable};
     pub use tokio::{
-        task::{JoinHandle, spawn, spawn_blocking, spawn_local, JoinError},
+        task::{JoinError, JoinHandle, spawn, spawn_blocking, spawn_local},
         time::{sleep, timeout as timeout_fut},
     };
 }

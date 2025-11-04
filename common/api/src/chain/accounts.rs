@@ -42,20 +42,20 @@ pub trait ChainWriteAccountOperations {
         &self,
         multiaddrs: &[Multiaddr],
         key: &OffchainKeypair,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>>;
+    ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>>;
 
     /// Withdraws native or token currency.
     async fn withdraw<C: Currency + Send>(
         &self,
         balance: Balance<C>,
         recipient: &Address,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, Self::Error>;
 
     /// Registers Safe address with the current node.
     async fn register_safe(
         &self,
         safe_address: &Address,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }
 
 /// Selector for on-chain node accounts.
@@ -76,19 +76,19 @@ impl AccountSelector {
         if self.public_only && !account.has_announced() {
             return false;
         }
-        
+
         if let Some(chain_key) = &self.chain_key {
             if &account.chain_addr != chain_key {
                 return false;
             }
         }
-        
+
         if let Some(packet_key) = &self.offchain_key {
             if &account.public_key != packet_key {
                 return false;
             }
         }
-        
+
         true
     }
 }
@@ -107,7 +107,7 @@ pub trait ChainReadAccountOperations {
 
     /// Returns the native or token currency Safe allowance.
     async fn safe_allowance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
-    
+
     /// Returns on-chain node accounts with the given [`AccountSelector`].
     async fn stream_accounts<'a>(
         &'a self,

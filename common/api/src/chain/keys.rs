@@ -1,6 +1,6 @@
 use std::error::Error;
 
-pub use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprKeyIdent, KeyIdMapper};
+pub use hopr_crypto_packet::{HoprKeyIdent, HoprSphinxHeaderSpec, HoprSphinxSuite, KeyIdMapper};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_primitive_types::prelude::Address;
 

@@ -1,32 +1,43 @@
 use std::time::Duration;
+
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
-use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
-use futures::future::Either;
+use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, future::Either};
 use futures_concurrency::stream::Merge;
 use futures_time::future::FutureExt as FuturesTimeExt;
-use petgraph::prelude::DiGraphMap;
 use hopr_api::chain::HoprKeyIdent;
 use hopr_async_runtime::AbortHandle;
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
+use petgraph::prelude::DiGraphMap;
 
-use crate::backend::Backend;
-use crate::connector::keys::HoprKeyMapper;
-use crate::connector::utils::{model_to_account_entry, model_to_graph_entry, process_account_changes_into_events, process_channel_changes_into_events};
-use crate::errors::ConnectorError;
+use crate::{
+    backend::Backend,
+    connector::{
+        keys::HoprKeyMapper,
+        utils::{model_to_account_entry, model_to_graph_entry, process_channel_changes_into_events},
+    },
+    errors::ConnectorError,
+};
 
-mod channels;
 mod accounts;
+mod channels;
+mod events;
 mod keys;
+mod tickets;
 mod utils;
 mod values;
-mod events;
-mod tickets;
 
-type EventsChannel = (async_broadcast::Sender<ChainEvent>, async_broadcast::InactiveReceiver<ChainEvent>);
+type EventsChannel = (
+    async_broadcast::Sender<ChainEvent>,
+    async_broadcast::InactiveReceiver<ChainEvent>,
+);
 
+/// A connector acting as a middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
+/// the [`blokli_client`] crate).
+///
+/// The connector object cannot be cloned, and shall be used inside an `Arc` if cloning is needed.
 pub struct HoprBlockchainConnector<B, C, P> {
     payload_generator: P,
     chain_key: ChainKeypair,
@@ -54,11 +65,12 @@ pub struct HoprBlockchainConnector<B, C, P> {
 }
 
 impl<B, C, P> HoprBlockchainConnector<B, C, P>
-    where
-        B: Backend + Send + Sync + 'static,
-        C: BlokliSubscriptionClient + BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
-        P: PayloadGenerator + Send + Sync + 'static
+where
+    B: Backend + Send + Sync + 'static,
+    C: BlokliSubscriptionClient + BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
+    P: PayloadGenerator + Send + Sync + 'static,
 {
+    /// Creates a new instance.
     pub fn new(chain_key: ChainKeypair, safe_address: Address, client: C, backend: B, payload_generator: P) -> Self {
         let backend = std::sync::Arc::new(backend);
         let (mut events_tx, events_rx) = async_broadcast::broadcast(1024);
@@ -71,12 +83,11 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
             chain_key,
             safe_address,
             client: std::sync::Arc::new(client),
-            graph: std::sync::Arc::new(parking_lot::RwLock::new(
-                DiGraphMap::with_capacity_and_hasher(
-                    10_000,
-                    100_000,
-                    ahash::RandomState::default()))
-            ),
+            graph: std::sync::Arc::new(parking_lot::RwLock::new(DiGraphMap::with_capacity_and_hasher(
+                10_000,
+                100_000,
+                ahash::RandomState::default(),
+            ))),
             backend: backend.clone(),
             connection_handle: None,
             events: (events_tx, events_rx),
@@ -150,8 +161,13 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                         mapper.id_to_key.insert(account.key_id, Some(account.public_key));
                         mapper.backend.insert_account(account.clone()).map(|old| (account, old))
                     })
-                        .map_err(|e| ConnectorError::BackendError(e.into()))
-                        .and_then(|res| futures::future::ready(res.map(Either::Left).map_err(|e| ConnectorError::BackendError(e.into()))))
+                    .map_err(|e| ConnectorError::BackendError(e.into()))
+                    .and_then(|res| {
+                        futures::future::ready(
+                            res.map(Either::Left)
+                                .map_err(|e| ConnectorError::BackendError(e.into())),
+                        )
+                    })
                 })
                 .fuse();
 
@@ -163,11 +179,17 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                     let backend = backend.clone();
                     hopr_async_runtime::prelude::spawn_blocking(move || {
                         graph.write().add_edge(src.key_id, dst.key_id, channel.get_id());
-                        backend.insert_channel(channel.clone())
+                        backend
+                            .insert_channel(channel.clone())
                             .map(|old| (channel, old.map(|old| old.diff(&channel))))
                     })
-                        .map_err(|e| ConnectorError::BackendError(e.into()))
-                        .and_then(|res| futures::future::ready(res.map(Either::Right).map_err(|e| ConnectorError::BackendError(e.into()))))
+                    .map_err(|e| ConnectorError::BackendError(e.into()))
+                    .and_then(|res| {
+                        futures::future::ready(
+                            res.map(Either::Right)
+                                .map_err(|e| ConnectorError::BackendError(e.into())),
+                        )
+                    })
                 })
                 .fuse();
 
@@ -196,9 +218,14 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                     let event_tx = event_tx.clone();
                     async move {
                         match account_or_channel {
-                            Ok(Either::Left((new_account, maybe_old_account))) => {
+                            Ok(Either::Left((new_account, old_account))) => {
                                 tracing::debug!(%new_account, "account inserted");
-                                process_account_changes_into_events(new_account, maybe_old_account, &event_tx).await;
+                                // We only track public accounts as events and also
+                                // broadcast announcements of already existing accounts (old_account == None).
+                                if new_account.has_announced() && old_account.is_none_or(|a| !a.has_announced()) {
+                                    tracing::debug!(account = %new_account, "new announcement");
+                                    let _ = event_tx.broadcast_direct(ChainEvent::Announcement(new_account.clone())).await;
+                                }
                             },
                             Ok(Either::Right((new_channel, Some(changes)))) => {
                                 tracing::debug!(id = %new_channel.get_id(), num_changes = changes.len(), "channel updated");
@@ -214,7 +241,6 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                         }
                     }
                 }).await;
-
         });
 
         connection_ready_rx
@@ -224,26 +250,31 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
                 Ok(Ok(Err(error))) => {
                     abort_handle.abort();
                     Err(ConnectorError::from(error))
-                },
+                }
                 Ok(Err(_)) => {
                     abort_handle.abort();
                     Err(ConnectorError::InvalidState("failed to determine connection state"))
-                },
+                }
                 Err(_) => {
                     abort_handle.abort();
                     Err(ConnectorError::ConnectionTimeout)
-                },
-
+                }
             })
             .await
     }
 
-
+    /// Connects to the chain using the underlying client, syncs all on-chain data
+    /// and subscribes for all future updates.
+    ///
+    /// If the sync of the current state does not happen within `timeout`, a [`ConnectorError::ConnectionTimeout`]
+    /// error is returned.
     pub async fn connect(&mut self, timeout: Duration) -> Result<(), ConnectorError> {
-        if self.connection_handle
+        if self
+            .connection_handle
             .as_ref()
             .filter(|handle| !handle.is_aborted())
-            .is_some() {
+            .is_some()
+        {
             return Err(ConnectorError::InvalidState("connector is already connected"));
         }
 
@@ -253,7 +284,7 @@ impl<B, C, P> HoprBlockchainConnector<B, C, P>
     }
 }
 
-impl<B,C,P> HoprBlockchainConnector<B,C,P> {
+impl<B, C, P> HoprBlockchainConnector<B, C, P> {
     pub(crate) fn check_connection_state(&self) -> Result<(), ConnectorError> {
         self.connection_handle
             .as_ref()
@@ -263,11 +294,11 @@ impl<B,C,P> HoprBlockchainConnector<B,C,P> {
     }
 }
 
-impl<B,C,P> Drop for HoprBlockchainConnector<B,C,P> {
+impl<B, C, P> Drop for HoprBlockchainConnector<B, C, P> {
     fn drop(&mut self) {
+        self.events.0.close();
         if let Some(abort_handle) = self.connection_handle.take() {
             abort_handle.abort();
         }
     }
 }
-

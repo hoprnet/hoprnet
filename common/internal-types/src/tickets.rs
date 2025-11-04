@@ -11,9 +11,8 @@ use tracing::{debug, error, instrument};
 use crate::{
     errors,
     errors::CoreTypesError,
-    prelude::{CoreTypesError::InvalidInputData, generate_channel_id},
+    prelude::{ChannelId, CoreTypesError::InvalidInputData, generate_channel_id},
 };
-use crate::prelude::ChannelId;
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -1002,7 +1001,9 @@ impl RedeemableTicket {
 
     /// Gets the [`TicketId`] of the ticket.
     #[inline]
-    pub fn ticket_id(&self) -> TicketId { TicketId::from(self.ticket.verified_ticket()) }
+    pub fn ticket_id(&self) -> TicketId {
+        TicketId::from(self.ticket.verified_ticket())
+    }
 }
 
 impl PartialEq for RedeemableTicket {

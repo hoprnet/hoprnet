@@ -11,8 +11,11 @@ use std::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_api::{
-    chain::{ChainReadChannelOperations, ChainWriteTicketOperations, ChannelSelector},
-    db::TicketSelector,
+    chain::{
+        ChainReadChannelOperations, ChainValues, ChainWriteTicketOperations, ChannelSelector,
+        redeem_tickets_via_selector,
+    },
+    db::{HoprDbTicketOperations, TicketSelector},
 };
 use hopr_internal_types::{prelude::*, tickets::AcknowledgedTicket};
 use hopr_primitive_types::prelude::*;
@@ -83,45 +86,49 @@ pub struct AutoRedeemingStrategyConfig {
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
-pub struct AutoRedeemingStrategy<A> {
+pub struct AutoRedeemingStrategy<A, Db> {
     hopr_chain_actions: A,
+    node_db: Db,
     cfg: AutoRedeemingStrategyConfig,
 }
 
 /// Number of concurrent channel redemption tasks.
 const REDEEMING_CONCURRENCY: usize = 20;
 
-impl<A> Debug for AutoRedeemingStrategy<A> {
+impl<A, Db> Debug for AutoRedeemingStrategy<A, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A> Display for AutoRedeemingStrategy<A> {
+impl<A, Db> Display for AutoRedeemingStrategy<A, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", Strategy::AutoRedeeming(self.cfg))
     }
 }
 
-impl<A> AutoRedeemingStrategy<A> {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A) -> Self {
+impl<A, Db> AutoRedeemingStrategy<A, Db> {
+    pub fn new(cfg: AutoRedeemingStrategyConfig, hopr_chain_actions: A, node_db: Db) -> Self {
         Self {
             cfg,
             hopr_chain_actions,
+            node_db,
         }
     }
 }
 
 #[async_trait]
-impl<A> SingularStrategy for AutoRedeemingStrategy<A>
+impl<A, Db> SingularStrategy for AutoRedeemingStrategy<A, Db>
 where
-    A: ChainWriteTicketOperations + ChainReadChannelOperations + Clone + Send + Sync,
+    A: ChainWriteTicketOperations + ChainReadChannelOperations + ChainValues + Clone + Send + Sync,
+    Db: HoprDbTicketOperations + Clone + Send + Sync,
 {
     async fn on_tick(&self) -> crate::errors::Result<()> {
         if !self.cfg.redeem_on_winning {
             debug!("trying to redeem all tickets in all channels");
 
             let chain_actions = self.hopr_chain_actions.clone();
+            let node_db = self.node_db.clone();
             self.hopr_chain_actions
                 .stream_channels(
                     ChannelSelector::default()
@@ -136,20 +143,19 @@ where
                 .map_err(|e| StrategyError::Other(e.into()))?
                 .for_each_concurrent(REDEEMING_CONCURRENCY, |channel| {
                     let chain_actions_clone = chain_actions.clone();
+                    let node_db = node_db.clone();
                     async move {
                         let selector = TicketSelector::from(&channel)
                             .with_amount(self.cfg.minimum_redeem_ticket_value..)
                             .with_index_range(channel.ticket_index.as_u64()..)
                             .with_state(AcknowledgedTicketStatus::Untouched);
 
-                        match chain_actions_clone
-                            .redeem_tickets_via_selector(selector)
+                        match redeem_tickets_via_selector(selector, &node_db, &chain_actions_clone)
                             .await
                             .map_err(|e| StrategyError::Other(e.into()))
                         {
-                            Ok(awaiter) => {
+                            Ok((count, _)) => {
                                 // We don't await the result of the redemption here
-                                let count = awaiter.len();
                                 if count > 0 {
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_COUNT_AUTO_REDEEMS.increment_by(count as u64);
@@ -189,18 +195,16 @@ where
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_COUNT_AUTO_REDEEMS.increment();
 
-                let rxs = self
-                    .hopr_chain_actions
-                    .redeem_tickets_via_selector(
-                        TicketSelector::from(channel)
-                            .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                            .with_index_range(channel.ticket_index.as_u64()..=ack.ticket.verified_ticket().index)
-                            .with_state(AcknowledgedTicketStatus::Untouched),
-                    )
-                    .await
-                    .map_err(|e| StrategyError::Other(e.into()))?;
-
-                std::mem::drop(rxs); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
+                let _ = redeem_tickets_via_selector(
+                    TicketSelector::from(channel)
+                        .with_amount(self.cfg.minimum_redeem_ticket_value..)
+                        .with_index_range(channel.ticket_index.as_u64()..=ack.ticket.verified_ticket().index)
+                        .with_state(AcknowledgedTicketStatus::Untouched),
+                    &self.node_db,
+                    &self.hopr_chain_actions,
+                )
+                .await
+                .map_err(|e| StrategyError::Other(e.into()))?;
 
                 Ok(())
             } else {
@@ -228,20 +232,19 @@ where
             }
             info!(%channel, "channel transitioned to PendingToClose, checking if it has tickets to redeem");
 
-            let count = self
-                .hopr_chain_actions
-                .redeem_tickets_via_selector(
-                    TicketSelector::from(channel)
-                        .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                        .with_index_range(channel.ticket_index.as_u64()..)
-                        .with_state(AcknowledgedTicketStatus::Untouched),
-                )
-                .await
-                .map_err(|e| StrategyError::Other(e.into()))?
-                .len();
+            let (count, _) = redeem_tickets_via_selector(
+                TicketSelector::from(channel)
+                    .with_amount(self.cfg.minimum_redeem_ticket_value..)
+                    .with_index_range(channel.ticket_index.as_u64()..)
+                    .with_state(AcknowledgedTicketStatus::Untouched),
+                &self.node_db,
+                &self.hopr_chain_actions,
+            )
+            .await
+            .map_err(|e| StrategyError::Other(e.into()))?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_COUNT_AUTO_REDEEMS.increment_by(count as u64);
+            METRIC_COUNT_AUTO_REDEEMS.increment();
 
             if count > 0 {
                 info!(count, %channel, "tickets in channel being closed sent for redemption");

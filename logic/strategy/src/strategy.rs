@@ -21,9 +21,13 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChainWriteTicketOperations};
+use hopr_api::{
+    chain::{ChainReadChannelOperations, ChainValues, ChainWriteChannelOperations, ChainWriteTicketOperations},
+    db::HoprDbTicketOperations,
+};
 use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 #[cfg(all(feature = "prometheus", not(test)))]
 use strum::VariantNames;
 use tracing::{error, warn};
@@ -71,8 +75,8 @@ fn just_true() -> bool {
 }
 
 #[inline]
-fn sixty() -> u64 {
-    60
+fn sixty_seconds() -> std::time::Duration {
+    std::time::Duration::from_secs(60)
 }
 
 #[inline]
@@ -83,6 +87,7 @@ fn empty_vector() -> Vec<Strategy> {
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MultiStrategyConfig {
@@ -105,10 +110,10 @@ pub struct MultiStrategyConfig {
     /// Execution interval of the configured strategies in seconds.
     ///
     /// Default is 60, minimum is 1.
-    #[default = 60]
-    #[serde(default = "sixty")]
-    #[validate(range(min = 1))]
-    pub execution_interval: u64,
+    #[default(sixty_seconds())]
+    #[serde(default = "sixty_seconds")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub execution_interval: std::time::Duration,
 
     /// Configuration of individual sub-strategies.
     ///
@@ -130,15 +135,17 @@ pub struct MultiStrategy {
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<A>(cfg: MultiStrategyConfig, hopr_chain_actions: A) -> Self
+    pub fn new<A, Db>(cfg: MultiStrategyConfig, hopr_chain_actions: A, node_db: Db) -> Self
     where
         A: ChainReadChannelOperations
             + ChainWriteChannelOperations
             + ChainWriteTicketOperations
+            + ChainValues
             + Clone
             + Send
             + Sync
             + 'static,
+        Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
@@ -152,6 +159,7 @@ impl MultiStrategy {
                 Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
                     *sub_cfg,
                     hopr_chain_actions.clone(),
+                    node_db.clone(),
                 ))),
                 Strategy::AutoFunding(sub_cfg) => {
                     strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, hopr_chain_actions.clone())))
@@ -165,7 +173,11 @@ impl MultiStrategy {
                         let mut cfg_clone = sub_cfg.clone();
                         cfg_clone.allow_recursive = false; // Do not allow more levels of recursion
 
-                        strategies.push(Box::new(Self::new(cfg_clone, hopr_chain_actions.clone())))
+                        strategies.push(Box::new(Self::new(
+                            cfg_clone,
+                            hopr_chain_actions.clone(),
+                            node_db.clone(),
+                        )))
                     } else {
                         error!("recursive multi-strategy not allowed and skipped")
                     }

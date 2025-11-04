@@ -118,7 +118,6 @@ impl<'a> From<&'a ChannelEntry> for ChannelParties {
     }
 }
 
-
 /// Overall description of a channel
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -251,7 +250,6 @@ pub enum ChannelChange {
     #[strum(to_string = "ticket index change: {left} -> {right}")]
     TicketIndex { left: u64, right: u64 },
 }
-
 
 impl ChannelChange {
     /// Compares the two given channels and returns a vector of [`ChannelChange`]s.

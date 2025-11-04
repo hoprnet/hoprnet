@@ -4500,6 +4500,7 @@ dependencies = [
  "hopr-primitive-types",
  "multiaddr",
  "strum 0.27.2",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -4790,7 +4791,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "3.1.0"
+version = "4.0.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4805,6 +4806,7 @@ dependencies = [
  "dashmap",
  "env_logger",
  "futures",
+ "futures-concurrency",
  "futures-time",
  "hex-literal",
  "hopr-api",
@@ -5035,8 +5037,11 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
+ "futures-concurrency",
+ "futures-time",
  "hex-literal",
  "hopr-api",
+ "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",

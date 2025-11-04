@@ -4,13 +4,14 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream::BoxStream};
-use hopr_internal_types::prelude::{generate_channel_id, ChannelStatus};
 pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatusDiscriminants};
+use hopr_internal_types::prelude::{ChannelStatus, generate_channel_id};
 use hopr_primitive_types::prelude::Address;
 pub use hopr_primitive_types::prelude::HoprBalance;
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub use chrono::Utc;
 use strum::IntoDiscriminant;
+
 use crate::chain::ChainReceipt;
 
 /// Selector for channels.
@@ -147,5 +148,5 @@ pub trait ChainWriteChannelOperations {
     async fn close_channel<'a>(
         &'a self,
         channel_id: &'a ChannelId,
-    ) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }

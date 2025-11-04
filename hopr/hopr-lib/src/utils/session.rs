@@ -84,7 +84,7 @@ impl FromStr for SessionTargetSpec {
             Self::Sealed(
                 base64::prelude::BASE64_URL_SAFE
                     .decode(stripped)
-                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
+                    .map_err(|e| HoprLibError::Other(e.into()))?,
             )
         } else if let Some(stripped) = s.strip_prefix("#") {
             Self::Service(
@@ -101,16 +101,12 @@ impl FromStr for SessionTargetSpec {
 impl SessionTargetSpec {
     pub fn into_target(self, protocol: IpProtocol) -> Result<SessionTarget, HoprLibError> {
         Ok(match (protocol, self) {
-            (IpProtocol::TCP, SessionTargetSpec::Plain(plain)) => SessionTarget::TcpStream(
-                IpOrHost::from_str(&plain)
-                    .map(SealedHost::from)
-                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
-            ),
-            (IpProtocol::UDP, SessionTargetSpec::Plain(plain)) => SessionTarget::UdpStream(
-                IpOrHost::from_str(&plain)
-                    .map(SealedHost::from)
-                    .map_err(|e| HoprLibError::GeneralError(e.to_string()))?,
-            ),
+            (IpProtocol::TCP, SessionTargetSpec::Plain(plain)) => {
+                SessionTarget::TcpStream(IpOrHost::from_str(&plain).map(SealedHost::from)?)
+            }
+            (IpProtocol::UDP, SessionTargetSpec::Plain(plain)) => {
+                SessionTarget::UdpStream(IpOrHost::from_str(&plain).map(SealedHost::from)?)
+            }
             (IpProtocol::TCP, SessionTargetSpec::Sealed(enc)) => {
                 SessionTarget::TcpStream(SealedHost::Sealed(enc.into_boxed_slice()))
             }

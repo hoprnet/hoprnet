@@ -1,37 +1,49 @@
-use blokli_client::api::BlokliTransactionClient;
-use futures::future::BoxFuture;
-use futures::{FutureExt, StreamExt};
-use futures::stream::FuturesUnordered;
-use hopr_api::chain::{ChainReadChannelOperations, ChainReceipt};
+use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
+use futures::{FutureExt, StreamExt, future::BoxFuture, stream::FuturesUnordered};
+use hopr_api::chain::{ChainReadChannelOperations, ChainReceipt, ChainValues};
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 
-use crate::backend::Backend;
-use crate::connector::{HoprBlockchainConnector};
-use crate::connector::utils::track_transaction;
-use crate::errors::ConnectorError;
-
+use crate::{
+    backend::Backend,
+    connector::{HoprBlockchainConnector, utils::track_transaction},
+    errors::ConnectorError,
+};
 
 #[async_trait::async_trait]
-impl<B,C,P> hopr_api::chain::ChainWriteTicketOperations for HoprBlockchainConnector<B,C,P>
+impl<B, C, P> hopr_api::chain::ChainWriteTicketOperations for HoprBlockchainConnector<B, C, P>
 where
     B: Backend + Send + Sync + 'static,
-    C: BlokliTransactionClient + Send + Sync + 'static,
-    P: PayloadGenerator + Send + Sync + 'static
+    C: BlokliTransactionClient + BlokliQueryClient + Send + Sync + 'static,
+    P: PayloadGenerator + Send + Sync + 'static,
 {
     type Error = ConnectorError;
 
-    async fn redeem_ticket(&self, ticket: RedeemableTicket) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
+    async fn redeem_ticket(
+        &self,
+        ticket: AcknowledgedTicket,
+    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
         self.check_connection_state()?;
-        
-        let channel = self.channel_by_id(&ticket.ticket.verified_ticket().channel_id)
+
+        let channel = self
+            .channel_by_id(&ticket.ticket.verified_ticket().channel_id)
             .await?
-            .ok_or(ConnectorError::ChannelDoesNotExist(ticket.ticket.verified_ticket().channel_id))?;
+            .ok_or(ConnectorError::ChannelDoesNotExist(
+                ticket.ticket.verified_ticket().channel_id,
+            ))?;
 
         if &channel.destination != self.chain_key.public().as_ref() {
             return Err(ConnectorError::InvalidArguments("ticket is not for this node"));
         }
+
+        // `into_redeemable` is a CPU-intensive operation. See #7616 for a future resolution.
+        let channel_dst = self.domain_separators().await?.channel;
+        let chain_key = self.chain_key.clone();
+        let ticket =
+            hopr_async_runtime::prelude::spawn_blocking(move || ticket.into_redeemable(&chain_key, &channel_dst))
+                .await
+                .map_err(|e| ConnectorError::OtherError(e.into()))??;
 
         let signed_payload = self
             .payload_generator
@@ -49,9 +61,12 @@ where
         Ok(tracker)
     }
 
-    async fn redeem_tickets(&self, mut tickets: Vec<RedeemableTicket>) -> Result<BoxFuture<'_, Vec<Result<ChainReceipt, Self::Error>>>, Self::Error> {
+    async fn redeem_tickets(
+        &self,
+        mut tickets: Vec<AcknowledgedTicket>,
+    ) -> Result<BoxFuture<'_, Vec<Result<ChainReceipt, Self::Error>>>, Self::Error> {
         self.check_connection_state()?;
-        
+
         // Make sure we redeem the tickets in the correct order and per channel
         tickets.sort();
         tickets.dedup();

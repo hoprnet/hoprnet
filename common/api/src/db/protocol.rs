@@ -57,6 +57,7 @@ impl<E: std::fmt::Display> std::fmt::Display for IncomingPacketError<E> {
 impl<E: std::error::Error> std::error::Error for IncomingPacketError<E> {}
 
 /// Trait defining all DB functionality needed by a packet/acknowledgement processing pipeline.
+// TODO: to be removed and dissolved in hopr-transport crates (see #7575)
 #[async_trait::async_trait]
 pub trait HoprDbProtocolOperations {
     type Error: std::error::Error + Send + Sync + 'static;
