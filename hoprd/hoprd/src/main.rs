@@ -24,7 +24,7 @@ use {
     opentelemetry_otlp::WithExportConfig as _,
     opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
 };
-use hopr_async_runtime::{Abortable, ProcessList};
+use hopr_async_runtime::{Abortable, AbortableList};
 use hopr_chain_connector::HoprBlokliConnector;
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::errors::HoprLibError;
@@ -207,7 +207,7 @@ fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlo
     )?))
 }
 
-async fn init_rest_api(cfg: &HoprdConfig, hopr: Arc<hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>) -> anyhow::Result<ProcessList<HoprdProcess>> {
+async fn init_rest_api(cfg: &HoprdConfig, hopr: Arc<hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>) -> anyhow::Result<AbortableList<HoprdProcess>> {
     let node_cfg_value =
         serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
@@ -227,7 +227,7 @@ async fn init_rest_api(cfg: &HoprdConfig, hopr: Arc<hopr_lib::Hopr<Arc<HoprBlokl
 
     let session_listener_sockets = Arc::new(ListenerJoinHandles::default());
 
-    let mut processes = ProcessList::<HoprdProcess>::default();
+    let mut processes = AbortableList::<HoprdProcess>::default();
 
     processes.insert(HoprdProcess::ListenerSocket, session_listener_sockets.clone());
 
@@ -379,7 +379,7 @@ async fn main_inner() -> anyhow::Result<()> {
     ));
     debug!(strategies = ?multi_strategy, "initialized strategies");
 
-    let mut processes = ProcessList::<HoprdProcess>::default();
+    let mut processes = AbortableList::<HoprdProcess>::default();
 
     if cfg.api.enable {
         let list = init_rest_api(&cfg, node.clone()).await?;
@@ -393,7 +393,7 @@ async fn main_inner() -> anyhow::Result<()> {
         ))
         .await?;
 
-    processes.flat_map(hopr_lib_processes, HoprdProcess::HoprLib);
+    processes.flat_map_extend_from(hopr_lib_processes, HoprdProcess::HoprLib);
 
     debug!("starting up strategies");
     processes.insert(

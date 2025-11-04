@@ -31,10 +31,16 @@ compile_error!("No runtime enabled");
 /// Abstraction over tasks that can be aborted (such as join or abort handles).
 #[auto_impl::auto_impl(&, Box, Arc)]
 pub trait Abortable {
-    /// Aborts the task.
+    /// Notifies the task that it should abort.
+    ///
+    /// Must be idempotent and not panic if it was already called before, due to implementation-specific
+    /// semantics of [`Abortable::was_aborted`].
     fn abort_task(&self);
 
-    /// Returns `true` if [`abort_task`](Abortable::abort_task) was already called.
+    /// Returns `true` if [`abort_task`](Abortable::abort_task) was already called or the task has finished.
+    ///
+    /// It is implementation-specific whether `true` actually means that the task has been finished.
+    /// The [`Abortable::abort_task`] therefore can be also called if `true` is returned without a consequence.
     fn was_aborted(&self) -> bool;
 }
 
@@ -59,22 +65,24 @@ impl Abortable for tokio::task::JoinHandle<()> {
     }
 }
 
-/// List of [`Abortable`] tasks.
+/// List of [`Abortable`] tasks with each task identified by a unique key of type `T`.
 ///
-/// Each task is identified by a unique key of type `T`.
+/// Abortable objects, such as join or abort handles, do not by design abort when dropped.
+/// Sometimes this behavior is not desirable, and spawned run-away tasks may still continue to live
+/// e.g.: after an error is raised.
 ///
-/// The list will terminate all the tasks in reverse insertion order once dropped.
+/// This object allows safely managing abortable tasks and will terminate all the tasks in reverse insertion order once dropped.
 ///
-/// Lists can be arbitrarily nested.
-pub struct ProcessList<T>(indexmap::IndexMap<T, Box<dyn Abortable>>);
+/// Additionally, this object also implements [`Abortable`] allowing it to be arbitrarily nested.
+pub struct AbortableList<T>(indexmap::IndexMap<T, Box<dyn Abortable>>);
 
-impl<T> Default for ProcessList<T> {
+impl<T> Default for AbortableList<T> {
     fn default() -> Self {
         Self(indexmap::IndexMap::new())
     }
 }
 
-impl<T: Hash + Eq> ProcessList<T> {
+impl<T: Hash + Eq> AbortableList<T> {
     /// Appends a new [`abortable task`](Abortable) to the end of this list.
     pub fn insert<A: Abortable + 'static>(&mut self, process: T, task: A) {
         self.0.insert(process, Box::new(task));
@@ -97,7 +105,7 @@ impl<T: Hash + Eq> ProcessList<T> {
     ///
     /// The tasks from `other` are moved to this list without aborting them.
     /// Afterward, `other` will be empty.
-    pub fn extend_from(&mut self, mut other: ProcessList<T>) {
+    pub fn extend_from(&mut self, mut other: AbortableList<T>) {
         self.0.extend(other.0.drain(..));
     }
 
@@ -105,11 +113,11 @@ impl<T: Hash + Eq> ProcessList<T> {
     ///
     /// The tasks from `other` are moved to this list without aborting them.
     /// Afterward, `other` will be empty.
-    pub fn flat_map<U: Hash + Eq>(&mut self, mut other: ProcessList<U>, key_map: impl Fn(U) -> T) {
+    pub fn flat_map_extend_from<U: Hash + Eq>(&mut self, mut other: AbortableList<U>, key_map: impl Fn(U) -> T) {
         self.0.extend(other.0.drain(..).map(|(k, v)| (key_map(k), v)));
     }
 }
-impl<T> ProcessList<T> {
+impl<T> AbortableList<T> {
     /// Checks if the list is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -135,7 +143,7 @@ impl<T> ProcessList<T> {
     }
 }
 
-impl<T> Abortable for ProcessList<T> {
+impl<T> Abortable for AbortableList<T> {
     fn abort_task(&self) {
         self.abort_all();
     }
@@ -145,7 +153,7 @@ impl<T> Abortable for ProcessList<T> {
     }
 }
 
-impl<T> Drop for ProcessList<T> {
+impl<T> Drop for AbortableList<T> {
     fn drop(&mut self) {
         self.abort_all();
         self.0.clear();

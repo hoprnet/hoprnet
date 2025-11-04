@@ -109,7 +109,7 @@ pub use hopr_transport::{
 use hopr_transport::{ChainKeypair, HoprTransport, HoprTransportConfig, OffchainKeypair, PeerDiscovery};
 use tracing::{debug, error, info, warn};
 use hopr_api::db::HoprNodeDbApi;
-pub use hopr_async_runtime::{ProcessList, Abortable};
+pub use hopr_async_runtime::{AbortableList, Abortable};
 
 pub use crate::{
     config::SafeModule,
@@ -272,7 +272,7 @@ where
             futures::channel::mpsc::Receiver<ApplicationDataIn>,
             futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         >,
-        ProcessList<HoprLibProcess>,
+        AbortableList<HoprLibProcess>,
     )> {
         self.error_if_not_in_state(
             state::HoprState::Uninitialized,
@@ -293,7 +293,7 @@ where
         )
         .await?;
 
-        let mut processes = ProcessList::<HoprLibProcess>::default();
+        let mut processes = AbortableList::<HoprLibProcess>::default();
 
         info!("Starting the node...");
 
@@ -518,7 +518,7 @@ where
 
         info!("starting transport");
         let (hopr_socket, transport_processes) = self.transport_api.run(indexer_peer_update_rx, session_tx).await?;
-        processes.flat_map(transport_processes, HoprLibProcess::Transport);
+        processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
         info!("starting outgoing ticket flush process");
         let (index_flush_stream, index_flush_handle) =
