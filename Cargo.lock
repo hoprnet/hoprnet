@@ -5046,7 +5046,6 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
- "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-protocol",
  "lazy_static",

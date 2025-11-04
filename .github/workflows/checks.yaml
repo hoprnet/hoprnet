@@ -32,6 +32,14 @@ jobs:
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
     secrets: inherit
 
+  cargo-deps-redundancy:
+    name: Cargo deps redundancy
+    uses: ./.github/workflows/checks-cargo-deps.yaml
+    with:
+      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
+    secrets: inherit
+
   audit:
     name: Audit
     uses: ./.github/workflows/checks-audit.yaml
@@ -55,7 +63,6 @@ jobs:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
     secrets: inherit
-
 
   performance:
     name: Performance

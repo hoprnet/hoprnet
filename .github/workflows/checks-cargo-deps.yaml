@@ -1,5 +1,9 @@
 ---
-name: Audit
+name: Cargo redundant deps
+
+env:
+  RUST_BACKTRACE: "1"
+  needs_nix_setup: true
 
 on:
   merge_group:
@@ -14,13 +18,17 @@ on:
         type: string
 
 concurrency:
-  group: ${{ inputs.source_branch || github.ref_name }}-audit
+  group: ${{ inputs.source_branch || github.ref_name }}-cargo-redundant-deps
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  cargo-audit:
-    name: Audit
+  detect-unused-dependencies:
+    name: Redundant cargo dependencies
     runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 10
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
@@ -35,5 +43,13 @@ jobs:
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
 
-      - name: Run Audit
-        run: nix run .#audit
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+        if: env.needs_nix_setup == true
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Find unused cargo dependencies
+        run: nix develop .#ci --command cargo machete
