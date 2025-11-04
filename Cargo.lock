@@ -4546,12 +4546,10 @@ dependencies = [
  "parking_lot",
  "petgraph",
  "redb",
- "strum 0.27.2",
  "tempfile",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "url",
 ]
 
 [[package]]
