@@ -47,15 +47,6 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 #[derive(Serialize, Deserialize, Clone, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct CliArgs {
-    /// Network the node will operate in
-    #[arg(
-        long,
-        env = "HOPRD_NETWORK",
-        help = "ID of the network the node will attempt to connect to",
-        required = false
-    )]
-    pub network: Option<String>,
-
     // Identity details
     #[arg(
         long,
@@ -149,63 +140,11 @@ pub struct CliArgs {
         value_name = "PASSWORD"
     )]
     pub password: Option<String>,
-
-    #[arg(
-        long = "noKeepLogs",
-        env = "HOPRD_INDEXER_DISABLE_KEEP_LOGS",
-        help = "Disables keeping RPC logs in the logs database after they were processed.",
-        action = ArgAction::Count
-    )]
-    pub no_keep_logs: u8,
-
-    #[arg(
-        long = "noFastSync",
-        env = "HOPRD_INDEXER_DISABLE_FAST_SYNC",
-        help = "Disables using fast sync at node start.",
-        action = ArgAction::Count
-    )]
-    pub no_fast_sync: u8,
-
-    #[arg(
-        long = "enableLogsSnapshot",
-        env = "HOPRD_ENABLE_LOGS_SNAPSHOT",
-        help = "Enables downloading logs snapshot at node start. If this is set to true, the node will attempt to \
-                download logs snapshot from the configured `logsSnapshotUrl`.",
-        value_name = "ENABLE_LOGS_SNAPSHOT",
-        action = ArgAction::Count
-    )]
-    pub enable_logs_snapshot: u8,
-
-    #[arg(
-        long = "logsSnapshotUrl",
-        env = "HOPRD_LOGS_SNAPSHOT_URL",
-        help = "URL to download logs snapshot from. If none is provided or configured in the configuration file, the \
-                node will not attempt to download any logs snapshot.",
-        value_name = "LOGS_SNAPSHOT_URL"
-    )]
-    pub logs_snapshot_url: Option<String>,
-
-    #[arg(
-        long = "maxBlockRange",
-        help = "Maximum number of blocks that can be fetched in a batch request from the RPC provider.",
-        env = "HOPRD_MAX_BLOCK_RANGE",
-        value_name = "MAX_BLOCK_RANGE",
-        value_parser = clap::value_parser ! (u64)
-    )]
-    pub max_block_range: Option<u64>,
-
-    #[arg(
-        long = "maxRequestsPerSec",
-        help = "Maximum number of RPC requests that can be performed per second.",
-        env = "HOPRD_MAX_RPC_REQUESTS_PER_SEC",
-        value_name = "MAX_RPC_REQUESTS_PER_SEC",
-        value_parser = clap::value_parser ! (u32)
-    )]
-    pub max_rpc_requests_per_sec: Option<u32>,
-
+    
+    
     #[arg(
         long,
-        help = "A custom RPC provider to be used for the node to connect to blockchain",
+        help = "A custom provider to be used for the node to connect to blockchain",
         env = "HOPRD_PROVIDER",
         value_name = "PROVIDER"
     )]
@@ -281,15 +220,7 @@ pub struct CliArgs {
         env = "HOPRD_CONFIGURATION_FILE_PATH"
     )]
     pub configuration_file_path: Option<String>,
-
-    #[arg(
-        long = "safeTransactionServiceProvider",
-        value_name = "HOPRD_SAFE_TX_SERVICE_PROVIDER",
-        help = "Base URL for safe transaction service",
-        env = "HOPRD_SAFE_TRANSACTION_SERVICE_PROVIDER"
-    )]
-    pub safe_transaction_service_provider: Option<String>,
-
+    
     #[arg(
         long = "safeAddress",
         value_name = "HOPRD_SAFE_ADDR",
@@ -305,12 +236,4 @@ pub struct CliArgs {
         env = "HOPRD_MODULE_ADDRESS"
     )]
     pub module_address: Option<String>,
-
-    #[arg(
-        long = "protocolConfig",
-        value_name = "HOPRD_PROTOCOL_CONFIG_PATH",
-        help = "Path to the protocol-config.json file",
-        env = "HOPRD_PROTOCOL_CONFIG_PATH"
-    )]
-    pub protocol_config_path: Option<String>,
 }

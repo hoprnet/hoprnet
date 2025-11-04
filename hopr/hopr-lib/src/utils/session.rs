@@ -5,7 +5,7 @@
 //! session operations.
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{VecDeque},
     fmt::Formatter,
     future::Future,
     hash::Hash,
@@ -15,7 +15,6 @@ use std::{
     sync::Arc,
 };
 
-use async_lock::RwLock;
 use base64::Engine;
 use bytesize::ByteSize;
 use dashmap::DashMap;
@@ -33,11 +32,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info};
-
+use hopr_chain_connector::HoprBlokliConnector;
 use crate::{
     Address, Hopr, HoprSession, HoprSessionId, SURB_SIZE, ServiceId, SessionClientConfig, SessionTarget,
     errors::HoprLibError, transfer_session,
 };
+use crate::state::Abortable;
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -181,7 +181,23 @@ pub fn build_binding_host(requested: Option<&str>, default: std::net::SocketAddr
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
 
-pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry>>>;
+impl std::fmt::Display for ListenerId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}://{}:{}", self.0, self.1.ip(), self.1.port())
+    }
+}
+
+#[derive(Default)]
+pub struct ListenerJoinHandles(pub DashMap<ListenerId, StoredSessionEntry>);
+
+impl Abortable for ListenerJoinHandles {
+    fn abort_process(&self) {
+        self.0.alter_all(|_, v| {
+            v.abort_handle.abort();
+            v
+        });
+    }
+}
 
 pub struct SessionPool {
     pool: Option<Arc<std::sync::Mutex<VecDeque<HoprSession>>>>,
@@ -196,7 +212,7 @@ impl SessionPool {
         dst: Address,
         target: SessionTarget,
         cfg: SessionClientConfig,
-        hopr: Arc<Hopr>,
+        hopr: Arc<Hopr<Arc<HoprBlokliConnector>>>,
     ) -> Result<Self, String> {
         let pool = Arc::new(std::sync::Mutex::new(VecDeque::with_capacity(size)));
         let hopr_clone = hopr.clone();
@@ -281,8 +297,8 @@ impl Drop for SessionPool {
 pub async fn create_tcp_client_binding(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr>,
-    open_listeners: ListenerJoinHandles,
+    hopr: Arc<Hopr<Arc<HoprBlokliConnector>>>,
+    open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
     config: SessionClientConfig,
@@ -416,7 +432,7 @@ pub async fn create_tcp_client_binding(
         });
     });
 
-    open_listeners.write_arc().await.insert(
+    open_listeners.0.insert(
         ListenerId(hopr_network_types::types::IpProtocol::TCP, bound_host),
         StoredSessionEntry {
             destination,
@@ -450,8 +466,8 @@ pub enum BindError {
 pub async fn create_udp_client_binding(
     bind_host: std::net::SocketAddr,
     port_range: Option<String>,
-    hopr: Arc<Hopr>,
-    open_listeners: ListenerJoinHandles,
+    hopr: Arc<Hopr<Arc<HoprBlokliConnector>>>,
+    open_listeners: Arc<ListenerJoinHandles>,
     destination: Address,
     target_spec: SessionTargetSpec,
     config: SessionClientConfig,
@@ -508,10 +524,10 @@ pub async fn create_udp_client_binding(
         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
 
         // Once the Session closes, remove it from the list
-        open_listeners_clone.write_arc().await.remove(&listener_id);
+        open_listeners_clone.0.remove(&listener_id);
     });
 
-    open_listeners.write_arc().await.insert(
+    open_listeners.0.insert(
         listener_id,
         StoredSessionEntry {
             destination,

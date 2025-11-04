@@ -1,12 +1,11 @@
-use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
-use async_lock::RwLock;
 use async_signal::{Signal, Signals};
 use futures::{
     FutureExt, StreamExt,
-    future::{AbortHandle, abortable},
+    future::{abortable},
 };
-use hopr_lib::{HoprKeys, IdentityRetrievalModes, ToHex, state::HoprLibProcess, utils::session::ListenerJoinHandles};
+use hopr_lib::{HoprKeys, IdentityRetrievalModes, ToHex, state::HoprLibProcess, utils::session::ListenerJoinHandles, Address, ProcessList};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
@@ -22,6 +21,7 @@ use {
     opentelemetry_otlp::WithExportConfig as _,
     opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
 };
+use hopr_lib::state::Abortable;
 
 // Avoid musl's default allocator due to degraded performance
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
@@ -119,29 +119,16 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-enum HoprdProcesses {
-    HoprLib(HoprLibProcess, AbortHandle),
-    ListenerSockets(ListenerJoinHandles),
-    RestApi(AbortHandle),
+#[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
+enum HoprdProcess {
+    #[strum(to_string = "hopr-lib process: {0}")]
+    HoprLib(HoprLibProcess),
+    #[strum(to_string = "session listener sockets")]
+    ListenerSocket,
+    #[strum(to_string = "REST API process")]
+    RestApi,
 }
 
-// Manual implementation needed, since Strum does not support skipping arguments
-impl std::fmt::Display for HoprdProcesses {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HoprdProcesses::HoprLib(p, _) => write!(f, "HoprLib process: {p}"),
-            HoprdProcesses::ListenerSockets(_) => write!(f, "SessionListenerSockets"),
-            HoprdProcesses::RestApi(_) => write!(f, "RestApi"),
-        }
-    }
-}
-
-impl std::fmt::Debug for HoprdProcesses {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // Intentionally same as Display
-        write!(f, "{self}")
-    }
-}
 
 #[cfg(not(feature = "runtime-tokio"))]
 compile_error!("The 'runtime-tokio' feature must be enabled");
@@ -250,17 +237,26 @@ async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         "Node public identifiers"
     );
 
+    // TODO: instantiate the connector properly
+    let hopr_chain_connector = hopr_chain_connector::create_trustless_hopr_blokli_connector(
+        &hopr_keys.chain_key,
+        hopr_chain_connector::blokli_client::BlokliClient::new("test".parse()?, Default::default()),
+        Address::default(),
+        hopr_chain_connector::ContractAddresses::default()
+    )?;
+
     // Create the node instance
     info!("Creating the HOPRd node instance from hopr-lib");
     let node = Arc::new(hopr_lib::Hopr::new(
         cfg.clone().into(),
+        Arc::new(hopr_chain_connector),
         &hopr_keys.packet_key,
         &hopr_keys.chain_key,
     )?);
 
     let node_clone = node.clone();
 
-    let mut processes: Vec<HoprdProcesses> = Vec::new();
+    let mut processes = ProcessList::<HoprdProcess, Arc<dyn Abortable>>::default();
 
     if cfg.api.enable {
         let node_cfg_value =
@@ -280,9 +276,9 @@ async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
         info!(listen_address, "Running a REST API");
 
-        let session_listener_sockets = Arc::new(RwLock::new(HashMap::new()));
+        let session_listener_sockets = Arc::new(ListenerJoinHandles::default());
 
-        processes.push(HoprdProcesses::ListenerSockets(session_listener_sockets.clone()));
+        processes.insert(HoprdProcess::ListenerSocket, session_listener_sockets.clone());
 
         let (proc, abort_handle) = abortable(
             async move {
@@ -302,7 +298,7 @@ async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             .inspect(|_| tracing::warn!(task = "hoprd - REST API", "long-running background task finished")),
         );
         let _jh = tokio::spawn(proc);
-        processes.push(HoprdProcesses::RestApi(abort_handle));
+        processes.insert(HoprdProcess::RestApi, Arc::new(abort_handle));
     }
 
     let (_hopr_socket, hopr_processes) = node
@@ -312,7 +308,7 @@ async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         ))
         .await?;
 
-    processes.extend(hopr_processes.into_iter().map(|(k, v)| HoprdProcesses::HoprLib(k, v)));
+    processes.extend(hopr_processes.into_iter().map(|(k, v)| (HoprdProcess::HoprLib(k), Arc::new(v) as Arc<dyn Abortable>)));
 
     let mut signals = Signals::new([Signal::Hup, Signal::Int]).map_err(|e| HoprdError::OsError(e.to_string()))?;
     while let Some(Ok(signal)) = signals.next().await {
@@ -322,22 +318,7 @@ async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             }
             Signal::Int => {
                 info!("Received the INT signal... tearing down the node");
-                futures::stream::iter(processes)
-                    .then(|process| async move {
-                        let mut abort_handles: Vec<AbortHandle> = Vec::new();
-                        info!("Stopping process '{process}'");
-                        match process {
-                            HoprdProcesses::HoprLib(_, ah) | HoprdProcesses::RestApi(ah) => abort_handles.push(ah),
-                            HoprdProcesses::ListenerSockets(ahs) => {
-                                abort_handles
-                                    .extend(ahs.write_arc().await.drain().map(|(_, entry)| entry.abort_handle));
-                            }
-                        }
-                        futures::stream::iter(abort_handles)
-                    })
-                    .flatten()
-                    .for_each_concurrent(None, |ah| async move { ah.abort() })
-                    .await;
+                processes.abort_process();
 
                 info!("All processes stopped... emulating the default handler...");
                 low_level::emulate_default_handler(signal as i32)?;

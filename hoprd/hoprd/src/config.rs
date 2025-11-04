@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use hopr_lib::{Address, HostConfig, HostType, ProtocolsConfig, config::HoprLibConfig};
+use hopr_lib::{Address, HostConfig, HostType, config::HoprLibConfig};
 use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
@@ -111,6 +111,9 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub session_ip_forwarding: SessionIpForwardingConfig,
+    /// Blokli provider to connect to.
+    #[validate(url)]
+    pub provider: Option<String>,
 }
 
 impl From<HoprdConfig> for HoprLibConfig {
@@ -207,58 +210,13 @@ impl HoprdConfig {
 
         // chain
         if cli_args.announce > 0 {
-            cfg.hopr.chain.announce = true;
-        }
-        if let Some(network) = cli_args.network {
-            cfg.hopr.chain.network = network;
+            cfg.hopr.publish = true;
         }
 
-        if let Some(protocol_config) = cli_args.protocol_config_path {
-            cfg.hopr.chain.protocols = ProtocolsConfig::from_str(
-                &std::fs::read_to_string(&protocol_config)
-                    .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?,
-            )
-            .map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
-        }
-
-        //   TODO: custom provider is redundant with the introduction of protocol-config.json
         if let Some(x) = cli_args.provider {
-            cfg.hopr.chain.provider = Some(x);
+            cfg.provider = Some(x);
         }
 
-        if let Some(x) = cli_args.max_rpc_requests_per_sec {
-            cfg.hopr.chain.max_rpc_requests_per_sec = Some(x);
-        }
-
-        if let Some(x) = cli_args.max_block_range {
-            // Override all max_block_range settings in all networks
-            for (_, n) in cfg.hopr.chain.protocols.networks.iter_mut() {
-                n.max_block_range = x;
-            }
-        }
-
-        // The --enable*/--no*/--disable* CLI flags are Count-based, therefore, if they equal to 0,
-        // it means they have not been specified on the CLI
-        if cli_args.no_fast_sync != 0 {
-            cfg.hopr.chain.fast_sync = false
-        }
-
-        if cli_args.no_keep_logs != 0 {
-            cfg.hopr.chain.keep_logs = false
-        }
-
-        if cli_args.enable_logs_snapshot != 0 {
-            cfg.hopr.chain.enable_logs_snapshot = true
-        }
-
-        if let Some(x) = cli_args.logs_snapshot_url {
-            cfg.hopr.chain.logs_snapshot_url = Some(x);
-        }
-
-        // safe module
-        if let Some(x) = cli_args.safe_transaction_service_provider {
-            cfg.hopr.safe_module.safe_transaction_service_provider = x
-        };
         if let Some(x) = cli_args.safe_address {
             cfg.hopr.safe_module.safe_address =
                 Address::from_str(&x).map_err(|e| HoprdError::ValidationError(e.to_string()))?
@@ -284,30 +242,12 @@ impl HoprdConfig {
         }
 
         if skip_validation {
-            Ok(cfg)
-        } else {
-            if !cfg
-                .hopr
-                .chain
-                .protocols
-                .supported_networks(hopr_lib::constants::APP_VERSION_COERCED)
-                .iter()
-                .any(|network| network == &cfg.hopr.chain.network)
-            {
-                return Err(crate::errors::HoprdError::ValidationError(format!(
-                    "The specified network '{}' is not listed as supported ({:?})",
-                    cfg.hopr.chain.network,
-                    cfg.hopr
-                        .chain
-                        .protocols
-                        .supported_networks(hopr_lib::constants::APP_VERSION_COERCED)
-                )));
-            }
+            return Ok(cfg)
+        }
 
-            match cfg.validate() {
-                Ok(_) => Ok(cfg),
-                Err(e) => Err(crate::errors::HoprdError::ValidationError(e.to_string())),
-            }
+        match cfg.validate() {
+            Ok(_) => Ok(cfg),
+            Err(e) => Err(crate::errors::HoprdError::ValidationError(e.to_string())),
         }
     }
 
@@ -411,57 +351,6 @@ mod tests {
     use super::*;
 
     pub fn example_cfg() -> anyhow::Result<HoprdConfig> {
-        let chain = hopr_lib::config::Chain {
-            protocols: hopr_lib::ProtocolsConfig::from_str(
-                r#"
-                    {
-                        "networks": {
-                          "anvil-localhost": {
-                            "chain": "anvil",
-                            "environment_type": "local",
-                            "version_range": "*",
-                            "indexer_start_block_number": 5,
-                            "addresses": {
-                              "network_registry": "0x3Aa5ebB10DC797CAC828524e59A333d0A371443c",
-                              "network_registry_proxy": "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
-                              "channels": "0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE",
-                              "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-                              "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
-                              "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
-                              "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
-                              "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
-                              "announcements": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
-                              "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
-                            },
-                            "confirmations": 2,
-                            "tags": [],
-                            "tx_polling_interval": 1000,
-                            "max_block_range": 200
-                          }
-                        },
-                        "chains": {
-                          "anvil": {
-                            "description": "Local Ethereum node, akin to Ganache, Hardhat chain",
-                            "chain_id": 31337,
-                            "live": false,
-                            "max_fee_per_gas": "1 gwei",
-                            "max_priority_fee_per_gas": "0.2 gwei",
-                            "default_provider": "http://127.0.0.1:8545/",
-                            "native_token_name": "ETH",
-                            "hopr_token_name": "wxHOPR",
-                            "block_time": 5000,
-                            "max_rpc_requests_per_sec": 100,
-                            "tags": [],
-                            "etherscan_api_url": null
-                          }
-                        }
-                      }
-                    "#,
-            )
-            .map_err(|e| anyhow::anyhow!(e))?,
-            ..hopr_lib::config::Chain::default()
-        };
-
         let db = hopr_lib::config::Db {
             data: "/app/db".to_owned(),
             ..hopr_lib::config::Db::default()
@@ -488,7 +377,6 @@ mod tests {
             hopr: HoprLibConfig {
                 host,
                 db,
-                chain,
                 safe_module,
                 ..HoprLibConfig::default()
             },
@@ -537,7 +425,7 @@ mod tests {
         let mut config_file = NamedTempFile::new()?;
 
         let mut cfg = example_cfg()?;
-        cfg.hopr.chain.provider = Some(pwnd.to_owned());
+        cfg.provider = Some(pwnd.to_owned());
 
         let yaml = serde_yaml::to_string(&cfg)?;
         config_file.write_all(yaml.as_bytes())?;
@@ -561,7 +449,7 @@ mod tests {
 
         let cfg = cfg?;
 
-        assert_eq!(cfg.hopr.chain.provider, Some(pwnd.to_owned()));
+        assert_eq!(cfg.provider, Some(pwnd.to_owned()));
 
         Ok(())
     }

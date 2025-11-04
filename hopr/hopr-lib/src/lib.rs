@@ -113,10 +113,12 @@ pub use hopr_transport::{
 use hopr_transport::{ChainKeypair, HoprTransport, HoprTransportConfig, OffchainKeypair, PeerDiscovery};
 use tracing::{debug, error, info, warn};
 
-use crate::{
+pub use hopr_chain_connector::HoprBlokliConnector;
+
+pub use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
-    state::{HoprLibProcessList, HoprState},
+    state::{ProcessList, HoprLibProcessList, HoprState},
     traits::chain::{CloseChannelResult, OpenChannelResult},
 };
 
@@ -287,11 +289,15 @@ where
     }
 
     pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        Ok(self.hopr_chain_api.node_balance().await?)
+        Ok(self.hopr_chain_api.get_balance(self.me_onchain()).await?)
     }
 
     pub async fn get_safe_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        Ok(self.hopr_chain_api.safe_balance().await?)
+        Ok(self.hopr_chain_api.get_balance(self.cfg.safe_module.safe_address).await?)
+    }
+
+    pub async fn chain_info(&self) -> errors::Result<ChainInfo> {
+        Ok(self.hopr_chain_api.chain_info().await?)
     }
 
     pub fn get_safe_config(&self) -> SafeModule {
@@ -333,11 +339,12 @@ where
             *MIN_NATIVE_BALANCE,
             *SUGGESTED_NATIVE_BALANCE,
             Duration::from_secs(200),
+            self.me_onchain(),
             &self.hopr_chain_api,
         )
         .await?;
 
-        let mut processes = HoprLibProcessList::new();
+        let mut processes = HoprLibProcessList::default();
 
         info!("Starting the node...");
 
@@ -971,7 +978,7 @@ where
 
     /// Current safe allowance balance
     pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
-        Ok(self.hopr_chain_api.safe_allowance().await?)
+        Ok(self.hopr_chain_api.safe_allowance(self.cfg.safe_module.safe_address).await?)
     }
 
     /// Withdraw on-chain assets to a given address

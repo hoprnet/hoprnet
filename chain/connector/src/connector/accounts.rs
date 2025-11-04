@@ -21,13 +21,14 @@ where
 {
     type Error = ConnectorError;
 
-    async fn node_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
+    async fn get_balance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
         self.check_connection_state()?;
 
+        let address = address.into();
         if Cy::is::<WxHOPR>() {
             Ok(self
                 .client
-                .query_token_balance(&self.chain_key.public().to_address().into())
+                .query_token_balance(&address.into())
                 .await?
                 .balance
                 .0
@@ -35,7 +36,7 @@ where
         } else if Cy::is::<XDai>() {
             Ok(self
                 .client
-                .query_native_balance(&self.chain_key.public().to_address().into())
+                .query_native_balance(&address.into())
                 .await?
                 .balance
                 .0
@@ -45,37 +46,14 @@ where
         }
     }
 
-    async fn safe_balance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
+    async fn safe_allowance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
         self.check_connection_state()?;
 
+        let address = address.into();
         if Cy::is::<WxHOPR>() {
             Ok(self
                 .client
-                .query_token_balance(&self.safe_address.into())
-                .await?
-                .balance
-                .0
-                .parse()?)
-        } else if Cy::is::<XDai>() {
-            Ok(self
-                .client
-                .query_native_balance(&self.safe_address.into())
-                .await?
-                .balance
-                .0
-                .parse()?)
-        } else {
-            Err(ConnectorError::InvalidState("unsupported currency"))
-        }
-    }
-
-    async fn safe_allowance<Cy: Currency>(&self) -> Result<Balance<Cy>, Self::Error> {
-        self.check_connection_state()?;
-
-        if Cy::is::<WxHOPR>() {
-            Ok(self
-                .client
-                .query_safe_allowance(&self.safe_address.into())
+                .query_safe_allowance(&address.into())
                 .await?
                 .allowance
                 .0

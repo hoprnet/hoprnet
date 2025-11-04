@@ -41,7 +41,6 @@ type EventsChannel = (
 pub struct HoprBlockchainConnector<B, C, P> {
     payload_generator: P,
     chain_key: ChainKeypair,
-    safe_address: Address,
     client: std::sync::Arc<C>,
     graph: std::sync::Arc<parking_lot::RwLock<DiGraphMap<HoprKeyIdent, ChannelId, ahash::RandomState>>>,
     backend: std::sync::Arc<B>,
@@ -49,7 +48,7 @@ pub struct HoprBlockchainConnector<B, C, P> {
     events: EventsChannel,
 
     // KeyId <-> OffchainPublicKey mapping
-    mapper: keys::HoprKeyMapper<B>,
+    mapper: HoprKeyMapper<B>,
     // Fast retrieval of chain keys by address
     chain_to_packet: moka::future::Cache<Address, Option<OffchainPublicKey>, ahash::RandomState>,
     // Fast retrieval of packet keys by chain key
@@ -71,17 +70,15 @@ where
     P: PayloadGenerator + Send + Sync + 'static,
 {
     /// Creates a new instance.
-    pub fn new(chain_key: ChainKeypair, safe_address: Address, client: C, backend: B, payload_generator: P) -> Self {
+    pub fn new(chain_key: ChainKeypair, client: C, backend: B, payload_generator: P) -> Self {
         let backend = std::sync::Arc::new(backend);
         let (mut events_tx, events_rx) = async_broadcast::broadcast(1024);
         events_tx.set_overflow(true);
         events_tx.set_await_active(false);
-        let events_rx = events_rx.deactivate();
 
         Self {
             payload_generator,
             chain_key,
-            safe_address,
             client: std::sync::Arc::new(client),
             graph: std::sync::Arc::new(parking_lot::RwLock::new(DiGraphMap::with_capacity_and_hasher(
                 10_000,
@@ -90,7 +87,7 @@ where
             ))),
             backend: backend.clone(),
             connection_handle: None,
-            events: (events_tx, events_rx),
+            events: (events_tx, events_rx.deactivate()),
             mapper: HoprKeyMapper {
                 id_to_key: moka::sync::CacheBuilder::new(10_000)
                     .time_to_idle(Duration::from_secs(600))

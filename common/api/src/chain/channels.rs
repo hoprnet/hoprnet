@@ -128,6 +128,7 @@ pub trait ChainReadChannelOperations {
 
 /// On-chain write operations regarding channels.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainWriteChannelOperations {
     type Error: Error + Send + Sync + 'static;
     /// Opens a channel with `dst` and `amount`.

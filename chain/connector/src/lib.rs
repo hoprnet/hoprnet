@@ -13,9 +13,9 @@ pub mod blokli_client {
     };
 }
 
-use hopr_chain_types::ContractAddresses;
-use hopr_crypto_types::prelude::ChainKeypair;
-use hopr_primitive_types::prelude::Address;
+pub use hopr_chain_types::ContractAddresses;
+pub use hopr_crypto_types::prelude::ChainKeypair;
+pub use hopr_primitive_types::prelude::Address;
 
 /// Type alias for a [`HoprBlockchainConnector`] that uses a [`TempDbBackend`] and a [`blokli_client::BlokliClient`].
 pub type HoprBlokliConnector = HoprBlockchainConnector<
@@ -28,7 +28,6 @@ pub type HoprBlokliConnector = HoprBlockchainConnector<
 pub fn create_trustless_hopr_blokli_connector(
     chain_key: &ChainKeypair,
     client: blokli_client::BlokliClient,
-    safe_address: Address,
     module_address: Address,
     contracts: ContractAddresses,
 ) -> Result<HoprBlokliConnector, errors::ConnectorError> {
@@ -36,7 +35,6 @@ pub fn create_trustless_hopr_blokli_connector(
 
     Ok(HoprBlockchainConnector::new(
         chain_key.clone(),
-        safe_address,
         client,
         TempDbBackend::new()?,
         payload_gen,
@@ -50,7 +48,6 @@ pub fn create_trustless_hopr_blokli_connector(
 pub async fn create_trustful_hopr_blokli_connector(
     _chain_key: &ChainKeypair,
     _client: blokli_client::BlokliClient,
-    _safe_address: Address,
     _module_address: Address,
 ) -> Result<HoprBlokliConnector, errors::ConnectorError> {
     todo!()

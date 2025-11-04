@@ -5335,15 +5335,17 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "3.1.1"
+version = "4.0.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.1",
  "async-signal",
  "clap",
  "console-subscriber",
+ "dashmap",
  "futures",
  "home",
+ "hopr-chain-connector",
  "hopr-lib",
  "hopr-metrics",
  "hopr-parallelize",
@@ -5359,6 +5361,7 @@ dependencies = [
  "serde_yaml",
  "signal-hook",
  "smart-default",
+ "strum 0.27.2",
  "tempfile",
  "test-log",
  "thiserror 2.0.17",

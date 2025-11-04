@@ -5,6 +5,7 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
+use futures::FutureExt;
 use hopr_lib::{
     Address, HoprTransportError, Multiaddr,
     errors::{HoprLibError, HoprStatusError},
@@ -73,13 +74,21 @@ pub(super) async fn show_peer_info(
     let hopr = state.hopr.clone();
 
     match hopr.chain_key_to_peerid(&destination).await {
-        Ok(Some(peer)) => Ok((
-            StatusCode::OK,
-            Json(NodePeerInfoResponse {
-                announced: hopr.multiaddresses_announced_on_chain(&peer).await,
-                observed: hopr.network_observed_multiaddresses(&peer).await,
-            }),
-        )),
+        Ok(Some(peer)) => {
+            let res = futures::try_join!(
+                hopr.multiaddresses_announced_on_chain(&peer),
+                hopr.network_observed_multiaddresses(&peer).map(Ok)
+            );
+            match res {
+                Ok((announced, observed)) => {
+                    Ok((
+                        StatusCode::OK,
+                        Json(NodePeerInfoResponse { announced, observed }),
+                    ))
+                },
+                Err(error) => Err(ApiErrorStatus::UnknownFailure(error.to_string())),
+            }
+        },
         Ok(None) => Err(ApiErrorStatus::PeerNotFound),
         Err(_) => Err(ApiErrorStatus::PeerNotFound),
     }

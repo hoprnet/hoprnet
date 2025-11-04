@@ -608,7 +608,7 @@ pub(crate) async fn create_client(
     let bind_host: std::net::SocketAddr = build_binding_host(args.listen_host.as_deref(), state.default_listen_host);
 
     let listener_id = ListenerId(protocol.into(), bind_host);
-    if bind_host.port() > 0 && state.open_listeners.read_arc().await.contains_key(&listener_id) {
+    if bind_host.port() > 0 && state.open_listeners.0.contains_key(&listener_id) {
         return Err((StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed));
     }
 
@@ -745,25 +745,28 @@ pub(crate) async fn list_clients(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let response = state
         .open_listeners
-        .read_arc()
-        .await
+        .0
         .iter()
-        .filter(|(id, _)| id.0 == protocol.into())
-        .map(|(id, entry)| SessionClientResponse {
-            protocol,
-            ip: id.1.ip().to_string(),
-            port: id.1.port(),
-            target: entry.target.to_string(),
-            forward_path: entry.forward_path.clone().into(),
-            return_path: entry.return_path.clone().into(),
-            destination: entry.destination,
-            hopr_mtu: SESSION_MTU,
-            surb_len: SURB_SIZE,
-            active_clients: entry.get_clients().iter().map(|e| e.key().to_string()).collect(),
-            max_client_sessions: entry.max_client_sessions,
-            max_surb_upstream: entry.max_surb_upstream,
-            response_buffer: entry.response_buffer,
-            session_pool: entry.session_pool,
+        .filter(|v| v.key().0 == protocol.into())
+        .map(|v| {
+            let ListenerId(_, addr) = *v.key();
+            let entry = v.value();
+            SessionClientResponse {
+                protocol,
+                ip: addr.ip().to_string(),
+                port: addr.port(),
+                target: entry.target.to_string(),
+                forward_path: entry.forward_path.clone().into(),
+                return_path: entry.return_path.clone().into(),
+                destination: entry.destination,
+                hopr_mtu: SESSION_MTU,
+                surb_len: SURB_SIZE,
+                active_clients: entry.get_clients().iter().map(|e| e.key().to_string()).collect(),
+                max_client_sessions: entry.max_client_sessions,
+                max_surb_upstream: entry.max_surb_upstream,
+                response_buffer: entry.response_buffer,
+                session_pool: entry.session_pool,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -997,7 +1000,7 @@ pub(crate) async fn close_client(
         .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))?;
 
     {
-        let mut open_listeners = state.open_listeners.write_arc().await;
+        let open_listeners = &state.open_listeners.0;
 
         let mut to_remove = Vec::new();
         let protocol: hopr_lib::IpProtocol = protocol.into();
@@ -1005,17 +1008,18 @@ pub(crate) async fn close_client(
         // Find all listeners with protocol, listening IP and optionally port number (if > 0)
         open_listeners
             .iter()
-            .filter(|(ListenerId(proto, addr), _)| {
+            .filter(|v| {
+                let ListenerId(proto, addr) = v.key();
                 protocol == *proto && addr.ip() == listening_ip && (addr.port() == port || port == 0)
             })
-            .for_each(|(id, _)| to_remove.push(*id));
+            .for_each(|v| to_remove.push(*v.key()));
 
         if to_remove.is_empty() {
             return Err((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput));
         }
 
         for bound_addr in to_remove {
-            let entry = open_listeners
+            let(_, entry) = open_listeners
                 .remove(&bound_addr)
                 .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
 

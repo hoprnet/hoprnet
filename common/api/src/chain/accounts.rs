@@ -99,14 +99,11 @@ impl AccountSelector {
 pub trait ChainReadAccountOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Returns the native or token currency balance of the current node's account.
-    async fn node_balance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
-
-    /// Returns the native or token currency balance of the current node's Safe.
-    async fn safe_balance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
+    /// Returns the native or token currency balance of the given on-chain account.
+    async fn get_balance<C: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<C>, Self::Error>;
 
     /// Returns the native or token currency Safe allowance.
-    async fn safe_allowance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
+    async fn safe_allowance<C: Currency, A: Into<Address> + Send>(&self, safe_address: A) -> Result<Balance<C>, Self::Error>;
 
     /// Returns on-chain node accounts with the given [`AccountSelector`].
     async fn stream_accounts<'a>(
