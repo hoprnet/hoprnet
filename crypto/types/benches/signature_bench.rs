@@ -5,10 +5,16 @@ use hopr_crypto_types::{
 };
 
 // Avoid musl's default allocator due to degraded performance
-// Use mimalloc with secure feature for better performance
-#[cfg(target_os = "linux")]
+//
+// https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
+#[cfg(all(feature = "allocator-mimalloc", feature = "allocator-jemalloc"))]
+compile_error!("feature \"allocator-jemalloc\" and feature \"allocator-mimalloc\" cannot be enabled at the same time");
+#[cfg(all(target_os = "linux", feature = "allocator-mimalloc"))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[cfg(all(target_os = "linux", feature = "allocator-jemalloc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 const SAMPLE_SIZE: usize = 10_000;
 

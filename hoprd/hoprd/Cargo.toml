@@ -48,6 +48,9 @@ prof = [
   "dep:console-subscriber",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
+allocator-mimalloc = ["dep:mimalloc"] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = ["dep:tikv-jemallocator"] # Use jemalloc as the global allocator on Linux
+
 [dependencies]
 anyhow = { workspace = true }
 async-lock = { workspace = true }
@@ -93,7 +96,8 @@ lazy_static = { workspace = true, optional = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-mimalloc = { workspace = true }
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }
 
 [build-dependencies]
 vergen-gix = { workspace = true, features = ["build"] }

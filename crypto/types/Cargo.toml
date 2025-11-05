@@ -16,6 +16,8 @@ serde = [
   "k256/serde",
   "libp2p-identity/serde",
 ]
+allocator-mimalloc = ["dep:mimalloc"] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = ["dep:tikv-jemallocator"] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
 aes = "0.8.4"
@@ -82,4 +84,5 @@ harness = false
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-mimalloc = { workspace = true }
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }

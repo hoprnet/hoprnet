@@ -21,6 +21,8 @@ serde = [
   "hopr-crypto-sphinx/serde",
   "hopr-path/serde",
 ]
+allocator-mimalloc = ["dep:mimalloc"] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = ["dep:tikv-jemallocator"] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
 hex = { workspace = true }
@@ -72,4 +74,5 @@ harness = false
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-mimalloc = { workspace = true }
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }
