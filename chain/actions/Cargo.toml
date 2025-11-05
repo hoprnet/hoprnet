@@ -36,6 +36,7 @@ smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+hopr-binding-v4 = { package = "hopr-bindings", git = "https://github.com/hoprnet/contracts", rev = "b160f991" }
 hopr-bindings = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
