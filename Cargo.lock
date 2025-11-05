@@ -5164,6 +5164,7 @@ dependencies = [
  "strum 0.27.2",
  "test-log",
  "thiserror 2.0.17",
+ "tikv-jemallocator",
  "tokio",
  "tokio-util",
  "tracing",
@@ -5483,6 +5484,7 @@ dependencies = [
  "strum 0.27.2",
  "test-log",
  "thiserror 2.0.17",
+ "tikv-jemallocator",
  "tokio",
  "tracing",
 ]
