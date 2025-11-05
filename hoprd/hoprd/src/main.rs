@@ -31,6 +31,9 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+#[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
+mod jemalloc_stats;
+
 fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
@@ -156,6 +159,9 @@ fn main() -> anyhow::Result<()> {
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
     init_logger()?;
+
+    #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
+    let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
         warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");

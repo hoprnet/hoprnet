@@ -54,6 +54,7 @@ allocator-mimalloc = [
 allocator-jemalloc = [
   "dep:tikv-jemallocator",
 ] # Use jemalloc as the global allocator on Linux
+allocator-jemalloc-stats = ["allocator-jemalloc", "dep:tikv-jemalloc-ctl"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -102,6 +103,7 @@ lazy_static = { workspace = true, optional = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 mimalloc = { workspace = true, optional = true }
 tikv-jemallocator = { workspace = true, optional = true }
+tikv-jemalloc-ctl = { workspace = true, features = ["stats"], optional = true }
 
 [build-dependencies]
 vergen-gix = { workspace = true, features = ["build"] }
