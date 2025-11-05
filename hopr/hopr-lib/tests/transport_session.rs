@@ -112,6 +112,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    // Test keepalive as well as sending 0 hop messages without channels
     let [src, dst] = exclusive_indexes::<2>();
 
     let ip = IpOrHost::from_str(":0")?;
@@ -149,7 +150,7 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 
     sleep(Duration::from_secs(2)).await;
 
-    let _ = session.write_all(b"ping").await.is_err();
+    assert!(session.write_all(b"ping").await.is_err());
 
     Ok(())
 }

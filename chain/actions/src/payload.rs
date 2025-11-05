@@ -546,11 +546,6 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
     if let Some(ref signature) = off_chain.verified_ticket().signature {
         let serialized_signature = signature.as_ref();
 
-        println!(
-            "off_chain.verified_ticket().amount.amount() {:?}",
-            off_chain.verified_ticket().amount.amount()
-        );
-
         Ok(OnChainRedeemableTicket {
             data: TicketData {
                 channelId: B256::from_slice(off_chain.verified_ticket().channel_id.as_ref()),

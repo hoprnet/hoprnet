@@ -246,3 +246,38 @@ async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> a
     assert!(final_balance_src < initial_balance_src - withdrawn_amount); // account for gas
     Ok(())
 }
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn test_check_ticket_price_is_default(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [node] = exclusive_indexes::<1>();
+
+    let ticket_price = cluster_fixture[node]
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+
+    assert!(ticket_price > hopr_lib::HoprBalance::zero());
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [node] = exclusive_indexes::<1>();
+
+    let winning_prob = cluster_fixture[node]
+        .inner()
+        .get_minimum_incoming_ticket_win_probability()
+        .await
+        .context("failed to get winning probability")?;
+
+    assert!(winning_prob.as_f64() > 0.0);
+    assert!(winning_prob.as_f64() < 1.0);
+
+    Ok(())
+}

@@ -6,7 +6,7 @@ use serial_test::serial;
 #[rstest]
 #[tokio::test]
 #[serial]
-async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(
+async fn test_peerids_should_be_convertible_to_chain_keys_and_vice_versa(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [candidate, tester] = exclusive_indexes::<2>();
