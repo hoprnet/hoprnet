@@ -222,7 +222,7 @@ pub struct Hopr {
 }
 
 impl Hopr {
-    pub fn new(
+    pub async fn new(
         mut cfg: config::HoprLibConfig,
         me: &OffchainKeypair,
         me_onchain: &ChainKeypair,
@@ -270,7 +270,7 @@ impl Hopr {
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
                 .unwrap_or_else(|| HoprNodeDbConfig::default().surb_distress_threshold),
         };
-        let node_db = futures::executor::block_on(HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
+        let node_db = HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg).await?;
 
         if let Some(provider) = &cfg.chain.provider {
             info!(provider, "Creating chain components using the custom provider");
@@ -365,7 +365,7 @@ impl Hopr {
             );
 
             // Calling get_ticket_statistics will initialize the respective metrics on tickets
-            if let Err(e) = futures::executor::block_on(node_db.get_ticket_statistics(None)) {
+            if let Err(e) = node_db.get_ticket_statistics(None).await {
                 error!(error = %e, "Failed to initialize ticket statistics metrics");
             }
         }
