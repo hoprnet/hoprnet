@@ -215,7 +215,7 @@ where
             async move {
                 let max_surbs = data.estimate_surbs_with_msg();
 
-                tracing::debug!(?routing, "resolving packet routing");
+                tracing::trace!(?routing, "resolving packet routing");
 
                 match planner.resolve_routing(data.data.total_len(), max_surbs, routing).await {
                     Ok((resolved, rem_surbs)) => {
