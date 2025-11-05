@@ -89,7 +89,6 @@ hopr-lib = { workspace = true, features = [
 ] }
 hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-parallelize = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 
 # Target-specific dependencies for memory allocators

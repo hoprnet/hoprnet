@@ -12,7 +12,6 @@ use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
-
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,

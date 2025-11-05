@@ -233,7 +233,9 @@ uuid = { version = "1.18.1" }
 url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
-mimalloc = { version = "0.1.48", default-features = false, features = ["secure"] }
+mimalloc = { version = "0.1.48", default-features = false, features = [
+  "secure",
+] }
 
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
