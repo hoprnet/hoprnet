@@ -4,7 +4,14 @@ version = "0.9.1"
 edition = "2021"
 license = "GPL-3.0-only"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = []
+allocator-mimalloc = [
+  "dep:mimalloc",
+] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = [
+  "dep:tikv-jemallocator",
+] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
@@ -45,4 +52,5 @@ hopr-crypto-random = { workspace = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.1"
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }

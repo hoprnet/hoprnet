@@ -12,10 +12,6 @@ use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
-
-#[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
-mod jemalloc_stats;
-
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -24,12 +20,21 @@ use {
 };
 
 // Avoid musl's default allocator due to degraded performance
+//
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "allocator-mimalloc", feature = "allocator-jemalloc"))]
+compile_error!("feature \"allocator-jemalloc\" and feature \"allocator-mimalloc\" cannot be enabled at the same time");
+#[cfg(all(target_os = "linux", feature = "allocator-mimalloc"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[cfg(all(target_os = "linux", feature = "allocator-jemalloc"))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
+mod jemalloc_stats;
+
+fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
@@ -147,53 +152,15 @@ impl std::fmt::Debug for HoprdProcesses {
 compile_error!("The 'runtime-tokio' feature must be enabled");
 
 #[cfg(feature = "runtime-tokio")]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Divide the available CPU parallelism by 2,
-    // since we want to use half of the available threads for IO-bound and half for CPU-bound tasks
-    let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
-
-    hopr_parallelize::cpu::init_thread_pool(
-        std::env::var("HOPRD_NUM_CPU_THREADS")
-            .ok()
-            .and_then(|v| usize::from_str(&v).ok())
-            .or(avail_parallelism)
-            .ok_or(anyhow::anyhow!(
-                "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
-                 environment variable."
-            ))?
-            .max(1),
-    )?;
-
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(
-            std::env::var("HOPRD_NUM_IO_THREADS")
-                .ok()
-                .and_then(|v| usize::from_str(&v).ok())
-                .or(avail_parallelism)
-                .ok_or(anyhow::anyhow!(
-                    "Could not determine the number of IO threads to use. Please set the HOPRD_NUM_IO_THREADS \
-                     environment variable."
-                ))?
-                .max(1),
-        )
-        .thread_name("hoprd")
-        .thread_stack_size(
-            std::env::var("HOPRD_THREAD_STACK_SIZE")
-                .ok()
-                .and_then(|v| usize::from_str(&v).ok())
-                .unwrap_or(10 * 1024 * 1024)
-                .max(2 * 1024 * 1024),
-        )
-        .build()?
-        .block_on(main_inner())
+fn main() -> anyhow::Result<()> {
+    hopr_lib::prepare_tokio_runtime()?.block_on(main_inner())
 }
 
 #[cfg(feature = "runtime-tokio")]
-async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
+async fn main_inner() -> anyhow::Result<()> {
     init_logger()?;
 
-    #[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
+    #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
@@ -252,11 +219,7 @@ async fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create the node instance
     info!("Creating the HOPRd node instance from hopr-lib");
-    let node = Arc::new(hopr_lib::Hopr::new(
-        cfg.clone().into(),
-        &hopr_keys.packet_key,
-        &hopr_keys.chain_key,
-    )?);
+    let node = Arc::new(hopr_lib::Hopr::new(cfg.clone().into(), &hopr_keys.packet_key, &hopr_keys.chain_key).await?);
 
     let node_clone = node.clone();
 

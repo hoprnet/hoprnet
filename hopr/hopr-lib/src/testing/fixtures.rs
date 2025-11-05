@@ -187,6 +187,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
                         format!("{SNAPSHOT_BASE}/node_{i}"),
                         moved_safes[i].clone(),
                     )
+                    .await
                 })
             })
             .join()
