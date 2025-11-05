@@ -312,7 +312,6 @@ mod tests {
             .addresses(&*BOB, &*ALICE)
             .amount(PRICE_PER_PACKET.div_f64(1.0f64)?.amount() * worth_packets)
             .index(index)
-            .index_offset(idx_offset)
             .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(4)
             .challenge(challenge)
