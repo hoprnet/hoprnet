@@ -1,3 +1,4 @@
+use alloy::primitives::utils::UnitsError;
 use hopr_chain_rpc::errors::RpcError;
 use hopr_internal_types::prelude::CoreTypesError;
 use hopr_primitive_types::errors::GeneralError;
@@ -68,6 +69,9 @@ pub enum ChainActionsError {
 
     #[error(transparent)]
     GeneralError(#[from] GeneralError),
+
+    #[error(transparent)]
+    UnitsError(#[from] UnitsError),
 }
 
 pub type Result<T> = std::result::Result<T, ChainActionsError>;

@@ -15,14 +15,13 @@ use alloy::{
     primitives::{
         B256, U256,
         aliases::{U24, U48, U56, U96},
+        utils::parse_units,
     },
     rpc::types::TransactionRequest,
-    sol_types::SolCall,
+    sol,
+    sol_types::{SolCall, SolValue},
 };
 use hopr_bindings::{
-    hoprannouncements::HoprAnnouncements::{
-        announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
-    },
     hoprchannels::{
         HoprChannels::{
             RedeemableTicket as OnChainRedeemableTicket, TicketData, closeIncomingChannelCall,
@@ -35,6 +34,10 @@ use hopr_bindings::{
     hoprnodemanagementmodule::HoprNodeManagementModule::execTransactionFromModuleCall,
     hoprnodesaferegistry::HoprNodeSafeRegistry::{deregisterNodeBySafeCall, registerSafeByNodeCall},
     hoprtoken::HoprToken::{approveCall, transferCall},
+};
+use hopr_bindings_v4::{
+    hopr_announcements::HoprAnnouncements::{announceCall, announceSafeCall},
+    hopr_token::HoprToken::sendCall,
 };
 use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::prelude::*;
@@ -51,6 +54,17 @@ use crate::errors::{
 enum Operation {
     Call = 0,
     // Future use: DelegateCall = 1,
+}
+
+sol! {
+    /// Mirrors the Solidity layout: (address, bytes32, bytes32, bytes32, string)
+    struct KeyBindAndAnnouncePayload {
+        address callerNode;
+        bytes32 ed25519_sig_0;
+        bytes32 ed25519_sig_1;
+        bytes32 ed25519_pub_key;
+        string  multiaddress;
+    }
 }
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.
@@ -172,27 +186,48 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
     }
 
     fn announce(&self, announcement: AnnouncementData) -> Result<TransactionRequest> {
-        let payload = match &announcement.key_binding {
+        // when the keys have already bounded, now only try to announce without key binding
+        let tx = match &announcement.key_binding {
             Some(binding) => {
+                // when keys are not bounded yet, bind keys and announce together
                 let serialized_signature = binding.signature.as_ref();
 
-                bindKeysAnnounceCall {
+                let inner_payload_struct = KeyBindAndAnnouncePayload {
+                    callerNode: self.me.into(),
                     ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
                     ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
                     ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
+                    multiaddress: announcement.multiaddress().to_string(),
+                };
+                let inner_payload = inner_payload_struct.abi_encode()[32..].to_vec();
+
+                // This should be the `keyBindingFee` value,
+                // updated from event KeyBindingFeeUpdate(uint256 newFee, uint256 oldFee) in the Announcements,sol.
+                // If the keys have been bounded, supply U256::ZERO,
+                let wxhopr_token_amount: U256 = parse_units("0.01", "gwei")?.into();
+
+                let call_data = sendCall {
+                    recipient: self.contract_addrs.announcements.into(),
+                    amount: wxhopr_token_amount,
+                    data: inner_payload.into(),
+                }
+                .abi_encode();
+
+                TransactionRequest::default()
+                    .with_input(call_data)
+                    .with_to(self.contract_addrs.token.into())
+            }
+            None => {
+                let call_data = announceCall {
                     baseMultiaddr: announcement.multiaddress().to_string(),
                 }
-                .abi_encode()
+                .abi_encode();
+                TransactionRequest::default()
+                    .with_input(call_data)
+                    .with_to(self.contract_addrs.announcements.into())
             }
-            None => announceCall {
-                baseMultiaddr: announcement.multiaddress().to_string(),
-            }
-            .abi_encode(),
         };
 
-        let tx = TransactionRequest::default()
-            .with_input(payload)
-            .with_to(self.contract_addrs.announcements.into());
         Ok(tx)
     }
 
@@ -333,38 +368,66 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
     }
 
     fn announce(&self, announcement: AnnouncementData) -> Result<TransactionRequest> {
-        let call_data = match &announcement.key_binding {
+        // when the keys have already bounded, now only try to announce without key binding
+        let tx = match &announcement.key_binding {
             Some(binding) => {
+                // when keys are not bounded yet, bind keys and announce together
                 let serialized_signature = binding.signature.as_ref();
 
-                bindKeysAnnounceSafeCall {
-                    selfAddress: self.me.into(),
+                let inner_payload_struct = KeyBindAndAnnouncePayload {
+                    callerNode: self.me.into(),
                     ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
                     ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
                     ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
+                    multiaddress: announcement.multiaddress().to_string(),
+                };
+                let inner_payload = inner_payload_struct.abi_encode()[32..].to_vec();
+
+                // This should be the `keyBindingFee` value,
+                // updated from event KeyBindingFeeUpdate(uint256 newFee, uint256 oldFee) in the Announcements,sol.
+                // If the keys have been bounded, supply U256::ZERO,
+                let wxhopr_token_amount: U256 = parse_units("0.01", "gwei")?.into();
+
+                let call_data = sendCall {
+                    recipient: self.contract_addrs.announcements.into(),
+                    amount: wxhopr_token_amount,
+                    data: inner_payload.into(),
+                }
+                .abi_encode();
+
+                TransactionRequest::default()
+                    .with_input(
+                        execTransactionFromModuleCall {
+                            to: self.contract_addrs.token.into(),
+                            value: U256::ZERO,
+                            data: call_data.into(),
+                            operation: Operation::Call as u8,
+                        }
+                        .abi_encode(),
+                    )
+                    .with_to(self.module.into())
+                    .with_gas_limit(DEFAULT_TX_GAS)
+            }
+            None => {
+                let call_data = announceSafeCall {
+                    selfAddress: self.me.into(),
                     baseMultiaddr: announcement.multiaddress().to_string(),
                 }
-                .abi_encode()
+                .abi_encode();
+                TransactionRequest::default()
+                    .with_input(
+                        execTransactionFromModuleCall {
+                            to: self.contract_addrs.announcements.into(),
+                            value: U256::ZERO,
+                            data: call_data.into(),
+                            operation: Operation::Call as u8,
+                        }
+                        .abi_encode(),
+                    )
+                    .with_to(self.module.into())
+                    .with_gas_limit(DEFAULT_TX_GAS)
             }
-            None => announceSafeCall {
-                selfAddress: self.me.into(),
-                baseMultiaddr: announcement.multiaddress().to_string(),
-            }
-            .abi_encode(),
         };
-
-        let tx = TransactionRequest::default()
-            .with_input(
-                execTransactionFromModuleCall {
-                    to: self.contract_addrs.announcements.into(),
-                    value: U256::ZERO,
-                    data: call_data.into(),
-                    operation: Operation::Call as u8,
-                }
-                .abi_encode(),
-            )
-            .with_to(self.module.into())
-            .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -575,7 +638,11 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 mod tests {
     use std::str::FromStr;
 
-    use alloy::{primitives::U256, providers::Provider};
+    use alloy::{
+        primitives::{B256, U256},
+        providers::Provider,
+        sol_types::SolValue,
+    };
     use anyhow::Context;
     use hex_literal::hex;
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
@@ -584,6 +651,8 @@ mod tests {
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::HoprBalance;
     use multiaddr::Multiaddr;
+
+    use crate::payload::KeyBindAndAnnouncePayload;
 
     use super::{BasicPayloadGenerator, PayloadGenerator};
 
