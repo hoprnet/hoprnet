@@ -1,4 +1,4 @@
-//! Jemalloc statistics logging - single module implementation
+//! Jemalloc statistics logging - single module implementation.
 
 use std::time::{Duration, Instant};
 

@@ -16,7 +16,6 @@ default = [
   "telemetry",
   "explicit-path",
   "transport-quic",
-  "jemalloc-stats",
 ] # uses tokio by default because of axum
 prometheus = [
   "hopr-lib/prometheus",
@@ -50,7 +49,14 @@ capture = ["hopr-lib/capture"]
 prof = [
   "dep:console-subscriber",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
-jemalloc-stats = ["dep:tikv-jemalloc-ctl"]
+
+allocator-mimalloc = [
+  "dep:mimalloc",
+] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = [
+  "dep:tikv-jemallocator",
+] # Use jemalloc as the global allocator on Linux
+allocator-jemalloc-stats = ["allocator-jemalloc", "dep:tikv-jemalloc-ctl"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -98,13 +104,13 @@ hopr-lib = { workspace = true, features = [
 ] }
 hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-parallelize = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.1"
-tikv-jemalloc-ctl = { version = "0.6.1", features = ["stats"], optional = true }
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }
+tikv-jemalloc-ctl = { workspace = true, features = ["stats"], optional = true }
 
 [build-dependencies]
 vergen-gix = { workspace = true, features = ["build"] }
