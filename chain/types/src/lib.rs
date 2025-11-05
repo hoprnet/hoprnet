@@ -1,10 +1,10 @@
 //! This crate contains various on-chain related modules and types.
 use alloy::{
-    contract::Result as ContractResult, network::TransactionBuilder, primitives, rpc::types::TransactionRequest,
+    contract::Result as ContractResult, network::TransactionBuilder, primitives, rpc::types::TransactionRequest, sol,
+    sol_types::SolValue,
 };
 use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
 use hopr_bindings::{
-    hoprannouncements::HoprAnnouncements::{self, HoprAnnouncementsInstance},
     hoprchannels::HoprChannels::{self, HoprChannelsInstance},
     hoprdummyproxyfornetworkregistry::HoprDummyProxyForNetworkRegistry::{
         self, HoprDummyProxyForNetworkRegistryInstance,
@@ -18,6 +18,10 @@ use hopr_bindings::{
     hoprtoken::HoprToken::{self, HoprTokenInstance},
     hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::{self, HoprWinningProbabilityOracleInstance},
 };
+use hopr_bindings_v4::{
+    hopr_announcements::HoprAnnouncements::{self, HoprAnnouncementsInstance},
+    hopr_announcements_proxy::HoprAnnouncementsProxy,
+};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
@@ -29,6 +33,15 @@ pub mod errors;
 // Various (mostly testing related) utility functions
 pub mod utils;
 
+sol! {
+    /// Mirrors the Solidity layout: (address, address, uint256, deployer)
+    struct AnnouncementsInitializePayload {
+        address token;
+        address safeRegistry;
+        uint256 defaultKeyBindingFee;
+        address deployer;
+    }
+}
 /// Holds addresses of all smart contracts.
 #[serde_with::serde_as]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -193,9 +206,30 @@ where
             primitives::Address::from(safe_registry.address().as_ref()),
         )
         .await?;
-        let announcements = HoprAnnouncements::deploy(
+        let announcements_implementation = HoprAnnouncements::deploy(provider.clone()).await?;
+        // prepare initializer data
+        // HoprAnnouncementsProxy hoprAnnouncementsProxy = new HoprAnnouncementsProxy(
+        //     address(announcementsImplementation),
+        //     abi.encodeWithSignature(
+        //         "initialize(bytes)",
+        //         abi.encode(address(hoprToken), address(safeRegistry), DEFAULT_KEY_BINDING_FEE, deployer)
+        //     )
+        // );
+        let announcement_initializer_data = announcements_implementation.initialize(
+            AnnouncementsInitializePayload {
+                token: primitives::Address::from(token.address().as_ref()),
+                safeRegistry: primitives::Address::from(safe_registry.address().as_ref()),
+                defaultKeyBindingFee: primitives::Uint::from(10_000_000_000_000_000_u128), // 0.01 HOPR
+                deployer: self_address,
+            }
+            .abi_encode()
+            .into(),
+        );
+
+        let announcements = HoprAnnouncementsProxy::deploy(
             provider.clone(),
-            primitives::Address::from(safe_registry.address().as_ref()),
+            primitives::Address::from(announcements_implementation.address().as_ref()),
+            announcement_initializer_data.calldata().clone(),
         )
         .await?;
         let network_registry = HoprNetworkRegistryInstance::new(primitives::Address::ZERO, provider.clone());
@@ -203,7 +237,10 @@ where
         Ok(Self {
             token,
             channels,
-            announcements,
+            announcements: HoprAnnouncementsInstance::new(
+                primitives::Address::from(announcements.address().as_ref()),
+                provider.clone(),
+            ),
             network_registry,
             network_registry_proxy: NetworkRegistryProxy::Dummy(zero_network_registry_proxy),
             safe_registry,

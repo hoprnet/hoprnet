@@ -27,6 +27,7 @@ strum = { workspace = true }
 thiserror = { workspace = true }
 
 hopr-bindings = { workspace = true }
+hopr-bindings-v4 = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }

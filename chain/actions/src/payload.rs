@@ -204,7 +204,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
                 // This should be the `keyBindingFee` value,
                 // updated from event KeyBindingFeeUpdate(uint256 newFee, uint256 oldFee) in the Announcements,sol.
                 // If the keys have been bounded, supply U256::ZERO,
-                let wxhopr_token_amount: U256 = parse_units("0.01", "gwei")?.into();
+                let wxhopr_token_amount: U256 = parse_units("0.01", "ether")?.into();
 
                 let call_data = sendCall {
                     recipient: self.contract_addrs.announcements.into(),
@@ -652,8 +652,6 @@ mod tests {
     use hopr_primitive_types::prelude::HoprBalance;
     use multiaddr::Multiaddr;
 
-    use crate::payload::KeyBindAndAnnouncePayload;
-
     use super::{BasicPayloadGenerator, PayloadGenerator};
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
@@ -681,6 +679,13 @@ mod tests {
                 &OffchainKeypair::from_secret(&PRIVATE_KEY)?,
             )),
         )?;
+
+        // ensure that the caller has some wxHOPR to pay for the announcement
+        let _ = hopr_chain_types::utils::mint_tokens(
+            contract_instances.token.clone(),
+            U256::from(10_000_000_000_000_000_u128),
+        )
+        .await;
 
         let tx = generator.announce(ad)?;
 
