@@ -15,7 +15,7 @@ pub mod account;
 pub mod announcement;
 /// Implements types related to HOPR payment channels.
 pub mod channels;
-/// Enumerates all errors in this crate.
+/// Lists all errors in this crate.
 pub mod errors;
 /// Types related to internal HOPR protocol logic.
 pub mod protocol;
@@ -81,10 +81,12 @@ impl std::str::FromStr for NodeId {
     }
 }
 
+pub use multiaddr::Multiaddr;
+
 #[doc(hidden)]
 pub mod prelude {
     pub use super::{
-        NodeId, account::*, announcement::*, channels::*, errors::CoreTypesError, protocol::*, tickets::*,
+        Multiaddr, NodeId, account::*, announcement::*, channels::*, errors::CoreTypesError, protocol::*, tickets::*,
     };
 }
 

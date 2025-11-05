@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use clap::{ArgAction, Parser, builder::ValueParser};
-use hopr_lib::{HostConfig, looks_like_domain};
+use hopr_lib::config::{HostConfig, looks_like_domain};
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
@@ -140,8 +140,7 @@ pub struct CliArgs {
         value_name = "PASSWORD"
     )]
     pub password: Option<String>,
-    
-    
+
     #[arg(
         long,
         help = "A custom provider to be used for the node to connect to blockchain",
@@ -220,7 +219,7 @@ pub struct CliArgs {
         env = "HOPRD_CONFIGURATION_FILE_PATH"
     )]
     pub configuration_file_path: Option<String>,
-    
+
     #[arg(
         long = "safeAddress",
         value_name = "HOPRD_SAFE_ADDR",

@@ -1,7 +1,7 @@
 use hopr_primitive_types::prelude::*;
-use hopr_transport::config::SessionGlobalConfig;
 pub use hopr_transport::config::{
-    HostConfig, HostType, NetworkConfig, ProbeConfig, ProtocolConfig, TransportConfig, validate_external_host,
+    HostConfig, HostType, NetworkConfig, ProbeConfig, ProtocolConfig, SessionGlobalConfig, TransportConfig,
+    looks_like_domain, validate_external_host,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -10,11 +10,6 @@ use validator::{Validate, ValidationError};
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
-
-#[inline]
-fn just_true() -> bool {
-    true
-}
 
 #[inline]
 fn default_invalid_address() -> Address {
@@ -52,8 +47,6 @@ fn validate_directory_exists(s: &str) -> Result<(), ValidationError> {
         Err(ValidationError::new("Invalid directory path specified"))
     }
 }
-
-
 
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct HoprLibConfig {

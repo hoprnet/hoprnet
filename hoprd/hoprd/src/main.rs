@@ -1,14 +1,11 @@
-use std::{str::FromStr, sync::Arc};
-use std::path::PathBuf;
-use std::time::Duration;
+use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
+
 use async_signal::{Signal, Signals};
-use console_subscriber::init;
-use futures::{
-    FutureExt, StreamExt,
-    future::{abortable},
+use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
+use hopr_lib::{
+    AbortableList, AcknowledgedTicket, Address, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
+    exports::api::chain::ChainEvents, state::HoprLibProcess, utils::session::ListenerJoinHandles,
 };
-use futures::channel::mpsc::channel;
-use hopr_lib::{HoprKeys, IdentityRetrievalModes, ToHex, state::HoprLibProcess, utils::session::ListenerJoinHandles, Address, AcknowledgedTicket, state, Keypair};
 use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
@@ -18,18 +15,16 @@ use tracing_subscriber::prelude::*;
 #[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
 mod jemalloc_stats;
 
+use hopr_chain_connector::HoprBlokliConnector;
+use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
+use hopr_lib::{errors::HoprLibError, prelude::ChainKeypair};
+use hoprd::config::HoprdConfig;
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
     opentelemetry_otlp::WithExportConfig as _,
     opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
 };
-use hopr_async_runtime::{Abortable, AbortableList};
-use hopr_chain_connector::HoprBlokliConnector;
-use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::prelude::ChainKeypair;
-use hoprd::config::HoprdConfig;
 
 // Avoid musl's default allocator due to degraded performance
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
@@ -37,7 +32,7 @@ use hoprd::config::HoprdConfig;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
+fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
@@ -142,7 +137,10 @@ enum HoprdProcess {
 #[cfg(not(feature = "runtime-tokio"))]
 compile_error!("The 'runtime-tokio' feature must be enabled");
 
-async fn init_db(cfg: &HoprdConfig, chain_key: &ChainKeypair) -> Result<(HoprNodeDb, futures::channel::mpsc::Receiver<AcknowledgedTicket>), anyhow::Error> {
+async fn init_db(
+    cfg: &HoprdConfig,
+    chain_key: &ChainKeypair,
+) -> Result<(HoprNodeDb, futures::channel::mpsc::Receiver<AcknowledgedTicket>), anyhow::Error> {
     let db_path: PathBuf = [&cfg.db.data, "node_db"].iter().collect();
     info!(path = ?db_path, "initiating DB");
 
@@ -187,9 +185,9 @@ async fn init_db(cfg: &HoprdConfig, chain_key: &ChainKeypair) -> Result<(HoprNod
         .unwrap_or(2048);
 
     debug!(
-            capacity = ack_ticket_channel_capacity,
-            "starting winning ticket processing"
-        );
+        capacity = ack_ticket_channel_capacity,
+        "starting winning ticket processing"
+    );
     let (on_ack_tkt_tx, on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
     node_db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
@@ -203,18 +201,20 @@ fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlo
         chain_key,
         hopr_chain_connector::blokli_client::BlokliClient::new("test".parse()?, Default::default()),
         Address::default(),
-        hopr_chain_connector::ContractAddresses::default()
+        hopr_chain_connector::ContractAddresses::default(),
     )?))
 }
 
-async fn init_rest_api(cfg: &HoprdConfig, hopr: Arc<hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>) -> anyhow::Result<AbortableList<HoprdProcess>> {
-    let node_cfg_value =
-        serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
+async fn init_rest_api(
+    cfg: &HoprdConfig,
+    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
+) -> anyhow::Result<AbortableList<HoprdProcess>> {
+    let node_cfg_value = serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
     let api_cfg = cfg.api.clone();
 
     let listen_address = match &cfg.api.host.address {
-        hopr_lib::HostType::IPv4(a) | hopr_lib::HostType::Domain(a) => {
+        hopr_lib::config::HostType::IPv4(a) | hopr_lib::config::HostType::Domain(a) => {
             format!("{a}:{}", cfg.api.host.port)
         }
     };
@@ -231,6 +231,7 @@ async fn init_rest_api(cfg: &HoprdConfig, hopr: Arc<hopr_lib::Hopr<Arc<HoprBlokl
 
     processes.insert(HoprdProcess::ListenerSocket, session_listener_sockets.clone());
 
+    let cfg_clone = cfg.clone();
     let (proc, abort_handle) = abortable(
         async move {
             if let Err(e) = serve_api(RestApiParameters {
@@ -239,14 +240,14 @@ async fn init_rest_api(cfg: &HoprdConfig, hopr: Arc<hopr_lib::Hopr<Arc<HoprBlokl
                 cfg: api_cfg,
                 hopr,
                 session_listener_sockets,
-                default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
+                default_session_listen_host: cfg_clone.session_ip_forwarding.default_entry_listen_host,
             })
-                .await
+            .await
             {
                 error!(error = %e, "the REST API server could not start")
             }
         }
-            .inspect(|_| tracing::warn!(task = "hoprd - REST API", "long-running background task finished")),
+        .inspect(|_| tracing::warn!(task = "hoprd - REST API", "long-running background task finished")),
     );
     let _jh = tokio::spawn(proc);
     processes.insert(HoprdProcess::RestApi, abort_handle);
@@ -315,7 +316,7 @@ async fn main_inner() -> anyhow::Result<()> {
     }
 
     let args = <CliArgs as clap::Parser>::parse();
-    let mut cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
+    let cfg = HoprdConfig::from_cli_args(args, false)?;
 
     let git_hash = option_env!("VERGEN_GIT_SHA").unwrap_or("unknown");
     info!(
@@ -332,7 +333,7 @@ async fn main_inner() -> anyhow::Result<()> {
         info!("The HOPRd node appears to run on DappNode");
     }
 
-    if let hopr_lib::HostType::IPv4(address) = &cfg.hopr.host.address {
+    if let hopr_lib::config::HostType::IPv4(address) = &cfg.hopr.host.address {
         let ipv4 = std::net::Ipv4Addr::from_str(address).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
         if ipv4.is_loopback() && !cfg.hopr.transport.announce_local_addresses {
@@ -403,7 +404,7 @@ async fn main_inner() -> anyhow::Result<()> {
             chain_connector.subscribe()?,
             ack_tickets_from_db,
             cfg.strategy.execution_interval.max(Duration::from_secs(1)),
-            hopr_keys.chain_key.public().to_address()
+            hopr_keys.chain_key.public().to_address(),
         ),
     );
 

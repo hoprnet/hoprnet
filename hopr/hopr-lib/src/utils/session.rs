@@ -5,16 +5,11 @@
 //! session operations.
 
 use std::{
-    collections::{VecDeque},
-    fmt::Formatter,
-    future::Future,
-    hash::Hash,
-    net::SocketAddr,
-    num::NonZeroUsize,
-    str::FromStr,
-    sync::Arc,
+    collections::VecDeque, fmt::Formatter, future::Future, hash::Hash, net::SocketAddr, num::NonZeroUsize,
+    str::FromStr, sync::Arc,
 };
 
+use anyhow::anyhow;
 use base64::Engine;
 use bytesize::ByteSize;
 use dashmap::DashMap;
@@ -22,6 +17,8 @@ use futures::{
     FutureExt, StreamExt, TryStreamExt,
     future::{AbortHandle, AbortRegistration},
 };
+use hopr_api::{chain::HoprChainApi, db::HoprNodeDbApi};
+use hopr_async_runtime::Abortable;
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
     udp::ForeignDataMode,
@@ -32,10 +29,9 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info};
-use hopr_async_runtime::Abortable;
 
 use crate::{
-    Address, Hopr, HoprSession, HoprSessionId, SURB_SIZE, ServiceId, SessionClientConfig, SessionTarget,
+    Address, Hopr, HoprSession, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
     errors::HoprLibError, transfer_session,
 };
 
@@ -141,11 +137,11 @@ pub struct StoredSessionEntry {
     /// The abort handle for the Session processing.
     pub abort_handle: AbortHandle,
 
-    clients: Arc<DashMap<HoprSessionId, (SocketAddr, AbortHandle)>>,
+    clients: Arc<DashMap<SessionId, (SocketAddr, AbortHandle)>>,
 }
 
 impl StoredSessionEntry {
-    pub fn get_clients(&self) -> &Arc<DashMap<HoprSessionId, (SocketAddr, AbortHandle)>> {
+    pub fn get_clients(&self) -> &Arc<DashMap<SessionId, (SocketAddr, AbortHandle)>> {
         &self.clients
     }
 }
@@ -204,7 +200,7 @@ impl Abortable for ListenerJoinHandles {
 }
 
 pub struct SessionPool {
-    pool: Option<Arc<std::sync::Mutex<VecDeque<HoprSession>>>>,
+    pool: Option<Arc<parking_lot::Mutex<VecDeque<HoprSession>>>>,
     ah: Option<AbortHandle>,
 }
 
@@ -217,8 +213,12 @@ impl SessionPool {
         target: SessionTarget,
         cfg: SessionClientConfig,
         hopr: Arc<Hopr<Chain, Db>>,
-    ) -> Result<Self, String> {
-        let pool = Arc::new(std::sync::Mutex::new(VecDeque::with_capacity(size)));
+    ) -> Result<Self, anyhow::Error>
+    where
+        Chain: HoprChainApi + Clone + Send + Sync + 'static,
+        Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+    {
+        let pool = Arc::new(parking_lot::Mutex::new(VecDeque::with_capacity(size)));
         let hopr_clone = hopr.clone();
         let pool_clone = pool.clone();
         futures::stream::iter(0..size.min(Self::MAX_SESSION_POOL_SIZE))
@@ -232,12 +232,12 @@ impl SessionPool {
                     match hopr.connect_to(dst, target.clone(), cfg.clone()).await {
                         Ok(s) => {
                             debug!(session_id = %s.id(), num_session = i, "created a new session in pool");
-                            pool.lock().map_err(|_| "lock failed".to_string())?.push_back(s);
+                            pool.lock().push_back(s);
                             Ok(())
                         }
                         Err(error) => {
                             error!(%error, num_session = i, "failed to establish session for pool");
-                            Err(format!("failed to establish session #{i} in pool to {dst}: {error}"))
+                            Err(anyhow!("failed to establish session #{i} in pool to {dst}: {error}"))
                         }
                     }
                 }
@@ -245,7 +245,7 @@ impl SessionPool {
             .await?;
 
         // Spawn a task that periodically sends keep alive messages to the Session in the pool.
-        if !pool.lock().map(|p| p.is_empty()).unwrap_or(true) {
+        if !pool.lock().is_empty() {
             let pool_clone_1 = pool.clone();
             let pool_clone_2 = pool.clone();
             let pool_clone_3 = pool.clone();
@@ -257,12 +257,12 @@ impl SessionPool {
                     ))
                     .take_while(move |_| {
                         // Continue the infinite interval stream until there are sessions in the pool
-                        futures::future::ready(pool_clone_1.lock().is_ok_and(|p| !p.is_empty()))
+                        futures::future::ready(!pool_clone_1.lock().is_empty())
                     })
                     .flat_map(move |_| {
                         // Get all SessionIds of the remaining Sessions in the pool
-                        let ids = pool_clone_2.lock().ok().map(|v| v.iter().map(|s| *s.id()).collect::<Vec<_>>());
-                        futures::stream::iter(ids.into_iter().flatten())
+                        let ids = pool_clone_2.lock().iter().map(|s| *s.id()).collect::<Vec<_>>();
+                        futures::stream::iter(ids)
                     })
                     .for_each(move |id| {
                         let hopr = hopr.clone();
@@ -271,9 +271,7 @@ impl SessionPool {
                             // Make sure the Session is still alive, otherwise remove it from the pool
                             if let Err(error) = hopr.keep_alive_session(&id).await {
                                 error!(%error, %dst, session_id = %id, "session in pool is not alive, removing from pool");
-                                if let Ok(mut pool) = pool.lock() {
-                                    pool.retain(|s| *s.id() != id);
-                                }
+                                pool.lock().retain(|s| *s.id() != id);
                             }
                         }
                     })
@@ -285,7 +283,7 @@ impl SessionPool {
     }
 
     pub fn pop(&mut self) -> Option<HoprSession> {
-        self.pool.as_ref().and_then(|pool| pool.lock().ok()?.pop_front())
+        self.pool.as_ref().and_then(|pool| pool.lock().pop_front())
     }
 }
 
@@ -308,7 +306,11 @@ pub async fn create_tcp_client_binding<Chain, Db>(
     config: SessionClientConfig,
     use_session_pool: Option<usize>,
     max_client_sessions: Option<usize>,
-) -> Result<(std::net::SocketAddr, Option<HoprSessionId>, usize), BindError> {
+) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+{
     // Bind the TCP socket first
     let (bound_host, tcp_listener) = tcp_listen_on(bind_host, port_range).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::AddrInUse {
@@ -475,7 +477,11 @@ pub async fn create_udp_client_binding<Chain, Db>(
     destination: Address,
     target_spec: SessionTargetSpec,
     config: SessionClientConfig,
-) -> Result<(std::net::SocketAddr, Option<HoprSessionId>, usize), BindError> {
+) -> Result<(std::net::SocketAddr, Option<SessionId>, usize), BindError>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+{
     // Bind the UDP socket first
     let (bound_host, udp_socket) = udp_bind_to(bind_host, port_range).await.map_err(|e| {
         if e.kind() == std::io::ErrorKind::AddrInUse {

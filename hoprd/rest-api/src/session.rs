@@ -14,10 +14,9 @@ use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, HoprSession, HoprSessionId, HoprTransportError, NodeId, SESSION_MTU, SURB_SIZE, ServiceId,
-    SessionCapabilities, SessionClientConfig, SessionManagerError, SessionTarget, SurbBalancerConfig,
-    TransportSessionError,
-    errors::HoprLibError,
+    Address, HoprSession, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
+    SessionId, SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
+    errors::{HoprLibError, HoprTransportError},
     utils::{
         futures::AsyncReadStreamer,
         session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding},
@@ -870,8 +869,8 @@ pub(crate) async fn adjust_session(
     Path(session_id): Path<String>,
     Json(args): Json<SessionConfig>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let session_id = HoprSessionId::from_str(&session_id)
-        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
+    let session_id =
+        SessionId::from_str(&session_id).map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
 
     if let Some(cfg) = Option::<SurbBalancerConfig>::from(args) {
         match state.hopr.update_session_surb_balancer_config(&session_id, cfg).await {
@@ -913,8 +912,8 @@ pub(crate) async fn session_config(
     State(state): State<Arc<InternalState>>,
     Path(session_id): Path<String>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let session_id = HoprSessionId::from_str(&session_id)
-        .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
+    let session_id =
+        SessionId::from_str(&session_id).map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidSessionId))?;
 
     match state.hopr.get_session_surb_balancer_config(&session_id).await {
         Ok(Some(cfg)) => {
@@ -1019,7 +1018,7 @@ pub(crate) async fn close_client(
         }
 
         for bound_addr in to_remove {
-            let(_, entry) = open_listeners
+            let (_, entry) = open_listeners
                 .remove(&bound_addr)
                 .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
 

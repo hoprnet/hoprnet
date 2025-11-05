@@ -46,7 +46,10 @@ where
         }
     }
 
-    async fn safe_allowance<Cy: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<Cy>, Self::Error> {
+    async fn safe_allowance<Cy: Currency, A: Into<Address> + Send>(
+        &self,
+        address: A,
+    ) -> Result<Balance<Cy>, Self::Error> {
         self.check_connection_state()?;
 
         let address = address.into();

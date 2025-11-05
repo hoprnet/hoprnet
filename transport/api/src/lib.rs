@@ -18,13 +18,13 @@ pub mod config;
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
-pub mod helpers;
+mod helpers;
 pub mod network_notifier;
 
 pub mod socket;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     sync::{Arc, OnceLock},
     time::Duration,
 };
@@ -40,7 +40,7 @@ use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbPeersOperations, HoprDbProtocolOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
-use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable, AbortableList};
+use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -214,7 +214,7 @@ where
             futures::channel::mpsc::Receiver<ApplicationDataIn>,
             futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         >,
-        AbortableList<HoprTransportProcess>
+        AbortableList<HoprTransportProcess>,
     )>
     where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,

@@ -12,6 +12,9 @@ pub use tickets::*;
 pub type DbTimestamp = chrono::DateTime<chrono::Utc>;
 
 /// Complete set of HOPR node database APIs.
+///
+/// This trait is automatically implemented for types
+/// that implement all the individual chain API traits to be implemented with the same error.
 pub trait HoprNodeDbApi:
     HoprDbTicketOperations<Error = Self::NodeDbError>
     + HoprDbPeersOperations<Error = Self::NodeDbError>

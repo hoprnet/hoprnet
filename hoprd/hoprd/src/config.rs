@@ -5,7 +5,10 @@ use std::{
     time::Duration,
 };
 
-use hopr_lib::{Address, HostConfig, HostType, config::HoprLibConfig};
+use hopr_lib::{
+    Address,
+    config::{HoprLibConfig, HostConfig, HostType},
+};
 use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
@@ -105,7 +108,7 @@ pub struct Db {
 ///
 /// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/hoprd/example_cfg.yaml)
 /// which is always in the root of this crate.
-#[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq, smart_default::SmartDefault)]
 #[serde(deny_unknown_fields)]
 pub struct HoprdConfig {
     /// Configuration related to hopr functionality
@@ -184,13 +187,13 @@ impl HoprdConfig {
 
         // db
         if let Some(data) = cli_args.data {
-            cfg.hopr.db.data = data
+            cfg.db.data = data
         }
         if cli_args.init > 0 {
-            cfg.hopr.db.initialize = true;
+            cfg.db.initialize = true;
         }
         if cli_args.force_init > 0 {
-            cfg.hopr.db.force_initialize = true;
+            cfg.db.force_initialize = true;
         }
 
         // api
@@ -253,11 +256,11 @@ impl HoprdConfig {
 
         // additional updates
         let home_symbol = '~';
-        if cfg.hopr.db.data.starts_with(home_symbol) {
-            cfg.hopr.db.data = home::home_dir()
+        if cfg.db.data.starts_with(home_symbol) {
+            cfg.db.data = home::home_dir()
                 .map(|h| h.as_path().display().to_string())
                 .expect("home dir for a user must be specified")
-                + &cfg.hopr.db.data[1..];
+                + &cfg.db.data[1..];
         }
         if cfg.identity.file.starts_with(home_symbol) {
             cfg.identity.file = home::home_dir()
@@ -267,7 +270,7 @@ impl HoprdConfig {
         }
 
         if skip_validation {
-            return Ok(cfg)
+            return Ok(cfg);
         }
 
         match cfg.validate() {

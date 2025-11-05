@@ -104,8 +104,8 @@ where
                 node_safe_registry: "0xe15C24a0910311c83aC78B5930d771089E93077b".parse()?,
                 module_implementation: "0xB7397C218766eBe6A1A634df523A1a7e412e67eA".parse()?,
                 ticket_price_oracle: "0xcA5656Fe6F2d847ACA32cf5f38E51D2054cA1273".parse()?,
-                winning_probability_oracle: "0x7Eb8d762fe794A108e568aD2097562cc5D3A1359".parse()?
-            }
+                winning_probability_oracle: "0x7Eb8d762fe794A108e568aD2097562cc5D3A1359".parse()?,
+            },
         })
     }
 }

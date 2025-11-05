@@ -1,4 +1,5 @@
 use std::{error::Error, time::Duration};
+
 pub use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::prelude::Hash;
 pub use hopr_internal_types::prelude::WinningProbability;
@@ -23,7 +24,7 @@ pub struct ChainInfo {
     /// Name of the HOPR network (e.g.: `dufour`)
     pub hopr_network_name: String,
     /// Addresses of the deployed HOPR smart contracts.
-    pub contract_addresses: ContractAddresses
+    pub contract_addresses: ContractAddresses,
 }
 
 /// Retrieves various on-chain information.

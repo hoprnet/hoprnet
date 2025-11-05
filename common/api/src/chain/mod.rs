@@ -16,6 +16,9 @@ pub use values::*;
 pub type ChainReceipt = hopr_crypto_types::prelude::Hash;
 
 /// Complete set of HOPR on-chain operation APIs.
+///
+/// This trait is automatically implemented for types
+/// that implement all the individual chain API traits to be implemented with the same error.
 pub trait HoprChainApi:
     ChainReadAccountOperations<Error = Self::ChainError>
     + ChainWriteAccountOperations<Error = Self::ChainError>

@@ -2,6 +2,7 @@
 //! runtime.
 
 use std::hash::Hash;
+
 pub use futures::future::AbortHandle;
 
 // Both features could be enabled during testing; therefore, we only use tokio when it's
@@ -71,7 +72,8 @@ impl Abortable for tokio::task::JoinHandle<()> {
 /// Sometimes this behavior is not desirable, and spawned run-away tasks may still continue to live
 /// e.g.: after an error is raised.
 ///
-/// This object allows safely managing abortable tasks and will terminate all the tasks in reverse insertion order once dropped.
+/// This object allows safely managing abortable tasks and will terminate all the tasks in reverse insertion order once
+/// dropped.
 ///
 /// Additionally, this object also implements [`Abortable`] allowing it to be arbitrarily nested.
 pub struct AbortableList<T>(indexmap::IndexMap<T, Box<dyn Abortable>>);

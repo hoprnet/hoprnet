@@ -31,7 +31,6 @@ runtime-tokio = [
   "hopr-lib/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
   "hopr-strategy/runtime-tokio",
-  "hopr-async-runtime/runtime-tokio"
 ]
 telemetry = [
   "dep:opentelemetry",
@@ -56,6 +55,7 @@ jemalloc-stats = ["dep:tikv-jemalloc-ctl"]
 [dependencies]
 anyhow = { workspace = true }
 async-signal = { workspace = true }
+async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 dashmap = { workspace = true }

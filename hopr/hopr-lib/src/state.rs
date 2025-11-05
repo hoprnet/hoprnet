@@ -30,4 +30,3 @@ pub enum HoprLibProcess {
     #[strum(to_string = "flush operation of outgoing ticket indices to the DB")]
     TicketIndexFlush,
 }
-

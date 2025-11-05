@@ -1,3 +1,4 @@
+pub use hopr_transport::errors::{HoprTransportError, ProbeError, ProtocolError};
 use thiserror::Error;
 
 use crate::state::HoprState;
@@ -19,10 +20,16 @@ pub enum HoprLibError {
     GeneralError(String),
 
     #[error(transparent)]
-    StatusError(#[from] HoprStatusError),
-    
+    DbError(anyhow::Error),
+
     #[error(transparent)]
-    TransportError(#[from] hopr_transport::errors::HoprTransportError),
+    ChainError(anyhow::Error),
+
+    #[error(transparent)]
+    StatusError(#[from] HoprStatusError),
+
+    #[error(transparent)]
+    TransportError(#[from] HoprTransportError),
 
     #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),
@@ -35,3 +42,17 @@ pub enum HoprLibError {
 }
 
 pub type Result<T> = std::result::Result<T, HoprLibError>;
+
+impl HoprLibError {
+    pub fn chain<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::ChainError(e.into())
+    }
+
+    pub fn db<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::DbError(e.into())
+    }
+
+    pub fn other(e: impl Into<anyhow::Error>) -> Self {
+        Self::Other(e.into())
+    }
+}

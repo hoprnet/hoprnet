@@ -399,7 +399,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 hopr_token: chain_info.contract_addresses.token,
                 hopr_channels: chain_info.contract_addresses.channels,
                 hopr_network_registry: chain_info.contract_addresses.network_registry,
-                hopr_node_safe_registry:chain_info.contract_addresses.node_safe_registry,
+                hopr_node_safe_registry: chain_info.contract_addresses.node_safe_registry,
                 hopr_management_module: chain_info.contract_addresses.module_implementation,
                 hopr_node_safe: safe_config.safe_address,
                 connectivity_status: hopr.network_health().await,

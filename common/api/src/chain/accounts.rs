@@ -103,7 +103,10 @@ pub trait ChainReadAccountOperations {
     async fn get_balance<C: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<C>, Self::Error>;
 
     /// Returns the native or token currency Safe allowance.
-    async fn safe_allowance<C: Currency, A: Into<Address> + Send>(&self, safe_address: A) -> Result<Balance<C>, Self::Error>;
+    async fn safe_allowance<C: Currency, A: Into<Address> + Send>(
+        &self,
+        safe_address: A,
+    ) -> Result<Balance<C>, Self::Error>;
 
     /// Returns on-chain node accounts with the given [`AccountSelector`].
     async fn stream_accounts<'a>(
