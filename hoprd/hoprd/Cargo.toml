@@ -48,8 +48,12 @@ prof = [
   "dep:console-subscriber",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
-allocator-mimalloc = ["dep:mimalloc"] # Use mimalloc as the global allocator on Linux
-allocator-jemalloc = ["dep:tikv-jemallocator"] # Use jemalloc as the global allocator on Linux
+allocator-mimalloc = [
+  "dep:mimalloc",
+] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = [
+  "dep:tikv-jemallocator",
+] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
 anyhow = { workspace = true }
