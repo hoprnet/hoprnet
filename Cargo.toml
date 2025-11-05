@@ -192,6 +192,8 @@ sysinfo = "0.37.2"
 tempfile = "3.23.0"
 test-log = { version = "0.2.18", features = ["trace"] }
 thiserror = "2.0.17"
+tikv-jemallocator = "0.6.1"
+tikv-jemalloc-ctl = { version = "0.6.1", features = ["stats"] }
 tokio = { version = "1.48.0", features = [
   "rt-multi-thread",
   "macros",
@@ -233,7 +235,9 @@ uuid = { version = "1.18.1" }
 url = { version = "2.5.7", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
-tikv-jemallocator = "0.6.1"
+mimalloc = { version = "0.1.48", default-features = false, features = [
+  "secure",
+] }
 
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }

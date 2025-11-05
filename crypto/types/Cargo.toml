@@ -3,6 +3,7 @@ name = "hopr-crypto-types"
 version = "0.7.3"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
+license = "GPL-3.0-only"
 
 [features]
 rust-ecdsa = []
@@ -15,6 +16,12 @@ serde = [
   "k256/serde",
   "libp2p-identity/serde",
 ]
+allocator-mimalloc = [
+  "dep:mimalloc",
+] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = [
+  "dep:tikv-jemallocator",
+] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
 aes = "0.8.4"
@@ -81,4 +88,5 @@ harness = false
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.1"
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }

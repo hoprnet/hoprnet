@@ -196,7 +196,7 @@
 
           hoprdBuildArgs = {
             inherit src depsSrc rev;
-            cargoExtraArgs = "-p hoprd-api";
+            cargoExtraArgs = "-p hoprd-api -F allocator-jemalloc";
             cargoToml = ./hoprd/hoprd/Cargo.toml;
           };
 
