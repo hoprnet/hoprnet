@@ -31,7 +31,7 @@ use serde_with::serde_as;
 #[cfg(all(feature = "prometheus", not(test)))]
 use strum::VariantNames;
 use tracing::{error, warn};
-use validator::Validate;
+use validator::{Validate, ValidationError};
 
 use crate::{
     Strategy, auto_funding::AutoFundingStrategy, auto_redeeming::AutoRedeemingStrategy,
@@ -84,6 +84,14 @@ fn empty_vector() -> Vec<Strategy> {
     vec![]
 }
 
+fn validate_execution_interval(interval: &std::time::Duration) -> std::result::Result<(), ValidationError> {
+    if interval < &std::time::Duration::from_secs(10) {
+        Err(ValidationError::new("strategy execution interval must be at least 1 second"))
+    } else {
+        Ok(())
+    }
+}
+
 /// Configuration options for the `MultiStrategy` chain.
 /// If `fail_on_continue` is set, the `MultiStrategy` sequence behaves as logical AND chain,
 /// otherwise it behaves like a logical OR chain.
@@ -109,10 +117,11 @@ pub struct MultiStrategyConfig {
 
     /// Execution interval of the configured strategies in seconds.
     ///
-    /// Default is 60, minimum is 1.
+    /// Default is 60 seconds, minimum is 10 seconds.
     #[default(sixty_seconds())]
     #[serde(default = "sixty_seconds")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    #[validate(custom(function = "validate_execution_interval"))]
     pub execution_interval: std::time::Duration,
 
     /// Configuration of individual sub-strategies.

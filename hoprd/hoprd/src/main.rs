@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, sync::Arc, time::Duration};
+use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
@@ -328,7 +328,8 @@ async fn main_inner() -> anyhow::Result<()> {
         "Node public identifiers"
     );
 
-    let (node_db, ack_tickets_from_db) = init_db(&cfg, &hopr_keys.chain_key).await?;
+    // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
+    let (node_db, stored_tickets) = init_db(&cfg, &hopr_keys.chain_key).await?;
 
     let chain_connector = init_blokli_connector(&hopr_keys.chain_key)?;
 
@@ -340,7 +341,7 @@ async fn main_inner() -> anyhow::Result<()> {
         node_db.clone(),
         &hopr_keys.packet_key,
         &hopr_keys.chain_key,
-    )?);
+    ).await?);
 
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),
@@ -371,8 +372,8 @@ async fn main_inner() -> anyhow::Result<()> {
         hopr_strategy::stream_events_to_strategy_with_tick(
             multi_strategy,
             chain_connector.subscribe()?,
-            ack_tickets_from_db,
-            cfg.strategy.execution_interval.max(Duration::from_secs(1)),
+            stored_tickets,
+            cfg.strategy.execution_interval,
             hopr_keys.chain_key.public().to_address(),
         ),
     );

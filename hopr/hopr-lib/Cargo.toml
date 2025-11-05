@@ -44,7 +44,6 @@ utils_futures = [] # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
 testing = [
-  "dep:futures-time",
   "dep:rand",
   "dep:rstest",
   "dep:tokio",
