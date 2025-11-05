@@ -4655,6 +4655,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "hopr-bindings 0.2.0",
+ "hopr-bindings 4.0.0",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
