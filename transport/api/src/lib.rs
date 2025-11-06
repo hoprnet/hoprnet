@@ -49,8 +49,7 @@ pub use hopr_crypto_types::{
 pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::RoutingOptions;
-use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
-use hopr_path::selectors::NoPathSelector;
+use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
@@ -296,7 +295,7 @@ where
 
         let mut addresses: HashSet<Multiaddr> = HashSet::new();
         for node_entry in public_nodes {
-            if let AccountType::Announced { multiaddr, .. } = node_entry.entry_type {
+            if let AccountType::Announced(multiaddr) = node_entry.entry_type {
                 let peer: PeerId = node_entry.public_key.into();
                 let multiaddresses = vec![multiaddr];
 

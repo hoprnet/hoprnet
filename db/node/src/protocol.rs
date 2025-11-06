@@ -10,7 +10,6 @@ use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_parallelize::cpu::spawn_fifo_blocking;
-use hopr_path::{Path, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 

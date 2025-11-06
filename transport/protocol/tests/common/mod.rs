@@ -1,27 +1,16 @@
 use std::{str::FromStr, time::Duration};
-
+use std::sync::Arc;
 use anyhow::Context;
 use async_trait::async_trait;
 use bimap::BiHashMap;
 use futures::{SinkExt, StreamExt, stream::BoxStream};
 use hex_literal::hex;
-use hopr_api::chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues, ChannelSelector, DomainSeparators};
+use hopr_api::chain::*;
 use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
-use hopr_crypto_types::{
-    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    types::{Hash, OffchainPublicKey},
-};
+use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
-use hopr_db_sql::{
-    HoprIndexerDb,
-    accounts::HoprDbAccountOperations,
-    channels::HoprDbChannelOperations,
-    info::HoprDbInfoOperations,
-    prelude::{DbSqlError, DomainSeparator},
-};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
@@ -30,6 +19,7 @@ use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 use tokio::time::timeout;
 use tracing::debug;
+use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 
 lazy_static! {
     pub static ref PEERS: Vec<OffchainKeypair> = [
@@ -62,6 +52,23 @@ lazy_static! {
         .enumerate()
         .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
         .collect::<BiHashMap<_, _>>();
+
+    static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestClient = hopr_chain_connector::testing::BlokliTestClientBuilder::default()
+        .with_accounts(PEERS.iter().enumerate().map(|(i, kp)| {
+            let node_key = kp.public();
+            let chain_key = PEERS_CHAIN[i].public();
+            AccountEntry {
+                public_key: *node_key,
+                chain_addr: chain_key.to_address(),
+                entry_type: AccountType::Announced("/ip4/127.0.0.1/tcp/4444".parse().unwrap()),
+                safe_address: None,
+                key_id: (i as u32).into(),
+            }
+        }))
+        .with_channels(PEERS_CHAIN.iter().take(PEERS_CHAIN.len()-1).enumerate().map(|(i, cp)| {
+            create_dummy_channel(cp.public().to_address(), PEERS_CHAIN[i+1].public().to_address())
+        }))
+        .build();
 }
 
 fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
@@ -75,159 +82,14 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
     )
 }
 
-pub async fn create_dbs(amount: usize) -> anyhow::Result<(Vec<HoprNodeDb>, Vec<HoprIndexerDb>)> {
-    let indexer_dbs =
-        futures::future::join_all((0..amount).map(|i| HoprIndexerDb::new_in_memory(PEERS_CHAIN[i].clone())))
-            .await
-            .into_iter()
-            .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
-            .collect::<anyhow::Result<Vec<HoprIndexerDb>>>()?;
-
+pub async fn create_dbs(amount: usize) -> anyhow::Result<Vec<HoprNodeDb>> {
     let node_dbs = futures::future::join_all((0..amount).map(|i| HoprNodeDb::new_in_memory(PEERS_CHAIN[i].clone())))
         .await
         .into_iter()
         .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
         .collect::<anyhow::Result<Vec<HoprNodeDb>>>()?;
 
-    Ok((node_dbs, indexer_dbs))
-}
-
-pub async fn create_minimal_topology(dbs: &mut [HoprIndexerDb]) -> anyhow::Result<()> {
-    let mut previous_channel: Option<ChannelEntry> = None;
-
-    for index in 0..dbs.len() {
-        dbs[index]
-            .set_domain_separator(None, DomainSeparator::Channel, Hash::default())
-            .await?;
-
-        dbs[index]
-            .update_ticket_price(None, (*DEFAULT_PRICE_PER_PACKET).into())
-            .await?;
-
-        // Link all the node keys and chain keys from the simulated announcements
-        for i in 0..PEERS.len() {
-            let node_key = PEERS[i].public();
-            let chain_key = PEERS_CHAIN[i].public();
-            dbs[index]
-                .insert_account(
-                    None,
-                    AccountEntry {
-                        public_key: *node_key,
-                        chain_addr: chain_key.to_address(),
-                        entry_type: AccountType::Announced {
-                            multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444")?,
-                            updated_block: 1,
-                        },
-                        published_at: 1,
-                    },
-                )
-                .await
-                .map_err(|e| hopr_transport_protocol::errors::ProtocolError::Logic(e.to_string()))?;
-        }
-
-        let mut channel: Option<ChannelEntry> = None;
-        let this_peer_chain = &PEERS_CHAIN[index];
-
-        if index < PEERS.len() - 1 {
-            channel = Some(create_dummy_channel(
-                this_peer_chain.public().to_address(),
-                PEERS_CHAIN[index + 1].public().to_address(),
-            ));
-
-            dbs[index]
-                .upsert_channel(None, channel.context("channel should be present")?)
-                .await
-                .map_err(|e| hopr_transport_protocol::errors::ProtocolError::Logic(e.to_string()))?;
-        }
-
-        if index > 0 {
-            dbs[index]
-                .upsert_channel(None, previous_channel.context("channel should be present")?)
-                .await
-                .map_err(|e| hopr_transport_protocol::errors::ProtocolError::Logic(e.to_string()))?;
-        }
-
-        previous_channel = channel;
-    }
-
-    Ok(())
-}
-
-#[derive(Clone)]
-pub struct IndexerDbChainWrapper(pub HoprIndexerDb);
-
-#[async_trait::async_trait]
-impl ChainReadChannelOperations for IndexerDbChainWrapper {
-    type Error = DbSqlError;
-
-    fn me(&self) -> &Address {
-        &self.0.me_onchain
-    }
-
-    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
-        self.0.get_channel_by_parties(None, src, dst, false).await
-    }
-
-    async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error> {
-        self.0.get_channel_by_id(None, channel_id).await
-    }
-
-    async fn stream_channels<'a>(&'a self, _: ChannelSelector) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
-        // Not necessary for tests
-        unimplemented!()
-    }
-}
-
-#[async_trait::async_trait]
-impl ChainValues for IndexerDbChainWrapper {
-    type Error = DbSqlError;
-
-    async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
-        let data = self.0.get_indexer_data(None).await?;
-        Ok(DomainSeparators {
-            ledger: Hash::default(),
-            safe_registry: Hash::default(),
-            channel: data.channels_dst.unwrap(),
-        })
-    }
-
-    async fn minimum_incoming_ticket_win_prob(&self) -> Result<WinningProbability, Self::Error> {
-        Ok(WinningProbability::ALWAYS)
-    }
-
-    async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
-        Ok((*DEFAULT_PRICE_PER_PACKET).into())
-    }
-
-    async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
-        Ok(Duration::from_secs(10))
-    }
-}
-
-#[async_trait::async_trait]
-impl ChainKeyOperations for IndexerDbChainWrapper {
-    type Error = DbSqlError;
-    type Mapper = bimap::BiHashMap<KeyIdent, OffchainPublicKey>;
-
-    async fn chain_key_to_packet_key(&self, chain: &Address) -> Result<Option<OffchainPublicKey>, Self::Error> {
-        Ok(PEERS_CHAIN
-            .iter()
-            .enumerate()
-            .find(|(_, a)| &a.public().to_address() == chain)
-            .map(|(i, _)| *PEERS[i].public()))
-    }
-
-    async fn packet_key_to_chain_key(&self, packet: &OffchainPublicKey) -> Result<Option<Address>, Self::Error> {
-        Ok(PEERS
-            .iter()
-            .enumerate()
-            .find(|(_, k)| k.public() == packet)
-            .map(|(i, _)| PEERS_CHAIN[i].public().to_address()))
-    }
-
-    fn key_id_mapper_ref(&self) -> &Self::Mapper {
-        &MAPPER
-    }
+    Ok(node_dbs)
 }
 
 #[allow(dead_code)]
@@ -253,9 +115,7 @@ pub async fn peer_setup_for(
 
     assert!(peer_count <= PEERS.len());
     assert!(peer_count >= 3);
-    let (node_dbs, mut indexer_dbs) = create_dbs(peer_count).await?;
-
-    create_minimal_topology(&mut indexer_dbs).await?;
+    let node_dbs = create_dbs(peer_count).await?;
 
     // Begin tests
     for i in 0..peer_count {
@@ -276,7 +136,7 @@ pub async fn peer_setup_for(
     let mut logical_channels = Vec::new();
     let mut ticket_channels = Vec::new();
 
-    for (i, (node_db, indexer_db)) in node_dbs.into_iter().zip(indexer_dbs.into_iter()).enumerate() {
+    for (i, node_db, ) in node_dbs.into_iter().enumerate() {
         let (received_ack_tickets_tx, received_ack_tickets_rx) =
             futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
 
@@ -296,11 +156,12 @@ pub async fn peer_setup_for(
         };
 
         node_db.start_ticket_processing(Some(received_ack_tickets_tx))?;
+        let connector = create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone(), Default::default()).await?;
 
         hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             node_db,
-            IndexerDbChainWrapper(indexer_db),
+            Arc::new(connector),
             (mixer_channel_tx, wire_msg_send_rx),
             (api_recv_tx, api_send_rx),
         )
@@ -366,54 +227,14 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
     futures::future::pending::<()>().await;
 }
 
-struct TestResolver;
-
-#[async_trait]
-impl PathAddressResolver for TestResolver {
-    async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError> {
-        Ok(PEERS_CHAIN
-            .iter()
-            .enumerate()
-            .find(|(_, a)| &a.public().to_address() == address)
-            .map(|(i, _)| *PEERS[i].public()))
-    }
-
-    async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError> {
-        Ok(PEERS
-            .iter()
-            .enumerate()
-            .find(|(_, k)| k.public() == key)
-            .map(|(i, _)| PEERS_CHAIN[i].public().to_address()))
-    }
-}
-
 pub async fn resolve_mock_path(
     me: Address,
-    peers_offchain: Vec<OffchainPublicKey>,
     peers_onchain: Vec<Address>,
 ) -> anyhow::Result<ValidatedPath> {
-    let peers_addrs = peers_offchain
-        .iter()
-        .copied()
-        .zip(peers_onchain.iter().copied())
-        .collect::<Vec<_>>();
 
-    let mut cg = ChannelGraph::new(me, Default::default());
-    let mut last_addr = cg.my_address();
-    for (_, addr) in peers_addrs.iter() {
-        let c = ChannelEntry::new(
-            last_addr,
-            *addr,
-            1000.into(),
-            0u32.into(),
-            ChannelStatus::Open,
-            0u32.into(),
-        );
-        cg.update_channel(c);
-        last_addr = *addr;
-    }
-
-    Ok(ValidatedPath::new(me, ChainPath::new(peers_onchain)?, &cg, &TestResolver).await?)
+    let connector = create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone(), Default::default()).await?;
+    let resolver = connector.as_path_resolver();
+    Ok(ValidatedPath::new(me, ChainPath::new(peers_onchain)?, &resolver).await?)
 }
 
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
@@ -449,7 +270,6 @@ pub async fn send_relay_receive_channel_of_n_peers(
     // Peer 1: start sending out packets
     let packet_path = resolve_mock_path(
         PEERS_CHAIN[0].public().to_address(),
-        PEERS[1..peer_count].iter().map(|p| *p.public()).collect(),
         PEERS_CHAIN[1..peer_count]
             .iter()
             .map(|key| key.public().to_address())

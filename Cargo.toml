@@ -24,7 +24,6 @@ members = [
   "hopr/hopr-lib",
   "hoprd/hoprd",
   "hoprd/rest-api",
-  "logic/path",
   "logic/strategy",
   "misc/metrics",
   "misc/platform",
@@ -256,7 +255,6 @@ hopr-internal-types = { path = "common/internal-types", default-features = false
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-network-types = { path = "common/network-types", default-features = false }
-hopr-path = { path = "logic/path" }
 hopr-parallelize = { path = "common/parallelize" }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }

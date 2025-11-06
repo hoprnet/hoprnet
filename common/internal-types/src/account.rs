@@ -91,7 +91,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::types::OffchainPublicKey;
     use hopr_primitive_types::prelude::*;
-    use multiaddr::Multiaddr;
+
 
     use crate::account::{
         AccountEntry,

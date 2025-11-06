@@ -3,8 +3,8 @@ use std::fmt::{Display, Formatter};
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_path::{NonEmptyPath, TransportPath};
 use hopr_primitive_types::prelude::*;
+
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
@@ -523,7 +523,6 @@ mod tests {
     use bimap::BiHashMap;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
-    use hopr_path::TransportPath;
     use parameterized::parameterized;
 
     use super::*;
@@ -626,7 +625,7 @@ mod tests {
         let return_paths = return_hops
             .into_iter()
             .map(|h| TransportPath::new(PEERS[0..=h].iter().rev().map(|kp| *kp.1.public())))
-            .collect::<std::result::Result<Vec<_>, hopr_path::errors::PathError>>()?;
+            .collect::<std::result::Result<Vec<_>, hopr_internal_types::errors::PathError>>()?;
 
         Ok(HoprPacket::into_outgoing(
             msg,

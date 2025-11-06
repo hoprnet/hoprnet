@@ -1,8 +1,8 @@
 [package]
 name = "hopr-internal-types"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Contains types required internally by the HOPR library, these are not generic enough to be used in the external APIs"
+description = "Contains HOPR-specific types required internally by the HOPR node"
 edition = "2021"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -17,6 +17,7 @@ serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-types/serde"]
 
 [dependencies]
 aquamarine = { workspace = true }
+async-trait = { workspace = true }
 hex-literal = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
@@ -31,11 +32,16 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
+
 [dev-dependencies]
 anyhow = { workspace = true }
 bincode = { workspace = true }
+bimap = { workspace = true }
 criterion = { workspace = true }
+mockall = { workspace = true}
 lazy_static = { workspace = true }
+parameterized = { workspace = true }
+tokio = {workspace = true}
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]

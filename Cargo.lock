@@ -1614,7 +1614,7 @@ dependencies = [
 [[package]]
 name = "blokli-client"
 version = "0.4.2"
-source = "git+https://github.com/hoprnet/blokli#6a500f2063e6443c724faee45c630995f658846e"
+source = "git+https://github.com/hoprnet/blokli#37f289007aac5a35ff8e481ac8f3bb22897cce2e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1808,17 +1808,6 @@ name = "cfg_aliases"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
-
-[[package]]
-name = "cfg_eval"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45565fc9416b9896014f5732ac776f810ee53a66730c17e4020c3ec064a8f88f"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.109",
-]
 
 [[package]]
 name = "chacha20"
@@ -4644,7 +4633,6 @@ dependencies = [
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
  "hopr-internal-types",
- "hopr-path",
  "hopr-primitive-types",
  "lazy_static",
  "mimalloc",
@@ -4782,7 +4770,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
- "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
@@ -4802,10 +4789,12 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "aquamarine",
+ "async-trait",
+ "bimap",
  "bincode",
  "criterion",
  "hex-literal",
@@ -4813,13 +4802,16 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-primitive-types",
  "lazy_static",
+ "mockall",
  "multiaddr",
  "num_enum",
+ "parameterized",
  "serde",
  "serde_bytes",
  "smart-default",
  "strum 0.27.2",
  "thiserror 2.0.17",
+ "tokio",
  "tracing",
 ]
 
@@ -4904,7 +4896,6 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
- "hopr-path",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
@@ -4931,34 +4922,6 @@ dependencies = [
  "futures",
  "rayon",
  "tokio",
-]
-
-[[package]]
-name = "hopr-path"
-version = "0.9.0"
-dependencies = [
- "anyhow",
- "async-lock 3.4.1",
- "async-trait",
- "bimap",
- "cfg_eval",
- "hex-literal",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-primitive-types",
- "lazy_static",
- "mockall",
- "parameterized",
- "petgraph",
- "regex",
- "serde",
- "serde_with",
- "smart-default",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -5106,7 +5069,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
- "hopr-path",
  "hopr-primitive-types",
  "hopr-protocol-app",
  "hopr-transport-identity",
@@ -5285,6 +5247,7 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
+ "hopr-chain-connector",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -5293,7 +5256,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-parallelize",
- "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-protocol-app",

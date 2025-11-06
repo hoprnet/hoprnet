@@ -1,22 +1,21 @@
-//! This Rust crate contains all the path construction and path selection algorithms in the HOPR mixnet.
-
-pub mod errors;
-/// Implements different path selectors in the [`ChannelGraph`].
-pub mod selectors;
-
 use std::{
     fmt::{Display, Formatter},
     ops::Deref,
 };
 
 use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::{
-    PathError,
-    PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid},
+use crate::{
+    NodeId,
+    channels::{ChannelEntry, ChannelStatus},
+    protocol::INTERMEDIATE_HOPS,
+    errors::{
+        PathError,
+        PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid},
+    }
 };
+
 
 pub(crate) type PathAddress = NodeId;
 
@@ -70,7 +69,7 @@ impl TransportPath {
     /// Creates a new instance from the given iterator.
     ///
     /// Fails if the iterator is empty.
-    pub fn new<T, I>(path: I) -> errors::Result<Self>
+    pub fn new<T, I>(path: I) -> Result<Self, PathError>
     where
         T: Into<OffchainPublicKey>,
         I: IntoIterator<Item = T>,
@@ -127,7 +126,7 @@ impl ChainPath {
     /// Creates a new instance from the given iterator.
     ///
     /// Fails if the iterator is empty.
-    pub fn new<T, I>(path: I) -> errors::Result<Self>
+    pub fn new<T, I>(path: I) -> Result<Self, PathError>
     where
         T: Into<Address>,
         I: IntoIterator<Item = T>,
@@ -232,7 +231,7 @@ impl ValidatedPath {
     /// [`Addresses`](Address).
     ///
     /// If the given path is empty or unresolvable, an error is returned.
-    pub async fn new<N, P, O, R>(origin: O, path: P, resolver: &R) -> errors::Result<ValidatedPath>
+    pub async fn new<N, P, O, R>(origin: O, path: P, resolver: &R) -> Result<ValidatedPath, PathError>
     where
         N: Into<PathAddress> + Copy,
         P: Path<N>,
@@ -353,8 +352,51 @@ impl Display for ValidatedPath {
 
 impl NonEmptyPath<OffchainPublicKey> for ValidatedPath {}
 
+/// Trait for implementing a custom path selection algorithm from the channel graph.
+#[async_trait::async_trait]
+pub trait PathSelector {
+    /// Select a path of maximum `max_hops` from `source` to `destination` in the given channel graph.
+    /// NOTE: the resulting path does not contain `source` but does contain `destination`.
+    /// Fails if no such path can be found.
+    async fn select_path(
+        &self,
+        source: Address,
+        destination: Address,
+        min_hops: usize,
+        max_hops: usize,
+    ) -> Result<ChannelPath, PathError>;
+
+    /// Constructs a new valid packet `Path` from source to the given destination.
+    /// This method uses `INTERMEDIATE_HOPS` as the maximum number of hops and 1 hop as a minimum.
+    async fn select_auto_path(&self, source: Address, destination: Address) -> Result<ChannelPath, PathError> {
+        self.select_path(source, destination, 1usize, INTERMEDIATE_HOPS).await
+    }
+}
+
+/// A path selector that does not resolve any path, always returns [`PathError::PathNotFound`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoPathSelector;
+
+#[async_trait::async_trait]
+impl PathSelector for NoPathSelector {
+    async fn select_path(
+        &self,
+        source: Address,
+        destination: Address,
+        min_hops: usize,
+        _max_hops: usize,
+    ) -> Result<ChannelPath, PathError> {
+        Err(PathError::PathNotFound(
+            min_hops,
+            source.to_string(),
+            destination.to_string(),
+        ))
+    }
+}
+
+
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use std::{
         iter,
         ops::Add,
@@ -365,7 +407,7 @@ pub(crate) mod tests {
     use anyhow::{Context, ensure};
     use async_trait::async_trait;
     use hex_literal::hex;
-    use hopr_internal_types::channels::ChannelEntry;
+
     use parameterized::parameterized;
 
     use super::*;
@@ -395,7 +437,7 @@ pub(crate) mod tests {
     struct DummyResolver(Vec<ChannelEntry>);
 
     impl DummyResolver {
-        pub fn new(me: Address) -> (Self, Vec<(OffchainPublicKey, Address)>) {
+        pub fn new(_me: Address) -> (Self, Vec<(OffchainPublicKey, Address)>) {
             let addrs = sorted_peers();
 
             let ts = SystemTime::now().add(Duration::from_secs(10));

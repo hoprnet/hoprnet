@@ -21,6 +21,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
+  "dep:tokio"
 ]
 prometheus = [
   "dep:hopr-metrics",

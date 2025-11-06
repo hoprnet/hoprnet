@@ -16,7 +16,6 @@ runtime-tokio = [
 ]
 prometheus = [
   "dep:hopr-metrics",
-  "hopr-path/prometheus",
   "hopr-db-node/prometheus",
 ]
 capture = ["dep:pcap-file"]
@@ -55,7 +54,6 @@ hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
-hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
@@ -72,11 +70,13 @@ criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }
-hopr-protocol-session = { workspace = true, features = ["session-types"] }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-connector = { workspace = true, features = ["runtime-tokio", "testing"]}
+hopr-protocol-session = { workspace = true, features = ["session-types", "runtime-tokio"] }
 hopr-protocol-start = { workspace = true }
-hopr-transport-session = { workspace = true }
+hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-mixer = { workspace = true }
-hopr-transport-probe = { workspace = true }
+hopr-transport-probe = { workspace = true, features = ["runtime-tokio"] }
 
 [[bench]]
 name = "protocol_throughput_emulated"

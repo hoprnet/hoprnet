@@ -66,8 +66,8 @@ lazy_static::lazy_static! {
 #[tokio::test]
 async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<()> {
     let mock_client = BlokliTestClientBuilder::default()
-        .with_accounts(ACCOUNTS.iter())
-        .with_channels(CHANNELS.iter())
+        .with_accounts(ACCOUNTS.iter().cloned())
+        .with_channels(CHANNELS.iter().cloned())
         .with_balances::<WxHOPR>([
             (CHAIN_KEYS[0].public().to_address(), 1000_u32.into()),
             (CHAIN_KEYS[1].public().to_address(), 2000_u32.into()),

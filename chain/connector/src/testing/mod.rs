@@ -1,4 +1,4 @@
-use blokli_client::BlokliTestClient;
+pub use blokli_client::BlokliTestClient;
 use hex::ToHex as HexHex;
 use hopr_api::chain::ChainInfo;
 use hopr_internal_types::channels::ChannelStatus;
@@ -10,7 +10,7 @@ use hopr_primitive_types::prelude::{Address, Currency, HoprBalance, ToHex, WxHOP
 pub struct BlokliTestClientBuilder(BlokliTestClient);
 
 impl BlokliTestClientBuilder {
-    pub fn with_channels<'a, I: IntoIterator<Item = &'a ChannelEntry>>(mut self, channels: I) -> Self {
+    pub fn with_channels<I: IntoIterator<Item = ChannelEntry>>(mut self, channels: I) -> Self {
         self.0.channels.extend(channels.into_iter().map(|channel| {
             blokli_client::api::types::Channel {
                 balance: blokli_client::api::types::TokenValueString(channel.balance.to_string()),
@@ -34,7 +34,7 @@ impl BlokliTestClientBuilder {
         self
     }
 
-    pub fn with_accounts<'a, I: IntoIterator<Item = &'a AccountEntry>>(mut self, accounts: I) -> Self {
+    pub fn with_accounts<I: IntoIterator<Item = AccountEntry>>(mut self, accounts: I) -> Self {
         self.0.accounts.extend(accounts.into_iter().map(|account| {
             blokli_client::api::types::Account {
                 chain_key: account.chain_addr.to_hex(),

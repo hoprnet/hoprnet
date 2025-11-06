@@ -4,13 +4,12 @@ use hopr_api::{
     db::{FoundSurb, HoprDbProtocolOperations},
 };
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_types::{crypto_traits::Randomizable, prelude::OffchainPublicKey};
+use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
-use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, errors::PathError, selectors::PathSelector};
 use hopr_primitive_types::prelude::*;
 use tracing::trace;
-
+use hopr_api::chain::ChainPathResolver;
 use crate::errors::HoprTransportError;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -40,31 +39,6 @@ pub(crate) struct PathPlanner<Db, R, S> {
     me: Address,
 }
 
-struct ChainPathResolver<'c, R>(&'c R);
-
-#[async_trait::async_trait]
-impl<'c, R: ChainKeyOperations + ChainReadChannelOperations + Sync> PathAddressResolver for ChainPathResolver<'c, R> {
-    async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError> {
-        self.0
-            .chain_key_to_packet_key(address)
-            .await
-            .map_err(|e| PathError::UnknownPeer(format!("{address}: {e}")))
-    }
-
-    async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError> {
-        self.0
-            .packet_key_to_chain_key(key)
-            .await
-            .map_err(|e| PathError::UnknownPeer(format!("{key}: {e}")))
-    }
-
-    async fn get_channel(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, PathError> {
-        self.0
-            .channel_by_parties(src, dst)
-            .await
-            .map_err(|e| PathError::MissingChannel(src.to_string(), format!("{dst}: {e}")))
-    }
-}
 
 impl<Db, R, S> PathPlanner<Db, R, S>
 where
@@ -104,6 +78,7 @@ where
         destination: NodeId,
         options: RoutingOptions,
     ) -> crate::errors::Result<ValidatedPath> {
+        let resolver = ChainPathResolver::from(&self.resolver);
         let path = match options {
             RoutingOptions::IntermediatePath(path) => {
                 trace!(?path, "resolving a specific path");
@@ -111,14 +86,14 @@ where
                 ValidatedPath::new(
                     source,
                     path.into_iter().chain(std::iter::once(destination)).collect::<Vec<_>>(),
-                    &ChainPathResolver(&self.resolver),
+                    &resolver,
                 )
                 .await?
             }
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
                 trace!(hops = 0, "resolving zero-hop path");
 
-                ValidatedPath::new(source, vec![destination], &ChainPathResolver(&self.resolver)).await?
+                ValidatedPath::new(source, vec![destination], &resolver).await?
             }
             RoutingOptions::Hops(hops) => {
                 trace!(%hops, "resolving path using hop count");
@@ -138,7 +113,7 @@ where
                 ValidatedPath::new(
                     source,
                     ChainPath::from_channel_path(cp, dst),
-                    &ChainPathResolver(&self.resolver),
+                    &resolver,
                 )
                 .await?
             }
@@ -146,7 +121,7 @@ where
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            use hopr_path::Path;
+            use hopr_internal_types::path::Path;
             hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 
