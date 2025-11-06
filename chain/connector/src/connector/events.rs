@@ -3,7 +3,7 @@ use hopr_api::chain::ChainEvent;
 
 use crate::{connector::HoprBlockchainConnector, errors::ConnectorError};
 
-impl<B, C, P> hopr_api::chain::ChainEvents for HoprBlockchainConnector<B, C, P> {
+impl<B, C, P> hopr_api::chain::ChainEvents for HoprBlockchainConnector<C, B, P> {
     type Error = ConnectorError;
 
     fn subscribe(&self) -> Result<impl Stream<Item = ChainEvent> + Send + 'static, Self::Error> {

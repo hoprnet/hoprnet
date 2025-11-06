@@ -54,7 +54,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainKeyOperations for HoprBlockchainConnector<B, C, P>
+impl<B, C, P> hopr_api::chain::ChainKeyOperations for HoprBlockchainConnector<C, B, P>
 where
     B: Backend + Send + Sync + 'static,
     C: Send + Sync,

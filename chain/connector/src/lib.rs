@@ -19,20 +19,19 @@ pub use hopr_chain_types::ContractAddresses;
 pub use hopr_crypto_types::prelude::ChainKeypair;
 pub use hopr_primitive_types::prelude::Address;
 
-/// Type alias for a [`HoprBlockchainConnector`] that uses a [`TempDbBackend`] and a [`blokli_client::BlokliClient`].
-pub type HoprBlokliConnector = HoprBlockchainConnector<
-    TempDbBackend,
-    blokli_client::BlokliClient,
-    hopr_chain_types::payload::SafePayloadGenerator,
->;
 
 /// Convenience function to create [`HoprBlokliConnector`] with own contract addresses.
-pub fn create_trustless_hopr_blokli_connector(
+///
+/// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::SafePayloadGenerator`]
+pub fn create_trustless_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
-    client: blokli_client::BlokliClient,
+    client: C,
     module_address: Address,
     contracts: ContractAddresses,
-) -> Result<HoprBlokliConnector, errors::ConnectorError> {
+) -> Result<HoprBlockchainConnector<C>, errors::ConnectorError>
+where
+    C: blokli_client::BlokliSubscriptionClient + blokli_client::BlokliQueryClient + blokli_client::BlokliTransactionClient + Send + Sync + 'static
+{
     let payload_gen = hopr_chain_types::payload::SafePayloadGenerator::new(chain_key, contracts, module_address);
 
     Ok(HoprBlockchainConnector::new(
@@ -47,13 +46,17 @@ pub fn create_trustless_hopr_blokli_connector(
 ///
 /// This instantiation explicitly trusts the contract address information retrieved from the
 /// [`blokli_client::BlokliClient`].
-pub async fn create_trustful_hopr_blokli_connector(
+/// If you wish to provide your own deployment information, use the [`create_trustless_hopr_blokli_connector`] function.
+///
+/// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::SafePayloadGenerator`]
+pub async fn create_trustful_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
-    client: blokli_client::BlokliClient,
+    client: C,
     module_address: Address,
-) -> Result<HoprBlokliConnector, errors::ConnectorError> {
-    use blokli_client::BlokliQueryClient;
-
+) -> Result<HoprBlockchainConnector<C>, errors::ConnectorError>
+where
+    C: blokli_client::BlokliSubscriptionClient + blokli_client::BlokliQueryClient + blokli_client::BlokliTransactionClient + Send + Sync + 'static
+{
     let info = client.query_chain_info().await?;
     let contract_addrs = serde_json::from_str(&info.contract_addresses.0)
         .map_err(|e| errors::ConnectorError::TypeConversion(format!("contract addresses not a valid JSON: {e}")))?;

@@ -20,12 +20,11 @@ pub(crate) fn model_to_account_entry(
         chain_addr: model.chain_key.parse()?,
         key_id: (model.keyid as u32).into(),
         entry_type: if let Some(maddr) = model.multi_addresses.first() {
-            AccountType::Announced {
-                multiaddr: maddr
+            AccountType::Announced(
+                maddr
                     .parse()
-                    .map_err(|e| ConnectorError::TypeConversion(format!("invalid multiaddress {maddr}: {e}")))?,
-                updated_block: 0,
-            }
+                    .map_err(|e| ConnectorError::TypeConversion(format!("invalid multiaddress {maddr}: {e}")))?
+            )
         } else {
             AccountType::NotAnnounced
         },

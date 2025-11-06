@@ -1,4 +1,5 @@
 use blokli_client::BlokliTestClient;
+use hex::ToHex as HexHex;
 use hopr_api::chain::ChainInfo;
 use hopr_internal_types::channels::ChannelStatus;
 use hopr_internal_types::prelude::{AccountEntry, ChannelEntry, WinningProbability};
@@ -9,7 +10,7 @@ use hopr_primitive_types::prelude::{Address, Currency, HoprBalance, ToHex, WxHOP
 pub struct BlokliTestClientBuilder(BlokliTestClient);
 
 impl BlokliTestClientBuilder {
-    pub fn with_channels<I: IntoIterator<Item = ChannelEntry>>(mut self, channels: I) -> Self {
+    pub fn with_channels<'a, I: IntoIterator<Item = &'a ChannelEntry>>(mut self, channels: I) -> Self {
         self.0.channels.extend(channels.into_iter().map(|channel| {
             blokli_client::api::types::Channel {
                 balance: blokli_client::api::types::TokenValueString(channel.balance.to_string()),
@@ -33,7 +34,7 @@ impl BlokliTestClientBuilder {
         self
     }
 
-    pub fn with_accounts<I: IntoIterator<Item = AccountEntry>>(mut self, accounts: I) -> Self {
+    pub fn with_accounts<'a, I: IntoIterator<Item = &'a AccountEntry>>(mut self, accounts: I) -> Self {
         self.0.accounts.extend(accounts.into_iter().map(|account| {
             blokli_client::api::types::Account {
                 chain_key: account.chain_addr.to_hex(),
@@ -47,11 +48,11 @@ impl BlokliTestClientBuilder {
         self
     }
 
-    pub fn with_balances<C: Currency, I: IntoIterator<Item = (Address, Balance<C>)>>(mut self, balances: I) -> Self {
+    pub fn with_balances<C: Currency>(mut self, balances: impl IntoIterator<Item = (Address, Balance<C>)>) -> Self {
         if C::is::<XDai>() {
             self.0.native_balances.extend(balances.into_iter()
                 .map(|(addr, balance)| {
-                    (addr.to_hex(), blokli_client::api::types::NativeBalance {
+                    (addr.encode_hex(), blokli_client::api::types::NativeBalance {
                         __typename: "".into(),
                         balance: blokli_client::api::types::TokenValueString(balance.to_string()),
                     })
@@ -59,7 +60,7 @@ impl BlokliTestClientBuilder {
         } else if C::is::<WxHOPR>() {
             self.0.token_balances.extend(balances.into_iter()
                 .map(|(addr, balance)| {
-                    (addr.to_hex(), blokli_client::api::types::HoprBalance {
+                    (addr.encode_hex(), blokli_client::api::types::HoprBalance {
                         __typename: "".into(),
                         balance: blokli_client::api::types::TokenValueString(balance.to_string()),
                     })
@@ -73,7 +74,7 @@ impl BlokliTestClientBuilder {
 
     pub fn with_safe_allowances<I: IntoIterator<Item = (Address, HoprBalance)>>(mut self, balances: I) -> Self {
         self.0.safe_allowances.extend(balances.into_iter().map(|(addr, allowance)| {
-            (addr.to_hex(), blokli_client::api::types::SafeHoprAllowance {
+            (addr.encode_hex(), blokli_client::api::types::SafeHoprAllowance {
                 __typename: "".into(),
                 allowance: blokli_client::api::types::TokenValueString(allowance.to_string()),
             })
@@ -102,7 +103,10 @@ impl BlokliTestClientBuilder {
         self
     }
 
-    //pub fn with_tx_client(mut self)
+    pub fn with_tx_client(mut self, tx_client: blokli_client::MockBlokliTransactionClientImpl) -> Self {
+        self.0.tx_client = Some(tx_client);
+        self
+    }
 
     pub fn build(self) -> BlokliTestClient {
         self.0

@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<B, C, P>
+impl<B, C, P> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<C, B, P>
 where
     B: Backend + Send + Sync + 'static,
     C: BlokliQueryClient + Send + Sync + 'static,
@@ -108,7 +108,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<B, C, P>
+impl<B, C, P> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<C, B, P>
 where
     B: Send + Sync,
     C: BlokliTransactionClient + Send + Sync + 'static,

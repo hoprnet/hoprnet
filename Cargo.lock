@@ -1613,8 +1613,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.4.1"
-source = "git+https://github.com/hoprnet/blokli#3007242178434020a19d43a3ac25d77eed811b19"
+version = "0.4.2"
+source = "git+https://github.com/hoprnet/blokli#6a500f2063e6443c724faee45c630995f658846e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4564,13 +4564,16 @@ dependencies = [
  "futures",
  "futures-concurrency",
  "futures-time",
+ "hex",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
+ "hopr-chain-connector",
  "hopr-chain-types",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
+ "lazy_static",
  "moka",
  "multiaddr",
  "parking_lot",

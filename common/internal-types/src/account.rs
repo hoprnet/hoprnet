@@ -11,7 +11,7 @@ pub enum AccountType {
     /// Node is not announced.
     NotAnnounced,
     /// Node is announced with a multi-address
-    Announced { multiaddr: Multiaddr, updated_block: u32 },
+    Announced(Multiaddr),
 }
 
 impl Display for AccountType {
@@ -20,16 +20,13 @@ impl Display for AccountType {
             Self::NotAnnounced => {
                 write!(f, "not announced")
             }
-            Self::Announced {
-                multiaddr,
-                updated_block,
-            } => write!(f, "announced as {multiaddr} at block {updated_block}"),
+            Self::Announced(multiaddr) => write!(f, "announced as {multiaddr}"),
         }
     }
 }
 
 /// Represents a node announcement entry on the block chain.
-/// This contains node's public key and optional announcement information (multiaddress, block number).
+/// This contains node's public key and optional announcement information (multiaddress).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountEntry {
@@ -50,9 +47,9 @@ impl AccountEntry {
     pub fn contains_routing_info(&self) -> bool {
         match &self.entry_type {
             AccountType::NotAnnounced => false,
-            AccountType::Announced { multiaddr, .. } => {
-                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "dns4")
-                    && multiaddr.protocol_stack().any(|p| p == "tcp")
+            AccountType::Announced(multiaddr) => {
+                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
+                    && multiaddr.protocol_stack().any(|p| p == "tcp" || p == "udp")
             }
         }
     }
@@ -60,7 +57,7 @@ impl AccountEntry {
     pub fn get_multiaddr(&self) -> Option<Multiaddr> {
         match &self.entry_type {
             AccountType::NotAnnounced => None,
-            AccountType::Announced { multiaddr, .. } => Some(multiaddr.clone()),
+            AccountType::Announced(multiaddr) => Some(multiaddr.clone()),
         }
     }
 
@@ -69,7 +66,7 @@ impl AccountEntry {
     /// Examples:
     /// - a node transitions from being a PRN to an edge node
     /// - a node becomes a PRN
-    /// - the IP of a PRN has changed, e.g. due to relocation
+    /// - the IP of a PRN has changed, e.g., due to relocation
     pub fn update(&mut self, new_entry_type: AccountType) {
         self.entry_type = new_entry_type;
     }
@@ -113,15 +110,11 @@ mod tests {
             public_key,
             chain_addr,
             key_id: 1.into(),
-            entry_type: Announced {
-                multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse::<Multiaddr>()?,
-                updated_block: 1,
-            },
+            entry_type: Announced("/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?),
             safe_address: None,
         };
 
         assert!(ae1.has_announced());
-
         assert!(!ae1.contains_routing_info());
 
         Ok(())
@@ -136,11 +129,18 @@ mod tests {
             public_key,
             chain_addr,
             key_id: 1.into(),
-            entry_type: Announced {
-                multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
-                    .parse::<Multiaddr>()?,
-                updated_block: 1,
-            },
+            entry_type: Announced("/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?),
+            safe_address: None,
+        };
+
+        assert!(ae1.has_announced());
+        assert!(ae1.contains_routing_info());
+
+        let ae1 = AccountEntry {
+            public_key,
+            chain_addr,
+            key_id: 1.into(),
+            entry_type: Announced("/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?),
             safe_address: None,
         };
 
