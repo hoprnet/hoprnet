@@ -683,7 +683,7 @@ mod tests {
         src: &ChainKeypair,
         dst: &ChainKeypair,
         index: u64,
-        index_offset: u32,
+        _index_offset: u32,
         win_prob: f64,
     ) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();

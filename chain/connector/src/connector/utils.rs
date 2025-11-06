@@ -23,7 +23,7 @@ pub(crate) fn model_to_account_entry(
             AccountType::Announced(
                 maddr
                     .parse()
-                    .map_err(|e| ConnectorError::TypeConversion(format!("invalid multiaddress {maddr}: {e}")))?
+                    .map_err(|e| ConnectorError::TypeConversion(format!("invalid multiaddress {maddr}: {e}")))?,
             )
         } else {
             AccountType::NotAnnounced

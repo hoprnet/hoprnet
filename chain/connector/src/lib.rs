@@ -19,7 +19,6 @@ pub use hopr_chain_types::ContractAddresses;
 pub use hopr_crypto_types::prelude::ChainKeypair;
 pub use hopr_primitive_types::prelude::Address;
 
-
 /// Convenience function to create [`HoprBlokliConnector`] with own contract addresses.
 ///
 /// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::SafePayloadGenerator`]
@@ -30,7 +29,12 @@ pub fn create_trustless_hopr_blokli_connector<C>(
     contracts: ContractAddresses,
 ) -> Result<HoprBlockchainConnector<C>, errors::ConnectorError>
 where
-    C: blokli_client::BlokliSubscriptionClient + blokli_client::BlokliQueryClient + blokli_client::BlokliTransactionClient + Send + Sync + 'static
+    C: blokli_client::BlokliSubscriptionClient
+        + blokli_client::BlokliQueryClient
+        + blokli_client::BlokliTransactionClient
+        + Send
+        + Sync
+        + 'static,
 {
     let payload_gen = hopr_chain_types::payload::SafePayloadGenerator::new(chain_key, contracts, module_address);
 
@@ -55,7 +59,12 @@ pub async fn create_trustful_hopr_blokli_connector<C>(
     module_address: Address,
 ) -> Result<HoprBlockchainConnector<C>, errors::ConnectorError>
 where
-    C: blokli_client::BlokliSubscriptionClient + blokli_client::BlokliQueryClient + blokli_client::BlokliTransactionClient + Send + Sync + 'static
+    C: blokli_client::BlokliSubscriptionClient
+        + blokli_client::BlokliQueryClient
+        + blokli_client::BlokliTransactionClient
+        + Send
+        + Sync
+        + 'static,
 {
     let info = client.query_chain_info().await?;
     let contract_addrs = serde_json::from_str(&info.contract_addresses.0)

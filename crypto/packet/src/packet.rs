@@ -4,7 +4,6 @@ use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 

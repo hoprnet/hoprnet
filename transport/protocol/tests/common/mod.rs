@@ -1,11 +1,11 @@
-use std::{str::FromStr, time::Duration};
 use std::sync::Arc;
+
 use anyhow::Context;
-use async_trait::async_trait;
 use bimap::BiHashMap;
-use futures::{SinkExt, StreamExt, stream::BoxStream};
+use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
 use hopr_api::chain::*;
+use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
@@ -16,10 +16,9 @@ use hopr_protocol_app::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::processor::PacketInteractionConfig;
 use lazy_static::lazy_static;
-use libp2p::{Multiaddr, PeerId};
+use libp2p::PeerId;
 use tokio::time::timeout;
 use tracing::debug;
-use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 
 lazy_static! {
     pub static ref PEERS: Vec<OffchainKeypair> = [
@@ -136,7 +135,7 @@ pub async fn peer_setup_for(
     let mut logical_channels = Vec::new();
     let mut ticket_channels = Vec::new();
 
-    for (i, node_db, ) in node_dbs.into_iter().enumerate() {
+    for (i, node_db) in node_dbs.into_iter().enumerate() {
         let (received_ack_tickets_tx, received_ack_tickets_rx) =
             futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
 
@@ -156,7 +155,8 @@ pub async fn peer_setup_for(
         };
 
         node_db.start_ticket_processing(Some(received_ack_tickets_tx))?;
-        let connector = create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone(), Default::default()).await?;
+        let connector =
+            create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone(), Default::default()).await?;
 
         hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
@@ -227,12 +227,9 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
     futures::future::pending::<()>().await;
 }
 
-pub async fn resolve_mock_path(
-    me: Address,
-    peers_onchain: Vec<Address>,
-) -> anyhow::Result<ValidatedPath> {
-
-    let connector = create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone(), Default::default()).await?;
+pub async fn resolve_mock_path(me: Address, peers_onchain: Vec<Address>) -> anyhow::Result<ValidatedPath> {
+    let connector =
+        create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone(), Default::default()).await?;
     let resolver = connector.as_path_resolver();
     Ok(ValidatedPath::new(me, ChainPath::new(peers_onchain)?, &resolver).await?)
 }

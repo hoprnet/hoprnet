@@ -9,13 +9,12 @@ use hopr_primitive_types::prelude::*;
 use crate::{
     NodeId,
     channels::{ChannelEntry, ChannelStatus},
-    protocol::INTERMEDIATE_HOPS,
     errors::{
         PathError,
         PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid},
-    }
+    },
+    protocol::INTERMEDIATE_HOPS,
 };
-
 
 pub(crate) type PathAddress = NodeId;
 
@@ -394,7 +393,6 @@ impl PathSelector for NoPathSelector {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::{
@@ -407,7 +405,6 @@ mod tests {
     use anyhow::{Context, ensure};
     use async_trait::async_trait;
     use hex_literal::hex;
-
     use parameterized::parameterized;
 
     use super::*;

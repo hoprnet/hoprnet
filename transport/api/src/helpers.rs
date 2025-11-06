@@ -1,6 +1,6 @@
 use futures::{TryStreamExt, stream::FuturesUnordered};
 use hopr_api::{
-    chain::{ChainKeyOperations, ChainReadChannelOperations},
+    chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations},
     db::{FoundSurb, HoprDbProtocolOperations},
 };
 use hopr_crypto_packet::prelude::*;
@@ -9,7 +9,7 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::trace;
-use hopr_api::chain::ChainPathResolver;
+
 use crate::errors::HoprTransportError;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -38,7 +38,6 @@ pub(crate) struct PathPlanner<Db, R, S> {
     selector: S,
     me: Address,
 }
-
 
 impl<Db, R, S> PathPlanner<Db, R, S>
 where
@@ -110,12 +109,7 @@ where
                     )
                     .await?;
 
-                ValidatedPath::new(
-                    source,
-                    ChainPath::from_channel_path(cp, dst),
-                    &resolver,
-                )
-                .await?
+                ValidatedPath::new(source, ChainPath::from_channel_path(cp, dst), &resolver).await?
             }
         };
 

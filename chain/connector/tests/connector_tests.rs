@@ -1,12 +1,19 @@
 use std::time::Duration;
+
 use hopr_api::chain::ChainReadAccountOperations;
-use hopr_chain_connector::{create_trustful_hopr_blokli_connector, create_trustless_hopr_blokli_connector, HoprBlockchainConnector};
-use hopr_chain_connector::testing::BlokliTestClientBuilder;
+use hopr_chain_connector::{
+    create_trustful_hopr_blokli_connector,
+    testing::BlokliTestClientBuilder,
+};
 use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
-use hopr_internal_types::channels::ChannelStatus;
-use hopr_internal_types::prelude::{AccountEntry, AccountType, ChannelEntry};
-use hopr_primitive_types::balance::WxHOPR;
-use hopr_primitive_types::prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance};
+use hopr_internal_types::{
+    channels::ChannelStatus,
+    prelude::{AccountEntry, AccountType, ChannelEntry},
+};
+use hopr_primitive_types::{
+    balance::WxHOPR,
+    prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
+};
 
 lazy_static::lazy_static! {
     static ref CHAIN_KEYS: Vec<ChainKeypair> = (0..3).map(|_| ChainKeypair::random()).collect();
@@ -78,16 +85,18 @@ async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<(
         ])
         .build();
 
-
     let me = ChainKeypair::random();
 
-    let mut connector = create_trustful_hopr_blokli_connector(&me, mock_client, Address::new(&[2u8; Address::SIZE])).await?;
+    let mut connector =
+        create_trustful_hopr_blokli_connector(&me, mock_client, Address::new(&[2u8; Address::SIZE])).await?;
 
     connector.connect(Duration::from_secs(5)).await?;
 
-    assert_eq!(HoprBalance::from(1000_u32), connector.get_balance(&CHAIN_KEYS[0]).await?);
+    assert_eq!(
+        HoprBalance::from(1000_u32),
+        connector.get_balance(&CHAIN_KEYS[0]).await?
+    );
     assert_eq!(XDaiBalance::from(1_u32), connector.get_balance(&CHAIN_KEYS[0]).await?);
-
 
     Ok(())
 }

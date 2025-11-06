@@ -17,12 +17,12 @@ pub mod announcement;
 pub mod channels;
 /// Lists all errors in this crate.
 pub mod errors;
+/// Implements types for path selection and construction.
+pub mod path;
 /// Types related to internal HOPR protocol logic.
 pub mod protocol;
 /// Implements types for tickets.
 pub mod tickets;
-/// Implements types for path selection and construction.
-pub mod path;
 
 /// Uniquely identifies a HOPR node either by its [`Address`] or [`OffchainPublicKey`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, strum::EnumIs, strum::EnumTryAs)]
@@ -88,7 +88,8 @@ pub use multiaddr::Multiaddr;
 #[doc(hidden)]
 pub mod prelude {
     pub use super::{
-        Multiaddr, NodeId, account::*, announcement::*, channels::*, errors::CoreTypesError, path::*, protocol::*, tickets::*,
+        Multiaddr, NodeId, account::*, announcement::*, channels::*, errors::CoreTypesError, path::*, protocol::*,
+        tickets::*,
     };
 }
 

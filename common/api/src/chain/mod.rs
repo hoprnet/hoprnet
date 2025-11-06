@@ -68,22 +68,34 @@ impl<'a, R: ChainKeyOperations + ChainReadChannelOperations> From<&'a R> for Cha
 }
 
 #[async_trait::async_trait]
-impl<'c, R: ChainKeyOperations + ChainReadChannelOperations + Sync> hopr_internal_types::path::PathAddressResolver for ChainPathResolver<'c, R> {
-    async fn resolve_transport_address(&self, address: &hopr_primitive_types::prelude::Address) -> Result<Option<hopr_crypto_types::prelude::OffchainPublicKey>, hopr_internal_types::errors::PathError> {
+impl<'c, R: ChainKeyOperations + ChainReadChannelOperations + Sync> hopr_internal_types::path::PathAddressResolver
+    for ChainPathResolver<'c, R>
+{
+    async fn resolve_transport_address(
+        &self,
+        address: &hopr_primitive_types::prelude::Address,
+    ) -> Result<Option<hopr_crypto_types::prelude::OffchainPublicKey>, hopr_internal_types::errors::PathError> {
         self.0
             .chain_key_to_packet_key(address)
             .await
             .map_err(|e| hopr_internal_types::errors::PathError::UnknownPeer(format!("{address}: {e}")))
     }
 
-    async fn resolve_chain_address(&self, key: &hopr_crypto_types::prelude::OffchainPublicKey) -> Result<Option<hopr_primitive_types::prelude::Address>, hopr_internal_types::errors::PathError> {
+    async fn resolve_chain_address(
+        &self,
+        key: &hopr_crypto_types::prelude::OffchainPublicKey,
+    ) -> Result<Option<hopr_primitive_types::prelude::Address>, hopr_internal_types::errors::PathError> {
         self.0
             .packet_key_to_chain_key(key)
             .await
             .map_err(|e| hopr_internal_types::errors::PathError::UnknownPeer(format!("{key}: {e}")))
     }
 
-    async fn get_channel(&self, src: &hopr_primitive_types::prelude::Address, dst: &hopr_primitive_types::prelude::Address) -> Result<Option<ChannelEntry>, hopr_internal_types::errors::PathError> {
+    async fn get_channel(
+        &self,
+        src: &hopr_primitive_types::prelude::Address,
+        dst: &hopr_primitive_types::prelude::Address,
+    ) -> Result<Option<ChannelEntry>, hopr_internal_types::errors::PathError> {
         self.0
             .channel_by_parties(src, dst)
             .await

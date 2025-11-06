@@ -31,7 +31,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
-use hopr_chain_connector::HoprBlokliConnector;
+use hopr_chain_connector::HoprBlockchainConnector;
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{Address, Hopr, errors::HoprLibError, utils::session::ListenerJoinHandles};
 use serde::Serialize;
@@ -55,6 +55,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
+
+type HoprBlokliConnector = HoprBlockchainConnector<hopr_chain_connector::blokli_client::BlokliClient>;
 
 #[derive(Clone)]
 pub(crate) struct AppState {

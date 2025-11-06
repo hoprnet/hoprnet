@@ -349,9 +349,6 @@ pub(crate) struct NodeInfoResponse {
     #[schema(value_type = String, example = "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae")]
     hopr_channels: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String, example = "0x3aa5ebb10dc797cac828524e59a333d0a371443c")]
-    hopr_network_registry: Address,
-    #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82")]
     hopr_node_safe_registry: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
@@ -398,7 +395,6 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 chain: chain_info.chain_id.to_string(),
                 hopr_token: chain_info.contract_addresses.token,
                 hopr_channels: chain_info.contract_addresses.channels,
-                hopr_network_registry: chain_info.contract_addresses.network_registry,
                 hopr_node_safe_registry: chain_info.contract_addresses.node_safe_registry,
                 hopr_management_module: chain_info.contract_addresses.module_implementation,
                 hopr_node_safe: safe_config.safe_address,

@@ -11,10 +11,16 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
 use petgraph::prelude::DiGraphMap;
-use crate::{backend::Backend, connector::{
-    keys::HoprKeyMapper,
-    utils::{model_to_account_entry, model_to_graph_entry, process_channel_changes_into_events},
-}, errors::ConnectorError, TempDbBackend};
+
+use crate::{
+    TempDbBackend,
+    backend::Backend,
+    connector::{
+        keys::HoprKeyMapper,
+        utils::{model_to_account_entry, model_to_graph_entry, process_channel_changes_into_events},
+    },
+    errors::ConnectorError,
+};
 
 mod accounts;
 mod channels;
@@ -33,7 +39,7 @@ type EventsChannel = (
 /// the [`blokli_client`] crate).
 ///
 /// The connector object cannot be cloned, and shall be used inside an `Arc` if cloning is needed.
-pub struct HoprBlockchainConnector<C, B = TempDbBackend, P = hopr_chain_types::payload::SafePayloadGenerator> {
+pub struct HoprBlockchainConnector<C, B = TempDbBackend, P = SafePayloadGenerator> {
     payload_generator: P,
     chain_key: ChainKeypair,
     client: std::sync::Arc<C>,
@@ -295,7 +301,7 @@ impl<B, C, P> Drop for HoprBlockchainConnector<C, B, P> {
     }
 }
 
-impl<B,C,P> HoprBlockchainConnector<C, B, P>
+impl<B, C, P> HoprBlockchainConnector<C, B, P>
 where
     B: Backend + Send + Sync + 'static,
     C: Send + Sync,

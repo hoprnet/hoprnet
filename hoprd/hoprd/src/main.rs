@@ -2,7 +2,7 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
-use hopr_chain_connector::HoprBlokliConnector;
+use hopr_chain_connector::{HoprBlockchainConnector, blokli_client::BlokliClient};
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::{
     AbortableList, AcknowledgedTicket, Address, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
@@ -198,7 +198,7 @@ async fn init_db(
     Ok((node_db, on_ack_tkt_rx))
 }
 
-fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlokliConnector>> {
+fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlockchainConnector<BlokliClient>>> {
     // TODO: instantiate the connector properly
     info!("initiating Blokli connector");
     Ok(Arc::new(hopr_chain_connector::create_trustless_hopr_blokli_connector(
@@ -211,7 +211,7 @@ fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlo
 
 async fn init_rest_api(
     cfg: &HoprdConfig,
-    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
+    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlockchainConnector<BlokliClient>>, HoprNodeDb>>,
 ) -> anyhow::Result<AbortableList<HoprdProcess>> {
     let node_cfg_value = serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 

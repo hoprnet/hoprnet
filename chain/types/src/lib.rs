@@ -250,9 +250,7 @@ where
         // Disable network registry in local environment and wait for its confirmation
         network_registry.disableRegistry().send().await?.watch().await?;
 
-        Ok(Self {
-            ..instances
-        })
+        Ok(Self { ..instances })
     }
 
     /// Deploys testing environment (with dummy network registry proxy) via the given provider.
@@ -284,9 +282,7 @@ where
         // Disable network registry in local environment and wait for its confirmation
         network_registry.disableRegistry().send().await?.watch().await?;
 
-        Ok(Self {
-            ..instances
-        })
+        Ok(Self { ..instances })
     }
 }
 

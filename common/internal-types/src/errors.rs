@@ -1,7 +1,7 @@
 use hopr_crypto_types::errors::CryptoError;
+use hopr_primitive_types::errors::GeneralError;
 use multiaddr::Error as MultiaddrError;
 use thiserror::Error;
-use hopr_primitive_types::errors::GeneralError;
 
 /// Enumeration of all core type related errors.
 #[derive(Error, Debug)]

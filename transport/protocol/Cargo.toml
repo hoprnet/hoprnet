@@ -14,10 +14,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-db-node/runtime-tokio",
 ]
-prometheus = [
-  "dep:hopr-metrics",
-  "hopr-db-node/prometheus",
-]
+prometheus = ["dep:hopr-metrics", "hopr-db-node/prometheus"]
 capture = ["dep:pcap-file"]
 
 [dependencies]
@@ -71,8 +68,14 @@ serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
-hopr-chain-connector = { workspace = true, features = ["runtime-tokio", "testing"]}
-hopr-protocol-session = { workspace = true, features = ["session-types", "runtime-tokio"] }
+hopr-chain-connector = { workspace = true, features = [
+  "runtime-tokio",
+  "testing",
+] }
+hopr-protocol-session = { workspace = true, features = [
+  "session-types",
+  "runtime-tokio",
+] }
 hopr-protocol-start = { workspace = true }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-mixer = { workspace = true }

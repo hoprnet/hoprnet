@@ -48,7 +48,9 @@ impl AccountEntry {
         match &self.entry_type {
             AccountType::NotAnnounced => false,
             AccountType::Announced(multiaddr) => {
-                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
+                multiaddr
+                    .protocol_stack()
+                    .any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
                     && multiaddr.protocol_stack().any(|p| p == "tcp" || p == "udp")
             }
         }
@@ -92,7 +94,6 @@ mod tests {
     use hopr_crypto_types::types::OffchainPublicKey;
     use hopr_primitive_types::prelude::*;
 
-
     use crate::account::{
         AccountEntry,
         AccountType::{Announced, NotAnnounced},
@@ -129,7 +130,9 @@ mod tests {
             public_key,
             chain_addr,
             key_id: 1.into(),
-            entry_type: Announced("/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?),
+            entry_type: Announced(
+                "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?,
+            ),
             safe_address: None,
         };
 
@@ -140,7 +143,9 @@ mod tests {
             public_key,
             chain_addr,
             key_id: 1.into(),
-            entry_type: Announced("/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?),
+            entry_type: Announced(
+                "/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?,
+            ),
             safe_address: None,
         };
 

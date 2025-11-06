@@ -18,7 +18,7 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
-hex = {workspace = true, optional = true }
+hex = { workspace = true, optional = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 petgraph = { workspace = true, features = ["rayon", "graphmap"] }
@@ -36,7 +36,10 @@ hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-hopr-chain-connector = { workspace = true, features = ["testing", "runtime-tokio"]}
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
