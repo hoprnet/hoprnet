@@ -18,9 +18,7 @@ alloy = { workspace = true, default-features = false, features = [
   "node-bindings",
 ] }
 async-trait = { workspace = true }
-libp2p-identity = { workspace = true }
 lazy_static = { workspace = true }
-tracing = { workspace = true }
 multiaddr = { workspace = true }
 hex-literal = { workspace = true }
 serde = { workspace = true }

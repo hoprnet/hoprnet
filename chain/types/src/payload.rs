@@ -61,18 +61,42 @@ enum Operation {
     // Future use: DelegateCall = 1,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GasEstimation {
+    pub gas_limit: u64,
+    pub max_fee_per_gas: u128,
+    pub max_priority_fee_per_gas: u128,
+}
+
+impl Default for GasEstimation {
+    fn default() -> Self {
+        Self {
+            // TODO: set some reasonable default values
+            gas_limit: 10_000,
+            max_fee_per_gas: 10_000_000_000,
+            max_priority_fee_per_gas: 10_000_000_000,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 pub trait SignableTransaction {
-    async fn sign_and_encode_to_eip2718(self, chain_keypair: &ChainKeypair) -> Result<Box<[u8]>>;
+    async fn sign_and_encode_to_eip2718(self, nonce: u64, max_gas: Option<GasEstimation>, chain_keypair: &ChainKeypair) -> Result<Box<[u8]>>;
 }
 
 #[async_trait::async_trait]
 impl SignableTransaction for TransactionRequest {
-    async fn sign_and_encode_to_eip2718(self, chain_keypair: &ChainKeypair) -> Result<Box<[u8]>> {
+    async fn sign_and_encode_to_eip2718(self, nonce: u64, max_gas: Option<GasEstimation>, chain_keypair: &ChainKeypair) -> Result<Box<[u8]>> {
+        let max_gas = max_gas.unwrap_or_default();
         let signer: EthereumWallet = PrivateKeySigner::from_slice(chain_keypair.secret().as_ref())
             .map_err(|e| SigningError(e.into()))?
             .into();
-        let signed: TxEnvelope = self.build(&signer).await.map_err(|e| SigningError(e.into()))?;
+        let signed: TxEnvelope = self
+            .nonce(nonce)
+            .gas_limit(max_gas.gas_limit)
+            .max_fee_per_gas(max_gas.max_fee_per_gas)
+            .max_priority_fee_per_gas(max_gas.max_priority_fee_per_gas)
+            .build(&signer).await.map_err(|e| SigningError(e.into()))?;
 
         Ok(signed.encoded_2718().into_boxed_slice())
     }
@@ -596,10 +620,6 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
 mod tests {
     use std::str::FromStr;
 
-    use alloy::providers::{
-        Identity, Provider, RootProvider,
-        fillers::{BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
-    };
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
@@ -644,17 +664,17 @@ mod tests {
             )),
         )?;
 
-        let signed_tx = generator.announce(ad)?.sign_and_encode_to_eip2718(&chain_key_0).await?;
-        insta::assert_snapshot!(hex::encode(signed_tx));
+        let signed_tx = generator.announce(ad)?.sign_and_encode_to_eip2718(2, None, &chain_key_0).await?;
+        insta::assert_snapshot!("announce_basic", hex::encode(signed_tx));
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99")?;
         let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
 
         let signed_tx = generator
             .announce(ad_reannounce)?
-            .sign_and_encode_to_eip2718(&chain_key_0)
+            .sign_and_encode_to_eip2718(1, None, &chain_key_0)
             .await?;
-        insta::assert_snapshot!(hex::encode(signed_tx));
+        insta::assert_snapshot!("announce_safe", hex::encode(signed_tx));
 
         Ok(())
     }
@@ -685,16 +705,16 @@ mod tests {
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS);
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket.clone())?;
-        let signed_tx = redeem_ticket_tx.sign_and_encode_to_eip2718(&chain_key_bob).await?;
+        let signed_tx = redeem_ticket_tx.sign_and_encode_to_eip2718(1, None, &chain_key_bob).await?;
 
-        insta::assert_snapshot!(hex::encode(signed_tx));
+        insta::assert_snapshot!("redeem_ticket_basic", hex::encode(signed_tx));
 
         let generator =
             SafePayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
-        let signed_tx = redeem_ticket_tx.sign_and_encode_to_eip2718(&chain_key_bob).await?;
+        let signed_tx = redeem_ticket_tx.sign_and_encode_to_eip2718(2, None, &chain_key_bob).await?;
 
-        insta::assert_snapshot!(hex::encode(signed_tx));
+        insta::assert_snapshot!("redeem_ticket_safe",hex::encode(signed_tx));
 
         Ok(())
     }
@@ -707,17 +727,17 @@ mod tests {
         let generator = BasicPayloadGenerator::new((&chain_key_alice).into(), *CONTRACT_ADDRS);
         let tx = generator.transfer((&chain_key_bob).into(), HoprBalance::from(100))?;
 
-        let signed_tx = tx.sign_and_encode_to_eip2718(&chain_key_bob).await?;
+        let signed_tx = tx.sign_and_encode_to_eip2718(1, None, &chain_key_bob).await?;
 
-        insta::assert_snapshot!(hex::encode(signed_tx));
+        insta::assert_snapshot!("withdraw_basic", hex::encode(signed_tx));
 
         let generator =
             SafePayloadGenerator::new((&chain_key_alice).into(), *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let tx = generator.transfer((&chain_key_bob).into(), HoprBalance::from(100))?;
 
-        let signed_tx = tx.sign_and_encode_to_eip2718(&chain_key_bob).await?;
+        let signed_tx = tx.sign_and_encode_to_eip2718(2, None, &chain_key_bob).await?;
 
-        insta::assert_snapshot!(hex::encode(signed_tx));
+        insta::assert_snapshot!("withdraw_safe", hex::encode(signed_tx));
 
         Ok(())
     }

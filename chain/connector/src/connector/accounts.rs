@@ -111,7 +111,7 @@ where
 impl<B, C, P> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<C, B, P>
 where
     B: Send + Sync,
-    C: BlokliTransactionClient + Send + Sync + 'static,
+    C: BlokliTransactionClient + BlokliQueryClient + Send + Sync + 'static,
     P: PayloadGenerator + Send + Sync + 'static,
 {
     type Error = ConnectorError;
@@ -136,7 +136,7 @@ where
         let signed_payload = self
             .payload_generator
             .transfer(*recipient, balance)?
-            .sign_and_encode_to_eip2718(&self.chain_key)
+            .sign_and_encode_to_eip2718(self.query_next_nonce().await?, None, &self.chain_key)
             .await?;
 
         let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;
@@ -152,7 +152,7 @@ where
         let signed_payload = self
             .payload_generator
             .register_safe_by_node(*safe_address)?
-            .sign_and_encode_to_eip2718(&self.chain_key)
+            .sign_and_encode_to_eip2718(self.query_next_nonce().await?, None, &self.chain_key)
             .await?;
 
         let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;

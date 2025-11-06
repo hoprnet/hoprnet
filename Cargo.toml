@@ -303,3 +303,8 @@ opt-level = 3
 debug = 2
 split-debuginfo = "off"
 strip = false
+
+# make insta snapshots faster
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3

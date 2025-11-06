@@ -48,7 +48,7 @@ where
         let signed_payload = self
             .payload_generator
             .redeem_ticket(ticket.clone())?
-            .sign_and_encode_to_eip2718(&self.chain_key)
+            .sign_and_encode_to_eip2718(self.query_next_nonce().await?, None, &self.chain_key)
             .await?;
 
         let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;

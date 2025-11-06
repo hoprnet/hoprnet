@@ -1,8 +1,10 @@
+use std::str::FromStr;
 use std::time::Duration;
 
-use blokli_client::api::BlokliQueryClient;
+use blokli_client::api::{AccountSelector, BlokliQueryClient};
 use futures::TryFutureExt;
 use hopr_api::chain::{ChainInfo, DomainSeparators};
+use hopr_crypto_types::prelude::Keypair;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
@@ -20,6 +22,23 @@ where
             .values
             .try_get_with(0, self.client.query_chain_info().map_err(ConnectorError::from))
             .await?)
+    }
+
+    pub(crate) async fn query_next_nonce(&self) -> Result<u64, ConnectorError> {
+        let accounts = self.client.query_accounts(AccountSelector::Address(
+            self.chain_key.public().to_address().into()
+        )).await?;
+
+        if accounts.len() > 1 {
+            return Err(ConnectorError::InvalidState("more than one account found".into()));
+        }
+
+        accounts
+            .first()
+            .cloned()
+            .and_then(|a| a.safe_transaction_count)
+            .ok_or(ConnectorError::InvalidState("no safe transaction count found".into()))
+            .and_then(|v| u64::from_str(&v.0).map_err(|_| ConnectorError::TypeConversion("invalid safe transaction count".into())))
     }
 }
 
