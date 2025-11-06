@@ -6,7 +6,7 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-fixed_rng = []
+fixed-rng = []
 
 [dependencies]
 rand = { workspace = true }

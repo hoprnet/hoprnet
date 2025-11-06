@@ -20,14 +20,13 @@
 use alloy::primitives::aliases::U56;
 use clap::Parser;
 use hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle;
-use hopr_chain_types::a2h;
 use hopr_internal_types::{prelude::WinningProbability, tickets::EncodedWinProb};
 use tracing::{debug, info};
 
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{ArgEnvReader, PrivateKeyArgs},
-    utils::{Cmd, HelperErrors},
+    utils::{Cmd, HelperErrors, a2h},
 };
 
 /// CLI arguments for `hopli win-prob`

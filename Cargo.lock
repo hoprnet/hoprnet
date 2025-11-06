@@ -1974,6 +1974,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "console"
+version = "0.15.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "054ccb5b10f9f2cbf51eb355ca1d05c2d279ce1804688d0db74b4733a5aeafd8"
+dependencies = [
+ "encode_unicode",
+ "libc",
+ "once_cell",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "console-api"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2753,6 +2765,12 @@ dependencies = [
  "subtle",
  "zeroize",
 ]
+
+[[package]]
+name = "encode_unicode"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
 name = "encoding_rs"
@@ -4484,6 +4502,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
+ "lazy_static",
  "mimalloc",
  "rpassword",
  "serde",
@@ -4588,10 +4607,12 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
+ "insta",
  "lazy_static",
  "libp2p-identity",
  "multiaddr",
  "serde",
+ "serde_json",
  "serde_with",
  "strum 0.27.2",
  "thiserror 2.0.17",
@@ -4681,7 +4702,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.7.3"
+version = "0.8.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -5932,6 +5953,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879f10e63c20629ecabbb64a8010319738c66a5cd0c29b02d63d272b03751d01"
 dependencies = [
  "generic-array 0.14.9",
+]
+
+[[package]]
+name = "insta"
+version = "1.43.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46fdb647ebde000f43b5b53f773c30cf9b0cb4300453208713fa38b2c70935a0"
+dependencies = [
+ "console",
+ "once_cell",
+ "similar",
 ]
 
 [[package]]

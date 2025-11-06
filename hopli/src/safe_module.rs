@@ -98,7 +98,6 @@ use hopr_bindings::{
     hoprnetworkregistry::HoprNetworkRegistry, hoprnodesaferegistry::HoprNodeSafeRegistry,
     hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
 };
-use hopr_chain_types::a2h;
 use hopr_crypto_types::keypairs::Keypair;
 use tracing::{info, warn};
 
@@ -111,7 +110,7 @@ use crate::{
         include_nodes_to_module, migrate_nodes, register_safes_and_nodes_on_network_registry, transfer_native_tokens,
         transfer_or_mint_tokens,
     },
-    utils::{Cmd, HelperErrors},
+    utils::{Cmd, HelperErrors, a2h},
 };
 
 /// CLI arguments for `hopli safe-module`

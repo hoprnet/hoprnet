@@ -14,10 +14,10 @@ pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
 /// Gets the default cryptographically secure random number generator.
 ///
-/// **WARNING** On debug builds with the ` fixed_rng ` feature enabled during
+/// **WARNING** On debug builds with the ` fixed-rng ` feature enabled during
 /// compilation, this function will return an RNG with a fixed seed, which is *NOT SECURE*!
 /// This is reserved for deterministic testing.
-#[cfg(all(debug_assertions, feature = "fixed_rng"))]
+#[cfg(all(debug_assertions, feature = "fixed-rng"))]
 #[inline]
 pub fn rng() -> impl RngCore + CryptoRng {
     use rand::SeedableRng;
@@ -28,7 +28,7 @@ pub fn rng() -> impl RngCore + CryptoRng {
 }
 
 /// Gets the default cryptographically secure random number generator.
-#[cfg(any(not(debug_assertions), not(feature = "fixed_rng")))]
+#[cfg(any(not(debug_assertions), not(feature = "fixed-rng")))]
 #[inline]
 pub fn rng() -> impl RngCore + CryptoRng {
     rand::rngs::OsRng
@@ -39,7 +39,7 @@ pub fn rng() -> impl RngCore + CryptoRng {
 /// See also [`rng`].
 #[inline]
 pub const fn is_rng_fixed() -> bool {
-    cfg!(debug_assertions) && cfg!(feature = "fixed_rng")
+    cfg!(debug_assertions) && cfg!(feature = "fixed-rng")
 }
 
 /// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).

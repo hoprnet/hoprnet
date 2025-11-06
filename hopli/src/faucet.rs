@@ -28,14 +28,13 @@ use std::{ops::Sub, str::FromStr};
 use alloy::primitives::{Address, U256, utils::parse_units};
 use clap::Parser;
 use hopr_bindings::hoprtoken::HoprToken;
-use hopr_chain_types::a2h;
 use tracing::info;
 
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{ArgEnvReader, IdentityFileArgs, PrivateKeyArgs},
     methods::{get_native_and_token_balances, transfer_native_tokens, transfer_or_mint_tokens},
-    utils::{Cmd, HelperErrors},
+    utils::{Cmd, HelperErrors, a2h},
 };
 
 /// CLI arguments for `hopli faucet`

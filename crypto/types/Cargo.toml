@@ -1,12 +1,13 @@
 [package]
 name = "hopr-crypto-types"
-version = "0.7.3"
+version = "0.8.0"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
 license = "GPL-3.0-only"
 
 [features]
 rust-ecdsa = []
+fixed-rng = ["hopr-crypto-random/fixed-rng"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",

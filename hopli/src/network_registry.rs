@@ -69,7 +69,7 @@ use crate::{
         deregister_nodes_from_network_registry, force_sync_safes_on_network_registry,
         register_safes_and_nodes_on_network_registry, toggle_network_registry_status,
     },
-    utils::{Cmd, HelperErrors},
+    utils::{Cmd, HelperErrors, a2h},
 };
 
 /// CLI arguments for `hopli network-registry`

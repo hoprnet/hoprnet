@@ -14,6 +14,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-types/serde"]
+fixed-rng = ["hopr-crypto-random/fixed-rng", "hopr-crypto-types/fixed-rng"]
 
 [dependencies]
 aquamarine = { workspace = true }

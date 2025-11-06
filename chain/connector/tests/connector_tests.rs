@@ -1,10 +1,7 @@
 use std::time::Duration;
 
 use hopr_api::chain::ChainReadAccountOperations;
-use hopr_chain_connector::{
-    create_trustful_hopr_blokli_connector,
-    testing::BlokliTestClientBuilder,
-};
+use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestClientBuilder};
 use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_internal_types::{
     channels::ChannelStatus,

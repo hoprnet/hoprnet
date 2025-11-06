@@ -29,7 +29,7 @@ prometheus = [
   "hopr-network-types/prometheus",
 ]
 capture = ["hopr-transport/capture"]
-fixed_rng = ["hopr-crypto-random/fixed_rng"]
+fixed-rng = ["hopr-crypto-random/fixed-rng"]
 
 # === utility features ===
 utils_session = [ # utility session functionality for advanced interaction with hopr-lib

@@ -43,11 +43,16 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 use crate::{
-    ContractAddresses, a2h,
+    ContractAddresses,
     errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError},
 };
 
 type Result<T> = std::result::Result<T, crate::errors::ChainTypesError>;
+
+// Used instead of From implementation to avoid alloy being a dependency of the primitive crates
+fn a2h(a: hopr_primitive_types::prelude::Address) -> alloy::primitives::Address {
+    alloy::primitives::Address::from_slice(a.as_ref())
+}
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -589,134 +594,76 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
 
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr, sync::Arc};
+    use std::str::FromStr;
 
-    use alloy::{
-        network::EthereumWallet,
-        primitives::U256,
-        providers::{
-            Identity, Provider, RootProvider,
-            fillers::{BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
-        },
+    use alloy::providers::{
+        Identity, Provider, RootProvider,
+        fillers::{BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
     };
-    use anyhow::Context;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::HoprBalance;
+    use hopr_primitive_types::prelude::{Address, BytesRepresentable, HoprBalance};
     use multiaddr::Multiaddr;
 
-    use super::{BasicPayloadGenerator, PayloadGenerator};
-    use crate::{ContractInstances, a2h};
+    use super::{BasicPayloadGenerator, PayloadGenerator, SafePayloadGenerator, SignableTransaction};
+    use crate::ContractAddresses;
 
-    const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
+    const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
+    const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
 
-    pub type AnvilRpcClient = FillProvider<
-        JoinFill<
-            JoinFill<Identity, JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>>,
-            WalletFiller<EthereumWallet>,
-        >,
-        RootProvider,
-    >;
-
-    pub fn create_rpc_client_to_anvil(
-        anvil: &alloy::node_bindings::AnvilInstance,
-        signer: &hopr_crypto_types::keypairs::ChainKeypair,
-    ) -> Arc<AnvilRpcClient> {
-        use alloy::{
-            providers::ProviderBuilder, rpc::client::ClientBuilder, signers::local::PrivateKeySigner,
-            transports::http::ReqwestTransport,
-        };
-        use hopr_crypto_types::keypairs::Keypair;
-
-        let wallet = PrivateKeySigner::from_slice(signer.secret().as_ref()).expect("failed to construct wallet");
-
-        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
-
-        let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
-
-        let provider = ProviderBuilder::new().wallet(wallet).connect_client(rpc_client);
-
-        Arc::new(provider)
+    lazy_static::lazy_static! {
+        static ref CONTRACT_ADDRS: ContractAddresses = serde_json::from_str(r#"{
+            "announcements": "0xf1c143B1bA20C7606d56aA2FA94502D25744b982",
+            "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
+            "module_implementation": "0x32863c4974fBb6253E338a0cb70C382DCeD2eFCb",
+            "network_registry": "0x15a315E1320cFF0de84671c0139042EE320CE38d",
+            "network_registry_proxy": "0x20559cbD3C2eDcD0b396431226C00D2Cd102eB3F",
+            "node_safe_registry": "0x4F7C7dE3BA2B29ED8B2448dF2213cA43f94E45c0",
+            "node_stake_v2_factory": "0x791d190b2c95397F4BcE7bD8032FD67dCEA7a5F2",
+            "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
+            "ticket_price_oracle": "0x442df1d946303fB088C9377eefdaeA84146DA0A6",
+            "winning_probability_oracle": "0xC15675d4CCa538D91a91a8D3EcFBB8499C3B0471"
+        }"#).unwrap();
     }
 
     #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56")?;
 
-        let anvil = crate::utils::create_anvil(None);
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
+        let chain_key_0 = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
-        // Deploy contracts
-        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
-            .await
-            .context("could not deploy contracts")?;
-
-        let generator = BasicPayloadGenerator::new((&chain_key_0).into(), (&contract_instances).into());
+        let generator = BasicPayloadGenerator::new((&chain_key_0).into(), *CONTRACT_ADDRS);
 
         let ad = AnnouncementData::new(
             test_multiaddr,
             Some(KeyBinding::new(
                 (&chain_key_0).into(),
-                &OffchainKeypair::from_secret(&PRIVATE_KEY)?,
+                &OffchainKeypair::from_secret(&PRIVATE_KEY_1)?,
             )),
         )?;
 
-        let tx = generator.announce(ad)?;
-
-        assert!(client.send_transaction(tx).await?.get_receipt().await?.status());
+        let signed_tx = generator.announce(ad)?.sign_and_encode_to_eip2718(&chain_key_0).await?;
+        insta::assert_snapshot!(hex::encode(signed_tx));
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99")?;
-
         let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
-        let reannounce_tx = generator.announce(ad_reannounce)?;
 
-        assert!(
-            client
-                .send_transaction(reannounce_tx)
-                .await?
-                .get_receipt()
-                .await?
-                .status()
-        );
+        let signed_tx = generator
+            .announce(ad_reannounce)?
+            .sign_and_encode_to_eip2718(&chain_key_0)
+            .await?;
+        insta::assert_snapshot!(hex::encode(signed_tx));
 
         Ok(())
     }
 
     #[tokio::test]
     async fn redeem_ticket() -> anyhow::Result<()> {
-        let anvil = crate::utils::create_anvil(None);
-        let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(&anvil, &chain_key_alice);
-
-        // Deploy contracts
-        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;
-
-        // Mint 1000 HOPR to Alice
-        let _ = crate::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128)).await;
-
-        let domain_separator: Hash = contract_instances.channels.domainSeparator().call().await?.0.into();
-
-        // Open channel Alice -> Bob
-        let _ = crate::utils::fund_channel(
-            (&chain_key_bob).into(),
-            contract_instances.token.clone(),
-            contract_instances.channels.clone(),
-            U256::from(1_u128),
-        )
-        .await;
-
-        // Fund Bob's node
-        let _ = crate::utils::fund_node(
-            (&chain_key_bob).into(),
-            U256::from(1000000000000000000_u128),
-            U256::from(10_u128),
-            contract_instances.token.clone(),
-        )
-        .await;
+        let domain_separator = Hash::default();
+        let chain_key_alice = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
+        let chain_key_bob = ChainKeypair::from_secret(&PRIVATE_KEY_2)?;
 
         let response = Response::try_from(RESPONSE_TO_CHALLENGE.as_ref())?;
 
@@ -736,56 +683,41 @@ mod tests {
             .into_redeemable(&chain_key_bob, &domain_separator)?;
 
         // Bob redeems the ticket
-        let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
-        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
-        let client = create_rpc_client_to_anvil(&anvil, &chain_key_bob);
+        let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS);
+        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket.clone())?;
+        let signed_tx = redeem_ticket_tx.sign_and_encode_to_eip2718(&chain_key_bob).await?;
 
-        assert!(
-            client
-                .send_transaction(redeem_ticket_tx)
-                .await?
-                .get_receipt()
-                .await?
-                .status()
-        );
+        insta::assert_snapshot!(hex::encode(signed_tx));
+
+        let generator =
+            SafePayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
+        let signed_tx = redeem_ticket_tx.sign_and_encode_to_eip2718(&chain_key_bob).await?;
+
+        insta::assert_snapshot!(hex::encode(signed_tx));
 
         Ok(())
     }
 
     #[tokio::test]
     async fn withdraw_token() -> anyhow::Result<()> {
-        let anvil = crate::utils::create_anvil(None);
-        let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(&anvil, &chain_key_alice);
+        let chain_key_alice = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
+        let chain_key_bob = ChainKeypair::from_secret(&PRIVATE_KEY_2)?;
 
-        // Deploy contracts
-        let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;
-        let generator = BasicPayloadGenerator::new((&chain_key_alice).into(), (&contract_instances).into());
-
-        // Mint 1000 HOPR to Alice
-        let _ = crate::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128)).await;
-
-        // Check balance is 1000 HOPR
-        let balance = contract_instances
-            .token
-            .balanceOf(a2h(hopr_primitive_types::primitives::Address::from(&chain_key_alice)))
-            .call()
-            .await?;
-        assert_eq!(balance, U256::from(1000_u128));
-
-        // Alice withdraws 100 HOPR (to Bob's address)
+        let generator = BasicPayloadGenerator::new((&chain_key_alice).into(), *CONTRACT_ADDRS);
         let tx = generator.transfer((&chain_key_bob).into(), HoprBalance::from(100))?;
 
-        assert!(client.send_transaction(tx).await?.get_receipt().await?.status());
+        let signed_tx = tx.sign_and_encode_to_eip2718(&chain_key_bob).await?;
 
-        // Alice withdraws 100 HOPR, leaving 900 HOPR to the node
-        let balance = contract_instances
-            .token
-            .balanceOf(a2h(hopr_primitive_types::primitives::Address::from(&chain_key_alice)))
-            .call()
-            .await?;
-        assert_eq!(balance, U256::from(900_u128));
+        insta::assert_snapshot!(hex::encode(signed_tx));
+
+        let generator =
+            SafePayloadGenerator::new((&chain_key_alice).into(), *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let tx = generator.transfer((&chain_key_bob).into(), HoprBalance::from(100))?;
+
+        let signed_tx = tx.sign_and_encode_to_eip2718(&chain_key_bob).await?;
+
+        insta::assert_snapshot!(hex::encode(signed_tx));
 
         Ok(())
     }
