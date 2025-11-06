@@ -113,7 +113,7 @@ impl HoprIndexerDb {
             directory.to_path_buf(),
             PoolOptions::new(),
             Some(0),
-            None,
+            Some(1),
             false,
             SQL_DB_LOGS_FILE_NAME,
         )
