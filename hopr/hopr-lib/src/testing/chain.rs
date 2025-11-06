@@ -6,6 +6,7 @@ use alloy::{
 };
 use alloy::{primitives::Bytes, providers::ext::AnvilApi};
 use anyhow::Context;
+use hopr_chain_api::config::Network;
 use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor, SnapshotRequestorLayer};
 use hopr_chain_types::{
     ContractAddresses, ContractInstances,
@@ -92,6 +93,7 @@ pub async fn deploy_test_environment(
     finality: u32,
     requestor: Option<SnapshotRequestor>,
     from_file: Option<&str>,
+    network: Option<Network>,
 ) -> anyhow::Result<TestChainEnv> {
     let anvil: AnvilInstance = create_anvil(Some(block_time));
     info!(url=%anvil.endpoint_url(), "Anvil started");
@@ -111,6 +113,15 @@ pub async fn deploy_test_environment(
             .await
             .context("failed to load anvil state from file")?;
 
+        // if network is not none, we can construct contract instances from addresses
+        let (contract_addresses, contract_instances) = if let Some(network) = network {
+            let contract_addresses: ContractAddresses = (&network.addresses).into();
+            let contract_instances = ContractInstances::new(&contract_addresses, provider.clone(), true);
+            (Some(contract_addresses), Some(contract_instances))
+        } else {
+            (None, None)
+        };
+
         Ok(TestChainEnv {
             contract_deployer,
             node_chain_keys: anvil
@@ -119,8 +130,8 @@ pub async fn deploy_test_environment(
                 .skip(1)
                 .map(|k| ChainKeypair::from_secret(k.to_bytes().as_ref()).unwrap())
                 .collect(),
-            contract_addresses: None,
-            contract_instances: None,
+            contract_addresses: contract_addresses,
+            contract_instances: contract_instances,
             anvil: anvil.into(),
             provider,
         })

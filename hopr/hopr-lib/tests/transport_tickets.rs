@@ -403,3 +403,90 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
 
     Ok(())
 }
+
+#[rstest]
+#[tokio::test]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_relay_with_reduced_winn_prob(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let new_winning_prob = 0.1;
+
+    cluster_fixture.reduce_winning_probability(new_winning_prob).await?;
+
+    let [src, mid, dst] = exclusive_indexes::<3>();
+    let message_count = 20;
+
+    let ticket_price = cluster_fixture[src]
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+    let funding_amount = ticket_price.mul(message_count);
+
+    let _fw_channel = cluster_fixture[src]
+        .inner()
+        .open_channel(&(cluster_fixture[mid].address()), funding_amount)
+        .await
+        .context("failed to open forward channel")?;
+
+    let _bw_channel = cluster_fixture[dst]
+        .inner()
+        .open_channel(&(cluster_fixture[mid].address()), funding_amount)
+        .await
+        .context("failed to open return channel")?;
+
+    sleep(std::time::Duration::from_secs(3)).await;
+
+    let ip = IpOrHost::from_str(":0")?;
+    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
+        cluster_fixture[mid].address().into(),
+    )));
+
+    let mut session = cluster_fixture[src]
+        .inner()
+        .connect_to(
+            cluster_fixture[dst].address(),
+            SessionTarget::UdpStream(SealedHost::Plain(ip)),
+            SessionClientConfig {
+                forward_path_options: routing.clone(),
+                return_path_options: routing,
+                capabilities: Default::default(),
+                pseudonym: None,
+                surb_management: None,
+                always_max_out_surbs: false,
+            },
+        )
+        .await
+        .context("creating a session must succeed")?;
+
+    const BUF_LEN: usize = 400;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    let stats_before = cluster_fixture[mid]
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    for _ in 1..=message_count {
+        tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
+            .await
+            .context("write failed")??;
+    }
+
+    sleep(std::time::Duration::from_secs(5)).await;
+
+    let stats_after = cluster_fixture[mid]
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert!(stats_after.winning_count < stats_before.winning_count + message_count as u128);
+
+    Ok(())
+}

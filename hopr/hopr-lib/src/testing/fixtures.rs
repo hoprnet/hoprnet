@@ -33,6 +33,38 @@ impl std::ops::Deref for ClusterGuard {
     }
 }
 
+impl ClusterGuard {
+    /// Reduce winning probability network wide
+    pub async fn reduce_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
+        let epsilon: f64 = 0.000001;
+
+        if let Some(instances) = &self.chain_env.contract_instances {
+            match instances.update_winning_probability(new_prob).await {
+                Ok(_) => {
+                    sleep(Duration::from_secs(5)).await;
+
+                    let [node] = exclusive_indexes::<1>();
+
+                    let winning_prob = self.cluster[node]
+                        .inner()
+                        .get_minimum_incoming_ticket_win_probability()
+                        .await?;
+
+                    if (winning_prob.as_f64() - new_prob).abs() < epsilon {
+                        Ok(())
+                    } else {
+                        Err(anyhow::anyhow!("Winning probability not reflected in the node"))
+                    }
+                }
+                Err(e) => Err(anyhow::anyhow!("Failed to update winning probability: {}", e)),
+            }
+        } else {
+            info!("Contract instances not available, cannot get current winning probability");
+            Err(anyhow::anyhow!("Contract instances not available"))
+        }
+    }
+}
+
 lazy_static! {
     static ref CLUSTER_MUTEX: Mutex<()> = Mutex::new(());
 }
@@ -70,7 +102,18 @@ pub async fn chainenv_fixture() -> TestChainEnv {
     }
 
     let load_file = format!("{SNAPSHOT_BASE}/anvil");
-    let res = deploy_test_environment(Duration::from_secs(1), 2, None, Some(load_file.as_str())).await;
+    let protocol_config = ProtocolsConfig::from_str(
+        &std::fs::read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
+    )
+    .expect("failed to parse protocol config");
+    let res = deploy_test_environment(
+        Duration::from_secs(1),
+        2,
+        None,
+        Some(load_file.as_str()),
+        Some(protocol_config.networks["anvil-localhost"].clone()),
+    )
+    .await;
     match res {
         Ok(env) => env,
         Err(e) => {

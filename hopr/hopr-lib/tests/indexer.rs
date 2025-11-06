@@ -251,7 +251,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let finality = 2;
 
-    let chain_env = deploy_test_environment(block_time, finality, Some(requestor_base), None).await?;
+    let chain_env = deploy_test_environment(block_time, finality, Some(requestor_base), None, None).await?;
 
     let mut safe_cfgs = [NodeSafeConfig::default(); 2];
     safe_cfgs[0] = onboard_node(&chain_env, &alice_chain_key, U256::from(10_u32), U256::from(10_000_u32)).await;

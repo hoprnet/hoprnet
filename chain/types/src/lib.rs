@@ -1,6 +1,9 @@
 //! This crate contains various on-chain related modules and types.
 use alloy::{
-    contract::Result as ContractResult, network::TransactionBuilder, primitives, providers::MULTICALL3_ADDRESS,
+    contract::{Error as ContractError, Result as ContractResult},
+    network::TransactionBuilder,
+    primitives::{self, aliases::U56},
+    providers::MULTICALL3_ADDRESS,
     rpc::types::TransactionRequest,
 };
 use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
@@ -20,6 +23,7 @@ use hopr_bindings::{
     hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::{self, HoprWinningProbabilityOracleInstance},
 };
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_internal_types::tickets::WinningProbability;
 use hopr_primitive_types::primitives::Address;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -302,6 +306,27 @@ where
             network_registry_proxy: NetworkRegistryProxy::Safe(network_registry_proxy),
             ..instances
         })
+    }
+
+    /// Updates the winning probability value without hopli
+    pub async fn update_winning_probability(&self, winning_probability: f64) -> ContractResult<&Self> {
+        let winning_probability_val = match WinningProbability::try_from(winning_probability) {
+            Ok(val) => val,
+            Err(_) => {
+                return Err(ContractError::UnknownFunction(
+                    "Failed to convert winning probability to the required format".into(),
+                ));
+            }
+        };
+
+        self.win_prob_oracle
+            .setWinProb(U56::from_be_slice(&winning_probability_val.as_encoded()))
+            .send()
+            .await?
+            .watch()
+            .await?;
+
+        Ok(self)
     }
 }
 

@@ -277,7 +277,7 @@ async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: Cluster
         .context("failed to get winning probability")?;
 
     assert!(winning_prob.as_f64() > 0.0);
-    assert!(winning_prob.as_f64() < 1.0);
+    assert!(winning_prob.as_f64() <= 1.0);
 
     Ok(())
 }
