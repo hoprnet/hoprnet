@@ -67,7 +67,10 @@ impl Display for Action {
             Action::Announce(data, key_binding_fee) => write!(
                 f,
                 "announce action of {} with key bound fee {}",
-                data.multiaddress(),
+                data.multiaddress()
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| "None".into()),
                 key_binding_fee
             ),
             Action::RegisterSafe(safe_address) => write!(f, "register safe action {safe_address}"),

@@ -39,7 +39,7 @@ pub trait ChainWriteAccountOperations {
     /// Announces transport key and list of multi addresses.
     async fn announce(
         &self,
-        multiaddrs: &[Multiaddr],
+        multiaddrs: Option<&[Multiaddr]>,
         key: &OffchainKeypair,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>>;
 

@@ -38,7 +38,8 @@ pub trait NodeActions {
 
     /// Announces node on-chain with key binding.
     /// The operation should also check if such an announcement has not been already made on-chain.
-    async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction>;
+    async fn announce(&self, multiaddrs: Option<&[Multiaddr]>, offchain_key: &OffchainKeypair)
+    -> Result<PendingAction>;
 
     /// Registers the safe address with the node
     async fn register_safe_by_node(&self, safe_address: Address) -> Result<PendingAction>;
@@ -68,10 +69,14 @@ impl<Db: Sync> NodeActions for ChainActions<Db> {
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction> {
+    async fn announce(
+        &self,
+        multiaddrs: Option<&[Multiaddr]>,
+        offchain_key: &OffchainKeypair,
+    ) -> Result<PendingAction> {
         // TODO: allow announcing all addresses once that option is supported
         let announcement_data = AnnouncementData::new(
-            multiaddrs[0].clone(),
+            multiaddrs.map(|ma| ma[0].clone()),
             KeyBinding::new(self.self_address(), offchain_key),
         )?;
 
@@ -82,9 +87,9 @@ impl<Db: Sync> NodeActions for ChainActions<Db> {
             .filter(|account| {
                 futures::future::ready(
                     &account.public_key == offchain_key.public()
-                        && account
-                            .get_multiaddr()
-                            .is_some_and(|ma| decapsulate_multiaddress(ma).eq(announcement_data.multiaddress())),
+                        && account.get_multiaddr().is_some_and(|ma| {
+                            decapsulate_multiaddress(ma).eq(announcement_data.multiaddress().as_ref().unwrap())
+                        }),
                 )
             })
             .count()
@@ -173,7 +178,7 @@ mod tests {
             .once()
             .withf(move |ad, key_binding_fee| {
                 let kb = ad.key_binding.clone();
-                ma.eq(ad.multiaddress())
+                ma.eq(ad.multiaddress().as_ref().unwrap())
                     && kb.packet_key == pubkey_clone
                     && kb.chain_key == *ALICE
                     && *key_binding_fee == U256::from(0_u128)
@@ -205,7 +210,10 @@ mod tests {
         });
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
-        let tx_res = actions.announce(&[announce_multiaddr], &ALICE_OFFCHAIN).await?.await?;
+        let tx_res = actions
+            .announce(Some(&[announce_multiaddr]), &ALICE_OFFCHAIN)
+            .await?
+            .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
@@ -253,7 +261,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), node_db.clone(), tx_sender.clone());
 
-        let res = actions.announce(&[announce_multiaddr], &ALICE_OFFCHAIN).await;
+        let res = actions.announce(Some(&[announce_multiaddr]), &ALICE_OFFCHAIN).await;
         assert!(
             matches!(res, Err(ChainActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"

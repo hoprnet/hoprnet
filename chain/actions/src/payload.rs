@@ -191,7 +191,11 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
             ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
             ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
             ed25519_pub_key: B256::from_slice(announcement.key_binding.packet_key.as_ref()),
-            multiaddress: announcement.multiaddress().to_string(),
+            multiaddress: announcement
+                .multiaddress()
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default(), // "" if None
         };
         let inner_payload = inner_payload_struct.abi_encode()[32..].to_vec();
 
@@ -353,7 +357,11 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
             ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
             ed25519_pub_key: B256::from_slice(announcement.key_binding.packet_key.as_ref()),
-            multiaddress: announcement.multiaddress().to_string(),
+            multiaddress: announcement
+                .multiaddress()
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default(),
         };
         let inner_payload = inner_payload_struct.abi_encode()[32..].to_vec();
 
@@ -618,7 +626,7 @@ mod tests {
         let generator = BasicPayloadGenerator::new((&chain_key_0).into(), (&contract_instances).into());
 
         let ad = AnnouncementData::new(
-            test_multiaddr,
+            Some(test_multiaddr),
             KeyBinding::new((&chain_key_0).into(), &OffchainKeypair::from_secret(&PRIVATE_KEY)?),
         )?;
 
@@ -638,7 +646,7 @@ mod tests {
         let rebind_fee = U256::ZERO;
 
         let ad_reannounce = AnnouncementData::new(
-            test_multiaddr_reannounce,
+            Some(test_multiaddr_reannounce),
             KeyBinding::new((&chain_key_0).into(), &OffchainKeypair::from_secret(&PRIVATE_KEY)?),
         )?;
         let reannounce_tx = generator.announce(ad_reannounce, rebind_fee)?;

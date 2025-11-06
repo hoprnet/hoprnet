@@ -567,13 +567,13 @@ impl Hopr {
         if self.is_public() {
             // At this point the node is already registered with Safe, so
             // we can announce via Safe-compliant TX
-
+            // TODO: make this return an Option. If edge node, return None. If relay node, return Some(multiaddresses)
             let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
 
             // The announcement is intentionally not awaited until confirmation
             match self
                 .hopr_chain_api
-                .announce(&multiaddresses_to_announce, &self.me)
+                .announce(Some(&multiaddresses_to_announce), &self.me)
                 .await
             {
                 Ok(_) => info!(?multiaddresses_to_announce, "Announcing node on chain",),

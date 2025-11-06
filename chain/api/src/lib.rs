@@ -462,7 +462,7 @@ impl ChainWriteAccountOperations for HoprChain {
 
     async fn announce(
         &self,
-        multiaddrs: &[Multiaddr],
+        multiaddrs: Option<&[Multiaddr]>,
         key: &OffchainKeypair,
     ) -> std::result::Result<
         BoxFuture<'_, std::result::Result<ChainReceipt, Self::Error>>,

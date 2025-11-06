@@ -342,7 +342,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse()?;
     let confirmation = alice_node
         .actions
-        .announce(&[maddr.clone()], &alice_node.offchain_key)
+        .announce(Some(&[maddr.clone()]), &alice_node.offchain_key)
         .await
         .expect("should submit announcement tx")
         .await
@@ -366,7 +366,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/20000".parse()?;
     let confirmation = bob_node
         .actions
-        .announce(&[maddr.clone()], &bob_node.offchain_key)
+        .announce(Some(&[maddr.clone()]), &bob_node.offchain_key)
         .await
         .expect("should submit announcement tx")
         .await

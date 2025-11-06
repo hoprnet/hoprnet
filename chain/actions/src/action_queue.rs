@@ -263,11 +263,11 @@ where
                 });
             }
             Action::Announce(data, key_binding_fee) => {
-                debug!(mutliaddress = %data.multiaddress(), "announcing node");
+                debug!(multiaddress = ?data.multiaddress(), "announcing node");
                 let tx_hash = self.tx_exec.announce(data.clone(), key_binding_fee).await?;
                 IndexerExpectation::new(
                     tx_hash,
-                    move |event| matches!(event, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress())),
+                    move |event| matches!(event, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress().as_ref().unwrap())),
                 )
             }
             Action::RegisterSafe(safe_address) => {
