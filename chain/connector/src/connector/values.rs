@@ -70,15 +70,13 @@ where
     async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(
-            self
-                .query_cached_chain_info()
-                .await?
-                .ticket_price
-                .0
-                .parse()
-                .inspect_err(|_| self.values.invalidate_all())?
-        )
+        Ok(self
+            .query_cached_chain_info()
+            .await?
+            .ticket_price
+            .0
+            .parse()
+            .inspect_err(|_| self.values.invalidate_all())?)
     }
 
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
@@ -103,9 +101,9 @@ where
 
         Ok(ChainInfo {
             chain_id: info.chain_id as u64,
-            hopr_network_name: "dufour".into(),
+            hopr_network_name: "<not set>".into(),
             contract_addresses: serde_json::from_str(&info.contract_addresses.0)
-                .map_err(|_| ConnectorError::TypeConversion("contract addresses not a valid JSON".into()))
+                .map_err(|e| ConnectorError::TypeConversion(format!("contract addresses not a valid JSON: {e}")))
                 .inspect_err(|_| self.values.invalidate_all())?,
         })
     }

@@ -77,6 +77,15 @@ pub struct ContractAddresses {
     pub module_implementation: Address,
 }
 
+// Used instead of From implementation to avoid alloy being a dependency of the primitive crates
+pub fn h2a(h: alloy::primitives::Address) -> Address {
+    Address::from(h.0.0)
+}
+
+pub fn a2h(a: Address) -> alloy::primitives::Address {
+    alloy::primitives::Address::from_slice(a.as_ref())
+}
+
 #[derive(Debug, Clone)]
 pub enum NetworkRegistryProxy<P> {
     Dummy(HoprDummyProxyForNetworkRegistryInstance<P>),
@@ -89,8 +98,8 @@ where
 {
     pub fn address(&self) -> Address {
         match self {
-            NetworkRegistryProxy::Dummy(c) => Into::<Address>::into(*c.address()),
-            NetworkRegistryProxy::Safe(c) => Into::<Address>::into(*c.address()),
+            NetworkRegistryProxy::Dummy(c) => h2a(*c.address()),
+            NetworkRegistryProxy::Safe(c) => h2a(*c.address()),
         }
     }
 }
@@ -116,42 +125,42 @@ where
 {
     pub fn new(contract_addresses: &ContractAddresses, provider: P, use_dummy_nr: bool) -> Self {
         Self {
-            token: HoprTokenInstance::new(contract_addresses.token.into(), provider.clone()),
-            channels: HoprChannelsInstance::new(contract_addresses.channels.into(), provider.clone()),
-            announcements: HoprAnnouncementsInstance::new(contract_addresses.announcements.into(), provider.clone()),
+            token: HoprTokenInstance::new(a2h(contract_addresses.token), provider.clone()),
+            channels: HoprChannelsInstance::new(a2h(contract_addresses.channels), provider.clone()),
+            announcements: HoprAnnouncementsInstance::new(a2h(contract_addresses.announcements), provider.clone()),
             network_registry: HoprNetworkRegistryInstance::new(
-                contract_addresses.network_registry.into(),
+                a2h(contract_addresses.network_registry),
                 provider.clone(),
             ),
             network_registry_proxy: if use_dummy_nr {
                 NetworkRegistryProxy::Dummy(HoprDummyProxyForNetworkRegistryInstance::new(
-                    contract_addresses.network_registry_proxy.into(),
+                    a2h(contract_addresses.network_registry_proxy),
                     provider.clone(),
                 ))
             } else {
                 NetworkRegistryProxy::Safe(HoprSafeProxyForNetworkRegistryInstance::new(
-                    contract_addresses.network_registry_proxy.into(),
+                    a2h(contract_addresses.network_registry_proxy),
                     provider.clone(),
                 ))
             },
             safe_registry: HoprNodeSafeRegistryInstance::new(
-                contract_addresses.node_safe_registry.into(),
+                a2h(contract_addresses.node_safe_registry),
                 provider.clone(),
             ),
             price_oracle: HoprTicketPriceOracleInstance::new(
-                contract_addresses.ticket_price_oracle.into(),
+                a2h(contract_addresses.ticket_price_oracle),
                 provider.clone(),
             ),
             win_prob_oracle: HoprWinningProbabilityOracleInstance::new(
-                contract_addresses.winning_probability_oracle.into(),
+                a2h(contract_addresses.winning_probability_oracle),
                 provider.clone(),
             ),
             stake_factory: HoprNodeStakeFactoryInstance::new(
-                contract_addresses.node_stake_v2_factory.into(),
+                a2h(contract_addresses.node_stake_v2_factory),
                 provider.clone(),
             ),
             module_implementation: HoprNodeManagementModuleInstance::new(
-                contract_addresses.module_implementation.into(),
+                a2h(contract_addresses.module_implementation),
                 provider.clone(),
             ),
         }
@@ -201,7 +210,7 @@ where
         debug!("deploying contracts...");
 
         // Get deployer address
-        let self_address = deployer.public().to_address().into();
+        let self_address = a2h(deployer.public().to_address());
 
         let stake_factory = HoprNodeStakeFactory::deploy(provider.clone()).await?;
         let module_implementation = HoprNodeManagementModule::deploy(provider.clone()).await?;
@@ -255,7 +264,7 @@ where
         let instances = Self::inner_deploy_common_contracts_for_testing(provider.clone(), deployer).await?;
 
         // Get deployer address
-        let self_address = deployer.public().to_address().into();
+        let self_address = a2h(deployer.public().to_address());
         // Deploy network registry proxy
         let network_registry_proxy = HoprDummyProxyForNetworkRegistry::deploy(provider.clone(), self_address).await?;
         let network_registry = HoprNetworkRegistry::deploy(
@@ -281,7 +290,7 @@ where
         let instances = Self::inner_deploy_common_contracts_for_testing(provider.clone(), deployer).await?;
 
         // Get deployer address
-        let self_address = deployer.public().to_address().into();
+        let self_address = a2h(deployer.public().to_address());
         // Deploy network registry proxy
         // TODO:
         let network_registry_proxy = HoprSafeProxyForNetworkRegistry::deploy(
@@ -319,16 +328,16 @@ where
 {
     fn from(instances: &ContractInstances<P>) -> Self {
         Self {
-            token: Into::<Address>::into(*instances.token.address()),
-            channels: Into::<Address>::into(*instances.channels.address()),
-            announcements: Into::<Address>::into(*instances.announcements.address()),
-            network_registry: Into::<Address>::into(*instances.network_registry.address()),
+            token: h2a(*instances.token.address()),
+            channels: h2a(*instances.channels.address()),
+            announcements: h2a(*instances.announcements.address()),
+            network_registry: h2a(*instances.network_registry.address()),
             network_registry_proxy: instances.network_registry_proxy.address(),
-            node_safe_registry: Into::<Address>::into(*instances.safe_registry.address()),
-            ticket_price_oracle: Into::<Address>::into(*instances.price_oracle.address()),
-            winning_probability_oracle: Into::<Address>::into(*instances.win_prob_oracle.address()),
-            node_stake_v2_factory: Into::<Address>::into(*instances.stake_factory.address()),
-            module_implementation: Into::<Address>::into(*instances.module_implementation.address()),
+            node_safe_registry: h2a(*instances.safe_registry.address()),
+            ticket_price_oracle: h2a(*instances.price_oracle.address()),
+            winning_probability_oracle: h2a(*instances.win_prob_oracle.address()),
+            node_stake_v2_factory: h2a(*instances.stake_factory.address()),
+            module_implementation: h2a(*instances.module_implementation.address()),
         }
     }
 }

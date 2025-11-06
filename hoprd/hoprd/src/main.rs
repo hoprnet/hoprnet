@@ -2,21 +2,18 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
+use hopr_chain_connector::HoprBlokliConnector;
+use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::{
-    AbortableList, AcknowledgedTicket, Address, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
-    exports::api::chain::ChainEvents, state::HoprLibProcess, utils::session::ListenerJoinHandles,
+    AbortableList, AcknowledgedTicket, Address, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
+    exports::api::chain::ChainEvents, prelude::ChainKeypair, state::HoprLibProcess,
+    utils::session::ListenerJoinHandles,
 };
-use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
+use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::prelude::*;
-
-use hopr_chain_connector::HoprBlokliConnector;
-use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
-use hopr_lib::{errors::HoprLibError, prelude::ChainKeypair};
-use hoprd::config::HoprdConfig;
-
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -335,13 +332,16 @@ async fn main_inner() -> anyhow::Result<()> {
 
     // Create the node instance
     info!("creating the HOPRd node instance from hopr-lib");
-    let node = Arc::new(hopr_lib::Hopr::new(
-        cfg.clone().into(),
-        chain_connector.clone(),
-        node_db.clone(),
-        &hopr_keys.packet_key,
-        &hopr_keys.chain_key,
-    ).await?);
+    let node = Arc::new(
+        hopr_lib::Hopr::new(
+            cfg.clone().into(),
+            chain_connector.clone(),
+            node_db.clone(),
+            &hopr_keys.packet_key,
+            &hopr_keys.chain_key,
+        )
+        .await?,
+    );
 
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
         cfg.strategy.clone(),

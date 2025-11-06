@@ -40,8 +40,8 @@ pub mod testing;
 pub mod exports {
     pub use hopr_api as api;
     pub mod types {
-        pub use hopr_primitive_types as primitive;
         pub use hopr_internal_types as internal;
+        pub use hopr_primitive_types as primitive;
     }
     pub mod crypto {
         pub use hopr_crypto_keypair as keypair;

@@ -1,6 +1,8 @@
 mod backend;
 mod connector;
 pub mod errors;
+#[cfg(feature = "testing")]
+pub mod testing;
 
 pub use backend::{Backend, InMemoryBackend, TempDbBackend};
 pub use connector::HoprBlockchainConnector;
@@ -46,9 +48,22 @@ pub fn create_trustless_hopr_blokli_connector(
 /// This instantiation explicitly trusts the contract address information retrieved from the
 /// [`blokli_client::BlokliClient`].
 pub async fn create_trustful_hopr_blokli_connector(
-    _chain_key: &ChainKeypair,
-    _client: blokli_client::BlokliClient,
-    _module_address: Address,
+    chain_key: &ChainKeypair,
+    client: blokli_client::BlokliClient,
+    module_address: Address,
 ) -> Result<HoprBlokliConnector, errors::ConnectorError> {
-    todo!()
+    use blokli_client::BlokliQueryClient;
+
+    let info = client.query_chain_info().await?;
+    let contract_addrs = serde_json::from_str(&info.contract_addresses.0)
+        .map_err(|e| errors::ConnectorError::TypeConversion(format!("contract addresses not a valid JSON: {e}")))?;
+
+    let payload_gen = hopr_chain_types::payload::SafePayloadGenerator::new(chain_key, contract_addrs, module_address);
+
+    Ok(HoprBlockchainConnector::new(
+        chain_key.clone(),
+        client,
+        TempDbBackend::new()?,
+        payload_gen,
+    ))
 }

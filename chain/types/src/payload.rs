@@ -43,7 +43,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 use crate::{
-    ContractAddresses,
+    ContractAddresses, a2h,
     errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError},
 };
 
@@ -117,7 +117,7 @@ pub trait PayloadGenerator {
 
 fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
     execTransactionFromModuleCall {
-        to: hopr_channels.into(),
+        to: a2h(hopr_channels),
         value: U256::ZERO,
         data: call_data.into(),
         operation: Operation::Call as u8,
@@ -128,7 +128,7 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
 fn approve_tx(spender: Address, amount: HoprBalance) -> TransactionRequest {
     TransactionRequest::default().with_input(
         approveCall {
-            spender: spender.into(),
+            spender: a2h(spender),
             value: U256::from_be_bytes(amount.amount().to_be_bytes()),
         }
         .abi_encode(),
@@ -141,7 +141,7 @@ fn transfer_tx<C: Currency>(destination: Address, amount: Balance<C>) -> Transac
     if WxHOPR::is::<C>() {
         tx.with_input(
             transferCall {
-                recipient: destination.into(),
+                recipient: a2h(destination),
                 amount: amount_u256,
             }
             .abi_encode(),
@@ -156,7 +156,7 @@ fn transfer_tx<C: Currency>(destination: Address, amount: Balance<C>) -> Transac
 fn register_safe_tx(safe_addr: Address) -> TransactionRequest {
     TransactionRequest::default().with_input(
         registerSafeByNodeCall {
-            safeAddr: safe_addr.into(),
+            safeAddr: a2h(safe_addr),
         }
         .abi_encode(),
     )
@@ -179,7 +179,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
     type TxRequest = TransactionRequest;
 
     fn approve(&self, spender: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
-        let tx = approve_tx(spender, amount).with_to(self.contract_addrs.token.into());
+        let tx = approve_tx(spender, amount).with_to(a2h(self.contract_addrs.token));
         Ok(tx)
     }
 
@@ -191,7 +191,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
         } else {
             return Err(InvalidArguments("invalid currency"));
         };
-        let tx = transfer_tx(destination, amount).with_to(to.into());
+        let tx = transfer_tx(destination, amount).with_to(a2h(to));
         Ok(tx)
     }
 
@@ -216,7 +216,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
         let tx = TransactionRequest::default()
             .with_input(payload)
-            .with_to(self.contract_addrs.announcements.into());
+            .with_to(a2h(self.contract_addrs.announcements));
         Ok(tx)
     }
 
@@ -228,12 +228,12 @@ impl PayloadGenerator for BasicPayloadGenerator {
         let tx = TransactionRequest::default()
             .with_input(
                 fundChannelCall {
-                    account: dest.into(),
+                    account: a2h(dest),
                     amount: U96::from_be_slice(&amount.amount().to_be_bytes()[32 - 12..]),
                 }
                 .abi_encode(),
             )
-            .with_to(self.contract_addrs.channels.into());
+            .with_to(a2h(self.contract_addrs.channels));
         Ok(tx)
     }
 
@@ -243,8 +243,8 @@ impl PayloadGenerator for BasicPayloadGenerator {
         }
 
         let tx = TransactionRequest::default()
-            .with_input(closeIncomingChannelCall { source: source.into() }.abi_encode())
-            .with_to(self.contract_addrs.channels.into());
+            .with_input(closeIncomingChannelCall { source: a2h(source) }.abi_encode())
+            .with_to(a2h(self.contract_addrs.channels));
         Ok(tx)
     }
 
@@ -258,11 +258,11 @@ impl PayloadGenerator for BasicPayloadGenerator {
         let tx = TransactionRequest::default()
             .with_input(
                 initiateOutgoingChannelClosureCall {
-                    destination: destination.into(),
+                    destination: a2h(destination),
                 }
                 .abi_encode(),
             )
-            .with_to(self.contract_addrs.channels.into());
+            .with_to(a2h(self.contract_addrs.channels));
         Ok(tx)
     }
 
@@ -276,11 +276,11 @@ impl PayloadGenerator for BasicPayloadGenerator {
         let tx = TransactionRequest::default()
             .with_input(
                 finalizeOutgoingChannelClosureCall {
-                    destination: destination.into(),
+                    destination: a2h(destination),
                 }
                 .abi_encode(),
             )
-            .with_to(self.contract_addrs.channels.into());
+            .with_to(a2h(self.contract_addrs.channels));
         Ok(tx)
     }
 
@@ -296,12 +296,12 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
         let tx = TransactionRequest::default()
             .with_input(redeemTicketCall { redeemable, params }.abi_encode())
-            .with_to(self.contract_addrs.channels.into());
+            .with_to(a2h(self.contract_addrs.channels));
         Ok(tx)
     }
 
     fn register_safe_by_node(&self, safe_addr: Address) -> Result<Self::TxRequest> {
-        let tx = register_safe_tx(safe_addr).with_to(self.contract_addrs.node_safe_registry.into());
+        let tx = register_safe_tx(safe_addr).with_to(a2h(self.contract_addrs.node_safe_registry));
         Ok(tx)
     }
 
@@ -337,7 +337,7 @@ impl PayloadGenerator for SafePayloadGenerator {
 
     fn approve(&self, spender: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
         let tx = approve_tx(spender, amount)
-            .with_to(self.contract_addrs.token.into())
+            .with_to(a2h(self.contract_addrs.token))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -352,7 +352,7 @@ impl PayloadGenerator for SafePayloadGenerator {
             return Err(InvalidArguments("invalid currency".into()));
         };
         let tx = transfer_tx(destination, amount)
-            .with_to(to.into())
+            .with_to(a2h(to))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -364,7 +364,7 @@ impl PayloadGenerator for SafePayloadGenerator {
                 let serialized_signature = binding.signature.as_ref();
 
                 bindKeysAnnounceSafeCall {
-                    selfAddress: self.me.into(),
+                    selfAddress: a2h(self.me),
                     ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
                     ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
                     ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
@@ -373,7 +373,7 @@ impl PayloadGenerator for SafePayloadGenerator {
                 .abi_encode()
             }
             None => announceSafeCall {
-                selfAddress: self.me.into(),
+                selfAddress: a2h(self.me),
                 baseMultiaddr: announcement.multiaddress().to_string(),
             }
             .abi_encode(),
@@ -382,14 +382,14 @@ impl PayloadGenerator for SafePayloadGenerator {
         let tx = TransactionRequest::default()
             .with_input(
                 execTransactionFromModuleCall {
-                    to: self.contract_addrs.announcements.into(),
+                    to: a2h(self.contract_addrs.announcements),
                     value: U256::ZERO,
                     data: call_data.into(),
                     operation: Operation::Call as u8,
                 }
                 .abi_encode(),
             )
-            .with_to(self.module.into())
+            .with_to(a2h(self.module))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -407,15 +407,15 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
 
         let call_data = fundChannelSafeCall {
-            selfAddress: self.me.into(),
-            account: dest.into(),
+            selfAddress: a2h(self.me),
+            account: a2h(dest),
             amount: U96::from_be_slice(&amount.amount().to_be_bytes()[32 - 12..]),
         }
         .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
-            .with_to(self.module.into())
+            .with_to(a2h(self.module))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -427,14 +427,14 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
 
         let call_data = closeIncomingChannelSafeCall {
-            selfAddress: self.me.into(),
-            source: source.into(),
+            selfAddress: a2h(self.me),
+            source: a2h(source),
         }
         .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
-            .with_to(self.module.into())
+            .with_to(a2h(self.module))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -448,14 +448,14 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
 
         let call_data = initiateOutgoingChannelClosureSafeCall {
-            selfAddress: self.me.into(),
-            destination: destination.into(),
+            selfAddress: a2h(self.me),
+            destination: a2h(destination),
         }
         .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
-            .with_to(self.module.into())
+            .with_to(a2h(self.module))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -469,14 +469,14 @@ impl PayloadGenerator for SafePayloadGenerator {
         }
 
         let call_data = finalizeOutgoingChannelClosureSafeCall {
-            selfAddress: self.me.into(),
-            destination: destination.into(),
+            selfAddress: a2h(self.me),
+            destination: a2h(destination),
         }
         .abi_encode();
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
-            .with_to(self.module.into())
+            .with_to(a2h(self.module))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -493,7 +493,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         );
 
         let call_data = redeemTicketSafeCall {
-            selfAddress: self.me.into(),
+            selfAddress: a2h(self.me),
             redeemable,
             params,
         }
@@ -501,7 +501,7 @@ impl PayloadGenerator for SafePayloadGenerator {
 
         let tx = TransactionRequest::default()
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
-            .with_to(self.module.into())
+            .with_to(a2h(self.module))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -509,7 +509,7 @@ impl PayloadGenerator for SafePayloadGenerator {
 
     fn register_safe_by_node(&self, safe_addr: Address) -> Result<Self::TxRequest> {
         let tx = register_safe_tx(safe_addr)
-            .with_to(self.contract_addrs.node_safe_registry.into())
+            .with_to(a2h(self.contract_addrs.node_safe_registry))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -517,13 +517,8 @@ impl PayloadGenerator for SafePayloadGenerator {
 
     fn deregister_node_by_safe(&self) -> Result<Self::TxRequest> {
         let tx = TransactionRequest::default()
-            .with_input(
-                deregisterNodeBySafeCall {
-                    nodeAddr: self.me.into(),
-                }
-                .abi_encode(),
-            )
-            .with_to(self.module.into())
+            .with_input(deregisterNodeBySafeCall { nodeAddr: a2h(self.me) }.abi_encode())
+            .with_to(a2h(self.module))
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)
@@ -612,7 +607,7 @@ mod tests {
     use multiaddr::Multiaddr;
 
     use super::{BasicPayloadGenerator, PayloadGenerator};
-    use crate::ContractInstances;
+    use crate::{ContractInstances, a2h};
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
@@ -774,7 +769,7 @@ mod tests {
         // Check balance is 1000 HOPR
         let balance = contract_instances
             .token
-            .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
+            .balanceOf(a2h(hopr_primitive_types::primitives::Address::from(&chain_key_alice)))
             .call()
             .await?;
         assert_eq!(balance, U256::from(1000_u128));
@@ -787,7 +782,7 @@ mod tests {
         // Alice withdraws 100 HOPR, leaving 900 HOPR to the node
         let balance = contract_instances
             .token
-            .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
+            .balanceOf(a2h(hopr_primitive_types::primitives::Address::from(&chain_key_alice)))
             .call()
             .await?;
         assert_eq!(balance, U256::from(900_u128));

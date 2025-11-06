@@ -27,8 +27,9 @@ use hopr_primitive_types::primitives::Address;
 use tracing::debug;
 
 use crate::{
-    ContractInstances, constants,
+    ContractInstances, a2h, constants,
     errors::{ChainTypesError, Result as ChainTypesResult},
+    h2a,
 };
 
 // define basic safe abi
@@ -101,7 +102,7 @@ pub fn create_native_transfer<N>(to: Address, amount: U256) -> N::TransactionReq
 where
     N: alloy::providers::Network,
 {
-    N::TransactionRequest::default().with_to(to.into()).with_value(amount)
+    N::TransactionRequest::default().with_to(a2h(to)).with_value(amount)
 }
 
 /// Funds the given wallet address with specified amount of native tokens and HOPR tokens.
@@ -117,7 +118,7 @@ where
     N: alloy::providers::Network,
 {
     let native_transfer_tx = N::TransactionRequest::default()
-        .with_to(node.into())
+        .with_to(a2h(node))
         .with_value(native_token);
 
     // let native_transfer_tx = Eip1559TransactionRequest::new()
@@ -129,7 +130,7 @@ where
     provider.send_transaction(native_transfer_tx).await?.watch().await?;
 
     hopr_token_contract
-        .transfer(node.into(), hopr_token)
+        .transfer(a2h(node), hopr_token)
         .send()
         .await?
         .watch()
@@ -157,7 +158,7 @@ where
         .await?;
 
     hopr_channels
-        .fundChannel(counterparty.into(), aliases::U96::from(amount))
+        .fundChannel(a2h(counterparty), aliases::U96::from(amount))
         .send()
         .await?
         .watch()
@@ -180,17 +181,17 @@ where
     N: alloy::providers::Network,
 {
     let hopr_token_with_new_client: HoprTokenInstance<P, N> =
-        HoprTokenInstance::new(hopr_token_address.into(), new_client.clone());
-    let hopr_channels_with_new_client = HoprChannelsInstance::new(hopr_channels_address.into(), new_client.clone());
+        HoprTokenInstance::new(a2h(hopr_token_address), new_client.clone());
+    let hopr_channels_with_new_client = HoprChannelsInstance::new(a2h(hopr_channels_address), new_client.clone());
     hopr_token_with_new_client
-        .approve(hopr_channels_address.into(), amount)
+        .approve(a2h(hopr_channels_address), amount)
         .send()
         .await?
         .watch()
         .await?;
 
     hopr_channels_with_new_client
-        .fundChannel(counterparty.into(), aliases::U96::from(amount))
+        .fundChannel(a2h(counterparty), aliases::U96::from(amount))
         .send()
         .await?
         .watch()
@@ -214,7 +215,7 @@ where
 
     let data_hash = safe_contract
         .getTransactionHash(
-            target.into(),
+            a2h(target),
             U256::ZERO,
             inner_tx_data.clone(),
             0,
@@ -231,7 +232,7 @@ where
     let signed_data_hash = wallet.sign_hash(&data_hash).await?;
 
     let safe_tx_data = SafeContract::execTransactionCall {
-        to: target.into(),
+        to: a2h(target),
         value: U256::ZERO,
         data: inner_tx_data,
         operation: 0,
@@ -277,7 +278,7 @@ where
     }
     .abi_encode();
 
-    let safe_contract = SafeContract::new(safe_address.into(), provider.clone());
+    let safe_contract = SafeContract::new(a2h(safe_address), provider.clone());
     let wallet = PrivateKeySigner::from_slice(deployer.secret().as_ref()).expect("failed to construct wallet");
     let safe_tx = get_safe_tx(safe_contract, module_address, inner_tx_data.into(), wallet).await?;
 
@@ -317,7 +318,7 @@ where
     }
     .abi_encode();
 
-    let safe_contract = SafeContract::new(safe_address.into(), provider.clone());
+    let safe_contract = SafeContract::new(a2h(safe_address), provider.clone());
     let wallet = PrivateKeySigner::from_slice(deployer.secret().as_ref()).expect("failed to construct wallet");
     let safe_tx = get_safe_tx(safe_contract, module_address, inner_tx_data.into(), wallet)
         .await
@@ -342,12 +343,12 @@ where
 {
     // Inner tx payload: include node to the module
     let inner_tx_data = HoprToken::approveCall {
-        spender: channel_address.into(),
+        spender: a2h(channel_address),
         value: U256::MAX,
     }
     .abi_encode();
 
-    let safe_contract = SafeContract::new(safe_address.into(), provider.clone());
+    let safe_contract = SafeContract::new(a2h(safe_address), provider.clone());
     let wallet = PrivateKeySigner::from_slice(deployer.secret().as_ref()).expect("failed to construct wallet");
     let safe_tx = get_safe_tx(safe_contract, token_address, inner_tx_data.into(), wallet)
         .await
@@ -443,7 +444,7 @@ where
 
     // create a salt from the nonce
     let curr_nonce = provider
-        .get_transaction_count(self_address.into())
+        .get_transaction_count(a2h(self_address))
         .pending()
         //  Some(BlockNumber::Pending.into()))
         .await
@@ -451,8 +452,7 @@ where
     debug!(%curr_nonce, "curr_nonce");
 
     // FIXME: Check if this is the correct way to get the nonce
-    let nonce =
-        keccak256((Into::<primitives::Address>::into(self_address), U256::from(curr_nonce)).abi_encode_packed());
+    let nonce = keccak256((a2h(self_address), U256::from(curr_nonce)).abi_encode_packed());
     let default_target = format!("{:?}010103020202020202020202", instances.channels.address());
 
     debug!(%self_address, "self_address");
@@ -462,7 +462,7 @@ where
 
     let typed_tx = HoprNodeStakeFactory::cloneCall {
         moduleSingletonAddress: *instances.module_implementation.address(),
-        admins: vec![self_address.into()],
+        admins: vec![a2h(self_address)],
         nonce: nonce.into(),
         defaultTarget: U256::from_str(&default_target).unwrap().into(),
     }
@@ -475,7 +475,7 @@ where
         .stake_factory
         .clone(
             *instances.module_implementation.address(),
-            vec![self_address.into()],
+            vec![a2h(self_address)],
             nonce.into(),
             U256::from_str(&default_target).unwrap().into(),
         )
@@ -505,5 +505,5 @@ where
     debug!("instance_deployment_tx module instance {:?}", deployed_module_address);
     debug!("instance_deployment_tx safe instance {:?}", deployed_safe_address);
 
-    Ok((deployed_module_address.into(), deployed_safe_address.into()))
+    Ok((h2a(deployed_module_address), h2a(deployed_safe_address)))
 }

@@ -28,6 +28,7 @@ use std::{ops::Sub, str::FromStr};
 use alloy::primitives::{Address, U256, utils::parse_units};
 use clap::Parser;
 use hopr_bindings::hoprtoken::HoprToken;
+use hopr_chain_types::a2h;
 use tracing::info;
 
 use crate::{
@@ -108,7 +109,7 @@ impl FaucetArgs {
             }));
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        eth_addresses_all.extend(local_identity.to_addresses()?.into_iter().map(Address::from));
+        eth_addresses_all.extend(local_identity.to_addresses()?.into_iter().map(a2h));
         info!("All the addresses: {:?}", eth_addresses_all);
 
         // `PRIVATE_KEY` - Private key is required to send on-chain transactions
@@ -118,7 +119,7 @@ impl FaucetArgs {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_token = HoprToken::new(contract_addresses.addresses.token.into(), rpc_provider.clone());
+        let hopr_token = HoprToken::new(a2h(contract_addresses.addresses.token), rpc_provider.clone());
 
         // complete actions as defined in `transferOrMintHoprAndSendNativeToAmount` in `SingleActions.s.sol`
         // get token and native balances for addresses

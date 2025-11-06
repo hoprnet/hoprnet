@@ -5,6 +5,7 @@ edition = "2024"
 
 [features]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+testing = ["blokli-client/testing"]
 
 [dependencies]
 ahash = { workspace = true }

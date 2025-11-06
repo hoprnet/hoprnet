@@ -98,6 +98,7 @@ use hopr_bindings::{
     hoprnetworkregistry::HoprNetworkRegistry, hoprnodesaferegistry::HoprNodeSafeRegistry,
     hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
 };
+use hopr_chain_types::a2h;
 use hopr_crypto_types::keypairs::Keypair;
 use tracing::{info, warn};
 
@@ -355,7 +356,7 @@ impl SafeModuleSubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
-                .map(Address::from),
+                .map(a2h),
         );
 
         let node_addresses = if node_eth_addresses.is_empty() {
@@ -384,7 +385,7 @@ impl SafeModuleSubcommands {
                 .split(',')
                 .map(|addr| Address::from_str(addr).unwrap())
                 .collect(),
-            None => vec![signer_private_key.clone().public().to_address().into()],
+            None => vec![a2h(signer_private_key.clone().public().to_address())],
         };
 
         // within one multicall, as an owner of the safe
@@ -395,16 +396,16 @@ impl SafeModuleSubcommands {
         // transfer safe ownership to actual admins
         // set desired threshold
         let hopr_stake_factory = HoprNodeStakeFactory::new(
-            contract_addresses.addresses.node_stake_v2_factory.into(),
+            a2h(contract_addresses.addresses.node_stake_v2_factory),
             rpc_provider.clone(),
         );
 
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             hopr_stake_factory,
-            contract_addresses.addresses.token.into(),
-            contract_addresses.addresses.channels.into(),
-            contract_addresses.addresses.module_implementation.into(),
-            contract_addresses.addresses.announcements.into(),
+            a2h(contract_addresses.addresses.token),
+            a2h(contract_addresses.addresses.channels),
+            a2h(contract_addresses.addresses.module_implementation),
+            a2h(contract_addresses.addresses.announcements),
             token_allowance,
             node_addresses,
             admin_eth_addresses,
@@ -417,7 +418,7 @@ impl SafeModuleSubcommands {
 
         // direct transfer of some HOPR tokens to the safe
         if let Some(hopr_amount_for_safe) = hopr_amount {
-            let hopr_token = HoprToken::new(contract_addresses.addresses.token.into(), rpc_provider.clone());
+            let hopr_token = HoprToken::new(a2h(contract_addresses.addresses.token), rpc_provider.clone());
             let hopr_to_be_transferred: U256 = parse_units(&hopr_amount_for_safe.to_string(), "ether")
                 .map_err(|_| HelperErrors::ParseError("Failed to parse HOPR amount units".into()))?
                 .into();
@@ -454,7 +455,7 @@ impl SafeModuleSubcommands {
             // get RPC provider for the given network and environment
             let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
             let hopr_network_registry = HoprNetworkRegistry::new(
-                contract_addresses.addresses.network_registry.into(),
+                a2h(contract_addresses.addresses.network_registry),
                 manager_rpc_provider.clone(),
             );
             // Overwrite any past registration of provided nodes in the network registry.
@@ -509,7 +510,7 @@ impl SafeModuleSubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
-                .map(Address::from),
+                .map(a2h),
         );
 
         // parse safe and module addresses
@@ -534,7 +535,7 @@ impl SafeModuleSubcommands {
         // 4. Remove node from network registry
         // 5. Include node to network registry
         let hopr_node_safe_registry = HoprNodeSafeRegistry::new(
-            contract_addresses.addresses.node_safe_registry.into(),
+            a2h(contract_addresses.addresses.node_safe_registry),
             rpc_provider.clone(),
         );
         let safe = SafeSingleton::new(safe_addr, rpc_provider.clone());
@@ -586,7 +587,7 @@ impl SafeModuleSubcommands {
             // get RPC provider for the given network and environment
             let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
             let hopr_network_registry = HoprNetworkRegistry::new(
-                contract_addresses.addresses.network_registry.into(),
+                a2h(contract_addresses.addresses.network_registry),
                 manager_rpc_provider.clone(),
             );
             // Overwrite any past registration of provided nodes in the network registry.
@@ -641,7 +642,7 @@ impl SafeModuleSubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
-                .map(Address::from),
+                .map(a2h),
         );
 
         // get allowance
@@ -673,9 +674,9 @@ impl SafeModuleSubcommands {
         migrate_nodes(
             safe.clone(),
             module_addr,
-            contract_addresses.addresses.channels.into(),
-            contract_addresses.addresses.token.into(),
-            contract_addresses.addresses.announcements.into(),
+            a2h(contract_addresses.addresses.channels),
+            a2h(contract_addresses.addresses.token),
+            a2h(contract_addresses.addresses.announcements),
             token_allowance,
             signer_private_key,
         )
@@ -693,7 +694,7 @@ impl SafeModuleSubcommands {
             // get RPC provider for the given network and environment
             let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
             let hopr_network_registry = HoprNetworkRegistry::new(
-                contract_addresses.addresses.network_registry.into(),
+                a2h(contract_addresses.addresses.network_registry),
                 manager_rpc_provider.clone(),
             );
             // Overwrite any past registration of provided nodes in the network registry.
@@ -752,7 +753,7 @@ impl SafeModuleSubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
-                .map(Address::from),
+                .map(a2h),
         );
 
         // parse safe and module addresses
@@ -765,13 +766,11 @@ impl SafeModuleSubcommands {
         let rpc_provider = network_provider.get_provider_without_signer().await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_token = HoprToken::new(contract_addresses.addresses.token.into(), rpc_provider.clone());
-        let network_registry = HoprNetworkRegistry::new(
-            contract_addresses.addresses.network_registry.into(),
-            rpc_provider.clone(),
-        );
+        let hopr_token = HoprToken::new(a2h(contract_addresses.addresses.token), rpc_provider.clone());
+        let network_registry =
+            HoprNetworkRegistry::new(a2h(contract_addresses.addresses.network_registry), rpc_provider.clone());
         let node_safe_registry = HoprNodeSafeRegistry::new(
-            contract_addresses.addresses.node_safe_registry.into(),
+            a2h(contract_addresses.addresses.node_safe_registry),
             rpc_provider.clone(),
         );
 
@@ -800,8 +799,8 @@ impl SafeModuleSubcommands {
                 &module_addr,
                 &node,
                 &safe_addr,
-                &contract_addresses.addresses.channels.into(),
-                &contract_addresses.addresses.announcements.into(),
+                &a2h(contract_addresses.addresses.channels),
+                &a2h(contract_addresses.addresses.announcements),
             )
             .await
             .map_err(HelperErrors::MulticallError)?;

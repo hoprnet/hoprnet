@@ -86,7 +86,9 @@ fn empty_vector() -> Vec<Strategy> {
 
 fn validate_execution_interval(interval: &std::time::Duration) -> std::result::Result<(), ValidationError> {
     if interval < &std::time::Duration::from_secs(10) {
-        Err(ValidationError::new("strategy execution interval must be at least 1 second"))
+        Err(ValidationError::new(
+            "strategy execution interval must be at least 1 second",
+        ))
     } else {
         Ok(())
     }

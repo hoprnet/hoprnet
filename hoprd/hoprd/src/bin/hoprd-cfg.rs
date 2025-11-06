@@ -74,7 +74,6 @@ fn main() -> Result<(), hoprd::errors::HoprdError> {
         let cfg: HoprdConfig = serde_yaml::from_str(&yaml_configuration)
             .map_err(|e| hoprd::errors::HoprdError::SerializationError(e.to_string()))?;
 
-
         if let Err(e) = cfg.validate() {
             return Err(hoprd::errors::HoprdError::ValidationError(e.to_string()));
         };

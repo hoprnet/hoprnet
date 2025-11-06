@@ -130,17 +130,6 @@ impl FromStr for Address {
     }
 }
 
-impl From<alloy::primitives::Address> for Address {
-    fn from(a: alloy::primitives::Address) -> Self {
-        Address::from(a.0.0)
-    }
-}
-impl From<Address> for alloy::primitives::Address {
-    fn from(a: Address) -> Self {
-        alloy::primitives::Address::from_slice(a.as_ref())
-    }
-}
-
 /// Represents and Ethereum challenge.
 ///
 /// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.

@@ -59,6 +59,7 @@ use std::str::FromStr;
 use alloy::primitives::Address;
 use clap::Parser;
 use hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry;
+use hopr_chain_types::a2h;
 use tracing::info;
 
 use crate::{
@@ -211,7 +212,7 @@ impl NetworkRegistrySubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
-                .map(Address::from),
+                .map(a2h),
         );
 
         // read all the safe addresses
@@ -233,10 +234,8 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry = HoprNetworkRegistry::new(
-            contract_addresses.addresses.network_registry.into(),
-            rpc_provider.clone(),
-        );
+        let hopr_network_registry =
+            HoprNetworkRegistry::new(a2h(contract_addresses.addresses.network_registry), rpc_provider.clone());
 
         // get registered safe of all the nodes
         // check if any of the node has been registered to a different address than the given safe address.
@@ -282,7 +281,7 @@ impl NetworkRegistrySubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {e:?}")))?
                 .into_iter()
-                .map(Address::from),
+                .map(a2h),
         );
         info!(
             "Will deregister {:?} nodes from the network registry",
@@ -296,10 +295,8 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry = HoprNetworkRegistry::new(
-            contract_addresses.addresses.network_registry.into(),
-            rpc_provider.clone(),
-        );
+        let hopr_network_registry =
+            HoprNetworkRegistry::new(a2h(contract_addresses.addresses.network_registry), rpc_provider.clone());
 
         // deregister all the given nodes from the network registry
         let removed_pairs_num =
@@ -345,10 +342,8 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry = HoprNetworkRegistry::new(
-            contract_addresses.addresses.network_registry.into(),
-            rpc_provider.clone(),
-        );
+        let hopr_network_registry =
+            HoprNetworkRegistry::new(a2h(contract_addresses.addresses.network_registry), rpc_provider.clone());
 
         // deregister all the given nodes from the network registry
         match eligibility {
@@ -383,10 +378,8 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry = HoprNetworkRegistry::new(
-            contract_addresses.addresses.network_registry.into(),
-            rpc_provider.clone(),
-        );
+        let hopr_network_registry =
+            HoprNetworkRegistry::new(a2h(contract_addresses.addresses.network_registry), rpc_provider.clone());
 
         toggle_network_registry_status(hopr_network_registry, enable).await
     }
