@@ -1613,8 +1613,8 @@ dependencies = [
 
 [[package]]
 name = "blokli-client"
-version = "0.4.0"
-source = "git+https://github.com/hoprnet/blokli#51590c6f30a3a2402c6e17dd92d0cdd211baee06"
+version = "0.4.1"
+source = "git+https://github.com/hoprnet/blokli#3007242178434020a19d43a3ac25d77eed811b19"
 dependencies = [
  "anyhow",
  "async-trait",
