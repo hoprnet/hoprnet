@@ -175,8 +175,15 @@ where
         Ok(self.client.post_transaction_and_await_confirmation(payload).await?)
     }
 
-    async fn announce(&self, data: AnnouncementData) -> hopr_chain_actions::errors::Result<Hash> {
-        let payload = self.payload_generator.announce(data)?;
+    async fn announce(
+        &self,
+        data: AnnouncementData,
+        key_binding_fee: U256,
+    ) -> hopr_chain_actions::errors::Result<Hash> {
+        let payload = self.payload_generator.announce(
+            data,
+            alloy::primitives::U256::from_be_slice(key_binding_fee.to_be_bytes().as_ref()),
+        )?;
         Ok(self.client.post_transaction(payload).await?)
     }
 

@@ -39,7 +39,7 @@ pub enum Action {
     WithdrawNative(Address, XDaiBalance),
 
     /// Announce node on-chain
-    Announce(AnnouncementData),
+    Announce(AnnouncementData, U256),
 
     /// Register a safe address with this node
     RegisterSafe(Address),
@@ -64,7 +64,12 @@ impl Display for Action {
             Action::WithdrawNative(destination, amount) => {
                 write!(f, "withdraw native action of {amount} to {destination}")
             }
-            Action::Announce(data) => write!(f, "announce action of {}", data.multiaddress()),
+            Action::Announce(data, key_binding_fee) => write!(
+                f,
+                "announce action of {} with key bound fee {}",
+                data.multiaddress(),
+                key_binding_fee
+            ),
             Action::RegisterSafe(safe_address) => write!(f, "register safe action {safe_address}"),
         }
     }

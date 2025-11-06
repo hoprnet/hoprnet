@@ -15,7 +15,6 @@ use alloy::{
     primitives::{
         B256, U256,
         aliases::{U24, U48, U56, U96},
-        utils::parse_units,
     },
     rpc::types::TransactionRequest,
     sol,
@@ -74,7 +73,7 @@ pub trait PayloadGenerator<T: Into<TransactionRequest>> {
     fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> Result<T>;
 
     /// Creates the transaction payload to announce a node on-chain.
-    fn announce(&self, announcement: AnnouncementData) -> Result<T>;
+    fn announce(&self, announcement: AnnouncementData, key_binding_fee: U256) -> Result<T>;
 
     /// Creates the transaction payload to open a payment channel
     fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<T>;
@@ -182,7 +181,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn announce(&self, announcement: AnnouncementData) -> Result<TransactionRequest> {
+    fn announce(&self, announcement: AnnouncementData, key_binding_fee: U256) -> Result<TransactionRequest> {
         // when the keys have already bounded, now only try to announce without key binding
         // when keys are not bounded yet, bind keys and announce together
         let serialized_signature = announcement.key_binding.signature.as_ref();
@@ -196,15 +195,9 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
         };
         let inner_payload = inner_payload_struct.abi_encode()[32..].to_vec();
 
-        // TODO: Read keyBindingFee from contract instead of hardcoding
-        // This should be the `keyBindingFee` value,
-        // updated from event KeyBindingFeeUpdate(uint256 newFee, uint256 oldFee) in the Announcements,sol.
-        // If the keys have been bounded, supply U256::ZERO,
-        let wxhopr_token_amount: U256 = parse_units("0.01", "ether")?.into();
-
         let call_data = sendCall {
             recipient: self.contract_addrs.announcements.into(),
-            amount: wxhopr_token_amount,
+            amount: key_binding_fee,
             data: inner_payload.into(),
         }
         .abi_encode();
@@ -350,7 +343,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn announce(&self, announcement: AnnouncementData) -> Result<TransactionRequest> {
+    fn announce(&self, announcement: AnnouncementData, key_binding_fee: U256) -> Result<TransactionRequest> {
         // when the keys have already bounded, now only try to announce without key binding
         // when keys are not bounded yet, bind keys and announce together
         let serialized_signature = announcement.key_binding.signature.as_ref();
@@ -364,15 +357,9 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         };
         let inner_payload = inner_payload_struct.abi_encode()[32..].to_vec();
 
-        // TODO: Read keyBindingFee from contract instead of hardcoding
-        // This should be the `keyBindingFee` value,
-        // updated from event KeyBindingFeeUpdate(uint256 newFee, uint256 oldFee) in the Announcements,sol.
-        // If the keys have been bounded, supply U256::ZERO,
-        let wxhopr_token_amount: U256 = parse_units("0.01", "ether")?.into();
-
         let call_data = sendCall {
             recipient: self.contract_addrs.announcements.into(),
-            amount: wxhopr_token_amount,
+            amount: key_binding_fee,
             data: inner_payload.into(),
         }
         .abi_encode();
@@ -597,7 +584,10 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 mod tests {
     use std::str::FromStr;
 
-    use alloy::{primitives::U256, providers::Provider};
+    use alloy::{
+        primitives::{U256, utils::parse_units},
+        providers::Provider,
+    };
     use anyhow::Context;
     use hex_literal::hex;
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
@@ -638,27 +628,29 @@ mod tests {
             U256::from(10_000_000_000_000_000_u128),
         )
         .await;
+        let first_bind_fee = parse_units("0.01", "ether")?.into();
 
-        let tx = generator.announce(ad)?;
+        let tx = generator.announce(ad, first_bind_fee)?;
 
         assert!(client.send_transaction(tx).await?.get_receipt().await?.status());
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99")?;
+        let rebind_fee = U256::ZERO;
 
-        // let ad_reannounce = AnnouncementData::new(
-        //     test_multiaddr_reannounce,
-        //     KeyBinding::new((&chain_key_0).into(), &OffchainKeypair::from_secret(&PRIVATE_KEY)?),
-        // )?;
-        // let reannounce_tx = generator.announce(ad_reannounce)?;
+        let ad_reannounce = AnnouncementData::new(
+            test_multiaddr_reannounce,
+            KeyBinding::new((&chain_key_0).into(), &OffchainKeypair::from_secret(&PRIVATE_KEY)?),
+        )?;
+        let reannounce_tx = generator.announce(ad_reannounce, rebind_fee)?;
 
-        // assert!(
-        //     client
-        //         .send_transaction(reannounce_tx)
-        //         .await?
-        //         .get_receipt()
-        //         .await?
-        //         .status()
-        // );
+        assert!(
+            client
+                .send_transaction(reannounce_tx)
+                .await?
+                .get_receipt()
+                .await?
+                .status()
+        );
 
         Ok(())
     }

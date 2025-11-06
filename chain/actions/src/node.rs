@@ -90,9 +90,23 @@ impl<Db: Sync> NodeActions for ChainActions<Db> {
             .count()
             .await;
 
+        // TODO: Read if the off-chain key and on-chain key has been bound already
+        let is_key_bound = true;
+        // TODO: Read keyBindingFee from contract instead of hardcoding
+        // This should be the `keyBindingFee` value,
+        // updated from event KeyBindingFeeUpdate(uint256 newFee, uint256 oldFee) in the Announcements,sol.
+        // If the keys have been bounded, supply U256::ZERO,
+        let key_binding_fee = if is_key_bound {
+            U256::from(0_u128)
+        } else {
+            U256::from(10_000_000_000_000_000_u128)
+        }; // 0.01 HOPR
+
         if count_announced == 0 {
             info!(%announcement_data, "initiating announcement");
-            self.tx_sender.send(Action::Announce(announcement_data)).await
+            self.tx_sender
+                .send(Action::Announce(announcement_data, key_binding_fee.into()))
+                .await
         } else {
             Err(AlreadyAnnounced)
         }
@@ -157,11 +171,14 @@ mod tests {
         tx_exec
             .expect_announce()
             .once()
-            .withf(move |ad| {
+            .withf(move |ad, key_binding_fee| {
                 let kb = ad.key_binding.clone();
-                ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == *ALICE
+                ma.eq(ad.multiaddress())
+                    && kb.packet_key == pubkey_clone
+                    && kb.chain_key == *ALICE
+                    && *key_binding_fee == U256::from(0_u128)
             })
-            .returning(move |_| Ok(random_hash));
+            .returning(move |_, _| Ok(random_hash));
 
         let ma = announce_multiaddr.clone();
         let pk = *ALICE_OFFCHAIN.public();
@@ -191,7 +208,10 @@ mod tests {
         let tx_res = actions.announce(&[announce_multiaddr], &ALICE_OFFCHAIN).await?.await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
-        assert!(matches!(tx_res.action, Action::Announce(_)), "must be announce action");
+        assert!(
+            matches!(tx_res.action, Action::Announce(_, _)),
+            "must be announce action"
+        );
         assert!(
             matches!(tx_res.event, Some(ChainEventType::Announcement { .. })),
             "must correspond to announcement chain event"

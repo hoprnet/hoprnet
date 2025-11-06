@@ -67,7 +67,7 @@ pub trait TransactionExecutor {
     async fn withdraw<C: Currency + Send + 'static>(&self, recipient: Address, amount: Balance<C>) -> Result<Hash>;
 
     /// Announces the node on-chain given the `AnnouncementData`
-    async fn announce(&self, data: AnnouncementData) -> Result<Hash>;
+    async fn announce(&self, data: AnnouncementData, key_binding_fee: U256) -> Result<Hash>;
 
     /// Registers Safe with the node.
     async fn register_safe(&self, safe_address: Address) -> Result<Hash>;
@@ -262,9 +262,9 @@ where
                     action: action.clone(),
                 });
             }
-            Action::Announce(data) => {
+            Action::Announce(data, key_binding_fee) => {
                 debug!(mutliaddress = %data.multiaddress(), "announcing node");
-                let tx_hash = self.tx_exec.announce(data.clone()).await?;
+                let tx_hash = self.tx_exec.announce(data.clone(), key_binding_fee).await?;
                 IndexerExpectation::new(
                     tx_hash,
                     move |event| matches!(event, ChainEventType::Announcement{multiaddresses,..} if multiaddresses.contains(data.multiaddress())),
