@@ -41,17 +41,20 @@ where
             ledger: Hash::from_hex(
                 &info
                     .ledger_dst
-                    .ok_or(ConnectorError::InvalidState("ledger DST not found"))?,
+                    .ok_or(ConnectorError::InvalidState("ledger DST not found"))
+                    .inspect_err(|_| self.values.invalidate_all())?,
             )?,
             safe_registry: Hash::from_hex(
                 &info
                     .safe_registry_dst
-                    .ok_or(ConnectorError::InvalidState("safe registry DST not found"))?,
+                    .ok_or(ConnectorError::InvalidState("safe registry DST not found"))
+                    .inspect_err(|_| self.values.invalidate_all())?,
             )?,
             channel: Hash::from_hex(
                 &info
                     .channel_dst
-                    .ok_or(ConnectorError::InvalidState("channel DST not found"))?,
+                    .ok_or(ConnectorError::InvalidState("channel DST not found"))
+                    .inspect_err(|_| self.values.invalidate_all())?,
             )?,
         })
     }
@@ -67,7 +70,15 @@ where
     async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(self.query_cached_chain_info().await?.ticket_price.0.parse()?)
+        Ok(
+            self
+                .query_cached_chain_info()
+                .await?
+                .ticket_price
+                .0
+                .parse()
+                .inspect_err(|_| self.values.invalidate_all())?
+        )
     }
 
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
@@ -80,7 +91,8 @@ where
                 .ok_or(ConnectorError::InvalidState("channel closure grace period not found"))?
                 .0
                 .parse()
-                .map_err(|_| ConnectorError::TypeConversion("channel closure grace period not a number".into()))?,
+                .map_err(|_| ConnectorError::TypeConversion("channel closure grace period not a number".into()))
+                .inspect_err(|_| self.values.invalidate_all())?,
         ))
     }
 
@@ -93,7 +105,8 @@ where
             chain_id: info.chain_id as u64,
             hopr_network_name: "dufour".into(),
             contract_addresses: serde_json::from_str(&info.contract_addresses.0)
-                .map_err(|_| ConnectorError::TypeConversion("contract addresses not a valid JSON".into()))?,
+                .map_err(|_| ConnectorError::TypeConversion("contract addresses not a valid JSON".into()))
+                .inspect_err(|_| self.values.invalidate_all())?,
         })
     }
 }
