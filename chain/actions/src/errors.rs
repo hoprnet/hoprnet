@@ -1,4 +1,5 @@
 use alloy::primitives::utils::UnitsError;
+
 use hopr_chain_rpc::errors::RpcError;
 use hopr_internal_types::prelude::CoreTypesError;
 use hopr_primitive_types::errors::GeneralError;

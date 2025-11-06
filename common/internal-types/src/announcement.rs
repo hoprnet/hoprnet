@@ -83,7 +83,7 @@ pub fn decapsulate_multiaddress(multiaddr: Multiaddr) -> Multiaddr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AnnouncementData {
     multiaddress: Multiaddr,
-    pub key_binding: Option<KeyBinding>,
+    pub key_binding: KeyBinding,
 }
 
 impl AnnouncementData {
@@ -91,34 +91,27 @@ impl AnnouncementData {
     /// The multiaddress must not be empty. It should be the external address of the node.
     /// It may contain a trailing PeerId (encapsulated multiaddr) or come without. If the
     /// peerId is present, it must match with the keybinding.
-    pub fn new(multiaddress: Multiaddr, key_binding: Option<KeyBinding>) -> Result<Self, GeneralError> {
+    pub fn new(multiaddress: Multiaddr, key_binding: KeyBinding) -> Result<Self, GeneralError> {
         if multiaddress.is_empty() {
             debug!("Received empty multiaddr");
             return Err(GeneralError::InvalidInput);
         }
 
-        if let Some(binding) = &key_binding {
-            // Encapsulate first (if already encapsulated, the operation verifies that peer id matches the given one)
-            match multiaddress.with_p2p(binding.packet_key.into()) {
-                Ok(mut multiaddress) => {
-                    // Now decapsulate again, because we store decapsulated multiaddress only (without the
-                    // /p2p/<peer_id> suffix)
-                    multiaddress.pop();
-                    Ok(Self {
-                        multiaddress,
-                        key_binding,
-                    })
-                }
-                Err(multiaddress) => Err(GeneralError::NonSpecificError(format!(
-                    "{multiaddress} does not match the keybinding {} peer id",
-                    binding.packet_key.to_peerid_str()
-                ))),
+        // Encapsulate first (if already encapsulated, the operation verifies that peer id matches the given one)
+        match multiaddress.with_p2p(key_binding.packet_key.into()) {
+            Ok(mut multiaddress) => {
+                // Now decapsulate again, because we store decapsulated multiaddress only (without the
+                // /p2p/<peer_id> suffix)
+                multiaddress.pop();
+                Ok(Self {
+                    multiaddress,
+                    key_binding,
+                })
             }
-        } else {
-            Ok(Self {
-                multiaddress: multiaddress.to_owned(),
-                key_binding: None,
-            })
+            Err(multiaddress) => Err(GeneralError::NonSpecificError(format!(
+                "{multiaddress} does not match the keybinding {} peer id",
+                key_binding.packet_key.to_peerid_str()
+            ))),
         }
     }
 
@@ -131,11 +124,7 @@ impl AnnouncementData {
 
 impl Display for AnnouncementData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if let Some(binding) = &self.key_binding {
-            write!(f, "announcement of {} with {binding}", self.multiaddress)
-        } else {
-            write!(f, "announcement of {}", self.multiaddress)
-        }
+        write!(f, "announcement of {} with {}", self.multiaddress, self.key_binding)
     }
 }
 

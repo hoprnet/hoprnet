@@ -72,7 +72,7 @@ impl<Db: Sync> NodeActions for ChainActions<Db> {
         // TODO: allow announcing all addresses once that option is supported
         let announcement_data = AnnouncementData::new(
             multiaddrs[0].clone(),
-            Some(KeyBinding::new(self.self_address(), offchain_key)),
+            KeyBinding::new(self.self_address(), offchain_key),
         )?;
 
         let count_announced = self
@@ -158,7 +158,7 @@ mod tests {
             .expect_announce()
             .once()
             .withf(move |ad| {
-                let kb = ad.key_binding.clone().expect("key binding must be present");
+                let kb = ad.key_binding.clone();
                 ma.eq(ad.multiaddress()) && kb.packet_key == pubkey_clone && kb.chain_key == *ALICE
             })
             .returning(move |_| Ok(random_hash));

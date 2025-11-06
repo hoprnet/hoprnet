@@ -219,7 +219,7 @@ where
             AnnouncementsInitializePayload {
                 token: primitives::Address::from(token.address().as_ref()),
                 safeRegistry: primitives::Address::from(safe_registry.address().as_ref()),
-                defaultKeyBindingFee: primitives::Uint::from(10_000_000_000_000_000_u128), // 0.01 HOPR
+                defaultKeyBindingFee: primitives::U256::from(10_000_000_000_000_000_u128), // 0.01 HOPR
                 deployer: self_address,
             }
             .abi_encode()
