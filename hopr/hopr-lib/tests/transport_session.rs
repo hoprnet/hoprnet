@@ -58,7 +58,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 
     let [src, mid, dst] = exclusive_indexes::<3>();
 
-    let _channels_there = ChannelGuard::try_open_channels_for_path(
+    let channels_there = ChannelGuard::try_open_channels_for_path(
         vec![
             cluster_fixture[src].instance.clone(),
             cluster_fixture[mid].instance.clone(),
@@ -68,7 +68,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
     )
     .await?;
 
-    let _channels_back = ChannelGuard::try_open_channels_for_path(
+    let channels_back = ChannelGuard::try_open_channels_for_path(
         vec![
             cluster_fixture[dst].instance.clone(),
             cluster_fixture[mid].instance.clone(),
@@ -103,6 +103,9 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
         .await?;
 
     // TODO: check here that the destination sees the new session created
+
+    channels_back.try_close_channels_all_channels().await?;
+    channels_there.try_close_channels_all_channels().await?;
 
     Ok(())
 }

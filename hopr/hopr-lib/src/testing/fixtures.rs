@@ -2,6 +2,12 @@ use std::{str::FromStr, time::Duration};
 
 use alloy::{primitives::U256, providers::ext::AnvilApi};
 use futures_time::future::FutureExt as _;
+use hopr_api::chain::HoprBalance;
+use hopr_primitive_types::bounded::BoundedVec;
+use hopr_transport::{
+    HoprSession, RoutingOptions, SessionClientConfig, SessionTarget,
+    session::{IpOrHost, SealedHost},
+};
 use lazy_static::lazy_static;
 use serde_json::json;
 use tokio::{sync::Mutex, time::sleep};
@@ -13,7 +19,7 @@ use crate::{
     testing::{
         chain::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node},
         dummies::EchoServer,
-        hopr::TestedHopr,
+        hopr::{ChannelGuard, TestedHopr},
     },
 };
 
@@ -34,8 +40,8 @@ impl std::ops::Deref for ClusterGuard {
 }
 
 impl ClusterGuard {
-    /// Reduce winning probability network wide
-    pub async fn reduce_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
+    /// Update winning probability in anvil
+    pub async fn update_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
         let epsilon: f64 = 0.000001;
 
         if let Some(instances) = &self.chain_env.contract_instances {
@@ -63,6 +69,59 @@ impl ClusterGuard {
             Err(anyhow::anyhow!("Contract instances not available"))
         }
     }
+
+    /// Create a session between two nodes, ensuring channels are open and funded as needed
+    pub async fn create_session_between(
+        &self,
+        src: usize,
+        mid: usize,
+        dst: usize,
+        funding_amount: HoprBalance,
+    ) -> anyhow::Result<(HoprSession, ChannelGuard, ChannelGuard)> {
+        let fw_channels = ChannelGuard::try_open_channels_for_path(
+            vec![
+                self.cluster[src].instance.clone(),
+                self.cluster[mid].instance.clone(),
+                self.cluster[dst].instance.clone(),
+            ],
+            funding_amount,
+        )
+        .await?;
+        let bw_channels = ChannelGuard::try_open_channels_for_path(
+            vec![
+                self.cluster[dst].instance.clone(),
+                self.cluster[mid].instance.clone(),
+                self.cluster[src].instance.clone(),
+            ],
+            funding_amount,
+        )
+        .await?;
+
+        sleep(std::time::Duration::from_secs(3)).await;
+
+        let ip = IpOrHost::from_str(":0")?;
+        let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
+            self.cluster[mid].address().into(),
+        )));
+
+        let session = self.cluster[src]
+            .inner()
+            .connect_to(
+                self.cluster[dst].address(),
+                SessionTarget::UdpStream(SealedHost::Plain(ip)),
+                SessionClientConfig {
+                    forward_path_options: routing.clone(),
+                    return_path_options: routing,
+                    capabilities: Default::default(),
+                    pseudonym: None,
+                    surb_management: None,
+                    always_max_out_surbs: false,
+                },
+            )
+            .await?;
+
+        Ok((session, fw_channels, bw_channels))
+    }
 }
 
 lazy_static! {
@@ -71,7 +130,7 @@ lazy_static! {
 
 pub const SNAPSHOT_BASE: &str = "/tmp/hopr-tests";
 pub const PATH_TO_PROTOCOL_CONFIG: &str = "tests/protocol-config-anvil.json";
-pub const SWARM_N: usize = 3;
+pub const SWARM_N: usize = 5;
 
 pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
     use rand::seq::index::sample;
@@ -82,6 +141,33 @@ pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
     for (i, idx) in indices.iter().enumerate() {
         arr[i] = idx;
     }
+    arr
+}
+
+/// Select N unique indexes, ensuring all intermediates indexes (not source and destination) are nodes with auto redeem
+/// enabled
+pub fn exclusive_indexes_with_auto_redeem_intermediaries<const N: usize>() -> [usize; N] {
+    use rand::seq::index::sample;
+    assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
+    assert!(N > 2, "N must be greater than 2 to have intermediaries");
+
+    let auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 == 0).collect();
+    let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 != 0).collect();
+
+    let auto_redeeming_indices = sample(&mut rand::thread_rng(), auto_redeem_indices_candidates.len(), N - 2);
+    let non_auto_redeeming_index = sample(&mut rand::thread_rng(), not_auto_redeem_indices_candidates.len(), 2);
+    let mut arr = [0; N];
+
+    // Select source and destination from non-auto-redeem nodes
+    let non_auto_redeeming = non_auto_redeeming_index.iter().collect::<Vec<_>>();
+    arr[0] = not_auto_redeem_indices_candidates[non_auto_redeeming[0]];
+    arr[N - 1] = not_auto_redeem_indices_candidates[non_auto_redeeming[1]];
+
+    // Select intermediaries from auto-redeem nodes
+    for (i, idx) in auto_redeeming_indices.iter().enumerate() {
+        arr[i + 1] = auto_redeem_indices_candidates[idx];
+    }
+
     arr
 }
 
@@ -212,6 +298,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
         let moved_safes = safes.clone();
         let moved_config = protocol_config.clone();
         let endpoint = chainenv_fixture.anvil.endpoint().to_string();
+        let do_auto_redeem = i % 2 == 0; // every other node does auto redeem
 
         async move {
             std::thread::spawn(move || {
@@ -229,6 +316,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
                         3001 + i as u16,
                         format!("{SNAPSHOT_BASE}/node_{i}"),
                         moved_safes[i].clone(),
+                        do_auto_redeem,
                     )
                 })
             })

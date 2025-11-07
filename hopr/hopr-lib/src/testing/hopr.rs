@@ -1,6 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
+use futures::future::join_all;
 use hopr_api::chain::HoprBalance;
 use hopr_crypto_types::{
     keypairs::ChainKeypair,
@@ -25,6 +26,7 @@ impl TestedHopr {
         host_port: u16,
         db_path: String,
         safe: NodeSafeConfig,
+        auto_redeems: bool,
     ) -> Self {
         let instance = Hopr::new(
             crate::config::HoprLibConfig {
@@ -57,11 +59,20 @@ impl TestedHopr {
                     ..Default::default()
                 },
                 strategy: hopr_strategy::strategy::MultiStrategyConfig {
-                    strategies: vec![hopr_strategy::Strategy::ClosureFinalizer(
-                        hopr_strategy::channel_finalizer::ClosureFinalizerStrategyConfig {
-                            max_closure_overdue: Duration::from_secs(1),
-                        },
-                    )],
+                    strategies: vec![
+                        hopr_strategy::Strategy::ClosureFinalizer(
+                            hopr_strategy::channel_finalizer::ClosureFinalizerStrategyConfig {
+                                max_closure_overdue: Duration::from_secs(1),
+                            },
+                        ),
+                        hopr_strategy::Strategy::AutoRedeeming(
+                            hopr_strategy::auto_redeeming::AutoRedeemingStrategyConfig {
+                                redeem_all_on_close: auto_redeems,
+                                minimum_redeem_ticket_value: 0.into(),
+                                redeem_on_winning: auto_redeems,
+                            },
+                        ),
+                    ],
                     ..Default::default()
                 },
                 transport: crate::config::TransportConfig {
@@ -118,10 +129,14 @@ impl TestedHopr {
 pub struct ChannelGuard {
     /// Prepared for the implementation of Drop and closing
     #[allow(dead_code)]
-    channels: Vec<(Arc<Hopr>, Hash)>,
+    pub channels: Vec<(Arc<Hopr>, Hash)>,
 }
 
 impl ChannelGuard {
+    pub fn channel_id(&self, index: usize) -> &Hash {
+        &self.channels[index].1
+    }
+
     #[must_use]
     pub async fn try_open_channels_for_path<I, T>(path: I, funding: HoprBalance) -> anyhow::Result<Self>
     where
@@ -133,7 +148,7 @@ impl ChannelGuard {
         let path: Vec<Arc<Hopr>> = path.into_iter().map(|item| item.into()).collect();
         let path_len = path.len();
 
-        // no need for a channel to the last node from previous to last
+        // no need for a channel to the last node from penultimate
         for window in path.into_iter().take(path_len - 1).collect::<Vec<_>>().windows(2) {
             let src = &window[0];
             let dst = &window[1];
@@ -147,5 +162,39 @@ impl ChannelGuard {
         }
 
         Ok(Self { channels })
+    }
+
+    #[must_use]
+    pub async fn try_to_get_all_ticket_counts(&self) -> anyhow::Result<Vec<usize>> {
+        let futures = self.channels.iter().map(|(hopr, channel_id)| {
+            let hopr = hopr.clone();
+            let channel_id = channel_id.clone();
+            async move {
+                hopr.tickets_in_channel(&channel_id)
+                    .await
+                    .context("getting ticket statistics must succeed")
+                    .into_iter()
+                    .count()
+            }
+        });
+
+        let stats = join_all(futures).await;
+        Ok(stats)
+    }
+
+    #[must_use]
+    pub async fn try_close_channels_all_channels(&self) -> anyhow::Result<()> {
+        let futures = self.channels.iter().map(|(hopr, channel_id)| {
+            let hopr = hopr.clone();
+            let channel_id = channel_id.clone();
+            async move {
+                hopr.close_channel_by_id(&channel_id)
+                    .await
+                    .context("closing channel must succeed")
+            }
+        });
+
+        join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
+        Ok(())
     }
 }
