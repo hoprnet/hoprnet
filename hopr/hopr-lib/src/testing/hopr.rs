@@ -29,6 +29,11 @@ impl TestedHopr {
         auto_redeems: bool,
         winn_prob: Option<f64>,
     ) -> Self {
+        // To properly run, tests rely on HOPR_TEST_DISABLE_CHECKS being set
+        if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
+            panic!("HOPR_TEST_DISABLE_CHECKS envvar must be set for tests");
+        }
+
         let instance = Hopr::new(
             crate::config::HoprLibConfig {
                 probe: crate::config::ProbeConfig {
