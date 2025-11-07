@@ -283,6 +283,39 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
                     .into());
                 }
 
+                let safe_address = state.accounts.iter().find(|a| a.chain_key == hex::encode(sender))
+                    .and_then(|a| a.safe_address.clone())
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("cannot find safe balance for {sender}")))?;
+
+                let safe_balance = state.token_balances.get_mut(&safe_address)
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("cannot find safe balance for {sender}")))?;
+
+                let safe_allowance = state.safe_allowances.get_mut(&safe_address)
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("cannot find safe allowance for {sender}")))?;
+
+                let safe_balance_num = safe_balance.balance.0.parse::<HoprBalance>()
+                    .map_err(|_| blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("failed to parse safe balance for {safe_address}")))?;
+
+                if safe_balance_num < stake {
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "safe balance {safe_address} for {sender} is lower than stake {stake}"
+                    ))
+                    .into());
+                }
+
+                let safe_allowance_num = safe_allowance.allowance.0.parse::<HoprBalance>()
+                    .map_err(|_| blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("failed to parse safe allowance for {safe_address}")))?;
+
+                if safe_allowance_num < stake {
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "safe allowance {safe_address} for {sender} is lower than stake {stake}"
+                    ))
+                    .into());
+                }
+
+                safe_balance.balance = blokli_client::api::types::TokenValueString((safe_balance_num - stake).to_string());
+                safe_allowance.allowance = blokli_client::api::types::TokenValueString((safe_allowance_num - stake).to_string());
+
                 if let Some(existing_channel) = state
                     .channels
                     .iter_mut()
@@ -415,7 +448,26 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
                 channel.ticket_index = blokli_client::api::types::Uint64(ticket_index.to_string());
                 channel.balance = blokli_client::api::types::TokenValueString((balance - ticket_amount).to_string());
 
-                tracing::debug!(%channel_id, %ticket_index, "ticket redeemed");
+                let channel = channel.clone();
+                if let Some(opposite_channel) = state.channels.iter_mut().find(|c| c.source == channel.destination && c.destination == channel.source) {
+                    let balance = opposite_channel.balance.0.parse::<HoprBalance>()
+                        .map_err(|_| blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("failed to parse balance on opposite channel {channel_id}")))?;
+                    opposite_channel.balance = blokli_client::api::types::TokenValueString((balance + ticket_amount).to_string());
+
+                    tracing::debug!(%channel_id, %ticket_index, other_id = channel.concrete_channel_id, "ticket redeemed with channel rebalance");
+                } else if let Some((safe_addr, safe_balance)) = state.accounts.iter_mut()
+                    .find(|a| a.keyid == channel.destination)
+                    .and_then(|a| a.safe_address.clone())
+                    .and_then(|safe_addr|state.token_balances.get_mut(&safe_addr).map(|b| (safe_addr, b)))
+                {
+                    let balance = safe_balance.balance.0.parse::<HoprBalance>()
+                        .map_err(|_| blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("failed to parse balance on safe {safe_addr}")))?;
+                    safe_balance.balance = blokli_client::api::types::TokenValueString((balance + ticket_amount).to_string());
+
+                    tracing::debug!(%channel_id, %ticket_index, %safe_addr, "ticket redeemed into safe");
+                } else {
+                    tracing::debug!(%channel_id, %ticket_index, "ticket redeemed");
+                }
             }
         }
         Ok(())
