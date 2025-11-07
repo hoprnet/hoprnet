@@ -21,6 +21,7 @@ let
       nettools
       gnugrep # Used for searching env variables
       gnutar # Used to extract the database files from the docker container
+      curl # Used in docker-compose for healthchecks
 
     ]
     ++ extraContents;
