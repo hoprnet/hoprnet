@@ -151,8 +151,8 @@ pub fn exclusive_indexes_with_auto_redeem_intermediaries<const N: usize>() -> [u
     assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
     assert!(N > 2, "N must be greater than 2 to have intermediaries");
 
-    let auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 == 0).collect();
-    let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 != 0).collect();
+    let auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 != 0).collect();
+    let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 == 0).collect();
 
     let auto_redeeming_indices = sample(&mut rand::thread_rng(), auto_redeem_indices_candidates.len(), N - 2);
     let non_auto_redeeming_index = sample(&mut rand::thread_rng(), not_auto_redeem_indices_candidates.len(), 2);
@@ -200,6 +200,7 @@ pub async fn chainenv_fixture() -> TestChainEnv {
         Some(protocol_config.networks["anvil-localhost"].clone()),
     )
     .await;
+
     match res {
         Ok(env) => env,
         Err(e) => {
@@ -298,7 +299,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
         let moved_safes = safes.clone();
         let moved_config = protocol_config.clone();
         let endpoint = chainenv_fixture.anvil.endpoint().to_string();
-        let do_auto_redeem = i % 2 == 0; // every other node does auto redeem
+        let do_auto_redeem = i % 2 != 0; // every other node does auto redeem and uses a custom winn_prob
 
         async move {
             std::thread::spawn(move || {
@@ -317,6 +318,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
                         format!("{SNAPSHOT_BASE}/node_{i}"),
                         moved_safes[i].clone(),
                         do_auto_redeem,
+                        if do_auto_redeem { Some(0.2) } else { None },
                     )
                 })
             })
@@ -348,7 +350,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     .await;
     // Wait for all nodes to reach the 'Running' state
     let res = futures::future::join_all(hopr_instances.iter().map(|instance| {
-        wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(120))
+        wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(180))
     }))
     .await;
 

@@ -27,6 +27,7 @@ impl TestedHopr {
         db_path: String,
         safe: NodeSafeConfig,
         auto_redeems: bool,
+        winn_prob: Option<f64>,
     ) -> Self {
         let instance = Hopr::new(
             crate::config::HoprLibConfig {
@@ -81,6 +82,10 @@ impl TestedHopr {
                 },
                 session: hopr_transport::config::SessionGlobalConfig {
                     idle_timeout: Duration::from_millis(2500),
+                    ..Default::default()
+                },
+                protocol: hopr_transport::config::ProtocolConfig {
+                    outgoing_ticket_winning_prob: winn_prob,
                     ..Default::default()
                 },
                 ..Default::default()

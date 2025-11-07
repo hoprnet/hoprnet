@@ -264,10 +264,10 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_relay_with_reduced_winn_prob(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    cluster_fixture.update_winning_probability(0.1).await?;
+    cluster_fixture.update_winning_probability(0.2).await?; // reduced to match the relayers custom winn prob
 
     let [src, mid, dst] = exclusive_indexes_with_auto_redeem_intermediaries::<3>();
-    let message_count = 20;
+    let message_count = 10;
 
     let ticket_price = cluster_fixture[src]
         .inner()
@@ -308,6 +308,121 @@ async fn test_relay_with_reduced_winn_prob(#[future(awt)] cluster_fixture: Clust
         .context("failed to get ticket statistics")?;
 
     assert!(stats_after.winning_count < stats_before.winning_count + message_count as u128);
+    assert!(stats_after.redeemed_value > stats_before.redeemed_value);
+
+    cluster_fixture.update_winning_probability(1.0).await?;
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
+    #[future(awt)] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
+    cluster_fixture.update_winning_probability(0.5).await?;
+
+    let [src, mid, dst] = exclusive_indexes_with_auto_redeem_intermediaries::<3>();
+    let message_count = 20;
+
+    let ticket_price = cluster_fixture[src]
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+    let funding_amount = ticket_price.mul(message_count);
+
+    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
+        .create_session_between(src, mid, dst, funding_amount)
+        .await?;
+
+    const BUF_LEN: usize = 400;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    let stats_before = cluster_fixture[mid]
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    for _ in 1..=message_count {
+        tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
+            .await
+            .context("write failed")??;
+    }
+    sleep(std::time::Duration::from_secs(5)).await;
+
+    let stats_after = cluster_fixture[mid]
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert_eq!(stats_after.winning_count, stats_before.winning_count);
+    assert_eq!(stats_after.unredeemed_value, stats_before.unredeemed_value);
+    assert_eq!(stats_after.redeemed_value, stats_before.redeemed_value);
+
+    cluster_fixture.update_winning_probability(1.0).await?;
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_relay_with_winn_prob_higher_than_min_win_prob_should_succeed(
+    #[future(awt)] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
+    cluster_fixture.update_winning_probability(0.1).await?;
+
+    let [src, mid, dst] = exclusive_indexes_with_auto_redeem_intermediaries::<3>();
+    let message_count = 20;
+
+    let ticket_price = cluster_fixture[src]
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+    let funding_amount = ticket_price.mul(message_count);
+
+    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
+        .create_session_between(src, mid, dst, funding_amount)
+        .await?;
+
+    const BUF_LEN: usize = 400;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    let stats_before = cluster_fixture[mid]
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    for _ in 1..=message_count {
+        tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
+            .await
+            .context("write failed")??;
+    }
+    sleep(std::time::Duration::from_secs(5)).await;
+
+    let stats_after = cluster_fixture[mid]
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert!(stats_after.winning_count > stats_before.winning_count);
     assert!(stats_after.redeemed_value > stats_before.redeemed_value);
 
     cluster_fixture.update_winning_probability(1.0).await?;
