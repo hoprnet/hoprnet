@@ -71,10 +71,9 @@ pub struct GasEstimation {
 impl Default for GasEstimation {
     fn default() -> Self {
         Self {
-            // TODO: set some reasonable default values
-            gas_limit: 10_000,
-            max_fee_per_gas: 10_000_000_000,
-            max_priority_fee_per_gas: 10_000_000_000,
+            gas_limit: 17_000_000,
+            max_fee_per_gas: 10_000_000, // 0.01 Gwei
+            max_priority_fee_per_gas: 2_000_000, // 0.002 Gwei
         }
     }
 }
