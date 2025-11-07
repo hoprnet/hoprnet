@@ -675,9 +675,6 @@ mod tests {
             .await?;
         insta::assert_snapshot!("announce_safe", hex::encode(signed_tx.clone()));
 
-        let tx = alloy::consensus::TxEnvelope::decode_2718_exact(signed_tx.as_ref())?;
-        tx.
-
         Ok(())
     }
 
