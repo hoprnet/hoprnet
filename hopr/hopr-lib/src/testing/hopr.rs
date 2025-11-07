@@ -1,17 +1,17 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use hopr_api::chain::{HoprBalance, HoprChainApi};
-use hopr_api::db::HoprNodeDbApi;
+use hopr_api::{
+    chain::{HoprBalance, HoprChainApi},
+    db::HoprNodeDbApi,
+};
 use hopr_crypto_types::{
     keypairs::ChainKeypair,
     prelude::{Keypair, OffchainKeypair},
 };
 use hopr_transport::Hash;
 
-use crate::{
-    Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude,
-};
+use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude};
 
 pub struct NodeSafeConfig {
     pub safe_address: Address,
@@ -93,7 +93,10 @@ where
     }
 
     pub async fn channel_from_hash(&self, channel_hash: &prelude::Hash) -> Option<ChannelEntry> {
-        self.instance.channel_from_hash(channel_hash).await.unwrap_or_else(|_| None)
+        self.instance
+            .channel_from_hash(channel_hash)
+            .await
+            .unwrap_or_else(|_| None)
     }
 
     pub async fn outgoing_channels_by_status(&self, status: ChannelStatus) -> Option<Vec<ChannelEntry>> {

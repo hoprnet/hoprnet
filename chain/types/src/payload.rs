@@ -72,7 +72,7 @@ impl Default for GasEstimation {
     fn default() -> Self {
         Self {
             gas_limit: 17_000_000,
-            max_fee_per_gas: 10_000_000, // 0.01 Gwei
+            max_fee_per_gas: 10_000_000,         // 0.01 Gwei
             max_priority_fee_per_gas: 2_000_000, // 0.002 Gwei
         }
     }
@@ -80,12 +80,22 @@ impl Default for GasEstimation {
 
 #[async_trait::async_trait]
 pub trait SignableTransaction {
-    async fn sign_and_encode_to_eip2718(self, nonce: u64, max_gas: Option<GasEstimation>, chain_keypair: &ChainKeypair) -> Result<Box<[u8]>>;
+    async fn sign_and_encode_to_eip2718(
+        self,
+        nonce: u64,
+        max_gas: Option<GasEstimation>,
+        chain_keypair: &ChainKeypair,
+    ) -> Result<Box<[u8]>>;
 }
 
 #[async_trait::async_trait]
 impl SignableTransaction for TransactionRequest {
-    async fn sign_and_encode_to_eip2718(self, nonce: u64, max_gas: Option<GasEstimation>, chain_keypair: &ChainKeypair) -> Result<Box<[u8]>> {
+    async fn sign_and_encode_to_eip2718(
+        self,
+        nonce: u64,
+        max_gas: Option<GasEstimation>,
+        chain_keypair: &ChainKeypair,
+    ) -> Result<Box<[u8]>> {
         let max_gas = max_gas.unwrap_or_default();
         let signer: EthereumWallet = PrivateKeySigner::from_slice(chain_keypair.secret().as_ref())
             .map_err(|e| SigningError(e.into()))?
@@ -95,7 +105,9 @@ impl SignableTransaction for TransactionRequest {
             .gas_limit(max_gas.gas_limit)
             .max_fee_per_gas(max_gas.max_fee_per_gas)
             .max_priority_fee_per_gas(max_gas.max_priority_fee_per_gas)
-            .build(&signer).await.map_err(|e| SigningError(e.into()))?;
+            .build(&signer)
+            .await
+            .map_err(|e| SigningError(e.into()))?;
 
         Ok(signed.encoded_2718().into_boxed_slice())
     }
@@ -618,7 +630,7 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use alloy::eips::Decodable2718;
+
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
@@ -663,7 +675,10 @@ mod tests {
             )),
         )?;
 
-        let signed_tx = generator.announce(ad)?.sign_and_encode_to_eip2718(2, None, &chain_key_0).await?;
+        let signed_tx = generator
+            .announce(ad)?
+            .sign_and_encode_to_eip2718(2, None, &chain_key_0)
+            .await?;
         insta::assert_snapshot!("announce_basic", hex::encode(signed_tx));
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99")?;
@@ -704,16 +719,20 @@ mod tests {
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS);
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket.clone())?;
-        let signed_tx = redeem_ticket_tx.sign_and_encode_to_eip2718(1, None, &chain_key_bob).await?;
+        let signed_tx = redeem_ticket_tx
+            .sign_and_encode_to_eip2718(1, None, &chain_key_bob)
+            .await?;
 
         insta::assert_snapshot!("redeem_ticket_basic", hex::encode(signed_tx));
 
         let generator =
             SafePayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
-        let signed_tx = redeem_ticket_tx.sign_and_encode_to_eip2718(2, None, &chain_key_bob).await?;
+        let signed_tx = redeem_ticket_tx
+            .sign_and_encode_to_eip2718(2, None, &chain_key_bob)
+            .await?;
 
-        insta::assert_snapshot!("redeem_ticket_safe",hex::encode(signed_tx));
+        insta::assert_snapshot!("redeem_ticket_safe", hex::encode(signed_tx));
 
         Ok(())
     }

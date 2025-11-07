@@ -52,7 +52,7 @@ enum Commands {
     /// Fund given address and/or addressed derived from identity files native tokens or HOPR tokens
     #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
     Faucet(FaucetArgs),
-    
+
     /// Commands around safe module
     #[command(visible_alias = "sm")]
     SafeModule {

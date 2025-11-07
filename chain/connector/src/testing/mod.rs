@@ -1,19 +1,16 @@
-pub use blokli_client::BlokliTestClient;
-use hex::ToHex as HexHex;
+use std::{ops::Add, str::FromStr};
+
+use blokli_client::BlokliTestStateMutator;
+pub use blokli_client::{BlokliTestClient, BlokliTestState};
 use hopr_api::chain::ChainInfo;
-use hopr_internal_types::{
-    channels::ChannelStatus,
-    prelude::{AccountEntry, ChannelEntry, WinningProbability},
-};
-use hopr_primitive_types::{
-    balance::Balance,
-    prelude::{Address, Currency, HoprBalance, ToHex, WxHOPR, XDai},
-};
+use hopr_chain_types::ParsedHoprChainAction;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 #[derive(Default)]
-pub struct BlokliTestClientBuilder(BlokliTestClient);
+pub struct BlokliTestStateBuilder(BlokliTestState);
 
-impl BlokliTestClientBuilder {
+impl BlokliTestStateBuilder {
     pub fn with_channels<I: IntoIterator<Item = ChannelEntry>>(mut self, channels: I) -> Self {
         self.0.channels.extend(channels.into_iter().map(|channel| {
             blokli_client::api::types::Channel {
@@ -25,12 +22,12 @@ impl BlokliTestClientBuilder {
                 } else {
                     None
                 },
-                concrete_channel_id: channel.get_id().to_hex(),
+                concrete_channel_id: hex::encode(channel.get_id()),
                 destination: self
                     .0
                     .accounts
                     .iter()
-                    .find(|a| a.chain_key == channel.source.to_hex())
+                    .find(|a| a.chain_key == hex::encode(channel.source))
                     .map(|a| a.keyid)
                     .expect(&format!("missing dst account {}", channel.source)),
                 epoch: channel.channel_epoch.as_u32() as i32,
@@ -38,7 +35,7 @@ impl BlokliTestClientBuilder {
                     .0
                     .accounts
                     .iter()
-                    .find(|a| a.chain_key == channel.destination.to_hex())
+                    .find(|a| a.chain_key == hex::encode(channel.destination))
                     .map(|a| a.keyid)
                     .expect(&format!("missing src account {}", channel.source)),
                 status: match channel.status {
@@ -56,11 +53,11 @@ impl BlokliTestClientBuilder {
         self.0
             .accounts
             .extend(accounts.into_iter().map(|account| blokli_client::api::types::Account {
-                chain_key: account.chain_addr.to_hex(),
+                chain_key: hex::encode(account.chain_addr),
                 keyid: u32::from(account.key_id) as i32,
                 multi_addresses: account.get_multiaddr().iter().map(|a| a.to_string()).collect(),
-                packet_key: account.public_key.to_hex(),
-                safe_address: account.safe_address.map(|a| a.to_hex()),
+                packet_key: hex::encode(account.public_key),
+                safe_address: account.safe_address.map(|a| hex::encode(a)),
                 safe_transaction_count: None,
             }));
         self
@@ -72,7 +69,7 @@ impl BlokliTestClientBuilder {
                 .native_balances
                 .extend(balances.into_iter().map(|(addr, balance)| {
                     (
-                        addr.encode_hex(),
+                        hex::encode(addr),
                         blokli_client::api::types::NativeBalance {
                             __typename: "".into(),
                             balance: blokli_client::api::types::TokenValueString(balance.to_string()),
@@ -84,7 +81,7 @@ impl BlokliTestClientBuilder {
                 .token_balances
                 .extend(balances.into_iter().map(|(addr, balance)| {
                     (
-                        addr.encode_hex(),
+                        hex::encode(addr),
                         blokli_client::api::types::HoprBalance {
                             __typename: "".into(),
                             balance: blokli_client::api::types::TokenValueString(balance.to_string()),
@@ -103,7 +100,7 @@ impl BlokliTestClientBuilder {
             .safe_allowances
             .extend(balances.into_iter().map(|(addr, allowance)| {
                 (
-                    addr.encode_hex(),
+                    hex::encode(addr),
                     blokli_client::api::types::SafeHoprAllowance {
                         __typename: "".into(),
                         allowance: blokli_client::api::types::TokenValueString(allowance.to_string()),
@@ -137,12 +134,248 @@ impl BlokliTestClientBuilder {
         self
     }
 
-    pub fn with_tx_client(mut self, tx_client: blokli_client::MockBlokliTransactionClientImpl) -> Self {
-        self.0.tx_client = Some(tx_client);
-        self
+    pub fn build(self) -> BlokliTestState {
+        self.0
     }
 
-    pub fn build(self) -> BlokliTestClient {
-        self.0
+    pub fn build_static_client(self) -> BlokliTestClient {
+        BlokliTestClient::new(self.0, FailingStateMutator)
+    }
+
+    pub fn build_dynamic_client(self) -> BlokliTestClient {
+        BlokliTestClient::new(self.0, Eip2718ParserBasedStateMutator)
+    }
+}
+
+struct FailingStateMutator;
+
+impl BlokliTestStateMutator for FailingStateMutator {
+    fn update_state(
+        &self,
+        _signed_tx: &[u8],
+        _state: &mut BlokliTestState,
+    ) -> Result<(), blokli_client::errors::BlokliClientError> {
+        Err(
+            blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("static client must not update state"))
+                .into(),
+        )
+    }
+}
+
+struct Eip2718ParserBasedStateMutator;
+
+impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
+    fn update_state(
+        &self,
+        signed_tx: &[u8],
+        state: &mut BlokliTestState,
+    ) -> Result<(), blokli_client::errors::BlokliClientError> {
+        let (action, sender) = ParsedHoprChainAction::parse_from_eip2718(signed_tx)
+            .map_err(|e| blokli_client::errors::ErrorKind::MockClientError(e.into()))?;
+        match action {
+            ParsedHoprChainAction::RegisterSafeAddress(safe_address) => {
+                state
+                    .accounts
+                    .iter_mut()
+                    .find(|a| a.chain_key == hex::encode(sender))
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "missing account for {sender}"
+                    )))?
+                    .safe_address = Some(hex::encode(safe_address));
+
+                tracing::debug!(%sender, %safe_address, "registered safe address");
+            }
+            ParsedHoprChainAction::Announce {
+                packet_key,
+                multiaddress,
+            } => {
+                if let Some(account) = state.accounts.iter_mut().find(|a| a.chain_key == hex::encode(sender)) {
+                    account.packet_key = hex::encode(packet_key);
+                    if let Some(multiaddress) = multiaddress.clone() {
+                        account.multi_addresses.push(multiaddress.to_string());
+                    }
+                } else {
+                    state.accounts.push(blokli_client::api::types::Account {
+                        chain_key: hex::encode(sender),
+                        keyid: state.accounts.len() as i32,
+                        multi_addresses: multiaddress.iter().map(|a| a.to_string()).collect(),
+                        packet_key: hex::encode(packet_key),
+                        safe_address: None,
+                        safe_transaction_count: Some(blokli_client::api::types::Uint64("1".into())),
+                    });
+                }
+
+                tracing::debug!(%sender, %packet_key, ?multiaddress, "node announced");
+            }
+            ParsedHoprChainAction::Withdraw(destination, amount) => {
+                let balance = state.native_balances.get_mut(&hex::encode(sender)).ok_or(
+                    blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("missing balance for {sender}")),
+                )?;
+
+                let new_balance = balance.balance.0.parse::<XDaiBalance>().map_err(|_| {
+                    blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "failed to parse balance for {sender}"
+                    ))
+                })? - amount;
+                balance.balance = blokli_client::api::types::TokenValueString(new_balance.to_string());
+
+                if let Some(dst_balance) = state.native_balances.get_mut(&hex::encode(destination)) {
+                    let new_balance = dst_balance.balance.0.parse::<XDaiBalance>().map_err(|_| {
+                        blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                            "failed to parse balance for {destination}"
+                        ))
+                    })? + amount;
+                    dst_balance.balance = blokli_client::api::types::TokenValueString(new_balance.to_string());
+
+                    tracing::debug!(%sender, %amount, %destination, "xdai withdrawn to an existing account");
+                } else {
+                    tracing::debug!(%sender, %amount, %destination, "xdai withdrawn");
+                }
+            }
+            ParsedHoprChainAction::OpenChannel(dst_addr, stake) => {
+                let source = state
+                    .accounts
+                    .iter()
+                    .find(|a| a.chain_key == hex::encode(sender))
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "missing account for {sender}"
+                    )))?;
+                let destination = state
+                    .accounts
+                    .iter()
+                    .find(|a| a.chain_key == hex::encode(dst_addr))
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "missing account for {dst_addr}"
+                    )))?;
+
+                if stake.is_zero() {
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "stake must be greater than zero"
+                    ))
+                    .into());
+                }
+
+                if let Some(existing_channel) = state
+                    .channels
+                    .iter_mut()
+                    .find(|c| c.source == source.keyid && c.destination == destination.keyid)
+                {
+                    if existing_channel.status != blokli_client::api::types::ChannelStatus::Closed {
+                        return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                            "channel {sender} -> {dst_addr} already opened"
+                        ))
+                        .into());
+                    }
+
+                    existing_channel.balance = blokli_client::api::types::TokenValueString(stake.to_string());
+                    existing_channel.status = blokli_client::api::types::ChannelStatus::Open;
+                    existing_channel.ticket_index = blokli_client::api::types::Uint64("0".into());
+                    existing_channel.closure_time = None;
+                    existing_channel.epoch += 1;
+
+                    tracing::debug!(%sender, %dst_addr, %stake, "channel re-opened");
+                } else {
+                    state.channels.push(blokli_client::api::types::Channel {
+                        balance: blokli_client::api::types::TokenValueString(stake.to_string()),
+                        closure_time: None,
+                        concrete_channel_id: hex::encode(generate_channel_id(&sender, &dst_addr)),
+                        destination: destination.keyid,
+                        epoch: 1,
+                        source: source.keyid,
+                        status: blokli_client::api::types::ChannelStatus::Open,
+                        ticket_index: blokli_client::api::types::Uint64("0".into()),
+                    });
+
+                    tracing::debug!(%sender, %dst_addr, %stake, "channel opened");
+                }
+            }
+            ParsedHoprChainAction::InitializeChannelClosure(channel_id) => {
+                let channel_id = hex::encode(channel_id);
+                let channel = state
+                    .channels
+                    .iter_mut()
+                    .find(|c| c.concrete_channel_id == channel_id)
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "missing channel {channel_id}"
+                    )))?;
+
+                let grace_period = state
+                    .chain_info
+                    .channel_closure_grace_period
+                    .clone()
+                    .map(|p| p.0)
+                    .unwrap_or("10".into());
+                let grace_period = u64::from_str(&grace_period)
+                    .map(|p| std::time::Duration::from_secs(p).max(std::time::Duration::from_secs(2)))
+                    .map_err(|_| {
+                        blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                            "failed to parse channel closure grace period"
+                        ))
+                    })?;
+
+                channel.status = blokli_client::api::types::ChannelStatus::PendingToClose;
+                channel.closure_time = Some(blokli_client::api::types::DateTime(
+                    hopr_api::chain::DateTime::from(std::time::SystemTime::now().add(grace_period)).to_rfc3339(),
+                ));
+
+                tracing::debug!(%channel_id, "channel closure initialized");
+            }
+            ParsedHoprChainAction::FinalizeChannelClosure(channel_id) => {
+                let channel_id = hex::encode(channel_id);
+                let channel = state
+                    .channels
+                    .iter_mut()
+                    .find(|c| c.concrete_channel_id == channel_id)
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "missing channel {channel_id}"
+                    )))?;
+
+                if channel.status != blokli_client::api::types::ChannelStatus::PendingToClose {
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "channel {channel_id} is not pending to close"
+                    ))
+                    .into());
+                }
+
+                channel.status = blokli_client::api::types::ChannelStatus::Closed;
+
+                tracing::debug!(%channel_id, "channel closure finalized");
+            }
+            ParsedHoprChainAction::RedeemTicket(channel_id, ticket_index) => {
+                let channel_id = hex::encode(channel_id);
+                let channel = state
+                    .channels
+                    .iter_mut()
+                    .find(|c| c.concrete_channel_id == channel_id)
+                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "missing channel {channel_id}"
+                    )))?;
+
+                if channel.status == blokli_client::api::types::ChannelStatus::Closed {
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "channel {channel_id} is closed"
+                    ))
+                    .into());
+                }
+
+                let channel_ticket_index = u64::from_str(&channel.ticket_index.0).map_err(|_| {
+                    blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "failed to parse ticket index of {channel_id}"
+                    ))
+                })?;
+
+                if channel_ticket_index < ticket_index {
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "ticket index of {channel_id} is lower than redeemed ticket index {ticket_index}"
+                    ))
+                    .into());
+                }
+
+                channel.ticket_index = blokli_client::api::types::Uint64(ticket_index.to_string());
+
+                tracing::debug!(%channel_id, %ticket_index, "ticket redeemed");
+            }
+        }
+        Ok(())
     }
 }

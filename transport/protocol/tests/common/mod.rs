@@ -52,7 +52,7 @@ lazy_static! {
         .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
         .collect::<BiHashMap<_, _>>();
 
-    static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestClient = hopr_chain_connector::testing::BlokliTestClientBuilder::default()
+    static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestClient = hopr_chain_connector::testing::BlokliTestStateBuilder::default()
         .with_accounts(PEERS.iter().enumerate().map(|(i, kp)| {
             let node_key = kp.public();
             let chain_key = PEERS_CHAIN[i].public();
@@ -67,7 +67,7 @@ lazy_static! {
         .with_channels(PEERS_CHAIN.iter().take(PEERS_CHAIN.len()-1).enumerate().map(|(i, cp)| {
             create_dummy_channel(cp.public().to_address(), PEERS_CHAIN[i+1].public().to_address())
         }))
-        .build();
+        .build_static_client();
 }
 
 fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {

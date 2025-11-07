@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use hopr_api::chain::ChainReadAccountOperations;
-use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestClientBuilder};
+use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_internal_types::{
     channels::ChannelStatus,
@@ -69,7 +69,7 @@ lazy_static::lazy_static! {
 
 #[tokio::test]
 async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<()> {
-    let mock_client = BlokliTestClientBuilder::default()
+    let mock_client = BlokliTestStateBuilder::default()
         .with_accounts(ACCOUNTS.iter().cloned())
         .with_channels(CHANNELS.iter().cloned())
         .with_balances::<WxHOPR>([
@@ -80,7 +80,7 @@ async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<(
             (CHAIN_KEYS[0].public().to_address(), 1_u32.into()),
             (CHAIN_KEYS[1].public().to_address(), 2_u32.into()),
         ])
-        .build();
+        .build_static_client();
 
     let me = ChainKeypair::random();
 

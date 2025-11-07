@@ -187,11 +187,9 @@ where
                 .finalize_outgoing_channel_closure(channel.destination)?,
             _ => return Err(ConnectorError::InvalidState("channel closure time has not elapsed")),
         };
-        let signed_payload = payload.sign_and_encode_to_eip2718(
-            self.query_next_nonce().await?,
-            None,
-            &self.chain_key
-        ).await?;
+        let signed_payload = payload
+            .sign_and_encode_to_eip2718(self.query_next_nonce().await?, None, &self.chain_key)
+            .await?;
 
         let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;
         Ok(track_transaction(self.client.as_ref(), tx_id)?.boxed())

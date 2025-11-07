@@ -9,6 +9,7 @@ pub type Result<T, E = ChainTypesError> = core::result::Result<T, E>;
 pub enum ChainTypesError {
     #[error("invalid state: {0}")]
     InvalidState(&'static str),
+
     #[error("invalid arguments: {0}")]
     InvalidArguments(&'static str),
 
@@ -22,4 +23,8 @@ pub enum ChainTypesError {
     /// An error occurred while interacting with contracts.
     #[error(transparent)]
     ContractError(#[from] ContractError),
+
+    /// An error occurred while parsing an EIP-2718 transaction.
+    #[error("error while parsing an EIP-2718 transaction: {0}")]
+    ParseError(anyhow::Error),
 }

@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 
 pub mod chain_events;
 pub mod errors;
+mod parser;
 pub mod payload;
+
+pub use parser::ParsedHoprChainAction;
 
 pub mod prelude {
     pub use super::{

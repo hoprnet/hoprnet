@@ -95,8 +95,7 @@ use std::str::FromStr;
 use alloy::primitives::{Address, U256, utils::parse_units};
 use clap::{Parser, builder::RangedU64ValueParser};
 use hopr_bindings::{
-    hoprnodesaferegistry::HoprNodeSafeRegistry,
-    hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
+    hoprnodesaferegistry::HoprNodeSafeRegistry, hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
 };
 use hopr_crypto_types::keypairs::Keypair;
 use tracing::{info, warn};
@@ -107,8 +106,7 @@ use crate::{
     methods::{
         SafeSingleton, debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries,
         deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
-        include_nodes_to_module, migrate_nodes, transfer_native_tokens,
-        transfer_or_mint_tokens,
+        include_nodes_to_module, migrate_nodes, transfer_native_tokens, transfer_or_mint_tokens,
     },
     utils::{Cmd, HelperErrors, a2h},
 };
@@ -683,12 +681,10 @@ impl SafeModuleSubcommands {
         for node in node_eth_addresses {
             info!("Starting debug checks for node: {:?}", node);
             info!("Checking node registration with safe registry...");
-            let registered_safe = debug_node_safe_module_setup_on_balance_and_registries(
-                node_safe_registry.clone(),
-                &node,
-            )
-            .await
-            .map_err(HelperErrors::MulticallError)?;
+            let registered_safe =
+                debug_node_safe_module_setup_on_balance_and_registries(node_safe_registry.clone(), &node)
+                    .await
+                    .map_err(HelperErrors::MulticallError)?;
 
             // compare the registered safe with the provided safe
             if registered_safe != safe_addr {

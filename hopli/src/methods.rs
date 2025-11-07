@@ -546,7 +546,6 @@ pub async fn get_registered_safes_for_nodes_on_network_registry<P: Provider + Wa
     Ok(response)
 }
 
-
 /// Helper function to predict module address. Note that here the caller is the contract deployer
 pub fn predict_module_address(
     caller: Address,
@@ -1121,13 +1120,11 @@ pub async fn debug_node_safe_module_setup_on_balance_and_registries<P: Provider>
         format_units(node_native_balance, "ether").unwrap_or("Unknown balance".into())
     );
 
-
     if safe_in_nodesafe_registry.eq(&Address::ZERO) {
         info!("Please start the node. It will auto-register to node-safe registry");
     } else {
         info!("safe in node-safe registry {:?}", safe_in_nodesafe_registry);
     }
-
 
     Ok(safe_in_nodesafe_registry)
 }
@@ -1224,14 +1221,14 @@ mod tests {
         sol_types::SolValue,
     };
     use hopr_bindings::{
-        hoprannouncements::HoprAnnouncements, hoprchannels::HoprChannels,
-        hoprnodesaferegistry::HoprNodeSafeRegistry, hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
+        hoprannouncements::HoprAnnouncements, hoprchannels::HoprChannels, hoprnodesaferegistry::HoprNodeSafeRegistry,
+        hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
     };
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
 
     use super::*;
-    use crate::utils::{ContractInstances, create_anvil, a2h};
+    use crate::utils::{ContractInstances, a2h, create_anvil};
 
     pub type AnvilRpcClient = FillProvider<
         JoinFill<

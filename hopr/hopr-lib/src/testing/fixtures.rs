@@ -9,10 +9,7 @@ use tracing::info;
 use crate::{
     Address,
     state::HoprState,
-    testing::{
-        dummies::EchoServer,
-        hopr::TestedHopr,
-    },
+    testing::{dummies::EchoServer, hopr::TestedHopr},
 };
 
 /// A guard that holds a reference to the cluster and ensures exclusive access
@@ -84,11 +81,9 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     // Acquire the mutex lock to ensure exclusive access to the cluster
     let lock = CLUSTER_MUTEX.lock().await;
 
-
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
     let onchain_keys = chainenv_fixture.node_chain_keys[0..SWARM_N].to_vec();
     assert!(onchain_keys.len() == SWARM_N);
-
 
     // Setup SWARM_N nodes
     let hopr_instances: Vec<TestedHopr> = futures::future::join_all((0..SWARM_N).map(|i| {
