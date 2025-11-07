@@ -1394,12 +1394,11 @@ mod tests {
         hoprannouncements::HoprAnnouncements, hoprchannels::HoprChannels, hoprnetworkregistry::HoprNetworkRegistry,
         hoprnodesaferegistry::HoprNodeSafeRegistry, hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
     };
-    use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
 
     use super::*;
-    use crate::utils::{ContractInstances, create_anvil};
+    use crate::utils::{ContractInstances, create_anvil, a2h};
 
     pub type AnvilRpcClient = FillProvider<
         JoinFill<
@@ -1557,7 +1556,7 @@ mod tests {
         let encoded_minter_role = keccak256(b"MINTER_ROLE");
         instances
             .token
-            .grantRole(encoded_minter_role, contract_deployer.public().to_address().into())
+            .grantRole(encoded_minter_role, a2h(contract_deployer.public().to_address()))
             .send()
             .await?
             .watch()
@@ -1566,7 +1565,7 @@ mod tests {
         // test the deployer has minter role now
         let check_minter_role = instances
             .token
-            .hasRole(encoded_minter_role, contract_deployer.public().to_address().into())
+            .hasRole(encoded_minter_role, a2h(contract_deployer.public().to_address()))
             .call()
             .await?;
         assert!(check_minter_role, "deployer does not have minter role yet");
@@ -1612,7 +1611,7 @@ mod tests {
         let encoded_minter_role = keccak256(b"MINTER_ROLE");
         instances
             .token
-            .grantRole(encoded_minter_role, contract_deployer.public().to_address().into())
+            .grantRole(encoded_minter_role, a2h(contract_deployer.public().to_address()))
             .send()
             .await?
             .watch()
@@ -1621,7 +1620,7 @@ mod tests {
         // test the deployer has minter role now
         let check_minter_role = instances
             .token
-            .hasRole(encoded_minter_role, contract_deployer.public().to_address().into())
+            .hasRole(encoded_minter_role, a2h(contract_deployer.public().to_address()))
             .call()
             .await?;
         assert!(check_minter_role, "deployer does not have minter role yet");
@@ -2000,7 +1999,7 @@ mod tests {
             *instances.announcements.address(),
             U256::MAX,
             None,
-            vec![contract_deployer.public().to_address().into()],
+            vec![a2h(contract_deployer.public().to_address())],
             U256::from(1),
         )
         .await?;
@@ -2085,7 +2084,7 @@ mod tests {
         // deploy safe suits
         deploy_safe_suites(client.clone()).await?;
 
-        let deployer_vec: Vec<Address> = vec![contract_deployer.public().to_address().into()];
+        let deployer_vec: Vec<Address> = vec![a2h(contract_deployer.public().to_address())];
 
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
@@ -2137,7 +2136,7 @@ mod tests {
 
         // node is removed
         let is_removed = node_module
-            .isNode(contract_deployer.public().to_address().into())
+            .isNode(a2h(contract_deployer.public().to_address()))
             .call()
             .await?;
         assert!(!is_removed, "node is not removed");
@@ -2166,7 +2165,7 @@ mod tests {
         // deploy safe suits
         deploy_safe_suites(client.clone()).await?;
 
-        let deployer_vec: Vec<Address> = vec![contract_deployer.public().to_address().into()];
+        let deployer_vec: Vec<Address> = vec![a2h(contract_deployer.public().to_address())];
 
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(

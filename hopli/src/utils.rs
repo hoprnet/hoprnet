@@ -174,10 +174,12 @@ pub enum HelperErrors {
 }
 
 // Used instead of From implementation to avoid alloy being a dependency of the primitive crates
+/// Converts [`alloy::primitives::Address`] into [`hopr_primitive_types::prelude::Address`]
 pub fn h2a(h: alloy::primitives::Address) -> hopr_primitive_types::prelude::Address {
     hopr_primitive_types::prelude::Address::from(h.0.0)
 }
 
+/// Converts [`hopr_primitive_types::prelude::Address`] into [`alloy::primitives::Address`]
 pub fn a2h(a: hopr_primitive_types::prelude::Address) -> alloy::primitives::Address {
     alloy::primitives::Address::from_slice(a.as_ref())
 }

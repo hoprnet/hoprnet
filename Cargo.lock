@@ -4487,7 +4487,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.9.1"
+version = "0.10.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4854,9 +4854,11 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
+ "hopr-chain-connector",
  "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-db-node",
  "hopr-internal-types",
  "hopr-lib",
  "hopr-metrics",

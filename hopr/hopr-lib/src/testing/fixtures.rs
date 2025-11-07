@@ -1,6 +1,5 @@
 use std::{str::FromStr, time::Duration};
 
-use alloy::{primitives::U256, providers::ext::AnvilApi};
 use futures_time::future::FutureExt as _;
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -8,25 +7,22 @@ use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
 
 use crate::{
-    Address, ProtocolsConfig,
+    Address,
     state::HoprState,
     testing::{
-        chain::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node},
         dummies::EchoServer,
         hopr::TestedHopr,
     },
 };
 
 /// A guard that holds a reference to the cluster and ensures exclusive access
-pub struct ClusterGuard {
-    pub cluster: Vec<TestedHopr>,
-    #[allow(dead_code)]
-    pub chain_env: TestChainEnv, // the object lives to hold the final reference to the anvil provider
+pub struct ClusterGuard<C, Db> {
+    pub cluster: Vec<TestedHopr<C, Db>>,
     _lock: tokio::sync::MutexGuard<'static, ()>,
 }
 
-impl std::ops::Deref for ClusterGuard {
-    type Target = Vec<TestedHopr>;
+impl<C, Db> std::ops::Deref for ClusterGuard<C, Db> {
+    type Target = Vec<TestedHopr<C, Db>>;
 
     fn deref(&self) -> &Self::Target {
         &self.cluster
@@ -88,80 +84,11 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     // Acquire the mutex lock to ensure exclusive access to the cluster
     let lock = CLUSTER_MUTEX.lock().await;
 
-    // Load or not load from snapshot
-    let load_state = std::path::Path::new(&format!("{SNAPSHOT_BASE}/anvil")).exists();
-
-    // SWARM_N_FIXTURE
-    let protocol_config = ProtocolsConfig::from_str(
-        &std::fs::read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
-    )
-    .expect("failed to parse protocol config");
 
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
     let onchain_keys = chainenv_fixture.node_chain_keys[0..SWARM_N].to_vec();
     assert!(onchain_keys.len() == SWARM_N);
 
-    // Setup SWARM_N safes
-    let mut safes = Vec::with_capacity(SWARM_N);
-    if load_state {
-        // read safe address and module from file {SNAPSHOT_BASE}/node_i/safe_addresses.json
-        for i in 0..SWARM_N {
-            let addresses: serde_json::Value = serde_json::from_str(
-                &std::fs::read_to_string(format!("{SNAPSHOT_BASE}/node_{i}/safe_addresses.json"))
-                    .expect("failed to read safe addresses from file"),
-            )
-            .expect("failed to parse safe addresses from file");
-            let safe_address = Address::from_str(
-                addresses
-                    .get("safe")
-                    .and_then(|v| v.as_str())
-                    .expect("missing safe address"),
-            )
-            .expect("invalid safe address");
-
-            let module_address = Address::from_str(
-                addresses
-                    .get("module")
-                    .and_then(|v| v.as_str())
-                    .expect("missing module address"),
-            )
-            .expect("invalid module address");
-
-            let safe = NodeSafeConfig {
-                safe_address: safe_address,
-                module_address: module_address,
-            };
-
-            safes.push(safe);
-
-            // remove folders under SNAPSHOT_BASE/node_i
-            std::fs::remove_dir_all(format!("{SNAPSHOT_BASE}/node_{i}/index_db")).ok();
-            std::fs::remove_dir_all(format!("{SNAPSHOT_BASE}/node_{i}/node_db")).ok();
-        }
-    } else {
-        for i in 0..SWARM_N {
-            let safe = onboard_node(
-                &chainenv_fixture,
-                &onchain_keys[i],
-                U256::from(1_000_000_000_000_000_000_u128),
-                U256::from(10_000_000_000_000_000_000_u128),
-            )
-            .await;
-            let safe_addresses = json!({
-                "safe": safe.safe_address.to_string(),
-                "module": safe.module_address.to_string(),
-            });
-            std::fs::create_dir_all(format!("{SNAPSHOT_BASE}/node_{i}")).expect("failed to create directory");
-            let _ = std::fs::write(
-                format!("{SNAPSHOT_BASE}/node_{i}/safe_addresses.json"),
-                serde_json::to_string_pretty(&safe_addresses).unwrap(),
-            );
-
-            safes.push(safe);
-        }
-    }
-
-    assert!(safes.len() == SWARM_N);
 
     // Setup SWARM_N nodes
     let hopr_instances: Vec<TestedHopr> = futures::future::join_all((0..SWARM_N).map(|i| {
@@ -197,17 +124,6 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     .into_iter()
     .collect::<Result<Vec<_>, _>>()
     .expect("One or more threads panicked");
-
-    let dump_state = !std::path::Path::new(&format!("{SNAPSHOT_BASE}/anvil")).exists();
-    if dump_state {
-        let state = chainenv_fixture
-            .provider
-            .anvil_dump_state()
-            .await
-            .expect("failed to dump anvil state");
-
-        std::fs::write(format!("{SNAPSHOT_BASE}/anvil"), state.as_ref()).expect("failed to write anvil state to file");
-    }
 
     // Run all nodes in parallel
     futures::future::join_all(

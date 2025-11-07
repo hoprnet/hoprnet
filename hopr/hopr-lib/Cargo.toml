@@ -107,6 +107,8 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 url = { workspace = true }
 
+hopr-db-node = { workspace = true }
+hopr-chain-connector = { workspace = true }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",

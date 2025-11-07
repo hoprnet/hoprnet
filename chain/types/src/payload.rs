@@ -618,7 +618,7 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-
+    use alloy::eips::Decodable2718;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
@@ -673,7 +673,10 @@ mod tests {
             .announce(ad_reannounce)?
             .sign_and_encode_to_eip2718(1, None, &chain_key_0)
             .await?;
-        insta::assert_snapshot!("announce_safe", hex::encode(signed_tx));
+        insta::assert_snapshot!("announce_safe", hex::encode(signed_tx.clone()));
+
+        let tx = alloy::consensus::TxEnvelope::decode_2718_exact(signed_tx.as_ref())?;
+        tx.
 
         Ok(())
     }
