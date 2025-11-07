@@ -95,7 +95,7 @@ use std::str::FromStr;
 use alloy::primitives::{Address, U256, utils::parse_units};
 use clap::{Parser, builder::RangedU64ValueParser};
 use hopr_bindings::{
-    hoprnetworkregistry::HoprNetworkRegistry, hoprnodesaferegistry::HoprNodeSafeRegistry,
+    hoprnodesaferegistry::HoprNodeSafeRegistry,
     hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
 };
 use hopr_crypto_types::keypairs::Keypair;
@@ -107,7 +107,7 @@ use crate::{
     methods::{
         SafeSingleton, debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries,
         deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
-        include_nodes_to_module, migrate_nodes, register_safes_and_nodes_on_network_registry, transfer_native_tokens,
+        include_nodes_to_module, migrate_nodes, transfer_native_tokens,
         transfer_or_mint_tokens,
     },
     utils::{Cmd, HelperErrors, a2h},
@@ -334,7 +334,6 @@ impl SafeModuleSubcommands {
         hopr_amount: Option<f64>,
         native_amount: Option<f64>,
         private_key: PrivateKeyArgs,
-        manager_private_key: ManagerPrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
         let mut node_eth_addresses: Vec<Address> = Vec::new();
@@ -443,36 +442,6 @@ impl SafeModuleSubcommands {
             );
         }
 
-        // action around network registry
-        if node_eth_addresses.is_empty() {
-            info!("No nodes provided. Skip actions around network registry");
-            return Ok(());
-        }
-
-        // read private key
-        if let Ok(manager_private_key) = manager_private_key.read_default() {
-            // get RPC provider for the given network and environment
-            let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
-            let hopr_network_registry = HoprNetworkRegistry::new(
-                a2h(contract_addresses.addresses.network_registry),
-                manager_rpc_provider.clone(),
-            );
-            // Overwrite any past registration of provided nodes in the network registry.
-            // This action is the same as calling `hopli network-registry manager-register`
-            let (removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
-                hopr_network_registry,
-                vec![*safe.address(); node_eth_addresses.len()],
-                node_eth_addresses.clone(),
-            )
-            .await?;
-            info!(
-                "{:?} pairs have been removed and {:?} pairs have been added to the network registry.",
-                removed_pairs_num, added_pairs_num
-            );
-        } else {
-            info!("skipping inclusion to the network registry as no manager private key has been provided.");
-        }
-
         Ok(())
     }
 
@@ -488,7 +457,6 @@ impl SafeModuleSubcommands {
         new_safe_address: String,
         new_module_address: String,
         private_key: PrivateKeyArgs,
-        manager_private_key: ManagerPrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
         let mut node_eth_addresses: Vec<Address> = Vec::new();
@@ -575,36 +543,6 @@ impl SafeModuleSubcommands {
             };
         };
 
-        // action around network registry
-        if node_eth_addresses.is_empty() {
-            info!("No nodes provided. Skip actions around network registry");
-            return Ok(());
-        }
-
-        // read private key of network registry manager
-        if let Ok(manager_private_key) = manager_private_key.read_default() {
-            // get RPC provider for the given network and environment
-            let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
-            let hopr_network_registry = HoprNetworkRegistry::new(
-                a2h(contract_addresses.addresses.network_registry),
-                manager_rpc_provider.clone(),
-            );
-            // Overwrite any past registration of provided nodes in the network registry.
-            // This action is the same as calling `hopli network-registry manager-register`
-            let (removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
-                hopr_network_registry,
-                vec![*safe.address(); node_eth_addresses.len()],
-                node_eth_addresses.clone(),
-            )
-            .await?;
-            info!(
-                "{:?} pairs have been removed and {:?} pairs have been added to the network registry.",
-                removed_pairs_num, added_pairs_num
-            );
-        } else {
-            info!("skipping inclusion to the network registry as no manager private key has been provided.");
-        }
-
         Ok(())
     }
 
@@ -620,7 +558,6 @@ impl SafeModuleSubcommands {
         module_address: String,
         allowance: Option<f64>,
         private_key: PrivateKeyArgs,
-        manager_private_key: ManagerPrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
         let mut node_eth_addresses: Vec<Address> = Vec::new();
@@ -682,35 +619,6 @@ impl SafeModuleSubcommands {
         .await?;
         info!("a new network has been included due to the migration");
 
-        // action around network registry
-        if node_eth_addresses.is_empty() {
-            info!("No nodes provided. Skip actions around network registry");
-            return Ok(());
-        }
-
-        // read private key of network registry manager
-        if let Ok(manager_private_key) = manager_private_key.read_default() {
-            // get RPC provider for the given network and environment
-            let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
-            let hopr_network_registry = HoprNetworkRegistry::new(
-                a2h(contract_addresses.addresses.network_registry),
-                manager_rpc_provider.clone(),
-            );
-            // Overwrite any past registration of provided nodes in the network registry.
-            // This action is the same as calling `hopli network-registry manager-register`
-            let (removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
-                hopr_network_registry,
-                vec![*safe.address(); node_eth_addresses.len()],
-                node_eth_addresses.clone(),
-            )
-            .await?;
-            info!(
-                "{:?} pairs have been removed and {:?} pairs have been added to the network registry.",
-                removed_pairs_num, added_pairs_num
-            );
-        } else {
-            info!("skipping inclusion to the network registry as no manager private key has been provided.");
-        }
         Ok(())
     }
 
@@ -766,8 +674,6 @@ impl SafeModuleSubcommands {
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
         let hopr_token = HoprToken::new(a2h(contract_addresses.addresses.token), rpc_provider.clone());
-        let network_registry =
-            HoprNetworkRegistry::new(a2h(contract_addresses.addresses.network_registry), rpc_provider.clone());
         let node_safe_registry = HoprNodeSafeRegistry::new(
             a2h(contract_addresses.addresses.node_safe_registry),
             rpc_provider.clone(),
@@ -776,9 +682,8 @@ impl SafeModuleSubcommands {
         // loop through all the nodes and debug
         for node in node_eth_addresses {
             info!("Starting debug checks for node: {:?}", node);
-            info!("Checking node registration with network registry...");
+            info!("Checking node registration with safe registry...");
             let registered_safe = debug_node_safe_module_setup_on_balance_and_registries(
-                network_registry.clone(),
                 node_safe_registry.clone(),
                 &node,
             )
@@ -827,7 +732,7 @@ impl Cmd for SafeModuleSubcommands {
                 hopr_amount,
                 native_amount,
                 private_key,
-                manager_private_key,
+                ..
             } => {
                 SafeModuleSubcommands::execute_safe_module_creation(
                     network_provider,
@@ -839,7 +744,6 @@ impl Cmd for SafeModuleSubcommands {
                     hopr_amount,
                     native_amount,
                     private_key,
-                    manager_private_key,
                 )
                 .await
             }
@@ -851,7 +755,7 @@ impl Cmd for SafeModuleSubcommands {
                 new_safe_address,
                 new_module_address,
                 private_key,
-                manager_private_key,
+                ..
             } => {
                 SafeModuleSubcommands::execute_safe_module_moving(
                     network_provider,
@@ -861,7 +765,6 @@ impl Cmd for SafeModuleSubcommands {
                     new_safe_address,
                     new_module_address,
                     private_key,
-                    manager_private_key,
                 )
                 .await
             }
@@ -873,7 +776,7 @@ impl Cmd for SafeModuleSubcommands {
                 module_address,
                 allowance,
                 private_key,
-                manager_private_key,
+                ..
             } => {
                 SafeModuleSubcommands::execute_safe_module_migration(
                     network_provider,
@@ -883,7 +786,6 @@ impl Cmd for SafeModuleSubcommands {
                     module_address,
                     allowance,
                     private_key,
-                    manager_private_key,
                 )
                 .await
             }
