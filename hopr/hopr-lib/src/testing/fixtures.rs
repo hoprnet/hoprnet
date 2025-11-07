@@ -320,6 +320,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
                         do_auto_redeem,
                         if do_auto_redeem { Some(0.2) } else { None },
                     )
+                    .await
                 })
             })
             .join()

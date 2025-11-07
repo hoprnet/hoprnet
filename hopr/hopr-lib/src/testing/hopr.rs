@@ -19,7 +19,7 @@ pub struct TestedHopr {
 }
 
 impl TestedHopr {
-    pub fn new(
+    pub async fn new(
         chain_keys: ChainKeypair,
         anvil_endpoint: String,
         protocol_config: ProtocolsConfig,
@@ -98,6 +98,7 @@ impl TestedHopr {
             &OffchainKeypair::random(),
             &chain_keys,
         )
+        .await
         .expect(format!("failed to create hopr instance on port {host_port}").as_str());
 
         Self {

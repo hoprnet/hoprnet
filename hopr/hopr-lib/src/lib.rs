@@ -153,6 +153,50 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+/// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.
+///
+/// Divide the available CPU parallelism by 2, since half of the available threads are
+/// to be used for IO-bound and half for CPU-bound tasks.
+#[cfg(feature = "runtime-tokio")]
+pub fn prepare_tokio_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
+    let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
+
+    hopr_parallelize::cpu::init_thread_pool(
+        std::env::var("HOPRD_NUM_CPU_THREADS")
+            .ok()
+            .and_then(|v| usize::from_str(&v).ok())
+            .or(avail_parallelism)
+            .ok_or(anyhow::anyhow!(
+                "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
+                 environment variable."
+            ))?
+            .max(1),
+    )?;
+
+    Ok(tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(
+            std::env::var("HOPRD_NUM_IO_THREADS")
+                .ok()
+                .and_then(|v| usize::from_str(&v).ok())
+                .or(avail_parallelism)
+                .ok_or(anyhow::anyhow!(
+                    "Could not determine the number of IO threads to use. Please set the HOPRD_NUM_IO_THREADS \
+                     environment variable."
+                ))?
+                .max(1),
+        )
+        .thread_name("hoprd")
+        .thread_stack_size(
+            std::env::var("HOPRD_THREAD_STACK_SIZE")
+                .ok()
+                .and_then(|v| usize::from_str(&v).ok())
+                .unwrap_or(10 * 1024 * 1024)
+                .max(2 * 1024 * 1024),
+        )
+        .build()?)
+}
+
 /// HOPR main object providing the entire HOPR node functionality
 ///
 /// Instantiating this object creates all processes and objects necessary for
@@ -178,7 +222,7 @@ pub struct Hopr {
 }
 
 impl Hopr {
-    pub fn new(
+    pub async fn new(
         mut cfg: config::HoprLibConfig,
         me: &OffchainKeypair,
         me_onchain: &ChainKeypair,
@@ -226,7 +270,7 @@ impl Hopr {
                 .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
                 .unwrap_or_else(|| HoprNodeDbConfig::default().surb_distress_threshold),
         };
-        let node_db = futures::executor::block_on(HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg))?;
+        let node_db = HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg).await?;
 
         if let Some(provider) = &cfg.chain.provider {
             info!(provider, "Creating chain components using the custom provider");
@@ -321,7 +365,7 @@ impl Hopr {
             );
 
             // Calling get_ticket_statistics will initialize the respective metrics on tickets
-            if let Err(e) = futures::executor::block_on(node_db.get_ticket_statistics(None)) {
+            if let Err(e) = node_db.get_ticket_statistics(None).await {
                 error!(error = %e, "Failed to initialize ticket statistics metrics");
             }
         }

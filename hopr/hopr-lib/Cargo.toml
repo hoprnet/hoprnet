@@ -48,7 +48,6 @@ utils_futures = [] # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
 testing = [
-  "dep:anyhow",
   "dep:futures-time",
   "dep:rand",
   "dep:rstest",
@@ -63,7 +62,7 @@ alloy = { workspace = true, default-features = false, features = [
   "json-rpc",
   "node-bindings",
 ] }
-anyhow = { workspace = true, optional = true }
+anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
@@ -111,7 +110,6 @@ hopr-strategy = { workspace = true }
 hopr-transport = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 env_logger = { workspace = true }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
