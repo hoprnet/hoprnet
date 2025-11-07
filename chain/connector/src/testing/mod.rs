@@ -3,7 +3,7 @@ use std::{ops::Add, str::FromStr};
 use blokli_client::BlokliTestStateMutator;
 pub use blokli_client::{BlokliTestClient, BlokliTestState};
 use hopr_api::chain::ChainInfo;
-use hopr_chain_types::ParsedHoprChainAction;
+use hopr_chain_types::{ContractAddresses, ParsedHoprChainAction};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -170,7 +170,10 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
         signed_tx: &[u8],
         state: &mut BlokliTestState,
     ) -> Result<(), blokli_client::errors::BlokliClientError> {
-        let (action, sender) = ParsedHoprChainAction::parse_from_eip2718(signed_tx)
+        let addresses: ContractAddresses = serde_json::from_str(&state.chain_info.contract_addresses.0)
+            .map_err(|_| blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("failed to parse contract addresses")))?;
+
+        let (action, sender) = ParsedHoprChainAction::parse_from_eip2718(signed_tx, &addresses)
             .map_err(|e| blokli_client::errors::ErrorKind::MockClientError(e.into()))?;
         match action {
             ParsedHoprChainAction::RegisterSafeAddress(safe_address) => {
@@ -207,14 +210,14 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
 
                 tracing::debug!(%sender, %packet_key, ?multiaddress, "node announced");
             }
-            ParsedHoprChainAction::Withdraw(destination, amount) => {
+            ParsedHoprChainAction::WithdrawNative(destination, amount) => {
                 let balance = state.native_balances.get_mut(&hex::encode(sender)).ok_or(
-                    blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("missing balance for {sender}")),
+                    blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("missing native balance for {sender}")),
                 )?;
 
                 let new_balance = balance.balance.0.parse::<XDaiBalance>().map_err(|_| {
                     blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                        "failed to parse balance for {sender}"
+                        "failed to parse native balance for {sender}"
                     ))
                 })? - amount;
                 balance.balance = blokli_client::api::types::TokenValueString(new_balance.to_string());
@@ -222,7 +225,7 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
                 if let Some(dst_balance) = state.native_balances.get_mut(&hex::encode(destination)) {
                     let new_balance = dst_balance.balance.0.parse::<XDaiBalance>().map_err(|_| {
                         blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                            "failed to parse balance for {destination}"
+                            "failed to parse native balance for {destination}"
                         ))
                     })? + amount;
                     dst_balance.balance = blokli_client::api::types::TokenValueString(new_balance.to_string());
@@ -232,7 +235,32 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
                     tracing::debug!(%sender, %amount, %destination, "xdai withdrawn");
                 }
             }
-            ParsedHoprChainAction::OpenChannel(dst_addr, stake) => {
+            ParsedHoprChainAction::WithdrawToken(destination, amount) => {
+                let balance = state.token_balances.get_mut(&hex::encode(sender)).ok_or(
+                    blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("missing token balance for {sender}")),
+                )?;
+
+                let new_balance = balance.balance.0.parse::<HoprBalance>().map_err(|_| {
+                    blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "failed to parse token balance for {sender}"
+                    ))
+                })? - amount;
+                balance.balance = blokli_client::api::types::TokenValueString(new_balance.to_string());
+
+                if let Some(dst_balance) = state.token_balances.get_mut(&hex::encode(destination)) {
+                    let new_balance = dst_balance.balance.0.parse::<HoprBalance>().map_err(|_| {
+                        blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                            "failed to parse token balance for {destination}"
+                        ))
+                    })? + amount;
+                    dst_balance.balance = blokli_client::api::types::TokenValueString(new_balance.to_string());
+
+                    tracing::debug!(%sender, %amount, %destination, "wxhopr withdrawn to an existing account");
+                } else {
+                    tracing::debug!(%sender, %amount, %destination, "wxhopr withdrawn");
+                }
+            }
+            ParsedHoprChainAction::FundChannel(dst_addr, stake) => {
                 let source = state
                     .accounts
                     .iter()
@@ -267,7 +295,10 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
                         .into());
                     }
 
-                    existing_channel.balance = blokli_client::api::types::TokenValueString(stake.to_string());
+                    let balance = existing_channel.balance.0.parse::<HoprBalance>()
+                        .map_err(|_| blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("failed to parse balance on channel {sender} -> {dst_addr}")))?;
+
+                    existing_channel.balance = blokli_client::api::types::TokenValueString((balance + stake).to_string());
                     existing_channel.status = blokli_client::api::types::ChannelStatus::Open;
                     existing_channel.ticket_index = blokli_client::api::types::Uint64("0".into());
                     existing_channel.closure_time = None;
@@ -341,7 +372,7 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
 
                 tracing::debug!(%channel_id, "channel closure finalized");
             }
-            ParsedHoprChainAction::RedeemTicket(channel_id, ticket_index) => {
+            ParsedHoprChainAction::RedeemTicket { channel_id, ticket_index, ticket_amount} => {
                 let channel_id = hex::encode(channel_id);
                 let channel = state
                     .channels
@@ -371,7 +402,18 @@ impl BlokliTestStateMutator for Eip2718ParserBasedStateMutator {
                     .into());
                 }
 
+                let balance = channel.balance.0.parse::<HoprBalance>()
+                    .map_err(|_| blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("failed to parse balance on channel {channel_id}")))?;
+
+                if balance < ticket_amount {
+                    return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
+                        "balance of channel {channel_id} is lower than ticket amount {ticket_amount}"
+                    ))
+                    .into());
+                }
+
                 channel.ticket_index = blokli_client::api::types::Uint64(ticket_index.to_string());
+                channel.balance = blokli_client::api::types::TokenValueString((balance - ticket_amount).to_string());
 
                 tracing::debug!(%channel_id, %ticket_index, "ticket redeemed");
             }
