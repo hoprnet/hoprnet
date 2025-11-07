@@ -1226,7 +1226,7 @@ impl HoprDbTicketOperations for HoprDb {
         for channel in channels.into_iter() {
             let selector = TicketSelector::from(&channel)
                 .with_state(AcknowledgedTicketStatus::BeingRedeemed)
-                .with_index(channel.ticket_index.as_u64());
+                .with_index_range(channel.ticket_index.as_u64()..);
 
             let mut tickets_stream = self
                 .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::Untouched)
