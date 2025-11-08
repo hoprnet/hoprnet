@@ -10,7 +10,6 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["mixer-channel"]
 p2p-announce-quic = []
 p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 runtime-tokio = [
@@ -31,9 +30,7 @@ prometheus = [
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
 ]
-mixer-stream = ["dep:rust-stream-ext-concurrent"]
-mixer-channel = []
-capture = ["hopr-transport-protocol/capture"]
+capture = ["dep:pcap-file"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -41,9 +38,10 @@ async-lock = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
+futures-time = { workspace = true }
 lazy_static = { workspace = true }
 proc-macro-regex = { workspace = true }
-rust-stream-ext-concurrent = { workspace = true, optional = true }
+pcap-file = { workspace = true, optional = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -64,6 +62,7 @@ hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
 hopr-path = { workspace = true }
 hopr-protocol-app = { workspace = true }
+hopr-protocol-hopr = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
