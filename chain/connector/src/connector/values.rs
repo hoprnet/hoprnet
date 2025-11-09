@@ -38,7 +38,9 @@ where
             .and_then(|a| a.safe_transaction_count)
             .ok_or(ConnectorError::InvalidState("no safe transaction count found".into()))
             .and_then(|v| {
-                u64::from_str(&v.0).map_err(|_| ConnectorError::TypeConversion("invalid safe transaction count".into()))
+                u64::from_str(&v.0)
+                    .map(|v| v + 1)
+                    .map_err(|_| ConnectorError::TypeConversion("invalid safe transaction count".into()))
             })
     }
 }

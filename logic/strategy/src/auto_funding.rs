@@ -116,13 +116,13 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use hopr_api::chain::ChainReceipt;
-
+    use hopr_chain_connector::create_trustful_hopr_blokli_connector;
+    use hopr_chain_connector::testing::BlokliTestStateBuilder;
+    use hopr_crypto_types::prelude::*;
     use super::*;
     use crate::{
         auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
         strategy::SingularStrategy,
-        tests::{MockChainActions, MockTestActions},
     };
 
     lazy_static::lazy_static! {
@@ -164,18 +164,21 @@ mod tests {
             0_u32.into(),
         );
 
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_random_accounts(&[&*ALICE,&*BOB, &*CHRIS, &*DAVE], false)
+            .with_channels([c1, c2, c3])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let snapshot = blokli_sim.snapshot();
+
+        let chain_connector = create_trustful_hopr_blokli_connector(&ChainKeypair::random(), blokli_sim, [1; Address::SIZE].into()).await?;
+
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,
             funding_amount: fund_amount,
         };
 
-        let mut mock = MockTestActions::new();
-        mock.expect_fund_channel()
-            .once()
-            .with(mockall::predicate::eq(c2.get_id()), mockall::predicate::eq(fund_amount))
-            .return_once(|_, _| Ok(ChainReceipt::default()));
-
-        let afs = AutoFundingStrategy::new(cfg, MockChainActions(mock.into()));
+        let afs = AutoFundingStrategy::new(cfg, chain_connector);
         afs.on_own_channel_changed(
             &c1,
             ChannelDirection::Outgoing,
@@ -205,6 +208,8 @@ mod tests {
             },
         )
         .await?;
+
+        insta::assert_yaml_snapshot!(*snapshot.refresh());
 
         Ok(())
     }

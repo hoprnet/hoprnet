@@ -40,7 +40,5 @@ hopr-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }
-hex-literal = { workspace = true }
 lazy_static = { workspace = true }
-multiaddr = { workspace = true }
 tokio = { workspace = true }

@@ -104,16 +104,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::Bound, time::SystemTime};
+    use std::time::SystemTime;
+    use std::ops::Add;
 
     use hex_literal::hex;
-    use hopr_api::chain::ChainReceipt;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
+    use hopr_chain_connector::create_trustful_hopr_blokli_connector;
+    use hopr_chain_connector::testing::BlokliTestStateBuilder;
 
     use super::*;
-    use crate::tests::{MockChainActions, MockTestActions};
 
     lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
@@ -131,43 +132,51 @@ mod tests {
     async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
         let max_closure_overdue = Duration::from_secs(600);
 
-        // Should finalize closure of this channel
-        let c_pending_elapsed = ChannelEntry::new(
-            *ALICE,
-            *DAVE,
-            10.into(),
-            0.into(),
-            ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
-            0.into(),
-        );
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_random_accounts(&[&*ALICE,&*BOB, &*CHARLIE, &*DAVE, &*EUGENE], false)
+            .with_channels([
+                // Should leave this channel opened
+                ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into()),
+                // Should leave this unfinalized, because the channel closure period has not yet elapsed
+                ChannelEntry::new(
+                    *ALICE,
+                    *CHARLIE,
+                    10.into(),
+                    0.into(),
+                    ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
+                    0.into(),
+                ),
+                // Should finalize closure of this channel
+                ChannelEntry::new(
+                    *ALICE,
+                    *DAVE,
+                    10.into(),
+                    0.into(),
+                    ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
+                    0.into(),
+                ),
+                // Should leave this unfinalized, because the channel closure is long overdue
+                ChannelEntry::new(
+                    *ALICE,
+                    *EUGENE,
+                    10.into(),
+                    0.into(),
+                    ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
+                    0.into(),
+                )
+            ])
+            .build_dynamic_client([1; Address::SIZE].into());
 
-        let mut mock = MockTestActions::new();
-        mock.expect_me().return_const(*ALICE);
+        let snapshot = blokli_sim.snapshot();
 
-        mock.expect_stream_channels()
-            .once()
-            .withf(move |selector| {
-                selector.source == Some(*ALICE)
-                    && selector.destination.is_none()
-                    && selector.allowed_states == &[ChannelStatusDiscriminants::PendingToClose]
-                    && match selector.closure_time_range {
-                        (Bound::Included(a), Bound::Included(b)) => {
-                            b.sub(a).to_std().is_ok_and(|d| d == max_closure_overdue)
-                        }
-                        _ => false,
-                    }
-            })
-            .return_once(move |_| futures::stream::iter([c_pending_elapsed]).boxed());
-
-        mock.expect_close_channel()
-            .once()
-            .with(mockall::predicate::eq(c_pending_elapsed.get_id()))
-            .return_once(|_| Ok((ChannelStatus::Closed, ChainReceipt::default())));
+        let chain_connector = create_trustful_hopr_blokli_connector(&ChainKeypair::random(), blokli_sim, [1; Address::SIZE].into()).await?;
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 
-        let strat = ClosureFinalizerStrategy::new(cfg, MockChainActions(mock.into()));
+        let strat = ClosureFinalizerStrategy::new(cfg, chain_connector);
         strat.on_tick().await?;
+
+        insta::assert_yaml_snapshot!(*snapshot.refresh());
 
         Ok(())
     }

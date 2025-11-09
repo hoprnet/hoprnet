@@ -297,7 +297,7 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: true,
             allow_recursive: true,
-            execution_interval: 1,
+            execution_interval: std::time::Duration::from_secs(1),
             strategies: Vec::new(),
         };
 
@@ -326,7 +326,7 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: false,
             allow_recursive: true,
-            execution_interval: 1,
+            execution_interval: std::time::Duration::from_secs(1),
             strategies: Vec::new(),
         };
 
