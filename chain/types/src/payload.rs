@@ -19,13 +19,11 @@ use alloy::{
     },
     rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,
-    sol_types::SolCall,
+    sol,
+    sol_types::{SolCall, SolValue},
 };
 use hopr_bindings::{
-    hoprannouncements::HoprAnnouncements::{
-        announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
-    },
-    hoprchannels::{
+    hopr_channels::{
         HoprChannels::{
             RedeemableTicket as OnChainRedeemableTicket, TicketData, closeIncomingChannelCall,
             closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall, finalizeOutgoingChannelClosureSafeCall,
@@ -34,9 +32,9 @@ use hopr_bindings::{
         },
         HoprCrypto::{CompactSignature, VRFParameters},
     },
-    hoprnodemanagementmodule::HoprNodeManagementModule::execTransactionFromModuleCall,
-    hoprnodesaferegistry::HoprNodeSafeRegistry::{deregisterNodeBySafeCall, registerSafeByNodeCall},
-    hoprtoken::HoprToken::{approveCall, transferCall},
+    hopr_node_management_module::HoprNodeManagementModule::execTransactionFromModuleCall,
+    hopr_node_safe_registry::HoprNodeSafeRegistry::{deregisterNodeBySafeCall, registerSafeByNodeCall},
+    hopr_token::HoprToken::{approveCall, sendCall, transferCall},
 };
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -46,6 +44,17 @@ use crate::{
     ContractAddresses,
     errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError},
 };
+
+sol! {
+    /// Mirrors the Solidity layout: (address, bytes32, bytes32, bytes32, string)
+    struct KeyBindAndAnnouncePayload {
+        address callerNode;
+        bytes32 ed25519_sig_0;
+        bytes32 ed25519_sig_1;
+        bytes32 ed25519_pub_key;
+        string  multiaddress;
+    }
+}
 
 type Result<T> = std::result::Result<T, crate::errors::ChainTypesError>;
 
@@ -125,7 +134,7 @@ pub trait PayloadGenerator {
     fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> Result<Self::TxRequest>;
 
     /// Creates the transaction payload to announce a node on-chain.
-    fn announce(&self, announcement: AnnouncementData) -> Result<Self::TxRequest>;
+    fn announce(&self, announcement: AnnouncementData, key_binding_fee: HoprBalance) -> Result<Self::TxRequest>;
 
     /// Creates the transaction payload to open a payment channel
     fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<Self::TxRequest>;
@@ -235,29 +244,34 @@ impl PayloadGenerator for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn announce(&self, announcement: AnnouncementData) -> Result<Self::TxRequest> {
-        let payload = match &announcement.key_binding {
-            Some(binding) => {
-                let serialized_signature = binding.signature.as_ref();
+    fn announce(&self, announcement: AnnouncementData, key_binding_fee: HoprBalance) -> Result<Self::TxRequest> {
+        // when the keys have already bounded, now only try to announce without key binding
+        // when keys are not bounded yet, bind keys and announce together
+        let serialized_signature = announcement.key_binding().signature.as_ref();
 
-                bindKeysAnnounceCall {
-                    ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
-                    ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
-                    ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
-                    baseMultiaddr: announcement.multiaddress().to_string(),
-                }
-                .abi_encode()
-            }
-            None => announceCall {
-                baseMultiaddr: announcement.multiaddress().to_string(),
-            }
-            .abi_encode(),
-        };
+        let inner_payload = KeyBindAndAnnouncePayload {
+            callerNode: a2h(self.me),
+            ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
+            ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
+            ed25519_pub_key: B256::from_slice(announcement.key_binding().packet_key.as_ref()),
+            multiaddress: announcement
+                .multiaddress()
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default(), // "" if None
+        }
+        .abi_encode();
 
-        let tx = TransactionRequest::default()
-            .with_input(payload)
-            .with_to(a2h(self.contract_addrs.announcements));
-        Ok(tx)
+        let call_data = sendCall {
+            recipient: a2h(self.contract_addrs.announcements),
+            amount: alloy::primitives::U256::from_be_slice(&key_binding_fee.amount().to_be_bytes()),
+            data: inner_payload[32..].to_vec().into(),
+        }
+        .abi_encode();
+
+        Ok(TransactionRequest::default()
+            .with_input(call_data)
+            .with_to(a2h(self.contract_addrs.token)))
     }
 
     fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
@@ -398,31 +412,35 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn announce(&self, announcement: AnnouncementData) -> Result<Self::TxRequest> {
-        let call_data = match &announcement.key_binding {
-            Some(binding) => {
-                let serialized_signature = binding.signature.as_ref();
+    fn announce(&self, announcement: AnnouncementData, key_binding_fee: HoprBalance) -> Result<Self::TxRequest> {
+        // when the keys have already bounded, now only try to announce without key binding
+        // when keys are not bounded yet, bind keys and announce together
+        let serialized_signature = announcement.key_binding().signature.as_ref();
 
-                bindKeysAnnounceSafeCall {
-                    selfAddress: a2h(self.me),
-                    ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
-                    ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
-                    ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
-                    baseMultiaddr: announcement.multiaddress().to_string(),
-                }
-                .abi_encode()
-            }
-            None => announceSafeCall {
-                selfAddress: a2h(self.me),
-                baseMultiaddr: announcement.multiaddress().to_string(),
-            }
-            .abi_encode(),
-        };
+        let inner_payload = KeyBindAndAnnouncePayload {
+            callerNode: a2h(self.me),
+            ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
+            ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
+            ed25519_pub_key: B256::from_slice(announcement.key_binding().packet_key.as_ref()),
+            multiaddress: announcement
+                .multiaddress()
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default(),
+        }
+        .abi_encode();
 
-        let tx = TransactionRequest::default()
+        let call_data = sendCall {
+            recipient: a2h(self.contract_addrs.announcements),
+            amount: alloy::primitives::U256::from_be_slice(&key_binding_fee.amount().to_be_bytes()),
+            data: inner_payload[32..].to_vec().into(),
+        }
+        .abi_encode();
+
+        Ok(TransactionRequest::default()
             .with_input(
                 execTransactionFromModuleCall {
-                    to: a2h(self.contract_addrs.announcements),
+                    to: a2h(self.contract_addrs.token),
                     value: U256::ZERO,
                     data: call_data.into(),
                     operation: Operation::Call as u8,
@@ -430,9 +448,7 @@ impl PayloadGenerator for SafePayloadGenerator {
                 .abi_encode(),
             )
             .with_to(a2h(self.module))
-            .with_gas_limit(DEFAULT_TX_GAS);
-
-        Ok(tx)
+            .with_gas_limit(DEFAULT_TX_GAS))
     }
 
     fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
@@ -612,7 +628,6 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
                 channelId: B256::from_slice(off_chain.verified_ticket().channel_id.as_ref()),
                 amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), /* Extract only the last 12 bytes (lowest 96 bits) */
                 ticketIndex: U48::from_be_slice(&off_chain.verified_ticket().index.to_be_bytes()[8 - 6..]),
-                indexOffset: 1,
                 epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),
                 winProb: U56::from_be_slice(&off_chain.verified_ticket().encoded_win_prob),
             },
@@ -628,7 +643,7 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::str::FromStr;
 
     use hex_literal::hex;
@@ -645,7 +660,7 @@ mod tests {
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
 
     lazy_static::lazy_static! {
-        static ref CONTRACT_ADDRS: ContractAddresses = serde_json::from_str(r#"{
+        pub static ref CONTRACT_ADDRS: ContractAddresses = serde_json::from_str(r#"{
             "announcements": "0xf1c143B1bA20C7606d56aA2FA94502D25744b982",
             "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
             "module_implementation": "0x32863c4974fBb6253E338a0cb70C382DCeD2eFCb",
@@ -667,25 +682,21 @@ mod tests {
 
         let generator = BasicPayloadGenerator::new((&chain_key_0).into(), *CONTRACT_ADDRS);
 
-        let ad = AnnouncementData::new(
-            test_multiaddr,
-            Some(KeyBinding::new(
-                (&chain_key_0).into(),
-                &OffchainKeypair::from_secret(&PRIVATE_KEY_1)?,
-            )),
-        )?;
+        let kb = KeyBinding::new((&chain_key_0).into(), &OffchainKeypair::from_secret(&PRIVATE_KEY_1)?);
+
+        let ad = AnnouncementData::new(kb, Some(test_multiaddr))?;
 
         let signed_tx = generator
-            .announce(ad)?
+            .announce(ad, 100_u32.into())?
             .sign_and_encode_to_eip2718(2, None, &chain_key_0)
             .await?;
         insta::assert_snapshot!("announce_basic", hex::encode(signed_tx));
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99")?;
-        let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
+        let ad_reannounce = AnnouncementData::new(kb, Some(test_multiaddr_reannounce))?;
 
         let signed_tx = generator
-            .announce(ad_reannounce)?
+            .announce(ad_reannounce, 0_u32.into())?
             .sign_and_encode_to_eip2718(1, None, &chain_key_0)
             .await?;
         insta::assert_snapshot!("announce_safe", hex::encode(signed_tx.clone()));

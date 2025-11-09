@@ -238,7 +238,8 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
-hopr-bindings = { path = "ethereum/bindings", default-features = false }
+hopr-bindings = { package = "hopr-bindings", git = "https://github.com/hoprnet/contracts", rev = "0efd78c1" }
+#hopr-bindings = { path = "ethereum/bindings", default-features = false }
 hopr-chain-connector = { path = "chain/connector" }
 hopr-chain-types = { path = "chain/types", default-features = false }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }

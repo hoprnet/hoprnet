@@ -4501,7 +4501,7 @@ dependencies = [
  "env_logger",
  "hex",
  "hex-literal",
- "hopr-bindings",
+ "hopr-bindings 4.0.0",
  "hopr-chain-types",
  "hopr-crypto-keypair",
  "hopr-crypto-random",
@@ -4565,6 +4565,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-bindings"
+version = "4.0.0"
+source = "git+https://github.com/hoprnet/contracts?rev=0efd78c1#0efd78c15a936e482bcbee3b7eeafc7b1c7ed938"
+dependencies = [
+ "alloy",
+ "anyhow",
+ "const_format",
+ "serde",
+ "serde_json",
+ "serde_with",
+]
+
+[[package]]
 name = "hopr-chain-connector"
 version = "0.1.0"
 dependencies = [
@@ -4609,7 +4622,7 @@ dependencies = [
  "async-trait",
  "hex",
  "hex-literal",
- "hopr-bindings",
+ "hopr-bindings 4.0.0",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",

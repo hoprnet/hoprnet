@@ -47,3 +47,22 @@ pub struct ContractAddresses {
     #[serde_as(as = "serde_with::DisplayFromStr")]
     pub module_implementation: Address,
 }
+
+impl<'a> IntoIterator for &'a ContractAddresses {
+    type IntoIter = std::vec::IntoIter<Address>;
+    type Item = Address;
+
+    fn into_iter(self) -> Self::IntoIter {
+        vec![
+            self.token,
+            self.channels,
+            self.announcements,
+            self.node_safe_registry,
+            self.ticket_price_oracle,
+            self.winning_probability_oracle,
+            self.node_stake_v2_factory,
+            self.module_implementation,
+        ]
+        .into_iter()
+    }
+}
