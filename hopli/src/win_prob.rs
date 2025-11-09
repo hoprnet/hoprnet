@@ -19,7 +19,7 @@
 //! ```
 use alloy::primitives::aliases::U56;
 use clap::Parser;
-use hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle;
+use hopr_bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
 use hopr_internal_types::{prelude::WinningProbability, tickets::EncodedWinProb};
 use tracing::{debug, info};
 

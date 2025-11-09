@@ -57,7 +57,7 @@ pub const MULTICALL3_DEPLOY_CODE: &[u8] = &hex!(
 #[cfg(test)]
 pub mod tests {
     use alloy::sol_types::SolCall;
-    use hopr_bindings::hoprchannels::HoprChannels::redeemTicketCall;
+    use hopr_bindings::hopr_channels::HoprChannels::redeemTicketCall;
     use hopr_internal_types::tickets::REDEEM_CALL_SELECTOR;
 
     #[test]

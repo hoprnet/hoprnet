@@ -25,14 +25,13 @@ use alloy::{
 };
 use hex_literal::hex;
 use hopr_bindings::{
-    hoprnetworkregistry::HoprNetworkRegistry::HoprNetworkRegistryInstance,
-    hoprnodemanagementmodule::HoprNodeManagementModule::{
+    hopr_node_management_module::HoprNodeManagementModule::{
         HoprNodeManagementModuleInstance, addChannelsAndTokenTargetCall, includeNodeCall, removeNodeCall,
         scopeTargetTokenCall,
     },
-    hoprnodesaferegistry::HoprNodeSafeRegistry::{HoprNodeSafeRegistryInstance, deregisterNodeBySafeCall},
-    hoprnodestakefactory::HoprNodeStakeFactory::{HoprNodeStakeFactoryInstance, cloneCall},
-    hoprtoken::HoprToken::{HoprTokenInstance, approveCall},
+    hopr_node_safe_registry::HoprNodeSafeRegistry::{HoprNodeSafeRegistryInstance, deregisterNodeBySafeCall},
+    hopr_node_stake_factory::HoprNodeStakeFactory::{HoprNodeStakeFactoryInstance, cloneCall},
+    hopr_token::HoprToken::{HoprTokenInstance, approveCall},
 };
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use tracing::{debug, info};
@@ -528,24 +527,6 @@ pub async fn transfer_native_tokens<P: Provider + WalletProvider>(
     Ok(total)
 }
 
-/// Get registered safes for given nodes on the network registry
-pub async fn get_registered_safes_for_nodes_on_network_registry<P: Provider + WalletProvider>(
-    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
-    node_addresses: Vec<Address>,
-) -> Result<Vec<Address>, MulticallError> {
-    let provider = network_registry.provider();
-
-    let mut dynamic_multicall = MulticallBuilder::new_dynamic(provider.clone());
-
-    for node in node_addresses {
-        dynamic_multicall = dynamic_multicall.add_dynamic(network_registry.nodeRegisterdToAccount(node));
-    }
-
-    let response = dynamic_multicall.aggregate().await?;
-
-    Ok(response)
-}
-
 /// Helper function to predict module address. Note that here the caller is the contract deployer
 pub fn predict_module_address(
     caller: Address,
@@ -750,7 +731,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
         target: *hopr_node_stake_factory.address(),
         allowFailure: false,
         callData: cloneCall {
-            moduleSingletonAddress: hopr_module_implementation_address,
+            // moduleSingletonAddress: hopr_module_implementation_address,
             admins: temporary_admins,
             nonce: nonce.into(),
             defaultTarget: default_target.into(),
@@ -854,11 +835,11 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
     info!("multicall is sent {:?}", tx_receipt.transaction_hash.to_string());
 
     let safe_address_from_log = tx_receipt
-        .decoded_log::<hopr_bindings::hoprnodestakefactory::HoprNodeStakeFactory::NewHoprNodeStakeSafe>()
+        .decoded_log::<hopr_bindings::hopr_node_stake_factory::HoprNodeStakeFactory::NewHoprNodeStakeSafe>()
         .ok_or_else(|| HelperErrors::ContractNotDeployed("cannot find safe from log".into()))?
         .instance;
     let module_address_from_log = tx_receipt
-        .decoded_log::<hopr_bindings::hoprnodestakefactory::HoprNodeStakeFactory::NewHoprNodeStakeModule>()
+        .decoded_log::<hopr_bindings::hopr_node_stake_factory::HoprNodeStakeFactory::NewHoprNodeStakeModule>()
         .ok_or_else(|| HelperErrors::ContractNotDeployed("cannot find module from log".into()))?
         .instance;
 
@@ -1221,8 +1202,9 @@ mod tests {
         sol_types::SolValue,
     };
     use hopr_bindings::{
-        hoprannouncements::HoprAnnouncements, hoprchannels::HoprChannels, hoprnodesaferegistry::HoprNodeSafeRegistry,
-        hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
+        hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels,
+        hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory,
+        hopr_token::HoprToken,
     };
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
@@ -1635,10 +1617,10 @@ mod tests {
         let deployment_receipt = instances
             .stake_factory
             .clone(
-                *instances.module_implementation.address(),
-                vec![caller],
+                //*instances.module_implementation.address(),
                 nonce.into(),
                 U256::from_str(&default_target)?.into(),
+                vec![caller],
             )
             .send()
             .await?
@@ -2001,7 +1983,7 @@ mod tests {
             *new_safe_registry.address(),
         )
         .await?;
-        let new_announcements = HoprAnnouncements::deploy(client.clone(), *new_safe_registry.address()).await?;
+        let new_announcements = HoprAnnouncements::deploy(client.clone()).await?;
 
         let deployer_vec: Vec<Address> = vec![self_address];
 

@@ -27,7 +27,7 @@ use std::{ops::Sub, str::FromStr};
 
 use alloy::primitives::{Address, U256, utils::parse_units};
 use clap::Parser;
-use hopr_bindings::hoprtoken::HoprToken;
+use hopr_bindings::hopr_token::HoprToken;
 use tracing::info;
 
 use crate::{

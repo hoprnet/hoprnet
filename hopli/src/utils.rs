@@ -17,21 +17,16 @@ use alloy::{
     transports::TransportErrorKind,
 };
 use hopr_bindings::{
-    hoprannouncements::{HoprAnnouncements, HoprAnnouncements::HoprAnnouncementsInstance},
-    hoprchannels::{HoprChannels, HoprChannels::HoprChannelsInstance},
-    hoprdummyproxyfornetworkregistry::{
-        HoprDummyProxyForNetworkRegistry, HoprDummyProxyForNetworkRegistry::HoprDummyProxyForNetworkRegistryInstance,
+    hopr_announcements::{HoprAnnouncements, HoprAnnouncements::HoprAnnouncementsInstance},
+    hopr_channels::{HoprChannels, HoprChannels::HoprChannelsInstance},
+    hopr_node_management_module::{
+        HoprNodeManagementModule, HoprNodeManagementModule::HoprNodeManagementModuleInstance,
     },
-    hoprnetworkregistry::HoprNetworkRegistry,
-    hoprnodemanagementmodule::{HoprNodeManagementModule, HoprNodeManagementModule::HoprNodeManagementModuleInstance},
-    hoprnodesaferegistry::{HoprNodeSafeRegistry, HoprNodeSafeRegistry::HoprNodeSafeRegistryInstance},
-    hoprnodestakefactory::{HoprNodeStakeFactory, HoprNodeStakeFactory::HoprNodeStakeFactoryInstance},
-    hoprsafeproxyfornetworkregistry::{
-        HoprSafeProxyForNetworkRegistry, HoprSafeProxyForNetworkRegistry::HoprSafeProxyForNetworkRegistryInstance,
-    },
-    hoprticketpriceoracle::{HoprTicketPriceOracle, HoprTicketPriceOracle::HoprTicketPriceOracleInstance},
-    hoprtoken::{HoprToken, HoprToken::HoprTokenInstance},
-    hoprwinningprobabilityoracle::{
+    hopr_node_safe_registry::{HoprNodeSafeRegistry, HoprNodeSafeRegistry::HoprNodeSafeRegistryInstance},
+    hopr_node_stake_factory::{HoprNodeStakeFactory, HoprNodeStakeFactory::HoprNodeStakeFactoryInstance},
+    hopr_ticket_price_oracle::{HoprTicketPriceOracle, HoprTicketPriceOracle::HoprTicketPriceOracleInstance},
+    hopr_token::{HoprToken, HoprToken::HoprTokenInstance},
+    hopr_winning_probability_oracle::{
         HoprWinningProbabilityOracle, HoprWinningProbabilityOracle::HoprWinningProbabilityOracleInstance,
     },
 };
@@ -184,24 +179,6 @@ pub fn a2h(a: hopr_primitive_types::prelude::Address) -> alloy::primitives::Addr
     alloy::primitives::Address::from_slice(a.as_ref())
 }
 
-#[derive(Debug, Clone)]
-pub enum NetworkRegistryProxy<P> {
-    Dummy(HoprDummyProxyForNetworkRegistryInstance<P>),
-    Safe(HoprSafeProxyForNetworkRegistryInstance<P>),
-}
-
-impl<P> NetworkRegistryProxy<P>
-where
-    P: alloy::providers::Provider + Clone,
-{
-    pub fn address(&self) -> hopr_primitive_types::prelude::Address {
-        match self {
-            NetworkRegistryProxy::Dummy(c) => h2a(*c.address()),
-            NetworkRegistryProxy::Safe(c) => h2a(*c.address()),
-        }
-    }
-}
-
 /// Holds instances to contracts.
 #[derive(Debug, Clone)]
 pub struct ContractInstances<P> {
@@ -293,7 +270,6 @@ where
         // Get deployer address
         let self_address = a2h(deployer.public().to_address());
 
-        let stake_factory = HoprNodeStakeFactory::deploy(provider.clone()).await?;
         let module_implementation = HoprNodeManagementModule::deploy(provider.clone()).await?;
         let safe_registry = HoprNodeSafeRegistry::deploy(provider.clone()).await?;
         let price_oracle = HoprTicketPriceOracle::deploy(
@@ -319,7 +295,15 @@ where
         .await?;
         let announcements = HoprAnnouncements::deploy(
             provider.clone(),
-            primitives::Address::from(safe_registry.address().as_ref()),
+            // primitives::Address::from(safe_registry.address().as_ref()),
+        )
+        .await?;
+        // TODO (QianchenYu): is this correct?
+        let stake_factory = HoprNodeStakeFactory::deploy(
+            provider.clone(),
+            primitives::Address::from(module_implementation.address().as_ref()),
+            primitives::Address::from(announcements.address().as_ref()),
+            self_address,
         )
         .await?;
 
@@ -338,53 +322,6 @@ where
     /// Deploys testing environment (with dummy network registry proxy) via the given provider.
     pub async fn deploy_for_testing(provider: P, deployer: &ChainKeypair) -> ContractResult<Self> {
         let instances = Self::inner_deploy_common_contracts_for_testing(provider.clone(), deployer).await?;
-
-        // Get deployer address
-        let self_address = a2h(deployer.public().to_address());
-        // Deploy network registry proxy
-        let network_registry_proxy = HoprDummyProxyForNetworkRegistry::deploy(provider.clone(), self_address).await?;
-        let network_registry = HoprNetworkRegistry::deploy(
-            provider.clone(),
-            primitives::Address::from(network_registry_proxy.address().as_ref()),
-            self_address,
-            self_address,
-        )
-        .await?;
-
-        // Disable network registry in local environment and wait for its confirmation
-        network_registry.disableRegistry().send().await?.watch().await?;
-
-        Ok(Self { ..instances })
-    }
-
-    /// Deploys testing environment (with dummy network registry proxy) via the given provider.
-    pub async fn deploy_for_testing_with_staking_proxy(provider: P, deployer: &ChainKeypair) -> ContractResult<Self> {
-        let instances = Self::inner_deploy_common_contracts_for_testing(provider.clone(), deployer).await?;
-
-        // Get deployer address
-        let self_address = a2h(deployer.public().to_address());
-        // Deploy network registry proxy
-        // TODO:
-        let network_registry_proxy = HoprSafeProxyForNetworkRegistry::deploy(
-            provider.clone(),
-            self_address,
-            self_address,
-            primitives::Uint::ZERO,
-            provider.get_block_number().await?.into(),
-            primitives::Address::from(instances.token.address().as_ref()),
-            primitives::Address::from(instances.safe_registry.address().as_ref()),
-        )
-        .await?;
-        let network_registry = HoprNetworkRegistry::deploy(
-            provider.clone(),
-            primitives::Address::from(network_registry_proxy.address().as_ref()),
-            self_address,
-            self_address,
-        )
-        .await?;
-
-        // Disable network registry in local environment and wait for its confirmation
-        network_registry.disableRegistry().send().await?.watch().await?;
 
         Ok(Self { ..instances })
     }
@@ -944,7 +881,7 @@ where
     debug!("default_target in u256 {:?}", U256::from_str(&default_target).unwrap());
 
     let typed_tx = HoprNodeStakeFactory::cloneCall {
-        moduleSingletonAddress: *instances.module_implementation.address(),
+        // moduleSingletonAddress: *instances.module_implementation.address(),
         admins: vec![a2h(self_address)],
         nonce: nonce.into(),
         defaultTarget: U256::from_str(&default_target).unwrap().into(),
@@ -957,10 +894,10 @@ where
     let instance_deployment_tx_receipt = instances
         .stake_factory
         .clone(
-            *instances.module_implementation.address(),
-            vec![a2h(self_address)],
+            //*instances.module_implementation.address(),
             nonce.into(),
             U256::from_str(&default_target).unwrap().into(),
+            vec![a2h(self_address)],
         )
         .send()
         .await?
