@@ -7,7 +7,7 @@ use hopr_chain_types::{ContractAddresses, ParsedHoprChainAction};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct BlokliTestStateBuilder(BlokliTestState);
 
 impl BlokliTestStateBuilder {

@@ -4501,7 +4501,7 @@ dependencies = [
  "env_logger",
  "hex",
  "hex-literal",
- "hopr-bindings 4.0.0",
+ "hopr-bindings",
  "hopr-chain-types",
  "hopr-crypto-keypair",
  "hopr-crypto-random",
@@ -4553,15 +4553,6 @@ dependencies = [
  "futures",
  "indexmap 2.12.0",
  "tokio",
-]
-
-[[package]]
-name = "hopr-bindings"
-version = "0.2.0"
-dependencies = [
- "alloy",
- "anyhow",
- "serde",
 ]
 
 [[package]]
@@ -4622,7 +4613,7 @@ dependencies = [
  "async-trait",
  "hex",
  "hex-literal",
- "hopr-bindings 4.0.0",
+ "hopr-bindings",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",

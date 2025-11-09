@@ -52,7 +52,7 @@ lazy_static! {
         .map(|(i, k)| (KeyIdent::from(i as u32), *k.public()))
         .collect::<BiHashMap<_, _>>();
 
-    static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestClient = hopr_chain_connector::testing::BlokliTestStateBuilder::default()
+    static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestStateBuilder = hopr_chain_connector::testing::BlokliTestStateBuilder::default()
         .with_accounts(PEERS.iter().enumerate().map(|(i, kp)| {
             let node_key = kp.public();
             let chain_key = PEERS_CHAIN[i].public();
@@ -66,8 +66,7 @@ lazy_static! {
         }))
         .with_channels(PEERS_CHAIN.iter().take(PEERS_CHAIN.len()-1).enumerate().map(|(i, cp)| {
             create_dummy_channel(cp.public().to_address(), PEERS_CHAIN[i+1].public().to_address())
-        }))
-        .build_static_client();
+        }));
 }
 
 fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
@@ -156,7 +155,7 @@ pub async fn peer_setup_for(
 
         node_db.start_ticket_processing(Some(received_ack_tickets_tx))?;
         let connector =
-            create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone(), Default::default()).await?;
+            create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone().build_static_client(), Default::default()).await?;
 
         hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
@@ -229,7 +228,7 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
 
 pub async fn resolve_mock_path(me: Address, peers_onchain: Vec<Address>) -> anyhow::Result<ValidatedPath> {
     let connector =
-        create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone(), Default::default()).await?;
+        create_trustful_hopr_blokli_connector(&PEERS_CHAIN[0], CHAIN_DATA.clone().build_static_client(), Default::default()).await?;
     let resolver = connector.as_path_resolver();
     Ok(ValidatedPath::new(me, ChainPath::new(peers_onchain)?, &resolver).await?)
 }

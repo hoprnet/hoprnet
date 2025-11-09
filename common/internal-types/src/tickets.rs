@@ -26,7 +26,8 @@ const ENCODED_WIN_PROB_LENGTH: usize = 7;
 /// Define the selector for the redeemTicketCall to avoid importing
 /// the entire hopr-bindings crate for one single constant.
 /// This value should be updated with the function interface changes.
-pub const REDEEM_CALL_SELECTOR: [u8; 4] = [252, 183, 121, 111];
+//pub const REDEEM_CALL_SELECTOR: [u8; 4] = [252, 183, 121, 111];
+pub const REDEEM_CALL_SELECTOR: [u8; 4] = [101, 227, 250, 114];
 
 /// Winning probability encoded in 7-byte representation
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
