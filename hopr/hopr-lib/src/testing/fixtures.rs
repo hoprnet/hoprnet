@@ -40,10 +40,10 @@ impl std::ops::Deref for ClusterGuard {
 }
 
 impl ClusterGuard {
-    /// Get oracle ticket price from chain
+    // /// Get oracle ticket price from chain
     // pub async fn get_oracle_ticket_price(&self) -> anyhow::Result<HoprBalance> {
     //     if let Some(instances) = &self.chain_env.contract_instances {
-    //         let price = instances
+    //         let price: HoprBalance = instances
     //             .price_oracle
     //             .currentTicketPrice()
     //             .call()

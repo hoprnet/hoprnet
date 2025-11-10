@@ -1,9 +1,10 @@
 use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
-use futures::AsyncWriteExt;
 use hopr_lib::{
-    HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget, SurbBalancerConfig,
+    HoprBalance, HoprTransportError, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
+    SurbBalancerConfig,
+    errors::HoprLibError,
     exports::transport::session::{IpOrHost, SealedHost},
     testing::{
         fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
@@ -117,7 +118,7 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 
     let ip = IpOrHost::from_str(":0")?;
 
-    let mut session = cluster_fixture[src]
+    let session = cluster_fixture[src]
         .inner()
         .connect_to(
             cluster_fixture[dst].address(),
@@ -141,16 +142,18 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
         .await
         .context("failed to keep alive session")?;
 
-    sleep(Duration::from_secs(2)).await;
+    sleep(Duration::from_secs(3)).await; // sleep longer than the session timeout
 
-    session
-        .write_all(b"ping")
-        .await
-        .context("failed to write to session before session sunsets")?;
-
-    sleep(Duration::from_secs(2)).await;
-
-    assert!(session.write_all(b"ping").await.is_err());
+    match cluster_fixture[src].inner().keep_alive_session(&session.id()).await {
+        Err(HoprLibError::TransportError(HoprTransportError::Session(hopr_lib::TransportSessionError::Manager(
+            hopr_lib::SessionManagerError::NonExistingSession,
+        )))) => {}
+        Err(e) => panic!(
+            "expected SessionNotFound error when keeping alive session, but got different error: {:?}",
+            e
+        ),
+        Ok(_) => panic!("expected error when keeping alive session, but got Ok"),
+    }
 
     Ok(())
 }
