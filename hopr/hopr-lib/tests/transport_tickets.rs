@@ -377,7 +377,7 @@ async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
 #[tokio::test]
 #[serial]
 #[cfg(feature = "session-client")]
-async fn test_relay_with_winn_prob_higher_than_min_win_prob_should_succeed(
+async fn relay_with_winn_prob_higher_than_min_win_prob_should_succeed(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     cluster_fixture.update_winning_probability(0.1).await?;

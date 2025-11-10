@@ -29,9 +29,12 @@ impl TestedHopr {
         auto_redeems: bool,
         winn_prob: Option<f64>,
     ) -> Self {
-        // To properly run, tests rely on HOPR_TEST_DISABLE_CHECKS being set
-        if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
-            panic!("HOPR_TEST_DISABLE_CHECKS envvar must be set for tests");
+        #[cfg(test)]
+        {
+            // To properly run, tests rely on HOPR_TEST_DISABLE_CHECKS being set
+            if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
+                panic!("HOPR_TEST_DISABLE_CHECKS envvar must be set for tests");
+            }
         }
 
         let instance = Hopr::new(
@@ -138,8 +141,6 @@ impl TestedHopr {
 ///
 /// Cleans up the opened channels on drop.
 pub struct ChannelGuard {
-    /// Prepared for the implementation of Drop and closing
-    #[allow(dead_code)]
     pub channels: Vec<(Arc<Hopr>, Hash)>,
 }
 
@@ -148,7 +149,6 @@ impl ChannelGuard {
         &self.channels[index].1
     }
 
-    #[must_use]
     pub async fn try_open_channels_for_path<I, T>(path: I, funding: HoprBalance) -> anyhow::Result<Self>
     where
         I: IntoIterator<Item = T>,
@@ -175,7 +175,6 @@ impl ChannelGuard {
         Ok(Self { channels })
     }
 
-    #[must_use]
     pub async fn try_to_get_all_ticket_counts(&self) -> anyhow::Result<Vec<usize>> {
         let futures = self.channels.iter().map(|(hopr, channel_id)| {
             let hopr = hopr.clone();
@@ -193,7 +192,6 @@ impl ChannelGuard {
         Ok(stats)
     }
 
-    #[must_use]
     pub async fn try_close_channels_all_channels(&self) -> anyhow::Result<()> {
         let futures = self.channels.iter().map(|(hopr, channel_id)| {
             let hopr = hopr.clone();
@@ -207,5 +205,16 @@ impl ChannelGuard {
 
         join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
         Ok(())
+    }
+}
+
+impl Drop for ChannelGuard {
+    fn drop(&mut self) {
+        let channels = self.channels.clone();
+        tokio::spawn(async move {
+            for (hopr, channel_id) in channels {
+                let _ = hopr.close_channel_by_id(&channel_id).await;
+            }
+        });
     }
 }

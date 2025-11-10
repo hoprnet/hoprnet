@@ -87,23 +87,32 @@ pub struct TestChainEnv {
     pub contract_addresses: Option<ContractAddresses>,
 }
 
+#[derive(Clone, smart_default::SmartDefault)]
+
+pub struct TestChainEnvConfig {
+    #[default(Duration::from_millis(1000))]
+    pub block_time: Duration,
+    #[default(2)]
+    pub finality: u32,
+    #[default(None)]
+    pub from_file: Option<String>,
+    #[default(None)]
+    pub snapshot_requestor: Option<SnapshotRequestor>,
+    #[default(None)]
+    pub network: Option<Network>,
+}
+
 /// Deploys Anvil and all HOPR smart contracts as a testing environment
-pub async fn deploy_test_environment(
-    block_time: Duration,
-    finality: u32,
-    requestor: Option<SnapshotRequestor>,
-    from_file: Option<&str>,
-    network: Option<Network>,
-) -> anyhow::Result<TestChainEnv> {
-    let anvil: AnvilInstance = create_anvil(Some(block_time));
+pub async fn deploy_test_environment(config: TestChainEnvConfig) -> anyhow::Result<TestChainEnv> {
+    let anvil: AnvilInstance = create_anvil(Some(config.block_time));
     info!(url=%anvil.endpoint_url(), "Anvil started");
 
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-    let provider = create_provider_to_anvil_with_snapshot(&anvil, &contract_deployer, requestor);
+    let provider = create_provider_to_anvil_with_snapshot(&anvil, &contract_deployer, config.snapshot_requestor);
 
-    if from_file.is_some() && std::path::Path::new(from_file.unwrap()).exists() {
-        let f = from_file.unwrap();
+    if config.from_file.is_some() && std::path::Path::new(&config.from_file.clone().unwrap()).exists() {
+        let f = config.from_file.unwrap();
         info!("Loading Anvil state from file: {f}");
         let state = std::fs::read(f).context("failed to read anvil state from file")?;
         let state_bytes: Bytes = Bytes::from(state);
@@ -114,7 +123,7 @@ pub async fn deploy_test_environment(
             .context("failed to load anvil state from file")?;
 
         // if network is not none, we can construct contract instances from addresses
-        let (contract_addresses, contract_instances) = if let Some(network) = network {
+        let (contract_addresses, contract_instances) = if let Some(network) = config.network {
             let contract_addresses: ContractAddresses = (&network.addresses).into();
             let contract_instances = ContractInstances::new(&contract_addresses, provider.clone(), true);
             (Some(contract_addresses), Some(contract_instances))
@@ -148,7 +157,7 @@ pub async fn deploy_test_environment(
         )
         .await;
 
-        sleep((1 + finality) * block_time).await;
+        sleep((1 + config.finality) * config.block_time).await;
 
         Ok(TestChainEnv {
             contract_deployer,

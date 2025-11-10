@@ -58,7 +58,7 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyho
 #[rstest]
 #[tokio::test]
 #[serial]
-async fn test_safe_and_module_shouldnt_change(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn safe_and_module_shouldnt_change(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [idx] = exclusive_indexes::<1>();
     let safe_address = cluster_fixture[idx].inner().get_safe_config();
 
@@ -131,7 +131,7 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
 #[rstest]
 #[tokio::test]
 #[serial]
-async fn test_channel_funding_should_be_visible_in_channel_stake(
+async fn channel_funding_should_be_visible_in_channel_stake(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     use hopr_lib::HoprBalance;
@@ -250,7 +250,26 @@ async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> a
 #[rstest]
 #[tokio::test]
 #[serial]
-async fn test_check_ticket_price_is_default(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn ticket_price_is_set_to_non_zero_value_on_start(
+    #[future(awt)] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
+    let [node] = exclusive_indexes::<1>();
+
+    let ticket_price = cluster_fixture[node]
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+
+    assert!(ticket_price > hopr_lib::HoprBalance::zero());
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [node] = exclusive_indexes::<1>();
 
     let ticket_price = cluster_fixture[node]
@@ -276,8 +295,7 @@ async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: Cluster
         .await
         .context("failed to get winning probability")?;
 
-    assert!(winning_prob.as_f64() > 0.0);
-    assert!(winning_prob.as_f64() <= 1.0);
+    assert!(winning_prob.as_f64() == 1.0);
 
     Ok(())
 }

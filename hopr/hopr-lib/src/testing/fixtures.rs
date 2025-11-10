@@ -17,7 +17,7 @@ use crate::{
     Address, ProtocolsConfig,
     state::HoprState,
     testing::{
-        chain::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node},
+        chain::{NodeSafeConfig, TestChainEnv, TestChainEnvConfig, deploy_test_environment, onboard_node},
         dummies::EchoServer,
         hopr::{ChannelGuard, TestedHopr},
     },
@@ -40,6 +40,23 @@ impl std::ops::Deref for ClusterGuard {
 }
 
 impl ClusterGuard {
+    /// Get oracle ticket price from chain
+    // pub async fn get_oracle_ticket_price(&self) -> anyhow::Result<HoprBalance> {
+    //     if let Some(instances) = &self.chain_env.contract_instances {
+    //         let price = instances
+    //             .price_oracle
+    //             .currentTicketPrice()
+    //             .call()
+    //             .await
+    //             .map(|v| HoprBalance::from(U256::from_be_bytes(v.to_be_bytes::<32>())))?;
+
+    //         Ok(price)
+    //     } else {
+    //         info!("Contract instances not available, cannot get oracle ticket price");
+    //         Err(anyhow::anyhow!("Contract instances not available"))
+    //     }
+    // }
+
     /// Update winning probability in anvil
     pub async fn update_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
         let epsilon: f64 = 0.000001;
@@ -192,13 +209,11 @@ pub async fn chainenv_fixture() -> TestChainEnv {
         &std::fs::read_to_string(PATH_TO_PROTOCOL_CONFIG).expect("failed to read protocol config file"),
     )
     .expect("failed to parse protocol config");
-    let res = deploy_test_environment(
-        Duration::from_secs(1),
-        2,
-        None,
-        Some(load_file.as_str()),
-        Some(protocol_config.networks["anvil-localhost"].clone()),
-    )
+    let res = deploy_test_environment(TestChainEnvConfig {
+        from_file: Some(load_file),
+        network: Some(protocol_config.networks["anvil-localhost"].clone()),
+        ..Default::default()
+    })
     .await;
 
     match res {

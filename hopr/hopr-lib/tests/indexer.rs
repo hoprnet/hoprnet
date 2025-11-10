@@ -30,7 +30,8 @@ use hopr_db_node::HoprNodeDb;
 use hopr_db_sql::{logs::HoprDbLogOperations, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_lib::testing::chain::{
-    NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
+    NodeSafeConfig, TestChainEnv, TestChainEnvConfig, create_rpc_client_to_anvil_with_snapshot,
+    deploy_test_environment, onboard_node,
 };
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
@@ -251,7 +252,13 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     let finality = 2;
 
-    let chain_env = deploy_test_environment(block_time, finality, Some(requestor_base), None, None).await?;
+    let chain_env = deploy_test_environment(TestChainEnvConfig {
+        block_time,
+        finality,
+        snapshot_requestor: Some(requestor_base),
+        ..Default::default()
+    })
+    .await?;
 
     let mut safe_cfgs = [NodeSafeConfig::default(); 2];
     safe_cfgs[0] = onboard_node(&chain_env, &alice_chain_key, U256::from(10_u32), U256::from(10_000_u32)).await;
