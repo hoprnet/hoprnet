@@ -48,7 +48,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.42", default-features = false, features = [
+alloy = { version = "=1.1.0", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -59,7 +59,7 @@ alloy = { version = "=1.0.42", default-features = false, features = [
 anyhow = "1.0.100"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-async-compression = "0.4.32"
+async-compression = "0.4.33"
 async-lock = "3.4.1"
 async-signal = "0.2.13"
 async-stream = "0.3.6"
@@ -97,7 +97,7 @@ float-cmp = "0.10.0"
 futures = "0.3.31"
 futures-concurrency = "7.6.3"
 futures-timer = "3.0.3"
-futures-time = "3.0.0"
+futures-time = "3.0.1"
 futures-util = "0.3"
 generic-array = "1.3.5"
 hashbrown = "0.16.0"
@@ -131,7 +131,7 @@ opentelemetry-otlp = { version = "0.31.0", default-features = false }
 opentelemetry_sdk = { version = "0.31.0" }
 tracing-opentelemetry = { version = "0.32.0" }
 temp-env = "0.3.6"
-parameterized = "2.0.0"
+parameterized = "2.1.0"
 parking_lot = "0.12.5"
 pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", features = ["serde-1"] }
@@ -213,7 +213,7 @@ tower-http = { version = "0.6.6", features = [
   "sensitive-headers",
 ] }
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
-oas3 = "0.19.0"
+oas3 = "0.20.0"
 urlencoding = "2.1.3"
 utoipa = { version = "5.4.0" }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
