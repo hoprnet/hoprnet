@@ -299,8 +299,8 @@ pub(super) async fn redeem_tickets_in_channel(
 
     match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, 0).await {
-            Ok(count) if count > 0 => (StatusCode::NO_CONTENT, "").into_response(),
-            Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+            Ok(_) => (StatusCode::NO_CONTENT, "").into_response(),
+            // Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
             Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }

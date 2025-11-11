@@ -13,7 +13,6 @@ use hopr_primitive_types::prelude::{Address, HoprBalance};
 use petgraph::prelude::DiGraphMap;
 
 use crate::{
-    TempDbBackend,
     backend::Backend,
     connector::{
         keys::HoprKeyMapper,
@@ -309,10 +308,10 @@ where
     P: PayloadGenerator + Send + Sync,
     P::TxRequest: Send + Sync,
 {
-    async fn send_tx(
-        &self,
+    async fn send_tx<'a>(
+        &'a self,
         tx_req: P::TxRequest,
-    ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send, ConnectorError> {
+    ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
         Ok(self
             .sequencer
             .enqueue_transaction(tx_req, self.cfg.tx_confirm_timeout)

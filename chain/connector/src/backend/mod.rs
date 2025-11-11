@@ -41,8 +41,10 @@ pub struct InMemoryBackend {
     channels: std::sync::Arc<dashmap::DashMap<ChannelId, ChannelEntry, ahash::RandomState>>,
 }
 
+#[cfg(any(test, feature = "testing"))]
 const DEFAULT_INMEMORY_BACKEND_CAPACITY: usize = 1024;
 
+#[cfg(any(test, feature = "testing"))]
 impl Default for InMemoryBackend {
     fn default() -> Self {
         Self {
@@ -60,6 +62,7 @@ impl Default for InMemoryBackend {
     }
 }
 
+#[cfg(any(test, feature = "testing"))]
 impl Backend for InMemoryBackend {
     type Error = std::convert::Infallible;
 

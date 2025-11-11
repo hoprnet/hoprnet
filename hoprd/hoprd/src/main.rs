@@ -2,7 +2,7 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
-use hopr_chain_connector::{HoprBlockchainConnector, blokli_client::BlokliClient};
+use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::{
     AbortableList, AcknowledgedTicket, Address, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
@@ -198,7 +198,7 @@ async fn init_db(
     Ok((node_db, on_ack_tkt_rx))
 }
 
-fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlockchainConnector<BlokliClient>>> {
+fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlockchainSafeConnector<BlokliClient>>> {
     // TODO: instantiate the connector properly
     info!("initiating Blokli connector");
     Ok(Arc::new(hopr_chain_connector::create_trustless_hopr_blokli_connector(
@@ -212,7 +212,7 @@ fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlo
 
 async fn init_rest_api(
     cfg: &HoprdConfig,
-    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlockchainConnector<BlokliClient>>, HoprNodeDb>>,
+    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, HoprNodeDb>>,
 ) -> anyhow::Result<AbortableList<HoprdProcess>> {
     let node_cfg_value = serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
@@ -344,13 +344,6 @@ async fn main_inner() -> anyhow::Result<()> {
         .await?,
     );
 
-    let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
-        cfg.strategy.clone(),
-        chain_connector.clone(),
-        node_db.clone(),
-    ));
-    debug!(strategies = ?multi_strategy, "initialized strategies");
-
     let mut processes = AbortableList::<HoprdProcess>::default();
 
     if cfg.api.enable {
@@ -364,6 +357,13 @@ async fn main_inner() -> anyhow::Result<()> {
             cfg.session_ip_forwarding,
         ))
         .await?;
+
+    let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
+        cfg.strategy.clone(),
+        chain_connector.clone(),
+        node.redemption_requests()?,
+    ));
+    debug!(strategies = ?multi_strategy, "initialized strategies");
 
     processes.flat_map_extend_from(hopr_lib_processes, HoprdProcess::HoprLib);
 

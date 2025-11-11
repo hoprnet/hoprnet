@@ -1,6 +1,6 @@
 //! ## Multi Strategy
 //!
-//! This strategy can stack multiple above strategies (called sub-strategies in this context) into one.
+//! This strategy can stack the multiple strategies (called sub-strategies in this context) into one.
 //! Once a strategy event is triggered, it is executed sequentially on the sub-strategies one by one.
 //! The strategy can be configured to not call the next sub-strategy event if the sub-strategy currently being executed
 //! failed, which is done by setting the `on_fail_continue` flag.
@@ -8,24 +8,26 @@
 //! Hence, the sub-strategy chain then can behave as a logical AND (`on_fail_continue` = `false`) execution chain
 //! or logical OR (`on_fail_continue` = `true`) execution chain.
 //!
-//! A Multi Strategy can also contain another Multi Strategy as a sub-strategy if `allow_recursive` flag is set.
+//! A Multi Strategy can also contain another Multi Strategy as a sub-strategy if the ` allow_recursive ` flag is set.
 //! However, this recursion is always allowed up to 2 levels only.
 //! Along with the `on_fail_continue` value, the recursive feature allows constructing more complex logical strategy
 //! chains.
 //!
-//! The MultiStrategy can also observe channels being `PendingToClose` and running out of closure grace period,
+//! The MultiStrategy can also observe channels being `PendingToClose` and running out of a closure grace period,
 //! and if this happens, it will issue automatically the final close transaction, which transitions the state to
 //! `Closed`. This can be controlled by the `finalize_channel_closure` parameter.
 //!
-//! For details on default parameters see [MultiStrategyConfig].
+//! For details on default parameters see [`MultiStrategyConfig`].
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_api::{
-    chain::{ChainReadChannelOperations, ChainValues, ChainWriteChannelOperations, ChainWriteTicketOperations},
-    db::HoprDbTicketOperations,
+use hopr_lib::{
+    AcknowledgedTicket, ChannelChange, ChannelDirection, ChannelEntry,
+    exports::api::{
+        chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
+        db::TicketSelector,
+    },
 };
-use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -34,8 +36,11 @@ use tracing::{error, warn};
 use validator::{Validate, ValidationError};
 
 use crate::{
-    Strategy, auto_funding::AutoFundingStrategy, auto_redeeming::AutoRedeemingStrategy,
-    channel_finalizer::ClosureFinalizerStrategy, errors::Result,
+    Strategy,
+    auto_funding::AutoFundingStrategy,
+    auto_redeeming::AutoRedeemingStrategy,
+    channel_finalizer::ClosureFinalizerStrategy,
+    errors::{Result, StrategyError},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -145,18 +150,13 @@ pub struct MultiStrategy {
 
 impl MultiStrategy {
     /// Constructs new `MultiStrategy`.
+    ///
     /// The strategy can contain another `MultiStrategy` if `allow_recursive` is set.
-    pub fn new<A, Db>(cfg: MultiStrategyConfig, hopr_chain_actions: A, node_db: Db) -> Self
+    pub fn new<A, R>(cfg: MultiStrategyConfig, hopr_chain_actions: A, redeem_sink: R) -> Self
     where
-        A: ChainReadChannelOperations
-            + ChainWriteChannelOperations
-            + ChainWriteTicketOperations
-            + ChainValues
-            + Clone
-            + Send
-            + Sync
-            + 'static,
-        Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
+        A: ChainReadChannelOperations + ChainWriteChannelOperations + Clone + Send + Sync + 'static,
+        R: futures::Sink<TicketSelector> + Sync + Send + Clone + 'static,
+        StrategyError: From<R::Error>,
     {
         let mut strategies = Vec::<Box<dyn SingularStrategy + Send + Sync>>::new();
 
@@ -170,7 +170,7 @@ impl MultiStrategy {
                 Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
                     *sub_cfg,
                     hopr_chain_actions.clone(),
-                    node_db.clone(),
+                    redeem_sink.clone(),
                 ))),
                 Strategy::AutoFunding(sub_cfg) => {
                     strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, hopr_chain_actions.clone())))
@@ -187,7 +187,7 @@ impl MultiStrategy {
                         strategies.push(Box::new(Self::new(
                             cfg_clone,
                             hopr_chain_actions.clone(),
-                            node_db.clone(),
+                            redeem_sink.clone(),
                         )))
                     } else {
                         error!("recursive multi-strategy not allowed and skipped")

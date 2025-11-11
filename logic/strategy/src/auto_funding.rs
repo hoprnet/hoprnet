@@ -7,9 +7,10 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_api::chain::ChainWriteChannelOperations;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_lib::{
+    ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, HoprBalance,
+    exports::api::chain::ChainWriteChannelOperations,
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::info;

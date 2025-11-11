@@ -6,8 +6,10 @@ use std::{
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector, Utc};
-use hopr_internal_types::prelude::*;
+use hopr_lib::{
+    ChannelStatusDiscriminants, Utc,
+    exports::api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DurationSeconds, serde_as};
 use tracing::{debug, error, info};

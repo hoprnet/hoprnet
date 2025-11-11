@@ -36,12 +36,9 @@ use std::{ops::Sub, str::FromStr, time::Duration};
 
 use futures::{StreamExt, pin_mut};
 use futures_concurrency::stream::Merge;
-use hopr_api::chain::ChainEvent;
-use hopr_internal_types::{
-    channels::ChannelStatus,
-    prelude::{AcknowledgedTicket, ChannelChange},
+use hopr_lib::{
+    AcknowledgedTicket, Address, ChannelChange, ChannelStatus, HoprBalance, exports::api::chain::ChainEvent,
 };
-use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 

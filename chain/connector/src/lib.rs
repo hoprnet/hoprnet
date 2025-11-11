@@ -4,7 +4,9 @@ pub mod errors;
 #[cfg(feature = "testing")]
 pub mod testing;
 
-pub use backend::{Backend, InMemoryBackend, TempDbBackend};
+#[cfg(feature = "testing")]
+pub use backend::InMemoryBackend;
+pub use backend::{Backend, TempDbBackend};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
 
 /// Re-exports of the `blokli_client` crate.
@@ -20,7 +22,12 @@ pub use hopr_crypto_types::prelude::ChainKeypair;
 pub use hopr_primitive_types::prelude::Address;
 
 /// Connector to HOPR on-chain contracts that uses multisig Safe as a signer and [`TempDbBackend`].
-pub type HoprBlockchainSafeConnector<C> = HoprBlockchainConnector<C, TempDbBackend, SafePayloadGenerator, <SafePayloadGenerator as PayloadGenerator>::TxRequest>;
+pub type HoprBlockchainSafeConnector<C> = HoprBlockchainConnector<
+    C,
+    TempDbBackend,
+    SafePayloadGenerator,
+    <SafePayloadGenerator as PayloadGenerator>::TxRequest,
+>;
 
 /// Convenience function to create [`HoprBlokliConnector`] with own contract addresses.
 ///

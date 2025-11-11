@@ -74,11 +74,11 @@ pub mod prelude {
 
 use std::{
     convert::identity,
-    sync::{Arc, atomic::Ordering},
+    sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
 
-use futures::{FutureExt, StreamExt, TryFutureExt, channel::mpsc::channel};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, channel::mpsc::channel};
 use futures_concurrency::stream::Chain;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
@@ -185,6 +185,7 @@ pub struct Hopr<Chain, Db> {
     cfg: config::HoprLibConfig,
     state: Arc<state::AtomicHoprState>,
     transport_api: HoprTransport<Db, Chain>,
+    redeem_requests: std::sync::OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
     chain_api: Chain,
 }
@@ -251,6 +252,7 @@ where
             transport_api: hopr_transport_api,
             chain_api: hopr_chain_api,
             node_db: hopr_node_db,
+            redeem_requests: OnceLock::new(),
         })
     }
 
@@ -585,6 +587,21 @@ where
                     )
                 }),
         );
+
+        let (redemption_req_tx, redemption_req_rx) = channel::<TicketSelector>(1024);
+        let _ = self.redeem_requests.set(redemption_req_tx);
+        let chain = self.chain_api.clone();
+        let node_db = self.node_db.clone();
+        spawn(redemption_req_rx.for_each(move |selector| {
+            let chain = chain.clone();
+            let db = node_db.clone();
+            async move {
+                match chain.redeem_tickets_via_selector(&db, selector).await {
+                    Ok(res) => info!(%res, "redemption complete"),
+                    Err(error) => error!(%error, "redemption failed"),
+                }
+            }
+        }));
 
         // NOTE: after the chain is synced, we can reset tickets which are considered
         // redeemed but on-chain state does not align with that. This implies there was a problem
@@ -1049,6 +1066,23 @@ where
             .map_err(HoprLibError::chain)
     }
 
+    pub fn redemption_requests(
+        &self,
+    ) -> errors::Result<impl futures::Sink<TicketSelector, Error = HoprLibError> + Clone> {
+        self.error_if_not_in_state(
+            state::HoprState::Running,
+            "Node is not ready for on-chain operations".into(),
+        )?;
+
+        // TODO: add universal timeout sink here
+        Ok(self
+            .redeem_requests
+            .get()
+            .cloned()
+            .expect("redeem_requests is not initialized")
+            .sink_map_err(HoprLibError::other))
+    }
+
     pub async fn redeem_all_tickets<B: Into<HoprBalance>>(&self, min_value: B) -> errors::Result<()> {
         self.error_if_not_in_state(
             state::HoprState::Running,
@@ -1056,10 +1090,7 @@ where
         )?;
 
         let min_value = min_value.into();
-        let chain_api = self.chain_api.clone();
-        let node_db = self.node_db.clone();
 
-        // Does not need to be done concurrently, because we do not await each channel's redemption
         self.chain_api
             .stream_channels(
                 ChannelSelector::default()
@@ -1071,26 +1102,14 @@ where
             )
             .map_err(HoprLibError::chain)
             .await?
-            .for_each(|channel| {
-                let chain_api = chain_api.clone();
-                let node_db = node_db.clone();
-                async move {
-                    match redeem_tickets_via_selector(
-                        TicketSelector::from(&channel)
-                            .with_amount(min_value..)
-                            .with_index_range(channel.ticket_index.as_u64()..)
-                            .with_state(AcknowledgedTicketStatus::Untouched),
-                        &node_db,
-                        &chain_api,
-                    )
-                    .await
-                    {
-                        Ok((count, _)) => info!(count, %channel, "redeemed tickets in channel"),
-                        Err(error) => error!(%error, %channel, "failed to redeem tickets"),
-                    }
-                }
+            .map(|channel| {
+                Ok(TicketSelector::from(&channel)
+                    .with_amount(min_value..)
+                    .with_index_range(channel.ticket_index.as_u64()..)
+                    .with_state(AcknowledgedTicketStatus::Untouched))
             })
-            .await;
+            .forward(self.redemption_requests()?)
+            .await?;
 
         Ok(())
     }
@@ -1099,7 +1118,7 @@ where
         &self,
         counterparty: &Address,
         min_value: B,
-    ) -> errors::Result<usize> {
+    ) -> errors::Result<()> {
         self.redeem_tickets_in_channel(&generate_channel_id(counterparty, &self.me_onchain()), min_value)
             .await
     }
@@ -1108,7 +1127,7 @@ where
         &self,
         channel_id: &Hash,
         min_value: B,
-    ) -> errors::Result<usize> {
+    ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let channel = self
@@ -1118,18 +1137,16 @@ where
             .map_err(HoprLibError::chain)?
             .ok_or(HoprLibError::GeneralError("Channel not found".into()))?;
 
-        let (len, _) = redeem_tickets_via_selector(
-            TicketSelector::from(channel)
-                .with_amount(min_value.into()..)
-                .with_index_range(channel.ticket_index.as_u64()..)
-                .with_state(AcknowledgedTicketStatus::Untouched),
-            &self.node_db,
-            &self.chain_api,
-        )
-        .await
-        .map_err(|e| HoprLibError::GeneralError(e.to_string()))?;
+        self.redemption_requests()?
+            .send(
+                TicketSelector::from(channel)
+                    .with_amount(min_value.into()..)
+                    .with_index_range(channel.ticket_index.as_u64()..)
+                    .with_state(AcknowledgedTicketStatus::Untouched),
+            )
+            .await?;
 
-        Ok(len)
+        Ok(())
     }
 
     pub async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> errors::Result<()> {
