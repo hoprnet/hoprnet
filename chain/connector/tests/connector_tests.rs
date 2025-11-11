@@ -84,8 +84,13 @@ async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<(
 
     let me = ChainKeypair::random();
 
-    let mut connector =
-        create_trustful_hopr_blokli_connector(&me, mock_client, Address::new(&[2u8; Address::SIZE])).await?;
+    let mut connector = create_trustful_hopr_blokli_connector(
+        &me,
+        Default::default(),
+        mock_client,
+        Address::new(&[2u8; Address::SIZE]),
+    )
+    .await?;
 
     connector.connect(Duration::from_secs(5)).await?;
 

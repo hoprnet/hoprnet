@@ -1,25 +1,40 @@
 mod tempdb;
 
-use hopr_api::chain::HoprKeyIdent;
-use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_internal_types::{
+pub use hopr_api::chain::HoprKeyIdent;
+pub use hopr_crypto_types::prelude::OffchainPublicKey;
+pub use hopr_internal_types::{
     account::AccountEntry,
     channels::{ChannelEntry, ChannelId},
 };
-use hopr_primitive_types::prelude::Address;
+pub use hopr_primitive_types::prelude::Address;
 
+/// Represents a cache backend for the connector.
 pub trait Backend {
     type Error: std::error::Error + Send + Sync + 'static;
+    /// Inserts an [`AccountEntry`] into the backend.
+    ///
+    /// Returns the old value if one was present in the backend before.
     fn insert_account(&self, entry: AccountEntry) -> Result<Option<AccountEntry>, Self::Error>;
+    /// Inserts a [`ChannelEntry`] into the backend.
+    ///
+    /// Returns the old value if one was present in the backend before.
     fn insert_channel(&self, channel: ChannelEntry) -> Result<Option<ChannelEntry>, Self::Error>;
+    /// Retrieves an [`AccountEntry`] by [`HoprKeyIdent`].
     fn get_account_by_id(&self, id: &HoprKeyIdent) -> Result<Option<AccountEntry>, Self::Error>;
+    /// Retrieves an [`AccountEntry`] by [`OffchainPublicKey`].
     fn get_account_by_key(&self, key: &OffchainPublicKey) -> Result<Option<AccountEntry>, Self::Error>;
+    /// Retrieves an [`AccountEntry`] by an on-chain [`Address`].
     fn get_account_by_address(&self, chain_key: &Address) -> Result<Option<AccountEntry>, Self::Error>;
+    /// Retrieves a [`ChannelEntry`] by its [`ChannelId`].
     fn get_channel_by_id(&self, id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error>;
 }
 
 pub use tempdb::TempDbBackend;
 
+/// Represents a backend that stores all data in-memory.
+///
+/// This is useful mainly for testing.
+#[cfg(any(test, feature = "testing"))]
 #[derive(Clone)]
 pub struct InMemoryBackend {
     accounts: std::sync::Arc<dashmap::DashMap<HoprKeyIdent, AccountEntry, ahash::RandomState>>,

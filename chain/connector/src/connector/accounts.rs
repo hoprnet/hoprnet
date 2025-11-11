@@ -14,7 +14,7 @@ use hopr_primitive_types::prelude::*;
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
 #[async_trait::async_trait]
-impl<B, C, P, R> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<C, R, B, P>
+impl<B, C, P, R> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<C, B, P, R>
 where
     B: Backend + Send + Sync + 'static,
     C: BlokliQueryClient + Send + Sync + 'static,
@@ -110,7 +110,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<C, P::TxRequest, B, P>
+impl<B, C, P> hopr_api::chain::ChainWriteAccountOperations for HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
     B: Send + Sync,
     C: BlokliTransactionClient + BlokliQueryClient + Send + Sync + 'static,
@@ -155,7 +155,7 @@ where
                     .map_err(|e| AnnouncementError::ProcessingError(ConnectorError::OtherError(e.into())))?,
                 existing_account
                     .map(|_| HoprBalance::zero())
-                    .unwrap_or(HoprBalance::from_str("0.01 wxHOPR").unwrap()),
+                    .unwrap_or(self.cfg.new_key_binding_fee),
             )
             .map_err(|e| AnnouncementError::ProcessingError(ConnectorError::from(e)))?;
 

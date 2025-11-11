@@ -9,7 +9,7 @@ use hopr_primitive_types::prelude::*;
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
 #[async_trait::async_trait]
-impl<B, C, P, R> hopr_api::chain::ChainReadChannelOperations for HoprBlockchainConnector<C, R, B, P>
+impl<B, C, P, R> hopr_api::chain::ChainReadChannelOperations for HoprBlockchainConnector<C, B, P, R>
 where
     B: Backend + Send + Sync + 'static,
     C: Send + Sync,
@@ -111,7 +111,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainWriteChannelOperations for HoprBlockchainConnector<C, P::TxRequest, B, P>
+impl<B, C, P> hopr_api::chain::ChainWriteChannelOperations for HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
     B: Backend + Send + Sync + 'static,
     C: BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,

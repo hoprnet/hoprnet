@@ -22,7 +22,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, R, C, P> hopr_api::chain::ChainValues for HoprBlockchainConnector<C, R, B, P>
+impl<B, R, C, P> hopr_api::chain::ChainValues for HoprBlockchainConnector<C, B, P, R>
 where
     B: Send + Sync,
     C: BlokliQueryClient + Send + Sync + 'static,

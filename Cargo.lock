@@ -4539,6 +4539,7 @@ dependencies = [
  "petgraph",
  "redb",
  "serde_json",
+ "smart-default",
  "tempfile",
  "thiserror 2.0.17",
  "tokio",

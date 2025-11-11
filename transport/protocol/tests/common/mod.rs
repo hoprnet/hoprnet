@@ -156,6 +156,7 @@ pub async fn peer_setup_for(
         node_db.start_ticket_processing(Some(received_ack_tickets_tx))?;
         let connector = create_trustful_hopr_blokli_connector(
             &PEERS_CHAIN[0],
+            Default::default(),
             CHAIN_DATA.clone().build_static_client(),
             Default::default(),
         )
@@ -233,6 +234,7 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
 pub async fn resolve_mock_path(me: Address, peers_onchain: Vec<Address>) -> anyhow::Result<ValidatedPath> {
     let connector = create_trustful_hopr_blokli_connector(
         &PEERS_CHAIN[0],
+        Default::default(),
         CHAIN_DATA.clone().build_static_client(),
         Default::default(),
     )

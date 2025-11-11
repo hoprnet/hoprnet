@@ -5,7 +5,7 @@ pub mod errors;
 pub mod testing;
 
 pub use backend::{Backend, InMemoryBackend, TempDbBackend};
-pub use connector::HoprBlockchainConnector;
+pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
 
 /// Re-exports of the `blokli_client` crate.
 pub mod blokli_client {
@@ -19,13 +19,15 @@ pub use hopr_chain_types::prelude::{ContractAddresses, PayloadGenerator, SafePay
 pub use hopr_crypto_types::prelude::ChainKeypair;
 pub use hopr_primitive_types::prelude::Address;
 
-type HoprBlockchainSafeConnector<C> = HoprBlockchainConnector<C, <SafePayloadGenerator as PayloadGenerator>::TxRequest>;
+/// Connector to HOPR on-chain contracts that uses multisig Safe as a signer and [`TempDbBackend`].
+pub type HoprBlockchainSafeConnector<C> = HoprBlockchainConnector<C, TempDbBackend, SafePayloadGenerator, <SafePayloadGenerator as PayloadGenerator>::TxRequest>;
 
 /// Convenience function to create [`HoprBlokliConnector`] with own contract addresses.
 ///
 /// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::SafePayloadGenerator`]
 pub fn create_trustless_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
+    cfg: BlockchainConnectorConfig,
     client: C,
     module_address: Address,
     contracts: ContractAddresses,
@@ -42,6 +44,7 @@ where
 
     Ok(HoprBlockchainConnector::new(
         chain_key.clone(),
+        cfg,
         client,
         TempDbBackend::new()?,
         payload_gen,
@@ -57,6 +60,7 @@ where
 /// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::SafePayloadGenerator`]
 pub async fn create_trustful_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
+    cfg: BlockchainConnectorConfig,
     client: C,
     module_address: Address,
 ) -> Result<HoprBlockchainSafeConnector<C>, errors::ConnectorError>
@@ -76,6 +80,7 @@ where
 
     Ok(HoprBlockchainConnector::new(
         chain_key.clone(),
+        cfg,
         client,
         TempDbBackend::new()?,
         payload_gen,

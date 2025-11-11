@@ -203,7 +203,8 @@ fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlo
     info!("initiating Blokli connector");
     Ok(Arc::new(hopr_chain_connector::create_trustless_hopr_blokli_connector(
         chain_key,
-        hopr_chain_connector::blokli_client::BlokliClient::new("test".parse()?, Default::default()),
+        Default::default(),
+        BlokliClient::new("test".parse()?, Default::default()),
         Address::default(),
         hopr_chain_connector::ContractAddresses::default(),
     )?))

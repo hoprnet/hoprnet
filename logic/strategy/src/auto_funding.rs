@@ -171,9 +171,13 @@ mod tests {
 
         let snapshot = blokli_sim.snapshot();
 
-        let chain_connector =
-            create_trustful_hopr_blokli_connector(&ChainKeypair::random(), blokli_sim, [1; Address::SIZE].into())
-                .await?;
+        let chain_connector = create_trustful_hopr_blokli_connector(
+            &ChainKeypair::random(),
+            Default::default(),
+            blokli_sim,
+            [1; Address::SIZE].into(),
+        )
+        .await?;
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,

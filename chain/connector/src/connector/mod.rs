@@ -9,7 +9,7 @@ use hopr_async_runtime::AbortHandle;
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::Address;
+use hopr_primitive_types::prelude::{Address, HoprBalance};
 use petgraph::prelude::DiGraphMap;
 
 use crate::{
@@ -37,13 +37,22 @@ type EventsChannel = (
     async_broadcast::InactiveReceiver<ChainEvent>,
 );
 
-pub(crate) const DEFAULT_TX_TIMEOUT: Duration = Duration::from_secs(10);
+/// Configuration of the [`HoprBlockchainConnector`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+pub struct BlockchainConnectorConfig {
+    /// Default time to wait until a transaction is confirmed.
+    #[default(Duration::from_secs(30))]
+    pub tx_confirm_timeout: Duration,
+    /// Fee to use for new key bindings.
+    #[default(HoprBalance::from_str("0.01 wxHOPR").unwrap())]
+    pub new_key_binding_fee: HoprBalance,
+}
 
 /// A connector acting as a middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
 /// the [`blokli_client`] crate).
 ///
 /// The connector object cannot be cloned, and shall be used inside an `Arc` if cloning is needed.
-pub struct HoprBlockchainConnector<C, R, B = TempDbBackend, P = SafePayloadGenerator> {
+pub struct HoprBlockchainConnector<C, B, P, R> {
     payload_generator: P,
     chain_key: ChainKeypair,
     client: std::sync::Arc<C>,
@@ -52,6 +61,7 @@ pub struct HoprBlockchainConnector<C, R, B = TempDbBackend, P = SafePayloadGener
     connection_handle: Option<AbortHandle>,
     sequencer: TransactionSequencer<C, R>,
     events: EventsChannel,
+    cfg: BlockchainConnectorConfig,
 
     // KeyId <-> OffchainPublicKey mapping
     mapper: HoprKeyMapper<B>,
@@ -67,7 +77,7 @@ pub struct HoprBlockchainConnector<C, R, B = TempDbBackend, P = SafePayloadGener
     values: moka::future::Cache<u32, blokli_client::api::types::ChainInfo>,
 }
 
-impl<B, C, P> HoprBlockchainConnector<C, P::TxRequest, B, P>
+impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
     B: Backend + Send + Sync + 'static,
     C: BlokliSubscriptionClient + BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
@@ -75,7 +85,13 @@ where
     P::TxRequest: Send + Sync + 'static,
 {
     /// Creates a new instance.
-    pub fn new(chain_key: ChainKeypair, client: C, backend: B, payload_generator: P) -> Self {
+    pub fn new(
+        chain_key: ChainKeypair,
+        cfg: BlockchainConnectorConfig,
+        client: C,
+        backend: B,
+        payload_generator: P,
+    ) -> Self {
         let backend = std::sync::Arc::new(backend);
         let (mut events_tx, events_rx) = async_broadcast::broadcast(1024);
         events_tx.set_overflow(true);
@@ -95,6 +111,7 @@ where
             events: (events_tx, events_rx.deactivate()),
             client,
             chain_key,
+            cfg,
             mapper: HoprKeyMapper {
                 id_to_key: moka::sync::CacheBuilder::new(10_000)
                     .time_to_idle(Duration::from_secs(600))
@@ -286,7 +303,7 @@ where
     }
 }
 
-impl<B, C, P> HoprBlockchainConnector<C, P::TxRequest, B, P>
+impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
 where
     C: BlokliTransactionClient + Send + Sync + 'static,
     P: PayloadGenerator + Send + Sync,
@@ -298,7 +315,7 @@ where
     ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send, ConnectorError> {
         Ok(self
             .sequencer
-            .enqueue_transaction(tx_req, DEFAULT_TX_TIMEOUT)
+            .enqueue_transaction(tx_req, self.cfg.tx_confirm_timeout)
             .await?
             .and_then(|tx| {
                 futures::future::ready(
@@ -332,7 +349,7 @@ impl<B, C, P, R> Drop for HoprBlockchainConnector<C, R, B, P> {
     }
 }
 
-impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P>
+impl<B, C, P, R> HoprBlockchainConnector<C, B, P, R>
 where
     B: Backend + Send + Sync + 'static,
     C: Send + Sync,
