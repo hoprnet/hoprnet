@@ -487,7 +487,7 @@ impl Hopr {
             ));
         }
 
-        #[cfg(feature = "disable_test_check")]
+        #[cfg(not(feature = "disable_test_check"))]
         {
             // Once we are able to query the chain,
             // check if the winning probability is configured correctly.
