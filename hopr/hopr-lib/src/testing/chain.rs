@@ -95,7 +95,7 @@ pub struct TestChainEnvConfig {
     #[default(2)]
     pub finality: u32,
     #[default(None)]
-    pub from_file: Option<String>,
+    pub from_file: Option<std::path::PathBuf>,
     #[default(None)]
     pub snapshot_requestor: Option<SnapshotRequestor>,
     #[default(None)]
@@ -113,7 +113,7 @@ pub async fn deploy_test_environment(config: TestChainEnvConfig) -> anyhow::Resu
 
     if config.from_file.is_some() && std::path::Path::new(&config.from_file.clone().unwrap()).exists() {
         let f = config.from_file.unwrap();
-        info!("Loading Anvil state from file: {f}");
+        info!("Loading Anvil state from file: {}", f.display());
         let state = std::fs::read(f).context("failed to read anvil state from file")?;
         let state_bytes: Bytes = Bytes::from(state);
 

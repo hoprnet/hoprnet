@@ -4,7 +4,7 @@ use anyhow::Context;
 use hopr_lib::{
     ChannelId,
     testing::{
-        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes, exclusive_indexes_not_auto_redeeming},
         hopr::TestedHopr,
     },
 };
@@ -288,7 +288,7 @@ async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: C
 #[tokio::test]
 #[serial]
 async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [node] = exclusive_indexes::<1>();
+    let [node] = exclusive_indexes_not_auto_redeeming::<1>();
 
     let winning_prob = cluster_fixture[node]
         .inner()

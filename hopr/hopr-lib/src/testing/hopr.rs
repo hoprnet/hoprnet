@@ -29,14 +29,6 @@ impl TestedHopr {
         auto_redeems: bool,
         winn_prob: Option<f64>,
     ) -> Self {
-        #[cfg(test)]
-        {
-            // To properly run, tests rely on HOPR_TEST_DISABLE_CHECKS being set
-            if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
-                panic!("HOPR_TEST_DISABLE_CHECKS envvar must be set for tests");
-            }
-        }
-
         let instance = Hopr::new(
             crate::config::HoprLibConfig {
                 probe: crate::config::ProbeConfig {
@@ -176,16 +168,12 @@ impl ChannelGuard {
     }
 
     pub async fn try_to_get_all_ticket_counts(&self) -> anyhow::Result<Vec<usize>> {
-        let futures = self.channels.iter().map(|(hopr, channel_id)| {
-            let hopr = hopr.clone();
-            let channel_id = channel_id.clone();
-            async move {
-                hopr.tickets_in_channel(&channel_id)
-                    .await
-                    .context("getting ticket statistics must succeed")
-                    .into_iter()
-                    .count()
-            }
+        let futures = self.channels.iter().map(|(hopr, channel_id)| async move {
+            hopr.tickets_in_channel(&channel_id)
+                .await
+                .context("getting ticket statistics must succeed")
+                .into_iter()
+                .count()
         });
 
         let stats = join_all(futures).await;

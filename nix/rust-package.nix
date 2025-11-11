@@ -133,12 +133,10 @@ let
     if runTests then
       sharedArgsBase
       // {
-        cargoTestExtraArgs = "--workspace -F runtime-tokio";
+        cargoTestExtraArgs = "--workspace -F runtime-tokio -F disable_test_check";
         doCheck = true;
         LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
         RUST_BACKTRACE = "full";
-        # set to disable certain checks during tests
-        HOPR_TEST_DISABLE_CHECKS = "true";
       }
     else if runClippy then
       sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }

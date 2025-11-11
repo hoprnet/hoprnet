@@ -9,6 +9,7 @@ use hopr_transport::{
     session::{IpOrHost, SealedHost},
 };
 use lazy_static::lazy_static;
+use rand::seq::index::sample;
 use serde_json::json;
 use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
@@ -149,7 +150,6 @@ pub const PATH_TO_PROTOCOL_CONFIG: &str = "tests/protocol-config-anvil.json";
 pub const SWARM_N: usize = 5;
 
 pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
-    use rand::seq::index::sample;
     assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
     let indices = sample(&mut rand::thread_rng(), SWARM_N, N);
     let mut arr = [0; N];
@@ -160,10 +160,24 @@ pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
     arr
 }
 
+pub fn exclusive_indexes_not_auto_redeeming<const N: usize>() -> [usize; N] {
+    assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
+    assert!(N <= (SWARM_N + 1) / 2, "Not enough non-auto-redeeming nodes");
+
+    let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 == 0).collect();
+    let selected_indices = sample(&mut rand::thread_rng(), not_auto_redeem_indices_candidates.len(), N);
+    let mut arr = [0; N];
+
+    for (i, idx) in selected_indices.iter().enumerate() {
+        arr[i] = not_auto_redeem_indices_candidates[idx];
+    }
+
+    arr
+}
+
 /// Select N unique indexes, ensuring all intermediates indexes (not source and destination) are nodes with auto redeem
 /// enabled
 pub fn exclusive_indexes_with_auto_redeem_intermediaries<const N: usize>() -> [usize; N] {
-    use rand::seq::index::sample;
     assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
     assert!(N > 2, "N must be greater than 2 to have intermediaries");
 
@@ -209,7 +223,7 @@ pub async fn chainenv_fixture() -> TestChainEnv {
     )
     .expect("failed to parse protocol config");
     let res = deploy_test_environment(TestChainEnvConfig {
-        from_file: Some(load_file),
+        from_file: Some(load_file.into()),
         network: Some(protocol_config.networks["anvil-localhost"].clone()),
         ..Default::default()
     })

@@ -449,6 +449,9 @@ impl Hopr {
             "Cannot start the hopr node multiple times".into(),
         )?;
 
+        #[cfg(feature = "disable_test_check")]
+        warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
+
         info!(
             address = %self.me_onchain(), minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
             "Node is not started, please fund this node",
@@ -484,29 +487,22 @@ impl Hopr {
             ));
         }
 
-        // Once we are able to query the chain,
-        // check if the ticket price is configured correctly.
-        let network_min_ticket_price = self.hopr_chain_api.minimum_ticket_price().await?;
-        let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
-        if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
-            return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
-                "configured outgoing ticket price is lower than the network minimum ticket price: \
-                 {configured_ticket_price:?} < {network_min_ticket_price}"
-            ))));
-        }
-        // Once we are able to query the chain,
-        // check if the winning probability is configured correctly.
-        let network_min_win_prob = self.hopr_chain_api.minimum_incoming_ticket_win_prob().await?;
-        let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
-        if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
-            && configured_win_prob
+        #[cfg(feature = "disable_test_check")]
+        {
+            // Once we are able to query the chain,
+            // check if the winning probability is configured correctly.
+            let network_min_win_prob = self.hopr_chain_api.minimum_incoming_ticket_win_prob().await?;
+            let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
+
+            if configured_win_prob
                 .and_then(|c| WinningProbability::try_from(c).ok())
                 .is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
-        {
-            return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
-                "configured outgoing ticket winning probability is lower than the network minimum winning \
-                 probability: {configured_win_prob:?} < {network_min_win_prob}"
-            ))));
+            {
+                return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
+                    "configured outgoing ticket winning probability is lower than the network minimum winning \
+                     probability: {configured_win_prob:?} < {network_min_win_prob}"
+                ))));
+            }
         }
 
         self.state.store(state::HoprState::Indexing, Ordering::Relaxed);

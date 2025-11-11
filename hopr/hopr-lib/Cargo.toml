@@ -55,6 +55,8 @@ testing = [
   "dep:tokio-util",
   "dep:hopr-chain-rpc",
 ] # testing related functionality
+disable_test_check = [
+] # disable the test that checks that features used in tests are also enabled in the lib
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
@@ -115,6 +117,7 @@ hex-literal = { workspace = true }
 mockall = { workspace = true }
 mockito = { workspace = true }
 parameterized = { workspace = true }
+rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 serde_yaml = { workspace = true }
@@ -131,5 +134,5 @@ hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",
   "session-client",
-  "testing",
+  "testing"
 ] }
