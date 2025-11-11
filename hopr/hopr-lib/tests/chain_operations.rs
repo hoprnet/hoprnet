@@ -271,6 +271,7 @@ async fn ticket_price_is_set_to_non_zero_value_on_start(
 #[serial]
 async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [node] = exclusive_indexes::<1>();
+    let oracle_price = cluster_fixture.get_oracle_ticket_price().await?;
 
     let ticket_price = cluster_fixture[node]
         .inner()
@@ -278,7 +279,7 @@ async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: C
         .await
         .context("failed to get ticket price")?;
 
-    assert!(ticket_price > hopr_lib::HoprBalance::zero());
+    assert_eq!(ticket_price, oracle_price);
 
     Ok(())
 }

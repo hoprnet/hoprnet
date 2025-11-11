@@ -1,9 +1,9 @@
 use std::{str::FromStr, time::Duration};
 
-use alloy::{primitives::U256, providers::ext::AnvilApi};
+use alloy::providers::ext::AnvilApi;
 use futures_time::future::FutureExt as _;
 use hopr_api::chain::HoprBalance;
-use hopr_primitive_types::bounded::BoundedVec;
+use hopr_primitive_types::{bounded::BoundedVec, traits::IntoEndian};
 use hopr_transport::{
     HoprSession, RoutingOptions, SessionClientConfig, SessionTarget,
     session::{IpOrHost, SealedHost},
@@ -40,22 +40,21 @@ impl std::ops::Deref for ClusterGuard {
 }
 
 impl ClusterGuard {
-    // /// Get oracle ticket price from chain
-    // pub async fn get_oracle_ticket_price(&self) -> anyhow::Result<HoprBalance> {
-    //     if let Some(instances) = &self.chain_env.contract_instances {
-    //         let price: HoprBalance = instances
-    //             .price_oracle
-    //             .currentTicketPrice()
-    //             .call()
-    //             .await
-    //             .map(|v| HoprBalance::from(U256::from_be_bytes(v.to_be_bytes::<32>())))?;
+    /// Get oracle ticket price from chain
+    pub async fn get_oracle_ticket_price(&self) -> anyhow::Result<HoprBalance> {
+        if let Some(instances) = &self.chain_env.contract_instances {
+            let price: HoprBalance = instances.price_oracle.currentTicketPrice().call().await.map(|v| {
+                HoprBalance::from(hopr_primitive_types::prelude::U256::from_be_bytes(
+                    v.to_be_bytes::<32>(),
+                ))
+            })?;
 
-    //         Ok(price)
-    //     } else {
-    //         info!("Contract instances not available, cannot get oracle ticket price");
-    //         Err(anyhow::anyhow!("Contract instances not available"))
-    //     }
-    // }
+            Ok(price)
+        } else {
+            info!("Contract instances not available, cannot get oracle ticket price");
+            Err(anyhow::anyhow!("Contract instances not available"))
+        }
+    }
 
     /// Update winning probability in anvil
     pub async fn update_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
@@ -288,8 +287,8 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
             let safe = onboard_node(
                 &chainenv_fixture,
                 &onchain_keys[i],
-                U256::from(1_000_000_000_000_000_000_u128),
-                U256::from(10_000_000_000_000_000_000_u128),
+                alloy::primitives::U256::from(1_000_000_000_000_000_000_u128),
+                alloy::primitives::U256::from(10_000_000_000_000_000_000_u128),
             )
             .await;
             let safe_addresses = json!({
