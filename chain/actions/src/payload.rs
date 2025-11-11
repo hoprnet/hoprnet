@@ -277,7 +277,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
     }
 
     fn register_safe_by_node(&self, safe_addr: Address) -> Result<TransactionRequest> {
-        let tx = register_safe_tx(safe_addr).with_to(self.contract_addrs.safe_registry.into());
+        let tx = register_safe_tx(safe_addr).with_to(self.contract_addrs.node_safe_registry.into());
         Ok(tx)
     }
 
@@ -483,7 +483,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
 
     fn register_safe_by_node(&self, safe_addr: Address) -> Result<TransactionRequest> {
         let tx = register_safe_tx(safe_addr)
-            .with_to(self.contract_addrs.safe_registry.into())
+            .with_to(self.contract_addrs.node_safe_registry.into())
             .with_gas_limit(DEFAULT_TX_GAS);
 
         Ok(tx)

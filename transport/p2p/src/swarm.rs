@@ -61,9 +61,13 @@ where
             // see https://github.com/libp2p/rust-libp2p/pull/4970
             libp2p::yamux::Config::default,
         )
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic()
-        .with_dns();
+        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?;
+
+    #[cfg(all(feature = "transport-quic", feature = "runtime-tokio"))]
+    let swarm = swarm.with_quic();
+
+    #[cfg(feature = "runtime-tokio")]
+    let swarm = swarm.with_dns();
 
     Ok(swarm
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?

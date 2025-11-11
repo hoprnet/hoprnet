@@ -12,10 +12,6 @@ use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
-
-#[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
-mod jemalloc_stats;
-
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -24,12 +20,21 @@ use {
 };
 
 // Avoid musl's default allocator due to degraded performance
+//
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "allocator-mimalloc", feature = "allocator-jemalloc"))]
+compile_error!("feature \"allocator-jemalloc\" and feature \"allocator-mimalloc\" cannot be enabled at the same time");
+#[cfg(all(target_os = "linux", feature = "allocator-mimalloc"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[cfg(all(target_os = "linux", feature = "allocator-jemalloc"))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
+mod jemalloc_stats;
+
+fn init_logger() -> anyhow::Result<()> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => tracing_subscriber::filter::EnvFilter::new("info")
@@ -84,6 +89,7 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_protocol(opentelemetry_otlp::Protocol::Grpc)
                     .with_timeout(std::time::Duration::from_secs(5))
                     .build()?;
+                let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into());
 
                 let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder()
                     .with_batch_exporter(exporter)
@@ -93,14 +99,16 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_max_attributes_per_span(16)
                     .with_resource(
                         opentelemetry_sdk::Resource::builder()
-                            .with_service_name(
-                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
-                            )
+                            .with_service_name(service_name.to_string())
                             .build(),
                     )
                     .build()
                     .tracer(env!("CARGO_PKG_NAME"));
-
+                info!(
+                    otel_service_name = %service_name,
+                    otel_exporter = "otlp",
+                    "OpenTelemetry tracing enabled"
+                );
                 telemetry = Some(tracing_opentelemetry::layer().with_tracer(tracer))
             }
             _ => {}
@@ -140,11 +148,19 @@ impl std::fmt::Debug for HoprdProcesses {
     }
 }
 
-#[cfg_attr(feature = "runtime-tokio", tokio::main)]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(not(feature = "runtime-tokio"))]
+compile_error!("The 'runtime-tokio' feature must be enabled");
+
+#[cfg(feature = "runtime-tokio")]
+fn main() -> anyhow::Result<()> {
+    hopr_lib::prepare_tokio_runtime()?.block_on(main_inner())
+}
+
+#[cfg(feature = "runtime-tokio")]
+async fn main_inner() -> anyhow::Result<()> {
     init_logger()?;
 
-    #[cfg(all(target_os = "linux", feature = "jemalloc-stats"))]
+    #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
     if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
@@ -203,11 +219,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create the node instance
     info!("Creating the HOPRd node instance from hopr-lib");
-    let node = Arc::new(hopr_lib::Hopr::new(
-        cfg.clone().into(),
-        &hopr_keys.packet_key,
-        &hopr_keys.chain_key,
-    )?);
+    let node = Arc::new(hopr_lib::Hopr::new(cfg.clone().into(), &hopr_keys.packet_key, &hopr_keys.chain_key).await?);
 
     let node_clone = node.clone();
 

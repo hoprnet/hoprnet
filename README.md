@@ -249,6 +249,7 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_SURB_RB_SIZE` - number of incoming SURBs the ring buffer can hold (default: 10 000)
 - `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
 - `HOPR_CAPTURE_PACKETS` - allow capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Note that `hoprd` must be built with the `capture` feature.
+- `HOPR_CAPTURE_PATH_TRIGGER` - path used as trigger to start capturing customized HOPR packets. When there exists a file in that path, it will start capturing data.
 - `HOPR_TRANSPORT_MAX_CONCURRENT_PACKETS` - maximum number of concurrently processed incoming packets from all peers (default: 10)
 - `HOPR_TRANSPORT_STREAM_OPEN_TIMEOUT_MS` - maximum time (in milliseconds) to wait until a stream connection is established to a peer (default: `2000 ms`)
 - `HOPR_PACKET_PLANNER_CONCURRENCY` - maximum number of concurrently planned outgoing packets (default: `10`)
@@ -260,6 +261,9 @@ On top of the default configuration options generated for the command line, the 
 - `HOPRD_SESSION_ENTRY_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Entry node (defaults to number of CPU cores)
 - `HOPRD_SESSION_EXIT_UDP_RX_PARALLELISM` - sets the number of UDP listening sockets for UDP sessions on Exit node (defaults to number of CPU cores)
 - `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
+- `HOPRD_NUM_CPU_THREADS` - sets the number of threads for CPU-bound tasks (default: number of CPU cores / 2)
+- `HOPRD_NUM_IO_THREADS` - sets the number of threads for IO-bound tasks (default: number of CPU cores / 2)
+- `HOPRD_THREAD_STACK_SIZE` - sets the thread stack size (default: 10 MB)
 
 ### Example execution
 
@@ -635,7 +639,7 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 
 ### HOPR packet capture
 
-Using the environment variable `HOPR_CAPTURE_PACKETS` allows capturing customized HOPR packet format to a PCAP file or to a `udpdump` host.
+Using the environment variable `HOPR_CAPTURE_PACKETS` allows capturing customized HOPR packet format to a PCAP file or to a `udpdump` host. Also define the environment variable `HOPR_CAPTURE_PATH_TRIGGER` with a path that will be periodically inspected, and once a file exists on that path, it will start capturing packets.
 However, for that to work the `hoprd` binary has to be built with the feature `capture`.
 For ease of use we provide different nix flake outputs that build the `hoprd`
 with the `capture` feature enabled:

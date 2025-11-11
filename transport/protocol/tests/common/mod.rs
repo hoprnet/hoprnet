@@ -25,7 +25,7 @@ use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_gra
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
-use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig};
+use hopr_transport_protocol::processor::PacketInteractionConfig;
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 use tokio::time::timeout;
@@ -238,7 +238,7 @@ pub type WireChannels = (
 
 #[allow(dead_code)]
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ApplicationDataOut, ResolvedTransportRouting)>,
+    futures::channel::mpsc::UnboundedSender<(ResolvedTransportRouting, ApplicationDataOut)>,
     futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationDataIn)>,
 );
 
@@ -285,7 +285,7 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationDataOut, ResolvedTransportRouting)>();
+            futures::channel::mpsc::unbounded::<(ResolvedTransportRouting, ApplicationDataOut)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationDataIn)>();
 
         let opk: &OffchainKeypair = &PEERS[i];
@@ -464,7 +464,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
     let pseudonym = HoprPseudonym::random();
     let mut sent_packet_count = 0;
     for test_msg in test_msgs.iter().take(packet_count) {
-        let sender = MsgSender::new(apis[0].0.clone());
+        let mut sender = apis[0].0.clone();
         let routing = ResolvedTransportRouting::Forward {
             pseudonym,
             forward_path: packet_path.clone(),
@@ -472,7 +472,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
         };
 
         sender
-            .send_packet(ApplicationDataOut::with_no_packet_info(test_msg.clone()), routing)
+            .send((routing, ApplicationDataOut::with_no_packet_info(test_msg.clone())))
             .await?;
 
         sent_packet_count += 1;

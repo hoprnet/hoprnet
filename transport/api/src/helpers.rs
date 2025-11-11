@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
-use futures::{FutureExt, StreamExt, TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
+use futures::{TryStreamExt, stream::FuturesUnordered};
 use hopr_api::{
     chain::ChainKeyOperations,
     db::{FoundSurb, HoprDbProtocolOperations},
@@ -13,11 +13,9 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, errors::PathError, selectors::PathSelector};
 use hopr_primitive_types::prelude::*;
-use hopr_protocol_app::prelude::*;
-use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use tracing::trace;
 
-use crate::{constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE, errors::HoprTransportError};
+use crate::errors::HoprTransportError;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -61,8 +59,6 @@ pub(crate) struct PathPlanner<Db, R, S> {
     selector: S,
     me: Address,
 }
-
-const DEFAULT_PACKET_PLANNER_CONCURRENCY: usize = 10;
 
 struct ChainPathResolver<'c, R>(&'c R);
 
@@ -109,11 +105,27 @@ where
         self.channel_graph.clone()
     }
 
+    async fn resolve_node_id_to_addr(&self, node_id: &NodeId) -> crate::errors::Result<Address> {
+        match node_id {
+            NodeId::Chain(addr) => Ok(*addr),
+            NodeId::Offchain(key) => self
+                .resolver
+                .packet_key_to_chain_key(key)
+                .await
+                .map_err(|e| {
+                    HoprTransportError::Other(format!("failed to resolve offchain key to chain key: {e}").into())
+                })?
+                .ok_or(HoprTransportError::Other(
+                    "failed to resolve offchain key to chain key: no chain key found".into(),
+                )),
+        }
+    }
+
     #[tracing::instrument(level = "trace", skip(self))]
     async fn resolve_path(
         &self,
-        source: Address,
-        destination: Address,
+        source: NodeId,
+        destination: NodeId,
         options: RoutingOptions,
     ) -> crate::errors::Result<ValidatedPath> {
         let cg = self.channel_graph.read_arc().await;
@@ -123,7 +135,7 @@ where
 
                 ValidatedPath::new(
                     source,
-                    ChainPath::new(path.into_iter().chain(std::iter::once(destination)))?,
+                    path.into_iter().chain(std::iter::once(destination)).collect::<Vec<_>>(),
                     &cg,
                     &ChainPathResolver(&self.resolver),
                 )
@@ -132,25 +144,26 @@ where
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
                 trace!(hops = 0, "resolving zero-hop path");
 
-                ValidatedPath::new(
-                    source,
-                    ChainPath::direct(destination),
-                    &cg,
-                    &ChainPathResolver(&self.resolver),
-                )
-                .await?
+                ValidatedPath::new(source, vec![destination], &cg, &ChainPathResolver(&self.resolver)).await?
             }
             RoutingOptions::Hops(hops) => {
                 trace!(%hops, "resolving path using hop count");
 
+                let dst = self.resolve_node_id_to_addr(&destination).await?;
+
                 let cp = self
                     .selector
-                    .select_path(source, destination, hops.into(), hops.into())
+                    .select_path(
+                        self.resolve_node_id_to_addr(&source).await?,
+                        dst,
+                        hops.into(),
+                        hops.into(),
+                    )
                     .await?;
 
                 ValidatedPath::new(
                     source,
-                    ChainPath::from_channel_path(cp, destination),
+                    ChainPath::from_channel_path(cp, dst),
                     &cg,
                     &ChainPathResolver(&self.resolver),
                 )
@@ -183,7 +196,7 @@ where
                 forward_options,
                 return_options,
             } => {
-                let forward_path = self.resolve_path(self.me, destination, forward_options).await?;
+                let forward_path = self.resolve_path(self.me.into(), *destination, forward_options).await?;
 
                 let return_paths = if let Some(return_options) = return_options {
                     // Safeguard for the correct number of SURBs
@@ -191,7 +204,7 @@ where
                     trace!(%destination, %num_possible_surbs, data_len = size_hint, max_surbs, "resolving packet return paths");
 
                     (0..num_possible_surbs)
-                        .map(|_| self.resolve_path(destination, self.me, return_options.clone()))
+                        .map(|_| self.resolve_path(*destination, self.me.into(), return_options.clone()))
                         .collect::<FuturesUnordered<_>>()
                         .try_collect::<Vec<ValidatedPath>>()
                         .await?
@@ -224,81 +237,4 @@ where
             }
         }
     }
-}
-
-// TODO: consider making this a `with` decorator for `MsgSender`
-// ^^ This requires
-//   a) `MsgSender` to be a `Sink`
-//   b) Dropping the `Clone` requirement on `Sink` that is given into `SessionManager`
-// However the DestinationRouting resolution concurrency (from for_each_concurrent) would be lost.
-// Therefore, this will likely make sense when the path planner is behind some sort of a mutex,
-// where concurrent resolution would not make sense.
-pub(crate) fn run_packet_planner<Db, R, S>(
-    planner: PathPlanner<Db, R, S>,
-    packet_sender: MsgSender<Sender<SendMsgInput>>,
-) -> Sender<(DestinationRouting, ApplicationDataOut)>
-where
-    Db: HoprDbProtocolOperations + Send + Sync + Clone + 'static,
-    R: ChainKeyOperations + Send + Sync + Clone + 'static,
-    S: PathSelector + Send + Sync + Clone + 'static,
-{
-    let (tx, rx) =
-        futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
-
-    let planner_concurrency = std::env::var("HOPR_PACKET_PLANNER_CONCURRENCY")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_PACKET_PLANNER_CONCURRENCY);
-
-    let distress_threshold = planner.db.get_surb_config().distress_threshold;
-    hopr_async_runtime::prelude::spawn(
-        rx.for_each_concurrent(planner_concurrency, move |(routing, mut data)| {
-            let planner = planner.clone();
-            let packet_sender = packet_sender.clone();
-            async move {
-                let max_surbs = data.estimate_surbs_with_msg();
-
-                match planner.resolve_routing(data.data.total_len(), max_surbs, routing).await {
-                    Ok((resolved, rem_surbs)) => {
-                        // Set the SURB distress/out-of-SURBs flag if applicable.
-                        // These flags are translated into HOPR protocol packet signals and are
-                        // applicable only on the return path.
-                        let mut signals_to_dst = data
-                            .packet_info
-                            .as_ref()
-                            .map(|info| info.signals_to_destination)
-                            .unwrap_or_default();
-
-                        if resolved.is_return() {
-                            signals_to_dst = match rem_surbs {
-                                Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                                    signals_to_dst | PacketSignal::SurbDistress
-                                }
-                                Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
-                                _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
-                            };
-                        } else {
-                            // Unset these flags as they make no sense on the forward path.
-                            signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
-                        }
-
-                        data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
-
-                        if let Err(error) = packet_sender.send_packet(data, resolved).await {
-                            tracing::error!(%error, "failed to enqueue packet for sending");
-                        }
-                    }
-                    Err(error) => tracing::error!(%error, "failed to resolve path for routing"),
-                }
-            }
-        })
-        .inspect(|_| {
-            tracing::warn!(
-                task = "transport (packet planner)",
-                "long-running background task finished"
-            )
-        }),
-    );
-
-    tx
 }

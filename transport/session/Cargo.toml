@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.13.4"
+version = "0.13.5"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -24,6 +24,12 @@ prometheus = [
   "dep:hopr-metrics",
   "dep:lazy_static",
 ]
+allocator-mimalloc = [
+  "dep:mimalloc",
+] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = [
+  "dep:tikv-jemallocator",
+] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
 arrayvec = { workspace = true }
@@ -78,4 +84,5 @@ harness = false
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.0"
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }
