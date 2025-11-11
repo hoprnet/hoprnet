@@ -54,11 +54,12 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainKeyOperations for HoprBlockchainConnector<C, B, P>
+impl<B, C, P, R> hopr_api::chain::ChainKeyOperations for HoprBlockchainConnector<C, R, B, P>
 where
     B: Backend + Send + Sync + 'static,
     C: Send + Sync,
     P: Send + Sync,
+    R: Send + Sync,
 {
     type Error = ConnectorError;
     type Mapper = HoprKeyMapper<B>;

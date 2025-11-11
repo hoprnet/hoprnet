@@ -104,15 +104,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
-    use std::ops::Add;
+    use std::{ops::Add, time::SystemTime};
 
     use hex_literal::hex;
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
-    use hopr_chain_connector::create_trustful_hopr_blokli_connector;
-    use hopr_chain_connector::testing::BlokliTestStateBuilder;
 
     use super::*;
 
@@ -133,7 +131,7 @@ mod tests {
         let max_closure_overdue = Duration::from_secs(600);
 
         let blokli_sim = BlokliTestStateBuilder::default()
-            .with_random_accounts(&[&*ALICE,&*BOB, &*CHARLIE, &*DAVE, &*EUGENE], false)
+            .with_random_accounts(&[&*ALICE, &*BOB, &*CHARLIE, &*DAVE, &*EUGENE], false)
             .with_channels([
                 // Should leave this channel opened
                 ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into()),
@@ -163,13 +161,15 @@ mod tests {
                     0.into(),
                     ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
                     0.into(),
-                )
+                ),
             ])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let snapshot = blokli_sim.snapshot();
 
-        let chain_connector = create_trustful_hopr_blokli_connector(&ChainKeypair::random(), blokli_sim, [1; Address::SIZE].into()).await?;
+        let chain_connector =
+            create_trustful_hopr_blokli_connector(&ChainKeypair::random(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 

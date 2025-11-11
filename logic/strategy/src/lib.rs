@@ -240,4 +240,3 @@ impl Default for Strategy {
 
 /// An alias for the strategy configuration type.
 pub type StrategyConfig = MultiStrategyConfig;
-

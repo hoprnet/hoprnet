@@ -13,11 +13,11 @@ pub enum ConnectorError {
     #[error("account {0} does not exist")]
     AccountDoesNotExist(HoprKeyIdent),
 
-    #[error("errors occured while sending multiple tickets for redemption")]
-    BatchRedemptionFailed,
-
     #[error("channel {0} does not exist")]
     ChannelDoesNotExist(ChannelId),
+
+    #[error("ticket is invalid or does not match the channel")]
+    InvalidTicket,
 
     #[error("channel {0} is closed")]
     ChannelClosed(ChannelId),
@@ -27,9 +27,6 @@ pub enum ConnectorError {
 
     #[error("timeout while waiting for the graph to be synced")]
     ConnectionTimeout,
-
-    #[error("transaction timed out while waiting for confirmation")]
-    TransactionTimeout,
 
     #[error("backend error: {0}")]
     BackendError(anyhow::Error),

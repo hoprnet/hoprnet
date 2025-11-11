@@ -46,7 +46,10 @@ hopr-transport-protocol = { workspace = true }
 anyhow = { workspace = true }
 futures = { workspace = true }
 hex-literal = { workspace = true }
-hopr-chain-connector = { workspace = true, features = ["testing", "runtime-tokio"]}
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 hopr-crypto-random = { workspace = true }
 insta = { workspace = true }
 mockall = { workspace = true }

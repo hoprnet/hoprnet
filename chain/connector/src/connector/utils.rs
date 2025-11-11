@@ -1,16 +1,10 @@
-use std::{str::FromStr, time::Duration};
+use std::str::FromStr;
 
-use blokli_client::api::BlokliTransactionClient;
-use futures::TryFutureExt;
-use hopr_api::chain::ChainReceipt;
 use hopr_chain_types::chain_events::ChainEvent;
-use hopr_crypto_types::prelude::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::errors::ConnectorError;
-
-const CLIENT_TX_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(crate) fn model_to_account_entry(
     model: blokli_client::api::types::Account,
@@ -68,30 +62,11 @@ pub(crate) fn model_to_graph_entry(
     Ok((src, dst, channel))
 }
 
-pub(crate) fn track_transaction<'a, B: BlokliTransactionClient + Send + Sync + 'static>(
-    client: &'a B,
-    tx_id: blokli_client::api::TxId,
-) -> Result<impl futures::Future<Output = Result<ChainReceipt, ConnectorError>> + Send + 'a, ConnectorError> {
-    Ok(client
-        .track_transaction(tx_id, CLIENT_TX_TIMEOUT)
-        .map_err(ConnectorError::from)
-        .and_then(|tx| {
-            futures::future::ready(
-                tx.transaction_hash
-                    .ok_or(ConnectorError::ClientError(
-                        blokli_client::errors::ErrorKind::NoData.into(),
-                    ))
-                    .and_then(|hash| Hash::from_hex(&hash.0).map_err(ConnectorError::from)),
-            )
-        }))
-}
-
 pub(crate) async fn process_channel_changes_into_events(
     new_channel: ChannelEntry,
     changes: Vec<ChannelChange>,
     me: &Address,
     event_tx: &async_broadcast::Sender<ChainEvent>,
-    redeemed_ticket_queue: &moka::future::Cache<TicketId, Box<VerifiedTicket>, ahash::RandomState>,
 ) {
     for change in changes {
         tracing::trace!(id = %new_channel.get_id(), %change, "channel updated");
@@ -140,23 +115,9 @@ pub(crate) async fn process_channel_changes_into_events(
             // but we're not interested in that here
             ChannelChange::TicketIndex { left, right } if left < right => match new_channel.direction(me) {
                 Some(ChannelDirection::Incoming) => {
-                    if let Some(redeemed_ticket) = redeemed_ticket_queue
-                        .remove(&TicketId {
-                            id: new_channel.get_id(),
-                            epoch: new_channel.channel_epoch.as_u32(),
-                            index: right,
-                        })
-                        .await
-                    {
-                        tracing::debug!(id = %new_channel.get_id(), "ticket redeemed on own channel");
-                        let _ = event_tx
-                            .broadcast_direct(ChainEvent::TicketRedeemed(new_channel.clone(), Some(redeemed_ticket)))
-                            .await;
-                    } else {
-                        tracing::error!(
-                            "got ticket redemption event on ticket that's no longer in the redemption cache"
-                        );
-                    }
+                    // The corresponding event is raised in the ticket redeem tracker,
+                    // as the failure must be tracked there too.
+                    tracing::debug!(id = %new_channel.get_id(), "ticket redemption succeeded");
                 }
                 Some(ChannelDirection::Outgoing) => {
                     tracing::debug!(id = %new_channel.get_id(), "counterparty has redeemed ticket on our channel");

@@ -1,10 +1,10 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, future::Either};
 use futures_concurrency::stream::Merge;
 use futures_time::future::FutureExt as FuturesTimeExt;
-use hopr_api::chain::{ChainPathResolver, HoprKeyIdent};
+use hopr_api::chain::{ChainPathResolver, ChainReceipt, HoprKeyIdent};
 use hopr_async_runtime::AbortHandle;
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
@@ -17,6 +17,7 @@ use crate::{
     backend::Backend,
     connector::{
         keys::HoprKeyMapper,
+        sequencer::TransactionSequencer,
         utils::{model_to_account_entry, model_to_graph_entry, process_channel_changes_into_events},
     },
     errors::ConnectorError,
@@ -26,6 +27,7 @@ mod accounts;
 mod channels;
 mod events;
 mod keys;
+mod sequencer;
 mod tickets;
 mod utils;
 mod values;
@@ -35,17 +37,20 @@ type EventsChannel = (
     async_broadcast::InactiveReceiver<ChainEvent>,
 );
 
+pub(crate) const DEFAULT_TX_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// A connector acting as a middleware between the HOPR APIs (see the [`hopr_api`] crate) and the Blokli Client API (see
 /// the [`blokli_client`] crate).
 ///
 /// The connector object cannot be cloned, and shall be used inside an `Arc` if cloning is needed.
-pub struct HoprBlockchainConnector<C, B = TempDbBackend, P = SafePayloadGenerator> {
+pub struct HoprBlockchainConnector<C, R, B = TempDbBackend, P = SafePayloadGenerator> {
     payload_generator: P,
     chain_key: ChainKeypair,
     client: std::sync::Arc<C>,
     graph: std::sync::Arc<parking_lot::RwLock<DiGraphMap<HoprKeyIdent, ChannelId, ahash::RandomState>>>,
     backend: std::sync::Arc<B>,
     connection_handle: Option<AbortHandle>,
+    sequencer: TransactionSequencer<C, R>,
     events: EventsChannel,
 
     // KeyId <-> OffchainPublicKey mapping
@@ -60,15 +65,14 @@ pub struct HoprBlockchainConnector<C, B = TempDbBackend, P = SafePayloadGenerato
     channel_by_parties: moka::future::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
     // Contains only the chain info structure
     values: moka::future::Cache<u32, blokli_client::api::types::ChainInfo>,
-    // Holds all the tickets which were submitted for redeeming
-    redeeming_tickets: moka::future::Cache<TicketId, Box<VerifiedTicket>, ahash::RandomState>,
 }
 
-impl<B, C, P> HoprBlockchainConnector<C, B, P>
+impl<B, C, P> HoprBlockchainConnector<C, P::TxRequest, B, P>
 where
     B: Backend + Send + Sync + 'static,
     C: BlokliSubscriptionClient + BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
     P: PayloadGenerator + Send + Sync + 'static,
+    P::TxRequest: Send + Sync + 'static,
 {
     /// Creates a new instance.
     pub fn new(chain_key: ChainKeypair, client: C, backend: B, payload_generator: P) -> Self {
@@ -77,10 +81,9 @@ where
         events_tx.set_overflow(true);
         events_tx.set_await_active(false);
 
+        let client = std::sync::Arc::new(client);
         Self {
             payload_generator,
-            chain_key,
-            client: std::sync::Arc::new(client),
             graph: std::sync::Arc::new(parking_lot::RwLock::new(DiGraphMap::with_capacity_and_hasher(
                 10_000,
                 100_000,
@@ -88,7 +91,10 @@ where
             ))),
             backend: backend.clone(),
             connection_handle: None,
+            sequencer: TransactionSequencer::new(chain_key.clone(), client.clone()),
             events: (events_tx, events_rx.deactivate()),
+            client,
+            chain_key,
             mapper: HoprKeyMapper {
                 id_to_key: moka::sync::CacheBuilder::new(10_000)
                     .time_to_idle(Duration::from_secs(600))
@@ -113,9 +119,6 @@ where
             values: moka::future::CacheBuilder::new(1)
                 .time_to_live(Duration::from_secs(600))
                 .build(),
-            redeeming_tickets: moka::future::CacheBuilder::new(2048)
-                .time_to_live(Duration::from_secs(600))
-                .build_with_hasher(ahash::RandomState::default()),
         }
     }
 
@@ -134,7 +137,6 @@ where
         let graph = self.graph.clone();
         let event_tx = self.events.0.clone();
         let me = self.chain_key.public().to_address();
-        let redeeming_tickets = self.redeeming_tickets.clone();
 
         hopr_async_runtime::prelude::spawn(async move {
             let connections = client
@@ -212,7 +214,6 @@ where
                     }
                 })
                 .for_each(|account_or_channel| {
-                    let redeeming_tickets = redeeming_tickets.clone();
                     let event_tx = event_tx.clone();
                     async move {
                         match account_or_channel {
@@ -227,7 +228,7 @@ where
                             },
                             Ok(Either::Right((new_channel, Some(changes)))) => {
                                 tracing::debug!(id = %new_channel.get_id(), num_changes = changes.len(), "channel updated");
-                                process_channel_changes_into_events(new_channel, changes, &me, &event_tx, &redeeming_tickets).await;
+                                process_channel_changes_into_events(new_channel, changes, &me, &event_tx).await;
                             },
                             Ok(Either::Right((new_channel, None))) => {
                                 tracing::debug!(id = %new_channel.get_id(), "channel opened");
@@ -276,13 +277,43 @@ where
             return Err(ConnectorError::InvalidState("connector is already connected"));
         }
 
+        self.sequencer.start().await?;
+
         let abort_handle = self.do_connect(timeout).await?;
         self.connection_handle = Some(abort_handle);
+
         Ok(())
     }
 }
 
-impl<B, C, P> HoprBlockchainConnector<C, B, P> {
+impl<B, C, P> HoprBlockchainConnector<C, P::TxRequest, B, P>
+where
+    C: BlokliTransactionClient + Send + Sync + 'static,
+    P: PayloadGenerator + Send + Sync,
+    P::TxRequest: Send + Sync,
+{
+    async fn send_tx(
+        &self,
+        tx_req: P::TxRequest,
+    ) -> Result<impl Future<Output = Result<ChainReceipt, ConnectorError>> + Send, ConnectorError> {
+        Ok(self
+            .sequencer
+            .enqueue_transaction(tx_req, DEFAULT_TX_TIMEOUT)
+            .await?
+            .and_then(|tx| {
+                futures::future::ready(
+                    tx.transaction_hash
+                        .ok_or(ConnectorError::InvalidState("transaction hash missing"))
+                        .and_then(|tx| {
+                            ChainReceipt::from_str(&tx.0)
+                                .map_err(|_| ConnectorError::TypeConversion("invalid tx hash".into()))
+                        }),
+                )
+            }))
+    }
+}
+
+impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
     pub(crate) fn check_connection_state(&self) -> Result<(), ConnectorError> {
         self.connection_handle
             .as_ref()
@@ -292,7 +323,7 @@ impl<B, C, P> HoprBlockchainConnector<C, B, P> {
     }
 }
 
-impl<B, C, P> Drop for HoprBlockchainConnector<C, B, P> {
+impl<B, C, P, R> Drop for HoprBlockchainConnector<C, R, B, P> {
     fn drop(&mut self) {
         self.events.0.close();
         if let Some(abort_handle) = self.connection_handle.take() {
@@ -301,11 +332,12 @@ impl<B, C, P> Drop for HoprBlockchainConnector<C, B, P> {
     }
 }
 
-impl<B, C, P> HoprBlockchainConnector<C, B, P>
+impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P>
 where
     B: Backend + Send + Sync + 'static,
     C: Send + Sync,
     P: Send + Sync,
+    R: Send + Sync,
 {
     /// Returns a [`PathAddressResolver`] using this connector.
     pub fn as_path_resolver(&self) -> ChainPathResolver<'_, Self> {

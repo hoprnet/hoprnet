@@ -15,9 +15,11 @@ pub mod blokli_client {
     };
 }
 
-pub use hopr_chain_types::ContractAddresses;
+pub use hopr_chain_types::prelude::{ContractAddresses, PayloadGenerator, SafePayloadGenerator};
 pub use hopr_crypto_types::prelude::ChainKeypair;
 pub use hopr_primitive_types::prelude::Address;
+
+type HoprBlockchainSafeConnector<C> = HoprBlockchainConnector<C, <SafePayloadGenerator as PayloadGenerator>::TxRequest>;
 
 /// Convenience function to create [`HoprBlokliConnector`] with own contract addresses.
 ///
@@ -27,7 +29,7 @@ pub fn create_trustless_hopr_blokli_connector<C>(
     client: C,
     module_address: Address,
     contracts: ContractAddresses,
-) -> Result<HoprBlockchainConnector<C>, errors::ConnectorError>
+) -> Result<HoprBlockchainSafeConnector<C>, errors::ConnectorError>
 where
     C: blokli_client::BlokliSubscriptionClient
         + blokli_client::BlokliQueryClient
@@ -36,7 +38,7 @@ where
         + Sync
         + 'static,
 {
-    let payload_gen = hopr_chain_types::payload::SafePayloadGenerator::new(chain_key, contracts, module_address);
+    let payload_gen = SafePayloadGenerator::new(chain_key, contracts, module_address);
 
     Ok(HoprBlockchainConnector::new(
         chain_key.clone(),
@@ -57,7 +59,7 @@ pub async fn create_trustful_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
     client: C,
     module_address: Address,
-) -> Result<HoprBlockchainConnector<C>, errors::ConnectorError>
+) -> Result<HoprBlockchainSafeConnector<C>, errors::ConnectorError>
 where
     C: blokli_client::BlokliSubscriptionClient
         + blokli_client::BlokliQueryClient

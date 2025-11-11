@@ -116,9 +116,9 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 #[cfg(test)]
 mod tests {
     use hex_literal::hex;
-    use hopr_chain_connector::create_trustful_hopr_blokli_connector;
-    use hopr_chain_connector::testing::BlokliTestStateBuilder;
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_crypto_types::prelude::*;
+
     use super::*;
     use crate::{
         auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
@@ -165,13 +165,15 @@ mod tests {
         );
 
         let blokli_sim = BlokliTestStateBuilder::default()
-            .with_random_accounts(&[&*ALICE,&*BOB, &*CHRIS, &*DAVE], false)
+            .with_random_accounts(&[&*ALICE, &*BOB, &*CHRIS, &*DAVE], false)
             .with_channels([c1, c2, c3])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let snapshot = blokli_sim.snapshot();
 
-        let chain_connector = create_trustful_hopr_blokli_connector(&ChainKeypair::random(), blokli_sim, [1; Address::SIZE].into()).await?;
+        let chain_connector =
+            create_trustful_hopr_blokli_connector(&ChainKeypair::random(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,

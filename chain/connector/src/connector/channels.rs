@@ -6,18 +6,15 @@ use hopr_crypto_types::prelude::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use crate::{
-    backend::Backend,
-    connector::{HoprBlockchainConnector, utils::track_transaction},
-    errors::ConnectorError,
-};
+use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainReadChannelOperations for HoprBlockchainConnector<C, B, P>
+impl<B, C, P, R> hopr_api::chain::ChainReadChannelOperations for HoprBlockchainConnector<C, R, B, P>
 where
     B: Backend + Send + Sync + 'static,
     C: Send + Sync,
     P: Send + Sync,
+    R: Send + Sync,
 {
     type Error = ConnectorError;
 
@@ -114,11 +111,12 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, C, P> hopr_api::chain::ChainWriteChannelOperations for HoprBlockchainConnector<C, B, P>
+impl<B, C, P> hopr_api::chain::ChainWriteChannelOperations for HoprBlockchainConnector<C, P::TxRequest, B, P>
 where
     B: Backend + Send + Sync + 'static,
     C: BlokliQueryClient + BlokliTransactionClient + Send + Sync + 'static,
     P: PayloadGenerator + Send + Sync + 'static,
+    P::TxRequest: Send + Sync + 'static,
 {
     type Error = ConnectorError;
 
@@ -130,14 +128,11 @@ where
         self.check_connection_state()?;
 
         let id = generate_channel_id(self.chain_key.public().as_ref(), dst);
-        let signed_payload = self
-            .payload_generator
-            .fund_channel(*dst, amount)?
-            .sign_and_encode_to_eip2718(self.query_next_nonce().await?, None, &self.chain_key)
-            .await?;
+        let tx_req = self.payload_generator.fund_channel(*dst, amount)?;
 
-        let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;
-        Ok(track_transaction(self.client.as_ref(), tx_id)?
+        Ok(self
+            .send_tx(tx_req)
+            .await?
             .and_then(move |tx_hash| futures::future::ok((id, tx_hash)))
             .boxed())
     }
@@ -155,14 +150,9 @@ where
             .channel_by_id(channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
-        let signed_payload = self
-            .payload_generator
-            .fund_channel(channel.destination, amount)?
-            .sign_and_encode_to_eip2718(self.query_next_nonce().await?, None, &self.chain_key)
-            .await?;
+        let tx_req = self.payload_generator.fund_channel(channel.destination, amount)?;
 
-        let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;
-        Ok(track_transaction(self.client.as_ref(), tx_id)?.boxed())
+        Ok(self.send_tx(tx_req).await?.boxed())
     }
 
     async fn close_channel<'a>(
@@ -177,7 +167,8 @@ where
             .channel_by_id(channel_id)
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
-        let payload = match channel.status {
+
+        let tx_req = match channel.status {
             ChannelStatus::Closed => return Err(ConnectorError::ChannelClosed(*channel_id)),
             ChannelStatus::Open => self
                 .payload_generator
@@ -187,11 +178,7 @@ where
                 .finalize_outgoing_channel_closure(channel.destination)?,
             _ => return Err(ConnectorError::InvalidState("channel closure time has not elapsed")),
         };
-        let signed_payload = payload
-            .sign_and_encode_to_eip2718(self.query_next_nonce().await?, None, &self.chain_key)
-            .await?;
 
-        let tx_id = self.client.submit_and_track_transaction(&signed_payload).await?;
-        Ok(track_transaction(self.client.as_ref(), tx_id)?.boxed())
+        Ok(self.send_tx(tx_req).await?.boxed())
     }
 }
