@@ -110,6 +110,23 @@ pub struct Addresses {
     pub node_stake_v2_factory: Address,
 }
 
+impl From<&Addresses> for ContractAddresses {
+    fn from(addresses: &Addresses) -> ContractAddresses {
+        ContractAddresses {
+            token: addresses.token,
+            channels: addresses.channels,
+            announcements: addresses.announcements,
+            network_registry: addresses.network_registry,
+            network_registry_proxy: addresses.network_registry_proxy,
+            node_safe_registry: addresses.node_safe_registry,
+            ticket_price_oracle: addresses.ticket_price_oracle,
+            winning_probability_oracle: addresses.winning_probability_oracle,
+            node_stake_v2_factory: addresses.node_stake_v2_factory,
+            module_implementation: addresses.module_implementation,
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainNetworkConfig {

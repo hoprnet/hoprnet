@@ -1,12 +1,14 @@
 use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
-use futures::AsyncWriteExt;
+use futures_time::future::FutureExt as _;
 use hopr_lib::{
-    HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget, SurbBalancerConfig,
+    HoprBalance, HoprTransportError, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
+    SurbBalancerConfig,
+    errors::HoprLibError,
     exports::transport::session::{IpOrHost, SealedHost},
     testing::{
-        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes, exclusive_indexes_not_auto_redeeming},
         hopr::ChannelGuard,
     },
 };
@@ -15,7 +17,7 @@ use rstest::rstest;
 use serial_test::serial;
 use tokio::time::sleep;
 
-const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
+const FUNDING_AMOUNT: &str = "1 wxHOPR";
 
 #[rstest]
 #[tokio::test]
@@ -54,9 +56,7 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[cfg(feature = "session-client")]
 #[test_log::test]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    use futures_time::future::FutureExt as _;
-
-    let [src, mid, dst] = exclusive_indexes::<3>();
+    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         vec![
@@ -112,11 +112,12 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    // Test keepalive as well as sending 0 hop messages without channels
     let [src, dst] = exclusive_indexes::<2>();
 
     let ip = IpOrHost::from_str(":0")?;
 
-    let mut session = cluster_fixture[src]
+    let session = cluster_fixture[src]
         .inner()
         .connect_to(
             cluster_fixture[dst].address(),
@@ -140,16 +141,18 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
         .await
         .context("failed to keep alive session")?;
 
-    sleep(Duration::from_secs(2)).await;
+    sleep(Duration::from_secs(3)).await; // sleep longer than the session timeout
 
-    session
-        .write_all(b"ping")
-        .await
-        .context("failed to write to session before session sunsets")?;
-
-    sleep(Duration::from_secs(2)).await;
-
-    let _ = session.write_all(b"ping").await.is_err();
+    match cluster_fixture[src].inner().keep_alive_session(&session.id()).await {
+        Err(HoprLibError::TransportError(HoprTransportError::Session(hopr_lib::TransportSessionError::Manager(
+            hopr_lib::SessionManagerError::NonExistingSession,
+        )))) => {}
+        Err(e) => panic!(
+            "expected SessionNotFound error when keeping alive session, but got different error: {:?}",
+            e
+        ),
+        Ok(_) => panic!("expected error when keeping alive session, but got Ok"),
+    }
 
     Ok(())
 }
@@ -159,9 +162,7 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    use hopr_primitive_types::bounded::BoundedVec;
-
-    let [src, mid, dst] = exclusive_indexes::<3>();
+    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         vec![

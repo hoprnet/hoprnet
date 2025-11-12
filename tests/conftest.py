@@ -58,17 +58,17 @@ def barebone_nodes():
 
 def nodes_with_auth():
     """All nodes within the same network as specified in the swarm7 fixture"""
-    return ["1", "3", "4"]
+    return ["1", "3", "5"]
 
 
 def default_nodes():
     """A node that uses the default strategies"""
-    return ["5"]
+    return ["5", "6"]
 
 
 def nodes_with_lower_outgoing_win_prob():
     """Nodes with outgoing ticket winning probability"""
-    return ["6"]
+    return []
 
 
 @pytest.fixture(scope="session")
