@@ -1,7 +1,7 @@
 use std::{str::FromStr, time::Duration};
 
 use alloy::providers::ext::AnvilApi;
-use futures_time::future::FutureExt as _;
+use futures_time::{future::FutureExt, time::Duration as FuturesDuration};
 use hopr_api::chain::HoprBalance;
 use hopr_primitive_types::{bounded::BoundedVec, traits::IntoEndian};
 use hopr_transport::{
@@ -120,8 +120,7 @@ impl ClusterGuard {
         let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
             self.cluster[mid].address().into(),
         )));
-
-        let session = self.cluster[src]
+        let session_result = self.cluster[src]
             .inner()
             .connect_to(
                 self.cluster[dst].address(),
@@ -135,9 +134,14 @@ impl ClusterGuard {
                     always_max_out_surbs: false,
                 },
             )
-            .await?;
+            .timeout(FuturesDuration::from_secs(5))
+            .await;
 
-        Ok((session, fw_channels, bw_channels))
+        match session_result {
+            Ok(Ok(s)) => Ok((s, fw_channels, bw_channels)),
+            Ok(Err(e)) => Err(e.into()),
+            Err(_) => Err(anyhow::anyhow!("Session opening timed out after 10s")),
+        }
     }
 }
 
@@ -147,7 +151,7 @@ lazy_static! {
 
 pub const SNAPSHOT_BASE: &str = "/tmp/hopr-tests";
 pub const PATH_TO_PROTOCOL_CONFIG: &str = "tests/protocol-config-anvil.json";
-pub const SWARM_N: usize = 5;
+pub const SWARM_N: usize = 6;
 
 pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
     assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
@@ -165,6 +169,21 @@ pub fn exclusive_indexes_not_auto_redeeming<const N: usize>() -> [usize; N] {
     assert!(N <= (SWARM_N + 1) / 2, "Not enough non-auto-redeeming nodes");
 
     let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 == 0).collect();
+    let selected_indices = sample(&mut rand::thread_rng(), not_auto_redeem_indices_candidates.len(), N);
+    let mut arr = [0; N];
+
+    for (i, idx) in selected_indices.iter().enumerate() {
+        arr[i] = not_auto_redeem_indices_candidates[idx];
+    }
+
+    arr
+}
+
+pub fn exclusive_indexes_auto_redeeming<const N: usize>() -> [usize; N] {
+    assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
+    assert!(N <= SWARM_N / 2, "Not enough non-auto-redeeming nodes");
+
+    let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 != 0).collect();
     let selected_indices = sample(&mut rand::thread_rng(), not_auto_redeem_indices_candidates.len(), N);
     let mut arr = [0; N];
 

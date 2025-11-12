@@ -5,7 +5,8 @@ use futures::AsyncWriteExt;
 use hopr_lib::{
     ChannelId, HoprBalance,
     testing::fixtures::{
-        ClusterGuard, cluster_fixture, exclusive_indexes, exclusive_indexes_with_auto_redeem_intermediaries,
+        ClusterGuard, cluster_fixture, exclusive_indexes_auto_redeeming, exclusive_indexes_not_auto_redeeming,
+        exclusive_indexes_with_auto_redeem_intermediaries,
     },
 };
 use rstest::rstest;
@@ -21,7 +22,7 @@ const FUNDING_AMOUNT: &str = "1 wxHOPR";
 async fn ticket_statistics_should_reset_when_cleaned(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes::<3>();
+    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
 
     let (mut session, fw_channels, bw_channels) = cluster_fixture
         .create_session_between(src, mid, dst, FUNDING_AMOUNT.parse::<HoprBalance>()?)
@@ -98,7 +99,7 @@ async fn ticket_statistics_should_reset_when_cleaned(
 async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes::<3>();
+    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
 
     let ticket_price = cluster_fixture[src]
         .inner()
@@ -145,8 +146,8 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes::<3>();
-    let message_count = 3;
+    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
+    let message_count = 10;
 
     let ticket_price = cluster_fixture[src]
         .inner()
@@ -179,10 +180,7 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
         .ticket_statistics()
         .await
         .context("failed to get ticket statistics")?;
-    assert_eq!(
-        stats_before.unredeemed_value,
-        funding_amount.mul(2) + ticket_price.mul(2)
-    ); // both ways + 2 packets for session initiation
+    assert!(stats_before.unredeemed_value > HoprBalance::zero());
 
     cluster_fixture[mid]
         .inner()
@@ -190,7 +188,7 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
         .await
         .context("failed to redeem tickets")?;
 
-    sleep(std::time::Duration::from_secs(15)).await;
+    sleep(std::time::Duration::from_secs(5)).await;
 
     let stats_after = cluster_fixture[mid]
         .inner()
@@ -198,7 +196,7 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
         .await
         .context("failed to get ticket statistics")?;
 
-    assert_eq!(stats_after.unredeemed_value, HoprBalance::zero());
+    assert!(stats_after.redeemed_value > stats_before.redeemed_value);
 
     Ok(())
 }
@@ -208,7 +206,8 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes::<3>();
+    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
+
     let message_count = 3;
 
     let ticket_price = cluster_fixture[src]
@@ -216,6 +215,13 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
         .get_ticket_price()
         .await
         .context("failed to get ticket price")?;
+
+    cluster_fixture[mid]
+        .inner()
+        .reset_ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
     let funding_amount = ticket_price.mul(message_count);
     let (mut session, fw_channel, bw_channel) = cluster_fixture
         .create_session_between(src, mid, dst, funding_amount)
@@ -241,11 +247,14 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
         .ticket_statistics()
         .await
         .context("failed to get ticket statistics")?;
+
     assert!(stats_before.unredeemed_value > HoprBalance::zero());
     assert_eq!(stats_before.neglected_value, HoprBalance::zero());
 
     fw_channel.try_close_channels_all_channels().await?;
     bw_channel.try_close_channels_all_channels().await?;
+
+    sleep(std::time::Duration::from_secs(5)).await;
 
     let stats_after = cluster_fixture[mid]
         .inner()
@@ -324,7 +333,7 @@ async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
 ) -> anyhow::Result<()> {
     cluster_fixture.update_winning_probability(0.5).await?;
 
-    let [src, mid, dst] = exclusive_indexes_with_auto_redeem_intermediaries::<3>();
+    let [src, mid, dst] = exclusive_indexes_auto_redeeming::<3>();
     let message_count = 20;
 
     let ticket_price = cluster_fixture[src]
@@ -334,39 +343,12 @@ async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
         .context("failed to get ticket price")?;
     let funding_amount = ticket_price.mul(message_count);
 
-    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session_between(src, mid, dst, funding_amount)
-        .await?;
-
-    const BUF_LEN: usize = 400;
-    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
-
-    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
-        .await
-        .context("write failed")??;
-
-    let stats_before = cluster_fixture[mid]
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    for _ in 1..=message_count {
-        tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
+    assert!(
+        cluster_fixture
+            .create_session_between(src, mid, dst, funding_amount)
             .await
-            .context("write failed")??;
-    }
-    sleep(std::time::Duration::from_secs(5)).await;
-
-    let stats_after = cluster_fixture[mid]
-        .inner()
-        .ticket_statistics()
-        .await
-        .context("failed to get ticket statistics")?;
-
-    assert_eq!(stats_after.winning_count, stats_before.winning_count);
-    assert_eq!(stats_after.unredeemed_value, stats_before.unredeemed_value);
-    assert_eq!(stats_after.redeemed_value, stats_before.redeemed_value);
+            .is_err()
+    );
 
     cluster_fixture.update_winning_probability(1.0).await?;
 

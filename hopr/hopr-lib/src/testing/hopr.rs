@@ -8,6 +8,7 @@ use hopr_crypto_types::{
     prelude::{Keypair, OffchainKeypair},
 };
 use hopr_transport::Hash;
+use tokio::time::sleep;
 
 use crate::{
     Address, ChannelEntry, ChannelStatus, Hopr, PeerId, ProtocolsConfig, prelude, testing::chain::NodeSafeConfig,
@@ -192,6 +193,21 @@ impl ChannelGuard {
         });
 
         join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
+
+        sleep(Duration::from_secs(2)).await;
+
+        let futures = self.channels.iter().map(|(hopr, channel_id)| {
+            let hopr = hopr.clone();
+            let channel_id = channel_id.clone();
+            async move {
+                hopr.close_channel_by_id(&channel_id)
+                    .await
+                    .context("closing channel must succeed")
+            }
+        });
+
+        join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
+
         Ok(())
     }
 }
