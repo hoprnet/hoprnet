@@ -60,10 +60,10 @@ impl ConnectorError {
     pub fn as_transaction_rejection_error(&self) -> Option<&TrackingErrorKind> {
         match self {
             ConnectorError::ClientError(client_error) => match client_error.kind() {
-                ErrorKind::TrackingError(e @ TrackingErrorKind::Reverted) |
-                ErrorKind::TrackingError(e @ TrackingErrorKind::ValidationFailed) => Some(e),
+                ErrorKind::TrackingError(e @ TrackingErrorKind::Reverted)
+                | ErrorKind::TrackingError(e @ TrackingErrorKind::ValidationFailed) => Some(e),
                 _ => None,
-            }
+            },
             _ => None,
         }
     }

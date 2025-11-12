@@ -10,7 +10,6 @@ type TxRequest<T> = (
     futures::channel::oneshot::Sender<errors::Result<blokli_client::api::TxId>>,
 );
 
-
 /// Takes care of sequencing transactions, nonce management and submitting the transactions to the blockchain in-order.
 pub struct TransactionSequencer<C, R> {
     sender: Option<futures::channel::mpsc::Sender<TxRequest<R>>>,
@@ -34,7 +33,10 @@ where
     }
 
     pub async fn start(&mut self) -> errors::Result<()> {
-        let tx_count = self.client.query_transaction_count(&self.signer.public().to_address().into()).await?;
+        let tx_count = self
+            .client
+            .query_transaction_count(&self.signer.public().to_address().into())
+            .await?;
         self.nonce.store(tx_count, std::sync::atomic::Ordering::SeqCst);
 
         let (sender, receiver) = futures::channel::mpsc::channel(1024);
@@ -68,12 +70,20 @@ where
                     }
                 })
                 .for_each(move |(res, notifier)| {
-                    // The nonce is incremented when the transaction succeeded or failed for other reasons than on-chain rejection.
-                    if res.is_ok() || res.as_ref().is_err_and(|error| error.as_transaction_rejection_error().is_none()) {
+                    // The nonce is incremented when the transaction succeeded or failed for other reasons than on-chain
+                    // rejection.
+                    if res.is_ok()
+                        || res
+                            .as_ref()
+                            .is_err_and(|error| error.as_transaction_rejection_error().is_none())
+                    {
                         nonce_inc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     if let Err(_) = notifier.send(res) {
-                        tracing::debug!("failed to notify transaction result - the caller may not want to await the result anymore.");
+                        tracing::debug!(
+                            "failed to notify transaction result - the caller may not want to await the result \
+                             anymore."
+                        );
                     }
                     futures::future::ready(())
                 }),
@@ -94,8 +104,7 @@ where
         &self,
         transaction: R,
         timeout_until_finalized: std::time::Duration,
-    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>>>
-    {
+    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>>> {
         let sender = self
             .sender
             .as_ref()

@@ -36,6 +36,7 @@ hopr-metrics = { workspace = true, optional = true, default-features = false }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+chrono = { workspace = true }
 hex-literal = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-tokio"] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

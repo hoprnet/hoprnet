@@ -1,15 +1,13 @@
 mod emulator;
 
+pub use blokli_client::{BlokliTestClient, BlokliTestState, exports::Entry};
 pub use emulator::{FullStateEmulator, StaticState};
-
-use std::collections::hash_map::Entry;
-
-pub use blokli_client::{BlokliTestClient, BlokliTestState};
-
 use hopr_api::chain::ChainInfo;
 use hopr_chain_types::ParsedHoprChainAction;
-use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
-use hopr_crypto_types::types::Hash;
+use hopr_crypto_types::{
+    prelude::{Keypair, OffchainKeypair},
+    types::Hash,
+};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -74,7 +72,10 @@ impl BlokliTestStateBuilder {
 
     /// Sets the initial [`AccountEntries`](AccountEntry) in the state.
     #[must_use]
-    pub fn with_accounts<I: IntoIterator<Item = (AccountEntry, HoprBalance, XDaiBalance)>>(mut self, accounts: I) -> Self {
+    pub fn with_accounts<I: IntoIterator<Item = (AccountEntry, HoprBalance, XDaiBalance)>>(
+        mut self,
+        accounts: I,
+    ) -> Self {
         for (account, hopr_balance, native_balance) in accounts {
             match self.0.accounts.entry(account.key_id.into()) {
                 Entry::Occupied(_) => panic!("duplicate key id for account {}", account.chain_addr),
@@ -137,27 +138,38 @@ impl BlokliTestStateBuilder {
     /// The off-chain keys and safe addresses are chosen deterministically using a
     /// pseudorandom function of each given address.
     #[must_use]
-    pub fn with_generated_accounts(self, addresses: &[&Address], public: bool, native: XDaiBalance, token: HoprBalance) -> Self {
+    pub fn with_generated_accounts(
+        self,
+        addresses: &[&Address],
+        public: bool,
+        native: XDaiBalance,
+        token: HoprBalance,
+    ) -> Self {
         let max_id = self.0.accounts.keys().max().copied().unwrap_or(0);
         self.with_accounts(addresses.iter().enumerate().map(|(index, &chain_addr)| {
             let pseudorandom_data = Hash::create(&[chain_addr.as_ref()]);
-            let ok = OffchainKeypair::from_secret(pseudorandom_data.as_ref()).expect("offchain keypair creation cannot fail");
+            let ok = OffchainKeypair::from_secret(pseudorandom_data.as_ref())
+                .expect("offchain keypair creation cannot fail");
             let safe_addr = pseudorandom_data.hash();
-            (AccountEntry {
-                public_key: *ok.public(),
-                chain_addr: *chain_addr,
-                entry_type: if public {
-                    AccountType::Announced(
-                        format!("/ip4/1.2.3.4/udp/{}/p2p/{}", 10000 + index, ok.public().to_peerid_str())
-                            .parse()
-                            .unwrap(),
-                    )
-                } else {
-                    AccountType::NotAnnounced
+            (
+                AccountEntry {
+                    public_key: *ok.public(),
+                    chain_addr: *chain_addr,
+                    entry_type: if public {
+                        AccountType::Announced(
+                            format!("/ip4/1.2.3.4/udp/{}/p2p/{}", 10000 + index, ok.public().to_peerid_str())
+                                .parse()
+                                .unwrap(),
+                        )
+                    } else {
+                        AccountType::NotAnnounced
+                    },
+                    safe_address: Some(Address::new(&safe_addr.as_ref()[0..Address::SIZE])),
+                    key_id: KeyIdent::from(max_id + index as u32),
                 },
-                safe_address: Some(Address::new(&safe_addr.as_ref()[0..Address::SIZE])),
-                key_id: KeyIdent::from(max_id + index as u32),
-            }, token, native)
+                token,
+                native,
+            )
         }))
     }
 
@@ -287,4 +299,3 @@ impl BlokliTestStateBuilder {
         (client, receiver)
     }
 }
-

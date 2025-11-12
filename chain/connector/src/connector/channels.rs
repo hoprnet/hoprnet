@@ -170,37 +170,32 @@ where
             .await?
             .ok_or_else(|| ConnectorError::ChannelDoesNotExist(*channel_id))?;
 
-        let direction = channel.direction(self.me())
-            .ok_or(ConnectorError::InvalidArguments("cannot close channels that is not own"))?;
+        let direction = channel.direction(self.me()).ok_or(ConnectorError::InvalidArguments(
+            "cannot close channels that is not own",
+        ))?;
 
         let tx_req = match channel.status {
             ChannelStatus::Closed => return Err(ConnectorError::ChannelClosed(*channel_id)),
             ChannelStatus::Open => {
                 if direction == ChannelDirection::Outgoing {
                     tracing::debug!(%channel_id, "initiating outgoing channel closure");
-                    self
-                        .payload_generator
+                    self.payload_generator
                         .initiate_outgoing_channel_closure(channel.destination)?
                 } else {
                     tracing::debug!(%channel_id, "closing incoming channel");
-                    self
-                        .payload_generator
-                        .close_incoming_channel(channel.source)?
+                    self.payload_generator.close_incoming_channel(channel.source)?
                 }
-            },
+            }
             c if c.closure_time_elapsed(&std::time::SystemTime::now()) => {
                 if direction == ChannelDirection::Outgoing {
                     tracing::debug!(%channel_id, "finalizing outgoing channel closure");
-                    self
-                        .payload_generator
+                    self.payload_generator
                         .finalize_outgoing_channel_closure(channel.destination)?
                 } else {
                     tracing::debug!(%channel_id, "closing incoming channel");
-                    self
-                        .payload_generator
-                        .close_incoming_channel(channel.source)?
+                    self.payload_generator.close_incoming_channel(channel.source)?
                 }
-            },
+            }
             _ => return Err(ConnectorError::InvalidState("channel closure time has not elapsed")),
         };
 

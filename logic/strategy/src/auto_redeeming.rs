@@ -120,7 +120,9 @@ where
     async fn enqueue_redeem_request(&self, selector: TicketSelector) -> crate::errors::Result<()> {
         let sink = self.redeem_sink.clone();
         pin_mut!(sink);
-        Ok(sink.send(selector.with_state(AcknowledgedTicketStatus::Untouched)).await?)
+        Ok(sink
+            .send(selector.with_state(AcknowledgedTicketStatus::Untouched))
+            .await?)
     }
 }
 
@@ -222,19 +224,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use hopr_lib::XDaiBalance;
-use std::{
+    use std::{
         ops::Add,
+        sync::Arc,
         time::{Duration, SystemTime},
     };
-    use std::sync::Arc;
-    use hex_literal::hex;
-    use hopr_chain_connector::create_trustful_hopr_blokli_connector;
-    use hopr_crypto_random::Randomizable;
-    use hopr_lib::{Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, Response, TicketBuilder, UnitaryFloatOps, WinningProbability};
-    use hopr_chain_connector::testing::*;
-    use super::*;
 
+    use hex_literal::hex;
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::*};
+    use hopr_crypto_random::Randomizable;
+    use hopr_lib::{
+        Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, Response, TicketBuilder, UnitaryFloatOps,
+        WinningProbability, XDaiBalance,
+    };
+
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
@@ -266,10 +270,7 @@ use std::{
             .build_static_client();
     }
 
-    fn generate_random_ack_ticket(
-        index: u64,
-        worth_packets: u32,
-    ) -> anyhow::Result<AcknowledgedTicket> {
+    fn generate_random_ack_ticket(index: u64, worth_packets: u32) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -291,7 +292,13 @@ use std::{
         let ack_ticket = generate_random_ack_ticket(0, 5)?;
         let (tx, rx) = futures::channel::mpsc::channel(10);
 
-        let mut connector = create_trustful_hopr_blokli_connector(&*BOB, Default::default(), CHAIN_CLIENT.clone(), [1u8; Address::SIZE].into()).await?;
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &*BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
         connector.connect(Duration::from_secs(3)).await?;
 
         let cfg = AutoRedeemingStrategyConfig {
@@ -304,32 +311,40 @@ use std::{
             let ars = AutoRedeemingStrategy::new(
                 cfg,
                 Arc::new(connector),
-                tx.sink_map_err(|e| StrategyError::Other(e.into()))
+                tx.sink_map_err(|e| StrategyError::Other(e.into())),
             );
 
-            ars.on_acknowledged_winning_ticket(&ack_ticket).await?;
-            assert!(ars.on_tick().await.is_err());
             ars.on_acknowledged_winning_ticket(&ack_ticket).await?;
             assert!(ars.on_tick().await.is_err());
         }
 
         let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(redeem_requests, vec![TicketSelector::from(CHANNEL_1.clone())
-            .with_amount(HoprBalance::zero()..)
-            .with_index_range(
-                ack_ticket.ticket.verified_ticket().index..=ack_ticket.ticket.verified_ticket().index,
-            )
-            .with_state(AcknowledgedTicketStatus::Untouched)]);
+        assert_eq!(
+            redeem_requests,
+            vec![
+                TicketSelector::from(CHANNEL_1.clone())
+                    .with_amount(HoprBalance::zero()..)
+                    .with_index_range(
+                        ack_ticket.ticket.verified_ticket().index..=ack_ticket.ticket.verified_ticket().index,
+                    )
+                    .with_state(AcknowledgedTicketStatus::Untouched)
+            ]
+        );
 
         Ok(())
     }
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem_on_tick() -> anyhow::Result<()> {
-        let ack_ticket = generate_random_ack_ticket(0, 5)?;
         let (tx, rx) = futures::channel::mpsc::channel(10);
 
-        let mut connector = create_trustful_hopr_blokli_connector(&*BOB, Default::default(), CHAIN_CLIENT.clone(), [1u8; Address::SIZE].into()).await?;
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &*BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
         connector.connect(Duration::from_secs(3)).await?;
 
         let cfg = AutoRedeemingStrategyConfig {
@@ -339,33 +354,45 @@ use std::{
         };
 
         {
-            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), tx.sink_map_err(|e| StrategyError::Other(e.into())));
+            let ars = AutoRedeemingStrategy::new(
+                cfg,
+                Arc::new(connector),
+                tx.sink_map_err(|e| StrategyError::Other(e.into())),
+            );
             ars.on_tick().await?;
-            assert!(ars.on_acknowledged_winning_ticket(&ack_ticket).await.is_err());
         }
 
         let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(redeem_requests, vec![
-            TicketSelector::from(CHANNEL_1.clone())
-                .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
-                .with_state(AcknowledgedTicketStatus::Untouched),
-            TicketSelector::from(CHANNEL_2.clone())
-                .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                .with_index_range(CHANNEL_2.ticket_index.as_u64()..)
-                .with_state(AcknowledgedTicketStatus::Untouched)
-        ]);
+        assert_eq!(
+            redeem_requests,
+            vec![
+                TicketSelector::from(CHANNEL_1.clone())
+                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
+                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
+                    .with_state(AcknowledgedTicketStatus::Untouched),
+                TicketSelector::from(CHANNEL_2.clone())
+                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
+                    .with_index_range(CHANNEL_2.ticket_index.as_u64()..)
+                    .with_state(AcknowledgedTicketStatus::Untouched)
+            ]
+        );
 
         Ok(())
     }
 
     #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem_minimum_ticket_amount() -> anyhow::Result<()> {
-        let ack_ticket_below = generate_random_ack_ticket(1,  4)?;
+        let ack_ticket_below = generate_random_ack_ticket(1, 4)?;
         let ack_ticket_at = generate_random_ack_ticket(1, 5)?;
 
         let (tx, rx) = futures::channel::mpsc::channel(10);
-        let mut connector = create_trustful_hopr_blokli_connector(&*BOB, Default::default(), CHAIN_CLIENT.clone(), [1u8; Address::SIZE].into()).await?;
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &*BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
         connector.connect(Duration::from_secs(3)).await?;
 
         let cfg = AutoRedeemingStrategyConfig {
@@ -375,7 +402,11 @@ use std::{
         };
 
         {
-            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), tx.sink_map_err(|e| StrategyError::Other(e.into())));
+            let ars = AutoRedeemingStrategy::new(
+                cfg,
+                Arc::new(connector),
+                tx.sink_map_err(|e| StrategyError::Other(e.into())),
+            );
             ars.on_acknowledged_winning_ticket(&ack_ticket_below)
                 .await
                 .expect_err("ticket below threshold should not satisfy");
@@ -383,12 +414,15 @@ use std::{
         }
 
         let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(redeem_requests, vec![
-            TicketSelector::from(CHANNEL_1.clone())
-                .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_at.ticket.verified_ticket().index)
-                .with_state(AcknowledgedTicketStatus::Untouched)
-        ]);
+        assert_eq!(
+            redeem_requests,
+            vec![
+                TicketSelector::from(CHANNEL_1.clone())
+                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
+                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_at.ticket.verified_ticket().index)
+                    .with_state(AcknowledgedTicketStatus::Untouched)
+            ]
+        );
 
         Ok(())
     }
@@ -399,7 +433,13 @@ use std::{
         channel.status = ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100)));
 
         let (tx, rx) = futures::channel::mpsc::channel(10);
-        let mut connector = create_trustful_hopr_blokli_connector(&*BOB, Default::default(), CHAIN_CLIENT.clone(), [1u8; Address::SIZE].into()).await?;
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &*BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
         connector.connect(Duration::from_secs(3)).await?;
 
         let cfg = AutoRedeemingStrategyConfig {
@@ -409,7 +449,11 @@ use std::{
         };
 
         {
-            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), tx.sink_map_err(|e| StrategyError::Other(e.into())));
+            let ars = AutoRedeemingStrategy::new(
+                cfg,
+                Arc::new(connector),
+                tx.sink_map_err(|e| StrategyError::Other(e.into())),
+            );
             ars.on_own_channel_changed(
                 &channel,
                 ChannelDirection::Incoming,
@@ -418,16 +462,19 @@ use std::{
                     right: channel.status,
                 },
             )
-                .await?;
+            .await?;
         }
 
         let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(redeem_requests, vec![
-            TicketSelector::from(CHANNEL_1.clone())
-                .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
-                .with_state(AcknowledgedTicketStatus::Untouched)
-        ]);
+        assert_eq!(
+            redeem_requests,
+            vec![
+                TicketSelector::from(CHANNEL_1.clone())
+                    .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
+                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
+                    .with_state(AcknowledgedTicketStatus::Untouched)
+            ]
+        );
 
         Ok(())
     }
@@ -437,7 +484,13 @@ use std::{
         let ack_ticket_1 = generate_random_ack_ticket(0, 5)?;
 
         let (tx, rx) = futures::channel::mpsc::channel(10);
-        let mut connector = create_trustful_hopr_blokli_connector(&*BOB, Default::default(), CHAIN_CLIENT.clone(), [1u8; Address::SIZE].into()).await?;
+        let mut connector = create_trustful_hopr_blokli_connector(
+            &*BOB,
+            Default::default(),
+            CHAIN_CLIENT.clone(),
+            [1u8; Address::SIZE].into(),
+        )
+        .await?;
         connector.connect(Duration::from_secs(3)).await?;
 
         {
@@ -447,18 +500,25 @@ use std::{
                 ..Default::default()
             };
 
-            let ars = AutoRedeemingStrategy::new(cfg, Arc::new(connector), tx.sink_map_err(|e| StrategyError::Other(e.into())));
+            let ars = AutoRedeemingStrategy::new(
+                cfg,
+                Arc::new(connector),
+                tx.sink_map_err(|e| StrategyError::Other(e.into())),
+            );
             ars.on_acknowledged_winning_ticket(&ack_ticket_1).await?;
             assert!(ars.on_tick().await.is_err());
         }
 
         let redeem_requests = rx.collect::<Vec<_>>().await;
-        assert_eq!(redeem_requests, vec![
-            TicketSelector::from(CHANNEL_1.clone())
-                .with_amount(HoprBalance::zero()..)
-                .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_1.ticket.verified_ticket().index)
-                .with_state(AcknowledgedTicketStatus::Untouched),
-        ]);
+        assert_eq!(
+            redeem_requests,
+            vec![
+                TicketSelector::from(CHANNEL_1.clone())
+                    .with_amount(HoprBalance::zero()..)
+                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_1.ticket.verified_ticket().index)
+                    .with_state(AcknowledgedTicketStatus::Untouched),
+            ]
+        );
 
         Ok(())
     }

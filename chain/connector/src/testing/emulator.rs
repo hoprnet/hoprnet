@@ -1,10 +1,12 @@
-use std::ops::Add;
-use std::str::FromStr;
+use std::{ops::Add, str::FromStr};
+
 use blokli_client::{BlokliTestState, BlokliTestStateMutator};
 use hopr_chain_types::{ContractAddresses, ParsedHoprChainAction};
 use hopr_internal_types::channels::generate_channel_id;
-use hopr_primitive_types::balance::{HoprBalance, XDaiBalance};
-use hopr_primitive_types::prelude::Address;
+use hopr_primitive_types::{
+    balance::{HoprBalance, XDaiBalance},
+    prelude::Address,
+};
 
 /// A [`BlokliTestStateMutator`] that does not update the state.
 ///
@@ -13,11 +15,7 @@ use hopr_primitive_types::prelude::Address;
 pub struct StaticState;
 
 impl BlokliTestStateMutator for StaticState {
-    fn update_state(
-        &self,
-        _: &[u8],
-        _: &mut BlokliTestState,
-    ) -> Result<(), blokli_client::errors::BlokliClientError> {
+    fn update_state(&self, _: &[u8], _: &mut BlokliTestState) -> Result<(), blokli_client::errors::BlokliClientError> {
         Err(
             blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("static client must not update state"))
                 .into(),
@@ -73,7 +71,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                             return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                                 "multiaddress must not be empty"
                             ))
-                                .into());
+                            .into());
                         }
                     }
                 } else {
@@ -109,7 +107,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "balance {balance_num} for {sender} is lower than amount {amount}"
                     ))
-                        .into());
+                    .into());
                 }
 
                 balance.balance = blokli_client::api::types::TokenValueString((balance_num - *amount).to_string());
@@ -144,7 +142,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "balance {balance_num} for {sender} is lower than amount {amount}"
                     ))
-                        .into());
+                    .into());
                 }
 
                 balance.balance = blokli_client::api::types::TokenValueString((balance_num - *amount).to_string());
@@ -176,7 +174,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "stake must be greater than zero"
                     ))
-                        .into());
+                    .into());
                 }
 
                 {
@@ -196,7 +194,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                         return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                             "safe balance of {sender} for {sender} is lower than stake {stake}"
                         ))
-                            .into());
+                        .into());
                     }
 
                     safe_balance.balance =
@@ -220,7 +218,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                         return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                             "safe allowance for {sender} is lower than stake {stake}"
                         ))
-                            .into());
+                        .into());
                     }
 
                     safe_allowance.allowance =
@@ -305,7 +303,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "channel {channel_id} is not pending to close"
                     ))
-                        .into());
+                    .into());
                 }
 
                 channel.status = blokli_client::api::types::ChannelStatus::Closed;
@@ -334,7 +332,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "channel {channel_id} is closed"
                     ))
-                        .into());
+                    .into());
                 }
 
                 let channel_ticket_index = u64::from_str(&channel.ticket_index.0).map_err(|_| {
@@ -347,7 +345,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "ticket index of {channel_id} is lower than redeemed ticket index {ticket_index}"
                     ))
-                        .into());
+                    .into());
                 }
 
                 let balance = channel.balance.0.parse::<HoprBalance>().map_err(|_| {
@@ -360,7 +358,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                         "balance of channel {channel_id} is lower than ticket amount {ticket_amount}"
                     ))
-                        .into());
+                    .into());
                 }
 
                 channel.ticket_index = blokli_client::api::types::Uint64(ticket_index.to_string());
@@ -405,9 +403,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
         *state.tx_counts.entry(hex::encode(sender)).or_default() += 1;
 
         let balance = state.native_balances.get_mut(&hex::encode(sender)).ok_or(
-            blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                "missing native balance for {sender}"
-            )),
+            blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!("missing native balance for {sender}")),
         )?;
 
         let balance_num = balance.balance.0.parse::<XDaiBalance>().map_err(|_| {
@@ -420,7 +416,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
             return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
                 "insufficient native funds for tx"
             ))
-                .into());
+            .into());
         }
 
         balance.balance = blokli_client::api::types::TokenValueString((balance_num - EMULATED_TX_PRICE).to_string());

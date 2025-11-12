@@ -116,15 +116,18 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{ops::Deref, str::FromStr, time::Duration};
+
     use futures::StreamExt;
     use futures_time::future::FutureExt;
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-    use hopr_lib::{Address, BytesRepresentable, ChainKeypair, Keypair, XDaiBalance};
-    use hopr_lib::exports::api::chain::{ChainEvent, ChainEvents};
-    use super::*;
+    use hopr_lib::{
+        Address, BytesRepresentable, ChainKeypair, Keypair, XDaiBalance,
+        exports::api::chain::{ChainEvent, ChainEvents},
+    };
 
+    use super::*;
     use crate::{
         auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
         strategy::SingularStrategy,
@@ -170,27 +173,31 @@ mod tests {
             *DAVE,
             5_u32.into(),
             0_u32.into(),
-            ChannelStatus::PendingToClose(std::time::SystemTime::now()),
+            ChannelStatus::PendingToClose(
+                chrono::DateTime::<chrono::Utc>::from_str("2025-11-10T00:00:00+00:00")
+                    .unwrap()
+                    .into(),
+            ),
             0_u32.into(),
         );
 
         let blokli_sim = BlokliTestStateBuilder::default()
-            .with_generated_accounts(&[&*ALICE, &*BOB, &*CHRIS, &*DAVE], false, XDaiBalance::new_base(1), HoprBalance::new_base(1000))
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &*DAVE],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
             .with_channels([c1, c2, c3])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let snapshot = blokli_sim.snapshot();
 
-        let mut chain_connector = create_trustful_hopr_blokli_connector(
-            &BOB_KP,
-            Default::default(),
-            blokli_sim,
-            [1; Address::SIZE].into(),
-        )
-        .await?;
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
         chain_connector.connect(Duration::from_secs(3)).await?;
         let events = chain_connector.subscribe()?;
-
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,
@@ -234,7 +241,9 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await?;
 
-        insta::assert_yaml_snapshot!(*snapshot.refresh());
+        let mut state = snapshot.refresh().deref().clone();
+        state.active_txs.clear(); // Clear non-deterministic data before snapshot comparison
+        insta::assert_yaml_snapshot!(state);
 
         Ok(())
     }

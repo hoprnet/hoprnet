@@ -322,10 +322,12 @@ where
             .sequencer
             .enqueue_transaction(tx_req, self.cfg.tx_confirm_timeout)
             .await?
-            .and_then(|tx| futures::future::ready(
-                ChainReceipt::from_str(&tx.transaction_hash.0)
-                    .map_err(|_| ConnectorError::TypeConversion("invalid tx hash".into()))
-            )))
+            .and_then(|tx| {
+                futures::future::ready(
+                    ChainReceipt::from_str(&tx.transaction_hash.0)
+                        .map_err(|_| ConnectorError::TypeConversion("invalid tx hash".into())),
+                )
+            }))
     }
 }
 

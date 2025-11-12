@@ -44,7 +44,11 @@ where
         }
 
         if channel.epoch as u32 != ticket.verified_ticket().channel_epoch {
-            tracing::error!(channel_epoch = channel.epoch, ticket_epoch = ticket.verified_ticket().channel_epoch, "invalid redeemed ticket epoch");
+            tracing::error!(
+                channel_epoch = channel.epoch,
+                ticket_epoch = ticket.verified_ticket().channel_epoch,
+                "invalid redeemed ticket epoch"
+            );
             return Err(ConnectorError::InvalidTicket);
         }
 
@@ -55,7 +59,11 @@ where
             .map_err(|e| ConnectorError::TypeConversion(format!("unparseable channel index at redemption: {e}")))?;
 
         if channel_index > ticket.verified_ticket().index {
-            tracing::error!(channel_index, ticket_index = ticket.verified_ticket().index, "invalid redeemed ticket index");
+            tracing::error!(
+                channel_index,
+                ticket_index = ticket.verified_ticket().index,
+                "invalid redeemed ticket index"
+            );
             return Err(ConnectorError::InvalidTicket);
         }
 
