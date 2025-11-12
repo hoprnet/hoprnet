@@ -51,6 +51,7 @@ testing = [
   "dep:rstest",
   "dep:tokio",
   "dep:tokio-util",
+  "dep:hex-literal",
   "dep:hopr-chain-connector",
   "dep:hopr-db-node",
   "hopr-chain-connector/testing",
@@ -69,6 +70,7 @@ dashmap = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 futures-concurrency = { workspace = true }
+hex-literal = { workspace = true, optional = true }
 human-bandwidth = { workspace = true, optional = true }
 lazy_static = { workspace = true }
 parking_lot = { workspace = true, optional = true }
