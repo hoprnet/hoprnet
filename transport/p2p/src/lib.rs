@@ -90,7 +90,7 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
 pub struct HoprNetworkBehavior {
     discovery: behavior::discovery::Behaviour,
     streams: libp2p_stream::Behaviour,
-    identify: libp2p_identify::Behaviour,
+    identify: libp2p::identify::Behaviour,
     autonat: autonat::Behaviour,
     kademlia: kad::Behaviour<MemoryStore>,
 }
@@ -109,7 +109,7 @@ impl HoprNetworkBehavior {
         Self {
             streams: libp2p_stream::Behaviour::new(),
             discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events),
-            identify: libp2p_identify::Behaviour::new(libp2p_identify::Config::new(
+            identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
                 "/hopr/identify/1.0.0".to_string(),
                 me.clone(),
             )),
@@ -129,7 +129,7 @@ pub enum HoprNetworkBehaviorEvent {
     TicketAggregation(
         libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
-    Identify(Box<libp2p_identify::Event>),
+    Identify(Box<libp2p::identify::Event>),
     Autonat(autonat::Event),
     Kademlia(kad::Event),
 }
@@ -157,8 +157,8 @@ impl From<libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::r
     }
 }
 
-impl From<libp2p_identify::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p_identify::Event) -> Self {
+impl From<libp2p::identify::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p::identify::Event) -> Self {
         Self::Identify(Box::new(event))
     }
 }

@@ -5248,7 +5248,6 @@ dependencies = [
  "hopr-transport-session",
  "lazy_static",
  "proc-macro-regex",
- "rand 0.8.5",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
@@ -5355,7 +5354,6 @@ dependencies = [
  "libp2p-identify",
  "libp2p-stream",
  "more-asserts",
- "rand 0.8.5",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
@@ -6295,6 +6293,7 @@ dependencies = [
  "libp2p-connection-limits",
  "libp2p-core",
  "libp2p-dns",
+ "libp2p-identify",
  "libp2p-identity",
  "libp2p-kad",
  "libp2p-mdns",
@@ -8054,7 +8053,7 @@ checksum = "440f724eba9f6996b75d63681b0a92b06947f1457076d503a4d2e2c8f56442b8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.106",
+ "syn 2.0.107",
 ]
 
 [[package]]

@@ -9,9 +9,8 @@ use hopr_transport_identity::{
 };
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
-    PeerId, autonat,
-    identity::PublicKey,
-    kad,
+    autonat,
+    multiaddr::Protocol,
     request_response::{OutboundRequestId, ResponseChannel},
     swarm::{NetworkInfo, SwarmEvent},
 };
@@ -375,22 +374,40 @@ impl HoprSwarm {
         }
     }
 
-    pub fn add_to_dht(&mut self, peer_id: &PeerId, multiaddress: &Multiaddr) {
-        let routing_update = self
-            .swarm
-            .behaviour_mut()
-            .kademlia
-            .add_address(peer_id, multiaddress.clone());
+    pub fn run_nat_server(&mut self, port: u16) {
+        info!(listen_on = port, "Starting NAT server");
 
-        info!(%peer_id, %multiaddress, ?routing_update, "DHT announce self");
-
-        let entry_key = kad::RecordKey::new(&peer_id.into());
-        match self.swarm.behaviour_mut().kademlia.start_providing(entry_key) {
-            Ok(query_id) => {
-                info!(%peer_id, %multiaddress, %query_id, "DHT announce started");
+        match self.swarm.listen_on(
+            Multiaddr::empty()
+                .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+                .with(Protocol::Tcp(port)),
+        ) {
+            Ok(_) => {
+                info!("NAT server started");
             }
             Err(e) => {
-                error!(%peer_id, %multiaddress, %e, "DHT announce failed to start");
+                warn!(error = %e, "Failed to listen on NAT server");
+            }
+        }
+    }
+
+    pub fn dial_nat_server(&mut self, addresses: Vec<Multiaddr>) {
+        // let dial_opts = DialOpts::peer_id(PeerId::random())
+        //     .addresses(addresses)
+        //     .extend_addresses_through_behaviour()
+        //     .build();
+        info!(
+            num_addresses = addresses.len(),
+            "Dialing NAT servers with multiple candidate addresses"
+        );
+
+        for addr in addresses {
+            let dial_opts = DialOpts::unknown_peer_id().address(addr.clone()).build();
+            if let Err(e) = self.swarm.dial(dial_opts) {
+                warn!(%addr, %e, "Failed to dial NAT server address");
+            } else {
+                info!(%addr, "Dialed NAT server address");
+                break;
             }
         }
     }
