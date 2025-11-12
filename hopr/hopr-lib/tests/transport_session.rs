@@ -1,13 +1,14 @@
 use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
+use futures_time::future::FutureExt as _;
 use hopr_lib::{
     HoprBalance, HoprTransportError, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
     SurbBalancerConfig,
     errors::HoprLibError,
     exports::transport::session::{IpOrHost, SealedHost},
     testing::{
-        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes, exclusive_indexes_not_auto_redeeming},
         hopr::ChannelGuard,
     },
 };
@@ -55,9 +56,7 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[cfg(feature = "session-client")]
 #[test_log::test]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    use futures_time::future::FutureExt as _;
-
-    let [src, mid, dst] = exclusive_indexes::<3>();
+    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         vec![
@@ -163,9 +162,7 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    use hopr_primitive_types::bounded::BoundedVec;
-
-    let [src, mid, dst] = exclusive_indexes::<3>();
+    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         vec![
