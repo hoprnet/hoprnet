@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ChainActionsError","HoprChainError"],"type":["Result"]};

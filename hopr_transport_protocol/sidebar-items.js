@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ACK_OUT_BUFFER_SIZE","CURRENT_HOPR_MSG_PROTOCOL","NUM_CONCURRENT_ACK_OUT_PROCESSING","NUM_CONCURRENT_TICKET_ACK_PROCESSING","TICKET_ACK_BUFFER_SIZE"],"enum":["PeerDiscovery","ProtocolProcesses"],"fn":["run_msg_ack_protocol"],"mod":["config","errors","heartbeat","processor","stream","timer"],"type":["HoprBinaryCodec"]};
