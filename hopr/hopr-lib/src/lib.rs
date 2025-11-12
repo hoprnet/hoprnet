@@ -327,7 +327,7 @@ impl Hopr {
                 logs_snapshot_url: cfg.chain.logs_snapshot_url.clone(),
                 data_directory: cfg.db.data.clone(),
             },
-        )?;
+        ).await?;
 
         let hopr_transport_api = HoprTransport::new(
             me,
