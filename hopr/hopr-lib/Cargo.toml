@@ -132,5 +132,5 @@ hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",
   "session-client",
-  "testing"
+  "testing",
 ] }
