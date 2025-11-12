@@ -198,7 +198,7 @@ where
                     hopr_async_runtime::prelude::spawn_blocking(move || {
                         graph.write().add_edge(src.key_id, dst.key_id, channel.get_id());
                         backend
-                            .insert_channel(channel.clone())
+                            .insert_channel(channel)
                             .map(|old| (channel, old.map(|old| old.diff(&channel))))
                     })
                     .map_err(|e| ConnectorError::BackendError(e.into()))

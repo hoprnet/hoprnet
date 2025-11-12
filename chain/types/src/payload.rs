@@ -276,7 +276,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
     fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
         if dest.eq(&self.me) {
-            return Err(InvalidArguments("Cannot fund channel to self".into()));
+            return Err(InvalidArguments("Cannot fund channel to self"));
         }
 
         let tx = TransactionRequest::default()
@@ -293,7 +293,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
     fn close_incoming_channel(&self, source: Address) -> Result<Self::TxRequest> {
         if source.eq(&self.me) {
-            return Err(InvalidArguments("Cannot close incoming channel from self".into()));
+            return Err(InvalidArguments("Cannot close incoming channel from self"));
         }
 
         let tx = TransactionRequest::default()
@@ -304,9 +304,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
     fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest> {
         if destination.eq(&self.me) {
-            return Err(InvalidArguments(
-                "Cannot initiate closure of incoming channel to self".into(),
-            ));
+            return Err(InvalidArguments("Cannot initiate closure of incoming channel to self"));
         }
 
         let tx = TransactionRequest::default()
@@ -322,9 +320,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
 
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest> {
         if destination.eq(&self.me) {
-            return Err(InvalidArguments(
-                "Cannot initiate closure of incoming channel to self".into(),
-            ));
+            return Err(InvalidArguments("Cannot initiate closure of incoming channel to self"));
         }
 
         let tx = TransactionRequest::default()
@@ -360,9 +356,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
     }
 
     fn deregister_node_by_safe(&self) -> Result<Self::TxRequest> {
-        Err(InvalidState(
-            "Can only deregister an address if Safe is activated".into(),
-        ))
+        Err(InvalidState("Can only deregister an address if Safe is activated"))
     }
 }
 
@@ -403,7 +397,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         } else if WxHOPR::is::<C>() {
             self.contract_addrs.token
         } else {
-            return Err(InvalidArguments("invalid currency".into()));
+            return Err(InvalidArguments("invalid currency"));
         };
         let tx = transfer_tx(destination, amount)
             .with_to(a2h(to))
@@ -453,13 +447,11 @@ impl PayloadGenerator for SafePayloadGenerator {
 
     fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
         if dest.eq(&self.me) {
-            return Err(InvalidArguments("Cannot fund channel to self".into()));
+            return Err(InvalidArguments("Cannot fund channel to self"));
         }
 
         if amount.amount() > hopr_primitive_types::prelude::U256::from(ChannelEntry::MAX_CHANNEL_BALANCE) {
-            return Err(InvalidArguments(
-                "Cannot fund channel with amount larger than 96 bits".into(),
-            ));
+            return Err(InvalidArguments("Cannot fund channel with amount larger than 96 bits"));
         }
 
         let call_data = fundChannelSafeCall {
@@ -479,7 +471,7 @@ impl PayloadGenerator for SafePayloadGenerator {
 
     fn close_incoming_channel(&self, source: Address) -> Result<Self::TxRequest> {
         if source.eq(&self.me) {
-            return Err(InvalidArguments("Cannot close incoming channel from self".into()));
+            return Err(InvalidArguments("Cannot close incoming channel from self"));
         }
 
         let call_data = closeIncomingChannelSafeCall {
@@ -498,9 +490,7 @@ impl PayloadGenerator for SafePayloadGenerator {
 
     fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest> {
         if destination.eq(&self.me) {
-            return Err(InvalidArguments(
-                "Cannot initiate closure of incoming channel to self".into(),
-            ));
+            return Err(InvalidArguments("Cannot initiate closure of incoming channel to self"));
         }
 
         let call_data = initiateOutgoingChannelClosureSafeCall {
@@ -519,9 +509,7 @@ impl PayloadGenerator for SafePayloadGenerator {
 
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest> {
         if destination.eq(&self.me) {
-            return Err(InvalidArguments(
-                "Cannot initiate closure of incoming channel to self".into(),
-            ));
+            return Err(InvalidArguments("Cannot initiate closure of incoming channel to self"));
         }
 
         let call_data = finalizeOutgoingChannelClosureSafeCall {
@@ -638,7 +626,7 @@ fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRe
             porSecret: U256::from_be_slice(off_chain.response.as_ref()),
         })
     } else {
-        Err(InvalidArguments("Acknowledged ticket must be signed".into()))
+        Err(InvalidArguments("Acknowledged ticket must be signed"))
     }
 }
 

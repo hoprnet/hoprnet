@@ -48,7 +48,7 @@ pub struct ContractAddresses {
     pub module_implementation: Address,
 }
 
-impl<'a> IntoIterator for &'a ContractAddresses {
+impl IntoIterator for &ContractAddresses {
     type IntoIter = std::vec::IntoIter<Address>;
     type Item = Address;
 

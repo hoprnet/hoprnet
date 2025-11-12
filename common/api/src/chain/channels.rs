@@ -85,10 +85,8 @@ impl ChannelSelector {
             }
         }
 
-        if !self.allowed_states.is_empty() {
-            if !self.allowed_states.contains(&entry.status.discriminant()) {
-                return false;
-            }
+        if !self.allowed_states.is_empty() && !self.allowed_states.contains(&entry.status.discriminant()) {
+            return false;
         }
 
         if let ChannelStatus::PendingToClose(time) = &entry.status {

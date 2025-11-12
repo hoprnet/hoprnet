@@ -125,7 +125,7 @@ where
         key: &OffchainKeypair,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>> {
         self.check_connection_state()
-            .map_err(|e| AnnouncementError::ProcessingError(e))?;
+            .map_err(AnnouncementError::ProcessingError)?;
 
         let new_announced_addrs = ahash::HashSet::from_iter(multiaddrs.iter().map(|a| a.to_string()));
 

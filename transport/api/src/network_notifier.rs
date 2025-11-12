@@ -92,7 +92,7 @@ where
             }
         };
 
-        if let Err(error) = self.network.update(&peer, result).await {
+        if let Err(error) = self.network.update(peer, result).await {
             error!(%error, "Encountered error on on updating the collected ping data")
         }
     }

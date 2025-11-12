@@ -77,7 +77,7 @@ pub(crate) async fn process_channel_changes_into_events(
             } => {
                 tracing::debug!(id = %new_channel.get_id(), "channel pending to close");
                 let _ = event_tx
-                    .broadcast_direct(ChainEvent::ChannelClosureInitiated(new_channel.clone()))
+                    .broadcast_direct(ChainEvent::ChannelClosureInitiated(new_channel))
                     .await;
             }
             ChannelChange::Status {
@@ -85,29 +85,25 @@ pub(crate) async fn process_channel_changes_into_events(
                 right: ChannelStatus::Closed,
             } => {
                 tracing::debug!(id = %new_channel.get_id(), "channel closed");
-                let _ = event_tx
-                    .broadcast_direct(ChainEvent::ChannelClosed(new_channel.clone()))
-                    .await;
+                let _ = event_tx.broadcast_direct(ChainEvent::ChannelClosed(new_channel)).await;
             }
             ChannelChange::Status {
                 left: ChannelStatus::Closed,
                 right: ChannelStatus::Open,
             } => {
                 tracing::debug!(id = %new_channel.get_id(), "channel reopened");
-                let _ = event_tx
-                    .broadcast_direct(ChainEvent::ChannelOpened(new_channel.clone()))
-                    .await;
+                let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new_channel)).await;
             }
             ChannelChange::Balance { left, right } => {
                 if left > right {
                     tracing::debug!(id = %new_channel.get_id(), "channel balance decreased");
                     let _ = event_tx
-                        .broadcast_direct(ChainEvent::ChannelBalanceDecreased(new_channel.clone(), left - right))
+                        .broadcast_direct(ChainEvent::ChannelBalanceDecreased(new_channel, left - right))
                         .await;
                 } else {
                     tracing::debug!(id = %new_channel.get_id(), "channel balance increased");
                     let _ = event_tx
-                        .broadcast_direct(ChainEvent::ChannelBalanceIncreased(new_channel.clone(), right - left))
+                        .broadcast_direct(ChainEvent::ChannelBalanceIncreased(new_channel, right - left))
                         .await;
                 }
             }
@@ -122,13 +118,13 @@ pub(crate) async fn process_channel_changes_into_events(
                 Some(ChannelDirection::Outgoing) => {
                     tracing::debug!(id = %new_channel.get_id(), "counterparty has redeemed ticket on our channel");
                     let _ = event_tx
-                        .broadcast_direct(ChainEvent::TicketRedeemed(new_channel.clone(), None))
+                        .broadcast_direct(ChainEvent::TicketRedeemed(new_channel, None))
                         .await;
                 }
                 None => {
                     tracing::debug!(id = %new_channel.get_id(), "ticket redeemed on foreign channel");
                     let _ = event_tx
-                        .broadcast_direct(ChainEvent::TicketRedeemed(new_channel.clone(), None))
+                        .broadcast_direct(ChainEvent::TicketRedeemed(new_channel, None))
                         .await;
                 }
             },

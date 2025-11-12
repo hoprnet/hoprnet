@@ -66,7 +66,7 @@ impl ParsedHoprChainAction {
         module: &Address,
         contract_addresses: &ContractAddresses,
     ) -> Result<(Self, Address), ChainTypesError> {
-        let tx = alloy::consensus::TxEnvelope::decode_2718_exact(signed_tx.as_ref())
+        let tx = alloy::consensus::TxEnvelope::decode_2718_exact(signed_tx)
             .map_err(|e| ChainTypesError::ParseError(e.into()))?
             .into_signed();
 
@@ -88,7 +88,7 @@ impl ParsedHoprChainAction {
             let module_call = execTransactionFromModuleCall::abi_decode(tx.input().as_ref())
                 .map_err(|e| ChainTypesError::ParseError(e.into()))?;
             (module_call.to.0.0.into(), module_call.data, true)
-        } else if let Some(_) = contract_addresses.into_iter().find(|addr| addr == &tx_target) {
+        } else if contract_addresses.into_iter().any(|addr| addr == tx_target) {
             (tx_target, tx.input().clone(), false)
         } else if tx.value() > 0 {
             return Ok((
@@ -143,8 +143,8 @@ impl ParsedHoprChainAction {
                 return Ok((
                     Self::RedeemTicket {
                         channel_id: ticket_data.channelId.0.into(),
-                        ticket_index: U256::from_be_bytes(&ticket_data.ticketIndex.to_be_bytes::<6>()).as_u64(),
-                        ticket_amount: HoprBalance::from_be_bytes(&ticket_data.amount.to_be_bytes::<12>()),
+                        ticket_index: U256::from_be_bytes(ticket_data.ticketIndex.to_be_bytes::<6>()).as_u64(),
+                        ticket_amount: HoprBalance::from_be_bytes(ticket_data.amount.to_be_bytes::<12>()),
                     },
                     signer,
                 ));
@@ -190,8 +190,8 @@ impl ParsedHoprChainAction {
                 return Ok((
                     Self::RedeemTicket {
                         channel_id: ticket_data.channelId.0.into(),
-                        ticket_index: U256::from_be_bytes(&ticket_data.ticketIndex.to_be_bytes::<6>()).as_u64(),
-                        ticket_amount: HoprBalance::from_be_bytes(&ticket_data.amount.to_be_bytes::<12>()),
+                        ticket_index: U256::from_be_bytes(ticket_data.ticketIndex.to_be_bytes::<6>()).as_u64(),
+                        ticket_amount: HoprBalance::from_be_bytes(ticket_data.amount.to_be_bytes::<12>()),
                     },
                     signer,
                 ));

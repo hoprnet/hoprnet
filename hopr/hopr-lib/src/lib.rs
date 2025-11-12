@@ -206,7 +206,7 @@ where
             warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
         }
 
-        let multiaddress: Multiaddr = (&cfg.host).try_into().map_err(|e| HoprLibError::TransportError(e))?;
+        let multiaddress: Multiaddr = (&cfg.host).try_into().map_err(HoprLibError::TransportError)?;
 
         let my_multiaddresses = vec![multiaddress];
 

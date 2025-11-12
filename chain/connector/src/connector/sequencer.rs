@@ -79,7 +79,7 @@ where
                     {
                         nonce_inc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
-                    if let Err(_) = notifier.send(res) {
+                    if notifier.send(res).is_err() {
                         tracing::debug!(
                             "failed to notify transaction result - the caller may not want to await the result \
                              anymore."
@@ -108,7 +108,7 @@ where
         let sender = self
             .sender
             .as_ref()
-            .ok_or(ConnectorError::InvalidState("transaction sender not started".into()))?;
+            .ok_or(ConnectorError::InvalidState("transaction sender not started"))?;
 
         let (notifier_tx, notifier_rx) = futures::channel::oneshot::channel();
 
@@ -116,12 +116,12 @@ where
             .clone()
             .send((transaction, notifier_tx))
             .await
-            .map_err(|_| ConnectorError::InvalidState("transaction queue dropped".into()))?;
+            .map_err(|_| ConnectorError::InvalidState("transaction queue dropped"))?;
 
         Ok(notifier_rx
             .map(move |result| {
                 result
-                    .map_err(|_| ConnectorError::InvalidState("transaction notifier dropped".into()))
+                    .map_err(|_| ConnectorError::InvalidState("transaction notifier dropped"))
                     .and_then(|tx_res| tx_res.map(|id| (id, timeout_until_finalized)))
             })
             .and_then(|(tx_id, timeout)| {

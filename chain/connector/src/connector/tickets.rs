@@ -108,7 +108,7 @@ where
                         if let Some(reject_error) = tx_tracking_error.as_transaction_rejection_error() {
                             TicketRedeemError::Rejected(ticket.ticket.clone(), format!("on-chain rejection: {reject_error:?}"))
                         } else {
-                            TicketRedeemError::ProcessingError(ticket.ticket.clone(), tx_tracking_error.into())
+                            TicketRedeemError::ProcessingError(ticket.ticket.clone(), tx_tracking_error)
                         })
                     .and_then(move |receipt| futures::future::ok((ticket_clone.ticket, receipt)))
                     .boxed())
@@ -118,7 +118,7 @@ where
             | Err(e @ ConnectorError::ChannelClosed(_)) => {
                 Err(TicketRedeemError::Rejected(ticket.ticket, e.to_string()))
             }
-            Err(e) => Err(TicketRedeemError::ProcessingError(ticket.ticket, e.into())),
+            Err(e) => Err(TicketRedeemError::ProcessingError(ticket.ticket, e)),
         }
     }
 }
