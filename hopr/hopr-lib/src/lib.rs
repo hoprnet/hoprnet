@@ -449,7 +449,7 @@ impl Hopr {
             "Cannot start the hopr node multiple times".into(),
         )?;
 
-        #[cfg(feature = "disable_test_check")]
+        #[cfg(feature = "testing")]
         warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
 
         info!(
@@ -487,7 +487,7 @@ impl Hopr {
             ));
         }
 
-        #[cfg(not(feature = "disable_test_check"))]
+        #[cfg(not(feature = "testing"))]
         {
             // Once we are able to query the chain,
             // check if the winning probability is configured correctly.

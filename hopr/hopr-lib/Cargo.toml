@@ -55,8 +55,6 @@ testing = [
   "dep:tokio-util",
   "dep:hopr-chain-rpc",
 ] # testing related functionality
-disable_test_check = [
-] # disable the test that checks that features used in tests are also enabled in the lib
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
