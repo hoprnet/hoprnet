@@ -5348,7 +5348,6 @@ dependencies = [
  "libp2p-identify",
  "libp2p-stream",
  "more-asserts",
- "rand 0.8.5",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
