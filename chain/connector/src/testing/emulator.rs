@@ -33,6 +33,19 @@ pub struct FullStateEmulator(
 
 const EMULATED_TX_PRICE: u128 = 1_u128;
 
+impl FullStateEmulator {
+    pub fn new(module: Address) -> Self {
+        Self(module, None)
+    }
+
+    pub fn new_with_chain_events_interceptor(
+        module: Address,
+    ) -> (Self, impl futures::Stream<Item = ParsedHoprChainAction>) {
+        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        (Self(module, Some(sender)), receiver)
+    }
+}
+
 impl BlokliTestStateMutator for FullStateEmulator {
     fn update_state(
         &self,

@@ -696,7 +696,7 @@ mod tests {
     use super::*;
     use crate::{
         Address, ApplicationData, ApplicationDataIn, ApplicationDataOut, DestinationRouting, HoprPseudonym,
-        HoprSession, HoprSessionId, RoutingOptions,
+        HoprSession, RoutingOptions, SessionId,
     };
 
     fn loopback_transport() -> (
@@ -723,7 +723,7 @@ mod tests {
     #[tokio::test]
     async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received()
     -> anyhow::Result<()> {
-        let session_id = HoprSessionId::new(4567u64, HoprPseudonym::random());
+        let session_id = SessionId::new(4567u64, HoprPseudonym::random());
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = HoprSession::new(
             session_id,
@@ -765,7 +765,7 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received()
     -> anyhow::Result<()> {
-        let session_id = HoprSessionId::new(4567u64, HoprPseudonym::random());
+        let session_id = SessionId::new(4567u64, HoprPseudonym::random());
         let peer: Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = HoprSession::new(
             session_id,

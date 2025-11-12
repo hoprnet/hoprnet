@@ -21,6 +21,8 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
+  "hopr-chain-connector?/runtime-tokio",
+  "hopr-db-node?/runtime-tokio",
   "dep:tokio",
 ]
 prometheus = [
@@ -49,6 +51,9 @@ testing = [
   "dep:rstest",
   "dep:tokio",
   "dep:tokio-util",
+  "dep:hopr-chain-connector",
+  "dep:hopr-db-node",
+  "hopr-chain-connector/testing",
 ] # testing related functionality
 
 [dependencies]
@@ -86,6 +91,8 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-chain-connector = { workspace = true, optional = true }
+hopr-db-node = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
@@ -108,7 +115,10 @@ test-log = { workspace = true }
 url = { workspace = true }
 
 hopr-db-node = { workspace = true }
-hopr-chain-connector = { workspace = true }
+hopr-chain-connector = { workspace = true, features = [
+  "runtime-tokio",
+  "testing",
+] }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",

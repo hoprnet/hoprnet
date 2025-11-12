@@ -5,14 +5,12 @@ use hopr_api::{
     chain::{HoprBalance, HoprChainApi},
     db::HoprNodeDbApi,
 };
-use hopr_crypto_types::{
-    keypairs::ChainKeypair,
-    prelude::{Keypair, OffchainKeypair},
-};
+use hopr_crypto_types::prelude::*;
 use hopr_transport::Hash;
 
 use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude};
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NodeSafeConfig {
     pub safe_address: Address,
     pub module_address: Address,
@@ -20,7 +18,6 @@ pub struct NodeSafeConfig {
 
 pub struct TestedHopr<C, Db> {
     pub instance: Arc<Hopr<C, Db>>,
-    pub safe_config: NodeSafeConfig,
 }
 
 impl<C, Db> TestedHopr<C, Db>
@@ -29,7 +26,8 @@ where
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
 {
     pub async fn new(
-        chain_keys: ChainKeypair,
+        chain_key: ChainKeypair,
+        offchain_key: OffchainKeypair,
         host_port: u16,
         node_db: Db,
         connector: C,
@@ -68,15 +66,14 @@ where
             },
             connector,
             node_db,
-            &OffchainKeypair::random(),
-            &chain_keys,
+            &offchain_key,
+            &chain_key,
         )
         .await
         .expect(format!("failed to create hopr instance on port {host_port}").as_str());
 
         Self {
             instance: std::sync::Arc::new(instance),
-            safe_config: safe,
         }
     }
 

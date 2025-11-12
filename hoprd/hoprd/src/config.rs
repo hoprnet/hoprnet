@@ -373,17 +373,11 @@ mod tests {
 
     use anyhow::Context;
     use clap::{Args, Command, FromArgMatches};
-    use hopr_lib::HostType;
     use tempfile::NamedTempFile;
 
     use super::*;
 
     pub fn example_cfg() -> anyhow::Result<HoprdConfig> {
-        let db = hopr_lib::config::Db {
-            data: "/app/db".to_owned(),
-            ..hopr_lib::config::Db::default()
-        };
-
         let safe_module = hopr_lib::config::SafeModule {
             safe_transaction_service_provider: "https:://provider.com/".to_owned(),
             safe_address: Address::from_str("0x0000000000000000000000000000000000000000")?,
@@ -404,9 +398,12 @@ mod tests {
         Ok(HoprdConfig {
             hopr: HoprLibConfig {
                 host,
-                db,
                 safe_module,
                 ..HoprLibConfig::default()
+            },
+            db: Db {
+                data: "/app/db".to_owned(),
+                ..Default::default()
             },
             identity,
             ..HoprdConfig::default()

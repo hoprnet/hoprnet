@@ -56,13 +56,13 @@ lazy_static! {
         .with_accounts(PEERS.iter().enumerate().map(|(i, kp)| {
             let node_key = kp.public();
             let chain_key = PEERS_CHAIN[i].public();
-            AccountEntry {
+            (AccountEntry {
                 public_key: *node_key,
                 chain_addr: chain_key.to_address(),
                 entry_type: AccountType::Announced("/ip4/127.0.0.1/tcp/4444".parse().unwrap()),
                 safe_address: None,
                 key_id: (i as u32).into(),
-            }
+            }, HoprBalance::new_base(1000), XDaiBalance::new_base(1))
         }))
         .with_channels(PEERS_CHAIN.iter().take(PEERS_CHAIN.len()-1).enumerate().map(|(i, cp)| {
             create_dummy_channel(cp.public().to_address(), PEERS_CHAIN[i+1].public().to_address())
