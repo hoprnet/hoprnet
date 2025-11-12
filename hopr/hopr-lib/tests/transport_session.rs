@@ -16,7 +16,7 @@ use rstest::rstest;
 use serial_test::serial;
 use tokio::time::sleep;
 
-const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
+const FUNDING_AMOUNT: &str = "1 wxHOPR";
 
 #[rstest]
 #[tokio::test]
