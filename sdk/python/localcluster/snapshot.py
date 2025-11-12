@@ -61,7 +61,7 @@ class Snapshot:
     def usable(self):
         expected_files = [
             self.sdir.joinpath(ANVIL_FOLDER_NAME),
-            self.sdir.joinpath("barebone-lower-win-prob.cfg.yaml"),
+            # self.sdir.joinpath("barebone-lower-win-prob.cfg.yaml"), # removed as no node uses this config to allow hopli tests to run
             self.sdir.joinpath("barebone.cfg.yaml"),
             self.sdir.joinpath("default.cfg.yaml"),
         ]
