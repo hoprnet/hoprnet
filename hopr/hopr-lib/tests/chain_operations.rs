@@ -4,7 +4,7 @@ use anyhow::Context;
 use hopr_lib::{
     ChannelId,
     testing::{
-        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes, exclusive_indexes_not_auto_redeeming},
         hopr::TestedHopr,
     },
 };
@@ -131,7 +131,7 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
 #[rstest]
 #[tokio::test]
 #[serial]
-async fn test_channel_funding_should_be_visible_in_channel_stake(
+async fn channel_funding_should_be_visible_in_channel_stake(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     use hopr_lib::HoprBalance;
@@ -244,5 +244,59 @@ async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> a
 
     assert_eq!(final_balance_dst, initial_balance_dst + withdrawn_amount);
     assert!(final_balance_src < initial_balance_src - withdrawn_amount); // account for gas
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn ticket_price_is_set_to_non_zero_value_on_start(
+    #[future(awt)] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
+    let [node] = exclusive_indexes::<1>();
+
+    let ticket_price = cluster_fixture[node]
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+
+    assert!(ticket_price > hopr_lib::HoprBalance::zero());
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [node] = exclusive_indexes::<1>();
+    let oracle_price = cluster_fixture.get_oracle_ticket_price().await?;
+
+    let ticket_price = cluster_fixture[node]
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+
+    assert_eq!(ticket_price, oracle_price);
+
+    Ok(())
+}
+
+#[rstest]
+#[tokio::test]
+#[serial]
+async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [node] = exclusive_indexes_not_auto_redeeming::<1>();
+
+    let winning_prob = cluster_fixture[node]
+        .inner()
+        .get_minimum_incoming_ticket_win_probability()
+        .await
+        .context("failed to get winning probability")?;
+
+    assert!(winning_prob.as_f64() == 1.0);
+
     Ok(())
 }

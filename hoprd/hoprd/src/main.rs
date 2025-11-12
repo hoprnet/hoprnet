@@ -272,10 +272,6 @@ async fn main_inner() -> anyhow::Result<()> {
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
 
-    if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
-        warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
-    }
-
     if cfg!(debug_assertions) {
         warn!("Executable was built using the DEBUG profile.");
     } else {

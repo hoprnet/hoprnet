@@ -42,7 +42,6 @@ futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
 proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true, optional = true }
-rand = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }

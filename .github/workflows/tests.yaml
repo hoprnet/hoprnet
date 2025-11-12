@@ -173,12 +173,14 @@ jobs:
       matrix:
         suite:
           - hopli
-          - websocket_api
-          - rest_api
-          - session
-          - integration
-          - redeeming
-          - win_prob
+          # disable other suites as those should be covered by the rust integration test suite.
+          # hopli is kept as it covers a different code path.
+          # - websocket_api
+          # - rest_api
+          # - session
+          # - integration
+          # - redeeming
+          # - win_prob 
     if: github.event.pull_request.draft == false
     steps:
       - name: Harden Runner

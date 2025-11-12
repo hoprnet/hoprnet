@@ -109,6 +109,7 @@ hex-literal = { workspace = true }
 mockall = { workspace = true }
 mockito = { workspace = true }
 parameterized = { workspace = true }
+rand = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 serde_yaml = { workspace = true }

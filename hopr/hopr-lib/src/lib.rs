@@ -316,6 +316,9 @@ where
             "Cannot start the hopr node multiple times".into(),
         )?;
 
+        #[cfg(feature = "testing")]
+        warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
+
         info!(
             address = %self.me_onchain(), minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
             "Node is not started, please fund this node",
@@ -378,11 +381,12 @@ where
             && configured_win_prob
                 .and_then(|c| WinningProbability::try_from(c).ok())
                 .is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
-        {
-            return Err(HoprLibError::GeneralError(format!(
-                "configured outgoing ticket winning probability is lower than the network minimum winning \
-                 probability: {configured_win_prob:?} < {network_min_win_prob}"
-            )));
+            {
+                return Err(HoprLibError::GeneralError(format!(
+                    "configured outgoing ticket winning probability is lower than the network minimum winning \
+                     probability: {configured_win_prob:?} < {network_min_win_prob}"
+                )));
+            }
         }
 
         self.state.store(state::HoprState::Indexing, Ordering::Relaxed);

@@ -1,12 +1,14 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
+use futures::future::join_all;
 use hopr_api::{
     chain::{HoprBalance, HoprChainApi},
     db::HoprNodeDbApi,
 };
 use hopr_crypto_types::prelude::*;
 use hopr_transport::Hash;
+use tokio::time::sleep;
 
 use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude};
 
@@ -32,6 +34,8 @@ where
         node_db: Db,
         connector: C,
         safe: NodeSafeConfig,
+        auto_redeems: bool,
+        winn_prob: Option<f64>,
     ) -> Self {
         let instance = Hopr::new(
             crate::config::HoprLibConfig {
@@ -60,6 +64,10 @@ where
                 },
                 session: hopr_transport::config::SessionGlobalConfig {
                     idle_timeout: Duration::from_millis(2500),
+                    ..Default::default()
+                },
+                protocol: hopr_transport::config::ProtocolConfig {
+                    outgoing_ticket_winning_prob: winn_prob,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -108,9 +116,7 @@ where
 ///
 /// Cleans up the opened channels on drop.
 pub struct ChannelGuard<C, Db> {
-    /// Prepared for the implementation of Drop and closing
-    #[allow(dead_code)]
-    channels: Vec<(Arc<Hopr<C, Db>>, Hash)>,
+    pub channels: Vec<(Arc<Hopr<C, Db>>, Hash)>,
 }
 
 impl<C, Db> ChannelGuard<C, Db>
@@ -118,7 +124,9 @@ where
     C: HoprChainApi + Clone + Send + Sync + 'static,
     Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
 {
-    #[must_use]
+    pub fn channel_id(&self, index: usize) -> &Hash {
+        &self.channels[index].1
+    }
     pub async fn try_open_channels_for_path<I, T>(path: I, funding: HoprBalance) -> anyhow::Result<Self>
     where
         I: IntoIterator<Item = T>,
@@ -129,7 +137,7 @@ where
         let path: Vec<Arc<Hopr<C, Db>>> = path.into_iter().map(|item| item.into()).collect();
         let path_len = path.len();
 
-        // no need for a channel to the last node from previous to last
+        // no need for a channel to the last node from penultimate
         for window in path.into_iter().take(path_len - 1).collect::<Vec<_>>().windows(2) {
             let src = &window[0];
             let dst = &window[1];
@@ -143,5 +151,59 @@ where
         }
 
         Ok(Self { channels })
+    }
+
+    pub async fn try_to_get_all_ticket_counts(&self) -> anyhow::Result<Vec<usize>> {
+        let futures = self.channels.iter().map(|(hopr, channel_id)| async move {
+            hopr.tickets_in_channel(&channel_id)
+                .await
+                .context("getting ticket statistics must succeed")
+                .into_iter()
+                .count()
+        });
+
+        let stats = join_all(futures).await;
+        Ok(stats)
+    }
+
+    pub async fn try_close_channels_all_channels(&self) -> anyhow::Result<()> {
+        let futures = self.channels.iter().map(|(hopr, channel_id)| {
+            let hopr = hopr.clone();
+            let channel_id = channel_id.clone();
+            async move {
+                hopr.close_channel_by_id(&channel_id)
+                    .await
+                    .context("closing channel must succeed")
+            }
+        });
+
+        join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
+
+        sleep(Duration::from_secs(2)).await;
+
+        let futures = self.channels.iter().map(|(hopr, channel_id)| {
+            let hopr = hopr.clone();
+            let channel_id = channel_id.clone();
+            async move {
+                hopr.close_channel_by_id(&channel_id)
+                    .await
+                    .context("closing channel must succeed")
+            }
+        });
+
+        join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()?;
+
+        Ok(())
+    }
+}
+
+impl Drop for ChannelGuard {
+    fn drop(&mut self) {
+        let channels = self.channels.clone();
+        tokio::spawn(async move {
+            for (hopr, channel_id) in channels {
+                let _ = hopr.close_channel_by_id(&channel_id).await;
+            }
+        });
     }
 }
