@@ -496,31 +496,38 @@ where
         if let Err(error) = self
             .chain_api
             .register_safe(&self.cfg.safe_module.safe_address)
+            .and_then(identity)
             .map_err(HoprLibError::chain)
-            .await?
             .await
         {
             // Intentionally ignoring the errored state
             error!(%error, "Failed to register node with safe")
         }
 
-        if self.is_public() {
-            // At this point the node is already registered with Safe, so
-            // we can announce via Safe-compliant TX
+        // Only public nodes announce multiaddresses
+        let multiaddresses_to_announce = if self.is_public() {
+            self.transport_api.announceable_multiaddresses()
+        } else {
+            Vec::with_capacity(0)
+        };
 
-            let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
+        // At this point the node is already registered with Safe, so
+        // we can announce via Safe-compliant TX
+        match self.chain_api.announce(&multiaddresses_to_announce, &self.me).await {
+            Ok(awaiter) => {
+                info!(?multiaddresses_to_announce, "announcing node on chain");
 
-            // The announcement is intentionally not awaited until confirmation
-            match self.chain_api.announce(&multiaddresses_to_announce, &self.me).await {
-                Ok(_) => info!(?multiaddresses_to_announce, "announcing node on chain",),
-                Err(AnnouncementError::AlreadyAnnounced) => {
-                    info!(multiaddresses_announced = ?multiaddresses_to_announce, "node already announced on chain")
-                }
-                // If the announcement fails, we keep going to prevent the node from retrying
-                // after restart.
-                // Functionality is limited, and users must check the logs for errors.
-                Err(error) => error!(%error, "failed to transmit node announcement"),
+                // Await until the announcement is confirmed on-chain, otherwise we cannot proceed.
+                awaiter.await.map_err(HoprLibError::chain)?;
+                info!(?multiaddresses_to_announce, "node has been successfully announced");
             }
+            Err(AnnouncementError::AlreadyAnnounced) => {
+                info!(multiaddresses_announced = ?multiaddresses_to_announce, "node already announced on chain")
+            }
+            // If the announcement fails, we keep going to prevent the node from retrying
+            // after restart.
+            // Functionality is limited, and users must check the logs for errors.
+            Err(error) => error!(%error, "failed to transmit node announcement"),
         }
 
         let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
