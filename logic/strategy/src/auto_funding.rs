@@ -116,24 +116,33 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+    use futures::StreamExt;
+    use futures_time::future::FutureExt;
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-    use hopr_crypto_types::prelude::*;
-
+    use hopr_lib::{Address, BytesRepresentable, ChainKeypair, Keypair, XDaiBalance};
+    use hopr_lib::exports::api::chain::{ChainEvent, ChainEvents};
     use super::*;
+
     use crate::{
         auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
         strategy::SingularStrategy,
     };
 
     lazy_static::lazy_static! {
+        static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .expect("lazy static keypair should be valid");
+
         static ref ALICE: Address = hex!("18f8ae833c85c51fbeba29cef9fbfb53b3bad950").into();
-        static ref BOB: Address = hex!("44f23fa14130ca540b37251309700b6c281d972e").into();
+        static ref BOB: Address = BOB_KP.public().to_address();
         static ref CHRIS: Address = hex!("b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234").into();
         static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_auto_funding_strategy() -> anyhow::Result<()> {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
@@ -166,19 +175,22 @@ mod tests {
         );
 
         let blokli_sim = BlokliTestStateBuilder::default()
-            .with_random_accounts(&[&*ALICE, &*BOB, &*CHRIS, &*DAVE], false)
+            .with_generated_accounts(&[&*ALICE, &*BOB, &*CHRIS, &*DAVE], false, XDaiBalance::new_base(1), HoprBalance::new_base(1000))
             .with_channels([c1, c2, c3])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let snapshot = blokli_sim.snapshot();
 
-        let chain_connector = create_trustful_hopr_blokli_connector(
-            &ChainKeypair::random(),
+        let mut chain_connector = create_trustful_hopr_blokli_connector(
+            &BOB_KP,
             Default::default(),
             blokli_sim,
             [1; Address::SIZE].into(),
         )
         .await?;
+        chain_connector.connect(Duration::from_secs(3)).await?;
+        let events = chain_connector.subscribe()?;
+
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,
@@ -215,6 +227,12 @@ mod tests {
             },
         )
         .await?;
+
+        events
+            .filter(|event| futures::future::ready(matches!(event, ChainEvent::ChannelBalanceIncreased(c, amount) if c.get_id() == c2.get_id() && amount == &fund_amount)))
+            .next()
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await?;
 
         insta::assert_yaml_snapshot!(*snapshot.refresh());
 

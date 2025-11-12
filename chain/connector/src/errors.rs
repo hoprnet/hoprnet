@@ -1,3 +1,4 @@
+use blokli_client::errors::{ErrorKind, TrackingErrorKind};
 use hopr_api::chain::HoprKeyIdent;
 use hopr_internal_types::prelude::ChannelId;
 use thiserror::Error;
@@ -52,3 +53,20 @@ pub enum ConnectorError {
     #[error("undefined error: {0}")]
     OtherError(anyhow::Error),
 }
+
+impl ConnectorError {
+    /// Indicates whether this error was caused by the transaction actually being rejected
+    /// by the target blockchain and returns the errors.
+    pub fn as_transaction_rejection_error(&self) -> Option<&TrackingErrorKind> {
+        match self {
+            ConnectorError::ClientError(client_error) => match client_error.kind() {
+                ErrorKind::TrackingError(e @ TrackingErrorKind::Reverted) |
+                ErrorKind::TrackingError(e @ TrackingErrorKind::ValidationFailed) => Some(e),
+                _ => None,
+            }
+            _ => None,
+        }
+    }
+}
+
+pub type Result<T> = std::result::Result<T, ConnectorError>;

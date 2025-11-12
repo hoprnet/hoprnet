@@ -89,6 +89,9 @@ pub trait ChainWriteTicketOperations {
     where
         Db: HoprDbTicketOperations + Sync,
     {
+        // Make sure the selector only matches untouched tickets
+        let selector = selector.with_state(AcknowledgedTicketStatus::Untouched);
+
         // Collect the tickets first so we don't hold up the DB connection
         let mut tickets = db
             .update_ticket_states_and_fetch(selector.clone(), AcknowledgedTicketStatus::BeingRedeemed)

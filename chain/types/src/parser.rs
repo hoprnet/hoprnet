@@ -26,20 +26,34 @@ use crate::{ContractAddresses, errors::ChainTypesError, payload::KeyBindAndAnnou
 /// This is effectively inverse of a [`PayloadGenerator`](crate::payload::PayloadGenerator).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedHoprChainAction {
+    /// Registration of a Safe address.
     RegisterSafeAddress(Address),
+    /// Announcement of a packet key and optional multiaddress.
     Announce {
+        /// Announced packet key (key-binding).
         packet_key: OffchainPublicKey,
+        /// Optional multiaddress to announce.
         multiaddress: Option<Multiaddr>,
     },
+    /// Withdrawal of native XDai to an address.
     WithdrawNative(Address, XDaiBalance),
+    /// Withdrawal of HOPR token to an address.
     WithdrawToken(Address, HoprBalance),
+    /// Funding of a payment channel to a given destination with a given amount.
     FundChannel(Address, HoprBalance),
+    /// Payment channel closure initiation with the given ID.
     InitializeChannelClosure(ChannelId),
+    /// Payment channel closure finalization with the given ID.
     FinalizeChannelClosure(ChannelId),
+    /// Incoming payment channel closure with the given ID.
     IncomingChannelClosure(ChannelId),
+    /// Redemption of ticket.
     RedeemTicket {
+        /// ID of the channel the ticket was issued on.
         channel_id: ChannelId,
+        /// Index of the ticket within the channel.
         ticket_index: u64,
+        /// Amount HOPR tokens on the ticket (value to be redeemed).
         ticket_amount: HoprBalance,
     },
 }

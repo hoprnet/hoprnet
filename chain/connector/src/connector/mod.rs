@@ -168,6 +168,7 @@ where
 
             let (account_stream, channel_stream) = connections.unwrap();
             let account_stream = account_stream
+                .inspect_ok(|entry| tracing::trace!(?entry, "new account entry"))
                 .map_err(ConnectorError::from)
                 .try_filter_map(|account| futures::future::ready(model_to_account_entry(account).map(Some)))
                 .and_then(move |account| {
@@ -189,6 +190,7 @@ where
 
             let channel_stream = channel_stream
                 .map_err(ConnectorError::from)
+                .inspect_ok(|entry| tracing::trace!(?entry, "new graph entry"))
                 .try_filter_map(|graph_event| futures::future::ready(model_to_graph_entry(graph_event).map(Some)))
                 .and_then(move |(src, dst, channel)| {
                     let graph = graph.clone();
@@ -223,7 +225,7 @@ where
                         }
                     }
                     if account_counter >= num_accounts && channel_counter >= num_channels {
-                        tracing::debug!("on-chain graph has been synced");
+                        tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
                         if let Some(connection_ready_tx) = connection_ready_tx.take() {
                             let _ = connection_ready_tx.send(Ok(()));
                         }
@@ -293,9 +295,13 @@ where
             return Err(ConnectorError::InvalidState("connector is already connected"));
         }
 
-        self.sequencer.start().await?;
-
         let abort_handle = self.do_connect(timeout).await?;
+
+        if let Err(error) = self.sequencer.start().await {
+            abort_handle.abort();
+            return Err(error);
+        }
+
         self.connection_handle = Some(abort_handle);
 
         Ok(())
@@ -316,16 +322,10 @@ where
             .sequencer
             .enqueue_transaction(tx_req, self.cfg.tx_confirm_timeout)
             .await?
-            .and_then(|tx| {
-                futures::future::ready(
-                    tx.transaction_hash
-                        .ok_or(ConnectorError::InvalidState("transaction hash missing"))
-                        .and_then(|tx| {
-                            ChainReceipt::from_str(&tx.0)
-                                .map_err(|_| ConnectorError::TypeConversion("invalid tx hash".into()))
-                        }),
-                )
-            }))
+            .and_then(|tx| futures::future::ready(
+                ChainReceipt::from_str(&tx.transaction_hash.0)
+                    .map_err(|_| ConnectorError::TypeConversion("invalid tx hash".into()))
+            )))
     }
 }
 

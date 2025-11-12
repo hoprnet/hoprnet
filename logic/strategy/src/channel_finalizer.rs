@@ -110,10 +110,8 @@ mod tests {
 
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
-    use hopr_crypto_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
-
+    use hopr_lib::{Address, BytesRepresentable, ChainKeypair, ChannelEntry, ChannelStatus, HoprBalance, Keypair, XDaiBalance};
     use super::*;
 
     lazy_static! {
@@ -133,7 +131,7 @@ mod tests {
         let max_closure_overdue = Duration::from_secs(600);
 
         let blokli_sim = BlokliTestStateBuilder::default()
-            .with_random_accounts(&[&*ALICE, &*BOB, &*CHARLIE, &*DAVE, &*EUGENE], false)
+            .with_generated_accounts(&[&*ALICE, &*BOB, &*CHARLIE, &*DAVE, &*EUGENE], false, XDaiBalance::new_base(1), HoprBalance::new_base(1000))
             .with_channels([
                 // Should leave this channel opened
                 ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into()),
@@ -144,7 +142,7 @@ mod tests {
                     10.into(),
                     0.into(),
                     ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
-                    0.into(),
+                    1.into(),
                 ),
                 // Should finalize closure of this channel
                 ChannelEntry::new(
@@ -153,7 +151,7 @@ mod tests {
                     10.into(),
                     0.into(),
                     ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
-                    0.into(),
+                    1.into(),
                 ),
                 // Should leave this unfinalized, because the channel closure is long overdue
                 ChannelEntry::new(
@@ -162,20 +160,21 @@ mod tests {
                     10.into(),
                     0.into(),
                     ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
-                    0.into(),
+                    1.into(),
                 ),
             ])
             .build_dynamic_client([1; Address::SIZE].into());
 
         let snapshot = blokli_sim.snapshot();
 
-        let chain_connector = create_trustful_hopr_blokli_connector(
-            &ChainKeypair::random(),
+        let mut chain_connector = create_trustful_hopr_blokli_connector(
+            &ALICE_KP,
             Default::default(),
             blokli_sim,
             [1; Address::SIZE].into(),
         )
         .await?;
+        chain_connector.connect(Duration::from_secs(3)).await?;
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 

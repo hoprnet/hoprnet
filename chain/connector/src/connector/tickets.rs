@@ -1,7 +1,4 @@
-use blokli_client::{
-    api::{BlokliQueryClient, BlokliTransactionClient},
-    errors::{ErrorKind, TrackingErrorKind},
-};
+use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use hopr_api::chain::{ChainReceipt, ChainValues, TicketRedeemError};
 use hopr_chain_types::prelude::*;
@@ -22,6 +19,7 @@ where
 
         let channel_id = ticket.verified_ticket().channel_id;
         if generate_channel_id(ticket.ticket.verified_issuer(), self.chain_key.public().as_ref()) != channel_id {
+            tracing::error!(%channel_id, "redeemed ticket is not ours");
             return Err(ConnectorError::InvalidTicket);
         }
 
@@ -35,15 +33,34 @@ where
             .await?
             .first()
             .cloned()
-            .ok_or_else(|| ConnectorError::ChannelDoesNotExist(channel_id))?;
+            .ok_or_else(|| {
+                tracing::error!(%channel_id, "trying to redeem a ticket on a channel that does not exist");
+                ConnectorError::ChannelDoesNotExist(channel_id)
+            })?;
 
         if channel.status == blokli_client::api::types::ChannelStatus::Closed {
+            tracing::error!(%channel_id, "trying to redeem a ticket on a closed channel");
             return Err(ConnectorError::ChannelClosed(channel_id));
+        }
+
+        if channel.epoch as u32 != ticket.verified_ticket().channel_epoch {
+            tracing::error!(channel_epoch = channel.epoch, ticket_epoch = ticket.verified_ticket().channel_epoch, "invalid redeemed ticket epoch");
+            return Err(ConnectorError::InvalidTicket);
+        }
+
+        let channel_index: u64 = channel
+            .ticket_index
+            .0
+            .parse()
+            .map_err(|e| ConnectorError::TypeConversion(format!("unparseable channel index at redemption: {e}")))?;
+
+        if channel_index > ticket.verified_ticket().index {
+            tracing::error!(channel_index, ticket_index = ticket.verified_ticket().index, "invalid redeemed ticket index");
+            return Err(ConnectorError::InvalidTicket);
         }
 
         // `into_redeemable` is a CPU-intensive operation. See #7616 for a future resolution.
         let channel_dst = self.domain_separators().await?.channel;
-
         let chain_key = self.chain_key.clone();
         let ticket =
             hopr_async_runtime::prelude::spawn_blocking(move || ticket.into_redeemable(&chain_key, &channel_dst))
@@ -80,17 +97,10 @@ where
                     .map_err(|e| TicketRedeemError::ProcessingError(ticket.ticket.clone(), e))?
                     .map_err(move |tx_tracking_error|
                         // For ticket redemption, certain errors are to be handled differently
-                        match tx_tracking_error {
-                            ConnectorError::ClientError(client_error)
-                            if matches!(
-                                client_error.kind(),
-                                ErrorKind::TrackingError(TrackingErrorKind::Reverted) |
-                                ErrorKind::TrackingError(TrackingErrorKind::ValidationFailed)
-                            ) =>
-                                {
-                                    TicketRedeemError::Rejected(ticket.ticket.clone(), client_error.to_string())
-                                }
-                            _ => TicketRedeemError::ProcessingError(ticket.ticket.clone(), tx_tracking_error.into())
+                        if let Some(reject_error) = tx_tracking_error.as_transaction_rejection_error() {
+                            TicketRedeemError::Rejected(ticket.ticket.clone(), format!("on-chain rejection: {reject_error:?}"))
+                        } else {
+                            TicketRedeemError::ProcessingError(ticket.ticket.clone(), tx_tracking_error.into())
                         })
                     .and_then(move |receipt| futures::future::ok((ticket_clone.ticket, receipt)))
                     .boxed())

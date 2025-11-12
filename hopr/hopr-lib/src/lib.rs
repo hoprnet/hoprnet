@@ -1155,13 +1155,9 @@ where
             "Node is not ready for on-chain operations".into(),
         )?;
 
-        // We do not await the on-chain confirmation
-        #[allow(clippy::let_underscore_future)]
-        let _ = self
-            .chain_api
-            .redeem_ticket(ack_ticket)
-            .await
-            .map_err(HoprLibError::chain)?;
+        self.redemption_requests()?
+            .send(TicketSelector::from(&ack_ticket).with_state(AcknowledgedTicketStatus::Untouched))
+            .await?;
 
         Ok(())
     }

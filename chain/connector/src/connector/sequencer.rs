@@ -1,15 +1,17 @@
-use blokli_client::api::{AccountSelector, BlokliQueryClient, BlokliTransactionClient};
+use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use hopr_chain_types::prelude::SignableTransaction;
 use hopr_crypto_types::prelude::*;
 
-use crate::errors::ConnectorError;
+use crate::errors::{self, ConnectorError};
 
 type TxRequest<T> = (
     T,
-    futures::channel::oneshot::Sender<Result<blokli_client::api::TxId, ConnectorError>>,
+    futures::channel::oneshot::Sender<errors::Result<blokli_client::api::TxId>>,
 );
 
+
+/// Takes care of sequencing transactions, nonce management and submitting the transactions to the blockchain in-order.
 pub struct TransactionSequencer<C, R> {
     sender: Option<futures::channel::mpsc::Sender<TxRequest<R>>>,
     nonce: std::sync::Arc<std::sync::atomic::AtomicU64>,
@@ -31,25 +33,9 @@ where
         }
     }
 
-    pub async fn start(&mut self) -> Result<(), ConnectorError> {
-        let accounts = self
-            .client
-            .query_accounts(AccountSelector::Address(self.signer.public().to_address().into()))
-            .await?;
-
-        if accounts.len() > 1 {
-            return Err(ConnectorError::InvalidState("more than one account found".into()));
-        }
-
-        if let Some(nonce) = accounts.first().and_then(|a| a.safe_transaction_count.clone()) {
-            self.nonce.store(
-                nonce
-                    .0
-                    .parse()
-                    .map_err(|_| ConnectorError::InvalidState("invalid network nonce".into()))?,
-                std::sync::atomic::Ordering::SeqCst,
-            );
-        }
+    pub async fn start(&mut self) -> errors::Result<()> {
+        let tx_count = self.client.query_transaction_count(&self.signer.public().to_address().into()).await?;
+        self.nonce.store(tx_count, std::sync::atomic::Ordering::SeqCst);
 
         let (sender, receiver) = futures::channel::mpsc::channel(1024);
         self.sender = Some(sender);
@@ -66,13 +52,14 @@ where
                     let nonce = nonce_load.load(std::sync::atomic::Ordering::SeqCst);
                     async move {
                         tx.sign_and_encode_to_eip2718(nonce, None, &signer)
-                            .map_err(ConnectorError::from)
+                            .map_err(errors::ConnectorError::from)
                             .and_then(move |tx| {
+                                tracing::debug!("submitting transaction");
                                 let client = client.clone();
                                 async move {
                                     client
                                         .submit_and_track_transaction(&tx)
-                                        .map_err(ConnectorError::from)
+                                        .map_err(errors::ConnectorError::from)
                                         .await
                                 }
                             })
@@ -81,11 +68,12 @@ where
                     }
                 })
                 .for_each(move |(res, notifier)| {
-                    if res.is_ok() {
+                    // The nonce is incremented when the transaction succeeded or failed for other reasons than on-chain rejection.
+                    if res.is_ok() || res.as_ref().is_err_and(|error| error.as_transaction_rejection_error().is_none()) {
                         nonce_inc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
                     if let Err(_) = notifier.send(res) {
-                        tracing::error!("failed to notify transaction result");
+                        tracing::debug!("failed to notify transaction result - the caller may not want to await the result anymore.");
                     }
                     futures::future::ready(())
                 }),
@@ -99,11 +87,14 @@ impl<C, R> TransactionSequencer<C, R>
 where
     C: BlokliTransactionClient + Send + Sync + 'static,
 {
+    /// Adds the transaction to the [`TransactionSequencer`] queue.
+    ///
+    /// The `timeout_until_finalized` is a total time until the TX is submitted and either confirmed or rejected.
     pub async fn enqueue_transaction(
         &self,
         transaction: R,
-        tx_timeout: std::time::Duration,
-    ) -> Result<impl Future<Output = Result<blokli_client::api::types::Transaction, ConnectorError>>, ConnectorError>
+        timeout_until_finalized: std::time::Duration,
+    ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>>>
     {
         let sender = self
             .sender
@@ -122,7 +113,7 @@ where
             .map(move |result| {
                 result
                     .map_err(|_| ConnectorError::InvalidState("transaction notifier dropped".into()))
-                    .and_then(|tx_res| tx_res.map(|id| (id, tx_timeout)))
+                    .and_then(|tx_res| tx_res.map(|id| (id, timeout_until_finalized)))
             })
             .and_then(|(tx_id, timeout)| {
                 self.client
