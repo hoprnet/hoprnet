@@ -116,7 +116,7 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 
 #[cfg(test)]
 mod tests {
-    use std::{ops::Deref, str::FromStr, time::Duration};
+    use std::{str::FromStr, time::Duration};
 
     use futures::StreamExt;
     use futures_time::future::FutureExt;
@@ -241,9 +241,7 @@ mod tests {
             .timeout(futures_time::time::Duration::from_secs(2))
             .await?;
 
-        let mut state = snapshot.refresh().deref().clone();
-        state.active_txs.clear(); // Clear non-deterministic data before snapshot comparison
-        insta::assert_yaml_snapshot!(state);
+        insta::assert_yaml_snapshot!(*snapshot.refresh());
 
         Ok(())
     }
