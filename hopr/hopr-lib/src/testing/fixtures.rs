@@ -140,7 +140,7 @@ impl ClusterGuard {
         match session_result {
             Ok(Ok(s)) => Ok((s, fw_channels, bw_channels)),
             Ok(Err(e)) => Err(e.into()),
-            Err(_) => Err(anyhow::anyhow!("Session opening timed out after 10s")),
+            Err(_) => Err(anyhow::anyhow!("Session opening timed out after 5s")),
         }
     }
 }
