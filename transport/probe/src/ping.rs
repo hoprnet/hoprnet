@@ -94,7 +94,7 @@ impl Pinger {
             }
             Err(_) => {
                 debug!(%peer, "Ping failed due to timeout");
-                Err(ProbeError::Timeout(self.config.timeout.as_secs()))
+                Err(ProbeError::ProbeNeighborTimeout(peer))
             }
         }
     }
@@ -115,7 +115,7 @@ mod tests {
 
         let replier = PingQueryReplier::new(tx);
 
-        replier.notify(Err(ProbeError::Timeout(4u64)));
+        replier.notify(Err(ProbeError::ProbeNeighborTimeout(PeerId::random())));
 
         assert!(rx.next().await.is_some_and(|r| r.is_err()));
 
