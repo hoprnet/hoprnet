@@ -16,9 +16,8 @@ use crate::{
     config::ProbeConfig,
     content::{Message, NeighborProbe},
     errors::ProbeError,
-    neighbors::ImmediateNeighborProber,
     ping::PingQueryReplier,
-    traits::{PeerDiscoveryFetch, ProbeStatusUpdate, TrafficGeneration},
+    traits::{ProbeStatusUpdate, TrafficGeneration},
 };
 
 #[inline(always)]
@@ -85,31 +84,30 @@ impl Probe {
     }
 
     /// The main function that assembles and starts the probing process.
-    pub async fn continuously_scan<T, U, V, W, Up>(
+    pub async fn continuously_scan<T, U, V, Up, Tr>(
         self,
         api: (T, U),      // lower (tx, rx) channels for sending and receiving messages
         manual_events: V, // explicit requests from the API
-        store: W,         // peer store
         move_up: Up,      // forward up non-probing messages from the network
+        traffic_generator: Tr,
     ) -> HashMap<HoprProbeProcess, hopr_async_runtime::AbortHandle>
     where
         T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
         T::Error: Send,
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
-        W: PeerDiscoveryFetch + ProbeStatusUpdate + Clone + Send + Sync + 'static,
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
+        Tr: TrafficGeneration + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
         let interval_between_rounds = self.cfg.interval;
 
+        let (probing_routes, reports) = traffic_generator.build();
+
         // Currently active probes
-        let store_eviction = store.clone();
+        let store_eviction = reports.clone();
         let timeout = self.cfg.timeout;
-        let active_probes: moka::future::Cache<
-            CacheKey,
-            CacheValue,
-        > = moka::future::Cache::builder()
+        let active_probes: moka::future::Cache<CacheKey, CacheValue> = moka::future::Cache::builder()
             .time_to_live(timeout)
             .max_capacity(100_000)
             .async_eviction_listener(
@@ -124,15 +122,15 @@ impl Probe {
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
-                            replier.notify(Err(ProbeError::Timeout(timeout.as_secs())));
+                            // replier.notify(Err(ProbeError::ProbeNeighborTimeout(peer.into())));
                         };
 
                         if let NodeId::Offchain(opk) = peer.as_ref() {
                             let peer: PeerId = opk.into();
                             futures::FutureExt::boxed(async move {
-                                store
-                                    .on_finished(&peer, &Err(ProbeError::Timeout(timeout.as_secs())))
-                                    .await;
+                                // store
+                                //     .on_finished(&peer, &Err(ProbeError::ProbeNeighborTimeout(timeout.as_secs())))
+                                //     .await;
                             })
                         } else {
                             futures::FutureExt::boxed(futures::future::ready(()))
@@ -151,23 +149,22 @@ impl Probe {
         let mut processes = HashMap::<HoprProbeProcess, hopr_async_runtime::AbortHandle>::new();
 
         // -- Emit probes --
-        let (direct_neighbors, _reports) =
-            ImmediateNeighborProber::new(self.cfg, store.clone()).build();
-        let direct_neighbors = direct_neighbors
-            .map(|peer| (peer, None))
-            .merge(manual_events.filter_map(|(peer, notifier)| async move {
-                if let Ok(peer) = OffchainPublicKey::from_peerid(&peer) {
-                    let routing = DestinationRouting::Forward {
-                        destination: Box::new(peer.into()),
-                        pseudonym: Some(HoprPseudonym::random()),
-                        forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
-                        return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
-                    };
-                    Some((routing, Some(notifier)))
-                } else {
-                    None
-                }
-            }));
+        let direct_neighbors =
+            probing_routes
+                .map(|peer| (peer, None))
+                .merge(manual_events.filter_map(|(peer, notifier)| async move {
+                    if let Ok(peer) = OffchainPublicKey::from_peerid(&peer) {
+                        let routing = DestinationRouting::Forward {
+                            destination: Box::new(peer.into()),
+                            pseudonym: Some(HoprPseudonym::random()),
+                            forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
+                            return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
+                        };
+                        Some((routing, Some(notifier)))
+                    } else {
+                        None
+                    }
+                }));
 
         processes.insert(
             HoprProbeProcess::Emit,
@@ -234,7 +231,6 @@ impl Probe {
             hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, in_data)| {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
-                let store = store.clone();
                 let move_up = move_up.clone();
 
                 async move {
@@ -266,7 +262,7 @@ impl Probe {
                                             
                                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                                 tracing::info!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
-                                                store.on_finished(&opk.into(), &Ok(latency)).await;
+                                                // store.on_finished(&opk.into(), &Ok(latency)).await;
                                             } else {
                                                 tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                                             }
@@ -307,6 +303,7 @@ mod tests {
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
     use super::*;
+    use crate::{neighbors::ImmediateNeighborProber, traits::PeerDiscoveryFetch};
 
     lazy_static::lazy_static!(
         static ref OFFCHAIN_KEYPAIR: OffchainKeypair = OffchainKeypair::random();
@@ -334,7 +331,7 @@ mod tests {
                 *peer,
                 match result {
                     Ok(duration) => Ok(*duration),
-                    Err(_e) => Err(ProbeError::Timeout(1000)),
+                    Err(_e) => Err(ProbeError::ProbeNeighborTimeout(peer.clone())),
                 },
             ));
         }
@@ -385,8 +382,8 @@ mod tests {
             .continuously_scan(
                 (from_probing_to_network_tx, from_network_to_probing_rx),
                 manual_probe_rx,
-                store,
                 from_probing_up_tx,
+                ImmediateNeighborProber::new(cfg, store),
             )
             .await;
 

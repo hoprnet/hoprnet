@@ -21,13 +21,13 @@
 pub mod config;
 pub mod content;
 pub mod errors;
-mod neighbors;
+pub mod neighbors;
 pub mod ping;
 pub mod probe;
 pub mod traits;
+pub mod types;
 
-pub use crate::content::Message as TrafficReturnedObservation;
-pub use crate::{config::ProbeConfig, probe::Probe};
+pub use crate::{config::ProbeConfig, content::Message as TrafficReturnedObservation, probe::Probe};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprProbeProcess {

@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use libp2p_identity::PeerId;
-
 use hopr_network_types::types::DestinationRouting;
+use libp2p_identity::PeerId;
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
@@ -29,8 +28,12 @@ pub trait TrafficGeneration {
     fn build(
         self,
     ) -> (
-        impl futures::Stream<Item = DestinationRouting>,
-        impl futures::Sink<crate::errors::Result<crate::TrafficReturnedObservation>, Error = impl std::error::Error>,
+        impl futures::Stream<Item = DestinationRouting> + Send,
+        impl futures::Sink<crate::errors::Result<crate::types::Telemetry>, Error = impl std::error::Error>
+        + Send
+        + Sync
+        + Clone
+        + 'static,
     );
 }
 

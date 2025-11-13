@@ -60,6 +60,7 @@ pub use hopr_transport_network::network::{Health, Network};
 use hopr_transport_p2p::HoprSwarm;
 use hopr_transport_probe::{
     Probe,
+    neighbors::ImmediateNeighborProber,
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
@@ -532,6 +533,7 @@ where
             note = "same as protocol bidirectional",
             "Creating probing channel"
         );
+
         let (tx_from_probing, rx_from_probing) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
@@ -548,12 +550,15 @@ where
             .continuously_scan(
                 (unresolved_routing_msg_tx.clone(), rx_from_protocol),
                 manual_ping_rx,
-                network_notifier::ProbeNetworkInteractions::new(
-                    self.network.clone(),
-                    self.resolver.clone(),
-                    self.path_planner.channel_graph(),
-                ),
                 tx_from_probing,
+                ImmediateNeighborProber::new(
+                    self.cfg.probe,
+                    network_notifier::ProbeNetworkInteractions::new(
+                        self.network.clone(),
+                        self.resolver.clone(),
+                        self.path_planner.channel_graph(),
+                    ),
+                ),
             )
             .await
             .into_iter()
