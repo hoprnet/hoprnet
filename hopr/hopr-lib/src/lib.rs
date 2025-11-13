@@ -185,7 +185,7 @@ pub struct Hopr<Chain, Db> {
     cfg: config::HoprLibConfig,
     state: Arc<state::AtomicHoprState>,
     transport_api: HoprTransport<Db, Chain>,
-    redeem_requests: std::sync::OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
+    redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
     chain_api: Chain,
 }

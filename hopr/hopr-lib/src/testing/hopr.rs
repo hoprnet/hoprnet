@@ -2,10 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
 use futures::future::join_all;
-use hopr_api::{
-    chain::{HoprBalance, HoprChainApi},
-    db::HoprNodeDbApi,
-};
+use hopr_primitive_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_transport::Hash;
@@ -31,7 +28,6 @@ impl TestedHopr {
         node_db: HoprNodeDb,
         connector: TestingConnector,
         safe: NodeSafeConfig,
-        auto_redeems: bool,
         winn_prob: Option<f64>,
     ) -> Self {
         let instance = Hopr::new(

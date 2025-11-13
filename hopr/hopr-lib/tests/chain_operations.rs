@@ -19,7 +19,7 @@ const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{HoprBalance, WxHOPR, XDai, XDaiBalance};
 
-    let node: &TestedHopr<_, _> = &cluster_fixture[0];
+    let node: &TestedHopr = &cluster_fixture[0];
     let safe_native = node
         .inner()
         .get_safe_balance::<XDai>()
@@ -74,7 +74,6 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyho
 #[rstest]
 #[tokio::test]
 #[serial]
-
 async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{ChannelStatus, HoprBalance};
     use tokio::time::sleep;

@@ -3,7 +3,7 @@ use std::{str::FromStr, time::Duration};
 use futures_time::future::FutureExt;
 use hex_literal::hex;
 use hopr_chain_connector::{
-    BlockchainConnectorConfig, HoprBlockchainSafeConnector,
+    BlockchainConnectorConfig,
     blokli_client::BlokliQueryClient,
     create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
@@ -13,10 +13,9 @@ use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::WinningProbability;
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::{bounded::BoundedVec, prelude::*};
-use hopr_transport_session::{HoprSession, SessionClientConfig, SessionTarget};
+use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
 use lazy_static::lazy_static;
 use rand::seq::index::sample;
-use serde_json::json;
 use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
 
@@ -24,7 +23,6 @@ use crate::{
     Address,
     state::HoprState,
     testing::{
-        TestingConnector,
         dummies::EchoServer,
         hopr::{ChannelGuard, NodeSafeConfig, TestedHopr},
     },
@@ -55,8 +53,7 @@ impl ClusterGuard {
     pub async fn update_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
         Ok(self
             .chain_client
-            .update_price_and_win_prob(None, Some(new_prob))
-            .await?)
+            .update_price_and_win_prob(None, Some(new_prob)))
     }
 
     /// Create a session between two nodes, ensuring channels are open and funded as needed
@@ -314,7 +311,6 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                         node_db,
                         std::sync::Arc::new(connector),
                         safes[i],
-                        do_auto_redeem,
                         if do_auto_redeem { Some(0.2) } else { None },
                     )
                     .await

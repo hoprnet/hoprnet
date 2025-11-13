@@ -3,9 +3,9 @@ use std::{str::FromStr, time::Duration};
 use anyhow::Context;
 use futures_time::future::FutureExt as _;
 use hopr_lib::{
-    HoprBalance, HoprTransportError, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
+    HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
     SurbBalancerConfig,
-    errors::HoprLibError,
+    errors::{HoprLibError, HoprTransportError},
     exports::transport::session::{IpOrHost, SealedHost},
     testing::{
         fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes, exclusive_indexes_not_auto_redeeming},
