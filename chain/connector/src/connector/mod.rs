@@ -155,6 +155,7 @@ where
         let me = self.chain_key.public().to_address();
         let values_cache = self.values.clone();
 
+
         #[allow(unused)]
         enum SubscribedEventType {
             Account((AccountEntry, Option<AccountEntry>)),
@@ -225,15 +226,15 @@ where
 
             futures::stream::Abortable::new((account_stream, channel_stream).merge(), abort_reg)
                 .inspect_ok(move |event_type| {
-                    if account_counter < num_accounts || matches!(event_type, SubscribedEventType::Account(_)) {
+                    if account_counter < num_accounts && matches!(event_type, SubscribedEventType::Account(_)) {
                         account_counter += 1;
                     }
-                    if channel_counter < num_channels || matches!(event_type, SubscribedEventType::Channel(_)) {
+                    if channel_counter < num_channels && matches!(event_type, SubscribedEventType::Channel(_)) {
                         channel_counter += 1;
                     }
                     if account_counter >= num_accounts && channel_counter >= num_channels {
-                        tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
                         if let Some(connection_ready_tx) = connection_ready_tx.take() {
+                            tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
                             let _ = connection_ready_tx.send(Ok(()));
                         }
                     }
@@ -253,11 +254,20 @@ where
                                 }
                             },
                             Ok(SubscribedEventType::Channel((new_channel, Some(changes)))) => {
-                                tracing::debug!(id = %new_channel.get_id(), num_changes = changes.len(), "channel updated");
+                                tracing::debug!(
+                                    id = %new_channel.get_id(),
+                                    src = %new_channel.source, dst = %new_channel.destination,
+                                    num_changes = changes.len(),
+                                    "channel updated"
+                                );
                                 process_channel_changes_into_events(new_channel, changes, &me, &event_tx).await;
                             },
                             Ok(SubscribedEventType::Channel((new_channel, None))) => {
-                                tracing::debug!(id = %new_channel.get_id(), "channel opened");
+                                tracing::debug!(
+                                    id = %new_channel.get_id(),
+                                    src = %new_channel.source, dst = %new_channel.destination,
+                                    "channel opened"
+                                );
                                 let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new_channel)).await;
                             }
                             // TODO: update the values in values_cache instead of invalidating it (make them separate cache entries?)

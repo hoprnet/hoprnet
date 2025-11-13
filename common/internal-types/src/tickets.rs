@@ -16,7 +16,7 @@ use crate::{
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
-const ENCODED_TICKET_LENGTH: usize = 64;
+const ENCODED_TICKET_LENGTH: usize = 60;
 
 /// Custom float to integer encoding used in the integer-only
 /// Ethereum Virtual Machine (EVM). Chosen to be easily
@@ -675,10 +675,6 @@ impl TryFrom<&[u8]> for Ticket {
             let mut index = [0u8; 8];
             index[2..8].copy_from_slice(&value[offset..offset + 6]);
             offset += 6;
-
-            let mut index_offset = [0u8; 4];
-            index_offset.copy_from_slice(&value[offset..offset + 4]);
-            offset += 4;
 
             let mut channel_epoch = [0u8; 4];
             channel_epoch[1..4].copy_from_slice(&value[offset..offset + 3]);
