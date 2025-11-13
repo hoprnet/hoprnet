@@ -1,21 +1,19 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use futures_time::future::FutureExt;
 use hex_literal::hex;
 use hopr_chain_connector::{
-    BlockchainConnectorConfig, HoprBlockchainSafeConnector, create_trustful_hopr_blokli_connector,
+    BlockchainConnectorConfig, HoprBlockchainSafeConnector,
+    blokli_client::BlokliQueryClient,
+    create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
-use hopr_crypto_types::{
-    keypairs::{ChainKeypair, OffchainKeypair},
-    prelude::Keypair,
-};
+use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::WinningProbability;
-use hopr_primitive_types::{
-    balance::XDaiBalance,
-    prelude::{BytesRepresentable, HoprBalance},
-};
+use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
+use hopr_primitive_types::{bounded::BoundedVec, prelude::*};
+use hopr_transport_session::{HoprSession, SessionClientConfig, SessionTarget};
 use lazy_static::lazy_static;
 use rand::seq::index::sample;
 use serde_json::json;
@@ -26,22 +24,21 @@ use crate::{
     Address,
     state::HoprState,
     testing::{
+        TestingConnector,
         dummies::EchoServer,
-        hopr::{NodeSafeConfig, TestedHopr},
-        hopr::{ChannelGuard, TestedHopr},
+        hopr::{ChannelGuard, NodeSafeConfig, TestedHopr},
     },
 };
 
-type TestingConnector = std::sync::Arc<HoprBlockchainSafeConnector<BlokliTestClient<FullStateEmulator>>>;
-
 /// A guard that holds a reference to the cluster and ensures exclusive access
 pub struct ClusterGuard {
-    pub cluster: Vec<TestedHopr<TestingConnector, HoprNodeDb>>,
+    pub cluster: Vec<TestedHopr>,
+    pub chain_client: BlokliTestClient<FullStateEmulator>,
     _lock: tokio::sync::MutexGuard<'static, ()>,
 }
 
 impl std::ops::Deref for ClusterGuard {
-    type Target = Vec<TestedHopr<TestingConnector, HoprNodeDb>>;
+    type Target = Vec<TestedHopr>;
 
     fn deref(&self) -> &Self::Target {
         &self.cluster
@@ -49,50 +46,17 @@ impl std::ops::Deref for ClusterGuard {
 }
 
 impl ClusterGuard {
-    /// Get oracle ticket price from chain
+    /// Get oracle ticket price from the chain
     pub async fn get_oracle_ticket_price(&self) -> anyhow::Result<HoprBalance> {
-        if let Some(instances) = &self.chain_env.contract_instances {
-            let price: HoprBalance = instances.price_oracle.currentTicketPrice().call().await.map(|v| {
-                HoprBalance::from(hopr_primitive_types::prelude::U256::from_be_bytes(
-                    v.to_be_bytes::<32>(),
-                ))
-            })?;
-
-            Ok(price)
-        } else {
-            info!("Contract instances not available, cannot get oracle ticket price");
-            Err(anyhow::anyhow!("Contract instances not available"))
-        }
+        Ok(self.chain_client.query_chain_info().await?.ticket_price.0.parse()?)
     }
 
-    /// Update winning probability in anvil
+    /// Update winning probability
     pub async fn update_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
-        let epsilon: f64 = 0.000001;
-
-        if let Some(instances) = &self.chain_env.contract_instances {
-            match instances.update_winning_probability(new_prob).await {
-                Ok(_) => {
-                    sleep(Duration::from_secs(5)).await;
-
-                    let [node] = exclusive_indexes::<1>();
-
-                    let winning_prob = self.cluster[node]
-                        .inner()
-                        .get_minimum_incoming_ticket_win_probability()
-                        .await?;
-
-                    if (winning_prob.as_f64() - new_prob).abs() < epsilon {
-                        Ok(())
-                    } else {
-                        Err(anyhow::anyhow!("Winning probability not reflected in the node"))
-                    }
-                }
-                Err(e) => Err(anyhow::anyhow!("Failed to update winning probability: {}", e)),
-            }
-        } else {
-            info!("Contract instances not available, cannot get current winning probability");
-            Err(anyhow::anyhow!("Contract instances not available"))
-        }
+        Ok(self
+            .chain_client
+            .update_price_and_win_prob(None, Some(new_prob))
+            .await?)
     }
 
     /// Create a session between two nodes, ensuring channels are open and funded as needed
@@ -122,7 +86,7 @@ impl ClusterGuard {
         )
         .await?;
 
-        sleep(std::time::Duration::from_secs(3)).await;
+        sleep(Duration::from_secs(3)).await;
 
         let ip = IpOrHost::from_str(":0")?;
         let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
@@ -142,7 +106,7 @@ impl ClusterGuard {
                     always_max_out_surbs: false,
                 },
             )
-            .timeout(FuturesDuration::from_secs(5))
+            .timeout(futures_time::time::Duration::from_secs(5))
             .await;
 
         match session_result {
@@ -307,57 +271,62 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
         .collect::<Vec<_>>();
 
     // Setup SWARM_N nodes
-    let hopr_instances: Vec<TestedHopr<TestingConnector, HoprNodeDb>> =
-        futures::future::join_all((0..SWARM_N).map(|i| {
-            let onchain_keys = onchain_keys.clone();
-            let offchain_keys = offchain_keys.clone();
-            let safes = safes.clone();
-            let do_auto_redeem = i % 2 != 0; // every other node does auto redeem and uses a custom winn_prob
-            let blokli_client = chainenv_fixture
-                .clone()
-                .with_mutator(FullStateEmulator::new(safes[i].module_address.clone()));
+    let hopr_instances: Vec<TestedHopr> = futures::future::join_all((0..SWARM_N).map(|i| {
+        let onchain_keys = onchain_keys.clone();
+        let offchain_keys = offchain_keys.clone();
+        let safes = safes.clone();
+        let do_auto_redeem = i % 2 != 0; // every other node does auto redeem and uses a custom winn_prob
+        let blokli_client = chainenv_fixture
+            .clone()
+            .with_mutator(FullStateEmulator::new(safes[i].module_address.clone()));
 
+        async move {
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(2)
+                    .enable_all()
+                    .build()
+                    .expect("failed to build Tokio runtime");
 
-            async move {
-                std::thread::spawn(move || {
-                    let rt = tokio::runtime::Builder::new_multi_thread()
-                        .worker_threads(2)
-                        .enable_all()
-                        .build()
-                        .expect("failed to build Tokio runtime");
-
-                    rt.block_on(async {
-                        let node_db = HoprNodeDb::new_in_memory(onchain_keys[i].clone())
-                            .await
-                            .expect("failed to create HoprNodeDb for node");
-                        let connector = create_trustful_hopr_blokli_connector(
-                            &onchain_keys[i],
-                            BlockchainConnectorConfig::default(),
-                            blokli_client,
-                            safes[i].module_address,
-                        )
+                rt.block_on(async {
+                    let node_db = HoprNodeDb::new_in_memory(onchain_keys[i].clone())
                         .await
-                        .expect("failed to create HoprBlockchainSafeConnector for node");
+                        .expect("failed to create HoprNodeDb for node");
 
-                        TestedHopr::new(
-                            onchain_keys[i].clone(),
-                            offchain_keys[i].clone(),
-                            3001 + i as u16,
-                            node_db,
-                            std::sync::Arc::new(connector),
-                            safes[i],
+                    let mut connector = create_trustful_hopr_blokli_connector(
+                        &onchain_keys[i],
+                        BlockchainConnectorConfig::default(),
+                        blokli_client,
+                        safes[i].module_address,
+                    )
+                    .await
+                    .expect("failed to create HoprBlockchainSafeConnector for node");
+
+                    connector
+                        .connect(Duration::from_secs(3))
+                        .await
+                        .expect("failed to connect to HoprBlockchainSafeConnector");
+
+                    TestedHopr::new(
+                        onchain_keys[i].clone(),
+                        offchain_keys[i].clone(),
+                        3001 + i as u16,
+                        node_db,
+                        std::sync::Arc::new(connector),
+                        safes[i],
                         do_auto_redeem,
-                        if do_auto_redeem { Some(0.2) } else { None },)
-                        .await
-                    })
+                        if do_auto_redeem { Some(0.2) } else { None },
+                    )
+                    .await
                 })
-                .join()
-            }
-        }))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .expect("One or more threads panicked");
+            })
+            .join()
+        }
+    }))
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()
+    .expect("One or more threads panicked");
 
     // Run all nodes in parallel
     futures::future::join_all(
@@ -390,11 +359,12 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
 
     ClusterGuard {
         cluster: hopr_instances,
+        chain_client: chainenv_fixture,
         _lock: lock,
     }
 }
 
-async fn wait_for_connectivity(instance: &TestedHopr<TestingConnector, HoprNodeDb>) {
+async fn wait_for_connectivity(instance: &TestedHopr) {
     info!("Waiting for full connectivity");
     loop {
         let peers = instance
@@ -410,7 +380,7 @@ async fn wait_for_connectivity(instance: &TestedHopr<TestingConnector, HoprNodeD
     }
 }
 
-async fn wait_for_status(instance: &TestedHopr<TestingConnector, HoprNodeDb>, expected_status: &HoprState) {
+async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState) {
     info!(
         "Waiting for node {} to reach status {:?}",
         instance.address(),

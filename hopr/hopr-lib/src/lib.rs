@@ -381,12 +381,11 @@ where
             && configured_win_prob
                 .and_then(|c| WinningProbability::try_from(c).ok())
                 .is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
-            {
-                return Err(HoprLibError::GeneralError(format!(
-                    "configured outgoing ticket winning probability is lower than the network minimum winning \
-                     probability: {configured_win_prob:?} < {network_min_win_prob}"
-                )));
-            }
+        {
+            return Err(HoprLibError::GeneralError(format!(
+                "configured outgoing ticket winning probability is lower than the network minimum winning \
+                 probability: {configured_win_prob:?} < {network_min_win_prob}"
+            )));
         }
 
         self.state.store(state::HoprState::Indexing, Ordering::Relaxed);
@@ -471,24 +470,6 @@ where
         announcement_stream_started_rx
             .await
             .map_err(|_| HoprLibError::GeneralError("failed to notify announcement stream start".into()))??;
-
-        // Subscribe to ticket redemption failures to allow resetting the ticket's state in the Node DB
-        let node_db = self.node_db.clone();
-        spawn(self
-            .chain_api
-            .subscribe()
-            .map_err(HoprLibError::chain)?
-            .filter_map(|event| futures::future::ready(event.try_as_redeem_failed()))
-            .for_each(move |(channel, reason, ticket)| {
-                let node_db = node_db.clone();
-                async move {
-                    tracing::warn!(%ticket, channel_id = %channel.get_id(), reason, "resetting ticket state after failed redemption");
-                    if let Err(error) = node_db.update_ticket_states(TicketSelector::from(ticket.as_ref()), AcknowledgedTicketStatus::Untouched).await {
-                        tracing::error!(%error, %ticket, "failed to reset ticket state after failed redemption");
-                    }
-                }
-            })
-        );
 
         info!(peer_id = %self.me_peer_id(), address = %self.me_onchain(), version = constants::APP_VERSION, "Node information");
 
@@ -599,6 +580,7 @@ where
                 }),
         );
 
+        // Start a queue that takes care of redeeming tickets via given TicketSelectors
         let (redemption_req_tx, redemption_req_rx) = channel::<TicketSelector>(1024);
         let _ = self.redeem_requests.set(redemption_req_tx);
         let chain = self.chain_api.clone();

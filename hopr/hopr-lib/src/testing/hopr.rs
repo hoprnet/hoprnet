@@ -7,10 +7,11 @@ use hopr_api::{
     db::HoprNodeDbApi,
 };
 use hopr_crypto_types::prelude::*;
+use hopr_db_node::HoprNodeDb;
 use hopr_transport::Hash;
 use tokio::time::sleep;
 
-use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude};
+use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude, testing::TestingConnector};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NodeSafeConfig {
@@ -18,21 +19,17 @@ pub struct NodeSafeConfig {
     pub module_address: Address,
 }
 
-pub struct TestedHopr<C, Db> {
-    pub instance: Arc<Hopr<C, Db>>,
+pub struct TestedHopr {
+    pub instance: Arc<Hopr<TestingConnector, HoprNodeDb>>,
 }
 
-impl<C, Db> TestedHopr<C, Db>
-where
-    C: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-{
+impl TestedHopr {
     pub async fn new(
         chain_key: ChainKeypair,
         offchain_key: OffchainKeypair,
         host_port: u16,
-        node_db: Db,
-        connector: C,
+        node_db: HoprNodeDb,
+        connector: TestingConnector,
         safe: NodeSafeConfig,
         auto_redeems: bool,
         winn_prob: Option<f64>,
@@ -85,7 +82,7 @@ where
         }
     }
 
-    pub fn inner(&self) -> &Hopr<C, Db> {
+    pub fn inner(&self) -> &Hopr<TestingConnector, HoprNodeDb> {
         &self.instance
     }
 
@@ -115,26 +112,23 @@ where
 /// Guard for opening and closing the channels in a HOPR network.
 ///
 /// Cleans up the opened channels on drop.
-pub struct ChannelGuard<C, Db> {
-    pub channels: Vec<(Arc<Hopr<C, Db>>, Hash)>,
+pub struct ChannelGuard {
+    pub channels: Vec<(Arc<Hopr<TestingConnector, HoprNodeDb>>, Hash)>,
 }
 
-impl<C, Db> ChannelGuard<C, Db>
-where
-    C: HoprChainApi + Clone + Send + Sync + 'static,
-    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
-{
+impl ChannelGuard {
     pub fn channel_id(&self, index: usize) -> &Hash {
         &self.channels[index].1
     }
+
     pub async fn try_open_channels_for_path<I, T>(path: I, funding: HoprBalance) -> anyhow::Result<Self>
     where
         I: IntoIterator<Item = T>,
-        T: Into<Arc<Hopr<C, Db>>>,
+        T: Into<Arc<Hopr<TestingConnector, HoprNodeDb>>>,
     {
         let mut channels = vec![];
 
-        let path: Vec<Arc<Hopr<C, Db>>> = path.into_iter().map(|item| item.into()).collect();
+        let path: Vec<Arc<Hopr<TestingConnector, HoprNodeDb>>> = path.into_iter().map(|item| item.into()).collect();
         let path_len = path.len();
 
         // no need for a channel to the last node from penultimate

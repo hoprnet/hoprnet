@@ -1585,7 +1585,7 @@ dependencies = [
 [[package]]
 name = "blokli-client"
 version = "0.6.1"
-source = "git+https://github.com/hoprnet/blokli#6d0e9bcb5739b659fa8ab71c6fc76fc045de788a"
+source = "git+https://github.com/hoprnet/blokli#05bd8187589f00cf9f14870afa4635857edd0409"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -7852,7 +7852,7 @@ checksum = "440f724eba9f6996b75d63681b0a92b06947f1457076d503a4d2e2c8f56442b8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.107",
+ "syn 2.0.110",
 ]
 
 [[package]]

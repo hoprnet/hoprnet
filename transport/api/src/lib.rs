@@ -24,7 +24,6 @@ pub mod network_notifier;
 pub mod socket;
 
 use std::{
-    collections::HashSet,
     sync::{Arc, OnceLock},
     time::Duration,
 };

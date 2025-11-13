@@ -9,7 +9,7 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
 /// Enumeration of HOPR chain events.
-#[derive(Debug, Clone, PartialEq, strum::EnumTryAs, strum::EnumIs)]
+#[derive(Debug, Clone, strum::EnumTryAs, strum::EnumIs, strum::EnumDiscriminants)]
 pub enum ChainEvent {
     /// Peer on-chain announcement event.
     ///
@@ -41,8 +41,15 @@ pub enum ChainEvent {
     ///
     /// If the channel is a node's own, it also contains the ticket that has been redeemed.
     TicketRedeemed(ChannelEntry, Option<Box<VerifiedTicket>>),
-    /// Ticket redemption on the node's own channel failed.
-    RedeemFailed(ChannelEntry, String, Box<VerifiedTicket>),
+
+    /// The minimum winning probability has been increased.
+    WinningProbabilityIncreased(WinningProbability),
+
+    /// The minimum winning probability has been decreased.
+    WinningProbabilityDecreased(WinningProbability),
+
+    /// A new ticket price has been set.
+    TicketPriceChanged(HoprBalance),
 }
 
 impl Display for ChainEvent {
@@ -55,7 +62,9 @@ impl Display for ChainEvent {
             ChainEvent::ChannelBalanceIncreased(c, _) => write!(f, "channel increase balance event {}", c.get_id()),
             ChainEvent::ChannelBalanceDecreased(c, _) => write!(f, "channel decrease balance event {}", c.get_id()),
             ChainEvent::TicketRedeemed(c, _) => write!(f, "ticket redeem event in channel {}", c.get_id()),
-            ChainEvent::RedeemFailed(c, r, _) => write!(f, "ticket redeem failed in channel {} due to {r}", c.get_id()),
+            ChainEvent::WinningProbabilityIncreased(p) => write!(f, "winning probability increased to {p}"),
+            ChainEvent::WinningProbabilityDecreased(p) => write!(f, "winning probability decreased to {p}"),
+            ChainEvent::TicketPriceChanged(p) => write!(f, "ticket price changed to {p}"),
         }
     }
 }
