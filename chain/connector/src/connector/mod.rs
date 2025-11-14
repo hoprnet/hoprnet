@@ -232,12 +232,11 @@ where
                     if channel_counter < num_channels && matches!(event_type, SubscribedEventType::Channel(_)) {
                         channel_counter += 1;
                     }
-                    if account_counter >= num_accounts && channel_counter >= num_channels {
-                        if let Some(connection_ready_tx) = connection_ready_tx.take() {
+                    if account_counter >= num_accounts && channel_counter >= num_channels
+                        && let Some(connection_ready_tx) = connection_ready_tx.take() {
                             tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
                             let _ = connection_ready_tx.send(Ok(()));
                         }
-                    }
                 })
                 .for_each(|event_type| {
                     let event_tx = event_tx.clone();
