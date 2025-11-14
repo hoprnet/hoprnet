@@ -2,9 +2,9 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
 use futures::future::join_all;
-use hopr_primitive_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
+use hopr_primitive_types::prelude::*;
 use hopr_transport::Hash;
 use tokio::time::sleep;
 

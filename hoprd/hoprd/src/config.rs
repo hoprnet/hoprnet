@@ -21,7 +21,7 @@ use crate::errors::HoprdError;
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
 
-pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";
+pub const DEFAULT_BLOKLI_URL: &str = "https://blokli.hoprnet.org";
 
 // Validate that the path is a valid UTF-8 path.
 //

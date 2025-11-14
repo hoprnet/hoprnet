@@ -28,6 +28,8 @@ runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
+  "hopr-db-node/runtime-tokio",
+  "hopr-chain-connector/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
   "hopr-strategy/runtime-tokio",
 ]

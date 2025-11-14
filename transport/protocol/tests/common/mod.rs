@@ -1,6 +1,5 @@
-use std::str::FromStr;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{str::FromStr, sync::Arc, time::Duration};
+
 use anyhow::Context;
 use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
@@ -9,7 +8,7 @@ use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
 use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
-use hopr_internal_types::prelude::*;
+use hopr_internal_types::{errors::PathError, prelude::*};
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
@@ -19,11 +18,9 @@ use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tokio::time::timeout;
 use tracing::debug;
-use hopr_internal_types::errors::PathError;
 
 lazy_static! {
     static ref DEFAULT_PRICE_PER_PACKET: HoprBalance = HoprBalance::from_str("0.1 wxHOPR").unwrap();
-
     pub static ref PEERS: Vec<OffchainKeypair> = [
         hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"),
         hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"),
@@ -34,7 +31,6 @@ lazy_static! {
     .iter()
     .map(|private| OffchainKeypair::from_secret(private).expect("lazy static keypair should be valid"))
     .collect();
-
     pub static ref PEERS_CHAIN: Vec<ChainKeypair> = [
         hex!("4db3ac225fdcc7e20bf887cd90bbd62dc6bd41ce8ba5c23cc9ae0bf56e20d056"),
         hex!("1d40c69c179528bbdf49c2254e93400b485f47d7d2fa84aae280af5a31c1918b"),
@@ -45,27 +41,31 @@ lazy_static! {
     .iter()
     .map(|private| ChainKeypair::from_secret(private).expect("lazy static keypair should be valid"))
     .collect();
-
     pub static ref CHANNELS: Vec<ChannelEntry> = PEERS_CHAIN
         .iter()
-        .take(PEERS_CHAIN.len()-1).enumerate().map(|(i, cp)| {
-            create_dummy_channel(cp.public().to_address(), PEERS_CHAIN[i+1].public().to_address())
-        }).collect::<Vec<_>>();
-
-    pub static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestStateBuilder = hopr_chain_connector::testing::BlokliTestStateBuilder::default()
-        .with_accounts(PEERS.iter().enumerate().map(|(i, kp)| {
-            let node_key = kp.public();
-            let chain_key = PEERS_CHAIN[i].public();
-            (AccountEntry {
-                public_key: *node_key,
-                chain_addr: chain_key.to_address(),
-                entry_type: AccountType::Announced(format!("/ip4/127.0.0.1/tcp/444{i}").parse().unwrap()),
-                safe_address: None,
-                key_id: ((i + 1) as u32).into(),
-            }, HoprBalance::new_base(1000), XDaiBalance::new_base(1))
-        }))
-        .with_channels(CHANNELS.iter().cloned())
-        .with_ticket_price(*DEFAULT_PRICE_PER_PACKET);
+        .take(PEERS_CHAIN.len() - 1)
+        .enumerate()
+        .map(|(i, cp)| { create_dummy_channel(cp.public().to_address(), PEERS_CHAIN[i + 1].public().to_address()) })
+        .collect::<Vec<_>>();
+    pub static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestStateBuilder =
+        hopr_chain_connector::testing::BlokliTestStateBuilder::default()
+            .with_accounts(PEERS.iter().enumerate().map(|(i, kp)| {
+                let node_key = kp.public();
+                let chain_key = PEERS_CHAIN[i].public();
+                (
+                    AccountEntry {
+                        public_key: *node_key,
+                        chain_addr: chain_key.to_address(),
+                        entry_type: AccountType::Announced(format!("/ip4/127.0.0.1/tcp/444{i}").parse().unwrap()),
+                        safe_address: None,
+                        key_id: ((i + 1) as u32).into(),
+                    },
+                    HoprBalance::new_base(1000),
+                    XDaiBalance::new_base(1),
+                )
+            }))
+            .with_channels(CHANNELS.iter().cloned())
+            .with_ticket_price(*DEFAULT_PRICE_PER_PACKET);
 }
 
 fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
@@ -115,7 +115,11 @@ pub async fn peer_setup_for(
             }
         };
 
-        debug!("peer {i} ({peer_type})    = {} ({})", PEERS[i].public().to_peerid_str(), PEERS_CHAIN[i].public().to_address());
+        debug!(
+            "peer {i} ({peer_type})    = {} ({})",
+            PEERS[i].public().to_peerid_str(),
+            PEERS_CHAIN[i].public().to_address()
+        );
     }
 
     let mut wire_channels = Vec::new();
@@ -226,7 +230,9 @@ struct MockPathResolver;
 #[async_trait::async_trait]
 impl PathAddressResolver for MockPathResolver {
     async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError> {
-        let index = PEERS_CHAIN.iter().enumerate()
+        let index = PEERS_CHAIN
+            .iter()
+            .enumerate()
             .find(|(_, key)| key.public().to_address() == *address)
             .map(|(i, _)| i);
 
@@ -234,7 +240,9 @@ impl PathAddressResolver for MockPathResolver {
     }
 
     async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError> {
-        let index = PEERS.iter().enumerate()
+        let index = PEERS
+            .iter()
+            .enumerate()
             .find(|(_, ockey)| ockey.public() == key)
             .map(|(i, _)| i);
 
@@ -242,7 +250,10 @@ impl PathAddressResolver for MockPathResolver {
     }
 
     async fn get_channel(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, PathError> {
-        Ok(CHANNELS.iter().find(|c| &c.source == src && &c.destination == dst).cloned())
+        Ok(CHANNELS
+            .iter()
+            .find(|c| &c.source == src && &c.destination == dst)
+            .cloned())
     }
 }
 

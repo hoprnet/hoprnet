@@ -3,8 +3,7 @@ use std::{str::FromStr, time::Duration};
 use anyhow::Context;
 use futures_time::future::FutureExt as _;
 use hopr_lib::{
-    HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget,
-    SurbBalancerConfig,
+    HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget, SurbBalancerConfig,
     errors::{HoprLibError, HoprTransportError},
     exports::transport::session::{IpOrHost, SealedHost},
     testing::{

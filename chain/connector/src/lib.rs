@@ -12,7 +12,7 @@ pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
 /// Re-exports of the `blokli_client` crate.
 pub mod blokli_client {
     pub use blokli_client::{
-        BlokliClient,
+        BlokliClient, BlokliClientConfig,
         api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient},
     };
 }

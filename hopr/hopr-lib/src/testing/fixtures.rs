@@ -51,9 +51,7 @@ impl ClusterGuard {
 
     /// Update winning probability
     pub async fn update_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
-        Ok(self
-            .chain_client
-            .update_price_and_win_prob(None, Some(new_prob)))
+        Ok(self.chain_client.update_price_and_win_prob(None, Some(new_prob)))
     }
 
     /// Create a session between two nodes, ensuring channels are open and funded as needed

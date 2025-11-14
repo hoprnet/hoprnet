@@ -2,14 +2,22 @@ use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
-use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
+use hopr_chain_connector::{
+    BlockchainConnectorConfig, HoprBlockchainSafeConnector,
+    blokli_client::{BlokliClient, BlokliClientConfig},
+};
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::{
-    AbortableList, AcknowledgedTicket, Address, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
+    AbortableList, AcknowledgedTicket, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
     exports::api::chain::ChainEvents, prelude::ChainKeypair, state::HoprLibProcess,
     utils::session::ListenerJoinHandles,
 };
-use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
+use hoprd::{
+    cli::CliArgs,
+    config::{DEFAULT_BLOKLI_URL, HoprdConfig},
+    errors::HoprdError,
+    exit::HoprServerIpForwardingReactor,
+};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
@@ -200,19 +208,32 @@ async fn init_db(
 
 async fn init_blokli_connector(
     chain_key: &ChainKeypair,
-) -> anyhow::Result<Arc<HoprBlockchainSafeConnector<BlokliClient>>> {
+    cfg: &HoprdConfig,
+) -> anyhow::Result<HoprBlockchainSafeConnector<BlokliClient>> {
     // TODO: instantiate the connector properly
     info!("initiating Blokli connector");
-    let mut connector = hopr_chain_connector::create_trustless_hopr_blokli_connector(
+    let mut connector = hopr_chain_connector::create_trustful_hopr_blokli_connector(
         chain_key,
-        Default::default(),
-        BlokliClient::new("test".parse()?, Default::default()),
-        Address::default(),
-        hopr_chain_connector::ContractAddresses::default(),
-    )?;
+        BlockchainConnectorConfig {
+            tx_confirm_timeout: std::time::Duration::from_secs(30),
+            ..Default::default()
+        },
+        BlokliClient::new(
+            cfg.provider
+                .as_ref()
+                .map(|s| s.as_str())
+                .unwrap_or(DEFAULT_BLOKLI_URL)
+                .parse()?,
+            BlokliClientConfig {
+                timeout: std::time::Duration::from_secs(5),
+            },
+        ),
+        cfg.hopr.safe_module.module_address,
+    )
+    .await?;
     connector.connect(std::time::Duration::from_secs(30)).await?;
 
-    Ok(Arc::new(connector))
+    Ok(connector)
 }
 
 async fn init_rest_api(
@@ -330,7 +351,7 @@ async fn main_inner() -> anyhow::Result<()> {
     // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
     let (node_db, stored_tickets) = init_db(&cfg, &hopr_keys.chain_key).await?;
 
-    let chain_connector = init_blokli_connector(&hopr_keys.chain_key).await?;
+    let chain_connector = Arc::new(init_blokli_connector(&hopr_keys.chain_key, &cfg).await?);
 
     // Create the node instance
     info!("creating the HOPRd node instance from hopr-lib");

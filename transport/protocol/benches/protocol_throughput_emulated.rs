@@ -1,22 +1,22 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
 
-use std::sync::Arc;
-use std::time::Duration;
-use common::{PEERS, PEERS_CHAIN, CHAIN_DATA, random_packets_of_count, resolve_mock_path};
+use std::{sync::Arc, time::Duration};
+
+use common::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{SinkExt, StreamExt};
+use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::keypairs::Keypair;
+use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_transport_protocol::processor::PacketInteractionConfig;
 use libp2p::PeerId;
-use hopr_chain_connector::create_trustful_hopr_blokli_connector;
-use hopr_db_node::HoprNodeDb;
 
 const SAMPLE_SIZE: usize = 50;
 
@@ -47,7 +47,9 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let node_db = HoprNodeDb::new_in_memory(PEERS_CHAIN[i].clone())
                             .await
                             .expect("node db must be constructible");
-                        node_db.start_ticket_processing(Some(futures::sink::drain())).expect("ticket processing must be started");
+                        node_db
+                            .start_ticket_processing(Some(futures::sink::drain()))
+                            .expect("ticket processing must be started");
                         node_dbs.push(node_db);
 
                         let mut connector = create_trustful_hopr_blokli_connector(
@@ -56,9 +58,13 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             CHAIN_DATA.clone().build_static_client(),
                             Default::default(),
                         )
-                        .await.expect("connector must be constructible");
+                        .await
+                        .expect("connector must be constructible");
 
-                        connector.connect(Duration::from_secs(3)).await.expect("connector must be connected");
+                        connector
+                            .connect(Duration::from_secs(3))
+                            .await
+                            .expect("connector must be connected");
                         connectors.push(Arc::new(connector));
                     }
                     (node_dbs, connectors)

@@ -155,7 +155,6 @@ where
         let me = self.chain_key.public().to_address();
         let values_cache = self.values.clone();
 
-
         #[allow(unused)]
         enum SubscribedEventType {
             Account((AccountEntry, Option<AccountEntry>)),
@@ -232,11 +231,13 @@ where
                     if channel_counter < num_channels && matches!(event_type, SubscribedEventType::Channel(_)) {
                         channel_counter += 1;
                     }
-                    if account_counter >= num_accounts && channel_counter >= num_channels
-                        && let Some(connection_ready_tx) = connection_ready_tx.take() {
-                            tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
-                            let _ = connection_ready_tx.send(Ok(()));
-                        }
+                    if account_counter >= num_accounts
+                        && channel_counter >= num_channels
+                        && let Some(connection_ready_tx) = connection_ready_tx.take()
+                    {
+                        tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
+                        let _ = connection_ready_tx.send(Ok(()));
+                    }
                 })
                 .for_each(|event_type| {
                     let event_tx = event_tx.clone();
@@ -249,9 +250,11 @@ where
                                 // broadcast announcements of already existing accounts (old_account == None).
                                 if new_account.has_announced() && old_account.is_none_or(|a| !a.has_announced()) {
                                     tracing::debug!(account = %new_account, "new announcement");
-                                    let _ = event_tx.broadcast_direct(ChainEvent::Announcement(new_account.clone())).await;
+                                    let _ = event_tx
+                                        .broadcast_direct(ChainEvent::Announcement(new_account.clone()))
+                                        .await;
                                 }
-                            },
+                            }
                             Ok(SubscribedEventType::Channel((new_channel, Some(changes)))) => {
                                 tracing::debug!(
                                     id = %new_channel.get_id(),
@@ -260,7 +263,7 @@ where
                                     "channel updated"
                                 );
                                 process_channel_changes_into_events(new_channel, changes, &me, &event_tx).await;
-                            },
+                            }
                             Ok(SubscribedEventType::Channel((new_channel, None))) => {
                                 tracing::debug!(
                                     id = %new_channel.get_id(),
@@ -269,17 +272,22 @@ where
                                 );
                                 let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new_channel)).await;
                             }
-                            // TODO: update the values in values_cache instead of invalidating it (make them separate cache entries?)
+                            // TODO: update the values in values_cache instead of invalidating it (make them separate
+                            // cache entries?)
                             Ok(SubscribedEventType::WinningProbability((new, old))) => {
                                 let old = old.unwrap_or_default();
                                 if new.approx_cmp(&old).is_gt() {
                                     tracing::debug!(%new, %old, "winning probability increased");
                                     values_cache.invalidate_all();
-                                    let _ = event_tx.broadcast_direct(ChainEvent::WinningProbabilityIncreased(new)).await;
+                                    let _ = event_tx
+                                        .broadcast_direct(ChainEvent::WinningProbabilityIncreased(new))
+                                        .await;
                                 } else if new.approx_cmp(&old).is_lt() {
                                     tracing::debug!(%new, %old, "winning probability decreased");
                                     values_cache.invalidate_all();
-                                    let _ = event_tx.broadcast_direct(ChainEvent::WinningProbabilityDecreased(new)).await;
+                                    let _ = event_tx
+                                        .broadcast_direct(ChainEvent::WinningProbabilityDecreased(new))
+                                        .await;
                                 }
                             }
                             Ok(SubscribedEventType::TicketPrice((new, old))) => {
@@ -292,7 +300,8 @@ where
                             }
                         }
                     }
-                }).await;
+                })
+                .await;
         });
 
         connection_ready_rx
