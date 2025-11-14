@@ -11,9 +11,6 @@ pub enum ProtocolError {
     #[error(transparent)]
     Other(Box<dyn std::error::Error + Send + Sync + 'static>),
 
-    #[error("db error: {0}")]
-    DatabaseError(#[from] hopr_db_node::errors::NodeDbError),
-
     #[error("General error {0}")]
     GeneralError(#[from] GeneralError),
 

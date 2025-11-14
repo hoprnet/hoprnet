@@ -18,6 +18,7 @@ serde = [
   "dep:serde",
   "dep:serde_bytes",
   "flagset/serde",
+  "hopr-internal-types/serde",
   "hopr-crypto-sphinx/serde",
 ]
 allocator-mimalloc = [

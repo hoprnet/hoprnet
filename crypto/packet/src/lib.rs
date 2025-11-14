@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn packet_length() {
         let packet_len = HoprPacket::SIZE;
-        assert_eq!(packet_len, 438 + PAYLOAD_SIZE_INT);
+        assert_eq!(packet_len, 434 + PAYLOAD_SIZE_INT);
     }
 
     #[test]
