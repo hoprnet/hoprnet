@@ -139,8 +139,10 @@ where
     }
 
     async fn do_connect(&self, timeout: Duration) -> Result<AbortHandle, ConnectorError> {
-        let num_accounts = self.client.count_accounts(None).await?.saturating_sub(1);
-        let num_channels = self.client.count_channels(None).await?.saturating_sub(1);
+        const TOLERANCE: f64 = 0.01;
+        let num_accounts = (self.client.count_accounts(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
+        let num_channels = (self.client.count_channels(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
+        tracing::debug!(num_accounts, num_channels, "connection thresholds");
 
         let (abort_handle, abort_reg) = AbortHandle::new_pair();
 
@@ -225,18 +227,21 @@ where
 
             futures::stream::Abortable::new((account_stream, channel_stream).merge(), abort_reg)
                 .inspect_ok(move |event_type| {
-                    if account_counter < num_accounts && matches!(event_type, SubscribedEventType::Account(_)) {
-                        account_counter += 1;
-                    }
-                    if channel_counter < num_channels && matches!(event_type, SubscribedEventType::Channel(_)) {
-                        channel_counter += 1;
-                    }
-                    if account_counter >= num_accounts
-                        && channel_counter >= num_channels
-                        && let Some(connection_ready_tx) = connection_ready_tx.take()
-                    {
-                        tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
-                        let _ = connection_ready_tx.send(Ok(()));
+                    if connection_ready_tx.is_some() {
+                        match event_type {
+                            SubscribedEventType::Account(_) => account_counter += 1,
+                            SubscribedEventType::Channel(_) => channel_counter += 1,
+                            _ => {}
+                        }
+
+                        // Send the completion notification
+                        // once we reach the expected number of accounts and channels with
+                        // the given tolerance
+                        if account_counter >= num_accounts && channel_counter >= num_channels
+                        {
+                            tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
+                            let _ = connection_ready_tx.take().unwrap().send(Ok(()));
+                        }
                     }
                 })
                 .for_each(|event_type| {

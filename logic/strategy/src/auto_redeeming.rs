@@ -334,7 +334,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_auto_redeeming_strategy_redeem_on_tick() -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::channel(10);
 
