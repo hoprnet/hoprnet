@@ -574,7 +574,12 @@ pub(crate) mod tests {
 
     const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
-    const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
+
+    lazy_static::lazy_static! {
+        static ref REDEEMABLE_TICKET: RedeemableTicket = bincode::serde::decode_from_slice(&hex!(
+            "20d7f3fa28f0caa757e81226e1ee86a9efdbe7991442286183797296ebaa4d292a0330783101ffffffffffffff01766fb51964b4b8797d0ad0d580481ba0024dcf3c01409f24b8d12487dd48340af4ebdc44eff0f4c85ee25b27aca72f50af361022b32232fb24b408a8ed17967c1d700acc3fccbce3408d885d5b8fc41f01c4cf103deb2010312e537a39dbd374fb8dbb7031f255a75ceab085d4789154830f90d9c3e297668430def9eacd2b5064acf85d73fb0b351a1c8c20b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb61026ffdd80eb690f54e85a2d085cb4f0cabdcf96f545af546b0fa8d67402d8c14ef04274e009938aaa5eea217f4103349d4b6bc80cabdd3b8177d473b8b00872d3c20bbac4b6ad5c187d6a7e7118df6d2e63a04f194b54204c18f61372f5b78d154200000000000000000000000000000000000000000000000000000000000000000"
+        ), bincode::config::standard()).unwrap().0;
+    }
 
     #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {
@@ -608,26 +613,9 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn redeem_ticket() -> anyhow::Result<()> {
-        let domain_separator = Hash::default();
-        let chain_key_alice = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
         let chain_key_bob = ChainKeypair::from_secret(&PRIVATE_KEY_2)?;
 
-        let response = Response::try_from(RESPONSE_TO_CHALLENGE.as_ref())?;
-
-        // Alice issues a ticket to Bob
-        let ticket = TicketBuilder::default()
-            .addresses(&chain_key_alice, &chain_key_bob)
-            .amount(1)
-            .index(1)
-            .win_prob(1.0.try_into()?)
-            .channel_epoch(1)
-            .challenge(response.to_challenge()?)
-            .build_signed(&chain_key_alice, &domain_separator)?;
-
-        // Bob acknowledges the ticket using the HalfKey from the Response
-        let acked_ticket = ticket
-            .into_acknowledged(response)
-            .into_redeemable(&chain_key_bob, &domain_separator)?;
+        let acked_ticket = REDEEMABLE_TICKET.clone();
 
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS);
@@ -638,6 +626,7 @@ pub(crate) mod tests {
 
         insta::assert_snapshot!("redeem_ticket_basic", hex::encode(signed_tx));
 
+        // Bob redeems the ticket
         let generator =
             SafePayloadGenerator::new((&chain_key_bob).into(), *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;

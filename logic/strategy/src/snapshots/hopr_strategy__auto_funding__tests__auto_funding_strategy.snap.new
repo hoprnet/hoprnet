@@ -1,0 +1,137 @@
+---
+source: logic/strategy/src/auto_funding.rs
+assertion_line: 244
+expression: "*snapshot.refresh()"
+---
+accounts:
+  0:
+    chain_key: 18f8ae833c85c51fbeba29cef9fbfb53b3bad950
+    keyid: 0
+    multi_addresses: []
+    packet_key: d6affd9ecd20b4fa1ea3fe65162604f01bc8fb859bb8a079b9e70be10eba15a6
+    safe_address: 93534e8ca82510a346dd329115ce7aefd4d35583
+  1:
+    chain_key: bea83ba0fcee21da44a30c893f466e6bf0c29bbb
+    keyid: 1
+    multi_addresses: []
+    packet_key: c443eb7d2eb0c95b3fe8ade2a75b7ea008087b5fe22843557273688d1e4d4f22
+    safe_address: 259bed99d230648d7c8a116af59abdd15c9f4f1e
+  2:
+    chain_key: b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234
+    keyid: 2
+    multi_addresses: []
+    packet_key: 8994396d4907dc5e18e209cf958f001afe8f04d7dc1b3a4fd0f9086ee8c610b7
+    safe_address: 0f944bc36fdcf97fff6807174eeb839ecd6035bd
+  3:
+    chain_key: 68499f50ff68d523385dc60686069935d17d762a
+    keyid: 3
+    multi_addresses: []
+    packet_key: 6cc4009e6dd36eea81f3d5b2b7a9f3dd0e78c66a9577e7090ebdd066882712d3
+    safe_address: f982b19d6920ee93a267aec482349ab4a6c8a150
+native_balances:
+  18f8ae833c85c51fbeba29cef9fbfb53b3bad950:
+    __typename: NativeBalance
+    balance: 1 xDai
+  93534e8ca82510a346dd329115ce7aefd4d35583:
+    __typename: NativeBalance
+    balance: 0 xDai
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: NativeBalance
+    balance: 0.999999999999999999 xDai
+  259bed99d230648d7c8a116af59abdd15c9f4f1e:
+    __typename: NativeBalance
+    balance: 0 xDai
+  b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234:
+    __typename: NativeBalance
+    balance: 1 xDai
+  0f944bc36fdcf97fff6807174eeb839ecd6035bd:
+    __typename: NativeBalance
+    balance: 0 xDai
+  68499f50ff68d523385dc60686069935d17d762a:
+    __typename: NativeBalance
+    balance: 1 xDai
+  f982b19d6920ee93a267aec482349ab4a6c8a150:
+    __typename: NativeBalance
+    balance: 0 xDai
+token_balances:
+  18f8ae833c85c51fbeba29cef9fbfb53b3bad950:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  93534e8ca82510a346dd329115ce7aefd4d35583:
+    __typename: HoprBalance
+    balance: 1000 wxHOPR
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  259bed99d230648d7c8a116af59abdd15c9f4f1e:
+    __typename: HoprBalance
+    balance: 999.999999999999999995 wxHOPR
+  b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  0f944bc36fdcf97fff6807174eeb839ecd6035bd:
+    __typename: HoprBalance
+    balance: 1000 wxHOPR
+  68499f50ff68d523385dc60686069935d17d762a:
+    __typename: HoprBalance
+    balance: 0 wxHOPR
+  f982b19d6920ee93a267aec482349ab4a6c8a150:
+    __typename: HoprBalance
+    balance: 1000 wxHOPR
+safe_allowances:
+  93534e8ca82510a346dd329115ce7aefd4d35583:
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+  259bed99d230648d7c8a116af59abdd15c9f4f1e:
+    __typename: SafeHoprAllowance
+    allowance: 9999999999999.999999999999999995 wxHOPR
+  0f944bc36fdcf97fff6807174eeb839ecd6035bd:
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+  f982b19d6920ee93a267aec482349ab4a6c8a150:
+    __typename: SafeHoprAllowance
+    allowance: 10000000000000 wxHOPR
+tx_counts:
+  bea83ba0fcee21da44a30c893f466e6bf0c29bbb: 1
+channels:
+  8a0da13eba62860787c9f93a665d2235d8e9632c491dc577ce9dd28d5be8a091:
+    balance: 0.00000000000000001 wxHOPR
+    closure_time: ~
+    concrete_channel_id: 8a0da13eba62860787c9f93a665d2235d8e9632c491dc577ce9dd28d5be8a091
+    destination: 1
+    epoch: 0
+    source: 0
+    status: OPEN
+    ticket_index: "0"
+  6924339470e763ceee49f1a6ce98a95780646ff6fd25744bcb3fc9d231c447ee:
+    balance: 0.00000000000000001 wxHOPR
+    closure_time: ~
+    concrete_channel_id: 6924339470e763ceee49f1a6ce98a95780646ff6fd25744bcb3fc9d231c447ee
+    destination: 2
+    epoch: 0
+    source: 1
+    status: OPEN
+    ticket_index: "0"
+  fa56c9b048679b117d551bd66ddc4835cfb754cbcc34a679512061ec1deef935:
+    balance: 0.000000000000000005 wxHOPR
+    closure_time: "2025-11-10T00:00:00+00:00"
+    concrete_channel_id: fa56c9b048679b117d551bd66ddc4835cfb754cbcc34a679512061ec1deef935
+    destination: 3
+    epoch: 0
+    source: 2
+    status: PENDINGTOCLOSE
+    ticket_index: "0"
+chain_info:
+  channel_closure_grace_period: "300"
+  channel_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  block_number: 1
+  chain_id: 100
+  ledger_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  min_ticket_winning_probability: 1
+  safe_registry_dst: "0000000000000000000000000000000000000000000000000000000000000000"
+  ticket_price: 1 wxHOPR
+  network: rotsee
+  contract_addresses: "\n                {\n                    \"announcements\": \"0xf1c143B1bA20C7606d56aA2FA94502D25744b982\",\n                    \"channels\": \"0x77C9414043d27fdC98A6A2d73fc77b9b383092a7\",\n                    \"module_implementation\": \"0x32863c4974fBb6253E338a0cb70C382DCeD2eFCb\",\n                    \"node_safe_registry\": \"0x4F7C7dE3BA2B29ED8B2448dF2213cA43f94E45c0\",\n                    \"node_stake_factory\": \"0x791d190b2c95397F4BcE7bD8032FD67dCEA7a5F2\",\n                    \"node_safe_migration\": \"0x0000000000000000000000000000000000000000\",\n                    \"token\": \"0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1\",\n                    \"ticket_price_oracle\": \"0x442df1d946303fB088C9377eefdaeA84146DA0A6\",\n                    \"winning_probability_oracle\": \"0xC15675d4CCa538D91a91a8D3EcFBB8499C3B0471\"\n                }"
+version: "1"
+health: OK
+active_txs: {}

@@ -139,8 +139,8 @@ where
     }
 
     async fn do_connect(&self, timeout: Duration) -> Result<AbortHandle, ConnectorError> {
-        let num_accounts = self.client.count_accounts(None).await? - 1;
-        let num_channels = self.client.count_channels(None).await? - 1;
+        let num_accounts = self.client.count_accounts(None).await?.saturating_sub(1);
+        let num_channels = self.client.count_channels(None).await?.saturating_sub(1);
 
         let (abort_handle, abort_reg) = AbortHandle::new_pair();
 

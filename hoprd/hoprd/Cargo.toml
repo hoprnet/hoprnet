@@ -122,3 +122,11 @@ anyhow = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 test-log = { workspace = true }
+hopr-lib = { workspace = true, features = [
+  "runtime-tokio",
+  "session-client",
+  "session-server",
+  "utils_session",
+  "utils_parallel",
+  "testing"
+] }
