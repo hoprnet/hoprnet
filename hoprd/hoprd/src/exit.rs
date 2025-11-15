@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, num::NonZeroUsize};
 
 use hopr_lib::{
-    HoprOffchainKeypair, ServiceId,
+    OffchainKeypair, ServiceId,
     errors::HoprLibError,
     prelude::{ConnectedUdpStream, ForeignDataMode, UdpStreamParallelism},
     transfer_session,
@@ -23,12 +23,12 @@ lazy_static::lazy_static! {
 /// bridging of TCP or UDP sockets from the Session Exit node to a destination.
 #[derive(Debug, Clone)]
 pub struct HoprServerIpForwardingReactor {
-    keypair: HoprOffchainKeypair,
+    keypair: OffchainKeypair,
     cfg: SessionIpForwardingConfig,
 }
 
 impl HoprServerIpForwardingReactor {
-    pub fn new(keypair: HoprOffchainKeypair, cfg: SessionIpForwardingConfig) -> Self {
+    pub fn new(keypair: OffchainKeypair, cfg: SessionIpForwardingConfig) -> Self {
         Self { keypair, cfg }
     }
 
@@ -48,7 +48,7 @@ impl HoprServerIpForwardingReactor {
 
 pub const SERVICE_ID_LOOPBACK: ServiceId = 0;
 
-#[hopr_lib::async_trait]
+#[async_trait::async_trait]
 impl hopr_lib::traits::session::HoprSessionServer for HoprServerIpForwardingReactor {
     #[tracing::instrument(level = "debug", skip(self, session))]
     async fn process(

@@ -54,7 +54,6 @@ hopr-async-runtime = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
-hopr-path = { workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }

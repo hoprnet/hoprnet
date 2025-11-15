@@ -4,12 +4,13 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream::BoxStream};
-use hopr_internal_types::prelude::ChannelStatus;
 pub use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry, ChannelId, ChannelStatusDiscriminants};
+use hopr_internal_types::prelude::{ChannelStatus, generate_channel_id};
 use hopr_primitive_types::prelude::Address;
 pub use hopr_primitive_types::prelude::HoprBalance;
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub use chrono::Utc;
+use strum::IntoDiscriminant;
 
 use crate::chain::ChainReceipt;
 
@@ -70,10 +71,38 @@ impl ChannelSelector {
         self.closure_time_range = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }
+
+    pub fn satisfies(&self, entry: &ChannelEntry) -> bool {
+        if let Some(source) = &self.source {
+            if entry.source != *source {
+                return false;
+            }
+        }
+
+        if let Some(dst) = &self.destination {
+            if entry.destination != *dst {
+                return false;
+            }
+        }
+
+        if !self.allowed_states.is_empty() && !self.allowed_states.contains(&entry.status.discriminant()) {
+            return false;
+        }
+
+        if let ChannelStatus::PendingToClose(time) = &entry.status {
+            let time = DateTime::from(*time);
+            if !self.closure_time_range.contains(&time) {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 /// On-chain read operations regarding channels.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainReadChannelOperations {
     type Error: Error + Send + Sync + 'static;
 
@@ -81,7 +110,9 @@ pub trait ChainReadChannelOperations {
     fn me(&self) -> &Address;
 
     /// Returns a single channel given `src` and `dst`.
-    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error>;
+    async fn channel_by_parties(&self, src: &Address, dst: &Address) -> Result<Option<ChannelEntry>, Self::Error> {
+        self.channel_by_id(&generate_channel_id(src, dst)).await
+    }
 
     /// Returns a single channel given `channel_id`.
     async fn channel_by_id(&self, channel_id: &ChannelId) -> Result<Option<ChannelEntry>, Self::Error>;
@@ -95,6 +126,7 @@ pub trait ChainReadChannelOperations {
 
 /// On-chain write operations regarding channels.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainWriteChannelOperations {
     type Error: Error + Send + Sync + 'static;
     /// Opens a channel with `dst` and `amount`.
@@ -115,5 +147,5 @@ pub trait ChainWriteChannelOperations {
     async fn close_channel<'a>(
         &'a self,
         channel_id: &'a ChannelId,
-    ) -> Result<BoxFuture<'a, Result<(ChannelStatus, ChainReceipt), Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'a, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }

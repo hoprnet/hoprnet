@@ -1,4 +1,4 @@
-pub use hopr_chain_api::errors::{ChainActionsError, HoprChainError};
+pub use hopr_transport::errors::{HoprTransportError, ProbeError, ProtocolError};
 use thiserror::Error;
 
 use crate::state::HoprState;
@@ -20,19 +20,39 @@ pub enum HoprLibError {
     GeneralError(String),
 
     #[error(transparent)]
+    DbError(anyhow::Error),
+
+    #[error(transparent)]
+    ChainError(anyhow::Error),
+
+    #[error(transparent)]
     StatusError(#[from] HoprStatusError),
 
     #[error(transparent)]
-    DbError(#[from] hopr_db_node::errors::NodeDbError),
-
-    #[error(transparent)]
-    TransportError(#[from] hopr_transport::errors::HoprTransportError),
-
-    #[error(transparent)]
-    ChainApi(#[from] hopr_chain_api::errors::HoprChainError),
+    TransportError(#[from] HoprTransportError),
 
     #[error(transparent)]
     TypeError(#[from] hopr_primitive_types::errors::GeneralError),
+
+    #[error(transparent)]
+    NetworkTypeError(#[from] hopr_network_types::errors::NetworkTypeError),
+
+    #[error(transparent)]
+    Other(anyhow::Error),
 }
 
 pub type Result<T> = std::result::Result<T, HoprLibError>;
+
+impl HoprLibError {
+    pub fn chain<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::ChainError(e.into())
+    }
+
+    pub fn db<E: Into<anyhow::Error>>(e: E) -> Self {
+        Self::DbError(e.into())
+    }
+
+    pub fn other(e: impl Into<anyhow::Error>) -> Self {
+        Self::Other(e.into())
+    }
+}

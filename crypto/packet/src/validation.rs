@@ -113,7 +113,6 @@ mod tests {
             .addresses(&*SENDER_PRIV_KEY, &*TARGET_PRIV_KEY)
             .amount(1)
             .index(1)
-            .index_offset(1)
             .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .eth_challenge(Default::default())

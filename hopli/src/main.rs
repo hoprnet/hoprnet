@@ -6,17 +6,16 @@ use tracing_subscriber::layer::SubscriberExt;
 use crate::{
     faucet::FaucetArgs,
     identity::IdentitySubcommands,
-    network_registry::NetworkRegistrySubcommands,
     safe_module::SafeModuleSubcommands,
     utils::{Cmd, HelperErrors},
     win_prob::WinProbSubcommands,
 };
+mod constants;
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
 pub mod key_pair;
 pub mod methods;
-pub mod network_registry;
 pub mod safe_module;
 pub mod utils;
 pub mod win_prob;
@@ -53,13 +52,6 @@ enum Commands {
     /// Fund given address and/or addressed derived from identity files native tokens or HOPR tokens
     #[clap(about = "Fund given address and/or addressed derived from identity files native tokens or HOPR tokens")]
     Faucet(FaucetArgs),
-
-    /// Commands around network registry.
-    #[command(visible_alias = "nr")]
-    NetworkRegistry {
-        #[command(subcommand)]
-        command: NetworkRegistrySubcommands,
-    },
 
     /// Commands around safe module
     #[command(visible_alias = "sm")]
@@ -98,9 +90,6 @@ async fn main() -> Result<(), HelperErrors> {
         }
         Commands::Faucet(opt) => {
             opt.async_run().await?;
-        }
-        Commands::NetworkRegistry { command } => {
-            command.async_run().await?;
         }
         Commands::SafeModule { command } => {
             command.async_run().await?;

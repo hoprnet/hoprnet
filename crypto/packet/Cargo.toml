@@ -18,8 +18,8 @@ serde = [
   "dep:serde",
   "dep:serde_bytes",
   "flagset/serde",
+  "hopr-internal-types/serde",
   "hopr-crypto-sphinx/serde",
-  "hopr-path/serde",
 ]
 allocator-mimalloc = [
   "dep:mimalloc",
@@ -42,7 +42,6 @@ hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-internal-types = { workspace = true }
-hopr-path = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]

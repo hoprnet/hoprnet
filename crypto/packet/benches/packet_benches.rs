@@ -5,9 +5,8 @@ use bimap::BiHashMap;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_random::Randomizable;
-use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_path::{Path, TransportPath};
 use hopr_primitive_types::prelude::{BytesEncodable, KeyIdent};
 
 // Avoid musl's default allocator due to degraded performance

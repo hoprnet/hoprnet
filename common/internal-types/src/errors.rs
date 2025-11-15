@@ -1,4 +1,5 @@
 use hopr_crypto_types::errors::CryptoError;
+use hopr_primitive_types::errors::GeneralError;
 use multiaddr::Error as MultiaddrError;
 use thiserror::Error;
 
@@ -36,7 +37,35 @@ pub enum CoreTypesError {
     CryptoError(#[from] CryptoError),
 
     #[error(transparent)]
-    GeneralError(#[from] hopr_primitive_types::errors::GeneralError),
+    GeneralError(#[from] GeneralError),
+}
+
+/// Path selection and construction errors.
+#[derive(Error, Debug)]
+pub enum PathError {
+    #[error("path is not valid")]
+    PathNotValid,
+
+    #[error("path contains an invalid peer id: {0}")]
+    InvalidPeer(String),
+
+    #[error("path contains a unknown peer that cannot be resolved: {0}")]
+    UnknownPeer(String),
+
+    #[error("missing channel between {0} and {1}")]
+    MissingChannel(String, String),
+
+    #[error("channel between {0} and {1} is not opened")]
+    ChannelNotOpened(String, String),
+
+    #[error("path contains loop on {0}")]
+    LoopsNotAllowed(String),
+
+    #[error("cannot find {0} hop path {1} -> {2} in the channel graph")]
+    PathNotFound(usize, String, String),
+
+    #[error(transparent)]
+    OtherError(#[from] GeneralError),
 }
 
 pub type Result<T> = core::result::Result<T, CoreTypesError>;

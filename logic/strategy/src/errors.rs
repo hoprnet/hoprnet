@@ -1,4 +1,4 @@
-use hopr_primitive_types::errors::GeneralError;
+use hopr_lib::GeneralError;
 use thiserror::Error;
 
 /// Enumerates all errors in this crate.
@@ -11,7 +11,7 @@ pub enum StrategyError {
     Other(Box<dyn std::error::Error + Send + Sync>),
 
     #[error(transparent)]
-    ProtocolError(#[from] hopr_transport_protocol::errors::ProtocolError),
+    HoprLib(#[from] hopr_lib::errors::HoprLibError),
 
     #[error("lower-level error: {0}")]
     GeneralError(#[from] GeneralError),

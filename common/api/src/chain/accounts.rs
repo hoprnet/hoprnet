@@ -33,6 +33,7 @@ impl<E: std::error::Error> std::error::Error for AnnouncementError<E> {}
 
 /// On-chain write operations regarding on-chain node accounts.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainWriteAccountOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
@@ -41,20 +42,20 @@ pub trait ChainWriteAccountOperations {
         &self,
         multiaddrs: &[Multiaddr],
         key: &OffchainKeypair,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>>;
+    ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, AnnouncementError<Self::Error>>;
 
     /// Withdraws native or token currency.
     async fn withdraw<C: Currency + Send>(
         &self,
         balance: Balance<C>,
         recipient: &Address,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, Self::Error>;
 
     /// Registers Safe address with the current node.
     async fn register_safe(
         &self,
         safe_address: &Address,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, Self::Error>;
 }
 
 /// Selector for on-chain node accounts.
@@ -70,34 +71,42 @@ pub struct AccountSelector {
     pub offchain_key: Option<OffchainPublicKey>,
 }
 
+impl AccountSelector {
+    pub fn satisfies(&self, account: &AccountEntry) -> bool {
+        if self.public_only && !account.has_announced() {
+            return false;
+        }
+
+        if let Some(chain_key) = &self.chain_key {
+            if &account.chain_addr != chain_key {
+                return false;
+            }
+        }
+
+        if let Some(packet_key) = &self.offchain_key {
+            if &account.public_key != packet_key {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
 /// Chain operations that read on-chain node accounts.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainReadAccountOperations {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    /// Returns the native or token currency balance of the current node's account.
-    async fn node_balance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
-
-    /// Returns the native or token currency balance of the current node's Safe.
-    async fn safe_balance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
+    /// Returns the native or token currency balance of the given on-chain account.
+    async fn get_balance<C: Currency, A: Into<Address> + Send>(&self, address: A) -> Result<Balance<C>, Self::Error>;
 
     /// Returns the native or token currency Safe allowance.
-    async fn safe_allowance<C: Currency>(&self) -> Result<Balance<C>, Self::Error>;
-
-    /// Returns account entry given the on-chain `address`.
-    async fn find_account_by_address(&self, address: &Address) -> Result<Option<AccountEntry>, Self::Error>;
-
-    /// Returns account entry given the off-chain `packet_key`.
-    async fn find_account_by_packet_key(
+    async fn safe_allowance<C: Currency, A: Into<Address> + Send>(
         &self,
-        packet_key: &OffchainPublicKey,
-    ) -> Result<Option<AccountEntry>, Self::Error>;
-
-    /// Validates the node's Safe setup.
-    async fn check_node_safe_module_status(&self) -> Result<bool, Self::Error>;
-
-    /// Checks if the given safe address can be registered with the current node.
-    async fn can_register_with_safe(&self, safe_address: &Address) -> Result<bool, Self::Error>;
+        safe_address: A,
+    ) -> Result<Balance<C>, Self::Error>;
 
     /// Returns on-chain node accounts with the given [`AccountSelector`].
     async fn stream_accounts<'a>(

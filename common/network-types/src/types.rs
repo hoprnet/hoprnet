@@ -7,8 +7,7 @@ use std::{
 use hickory_resolver::name_server::ConnectionProvider;
 use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_random::Randomizable;
-use hopr_internal_types::{NodeId, prelude::HoprPseudonym};
-pub use hopr_path::ValidatedPath;
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
 use libp2p_identity::PeerId;
 

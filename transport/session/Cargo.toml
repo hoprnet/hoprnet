@@ -68,6 +68,7 @@ hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "serde",
+  "runtime-tokio",
 ] }
 mockall = { workspace = true }
 rand = { workspace = true }

@@ -5,6 +5,7 @@
 //! as proposed by Ross Anderson and Eli Biham.
 use std::{fmt::Formatter, marker::PhantomData, ops::Sub};
 
+#[allow(deprecated)] // Until the crate updates to newer versions of `generic-array`
 use cipher::{
     AlgorithmName, ArrayLength, Block, BlockSizeUser, Iv, IvSizeUser, Key, KeyInit, KeyIvInit, KeySizeUser,
     StreamCipher, generic_array::GenericArray, inout::InOut,

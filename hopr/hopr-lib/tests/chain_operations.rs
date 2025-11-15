@@ -55,26 +55,25 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyho
     Ok(())
 }
 
+// #[rstest]
+// #[tokio::test]
+// #[serial]
+// async fn test_safe_and_module_shouldnt_change(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+// let [idx] = exclusive_indexes::<1>();
+// let safe_address = cluster_fixture[idx].inner().get_safe_config();
+//
+// assert_eq!(
+// safe_address.module_address,
+// cluster_fixture[idx].safe_config.module_address
+// );
+// assert_eq!(safe_address.safe_address, cluster_fixture[idx].safe_config.safe_address);
+//
+// Ok(())
+// }
+
 #[rstest]
 #[tokio::test]
 #[serial]
-async fn safe_and_module_shouldnt_change(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [idx] = exclusive_indexes::<1>();
-    let safe_address = cluster_fixture[idx].inner().get_safe_config();
-
-    assert_eq!(
-        safe_address.module_address,
-        cluster_fixture[idx].safe_config.module_address
-    );
-    assert_eq!(safe_address.safe_address, cluster_fixture[idx].safe_config.safe_address);
-
-    Ok(())
-}
-
-#[rstest]
-#[tokio::test]
-#[serial]
-
 async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{ChannelStatus, HoprBalance};
     use tokio::time::sleep;

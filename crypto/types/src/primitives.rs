@@ -75,6 +75,7 @@ impl<T: KeyIvInit> std::fmt::Debug for IvKey<T> {
     }
 }
 
+#[allow(deprecated)] // Until the dependency updates to newer versions of `generic-array`
 impl<T: KeyIvInit> IvKey<T> {
     /// Total size of the key and IV in bytes.
     pub const SIZE: usize = T::KeySize::USIZE + T::IvSize::USIZE;

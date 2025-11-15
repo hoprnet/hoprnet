@@ -1,6 +1,6 @@
 use std::error::Error;
 
-pub use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, KeyIdMapper};
+pub use hopr_crypto_packet::{HoprKeyIdent, HoprSphinxHeaderSpec, HoprSphinxSuite, KeyIdMapper};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_primitive_types::prelude::Address;
 
@@ -8,6 +8,7 @@ use hopr_primitive_types::prelude::Address;
 ///
 /// This typically translates to optimized (and cached) versions of [`ChainReadChannelOperations`].
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait ChainKeyOperations {
     type Error: Error + Send + Sync + 'static;
     type Mapper: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> + Clone + Send + Sync + 'static;

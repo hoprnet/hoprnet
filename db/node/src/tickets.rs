@@ -95,10 +95,6 @@ impl IntoCondition for WrappedTicketSelector {
             expr = expr.and(ticket::Column::State.eq(state as u8))
         }
 
-        if self.0.only_aggregated {
-            expr = expr.and(ticket::Column::IndexOffset.gt(1));
-        }
-
         // Win prob lower bound
         expr = match self.0.win_prob.0 {
             Bound::Included(gte) => expr.and(ticket::Column::WinningProbability.gte(gte.as_encoded().to_vec())),
@@ -687,7 +683,7 @@ mod tests {
         src: &ChainKeypair,
         dst: &ChainKeypair,
         index: u64,
-        index_offset: u32,
+        _index_offset: u32,
         win_prob: f64,
     ) -> anyhow::Result<AcknowledgedTicket> {
         let hk1 = HalfKey::random();
@@ -698,7 +694,6 @@ mod tests {
             .addresses(src, dst)
             .amount(TICKET_VALUE)
             .index(index)
-            .index_offset(index_offset)
             .win_prob(win_prob.try_into()?)
             .channel_epoch(CHANNEL_EPOCH)
             .challenge(challenge)

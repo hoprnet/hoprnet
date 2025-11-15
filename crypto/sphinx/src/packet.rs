@@ -238,6 +238,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
     }
 
     /// Transform this partial packet into an actual [`MetaPacket`] using the given payload.
+    #[allow(deprecated)] // Until the dependency updates to newer versions of `generic-array`
     pub fn into_meta_packet<const P: usize>(self, mut payload: PaddedPayload<P>) -> MetaPacket<S, H, P> {
         for iv_key in self.prp_inits {
             let prp = iv_key.into_init::<S::PRP>();

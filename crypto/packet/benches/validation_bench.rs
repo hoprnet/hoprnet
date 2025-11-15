@@ -35,7 +35,6 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
         .addresses(source.public().to_address(), dest.public().to_address())
         .balance(HoprBalance::new_base(100))
         .index(1)
-        .index_offset(1)
         .eth_challenge(Default::default())
         .win_prob(WinningProbability::ALWAYS)
         .channel_epoch(1)

@@ -25,14 +25,13 @@ use alloy::{
 };
 use hex_literal::hex;
 use hopr_bindings::{
-    hoprnetworkregistry::HoprNetworkRegistry::HoprNetworkRegistryInstance,
-    hoprnodemanagementmodule::HoprNodeManagementModule::{
+    hopr_node_management_module::HoprNodeManagementModule::{
         HoprNodeManagementModuleInstance, addChannelsAndTokenTargetCall, includeNodeCall, removeNodeCall,
         scopeTargetTokenCall,
     },
-    hoprnodesaferegistry::HoprNodeSafeRegistry::{HoprNodeSafeRegistryInstance, deregisterNodeBySafeCall},
-    hoprnodestakefactory::HoprNodeStakeFactory::{HoprNodeStakeFactoryInstance, cloneCall},
-    hoprtoken::HoprToken::{HoprTokenInstance, approveCall},
+    hopr_node_safe_registry::HoprNodeSafeRegistry::{HoprNodeSafeRegistryInstance, deregisterNodeBySafeCall},
+    hopr_node_stake_factory::HoprNodeStakeFactory::{HoprNodeStakeFactoryInstance, cloneCall},
+    hopr_token::HoprToken::{HoprTokenInstance, approveCall},
 };
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use tracing::{debug, info};
@@ -528,180 +527,6 @@ pub async fn transfer_native_tokens<P: Provider + WalletProvider>(
     Ok(total)
 }
 
-/// Get registered safes for given nodes on the network registry
-pub async fn get_registered_safes_for_nodes_on_network_registry<P: Provider + WalletProvider>(
-    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
-    node_addresses: Vec<Address>,
-) -> Result<Vec<Address>, MulticallError> {
-    let provider = network_registry.provider();
-
-    let mut dynamic_multicall = MulticallBuilder::new_dynamic(provider.clone());
-
-    for node in node_addresses {
-        dynamic_multicall = dynamic_multicall.add_dynamic(network_registry.nodeRegisterdToAccount(node));
-    }
-
-    let response = dynamic_multicall.aggregate().await?;
-
-    Ok(response)
-}
-
-/// Register safes and nodes to the network registry, and force-sync the eligibility to true.
-/// It returns the number of removed nodes and nodes being added.
-/// - If nodes have been registered to a different safe, overwrite it (remove the old safe and regsiter with the new
-///   safe)
-/// - If ndoes have been registered to the same safe, no op
-/// - If nodes have not been registered to any safe, register it
-///
-/// After all the nodes have been added to the network registry, force-sync the eligibility of all the added safes to
-/// true
-pub async fn register_safes_and_nodes_on_network_registry<P: Provider + WalletProvider + Clone>(
-    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
-    safe_addresses: Vec<Address>,
-    node_addresses: Vec<Address>,
-) -> Result<(usize, usize), HelperErrors> {
-    assert_eq!(
-        safe_addresses.len(),
-        node_addresses.len(),
-        "unmatched lengths of safes and nodes"
-    );
-
-    // check registered safes of given node addresses
-    let registered_safes =
-        get_registered_safes_for_nodes_on_network_registry(network_registry.clone(), node_addresses.clone()).await?;
-
-    let mut nodes_to_remove: Vec<Address> = Vec::new();
-    let mut safes_to_add: Vec<Address> = Vec::new();
-    let mut nodes_to_add: Vec<Address> = Vec::new();
-
-    for (i, registered_safe) in registered_safes.iter().enumerate() {
-        if registered_safe.eq(&Address::ZERO) {
-            // no entry, add to network registry
-            safes_to_add.push(safe_addresses[i]);
-            nodes_to_add.push(node_addresses[i]);
-        } else if registered_safe.ne(&safe_addresses[i]) {
-            // remove first then add
-            nodes_to_remove.push(node_addresses[i]);
-            safes_to_add.push(safe_addresses[i]);
-            nodes_to_add.push(node_addresses[i]);
-        } else {
-            // no-op
-        }
-    }
-
-    if !nodes_to_remove.is_empty() {
-        // need to remove some nodes
-        network_registry
-            .managerDeregister(nodes_to_remove.clone())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-
-    network_registry
-        .managerRegister(safes_to_add.clone(), nodes_to_add.clone())
-        .send()
-        .await?
-        .watch()
-        .await?;
-
-    // force sync their eligibility
-    network_registry
-        .managerForceSync(safes_to_add.clone(), vec![true; safes_to_add.len()])
-        .send()
-        .await?
-        .watch()
-        .await?;
-
-    Ok((nodes_to_remove.len(), nodes_to_add.len()))
-}
-
-/// Deregister safes and nodes from the network registry. Does not do any action on the eligibility.
-/// It returns the number of removed nodes
-/// - If nodes have been registered to a safe, remove the node
-/// - If nodes have not been registered to any safe, no op
-pub async fn deregister_nodes_from_network_registry<P: Provider + WalletProvider + Clone>(
-    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
-    node_addresses: Vec<Address>,
-) -> Result<usize, HelperErrors> {
-    // check registered safes of given node addresses
-    let registered_safes =
-        get_registered_safes_for_nodes_on_network_registry(network_registry.clone(), node_addresses.clone()).await?;
-
-    let mut nodes_to_remove: Vec<Address> = Vec::new();
-
-    for (i, registered_safe) in registered_safes.iter().enumerate() {
-        if registered_safe.ne(&Address::ZERO) {
-            // remove the node
-            nodes_to_remove.push(node_addresses[i]);
-        }
-    }
-
-    if !nodes_to_remove.is_empty() {
-        // need to remove some nodes
-        network_registry
-            .managerDeregister(nodes_to_remove.clone())
-            .send()
-            .await?
-            .watch()
-            .await?;
-    }
-    Ok(nodes_to_remove.len())
-}
-
-/// Force-sync the eligibility to given values. This can only be called with a manager account
-pub async fn force_sync_safes_on_network_registry<P: Provider>(
-    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
-    safe_addresses: Vec<Address>,
-    eligibilities: Vec<bool>,
-) -> Result<(), HelperErrors> {
-    assert_eq!(
-        safe_addresses.len(),
-        eligibilities.len(),
-        "unmatched lengths of safes and eligibilities"
-    );
-
-    // force sync their eligibility
-    network_registry
-        .managerForceSync(safe_addresses, eligibilities)
-        .send()
-        .await?
-        .watch()
-        .await?;
-
-    Ok(())
-}
-
-pub async fn toggle_network_registry_status<P: Provider>(
-    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
-    status: bool,
-) -> Result<(), HelperErrors> {
-    let current_status = network_registry.enabled().call().await?;
-
-    info!(
-        current_status = ?current_status,
-        desired_status = ?status,
-        "Toggling network registry status",
-    );
-
-    if current_status == status {
-        info!("Network registry is already in the desired state: {:?}", status);
-        return Ok(());
-    }
-
-    if status {
-        info!("Enabling the network registry");
-        // enable network registry
-        network_registry.enableRegistry().send().await?.watch().await?;
-    } else {
-        info!("Disabling the network registry");
-        // disable network registry
-        network_registry.disableRegistry().send().await?.watch().await?;
-    }
-    Ok(())
-}
-
 /// Helper function to predict module address. Note that here the caller is the contract deployer
 pub fn predict_module_address(
     caller: Address,
@@ -906,7 +731,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
         target: *hopr_node_stake_factory.address(),
         allowFailure: false,
         callData: cloneCall {
-            moduleSingletonAddress: hopr_module_implementation_address,
+            // moduleSingletonAddress: hopr_module_implementation_address,
             admins: temporary_admins,
             nonce: nonce.into(),
             defaultTarget: default_target.into(),
@@ -1010,11 +835,11 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
     info!("multicall is sent {:?}", tx_receipt.transaction_hash.to_string());
 
     let safe_address_from_log = tx_receipt
-        .decoded_log::<hopr_bindings::hoprnodestakefactory::HoprNodeStakeFactory::NewHoprNodeStakeSafe>()
+        .decoded_log::<hopr_bindings::hopr_node_stake_factory::HoprNodeStakeFactory::NewHoprNodeStakeSafe>()
         .ok_or_else(|| HelperErrors::ContractNotDeployed("cannot find safe from log".into()))?
         .instance;
     let module_address_from_log = tx_receipt
-        .decoded_log::<hopr_bindings::hoprnodestakefactory::HoprNodeStakeFactory::NewHoprNodeStakeModule>()
+        .decoded_log::<hopr_bindings::hopr_node_stake_factory::HoprNodeStakeFactory::NewHoprNodeStakeModule>()
         .ok_or_else(|| HelperErrors::ContractNotDeployed("cannot find module from log".into()))?
         .instance;
 
@@ -1244,14 +1069,12 @@ pub async fn migrate_nodes<P: WalletProvider + Provider>(
 
 /// Quick check if the following values are correct, for one single node:
 /// 1. node xDAI balance
-/// 2. If node has been included on Network Registry
-/// 3. If node and safe are associated on Node Safe Registry
+/// 2. If node and safe are associated on Node Safe Registry
 pub async fn debug_node_safe_module_setup_on_balance_and_registries<P: Provider>(
-    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
     node_safe_registry: HoprNodeSafeRegistryInstance<Arc<P>>,
     node_address: &Address,
 ) -> Result<Address, MulticallError> {
-    let provider = network_registry.provider();
+    let provider = node_safe_registry.provider();
     // let mut multicall = Multicall::new(provider.clone(), Some(MULTICALL_ADDRESS))
     //     .await
     //     .expect("cannot create multicall");
@@ -1261,12 +1084,10 @@ pub async fn debug_node_safe_module_setup_on_balance_and_registries<P: Provider>
         .multicall()
         // 1. node xDAI balance
         .get_eth_balance(*node_address)
-        // 2. get safe address from the Network Registry
-        .add(network_registry.nodeRegisterdToAccount(*node_address))
-        // 3. get the safe address from the Node Safe Registry
+        // 2. get the safe address from the Node Safe Registry
         .add(node_safe_registry.nodeToSafe(*node_address));
 
-    let (node_native_balance, safe_in_network_registry, safe_in_nodesafe_registry) = multicall.aggregate().await?;
+    let (node_native_balance, safe_in_nodesafe_registry) = multicall.aggregate().await?;
 
     info!(
         "node does{:?} have xDAI balance {:?}",
@@ -1280,23 +1101,13 @@ pub async fn debug_node_safe_module_setup_on_balance_and_registries<P: Provider>
         format_units(node_native_balance, "ether").unwrap_or("Unknown balance".into())
     );
 
-    if safe_in_network_registry.eq(&Address::ZERO) {
-        info!("Please register the node to the network registry");
-    } else {
-        info!("safe in network registry {:?}", safe_in_network_registry);
-    }
-
     if safe_in_nodesafe_registry.eq(&Address::ZERO) {
         info!("Please start the node. It will auto-register to node-safe registry");
     } else {
         info!("safe in node-safe registry {:?}", safe_in_nodesafe_registry);
     }
-    info!(
-        "Safes in both registies should match: {:?}",
-        safe_in_network_registry.eq(&safe_in_nodesafe_registry)
-    );
 
-    Ok(safe_in_network_registry)
+    Ok(safe_in_nodesafe_registry)
 }
 
 /// Quick check if the following values are correct, for one single node:
@@ -1391,14 +1202,15 @@ mod tests {
         sol_types::SolValue,
     };
     use hopr_bindings::{
-        hoprannouncements::HoprAnnouncements, hoprchannels::HoprChannels, hoprnetworkregistry::HoprNetworkRegistry,
-        hoprnodesaferegistry::HoprNodeSafeRegistry, hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
+        hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels,
+        hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory,
+        hopr_token::HoprToken,
     };
-    use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
 
     use super::*;
+    use crate::utils::{ContractInstances, a2h, create_anvil};
 
     pub type AnvilRpcClient = FillProvider<
         JoinFill<
@@ -1408,7 +1220,6 @@ mod tests {
         RootProvider,
     >;
     /// Used for testing. Creates RPC client to the local Anvil instance.
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn create_rpc_client_to_anvil(
         anvil: &alloy::node_bindings::AnvilInstance,
         signer: &hopr_crypto_types::keypairs::ChainKeypair,
@@ -1512,7 +1323,7 @@ mod tests {
         let kp_address = Address::from(&kp.public().to_address().into());
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         // deploy hopr contracts
@@ -1543,7 +1354,7 @@ mod tests {
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         // deploy hopr contracts
@@ -1557,7 +1368,7 @@ mod tests {
         let encoded_minter_role = keccak256(b"MINTER_ROLE");
         instances
             .token
-            .grantRole(encoded_minter_role, contract_deployer.public().to_address().into())
+            .grantRole(encoded_minter_role, a2h(contract_deployer.public().to_address()))
             .send()
             .await?
             .watch()
@@ -1566,7 +1377,7 @@ mod tests {
         // test the deployer has minter role now
         let check_minter_role = instances
             .token
-            .hasRole(encoded_minter_role, contract_deployer.public().to_address().into())
+            .hasRole(encoded_minter_role, a2h(contract_deployer.public().to_address()))
             .call()
             .await?;
         assert!(check_minter_role, "deployer does not have minter role yet");
@@ -1598,7 +1409,7 @@ mod tests {
         let desired_amount = vec![U256::from(42)];
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         // deploy hopr contracts
@@ -1612,7 +1423,7 @@ mod tests {
         let encoded_minter_role = keccak256(b"MINTER_ROLE");
         instances
             .token
-            .grantRole(encoded_minter_role, contract_deployer.public().to_address().into())
+            .grantRole(encoded_minter_role, a2h(contract_deployer.public().to_address()))
             .send()
             .await?
             .watch()
@@ -1621,7 +1432,7 @@ mod tests {
         // test the deployer has minter role now
         let check_minter_role = instances
             .token
-            .hasRole(encoded_minter_role, contract_deployer.public().to_address().into())
+            .hasRole(encoded_minter_role, a2h(contract_deployer.public().to_address()))
             .call()
             .await?;
         assert!(check_minter_role, "deployer does not have minter role yet");
@@ -1651,7 +1462,7 @@ mod tests {
         let desired_amount: Vec<U256> = Vec::new();
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         // deploy hopr contracts
@@ -1691,7 +1502,7 @@ mod tests {
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1718,69 +1529,6 @@ mod tests {
             U256::from(10),
             "amount transferred does not equal to the desired amount"
         );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_register_safes_and_nodes_then_deregister_nodes_in_anvil_with_multicall() -> anyhow::Result<()> {
-        let mut safe_addresses: Vec<Address> = Vec::new();
-        let mut node_addresses: Vec<Address> = Vec::new();
-        for _ in 0..4 {
-            safe_addresses.push(get_random_address_for_testing());
-            node_addresses.push(get_random_address_for_testing());
-        }
-
-        // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
-        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
-            .await
-            .expect("failed to deploy");
-        // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await?;
-
-        // register some nodes
-        let (removed_amt, added_amt) = register_safes_and_nodes_on_network_registry(
-            instances.network_registry.clone(),
-            safe_addresses.clone(),
-            node_addresses.clone(),
-        )
-        .await?;
-
-        assert_eq!(removed_amt, 0, "should not remove any safe");
-        assert_eq!(added_amt, 4, "there should be 4 additions");
-
-        // get registered safes from nodes
-        let registered_safes = get_registered_safes_for_nodes_on_network_registry(
-            instances.network_registry.clone(),
-            node_addresses.clone(),
-        )
-        .await?;
-
-        assert_eq!(safe_addresses.len(), registered_safes.len(), "returned length unmatch");
-        for (i, safe_addr) in safe_addresses.iter().enumerate() {
-            assert_eq!(safe_addr, &registered_safes[i], "registered safe addresses unmatch");
-        }
-
-        // deregister 3 of them
-        let deregisterd_nodes = deregister_nodes_from_network_registry(
-            instances.network_registry.clone(),
-            node_addresses.split_at(3).0.to_vec(),
-        )
-        .await?;
-        assert_eq!(deregisterd_nodes, 3, "cannot deregister all the nodes");
-
-        // re-register 4 of them
-        let (removed_amt_2, added_amt_2) = register_safes_and_nodes_on_network_registry(
-            instances.network_registry.clone(),
-            safe_addresses.clone(),
-            node_addresses.clone(),
-        )
-        .await?;
-
-        assert_eq!(removed_amt_2, 0, "should not remove any safe");
-        assert_eq!(added_amt_2, 3, "there should be 3 additions");
         Ok(())
     }
 
@@ -1826,7 +1574,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1869,10 +1617,10 @@ mod tests {
         let deployment_receipt = instances
             .stake_factory
             .clone(
-                *instances.module_implementation.address(),
-                vec![caller],
+                //*instances.module_implementation.address(),
                 nonce.into(),
                 U256::from_str(&default_target)?.into(),
+                vec![caller],
             )
             .send()
             .await?
@@ -1911,7 +1659,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1980,7 +1728,7 @@ mod tests {
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2000,7 +1748,7 @@ mod tests {
             *instances.announcements.address(),
             U256::MAX,
             None,
-            vec![contract_deployer.public().to_address().into()],
+            vec![a2h(contract_deployer.public().to_address())],
             U256::from(1),
         )
         .await?;
@@ -2074,7 +1822,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2085,7 +1833,7 @@ mod tests {
         // deploy safe suits
         deploy_safe_suites(client.clone()).await?;
 
-        let deployer_vec: Vec<Address> = vec![contract_deployer.public().to_address().into()];
+        let deployer_vec: Vec<Address> = vec![a2h(contract_deployer.public().to_address())];
 
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
@@ -2137,7 +1885,7 @@ mod tests {
 
         // node is removed
         let is_removed = node_module
-            .isNode(contract_deployer.public().to_address().into())
+            .isNode(a2h(contract_deployer.public().to_address()))
             .call()
             .await?;
         assert!(!is_removed, "node is not removed");
@@ -2155,7 +1903,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2166,7 +1914,7 @@ mod tests {
         // deploy safe suits
         deploy_safe_suites(client.clone()).await?;
 
-        let deployer_vec: Vec<Address> = vec![contract_deployer.public().to_address().into()];
+        let deployer_vec: Vec<Address> = vec![a2h(contract_deployer.public().to_address())];
 
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
@@ -2213,9 +1961,9 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let self_address: Address = contract_deployer.public().to_address().into();
+        let self_address: Address = a2h(contract_deployer.public().to_address());
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
@@ -2235,14 +1983,7 @@ mod tests {
             *new_safe_registry.address(),
         )
         .await?;
-        let new_announcements = HoprAnnouncements::deploy(client.clone(), *new_safe_registry.address()).await?;
-        let _new_network_registry = HoprNetworkRegistry::deploy(
-            client.clone(),
-            instances.network_registry_proxy.address().into(),
-            self_address,
-            self_address,
-        )
-        .await?;
+        let new_announcements = HoprAnnouncements::deploy(client.clone()).await?;
 
         let deployer_vec: Vec<Address> = vec![self_address];
 
@@ -2287,79 +2028,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_debug_node_safe_module_setup_on_balance_and_registries() -> anyhow::Result<()> {
-        // set allowance for token transfer for the safe multiple times
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let mut node_addresses: Vec<Address> = Vec::new();
-        for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing());
-        }
-
-        // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
-        let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
-        let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
-            .await
-            .expect("failed to deploy");
-        // deploy multicall contract
-        deploy_multicall3_for_testing(client.clone()).await?;
-        // deploy safe suits
-        deploy_safe_suites(client.clone()).await?;
-
-        let deployer_vec: Vec<Address> = vec![contract_deployer.public().to_address().into()];
-
-        // create a safe
-        let (safe, _) = deploy_safe_module_with_targets_and_nodes(
-            instances.stake_factory,
-            *instances.token.address(),
-            *instances.channels.address(),
-            *instances.module_implementation.address(),
-            *instances.announcements.address(),
-            U256::MAX,
-            None,
-            deployer_vec.clone(),
-            U256::from(1),
-        )
-        .await?;
-        let registered_safe_before_registration = debug_node_safe_module_setup_on_balance_and_registries(
-            instances.network_registry.clone(),
-            instances.safe_registry.clone(),
-            &node_addresses[0],
-        )
-        .await?;
-
-        assert_eq!(
-            registered_safe_before_registration,
-            Address::ZERO,
-            "safe is already registered"
-        );
-
-        // register some nodes
-        let (..) = register_safes_and_nodes_on_network_registry(
-            instances.network_registry.clone(),
-            vec![*safe.address()],
-            vec![node_addresses[0]],
-        )
-        .await?;
-
-        let registered_safe_after_registration = debug_node_safe_module_setup_on_balance_and_registries(
-            instances.network_registry.clone(),
-            instances.safe_registry.clone(),
-            &node_addresses[0],
-        )
-        .await?;
-
-        assert_eq!(
-            &registered_safe_after_registration,
-            safe.address(),
-            "safe is not registered"
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_debug_node_safe_module_setup_main() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
@@ -2370,7 +2038,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = hopr_chain_types::utils::create_anvil(None);
+        let anvil = create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(&anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2381,7 +2049,7 @@ mod tests {
         // deploy safe suits
         deploy_safe_suites(client.clone()).await?;
 
-        let deployer_vec: Vec<Address> = vec![contract_deployer.public().to_address().into()];
+        let deployer_vec: Vec<Address> = vec![a2h(contract_deployer.public().to_address())];
 
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
@@ -2394,14 +2062,6 @@ mod tests {
             None,
             deployer_vec.clone(),
             U256::from(1),
-        )
-        .await?;
-
-        // register some nodes
-        let (..) = register_safes_and_nodes_on_network_registry(
-            instances.network_registry.clone(),
-            vec![*safe.address()],
-            vec![node_addresses[0]],
         )
         .await?;
 

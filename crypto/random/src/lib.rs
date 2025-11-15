@@ -12,23 +12,34 @@ pub use rand::{Rng, RngCore};
 /// This is the last positive 64-bit value in the two's complement representation.
 pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
-/// Gets the default cryptographically secure random number generator.
-///
-/// **WARNING** On debug builds with the ` fixed_rng ` feature enabled during
-/// compilation, this function will return an RNG with a fixed seed, which is *NOT SECURE*!
-/// This is reserved for deterministic testing.
-#[cfg(all(debug_assertions, feature = "fixed_rng"))]
-#[inline]
-pub fn rng() -> impl RngCore + CryptoRng {
-    use rand::SeedableRng;
-    rand::rngs::StdRng::from_seed([
+#[cfg(all(debug_assertions, feature = "fixed-rng"))]
+use rand::SeedableRng;
+
+#[cfg(all(debug_assertions, feature = "fixed-rng"))]
+lazy_static::lazy_static! {
+    static ref FIXED_RNG: std::sync::Mutex<rand::rngs::StdRng> = std::sync::Mutex::new(rand::rngs::StdRng::from_seed([
         0x5f, 0x57, 0xce, 0x2a, 0x84, 0x14, 0x7e, 0x88, 0x43, 0x56, 0x44, 0x56, 0x7f, 0x90, 0x4f, 0xb2, 0x04, 0x6b,
         0x18, 0x42, 0x75, 0x69, 0xbe, 0x53, 0xb2, 0x29, 0x78, 0xbd, 0xf3, 0x0a, 0xda, 0xba,
-    ])
+    ]));
 }
 
 /// Gets the default cryptographically secure random number generator.
-#[cfg(any(not(debug_assertions), not(feature = "fixed_rng")))]
+///
+/// **WARNING** On debug builds with the ` fixed-rng ` feature enabled during
+/// compilation, this function will return an RNG with a fixed seed, which is *NOT SECURE*!
+/// This is reserved for deterministic testing.
+#[cfg(all(debug_assertions, feature = "fixed-rng"))]
+#[inline]
+pub fn rng() -> impl RngCore + CryptoRng {
+    let mut global_rng = FIXED_RNG.lock().expect("failed to lock fixed RNG");
+    let mut seed = [0u8; 32];
+    global_rng.fill_bytes(&mut seed);
+
+    rand::rngs::StdRng::from_seed(seed)
+}
+
+/// Gets the default cryptographically secure random number generator.
+#[cfg(any(not(debug_assertions), not(feature = "fixed-rng")))]
 #[inline]
 pub fn rng() -> impl RngCore + CryptoRng {
     rand::rngs::OsRng
@@ -39,7 +50,7 @@ pub fn rng() -> impl RngCore + CryptoRng {
 /// See also [`rng`].
 #[inline]
 pub const fn is_rng_fixed() -> bool {
-    cfg!(debug_assertions) && cfg!(feature = "fixed_rng")
+    cfg!(debug_assertions) && cfg!(feature = "fixed-rng")
 }
 
 /// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).

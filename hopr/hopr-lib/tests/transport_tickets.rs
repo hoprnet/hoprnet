@@ -184,7 +184,7 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
 
     cluster_fixture[mid]
         .inner()
-        .redeem_all_tickets(0, false)
+        .redeem_all_tickets(0)
         .await
         .context("failed to redeem tickets")?;
 

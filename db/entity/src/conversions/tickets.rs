@@ -15,7 +15,6 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
             .channel_id(Hash::from_hex(&value.channel_id)?)
             .amount(U256::from_be_bytes(&value.amount))
             .index(U256::from_be_bytes(&value.index).as_u64())
-            .index_offset(value.index_offset as u32)
             .win_prob(
                 value
                     .winning_probability
@@ -63,7 +62,7 @@ impl From<AcknowledgedTicket> for ticket::ActiveModel {
             channel_id: Set(value.verified_ticket().channel_id.to_hex()),
             amount: Set(value.verified_ticket().amount.amount().to_be_bytes().to_vec()),
             index: Set(value.verified_ticket().index.to_be_bytes().to_vec()),
-            index_offset: Set(value.verified_ticket().index_offset as i32),
+            index_offset: Set(1),
             winning_probability: Set(value.verified_ticket().encoded_win_prob.to_vec()),
             channel_epoch: Set(U256::from(value.verified_ticket().channel_epoch).to_be_bytes().to_vec()),
             signature: Set(value.verified_ticket().signature.unwrap().as_ref().to_vec()),

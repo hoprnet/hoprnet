@@ -37,8 +37,6 @@ pub(crate) struct ChannelTicket {
     amount: HoprBalance,
     #[schema(example = 0)]
     index: u64,
-    #[schema(example = 1)]
-    index_offset: u32,
     #[schema(example = "1")]
     win_prob: String,
     #[schema(example = 1)]
@@ -55,7 +53,6 @@ impl From<Ticket> for ChannelTicket {
             channel_id: value.channel_id,
             amount: value.amount,
             index: value.index,
-            index_offset: value.index_offset,
             win_prob: value.win_prob().to_string(),
             channel_epoch: value.channel_epoch,
             signature: value.signature.expect("impossible to have an unsigned ticket").to_hex(),
@@ -260,7 +257,7 @@ pub(super) async fn reset_ticket_statistics(State(state): State<Arc<InternalStat
     )]
 pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let hopr = state.hopr.clone();
-    match hopr.redeem_all_tickets(0, false).await {
+    match hopr.redeem_all_tickets(0).await {
         Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
@@ -301,9 +298,9 @@ pub(super) async fn redeem_tickets_in_channel(
     let hopr = state.hopr.clone();
 
     match Hash::from_hex(channel_id.as_str()) {
-        Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, 0, false).await {
-            Ok(count) if count > 0 => (StatusCode::NO_CONTENT, "").into_response(),
-            Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+        Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, 0).await {
+            Ok(_) => (StatusCode::NO_CONTENT, "").into_response(),
+            // Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
             Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
