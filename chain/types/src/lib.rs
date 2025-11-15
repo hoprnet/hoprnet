@@ -8,15 +8,21 @@ pub mod errors;
 mod parser;
 pub mod payload;
 
+#[cfg(feature = "use-bindings")]
 pub use parser::ParsedHoprChainAction;
 
 pub mod prelude {
     pub use super::{
         ContractAddresses,
         chain_events::ChainEvent,
-        payload::{BasicPayloadGenerator, PayloadGenerator, SafePayloadGenerator, SignableTransaction},
+        payload::{
+            BasicPayloadGenerator, GasEstimation, PayloadGenerator, SafePayloadGenerator, SignableTransaction,
+            TransactionRequest,
+        },
     };
 }
+
+// TODO: use this from hopr-bindings once https://github.com/hoprnet/contracts/pull/29 is merged
 
 /// Holds addresses of all smart contracts.
 #[serde_with::serde_as]
@@ -42,7 +48,7 @@ pub struct ContractAddresses {
     pub winning_probability_oracle: Address,
     /// Stake factory contract
     #[serde_as(as = "serde_with::DisplayFromStr")]
-    pub node_stake_v2_factory: Address,
+    pub node_stake_factory: Address,
     /// Node management module contract (can be zero if safe is not used)
     #[serde_as(as = "serde_with::DisplayFromStr")]
     pub module_implementation: Address,
@@ -60,7 +66,7 @@ impl IntoIterator for &ContractAddresses {
             self.node_safe_registry,
             self.ticket_price_oracle,
             self.winning_probability_oracle,
-            self.node_stake_v2_factory,
+            self.node_stake_factory,
             self.module_implementation,
         ]
         .into_iter()

@@ -214,7 +214,7 @@ where
                 provider.clone(),
             ),
             stake_factory: HoprNodeStakeFactoryInstance::new(
-                a2h(contract_addresses.node_stake_v2_factory),
+                a2h(contract_addresses.node_stake_factory),
                 provider.clone(),
             ),
             module_implementation: HoprNodeManagementModuleInstance::new(
@@ -339,7 +339,7 @@ where
             node_safe_registry: h2a(*instances.safe_registry.address()),
             ticket_price_oracle: h2a(*instances.price_oracle.address()),
             winning_probability_oracle: h2a(*instances.win_prob_oracle.address()),
-            node_stake_v2_factory: h2a(*instances.stake_factory.address()),
+            node_stake_factory: h2a(*instances.stake_factory.address()),
             module_implementation: h2a(*instances.module_implementation.address()),
         }
     }

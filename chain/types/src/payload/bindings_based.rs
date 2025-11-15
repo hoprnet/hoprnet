@@ -1,14 +1,4 @@
-//! Module defining various Ethereum transaction payload generators for the actions.
-//!
-//! This module defines the basic [`PayloadGenerator`] trait that describes how an action
-//! is translated into a [`TransactionRequest`] that can be submitted on-chain.
-//!
-//! There are two main implementations:
-//! - [`BasicPayloadGenerator`] which implements generation of a direct EIP1559 transaction payload. This is currently
-//!   not used by a HOPR node.
-//! - [`SafePayloadGenerator`] which implements generation of a payload that embeds the transaction data into the SAFE
-//!   transaction. This is currently the main mode of HOPR node operation.
-
+pub use alloy::rpc::types::TransactionRequest;
 use alloy::{
     consensus::TxEnvelope,
     eips::Encodable2718,
@@ -17,7 +7,6 @@ use alloy::{
         B256, U256,
         aliases::{U24, U48, U56, U96},
     },
-    rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,
     sol,
     sol_types::{SolCall, SolValue},
@@ -43,7 +32,14 @@ use hopr_primitive_types::prelude::*;
 use crate::{
     ContractAddresses,
     errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError},
+    payload,
+    payload::{DEFAULT_TX_GAS, GasEstimation, PayloadGenerator, SignableTransaction},
 };
+
+// Used instead of From implementation to avoid alloy being a dependency of the primitive crates
+fn a2h(a: hopr_primitive_types::prelude::Address) -> alloy::primitives::Address {
+    alloy::primitives::Address::from_slice(a.as_ref())
+}
 
 sol! {
     /// Mirrors the Solidity layout: (address, bytes32, bytes32, bytes32, string)
@@ -56,45 +52,11 @@ sol! {
     }
 }
 
-type Result<T> = std::result::Result<T, crate::errors::ChainTypesError>;
-
-// Used instead of From implementation to avoid alloy being a dependency of the primitive crates
-fn a2h(a: hopr_primitive_types::prelude::Address) -> alloy::primitives::Address {
-    alloy::primitives::Address::from_slice(a.as_ref())
-}
-
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Operation {
     Call = 0,
     // Future use: DelegateCall = 1,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct GasEstimation {
-    pub gas_limit: u64,
-    pub max_fee_per_gas: u128,
-    pub max_priority_fee_per_gas: u128,
-}
-
-impl Default for GasEstimation {
-    fn default() -> Self {
-        Self {
-            gas_limit: 17_000_000,
-            max_fee_per_gas: 10_000_000,         // 0.01 Gwei
-            max_priority_fee_per_gas: 2_000_000, // 0.002 Gwei
-        }
-    }
-}
-
-#[async_trait::async_trait]
-pub trait SignableTransaction {
-    async fn sign_and_encode_to_eip2718(
-        self,
-        nonce: u64,
-        max_gas: Option<GasEstimation>,
-        chain_keypair: &ChainKeypair,
-    ) -> Result<Box<[u8]>>;
 }
 
 #[async_trait::async_trait]
@@ -104,7 +66,7 @@ impl SignableTransaction for TransactionRequest {
         nonce: u64,
         max_gas: Option<GasEstimation>,
         chain_keypair: &ChainKeypair,
-    ) -> Result<Box<[u8]>> {
+    ) -> payload::Result<Box<[u8]>> {
         let max_gas = max_gas.unwrap_or_default();
         let signer: EthereumWallet = PrivateKeySigner::from_slice(chain_keypair.secret().as_ref())
             .map_err(|e| SigningError(e.into()))?
@@ -120,48 +82,6 @@ impl SignableTransaction for TransactionRequest {
 
         Ok(signed.encoded_2718().into_boxed_slice())
     }
-}
-
-/// Trait for various implementations of common on-chain transaction payloads generators.
-pub trait PayloadGenerator {
-    type TxRequest: SignableTransaction + Send;
-
-    /// Create an ERC20 approve transaction payload. Pre-requisite to open payment channels.
-    /// The `spender` address is typically the HOPR Channels contract address.
-    fn approve(&self, spender: Address, amount: HoprBalance) -> Result<Self::TxRequest>;
-
-    /// Create a ERC20 transfer transaction payload
-    fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> Result<Self::TxRequest>;
-
-    /// Creates the transaction payload to announce a node on-chain.
-    fn announce(&self, announcement: AnnouncementData, key_binding_fee: HoprBalance) -> Result<Self::TxRequest>;
-
-    /// Creates the transaction payload to open a payment channel
-    fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<Self::TxRequest>;
-
-    /// Creates the transaction payload to immediately close an incoming payment channel
-    fn close_incoming_channel(&self, source: Address) -> Result<Self::TxRequest>;
-
-    /// Creates the transaction payload that initiates the closure of a payment channel.
-    /// Once the notice period is due, the funds can be withdrawn using a
-    /// finalizeChannelClosure transaction.
-    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest>;
-
-    /// Creates a transaction payload that withdraws funds from
-    /// an outgoing payment channel. This will succeed once the closure
-    /// notice period is due.
-    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest>;
-
-    /// Used to create the payload to claim incentives for relaying a mixnet packet.
-    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<Self::TxRequest>;
-
-    /// Creates a transaction payload to register a Safe instance which is used
-    /// to manage the node's funds
-    fn register_safe_by_node(&self, safe_addr: Address) -> Result<Self::TxRequest>;
-
-    /// Creates a transaction payload to remove the Safe instance. Once succeeded,
-    /// the node no longer manages the funds.
-    fn deregister_node_by_safe(&self) -> Result<Self::TxRequest>;
 }
 
 fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
@@ -227,12 +147,12 @@ impl BasicPayloadGenerator {
 impl PayloadGenerator for BasicPayloadGenerator {
     type TxRequest = TransactionRequest;
 
-    fn approve(&self, spender: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
+    fn approve(&self, spender: Address, amount: HoprBalance) -> payload::Result<Self::TxRequest> {
         let tx = approve_tx(spender, amount).with_to(a2h(self.contract_addrs.token));
         Ok(tx)
     }
 
-    fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> Result<Self::TxRequest> {
+    fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> payload::Result<Self::TxRequest> {
         let to = if XDai::is::<C>() {
             destination
         } else if WxHOPR::is::<C>() {
@@ -244,7 +164,11 @@ impl PayloadGenerator for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn announce(&self, announcement: AnnouncementData, key_binding_fee: HoprBalance) -> Result<Self::TxRequest> {
+    fn announce(
+        &self,
+        announcement: AnnouncementData,
+        key_binding_fee: HoprBalance,
+    ) -> payload::Result<Self::TxRequest> {
         // when the keys have already bounded, now only try to announce without key binding
         // when keys are not bounded yet, bind keys and announce together
         let serialized_signature = announcement.key_binding().signature.as_ref();
@@ -274,7 +198,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
             .with_to(a2h(self.contract_addrs.token)))
     }
 
-    fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
+    fn fund_channel(&self, dest: Address, amount: HoprBalance) -> payload::Result<Self::TxRequest> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self"));
         }
@@ -291,7 +215,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn close_incoming_channel(&self, source: Address) -> Result<Self::TxRequest> {
+    fn close_incoming_channel(&self, source: Address) -> payload::Result<Self::TxRequest> {
         if source.eq(&self.me) {
             return Err(InvalidArguments("Cannot close incoming channel from self"));
         }
@@ -302,7 +226,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest> {
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> payload::Result<Self::TxRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments("Cannot initiate closure of incoming channel to self"));
         }
@@ -318,7 +242,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest> {
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> payload::Result<Self::TxRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments("Cannot initiate closure of incoming channel to self"));
         }
@@ -334,7 +258,7 @@ impl PayloadGenerator for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<Self::TxRequest> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> payload::Result<Self::TxRequest> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
         let params = convert_vrf_parameters(
@@ -350,12 +274,12 @@ impl PayloadGenerator for BasicPayloadGenerator {
         Ok(tx)
     }
 
-    fn register_safe_by_node(&self, safe_addr: Address) -> Result<Self::TxRequest> {
+    fn register_safe_by_node(&self, safe_addr: Address) -> payload::Result<Self::TxRequest> {
         let tx = register_safe_tx(safe_addr).with_to(a2h(self.contract_addrs.node_safe_registry));
         Ok(tx)
     }
 
-    fn deregister_node_by_safe(&self) -> Result<Self::TxRequest> {
+    fn deregister_node_by_safe(&self) -> payload::Result<Self::TxRequest> {
         Err(InvalidState("Can only deregister an address if Safe is activated"))
     }
 }
@@ -367,8 +291,6 @@ pub struct SafePayloadGenerator {
     contract_addrs: ContractAddresses,
     module: Address,
 }
-
-const DEFAULT_TX_GAS: u64 = 400_000;
 
 impl SafePayloadGenerator {
     pub fn new(chain_keypair: &ChainKeypair, contract_addrs: ContractAddresses, module: Address) -> Self {
@@ -383,7 +305,7 @@ impl SafePayloadGenerator {
 impl PayloadGenerator for SafePayloadGenerator {
     type TxRequest = TransactionRequest;
 
-    fn approve(&self, spender: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
+    fn approve(&self, spender: Address, amount: HoprBalance) -> payload::Result<Self::TxRequest> {
         let tx = approve_tx(spender, amount)
             .with_to(a2h(self.contract_addrs.token))
             .with_gas_limit(DEFAULT_TX_GAS);
@@ -391,7 +313,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> Result<Self::TxRequest> {
+    fn transfer<C: Currency>(&self, destination: Address, amount: Balance<C>) -> payload::Result<Self::TxRequest> {
         let to = if XDai::is::<C>() {
             destination
         } else if WxHOPR::is::<C>() {
@@ -406,7 +328,11 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn announce(&self, announcement: AnnouncementData, key_binding_fee: HoprBalance) -> Result<Self::TxRequest> {
+    fn announce(
+        &self,
+        announcement: AnnouncementData,
+        key_binding_fee: HoprBalance,
+    ) -> payload::Result<Self::TxRequest> {
         // when the keys have already bounded, now only try to announce without key binding
         // when keys are not bounded yet, bind keys and announce together
         let serialized_signature = announcement.key_binding().signature.as_ref();
@@ -445,7 +371,7 @@ impl PayloadGenerator for SafePayloadGenerator {
             .with_gas_limit(DEFAULT_TX_GAS))
     }
 
-    fn fund_channel(&self, dest: Address, amount: HoprBalance) -> Result<Self::TxRequest> {
+    fn fund_channel(&self, dest: Address, amount: HoprBalance) -> payload::Result<Self::TxRequest> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self"));
         }
@@ -469,7 +395,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn close_incoming_channel(&self, source: Address) -> Result<Self::TxRequest> {
+    fn close_incoming_channel(&self, source: Address) -> payload::Result<Self::TxRequest> {
         if source.eq(&self.me) {
             return Err(InvalidArguments("Cannot close incoming channel from self"));
         }
@@ -488,7 +414,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest> {
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> payload::Result<Self::TxRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments("Cannot initiate closure of incoming channel to self"));
         }
@@ -507,7 +433,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<Self::TxRequest> {
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> payload::Result<Self::TxRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments("Cannot initiate closure of incoming channel to self"));
         }
@@ -526,7 +452,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<Self::TxRequest> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> payload::Result<Self::TxRequest> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
         let params = convert_vrf_parameters(
@@ -551,7 +477,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn register_safe_by_node(&self, safe_addr: Address) -> Result<Self::TxRequest> {
+    fn register_safe_by_node(&self, safe_addr: Address) -> payload::Result<Self::TxRequest> {
         let tx = register_safe_tx(safe_addr)
             .with_to(a2h(self.contract_addrs.node_safe_registry))
             .with_gas_limit(DEFAULT_TX_GAS);
@@ -559,7 +485,7 @@ impl PayloadGenerator for SafePayloadGenerator {
         Ok(tx)
     }
 
-    fn deregister_node_by_safe(&self) -> Result<Self::TxRequest> {
+    fn deregister_node_by_safe(&self) -> payload::Result<Self::TxRequest> {
         let tx = TransactionRequest::default()
             .with_input(deregisterNodeBySafeCall { nodeAddr: a2h(self.me) }.abi_encode())
             .with_to(a2h(self.module))
@@ -607,7 +533,7 @@ fn convert_vrf_parameters(
 /// that the smart contract understands
 ///
 /// Not implemented using From trait because logic fits better here
-fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnChainRedeemableTicket> {
+fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> payload::Result<OnChainRedeemableTicket> {
     if let Some(ref signature) = off_chain.verified_ticket().signature {
         let serialized_signature = signature.as_ref();
 
@@ -637,30 +563,16 @@ pub(crate) mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::{Address, BytesRepresentable, HoprBalance};
+    use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
 
-    use super::{BasicPayloadGenerator, PayloadGenerator, SafePayloadGenerator, SignableTransaction};
-    use crate::ContractAddresses;
+    use crate::payload::{
+        BasicPayloadGenerator, PayloadGenerator, SafePayloadGenerator, SignableTransaction, tests::CONTRACT_ADDRS,
+    };
 
     const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
-
-    lazy_static::lazy_static! {
-        pub static ref CONTRACT_ADDRS: ContractAddresses = serde_json::from_str(r#"{
-            "announcements": "0xf1c143B1bA20C7606d56aA2FA94502D25744b982",
-            "channels": "0x77C9414043d27fdC98A6A2d73fc77b9b383092a7",
-            "module_implementation": "0x32863c4974fBb6253E338a0cb70C382DCeD2eFCb",
-            "network_registry": "0x15a315E1320cFF0de84671c0139042EE320CE38d",
-            "network_registry_proxy": "0x20559cbD3C2eDcD0b396431226C00D2Cd102eB3F",
-            "node_safe_registry": "0x4F7C7dE3BA2B29ED8B2448dF2213cA43f94E45c0",
-            "node_stake_v2_factory": "0x791d190b2c95397F4BcE7bD8032FD67dCEA7a5F2",
-            "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-            "ticket_price_oracle": "0x442df1d946303fB088C9377eefdaeA84146DA0A6",
-            "winning_probability_oracle": "0xC15675d4CCa538D91a91a8D3EcFBB8499C3B0471"
-        }"#).unwrap();
-    }
 
     #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {

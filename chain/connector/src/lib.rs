@@ -8,6 +8,7 @@ pub mod testing;
 pub use backend::InMemoryBackend;
 pub use backend::{Backend, TempDbBackend};
 pub use connector::{BlockchainConnectorConfig, HoprBlockchainConnector};
+pub use hopr_chain_types::payload::SafePayloadGenerator;
 
 /// Re-exports of the `blokli_client` crate.
 pub mod blokli_client {
@@ -17,7 +18,7 @@ pub mod blokli_client {
     };
 }
 
-pub use hopr_chain_types::prelude::{ContractAddresses, PayloadGenerator, SafePayloadGenerator};
+pub use hopr_chain_types::prelude::{ContractAddresses, PayloadGenerator};
 pub use hopr_crypto_types::prelude::ChainKeypair;
 pub use hopr_primitive_types::prelude::Address;
 
@@ -31,7 +32,7 @@ pub type HoprBlockchainSafeConnector<C> = HoprBlockchainConnector<
 
 /// Convenience function to create [`HoprBlokliConnector`] with own contract addresses.
 ///
-/// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::SafePayloadGenerator`]
+/// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::bindings_based::SafePayloadGenerator`]
 pub fn create_trustless_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
     cfg: BlockchainConnectorConfig,
@@ -64,7 +65,7 @@ where
 /// [`blokli_client::BlokliClient`].
 /// If you wish to provide your own deployment information, use the [`create_trustless_hopr_blokli_connector`] function.
 ///
-/// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::SafePayloadGenerator`]
+/// The returned instance uses [`TempDbBackend`] and [`hopr_chain_types::payload::bindings_based::SafePayloadGenerator`]
 pub async fn create_trustful_hopr_blokli_connector<C>(
     chain_key: &ChainKeypair,
     cfg: BlockchainConnectorConfig,
@@ -83,7 +84,7 @@ where
     let contract_addrs = serde_json::from_str(&info.contract_addresses.0)
         .map_err(|e| errors::ConnectorError::TypeConversion(format!("contract addresses not a valid JSON: {e}")))?;
 
-    let payload_gen = hopr_chain_types::payload::SafePayloadGenerator::new(chain_key, contract_addrs, module_address);
+    let payload_gen = SafePayloadGenerator::new(chain_key, contract_addrs, module_address);
 
     Ok(HoprBlockchainConnector::new(
         chain_key.clone(),

@@ -259,7 +259,9 @@ mod tests {
     use hopr_internal_types::prelude::{AnnouncementData, KeyBinding, TicketBuilder};
 
     use super::*;
-    use crate::payload::{BasicPayloadGenerator, PayloadGenerator, SafePayloadGenerator, SignableTransaction};
+    use crate::payload::{
+        BasicPayloadGenerator, PayloadGenerator, SafePayloadGenerator, SignableTransaction, tests::CONTRACT_ADDRS,
+    };
 
     const PRIVATE_KEY_1: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const PRIVATE_KEY_2: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
@@ -274,18 +276,14 @@ mod tests {
             Some("/ip4/127.0.0.1/tcp/10000".parse()?),
         )?;
 
-        let safe_gen =
-            SafePayloadGenerator::new(&cp, *crate::payload::tests::CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .announce(ad, 10_u32.into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::Announce {
@@ -302,35 +300,28 @@ mod tests {
     async fn fund_channel_action_should_decode() -> anyhow::Result<()> {
         let cp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
-        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *crate::payload::tests::CONTRACT_ADDRS);
+        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .fund_channel([2u8; Address::SIZE].into(), 123_u32.into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::FundChannel([2u8; Address::SIZE].into(), 123_u32.into())
         );
         assert_eq!(signer, cp.public().to_address());
 
-        let safe_gen =
-            SafePayloadGenerator::new(&cp, *crate::payload::tests::CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .fund_channel([2u8; Address::SIZE].into(), 123_u32.into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::FundChannel([2u8; Address::SIZE].into(), 123_u32.into())
@@ -344,7 +335,7 @@ mod tests {
     async fn initiate_channel_closure_action_should_decode() -> anyhow::Result<()> {
         let cp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
-        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *crate::payload::tests::CONTRACT_ADDRS);
+        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .initiate_outgoing_channel_closure([2u8; Address::SIZE].into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
@@ -352,26 +343,19 @@ mod tests {
 
         let channel_id = generate_channel_id(&cp.public().to_address(), &[2u8; Address::SIZE].into());
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(action, ParsedHoprChainAction::InitializeChannelClosure(channel_id));
         assert_eq!(signer, cp.public().to_address());
 
-        let safe_gen =
-            SafePayloadGenerator::new(&cp, *crate::payload::tests::CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .initiate_outgoing_channel_closure([2u8; Address::SIZE].into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(action, ParsedHoprChainAction::InitializeChannelClosure(channel_id));
         assert_eq!(signer, cp.public().to_address());
 
@@ -382,7 +366,7 @@ mod tests {
     async fn finalize_channel_closure_action_should_decode() -> anyhow::Result<()> {
         let cp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
-        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *crate::payload::tests::CONTRACT_ADDRS);
+        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .finalize_outgoing_channel_closure([2u8; Address::SIZE].into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
@@ -390,26 +374,19 @@ mod tests {
 
         let channel_id = generate_channel_id(&cp.public().to_address(), &[2u8; Address::SIZE].into());
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(action, ParsedHoprChainAction::FinalizeChannelClosure(channel_id));
         assert_eq!(signer, cp.public().to_address());
 
-        let safe_gen =
-            SafePayloadGenerator::new(&cp, *crate::payload::tests::CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .finalize_outgoing_channel_closure([2u8; Address::SIZE].into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(action, ParsedHoprChainAction::FinalizeChannelClosure(channel_id));
         assert_eq!(signer, cp.public().to_address());
 
@@ -420,7 +397,7 @@ mod tests {
     async fn incoming_channel_closure_action_should_decode() -> anyhow::Result<()> {
         let cp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
-        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *crate::payload::tests::CONTRACT_ADDRS);
+        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .close_incoming_channel([2u8; Address::SIZE].into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
@@ -428,26 +405,19 @@ mod tests {
 
         let channel_id = generate_channel_id(&[2u8; Address::SIZE].into(), &cp.public().to_address());
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(action, ParsedHoprChainAction::IncomingChannelClosure(channel_id));
         assert_eq!(signer, cp.public().to_address());
 
-        let safe_gen =
-            SafePayloadGenerator::new(&cp, *crate::payload::tests::CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .close_incoming_channel([2u8; Address::SIZE].into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(action, ParsedHoprChainAction::IncomingChannelClosure(channel_id));
         assert_eq!(signer, cp.public().to_address());
 
@@ -458,35 +428,28 @@ mod tests {
     async fn register_safe_action_should_decode() -> anyhow::Result<()> {
         let cp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
-        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *crate::payload::tests::CONTRACT_ADDRS);
+        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .register_safe_by_node([2u8; Address::SIZE].into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::RegisterSafeAddress([2u8; Address::SIZE].into())
         );
         assert_eq!(signer, cp.public().to_address());
 
-        let safe_gen =
-            SafePayloadGenerator::new(&cp, *crate::payload::tests::CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .register_safe_by_node([2u8; Address::SIZE].into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::RegisterSafeAddress([2u8; Address::SIZE].into())
@@ -513,17 +476,14 @@ mod tests {
             .into_acknowledged(resp)
             .into_redeemable(&cp_2, &Hash::default())?;
 
-        let basic_gen = BasicPayloadGenerator::new(cp_2.public().to_address(), *crate::payload::tests::CONTRACT_ADDRS);
+        let basic_gen = BasicPayloadGenerator::new(cp_2.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .redeem_ticket(ticket.clone())?
             .sign_and_encode_to_eip2718(1, None, &cp_2)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::RedeemTicket {
@@ -534,21 +494,14 @@ mod tests {
         );
         assert_eq!(signer, cp_2.public().to_address());
 
-        let safe_gen = SafePayloadGenerator::new(
-            &cp_2,
-            *crate::payload::tests::CONTRACT_ADDRS,
-            [1u8; Address::SIZE].into(),
-        );
+        let safe_gen = SafePayloadGenerator::new(&cp_2, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .redeem_ticket(ticket.clone())?
             .sign_and_encode_to_eip2718(1, None, &cp_2)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::RedeemTicket {
@@ -566,35 +519,28 @@ mod tests {
     async fn withdraw_native_action_should_decode() -> anyhow::Result<()> {
         let cp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
-        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *crate::payload::tests::CONTRACT_ADDRS);
+        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .transfer::<XDai>([2u8; Address::SIZE].into(), 123_u32.into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::WithdrawNative([2u8; Address::SIZE].into(), 123_u32.into())
         );
         assert_eq!(signer, cp.public().to_address());
 
-        let safe_gen =
-            SafePayloadGenerator::new(&cp, *crate::payload::tests::CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .transfer::<XDai>([2u8; Address::SIZE].into(), 123_u32.into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::WithdrawNative([2u8; Address::SIZE].into(), 123_u32.into())
@@ -608,35 +554,28 @@ mod tests {
     async fn withdraw_token_safe_action_should_decode() -> anyhow::Result<()> {
         let cp = ChainKeypair::from_secret(&PRIVATE_KEY_1)?;
 
-        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *crate::payload::tests::CONTRACT_ADDRS);
+        let basic_gen = BasicPayloadGenerator::new(cp.public().to_address(), *CONTRACT_ADDRS);
         let signed_tx = basic_gen
             .transfer::<WxHOPR>([2u8; Address::SIZE].into(), 123_u32.into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::WithdrawToken([2u8; Address::SIZE].into(), 123_u32.into())
         );
         assert_eq!(signer, cp.public().to_address());
 
-        let safe_gen =
-            SafePayloadGenerator::new(&cp, *crate::payload::tests::CONTRACT_ADDRS, [1u8; Address::SIZE].into());
+        let safe_gen = SafePayloadGenerator::new(&cp, *CONTRACT_ADDRS, [1u8; Address::SIZE].into());
         let signed_tx = safe_gen
             .transfer::<WxHOPR>([2u8; Address::SIZE].into(), 123_u32.into())?
             .sign_and_encode_to_eip2718(1, None, &cp)
             .await?;
 
-        let (action, signer) = ParsedHoprChainAction::parse_from_eip2718(
-            &signed_tx,
-            &[1u8; Address::SIZE].into(),
-            &crate::payload::tests::CONTRACT_ADDRS,
-        )?;
+        let (action, signer) =
+            ParsedHoprChainAction::parse_from_eip2718(&signed_tx, &[1u8; Address::SIZE].into(), &CONTRACT_ADDRS)?;
         assert_eq!(
             action,
             ParsedHoprChainAction::WithdrawToken([2u8; Address::SIZE].into(), 123_u32.into())

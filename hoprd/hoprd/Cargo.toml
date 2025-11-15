@@ -20,6 +20,7 @@ default = [
 prometheus = [
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
+  "hopr-db-node/prometheus",
   "hopr-strategy/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",

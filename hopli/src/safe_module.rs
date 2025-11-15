@@ -392,7 +392,7 @@ impl SafeModuleSubcommands {
         // transfer safe ownership to actual admins
         // set desired threshold
         let hopr_stake_factory = HoprNodeStakeFactory::new(
-            a2h(contract_addresses.addresses.node_stake_v2_factory),
+            a2h(contract_addresses.addresses.node_stake_factory),
             rpc_provider.clone(),
         );
 
