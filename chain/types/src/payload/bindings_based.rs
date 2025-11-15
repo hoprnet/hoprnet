@@ -33,8 +33,10 @@ use crate::{
     ContractAddresses,
     errors::ChainTypesError::{InvalidArguments, InvalidState, SigningError},
     payload,
-    payload::{DEFAULT_TX_GAS, GasEstimation, PayloadGenerator, SignableTransaction},
+    payload::{GasEstimation, PayloadGenerator, SignableTransaction},
 };
+
+const DEFAULT_TX_GAS: u64 = 400_000;
 
 // Used instead of From implementation to avoid alloy being a dependency of the primitive crates
 fn a2h(a: hopr_primitive_types::prelude::Address) -> alloy::primitives::Address {

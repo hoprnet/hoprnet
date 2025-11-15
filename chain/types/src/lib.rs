@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod chain_events;
 pub mod errors;
+#[cfg(feature = "use-bindings")]
 mod parser;
 pub mod payload;
 
@@ -16,13 +17,12 @@ pub mod prelude {
         ContractAddresses,
         chain_events::ChainEvent,
         payload::{
-            BasicPayloadGenerator, GasEstimation, PayloadGenerator, SafePayloadGenerator, SignableTransaction,
-            TransactionRequest,
+            GasEstimation, PayloadGenerator, SignableTransaction,
         },
     };
+    #[cfg(feature = "use-bindings")]
+    pub use super::payload::{BasicPayloadGenerator, SafePayloadGenerator, TransactionRequest};
 }
-
-// TODO: use this from hopr-bindings once https://github.com/hoprnet/contracts/pull/29 is merged
 
 /// Holds addresses of all smart contracts.
 #[serde_with::serde_as]
@@ -46,6 +46,9 @@ pub struct ContractAddresses {
     /// Minimum ticket winning probability contract
     #[serde_as(as = "serde_with::DisplayFromStr")]
     pub winning_probability_oracle: Address,
+    /// Migration helper for node safes and modules
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub node_safe_migration: Address,
     /// Stake factory contract
     #[serde_as(as = "serde_with::DisplayFromStr")]
     pub node_stake_factory: Address,
@@ -70,5 +73,35 @@ impl IntoIterator for &ContractAddresses {
             self.module_implementation,
         ]
         .into_iter()
+    }
+}
+
+#[cfg(feature = "use-bindings")]
+impl From<hopr_bindings::ContractAddresses> for ContractAddresses {
+    fn from(value: hopr_bindings::ContractAddresses) -> Self {
+        Self {
+            token: Address::new(&value.token.0.0),
+            channels: Address::new(&value.channels.0.0),
+            announcements: Address::new(&value.announcements.0.0),
+            node_safe_registry: Address::new(&value.node_safe_registry.0.0),
+            ticket_price_oracle: Address::new(&value.ticket_price_oracle.0.0),
+            winning_probability_oracle: Address::new(&value.winning_probability_oracle.0.0),
+            node_safe_migration: Address::new(&value.node_safe_migration.0.0),
+            node_stake_factory: Address::new(&value.node_stake_factory.0.0),
+            module_implementation: Address::new(&value.module_implementation.0.0),
+        }
+    }
+}
+
+#[cfg(feature = "use-bindings")]
+impl ContractAddresses {
+    /// Returns contract addresses for the given HOPR network `name` 
+    /// or `None` if the network does not exist.
+    pub fn for_network(name: &str) -> Option<Self> {
+        hopr_bindings::config::NetworksWithContractAddresses::default()
+            .networks
+            .get(name)
+            .cloned()
+            .map(|n| n.addresses.into())
     }
 }

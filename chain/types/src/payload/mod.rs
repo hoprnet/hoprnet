@@ -14,13 +14,15 @@
 #[cfg(feature = "use-bindings")]
 mod bindings_based;
 
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
+
 #[cfg(feature = "use-bindings")]
 pub(crate) use bindings_based::KeyBindAndAnnouncePayload;
 #[cfg(feature = "use-bindings")]
 pub use bindings_based::{BasicPayloadGenerator, SafePayloadGenerator, TransactionRequest};
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+
 
 type Result<T> = std::result::Result<T, crate::errors::ChainTypesError>;
 
@@ -104,8 +106,6 @@ pub trait PayloadGenerator {
     /// the node no longer manages the funds.
     fn deregister_node_by_safe(&self) -> Result<Self::TxRequest>;
 }
-
-const DEFAULT_TX_GAS: u64 = 400_000;
 
 #[cfg(test)]
 pub(crate) mod tests {
