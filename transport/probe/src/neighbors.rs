@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_stream::stream;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
@@ -11,14 +13,21 @@ use crate::{
     traits::{PeerDiscoveryFetch, ProbeStatusUpdate, TrafficGeneration},
 };
 
-#[derive(Clone)]
 struct TelemetrySink<T> {
-    prober: T,
+    prober: Arc<T>,
+}
+
+impl<T> Clone for TelemetrySink<T> {
+    fn clone(&self) -> Self {
+        Self {
+            prober: self.prober.clone(),
+        }
+    }
 }
 
 impl<T> futures::Sink<crate::errors::Result<crate::types::Telemetry>> for TelemetrySink<T>
 where
-    T: ProbeStatusUpdate + Send + Sync + Clone + 'static,
+    T: ProbeStatusUpdate + Send + Sync + 'static,
 {
     type Error = std::convert::Infallible;
 
@@ -94,18 +103,21 @@ where
 
 pub struct ImmediateNeighborProber<T> {
     cfg: ProbeConfig,
-    prober: T,
+    prober: Arc<T>,
 }
 
 impl<T> ImmediateNeighborProber<T> {
     pub fn new(cfg: ProbeConfig, prober: T) -> Self {
-        Self { cfg, prober }
+        Self {
+            cfg,
+            prober: Arc::new(prober),
+        }
     }
 }
 
 impl<T> TrafficGeneration for ImmediateNeighborProber<T>
 where
-    T: PeerDiscoveryFetch + ProbeStatusUpdate + Send + Sync + Clone + 'static,
+    T: PeerDiscoveryFetch + ProbeStatusUpdate + Send + Sync + 'static,
 {
     fn build(
         self,
@@ -179,10 +191,6 @@ mod tests {
         #[async_trait::async_trait]
         impl PeerDiscoveryFetch for ScanInteraction {
             async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<PeerId>;
-        }
-
-        impl Clone for ScanInteraction {
-            fn clone(&self) -> Self;
         }
     }
 

@@ -5374,7 +5374,6 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
- "hopr-metrics",
  "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",

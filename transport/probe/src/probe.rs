@@ -17,7 +17,8 @@ use crate::{
     content::{Message, NeighborProbe},
     errors::ProbeError,
     ping::PingQueryReplier,
-    traits::{ProbeStatusUpdate, TrafficGeneration},
+    traits::TrafficGeneration,
+    types::{NeighborTelemetry, Telemetry},
 };
 
 #[inline(always)]
@@ -122,15 +123,23 @@ impl Probe {
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
-                            // replier.notify(Err(ProbeError::ProbeNeighborTimeout(peer.into())));
+                            if let NodeId::Offchain(opk) = peer.as_ref() {
+                                replier.notify(Err(ProbeError::ProbeNeighborTimeout(opk.into())));
+                            } else {
+                                tracing::warn!(
+                                    reason = "non-offchain peer",
+                                    "cannot notify timeout for non-offchain peer"
+                                );
+                            }
                         };
 
                         if let NodeId::Offchain(opk) = peer.as_ref() {
                             let peer: PeerId = opk.into();
                             futures::FutureExt::boxed(async move {
-                                // store
-                                //     .on_finished(&peer, &Err(ProbeError::ProbeNeighborTimeout(timeout.as_secs())))
-                                //     .await;
+                                pin_mut!(store);
+                                if let Err(error) = store.send(Err(ProbeError::ProbeNeighborTimeout(peer))).await {
+                                    tracing::error!(%peer, %error, "failed to record probe timeout");
+                                }
                             })
                         } else {
                             futures::FutureExt::boxed(futures::future::ready(()))
@@ -232,6 +241,7 @@ impl Probe {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
                 let move_up = move_up.clone();
+                let store = reports.clone();
 
                 async move {
                     // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occurring on random tags
@@ -241,8 +251,11 @@ impl Probe {
                         match message {
                             Ok(message) => {
                                 match message {
-                                    Message::Telemetry(_path_telemetry) => {
-                                        tracing::warn!(%pseudonym, reason = "feature not implemented", "this node could not originate the telemetry");
+                                    Message::Telemetry(path_telemetry) => {
+                                        pin_mut!(store);
+                                        if let Err(error) = store.send(Ok(Telemetry::Loopback(path_telemetry))).await {
+                                            tracing::error!(%pseudonym, %error, "failed to record probe success");
+                                        }
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
@@ -259,10 +272,16 @@ impl Probe {
                                             let latency = current_time()
                                                 .as_unix_timestamp()
                                                 .saturating_sub(start);
-                                            
+
                                             if let NodeId::Offchain(opk) = peer.as_ref() {
                                                 tracing::info!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
-                                                // store.on_finished(&opk.into(), &Ok(latency)).await;
+                                                pin_mut!(store);
+                                                if let Err(error) = store.send(Ok(Telemetry::Neighbor(NeighborTelemetry {
+                                                    peer: opk.into(),
+                                                    rtt: latency,
+                                                }))).await {
+                                                    tracing::error!(%pseudonym, %error, "failed to record probe success");
+                                                }
                                             } else {
                                                 tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
                                             }
@@ -303,7 +322,10 @@ mod tests {
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
     use super::*;
-    use crate::{neighbors::ImmediateNeighborProber, traits::PeerDiscoveryFetch};
+    use crate::{
+        neighbors::ImmediateNeighborProber,
+        traits::{PeerDiscoveryFetch, ProbeStatusUpdate},
+    };
 
     lazy_static::lazy_static!(
         static ref OFFCHAIN_KEYPAIR: OffchainKeypair = OffchainKeypair::random();
