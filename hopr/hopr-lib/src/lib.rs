@@ -97,7 +97,7 @@ pub use hopr_primitive_types::prelude::*;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 pub use crate::{
     config::SafeModule,
@@ -584,7 +584,7 @@ where
                     let node_db = node_db.clone();
                     async move {
                         match node_db.persist_outgoing_ticket_indices().await {
-                            Ok(count) => debug!(count, "successfully flushed states of outgoing ticket indices"),
+                            Ok(count) => trace!(count, "successfully flushed states of outgoing ticket indices"),
                             Err(error) => error!(%error, "Failed to flush ticket indices"),
                         }
                     }
