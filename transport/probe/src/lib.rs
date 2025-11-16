@@ -11,8 +11,8 @@
 //!    connection to the neighbor, since in the worst case scenario the mitigation strategy can discard unsuitable
 //!    peers.
 //!
-//! 2. **Multi-hop probing** - collects telemetry using a probing mechanism based on looping. A loop is a message sent by
-//!    this peer to itself through different pre-selected peers. This probing mechanism can be combined together with
+//! 2. **Multi-hop probing** - collects telemetry using a probing mechanism based on looping. A loop is a message sent
+//!    by this peer to itself through different pre-selected peers. This probing mechanism can be combined together with
 //!    the cover traffic into a single mechanism improving the network view.
 //!
 //!

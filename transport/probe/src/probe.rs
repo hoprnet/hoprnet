@@ -211,7 +211,11 @@ impl Probe {
                                     } else {
                                         active_probes
                                             .insert(
-                                                (pseudonym.expect("the pseudonym must be present in Forward routing"), nonce),
+                                                (
+                                                    pseudonym
+                                                        .expect("the pseudonym must be present in Forward routing"),
+                                                    nonce,
+                                                ),
                                                 (destination, current_time().as_unix_timestamp(), notifier),
                                             )
                                             .await;
