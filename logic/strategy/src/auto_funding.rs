@@ -174,8 +174,7 @@ mod tests {
             5_u32.into(),
             0_u32.into(),
             ChannelStatus::PendingToClose(
-                chrono::DateTime::<chrono::Utc>::from_str("2025-11-10T00:00:00+00:00")?
-                    .into(),
+                chrono::DateTime::<chrono::Utc>::from_str("2025-11-10T00:00:00+00:00")?.into(),
             ),
             0_u32.into(),
         );

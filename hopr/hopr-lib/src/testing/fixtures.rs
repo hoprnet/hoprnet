@@ -116,7 +116,7 @@ lazy_static! {
     static ref CLUSTER_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-pub const SWARM_N: usize = 6;
+pub const SWARM_N: usize = 3;
 
 pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
     assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
@@ -332,7 +332,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                 });
 
                 result.map(|(instance, socket)| TestedHopr {
-                    runtime,
+                    runtime: Some(runtime),
                     instance,
                     socket,
                 })
@@ -380,6 +380,12 @@ async fn wait_for_connectivity(instance: &TestedHopr) {
         if peers.len() == SWARM_N - 1 {
             break;
         }
+
+        tracing::debug!(
+            "{} peers connected on {}, waiting for full mesh",
+            peers.len(),
+            instance.instance.me_onchain()
+        );
         sleep(Duration::from_secs(1)).await;
     }
 }

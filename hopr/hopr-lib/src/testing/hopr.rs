@@ -58,6 +58,7 @@ pub async fn create_hopr_instance(
                 outgoing_ticket_winning_prob: winn_prob,
                 ..Default::default()
             },
+            publish: true,
             ..Default::default()
         },
         connector,
@@ -71,13 +72,19 @@ pub async fn create_hopr_instance(
 
 pub struct TestedHopr {
     /// Tokio runtime in which all long-running tasks of the HOPR node are spawned.
-    ///
-    /// This includes what's in `processes` and a few additional tasks.
-    pub runtime: tokio::runtime::Runtime,
+    pub runtime: Option<tokio::runtime::Runtime>,
     /// HOPR instance that is used for testing.
     pub instance: Arc<Hopr<TestingConnector, HoprNodeDb>>,
     /// Transport socket that can be used to send and receive data via the HOPR node.
     pub socket: HoprTransportIO,
+}
+
+impl Drop for TestedHopr {
+    fn drop(&mut self) {
+        if let Some(runtime) = self.runtime.take() {
+            runtime.shutdown_background();
+        }
+    }
 }
 
 impl TestedHopr {
