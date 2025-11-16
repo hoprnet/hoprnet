@@ -3,7 +3,7 @@ name = "hoprd"
 version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "HOPR node executable."
+description = "HOPR node executable"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -67,7 +67,6 @@ async-signal = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
-dashmap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.12"
 proc-macro-regex = { workspace = true }
@@ -128,5 +127,5 @@ hopr-lib = { workspace = true, features = [
   "session-server",
   "utils_session",
   "utils_parallel",
-  "testing"
+  "testing",
 ] }

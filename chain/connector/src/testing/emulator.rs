@@ -66,7 +66,9 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     account.safe_address = Some(hex::encode(safe_address));
                     tracing::debug!(%sender, %safe_address, "registered safe address to account");
                 } else {
-                    state.unpaired_safes.insert(hex::encode(sender), hex::encode(safe_address));
+                    state
+                        .unpaired_safes
+                        .insert(hex::encode(sender), hex::encode(safe_address));
                     tracing::debug!(%sender, %safe_address, "registered safe address without account");
                 }
             }

@@ -5293,7 +5293,6 @@ dependencies = [
  "async-trait",
  "clap",
  "console-subscriber",
- "dashmap",
  "futures",
  "home",
  "hopr-chain-connector",

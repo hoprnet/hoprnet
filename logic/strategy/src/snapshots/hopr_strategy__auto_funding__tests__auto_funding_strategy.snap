@@ -27,6 +27,7 @@ accounts:
     multi_addresses: []
     packet_key: 6cc4009e6dd36eea81f3d5b2b7a9f3dd0e78c66a9577e7090ebdd066882712d3
     safe_address: f982b19d6920ee93a267aec482349ab4a6c8a150
+unpaired_safes: {}
 native_balances:
   18f8ae833c85c51fbeba29cef9fbfb53b3bad950:
     __typename: NativeBalance

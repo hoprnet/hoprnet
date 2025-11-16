@@ -1,6 +1,5 @@
-use std::{str::FromStr, time::Duration};
-use std::convert::identity;
-use std::ops::Div;
+use std::{convert::identity, ops::Div, str::FromStr, time::Duration};
+
 use futures_time::future::FutureExt;
 use hex_literal::hex;
 use hopr_chain_connector::{
@@ -25,10 +24,9 @@ use crate::{
     state::HoprState,
     testing::{
         dummies::EchoServer,
-        hopr::{ChannelGuard, NodeSafeConfig, TestedHopr},
+        hopr::{ChannelGuard, NodeSafeConfig, TestedHopr, create_hopr_instance},
     },
 };
-use crate::testing::hopr::create_hopr_instance;
 
 /// A guard that holds a reference to the cluster and ensures exclusive access
 pub struct ClusterGuard {
@@ -268,75 +266,81 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
         .collect::<Vec<_>>();
 
     // Setup SWARM_N nodes
-    let hopr_instances: Vec<TestedHopr> = (0..SWARM_N).map(|i| {
-        let onchain_keys = onchain_keys.clone();
-        let offchain_keys = offchain_keys.clone();
-        let safes = safes.clone();
-        let do_auto_redeem = i % 2 != 0; // every other node does auto redeem and uses a custom winn_prob
+    let hopr_instances: Vec<TestedHopr> = (0..SWARM_N)
+        .map(|i| {
+            let onchain_keys = onchain_keys.clone();
+            let offchain_keys = offchain_keys.clone();
+            let safes = safes.clone();
+            let do_auto_redeem = i % 2 != 0; // every other node does auto redeem and uses a custom winn_prob
 
-        let blokli_client = chainenv_fixture
-            .clone()
-            .with_mutator(FullStateEmulator::new(safes[i].module_address.clone()));
+            let blokli_client = chainenv_fixture
+                .clone()
+                .with_mutator(FullStateEmulator::new(safes[i].module_address.clone()));
 
-        std::thread::spawn(move || {
-            // This runtime holds all the tasks spawned by the Hopr node.
-            // It must live as long as the Hopr node, otherwise the tasks will terminate.
-            let runtime = tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(
-                    std::thread::available_parallelism()
-                        .map(|v| v.get())
-                        .unwrap_or(1)
-                        .div(SWARM_N)
-                        .max(3) - 1,
-                )
-                .thread_name(format!("hopr-node-{i}"))
-                .enable_all()
-                .build()
-                .expect("failed to build Tokio runtime");
+            std::thread::spawn(move || {
+                // This runtime holds all the tasks spawned by the Hopr node.
+                // It must live as long as the Hopr node, otherwise the tasks will terminate.
+                let runtime = tokio::runtime::Builder::new_multi_thread()
+                    .worker_threads(
+                        std::thread::available_parallelism()
+                            .map(|v| v.get())
+                            .unwrap_or(1)
+                            .div(SWARM_N)
+                            .max(3)
+                            - 1,
+                    )
+                    .thread_name(format!("hopr-node-{i}"))
+                    .enable_all()
+                    .build()
+                    .expect("failed to build Tokio runtime");
 
-            let result = runtime.block_on(async {
-                let node_db = HoprNodeDb::new_in_memory(onchain_keys[i].clone())
+                let result = runtime.block_on(async {
+                    let node_db = HoprNodeDb::new_in_memory(onchain_keys[i].clone())
+                        .await
+                        .expect("failed to create HoprNodeDb for node");
+
+                    let mut connector = create_trustful_hopr_blokli_connector(
+                        &onchain_keys[i],
+                        BlockchainConnectorConfig::default(),
+                        blokli_client,
+                        safes[i].module_address,
+                    )
                     .await
-                    .expect("failed to create HoprNodeDb for node");
+                    .expect("failed to create HoprBlockchainSafeConnector for node");
 
-                let mut connector = create_trustful_hopr_blokli_connector(
-                    &onchain_keys[i],
-                    BlockchainConnectorConfig::default(),
-                    blokli_client,
-                    safes[i].module_address,
-                )
-                .await
-                .expect("failed to create HoprBlockchainSafeConnector for node");
+                    connector
+                        .connect(Duration::from_secs(3))
+                        .await
+                        .expect("failed to connect to HoprBlockchainSafeConnector");
 
-                connector
-                    .connect(Duration::from_secs(3))
-                    .await
-                    .expect("failed to connect to HoprBlockchainSafeConnector");
+                    let instance = create_hopr_instance(
+                        onchain_keys[i].clone(),
+                        offchain_keys[i].clone(),
+                        3001 + i as u16,
+                        node_db,
+                        std::sync::Arc::new(connector),
+                        safes[i],
+                        if do_auto_redeem { Some(0.2) } else { None },
+                    )
+                    .await;
 
-                let instance = create_hopr_instance(
-                    onchain_keys[i].clone(),
-                    offchain_keys[i].clone(),
-                    3001 + i as u16,
-                    node_db,
-                    std::sync::Arc::new(connector),
-                    safes[i],
-                    if do_auto_redeem { Some(0.2) } else { None },
-                )
-                .await;
+                    let socket = instance.run(EchoServer::new()).await?;
 
-                let (socket, processes) = instance.run(EchoServer::new()).await?;
+                    anyhow::Ok((std::sync::Arc::new(instance), socket))
+                });
 
-                anyhow::Ok((std::sync::Arc::new(instance), socket, processes))
-            });
-
-            result.map(|(instance, socket, processes)| TestedHopr { runtime, instance, socket, processes })
+                result.map(|(instance, socket)| TestedHopr {
+                    runtime,
+                    instance,
+                    socket,
+                })
+            })
+            .join()
+            .map_err(|_| anyhow::anyhow!("hopr node starting thread panicked"))
+            .and_then(identity)
         })
-        .join()
-        .map_err(|_| anyhow::anyhow!("hopr node starting thread panicked"))
-        .and_then(identity)
-    })
-    .collect::<Result<Vec<_>, _>>()
-    .expect("one or more HOPR nodes could not be created");
+        .collect::<Result<Vec<_>, _>>()
+        .expect("one or more HOPR nodes could not be created");
 
     // Wait for all nodes to reach the 'Running' state
     futures::future::try_join_all(hopr_instances.iter().map(|instance| {
@@ -344,7 +348,6 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
     }))
     .await
     .expect("status wait failed");
-
 
     // Wait for full mesh connectivity
     futures::future::try_join_all(

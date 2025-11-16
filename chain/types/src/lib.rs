@@ -13,15 +13,13 @@ pub mod payload;
 pub use parser::ParsedHoprChainAction;
 
 pub mod prelude {
+    #[cfg(feature = "use-bindings")]
+    pub use super::payload::{BasicPayloadGenerator, SafePayloadGenerator, TransactionRequest};
     pub use super::{
         ContractAddresses,
         chain_events::ChainEvent,
-        payload::{
-            GasEstimation, PayloadGenerator, SignableTransaction,
-        },
+        payload::{GasEstimation, PayloadGenerator, SignableTransaction},
     };
-    #[cfg(feature = "use-bindings")]
-    pub use super::payload::{BasicPayloadGenerator, SafePayloadGenerator, TransactionRequest};
 }
 
 /// Holds addresses of all smart contracts.
@@ -95,7 +93,7 @@ impl From<hopr_bindings::ContractAddresses> for ContractAddresses {
 
 #[cfg(feature = "use-bindings")]
 impl ContractAddresses {
-    /// Returns contract addresses for the given HOPR network `name` 
+    /// Returns contract addresses for the given HOPR network `name`
     /// or `None` if the network does not exist.
     pub fn for_network(name: &str) -> Option<Self> {
         hopr_bindings::config::NetworksWithContractAddresses::default()

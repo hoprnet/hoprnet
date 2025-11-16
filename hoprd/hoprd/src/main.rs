@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{num::NonZeroUsize, path::PathBuf, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
@@ -9,8 +9,7 @@ use hopr_chain_connector::{
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::{
     AbortableList, AcknowledgedTicket, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
-    exports::api::chain::ChainEvents, prelude::ChainKeypair, state::HoprLibProcess,
-    utils::session::ListenerJoinHandles,
+    exports::api::chain::ChainEvents, prelude::ChainKeypair, utils::session::ListenerJoinHandles,
 };
 use hoprd::{
     cli::CliArgs,
@@ -136,8 +135,6 @@ fn init_logger() -> anyhow::Result<()> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
-    #[strum(to_string = "hopr-lib process: {0}")]
-    HoprLib(HoprLibProcess),
     #[strum(to_string = "session listener sockets")]
     ListenerSocket,
     #[strum(to_string = "hopr strategies process")]
@@ -288,7 +285,23 @@ async fn init_rest_api(
 
 #[cfg(feature = "runtime-tokio")]
 fn main() -> anyhow::Result<()> {
-    hopr_lib::prepare_tokio_runtime()?.block_on(main_inner())
+    let num_cpu_threads = std::env::var("HOPRD_NUM_CPU_THREADS").ok().and_then(|v| {
+        usize::from_str(&v)
+            .map_err(anyhow::Error::from)
+            .and_then(|v| NonZeroUsize::try_from(v).map_err(anyhow::Error::from))
+            .inspect_err(|error| error!(%error, "failed to parse HOPRD_NUM_CPU_THREADS"))
+            .ok()
+    });
+
+    let num_io_threads = std::env::var("HOPRD_NUM_IO_THREADS").ok().and_then(|v| {
+        usize::from_str(&v)
+            .map_err(anyhow::Error::from)
+            .and_then(|v| NonZeroUsize::try_from(v).map_err(anyhow::Error::from))
+            .inspect_err(|error| error!(%error, "failed to parse HOPRD_NUM_IO_THREADS"))
+            .ok()
+    });
+
+    hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)?.block_on(main_inner())
 }
 
 #[cfg(feature = "runtime-tokio")]
@@ -373,7 +386,7 @@ async fn main_inner() -> anyhow::Result<()> {
         processes.extend_from(list);
     }
 
-    let (_hopr_socket, hopr_lib_processes) = node
+    let _hopr_socket = node
         .run(HoprServerIpForwardingReactor::new(
             hopr_keys.packet_key.clone(),
             cfg.session_ip_forwarding,
@@ -386,8 +399,6 @@ async fn main_inner() -> anyhow::Result<()> {
         node.redemption_requests()?,
     ));
     debug!(strategies = ?multi_strategy, "initialized strategies");
-
-    processes.flat_map_extend_from(hopr_lib_processes, HoprdProcess::HoprLib);
 
     debug!("starting up strategies");
     processes.insert(
@@ -409,7 +420,9 @@ async fn main_inner() -> anyhow::Result<()> {
             }
             Signal::Int => {
                 info!("Received the INT signal... tearing down the node");
-                processes.abort_all();
+                // Explicitly tear down running processes here
+                drop(node);
+                drop(processes);
 
                 info!("All processes stopped... emulating the default handler...");
                 low_level::emulate_default_handler(signal as i32)?;

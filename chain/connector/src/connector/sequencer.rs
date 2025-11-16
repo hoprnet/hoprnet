@@ -76,8 +76,8 @@ where
                     // rejection.
                     if res.is_ok()
                         || res
-                        .as_ref()
-                        .is_err_and(|error| error.as_transaction_rejection_error().is_none())
+                            .as_ref()
+                            .is_err_and(|error| error.as_transaction_rejection_error().is_none())
                     {
                         nonce_inc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }

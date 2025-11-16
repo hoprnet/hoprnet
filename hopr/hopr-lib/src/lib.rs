@@ -74,6 +74,7 @@ pub mod prelude {
 
 use std::{
     convert::identity,
+    num::NonZeroUsize,
     sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
@@ -129,14 +130,16 @@ lazy_static::lazy_static! {
 /// Divide the available CPU parallelism by 2, since half of the available threads are
 /// to be used for IO-bound and half for CPU-bound tasks.
 #[cfg(feature = "runtime-tokio")]
-pub fn prepare_tokio_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
+pub fn prepare_tokio_runtime(
+    num_cpu_threads: Option<NonZeroUsize>,
+    num_io_threads: Option<NonZeroUsize>,
+) -> anyhow::Result<tokio::runtime::Runtime> {
     use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
     hopr_parallelize::cpu::init_thread_pool(
-        std::env::var("HOPRD_NUM_CPU_THREADS")
-            .ok()
-            .and_then(|v| usize::from_str(&v).ok())
+        num_cpu_threads
+            .map(|v| v.get())
             .or(avail_parallelism)
             .ok_or(anyhow::anyhow!(
                 "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
@@ -148,9 +151,8 @@ pub fn prepare_tokio_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
     Ok(tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(
-            std::env::var("HOPRD_NUM_IO_THREADS")
-                .ok()
-                .and_then(|v| usize::from_str(&v).ok())
+            num_io_threads
+                .map(|v| v.get())
                 .or(avail_parallelism)
                 .ok_or(anyhow::anyhow!(
                     "Could not determine the number of IO threads to use. Please set the HOPRD_NUM_IO_THREADS \
@@ -172,7 +174,7 @@ pub fn prepare_tokio_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
 /// Type alias used to send and receive transport data via a running HOPR node.
 pub type HoprTransportIO = socket::HoprSocket<
     futures::channel::mpsc::Receiver<ApplicationDataIn>,
-    futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>
+    futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
 >;
 
 /// HOPR main object providing the entire HOPR node functionality
@@ -194,6 +196,7 @@ pub struct Hopr<Chain, Db> {
     redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
     chain_api: Chain,
+    processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
 impl<Chain, Db> Hopr<Chain, Db>
@@ -259,6 +262,7 @@ where
             chain_api: hopr_chain_api,
             node_db: hopr_node_db,
             redeem_requests: OnceLock::new(),
+            processes: OnceLock::new(),
         })
     }
 
@@ -305,14 +309,12 @@ where
         self.cfg.publish
     }
 
-    // TODO: move the abortable processes into the HOPR instance itself, so their lifetimes are tied
-
     pub async fn run<
         #[cfg(feature = "session-server")] T: traits::session::HoprSessionServer + Clone + Send + 'static,
     >(
         &self,
         #[cfg(feature = "session-server")] serve_handler: T,
-    ) -> errors::Result<(HoprTransportIO, AbortableList<HoprLibProcess>)> {
+    ) -> errors::Result<HoprTransportIO> {
         self.error_if_not_in_state(
             state::HoprState::Uninitialized,
             "Cannot start the hopr node multiple times".into(),
@@ -494,7 +496,7 @@ where
             Err(error) => {
                 error!(%safe_addr, %error, "safe registration failed");
                 return Err(HoprLibError::chain(error));
-            },
+            }
         }
 
         // Only public nodes announce multiaddresses
@@ -519,7 +521,7 @@ where
             Err(error) => {
                 error!(%error, ?multiaddresses_to_announce, "failed to transmit node announcement");
                 return Err(HoprLibError::chain(error));
-            },
+            }
         }
 
         let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
@@ -652,7 +654,8 @@ where
             1.0,
         );
 
-        Ok((hopr_socket, processes))
+        let _ = self.processes.set(processes);
+        Ok(hopr_socket)
     }
 
     // p2p transport =========

@@ -182,7 +182,8 @@ where
         &self,
         safe_address: &Address,
     ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, SafeRegistrationError<Self::Error>> {
-        self.check_connection_state().map_err(SafeRegistrationError::ProcessingError)?;
+        self.check_connection_state()
+            .map_err(SafeRegistrationError::ProcessingError)?;
 
         if let Some(safe) = self
             .client
@@ -192,17 +193,19 @@ where
             .await
             .map_err(|e| SafeRegistrationError::ProcessingError(ConnectorError::from(e)))?
             .iter()
-            .find_map(|account| account.safe_address.clone()) {
-
-            return Err(SafeRegistrationError::AlreadyRegistered(
-                safe.parse().unwrap_or_else(|e| {
+            .find_map(|account| account.safe_address.clone())
+        {
+            return Err(SafeRegistrationError::AlreadyRegistered(safe.parse().unwrap_or_else(
+                |e| {
                     tracing::error!("failed to parse safe {safe} address: {e}");
                     Address::default()
-                })
-            ))
+                },
+            )));
         }
 
-        let tx_req = self.payload_generator.register_safe_by_node(*safe_address)
+        let tx_req = self
+            .payload_generator
+            .register_safe_by_node(*safe_address)
             .map_err(|e| SafeRegistrationError::ProcessingError(ConnectorError::from(e)))?;
 
         Ok(self

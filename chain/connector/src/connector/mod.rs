@@ -157,7 +157,7 @@ where
         let me = self.chain_key.public().to_address();
         let values_cache = self.values.clone();
 
-        #[allow(unused)]
+        #[allow(unused, clippy::large_enum_variant)]
         enum SubscribedEventType {
             Account((AccountEntry, Option<AccountEntry>)),
             Channel((ChannelEntry, Option<Vec<ChannelChange>>)),
@@ -224,7 +224,7 @@ where
 
             let mut account_counter = 0;
             let mut channel_counter = 0;
-            if min_channels == 0 && min_channels == 0 {
+            if min_accounts == 0 && min_channels == 0 {
                 tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
                 let _ = connection_ready_tx.take().unwrap().send(Ok(()));
             }
@@ -241,8 +241,7 @@ where
                         // Send the completion notification
                         // once we reach the expected number of accounts and channels with
                         // the given tolerance
-                        if account_counter >= min_accounts && channel_counter >= min_channels
-                        {
+                        if account_counter >= min_accounts && channel_counter >= min_channels {
                             tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
                             let _ = connection_ready_tx.take().unwrap().send(Ok(()));
                         }

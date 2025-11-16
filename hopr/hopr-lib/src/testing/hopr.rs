@@ -7,8 +7,8 @@ use hopr_db_node::HoprNodeDb;
 use hopr_primitive_types::prelude::*;
 use hopr_transport::Hash;
 use tokio::time::sleep;
-use hopr_async_runtime::AbortableList;
-use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude, testing::TestingConnector, HoprTransportIO, HoprLibProcess};
+
+use crate::{Address, ChannelEntry, ChannelStatus, Hopr, HoprTransportIO, PeerId, prelude, testing::TestingConnector};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NodeSafeConfig {
@@ -65,8 +65,8 @@ pub async fn create_hopr_instance(
         &offchain_key,
         &chain_key,
     )
-        .await
-        .expect(format!("failed to create hopr instance on port {host_port}").as_str())
+    .await
+    .expect(format!("failed to create hopr instance on port {host_port}").as_str())
 }
 
 pub struct TestedHopr {
@@ -78,11 +78,6 @@ pub struct TestedHopr {
     pub instance: Arc<Hopr<TestingConnector, HoprNodeDb>>,
     /// Transport socket that can be used to send and receive data via the HOPR node.
     pub socket: HoprTransportIO,
-    /// List of abortable processes spawned by the HOPR node.
-    ///
-    /// NOTE: this is NOT the list of all HOPR processes, as there are
-    /// additional ones that abort themselves automatically.
-    pub processes: AbortableList<HoprLibProcess>,
 }
 
 impl TestedHopr {
