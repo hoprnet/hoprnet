@@ -21,6 +21,6 @@ networks:
       - config_file: 'default.cfg.yaml'
         identity_path: './sdk/identities/hopr-node_5.id'
         host: localhost
-      - config_file: 'barebone-lower-win-prob.cfg.yaml'
+      - config_file: 'default.cfg.yaml'
         identity_path: './sdk/identities/hopr-node_6.id'
         host: '127.0.0.1'

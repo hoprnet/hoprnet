@@ -2,7 +2,6 @@ import asyncio
 import random
 
 import pytest
-
 from sdk.python.api.balance import Balance
 from sdk.python.localcluster.node import Node
 
