@@ -169,6 +169,12 @@ pub fn prepare_tokio_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
         .build()?)
 }
 
+/// Type alias used to send and receive transport data via a running HOPR node.
+pub type HoprTransportIO = socket::HoprSocket<
+    futures::channel::mpsc::Receiver<ApplicationDataIn>,
+    futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>
+>;
+
 /// HOPR main object providing the entire HOPR node functionality
 ///
 /// Instantiating this object creates all processes and objects necessary for
@@ -299,18 +305,14 @@ where
         self.cfg.publish
     }
 
+    // TODO: move the abortable processes into the HOPR instance itself, so their lifetimes are tied
+
     pub async fn run<
         #[cfg(feature = "session-server")] T: traits::session::HoprSessionServer + Clone + Send + 'static,
     >(
         &self,
         #[cfg(feature = "session-server")] serve_handler: T,
-    ) -> errors::Result<(
-        hopr_transport::socket::HoprSocket<
-            futures::channel::mpsc::Receiver<ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
-        >,
-        AbortableList<HoprLibProcess>,
-    )> {
+    ) -> errors::Result<(HoprTransportIO, AbortableList<HoprLibProcess>)> {
         self.error_if_not_in_state(
             state::HoprState::Uninitialized,
             "Cannot start the hopr node multiple times".into(),
@@ -473,20 +475,26 @@ where
 
         info!(peer_id = %self.me_peer_id(), address = %self.me_onchain(), version = constants::APP_VERSION, "Node information");
 
-        info!("Registering safe by node");
-        if self.me_onchain() == self.cfg.safe_module.safe_address {
+        let safe_addr = self.cfg.safe_module.safe_address;
+
+        if self.me_onchain() == safe_addr {
             return Err(HoprLibError::GeneralError("cannot self as staking safe address".into()));
         }
 
-        if let Err(error) = self
-            .chain_api
-            .register_safe(&self.cfg.safe_module.safe_address)
-            .and_then(identity)
-            .map_err(HoprLibError::chain)
-            .await
-        {
-            // Intentionally ignoring the errored state
-            error!(%error, "Failed to register node with safe")
+        info!(%safe_addr, "registering safe with this node");
+        match self.chain_api.register_safe(&safe_addr).await {
+            Ok(awaiter) => {
+                // Wait until the registration is confirmed on-chain, otherwise we cannot proceed.
+                awaiter.await.map_err(HoprLibError::chain)?;
+                info!(%safe_addr, "safe successfully registered with this node");
+            }
+            Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe == safe_addr => {
+                info!(%safe_addr, "this safe is already registered with this node");
+            }
+            Err(error) => {
+                error!(%safe_addr, %error, "safe registration failed");
+                return Err(HoprLibError::chain(error));
+            },
         }
 
         // Only public nodes announce multiaddresses
@@ -498,21 +506,20 @@ where
 
         // At this point the node is already registered with Safe, so
         // we can announce via Safe-compliant TX
+        info!(?multiaddresses_to_announce, "announcing node on chain");
         match self.chain_api.announce(&multiaddresses_to_announce, &self.me).await {
             Ok(awaiter) => {
-                info!(?multiaddresses_to_announce, "announcing node on chain");
-
-                // Await until the announcement is confirmed on-chain, otherwise we cannot proceed.
+                // Wait until the announcement is confirmed on-chain, otherwise we cannot proceed.
                 awaiter.await.map_err(HoprLibError::chain)?;
                 info!(?multiaddresses_to_announce, "node has been successfully announced");
             }
             Err(AnnouncementError::AlreadyAnnounced) => {
                 info!(multiaddresses_announced = ?multiaddresses_to_announce, "node already announced on chain")
             }
-            // If the announcement fails, we keep going to prevent the node from retrying
-            // after restart.
-            // Functionality is limited, and users must check the logs for errors.
-            Err(error) => error!(%error, "failed to transmit node announcement"),
+            Err(error) => {
+                error!(%error, ?multiaddresses_to_announce, "failed to transmit node announcement");
+                return Err(HoprLibError::chain(error));
+            },
         }
 
         let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")

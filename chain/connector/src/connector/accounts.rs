@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, TryFutureExt, future::BoxFuture, stream::BoxStream};
-use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr};
+use hopr_api::chain::{AccountSelector, AnnouncementError, ChainReceipt, Multiaddr, SafeRegistrationError};
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::{
@@ -181,11 +181,34 @@ where
     async fn register_safe(
         &self,
         safe_address: &Address,
-    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, Self::Error> {
-        self.check_connection_state()?;
+    ) -> Result<BoxFuture<'_, Result<ChainReceipt, Self::Error>>, SafeRegistrationError<Self::Error>> {
+        self.check_connection_state().map_err(SafeRegistrationError::ProcessingError)?;
 
-        let tx_req = self.payload_generator.register_safe_by_node(*safe_address)?;
+        if let Some(safe) = self
+            .client
+            .query_accounts(blokli_client::api::v1::AccountSelector::Address(
+                self.chain_key.public().to_address().into(),
+            ))
+            .await
+            .map_err(|e| SafeRegistrationError::ProcessingError(ConnectorError::from(e)))?
+            .iter()
+            .find_map(|account| account.safe_address.clone()) {
 
-        Ok(self.send_tx(tx_req).await?.boxed())
+            return Err(SafeRegistrationError::AlreadyRegistered(
+                safe.parse().unwrap_or_else(|e| {
+                    tracing::error!("failed to parse safe {safe} address: {e}");
+                    Address::default()
+                })
+            ))
+        }
+
+        let tx_req = self.payload_generator.register_safe_by_node(*safe_address)
+            .map_err(|e| SafeRegistrationError::ProcessingError(ConnectorError::from(e)))?;
+
+        Ok(self
+            .send_tx(tx_req)
+            .map_err(SafeRegistrationError::ProcessingError)
+            .await?
+            .boxed())
     }
 }

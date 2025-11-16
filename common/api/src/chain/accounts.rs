@@ -1,5 +1,3 @@
-use std::fmt::Formatter;
-
 use futures::{future::BoxFuture, stream::BoxStream};
 use hopr_crypto_types::prelude::{OffchainKeypair, OffchainPublicKey};
 pub use hopr_internal_types::prelude::AccountEntry;
@@ -12,24 +10,25 @@ use crate::chain::ChainReceipt;
 /// Error that can occur when making a node announcement.
 ///
 /// See [`ChainWriteAccountOperations::announce`]
-#[derive(Debug, strum::EnumIs, strum::EnumTryAs)]
+#[derive(Debug, strum::EnumIs, strum::EnumTryAs, thiserror::Error)]
 pub enum AnnouncementError<E> {
     /// Special error when an account is already announced.
+    #[error("already announced")]
     AlreadyAnnounced,
     /// Error that can occur when processing an announcement.
+    #[error("account announcement error: {0}")]
     ProcessingError(E),
 }
-
-impl<E: std::fmt::Display> std::fmt::Display for AnnouncementError<E> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AnnouncementError::AlreadyAnnounced => f.write_str("already announced"),
-            AnnouncementError::ProcessingError(e) => write!(f, "account processing error: {e}"),
-        }
-    }
+/// Error that can occur when registering node with a Safe.
+#[derive(Debug, strum::EnumIs, strum::EnumTryAs, thiserror::Error)]
+pub enum SafeRegistrationError<E> {
+    /// Special error when a Safe is already registered.
+    #[error("safe {0} is already registered with this node")]
+    AlreadyRegistered(Address),
+    /// Error that can occur when processing a Safe registration.
+    #[error("safe registration error: {0}")]
+    ProcessingError(E),
 }
-
-impl<E: std::error::Error> std::error::Error for AnnouncementError<E> {}
 
 /// On-chain write operations regarding on-chain node accounts.
 #[async_trait::async_trait]
@@ -55,7 +54,7 @@ pub trait ChainWriteAccountOperations {
     async fn register_safe(
         &self,
         safe_address: &Address,
-    ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, Self::Error>;
+    ) -> Result<BoxFuture<'life0, Result<ChainReceipt, Self::Error>>, SafeRegistrationError<Self::Error>>;
 }
 
 /// Selector for on-chain node accounts.

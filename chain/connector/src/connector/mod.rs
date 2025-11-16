@@ -140,9 +140,9 @@ where
 
     async fn do_connect(&self, timeout: Duration) -> Result<AbortHandle, ConnectorError> {
         const TOLERANCE: f64 = 0.01;
-        let num_accounts = (self.client.count_accounts(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
-        let num_channels = (self.client.count_channels(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
-        tracing::debug!(num_accounts, num_channels, "connection thresholds");
+        let min_accounts = (self.client.count_accounts(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
+        let min_channels = (self.client.count_channels(None).await? as f64 * (1.0 - TOLERANCE)).round() as u32;
+        tracing::debug!(min_accounts, min_channels, "connection thresholds");
 
         let (abort_handle, abort_reg) = AbortHandle::new_pair();
 
@@ -224,6 +224,10 @@ where
 
             let mut account_counter = 0;
             let mut channel_counter = 0;
+            if min_channels == 0 && min_channels == 0 {
+                tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
+                let _ = connection_ready_tx.take().unwrap().send(Ok(()));
+            }
 
             futures::stream::Abortable::new((account_stream, channel_stream).merge(), abort_reg)
                 .inspect_ok(move |event_type| {
@@ -237,7 +241,7 @@ where
                         // Send the completion notification
                         // once we reach the expected number of accounts and channels with
                         // the given tolerance
-                        if account_counter >= num_accounts && channel_counter >= num_channels
+                        if account_counter >= min_accounts && channel_counter >= min_channels
                         {
                             tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
                             let _ = connection_ready_tx.take().unwrap().send(Ok(()));
@@ -323,6 +327,7 @@ where
                 }
                 Err(_) => {
                     abort_handle.abort();
+                    tracing::error!(min_accounts, min_channels, "connection timeout when syncing");
                     Err(ConnectorError::ConnectionTimeout)
                 }
             })
@@ -353,6 +358,7 @@ where
 
         self.connection_handle = Some(abort_handle);
 
+        tracing::info!(node = %self.chain_key.public().to_address(), "connected to chain as node");
         Ok(())
     }
 

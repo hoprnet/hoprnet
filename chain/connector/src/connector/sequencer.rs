@@ -42,6 +42,8 @@ where
         let (sender, receiver) = futures::channel::mpsc::channel(1024);
         self.sender = Some(sender);
 
+        tracing::debug!(tx_count, signer = %self.signer.public().to_address(), "starting transaction sequencer");
+
         let nonce_load = self.nonce.clone();
         let nonce_inc = self.nonce.clone();
         let client = self.client.clone();
@@ -74,8 +76,8 @@ where
                     // rejection.
                     if res.is_ok()
                         || res
-                            .as_ref()
-                            .is_err_and(|error| error.as_transaction_rejection_error().is_none())
+                        .as_ref()
+                        .is_err_and(|error| error.as_transaction_rejection_error().is_none())
                     {
                         nonce_inc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
@@ -86,7 +88,8 @@ where
                         );
                     }
                     futures::future::ready(())
-                }),
+                })
+                .inspect(|_| tracing::warn!("transaction sequencer queue stopped")),
         );
 
         Ok(())
@@ -105,20 +108,20 @@ where
         transaction: R,
         timeout_until_finalized: std::time::Duration,
     ) -> errors::Result<impl Future<Output = errors::Result<blokli_client::api::types::Transaction>>> {
-        let sender = self
+        let mut sender = self
             .sender
-            .as_ref()
+            .clone()
             .ok_or(ConnectorError::InvalidState("transaction sender not started"))?;
 
         let (notifier_tx, notifier_rx) = futures::channel::oneshot::channel();
 
         sender
-            .clone()
             .send((transaction, notifier_tx))
             .await
             .map_err(|_| ConnectorError::InvalidState("transaction queue dropped"))?;
 
         Ok(notifier_rx
+            .inspect_ok(|res| tracing::debug!(?res, "transaction tracking id received"))
             .map(move |result| {
                 result
                     .map_err(|_| ConnectorError::InvalidState("transaction notifier dropped"))
@@ -128,6 +131,7 @@ where
                 self.client
                     .track_transaction(tx_id, timeout)
                     .map_err(ConnectorError::from)
+                    .inspect(|res| tracing::debug!(?res, "transaction tracking done"))
             }))
     }
 }

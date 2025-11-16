@@ -4,7 +4,7 @@ use rstest::rstest;
 use serial_test::serial;
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(
     #[future(awt)] cluster_fixture: ClusterGuard,

@@ -7,8 +7,8 @@ use hopr_db_node::HoprNodeDb;
 use hopr_primitive_types::prelude::*;
 use hopr_transport::Hash;
 use tokio::time::sleep;
-
-use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude, testing::TestingConnector};
+use hopr_async_runtime::AbortableList;
+use crate::{Address, ChannelEntry, ChannelStatus, Hopr, PeerId, prelude, testing::TestingConnector, HoprTransportIO, HoprLibProcess};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NodeSafeConfig {
@@ -16,68 +16,76 @@ pub struct NodeSafeConfig {
     pub module_address: Address,
 }
 
+pub async fn create_hopr_instance(
+    chain_key: ChainKeypair,
+    offchain_key: OffchainKeypair,
+    host_port: u16,
+    node_db: HoprNodeDb,
+    connector: TestingConnector,
+    safe: NodeSafeConfig,
+    winn_prob: Option<f64>,
+) -> Hopr<TestingConnector, HoprNodeDb> {
+    Hopr::new(
+        crate::config::HoprLibConfig {
+            probe: crate::config::ProbeConfig {
+                timeout: Duration::from_secs(2),
+                max_parallel_probes: 10,
+                recheck_threshold: Duration::from_secs(1),
+                ..Default::default()
+            },
+            network_options: crate::config::NetworkConfig {
+                ignore_timeframe: Duration::from_secs(0),
+                ..Default::default()
+            },
+            host: crate::config::HostConfig {
+                address: crate::config::HostType::default(),
+                port: host_port,
+            },
+            safe_module: crate::config::SafeModule {
+                safe_address: safe.safe_address,
+                module_address: safe.module_address,
+                ..Default::default()
+            },
+            transport: crate::config::TransportConfig {
+                prefer_local_addresses: true,
+                announce_local_addresses: true,
+            },
+            session: hopr_transport::config::SessionGlobalConfig {
+                idle_timeout: Duration::from_millis(2500),
+                ..Default::default()
+            },
+            protocol: hopr_transport::config::ProtocolConfig {
+                outgoing_ticket_winning_prob: winn_prob,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        connector,
+        node_db,
+        &offchain_key,
+        &chain_key,
+    )
+        .await
+        .expect(format!("failed to create hopr instance on port {host_port}").as_str())
+}
+
 pub struct TestedHopr {
+    /// Tokio runtime in which all long-running tasks of the HOPR node are spawned.
+    ///
+    /// This includes what's in `processes` and a few additional tasks.
+    pub runtime: tokio::runtime::Runtime,
+    /// HOPR instance that is used for testing.
     pub instance: Arc<Hopr<TestingConnector, HoprNodeDb>>,
+    /// Transport socket that can be used to send and receive data via the HOPR node.
+    pub socket: HoprTransportIO,
+    /// List of abortable processes spawned by the HOPR node.
+    ///
+    /// NOTE: this is NOT the list of all HOPR processes, as there are
+    /// additional ones that abort themselves automatically.
+    pub processes: AbortableList<HoprLibProcess>,
 }
 
 impl TestedHopr {
-    pub async fn new(
-        chain_key: ChainKeypair,
-        offchain_key: OffchainKeypair,
-        host_port: u16,
-        node_db: HoprNodeDb,
-        connector: TestingConnector,
-        safe: NodeSafeConfig,
-        winn_prob: Option<f64>,
-    ) -> Self {
-        let instance = Hopr::new(
-            crate::config::HoprLibConfig {
-                probe: crate::config::ProbeConfig {
-                    timeout: Duration::from_secs(2),
-                    max_parallel_probes: 10,
-                    recheck_threshold: Duration::from_secs(1),
-                    ..Default::default()
-                },
-                network_options: crate::config::NetworkConfig {
-                    ignore_timeframe: Duration::from_secs(0),
-                    ..Default::default()
-                },
-                host: crate::config::HostConfig {
-                    address: crate::config::HostType::default(),
-                    port: host_port,
-                },
-                safe_module: crate::config::SafeModule {
-                    safe_address: safe.safe_address,
-                    module_address: safe.module_address,
-                    ..Default::default()
-                },
-                transport: crate::config::TransportConfig {
-                    prefer_local_addresses: true,
-                    announce_local_addresses: true,
-                },
-                session: hopr_transport::config::SessionGlobalConfig {
-                    idle_timeout: Duration::from_millis(2500),
-                    ..Default::default()
-                },
-                protocol: hopr_transport::config::ProtocolConfig {
-                    outgoing_ticket_winning_prob: winn_prob,
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            connector,
-            node_db,
-            &offchain_key,
-            &chain_key,
-        )
-        .await
-        .expect(format!("failed to create hopr instance on port {host_port}").as_str());
-
-        Self {
-            instance: std::sync::Arc::new(instance),
-        }
-    }
-
     pub fn inner(&self) -> &Hopr<TestingConnector, HoprNodeDb> {
         &self.instance
     }
