@@ -1,6 +1,7 @@
 use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
+use hopr_internal_types::prelude::WinningProbability;
 use hopr_lib::{
     ChannelId,
     testing::{
@@ -14,7 +15,7 @@ use serial_test::serial;
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{HoprBalance, WxHOPR, XDai, XDaiBalance};
@@ -72,7 +73,7 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyho
 // }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     use hopr_lib::{ChannelStatus, HoprBalance};
@@ -84,7 +85,7 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
         cluster_fixture[src]
             .outgoing_channels_by_status(ChannelStatus::Open)
             .await
-            .context("failed to get channels from src node")?
+            .context("failed to get initial channels from src node")?
             .is_empty()
     );
 
@@ -121,14 +122,14 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
         .status
     {
         ChannelStatus::PendingToClose(_) => (),
-        _ => panic!("channel should be in PendingToClose state"),
+        _ => panic!("channel {} should be in PendingToClose state", channel.channel_id),
     }
 
     Ok(())
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn channel_funding_should_be_visible_in_channel_stake(
     #[future(awt)] cluster_fixture: ClusterGuard,
@@ -160,7 +161,7 @@ async fn channel_funding_should_be_visible_in_channel_stake(
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn test_channel_retrieval(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, ext, dst] = exclusive_indexes::<3>();
@@ -204,7 +205,7 @@ async fn test_channel_retrieval(#[future(awt)] cluster_fixture: ClusterGuard) ->
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = exclusive_indexes::<2>();
@@ -247,7 +248,7 @@ async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> a
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn ticket_price_is_set_to_non_zero_value_on_start(
     #[future(awt)] cluster_fixture: ClusterGuard,
@@ -266,7 +267,7 @@ async fn ticket_price_is_set_to_non_zero_value_on_start(
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [node] = exclusive_indexes::<1>();
@@ -284,7 +285,7 @@ async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: C
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [node] = exclusive_indexes_not_auto_redeeming::<1>();
@@ -295,7 +296,7 @@ async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: Cluster
         .await
         .context("failed to get winning probability")?;
 
-    assert!(winning_prob.as_f64() == 1.0);
+    assert!(winning_prob.approx_eq(&WinningProbability::ALWAYS));
 
     Ok(())
 }

@@ -216,10 +216,7 @@ async fn init_blokli_connector(
             ..Default::default()
         },
         BlokliClient::new(
-            cfg.provider
-                .as_deref()
-                .unwrap_or(DEFAULT_BLOKLI_URL)
-                .parse()?,
+            cfg.provider.as_deref().unwrap_or(DEFAULT_BLOKLI_URL).parse()?,
             BlokliClientConfig {
                 timeout: std::time::Duration::from_secs(5),
             },

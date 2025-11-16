@@ -59,6 +59,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
         let (action, sender) = ParsedHoprChainAction::parse_from_eip2718(signed_tx, &self.0, &addresses)
             .map_err(|e| blokli_client::errors::ErrorKind::MockClientError(e.into()))?;
+        tracing::debug!(%sender, ?action, "parsed action from signed transaction");
 
         match &action {
             ParsedHoprChainAction::RegisterSafeAddress(safe_address) => {

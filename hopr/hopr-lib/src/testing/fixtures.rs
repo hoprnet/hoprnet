@@ -356,6 +356,8 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
     .await
     .expect("connectivity wait failed");
 
+    info!("CLUSTER STARTED");
+
     ClusterGuard {
         cluster: hopr_instances,
         chain_client: chainenv_fixture,

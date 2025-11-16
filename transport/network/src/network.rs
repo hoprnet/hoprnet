@@ -136,8 +136,7 @@ where
         }
 
         // Filter out private addresses before storing
-        addrs
-            .retain(|a| self.cfg.allow_private_addresses_in_store || is_public_address(a));
+        addrs.retain(|a| self.cfg.allow_private_addresses_in_store || is_public_address(a));
 
         debug!(%peer, %origin, multiaddresses = ?addrs, "Filtered addresses, proceeding with public addresses only");
 

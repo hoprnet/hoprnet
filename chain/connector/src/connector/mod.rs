@@ -157,6 +157,12 @@ where
         let me = self.chain_key.public().to_address();
         let values_cache = self.values.clone();
 
+        let chain_to_packet = self.chain_to_packet.clone();
+        let packet_to_chain = self.packet_to_chain.clone();
+
+        let channel_by_id = self.channel_by_id.clone();
+        let channel_by_parties = self.channel_by_parties.clone();
+
         #[allow(unused, clippy::large_enum_variant)]
         enum SubscribedEventType {
             Account((AccountEntry, Option<AccountEntry>)),
@@ -184,17 +190,30 @@ where
                 .try_filter_map(|account| futures::future::ready(model_to_account_entry(account).map(Some)))
                 .and_then(move |account| {
                     let mapper = mapper.clone();
+                    let chain_to_packet = chain_to_packet.clone();
+                    let packet_to_chain = packet_to_chain.clone();
                     hopr_async_runtime::prelude::spawn_blocking(move || {
                         mapper.key_to_id.insert(account.public_key, Some(account.key_id));
                         mapper.id_to_key.insert(account.key_id, Some(account.public_key));
                         mapper.backend.insert_account(account.clone()).map(|old| (account, old))
                     })
                     .map_err(|e| ConnectorError::BackendError(e.into()))
-                    .and_then(|res| {
-                        futures::future::ready(
+                    .and_then(move |res| {
+                        let chain_to_packet = chain_to_packet.clone();
+                        let packet_to_chain = packet_to_chain.clone();
+                        async move {
+                            if let Ok((account, _)) = &res {
+                                // Rather update the cached entry than invalidating it
+                                chain_to_packet
+                                    .insert(account.chain_addr, Some(account.public_key))
+                                    .await;
+                                packet_to_chain
+                                    .insert(account.public_key, Some(account.chain_addr))
+                                    .await;
+                            }
                             res.map(SubscribedEventType::Account)
-                                .map_err(|e| ConnectorError::BackendError(e.into())),
-                        )
+                                .map_err(|e| ConnectorError::BackendError(e.into()))
+                        }
                     })
                 })
                 .fuse();
@@ -206,6 +225,8 @@ where
                 .and_then(move |(src, dst, channel)| {
                     let graph = graph.clone();
                     let backend = backend.clone();
+                    let channel_by_id = channel_by_id.clone();
+                    let channel_by_parties = channel_by_parties.clone();
                     hopr_async_runtime::prelude::spawn_blocking(move || {
                         graph.write().add_edge(src.key_id, dst.key_id, channel.get_id());
                         backend
@@ -213,11 +234,20 @@ where
                             .map(|old| (channel, old.map(|old| old.diff(&channel))))
                     })
                     .map_err(|e| ConnectorError::BackendError(e.into()))
-                    .and_then(|res| {
-                        futures::future::ready(
+                    .and_then(move |res| {
+                        let channel_by_id = channel_by_id.clone();
+                        let channel_by_parties = channel_by_parties.clone();
+                        async move {
+                            if let Ok((channel, _)) = &res {
+                                // Rather update the cached entry than invalidating it
+                                channel_by_id.insert(channel.get_id(), Some(channel.clone())).await;
+                                channel_by_parties
+                                    .insert(ChannelParties::from(channel), Some(channel.clone()))
+                                    .await;
+                            }
                             res.map(SubscribedEventType::Channel)
-                                .map_err(|e| ConnectorError::BackendError(e.into())),
-                        )
+                                .map_err(|e| ConnectorError::BackendError(e.into()))
+                        }
                     })
                 })
                 .fuse();

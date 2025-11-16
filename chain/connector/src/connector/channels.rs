@@ -72,8 +72,8 @@ where
         self.check_connection_state()?;
 
         // Note: Since the graph does not contain Closed channels, they cannot
-        // be selected if requested via the ChannelSelector.
-        if selector.allowed_states.contains(&ChannelStatusDiscriminants::Closed) {
+        // be selected if requested solely via the ChannelSelector.
+        if selector.allowed_states == &[ChannelStatusDiscriminants::Closed] {
             return Err(ConnectorError::InvalidArguments("cannot stream closed channels"));
         }
 
