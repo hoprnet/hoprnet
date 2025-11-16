@@ -63,7 +63,12 @@ use hopr_transport_probe::{
     neighbors::ImmediateNeighborProber,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
+pub use hopr_transport_probe::{
+    errors::ProbeError,
+    ping::PingQueryReplier,
+    traits::TrafficGeneration,
+    types::{NeighborTelemetry, Telemetry},
+};
 use hopr_transport_protocol::processor::PacketInteractionConfig;
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
 pub use hopr_transport_session as session;
@@ -216,8 +221,9 @@ where
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
-    pub async fn run<S>(
+    pub async fn run<S, Ct>(
         &self,
+        cover_traffic: Option<Ct>,
         discovery_updates: S,
         on_incoming_session: Sender<IncomingSession>,
     ) -> crate::errors::Result<(
@@ -229,6 +235,7 @@ where
     )>
     where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
+        Ct: TrafficGeneration + Send + Sync + 'static,
     {
         info!("Loading initial peers from the chain");
         let public_nodes = self
@@ -546,23 +553,34 @@ where
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
         let probe = Probe::new(self.cfg.probe);
-        for (k, v) in probe
-            .continuously_scan(
-                (unresolved_routing_msg_tx.clone(), rx_from_protocol),
-                manual_ping_rx,
-                tx_from_probing,
-                ImmediateNeighborProber::new(
-                    self.cfg.probe,
-                    network_notifier::ProbeNetworkInteractions::new(
-                        self.network.clone(),
-                        self.resolver.clone(),
-                        self.path_planner.channel_graph(),
+        let probing_processes = if let Some(ct) = cover_traffic {
+            probe
+                .continuously_scan(
+                    (unresolved_routing_msg_tx.clone(), rx_from_protocol),
+                    manual_ping_rx,
+                    tx_from_probing,
+                    ct,
+                )
+                .await
+        } else {
+            probe
+                .continuously_scan(
+                    (unresolved_routing_msg_tx.clone(), rx_from_protocol),
+                    manual_ping_rx,
+                    tx_from_probing,
+                    ImmediateNeighborProber::new(
+                        self.cfg.probe,
+                        network_notifier::ProbeNetworkInteractions::new(
+                            self.network.clone(),
+                            self.resolver.clone(),
+                            self.path_planner.channel_graph(),
+                        ),
                     ),
-                ),
-            )
-            .await
-            .into_iter()
-        {
+                )
+                .await
+        };
+
+        for (k, v) in probing_processes.into_iter() {
             processes.insert(HoprTransportProcess::Probing(k), v);
         }
 

@@ -27,7 +27,13 @@ pub mod probe;
 pub mod traits;
 pub mod types;
 
-pub use crate::{config::ProbeConfig, content::Message as TrafficReturnedObservation, probe::Probe};
+pub use crate::{
+    config::ProbeConfig,
+    content::Message as TrafficReturnedObservation,
+    probe::Probe,
+    traits::TrafficGeneration,
+    types::{NeighborTelemetry, Telemetry},
+};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprProbeProcess {
