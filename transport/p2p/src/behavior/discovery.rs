@@ -35,10 +35,11 @@ pub struct Behaviour {
     >,
     bootstrap_peers: HashMap<PeerId, Vec<Multiaddr>>,
     connected_peers: HashMap<PeerId, usize>,
+    allow_private_addresses: bool,
 }
 
 impl Behaviour {
-    pub fn new<T>(me: PeerId, onchain_events: T) -> Self
+    pub fn new<T>(me: PeerId, onchain_events: T, allow_private_addresses: bool) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
@@ -48,6 +49,7 @@ impl Behaviour {
             bootstrap_peers: HashMap::new(),
             pending_events: VecDeque::new(),
             connected_peers: HashMap::new(),
+            allow_private_addresses,
         }
     }
 }
@@ -188,7 +190,7 @@ impl NetworkBehaviour for Behaviour {
 
                         // Filter out private addresses before adding to pending events and peer store
                         let public_addresses: HashSet<_> = multiaddresses.into_iter()
-                            .filter(is_public_address)
+                            .filter(|a| self.allow_private_addresses || is_public_address(a))
                             .collect();
 
                         let filtered_count = multiaddress_count - public_addresses.len();

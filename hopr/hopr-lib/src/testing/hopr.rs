@@ -37,6 +37,7 @@ pub async fn create_hopr_instance(
             },
             network_options: crate::config::NetworkConfig {
                 ignore_timeframe: Duration::from_secs(0),
+                allow_private_addresses_in_store: true,
                 ..Default::default()
             },
             host: crate::config::HostConfig {

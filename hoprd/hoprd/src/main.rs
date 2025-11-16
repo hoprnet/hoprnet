@@ -335,16 +335,6 @@ async fn main_inner() -> anyhow::Result<()> {
         info!("The HOPRd node appears to run on DappNode");
     }
 
-    if let hopr_lib::config::HostType::IPv4(address) = &cfg.hopr.host.address {
-        let ipv4 = std::net::Ipv4Addr::from_str(address).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
-
-        if ipv4.is_loopback() && !cfg.hopr.transport.announce_local_addresses {
-            Err(hopr_lib::errors::HoprLibError::GeneralError(
-                "Cannot announce a loopback address".into(),
-            ))?;
-        }
-    }
-
     // Find or create an identity
     let hopr_keys: HoprKeys = match &cfg.identity.private_key {
         Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },

@@ -501,10 +501,18 @@ where
 
         // Only public nodes announce multiaddresses
         let multiaddresses_to_announce = if self.is_public() {
+            // The multiaddresses are filtered for the non-private ones,
+            // unless `announce_local_addresses` is set to `true`.
             self.transport_api.announceable_multiaddresses()
         } else {
             Vec::with_capacity(0)
         };
+
+        // Warn when announcing a private multiaddress, which is acceptable in certain scenarios
+        multiaddresses_to_announce
+            .iter()
+            .filter(|a| !is_public_address(a))
+            .for_each(|multi_addr| tracing::warn!(?multi_addr, "announcing private multiaddress"));
 
         // At this point the node is already registered with Safe, so
         // we can announce via Safe-compliant TX

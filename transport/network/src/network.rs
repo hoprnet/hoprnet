@@ -78,7 +78,7 @@ pub enum UpdateFailure {
 }
 
 /// The network object storing information about the running observed state of the network,
-/// including peers, connection qualities and updates for other parts of the system.
+/// including peers, connection qualities, and updates for other parts of the system.
 #[derive(Debug)]
 pub struct Network<T> {
     me: PeerId,
@@ -127,9 +127,8 @@ where
     /// Each peer must have an origin specification.
     ///
     /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out before storing
-    /// to prevent private addresses from entering the peer store. This filtering can be disabled
-    /// by setting the `HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES` env variable
-    /// to `true`.
+    /// to prevent private addresses from entering the peer store,
+    /// unless [`NetworkConfig::allow_private_addresses_in_store`] is set.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn add(&self, peer: &PeerId, origin: PeerOrigin, mut addrs: Vec<Multiaddr>) -> Result<()> {
         if peer == &self.me {
@@ -137,7 +136,10 @@ where
         }
 
         // Filter out private addresses before storing
-        addrs = addrs.into_iter().filter(is_public_address).collect();
+        addrs = addrs
+            .into_iter()
+            .filter(|a| self.cfg.allow_private_addresses_in_store || is_public_address(a))
+            .collect();
 
         debug!(%peer, %origin, multiaddresses = ?addrs, "Filtered addresses, proceeding with public addresses only");
 
@@ -195,9 +197,8 @@ where
     /// Get peer information and status.
     ///
     /// Private multiaddresses (RFC1918, loopback, link-local) are filtered out from the returned
-    /// PeerStatus to prevent exposure through public APIs. This filtering can be disabled by
-    /// setting the `HOPR_INTERNAL_TRANSPORT_ACCEPT_PRIVATE_NETWORK_IP_ADDRESSES` env variable
-    /// to `true`.
+    /// PeerStatus to prevent exposure through public APIs,
+    /// unless [`NetworkConfig::allow_private_addresses_in_store`] is set.
     #[tracing::instrument(level = "debug", skip(self), ret(level = "trace"), err)]
     pub async fn get(&self, peer: &PeerId) -> Result<Option<PeerStatus>> {
         if peer == &self.me {
@@ -207,7 +208,7 @@ where
                 ps.multiaddresses = self
                     .me_addresses
                     .iter()
-                    .filter(|addr| is_public_address(addr))
+                    .filter(|addr| self.cfg.allow_private_addresses_in_store || is_public_address(addr))
                     .cloned()
                     .collect();
                 ps
@@ -225,7 +226,7 @@ where
                     peer_status.multiaddresses = peer_status
                         .multiaddresses
                         .iter()
-                        .filter(|addr| is_public_address(addr))
+                        .filter(|addr| self.cfg.allow_private_addresses_in_store || is_public_address(addr))
                         .cloned()
                         .collect();
                     Ok(Some(peer_status))

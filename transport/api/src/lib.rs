@@ -352,8 +352,13 @@ where
             (tx, rx)
         };
 
-        let transport_layer =
-            HoprSwarm::new((&self.me).into(), discovery_updates, self.my_multiaddresses.clone()).await;
+        let transport_layer = HoprSwarm::new(
+            (&self.me).into(),
+            discovery_updates,
+            self.my_multiaddresses.clone(),
+            self.cfg.transport.prefer_local_addresses,
+        )
+        .await;
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
@@ -680,8 +685,7 @@ where
             .into_iter()
             .filter(|ma| {
                 hopr_transport_identity::multiaddrs::is_supported(ma)
-                    && (self.cfg.transport.announce_local_addresses
-                        || !hopr_transport_identity::multiaddrs::is_private(ma))
+                    && (self.cfg.transport.announce_local_addresses || is_public_address(ma))
             })
             .map(|ma| strip_p2p_protocol(&ma))
             .filter(|v| !v.is_empty())
