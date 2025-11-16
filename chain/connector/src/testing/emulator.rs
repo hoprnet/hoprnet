@@ -62,14 +62,13 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
         match &action {
             ParsedHoprChainAction::RegisterSafeAddress(safe_address) => {
-                state
-                    .get_account_mut(&sender.into())
-                    .ok_or(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                        "missing account for {sender}"
-                    )))?
-                    .safe_address = Some(hex::encode(safe_address));
-
-                tracing::debug!(%sender, %safe_address, "registered safe address");
+                if let Some(account) = state.get_account_mut(&sender.into()) {
+                    account.safe_address = Some(hex::encode(safe_address));
+                    tracing::debug!(%sender, %safe_address, "registered safe address to account");
+                } else {
+                    state.unpaired_safes.insert(hex::encode(sender), hex::encode(safe_address));
+                    tracing::debug!(%sender, %safe_address, "registered safe address without account");
+                }
             }
             ParsedHoprChainAction::Announce {
                 packet_key,
@@ -87,6 +86,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
                             .into());
                         }
                     }
+                    tracing::debug!(%sender, %packet_key, ?multiaddress, "node re-announced");
                 } else {
                     let next_key_id = state.accounts.keys().max().map(|k| k + 1).unwrap_or(1);
                     state.accounts.insert(
@@ -96,12 +96,11 @@ impl BlokliTestStateMutator for FullStateEmulator {
                             keyid: next_key_id as i32,
                             multi_addresses: multiaddress.iter().map(|a| a.to_string()).collect(),
                             packet_key: hex::encode(packet_key),
-                            safe_address: None,
+                            safe_address: state.unpaired_safes.shift_remove(&hex::encode(sender)),
                         },
                     );
+                    tracing::debug!(%sender, %packet_key, ?multiaddress, "node announced");
                 }
-
-                tracing::debug!(%sender, %packet_key, ?multiaddress, "node announced");
             }
             ParsedHoprChainAction::WithdrawNative(destination, amount) => {
                 let balance = state.native_balances.get_mut(&hex::encode(sender)).ok_or(
