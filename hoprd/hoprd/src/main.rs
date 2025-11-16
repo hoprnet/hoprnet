@@ -217,8 +217,7 @@ async fn init_blokli_connector(
         },
         BlokliClient::new(
             cfg.provider
-                .as_ref()
-                .map(|s| s.as_str())
+                .as_deref()
                 .unwrap_or(DEFAULT_BLOKLI_URL)
                 .parse()?,
             BlokliClientConfig {
