@@ -271,7 +271,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
             let onchain_keys = onchain_keys.clone();
             let offchain_keys = offchain_keys.clone();
             let safes = safes.clone();
-            let do_auto_redeem = i % 2 != 0; // every other node does auto redeem and uses a custom winn_prob
+            let lower_win_prob = i % 2 != 0; // every other node uses a lower winn_prob
 
             let blokli_client = chainenv_fixture
                 .clone()
@@ -299,6 +299,8 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                         .await
                         .expect("failed to create HoprNodeDb for node");
 
+                    blokli_client.update_price_and_win_prob(None, lower_win_prob.then_some(0.2));
+
                     let mut connector = create_trustful_hopr_blokli_connector(
                         &onchain_keys[i],
                         BlockchainConnectorConfig::default(),
@@ -320,7 +322,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                         node_db,
                         std::sync::Arc::new(connector),
                         safes[i],
-                        if do_auto_redeem { Some(0.2) } else { None },
+                        lower_win_prob.then_some(0.2),
                     )
                     .await;
 
@@ -338,6 +340,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
             .join()
             .map_err(|_| anyhow::anyhow!("hopr node starting thread panicked"))
             .and_then(identity)
+            .inspect_err(|error| tracing::error!(%error, "hopr node failed to start"))
         })
         .collect::<Result<Vec<_>, _>>()
         .expect("one or more HOPR nodes could not be created");
