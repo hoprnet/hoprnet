@@ -327,15 +327,10 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                     .await;
 
                     let socket = instance.run(EchoServer::new()).await?;
-
-                    anyhow::Ok((std::sync::Arc::new(instance), socket))
+                    anyhow::Ok((instance, socket))
                 });
 
-                result.map(|(instance, socket)| TestedHopr {
-                    runtime: Some(runtime),
-                    instance,
-                    socket,
-                })
+                result.map(|(instance, socket)| TestedHopr::new(runtime, instance, socket))
             })
             .join()
             .map_err(|_| anyhow::anyhow!("hopr node starting thread panicked"))
@@ -381,7 +376,7 @@ async fn wait_for_connectivity(instance: &TestedHopr) {
             break;
         }
 
-        tracing::debug!(
+        tracing::trace!(
             "{} peers connected on {}, waiting for full mesh",
             peers.len(),
             instance.instance.me_onchain()
@@ -401,6 +396,11 @@ async fn wait_for_status(instance: &TestedHopr, expected_status: &HoprState) {
         if &status == expected_status {
             break;
         }
+
+        tracing::trace!(
+            "{status} on {}, waiting for {expected_status}",
+            instance.instance.me_onchain()
+        );
         sleep(Duration::from_secs(1)).await;
     }
 }

@@ -8,7 +8,9 @@ use hopr_primitive_types::prelude::*;
 use hopr_transport::Hash;
 use tokio::time::sleep;
 
-use crate::{Address, ChannelEntry, ChannelStatus, Hopr, HoprTransportIO, PeerId, prelude, testing::TestingConnector};
+use crate::{
+    Address, ChannelEntry, ChannelStatus, Hopr, HoprState, HoprTransportIO, PeerId, prelude, testing::TestingConnector,
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct NodeSafeConfig {
@@ -71,16 +73,32 @@ pub async fn create_hopr_instance(
 }
 
 pub struct TestedHopr {
-    /// Tokio runtime in which all long-running tasks of the HOPR node are spawned.
-    pub runtime: Option<tokio::runtime::Runtime>,
+    // Tokio runtime in which all long-running tasks of the HOPR node are spawned.
+    runtime: Option<tokio::runtime::Runtime>,
     /// HOPR instance that is used for testing.
     pub instance: Arc<Hopr<TestingConnector, HoprNodeDb>>,
     /// Transport socket that can be used to send and receive data via the HOPR node.
     pub socket: HoprTransportIO,
 }
 
+impl TestedHopr {
+    pub fn new(
+        runtime: tokio::runtime::Runtime,
+        instance: Hopr<TestingConnector, HoprNodeDb>,
+        socket: HoprTransportIO,
+    ) -> Self {
+        assert_eq!(HoprState::Running, instance.status(), "hopr instance must be running");
+        Self {
+            runtime: Some(runtime),
+            instance: Arc::new(instance),
+            socket,
+        }
+    }
+}
+
 impl Drop for TestedHopr {
     fn drop(&mut self) {
+        let _ = self.instance.shutdown();
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_background();
         }

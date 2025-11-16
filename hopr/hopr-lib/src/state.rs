@@ -8,9 +8,8 @@ use crate::exports::transport::HoprTransportProcess;
 pub enum HoprState {
     Uninitialized = 0,
     Initializing = 1,
-    Indexing = 2,
-    Starting = 3,
-    Running = 4,
+    Running = 2,
+    Terminated = 3,
 }
 
 impl std::fmt::Display for HoprState {
@@ -29,4 +28,8 @@ pub enum HoprLibProcess {
     SessionServer,
     #[strum(to_string = "flush operation of outgoing ticket indices to the DB")]
     TicketIndexFlush,
+    #[strum(to_string = "driver of the ticket redemption queue")]
+    TicketRedemptions,
+    #[strum(to_string = "subscription process for chain events")]
+    ChainSubscription,
 }
