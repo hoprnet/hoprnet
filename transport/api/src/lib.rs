@@ -46,9 +46,8 @@ pub use hopr_crypto_types::{
 };
 pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::DestinationRouting;
 pub use hopr_network_types::prelude::RoutingOptions;
-use hopr_network_types::prelude::*;
+use hopr_network_types::prelude::{DestinationRouting, *};
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
@@ -561,8 +560,9 @@ where
                     manual_ping_rx,
                     tx_from_probing,
                     ImmediateNeighborProber::new(
-                        self.cfg.probe,network_notifier::ProbeNetworkInteractions::new(self.network.clone()),
-                ),
+                        self.cfg.probe,
+                        network_notifier::ProbeNetworkInteractions::new(self.network.clone()),
+                    ),
                 )
                 .await
         };

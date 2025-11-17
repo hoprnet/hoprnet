@@ -603,7 +603,8 @@ where
 
         let (hopr_socket, transport_processes) = self
             .transport_api
-            .run(cover_traffic,indexer_peer_update_rx, session_tx).await?;
+            .run(cover_traffic, indexer_peer_update_rx, session_tx)
+            .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
         info!("starting outgoing ticket flush process");

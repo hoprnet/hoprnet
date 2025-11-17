@@ -51,6 +51,7 @@ alloy = { version = "=1.0.42", default-features = false, features = [
   "k256",
   "std",
 ] }
+ahash = "0.8.12"
 anyhow = "1.0.100"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
@@ -101,7 +102,7 @@ hex-literal = "1.1.0"
 hickory-resolver = "0.25.2"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
 insta = { version = "1.43.2", features = ["json", "yaml"] }
-indexmap = {version = "2.12.0", features = ["serde", "rayon"]}
+indexmap = { version = "2.12.0", features = ["serde", "rayon"] }
 k256 = { version = "0.13.4", features = [
   "arithmetic",
   "ecdh",

@@ -5,7 +5,7 @@ use futures_concurrency::stream::StreamExt as _;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::types::ResolvedTransportRouting;
+use hopr_network_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::traits::AsUnixTimestamp;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
