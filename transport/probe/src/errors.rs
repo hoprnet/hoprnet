@@ -3,8 +3,11 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ProbeError {
-    #[error("the network operation timed out after {0} seconds")]
-    Timeout(u64),
+    #[error("the network operation timed out for peer {0:?}")]
+    ProbeNeighborTimeout(PeerId),
+
+    #[error("failed loopback probe")]
+    ProbeLoopbackTimeout(crate::content::PathTelemetry),
 
     #[error("error while decoding message data")]
     DecodingError,

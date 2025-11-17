@@ -390,11 +390,11 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: TestChainEnv) -> C
     }
 
     // Run all nodes in parallel
-    futures::future::join_all(
-        hopr_instances
-            .iter()
-            .map(|instance| instance.inner().run(EchoServer::new())),
-    )
+    futures::future::join_all(hopr_instances.iter().map(|instance| {
+        instance
+            .inner()
+            .run(None::<crate::DummyCoverTrafficType>, EchoServer::new())
+    }))
     .await;
     // Wait for all nodes to reach the 'Running' state
     let res = futures::future::join_all(hopr_instances.iter().map(|instance| {
