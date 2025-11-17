@@ -41,7 +41,8 @@ members = [
 ]
 
 [workspace.dependencies]
-ahash = "0.8.12"
+# Keep pinned to v1.0.42, which is also used by hopr-bindings and blokli.
+# If updated, also update blokli and hopr-bindings.
 alloy = { version = "=1.0.42", default-features = false, features = [
   "essentials",
   "json-rpc",

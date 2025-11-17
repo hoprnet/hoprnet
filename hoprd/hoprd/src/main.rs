@@ -373,10 +373,10 @@ async fn main_inner() -> anyhow::Result<()> {
     }
 
     let _hopr_socket = node
-        .run(HoprServerIpForwardingReactor::new(
-            hopr_keys.packet_key.clone(),
-            cfg.session_ip_forwarding,
-        ))
+        .run(
+            None::<hopr_lib::DummyCoverTrafficType>,
+            HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
+        )
         .await?;
 
     let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(

@@ -125,6 +125,31 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+pub struct DummyCoverTrafficType {
+    #[allow(dead_code)]
+    _unconstructable: (),
+}
+
+impl TrafficGeneration for DummyCoverTrafficType {
+    fn build(
+        self,
+    ) -> (
+        impl futures::Stream<Item = DestinationRouting> + Send,
+        impl futures::Sink<
+            std::result::Result<hopr_transport::Telemetry, hopr_transport::ProbeError>,
+            Error = impl std::error::Error,
+        > + Send
+        + Sync
+        + Clone
+        + 'static,
+    ) {
+        (
+            futures::stream::empty(),
+            futures::sink::drain::<std::result::Result<hopr_transport::Telemetry, hopr_transport::ProbeError>>(),
+        )
+    }
+}
+
 /// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.
 ///
 /// Divide the available CPU parallelism by 2, since half of the available threads are
@@ -310,11 +335,16 @@ where
     }
 
     pub async fn run<
+        Ct,
         #[cfg(feature = "session-server")] T: traits::session::HoprSessionServer + Clone + Send + 'static,
     >(
         &self,
+        cover_traffic: Option<Ct>,
         #[cfg(feature = "session-server")] serve_handler: T,
-    ) -> errors::Result<HoprTransportIO> {
+    ) -> errors::Result<HoprTransportIO>
+    where
+        Ct: TrafficGeneration + Send + Sync + 'static,
+    {
         self.error_if_not_in_state(
             HoprState::Uninitialized,
             "cannot start the hopr node multiple times".into(),
@@ -570,7 +600,10 @@ where
         }
 
         info!("starting transport");
-        let (hopr_socket, transport_processes) = self.transport_api.run(indexer_peer_update_rx, session_tx).await?;
+
+        let (hopr_socket, transport_processes) = self
+            .transport_api
+            .run(cover_traffic,indexer_peer_update_rx, session_tx).await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
         info!("starting outgoing ticket flush process");

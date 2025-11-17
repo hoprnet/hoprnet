@@ -33,7 +33,6 @@ use futures::{
     FutureExt, SinkExt, StreamExt,
     channel::mpsc::{Sender, channel},
 };
-use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
@@ -47,6 +46,7 @@ pub use hopr_crypto_types::{
 };
 pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::DestinationRouting;
 pub use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -57,10 +57,16 @@ use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network};
 use hopr_transport_p2p::HoprSwarm;
 use hopr_transport_probe::{
-    DbProxy, Probe,
+    Probe,
+    neighbors::ImmediateNeighborProber,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
+pub use hopr_transport_probe::{
+    errors::ProbeError,
+    ping::PingQueryReplier,
+    traits::TrafficGeneration,
+    types::{NeighborTelemetry, Telemetry},
+};
 pub use hopr_transport_protocol::PeerDiscovery;
 use hopr_transport_protocol::processor::PacketInteractionConfig;
 pub use hopr_transport_session as session;
@@ -202,8 +208,9 @@ where
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
-    pub async fn run<S>(
+    pub async fn run<S, Ct>(
         &self,
+        cover_traffic: Option<Ct>,
         discovery_updates: S,
         on_incoming_session: Sender<IncomingSession>,
     ) -> errors::Result<(
@@ -215,6 +222,7 @@ where
     )>
     where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
+        Ct: TrafficGeneration + Send + Sync + 'static,
     {
         info!("Loading initial peers from the chain");
         let public_nodes = self
@@ -309,9 +317,6 @@ where
 
         let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
             channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
-
-        let (resolved_routing_msg_tx, resolved_routing_msg_rx) =
-            channel::<(ResolvedTransportRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         // -- transport medium
         let mixer_cfg = build_mixer_cfg_from_env();
@@ -458,51 +463,49 @@ where
         // sending the external packets to the transport pipeline.
         let path_planner = self.path_planner.clone();
         let distress_threshold = self.db.get_surb_config().distress_threshold;
-        let all_resolved_external_msg_rx = unresolved_routing_msg_rx
-            .filter_map(move |(unresolved, mut data)| {
-                let path_planner = path_planner.clone();
-                async move {
-                    trace!(?unresolved, "resolving routing for packet");
-                    match path_planner
-                        .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
-                        .await
-                    {
-                        Ok((resolved, rem_surbs)) => {
-                            // Set the SURB distress/out-of-SURBs flag if applicable.
-                            // These flags are translated into HOPR protocol packet signals and are
-                            // applicable only on the return path.
-                            let mut signals_to_dst = data
-                                .packet_info
-                                .as_ref()
-                                .map(|info| info.signals_to_destination)
-                                .unwrap_or_default();
+        let all_resolved_external_msg_rx = unresolved_routing_msg_rx.filter_map(move |(unresolved, mut data)| {
+            let path_planner = path_planner.clone();
+            async move {
+                trace!(?unresolved, "resolving routing for packet");
+                match path_planner
+                    .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
+                    .await
+                {
+                    Ok((resolved, rem_surbs)) => {
+                        // Set the SURB distress/out-of-SURBs flag if applicable.
+                        // These flags are translated into HOPR protocol packet signals and are
+                        // applicable only on the return path.
+                        let mut signals_to_dst = data
+                            .packet_info
+                            .as_ref()
+                            .map(|info| info.signals_to_destination)
+                            .unwrap_or_default();
 
-                            if resolved.is_return() {
-                                signals_to_dst = match rem_surbs {
-                                    Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                                        signals_to_dst | PacketSignal::SurbDistress
-                                    }
-                                    Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
-                                    _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
-                                };
-                            } else {
-                                // Unset these flags as they make no sense on the forward path.
-                                signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
-                            }
+                        if resolved.is_return() {
+                            signals_to_dst = match rem_surbs {
+                                Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                                    signals_to_dst | PacketSignal::SurbDistress
+                                }
+                                Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
+                                _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
+                            };
+                        } else {
+                            // Unset these flags as they make no sense on the forward path.
+                            signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
+                        }
 
-                            data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
-                            trace!(?resolved, "resolved routing for packet");
-                            Some((resolved, data))
-                        }
-                        Err(error) => {
-                            error!(%error, "failed to resolve routing");
-                            None
-                        }
+                        data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
+                        trace!(?resolved, "resolved routing for packet");
+                        Some((resolved, data))
+                    }
+                    Err(error) => {
+                        error!(%error, "failed to resolve routing");
+                        None
                     }
                 }
-                .in_current_span()
-            })
-            .merge(resolved_routing_msg_rx);
+            }
+            .in_current_span()
+        });
 
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
@@ -529,6 +532,7 @@ where
             note = "same as protocol bidirectional",
             "Creating probing channel"
         );
+
         let (tx_from_probing, rx_from_probing) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
@@ -540,20 +544,30 @@ where
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
-        // TODO (Tibor): make Probing accept Sender<(DestinationRouting, ApplicationDataOut)> and remove the
-        // resolved_routing_msg_tx channel completely
-        let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
-        for (k, v) in probe
-            .continuously_scan(
-                (resolved_routing_msg_tx, rx_from_protocol),
-                manual_ping_rx,
-                network_notifier::ProbeNetworkInteractions::new(self.network.clone()),
-                DbProxy::new(self.db.clone(), self.resolver.clone()),
-                tx_from_probing,
-            )
-            .await
-            .into_iter()
-        {
+        let probe = Probe::new(self.cfg.probe);
+        let probing_processes = if let Some(ct) = cover_traffic {
+            probe
+                .continuously_scan(
+                    (unresolved_routing_msg_tx.clone(), rx_from_protocol),
+                    manual_ping_rx,
+                    tx_from_probing,
+                    ct,
+                )
+                .await
+        } else {
+            probe
+                .continuously_scan(
+                    (unresolved_routing_msg_tx.clone(), rx_from_protocol),
+                    manual_ping_rx,
+                    tx_from_probing,
+                    ImmediateNeighborProber::new(
+                        self.cfg.probe,network_notifier::ProbeNetworkInteractions::new(self.network.clone()),
+                ),
+                )
+                .await
+        };
+
+        for (k, v) in probing_processes.into_iter() {
             processes.insert(HoprTransportProcess::Probing(k), v);
         }
 
