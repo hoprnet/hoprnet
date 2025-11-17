@@ -161,7 +161,7 @@ pub struct HoprChain {
 
 impl HoprChain {
     #[allow(clippy::too_many_arguments)] // TODO: refactor this function into a reasonable group of components once fully rearchitected
-    pub fn new(
+    pub async fn new(
         me_onchain: ChainKeypair,
         chain_config: config::ChainNetworkConfig,
         node_db: HoprNodeDb,
@@ -171,7 +171,7 @@ impl HoprChain {
         safe_address: Address,
         indexer_cfg: IndexerConfig,
     ) -> Result<Self> {
-        let db = futures::executor::block_on(HoprIndexerDb::new(
+        let db = HoprIndexerDb::new(
             PathBuf::from_iter([data_dir_path, "index_db"]).as_path(),
             me_onchain.clone(),
             HoprIndexerDbConfig {
@@ -179,7 +179,7 @@ impl HoprChain {
                 force_create: node_db.config().force_create,
                 log_slow_queries: node_db.config().log_slow_queries,
             },
-        ))?;
+        ).await?;
 
         // TODO: extract this from the global config type
         let mut rpc_http_config = hopr_chain_rpc::HttpPostRequestorConfig::default();
