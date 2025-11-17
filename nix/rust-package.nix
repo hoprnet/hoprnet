@@ -22,7 +22,6 @@
   runClippy ? false,
   runTests ? false,
   runBench ? false,
-  solcDefault,
   src,
   stdenv,
 }:
@@ -109,7 +108,7 @@ let
 
     nativeBuildInputs = [
       llvmPackages.bintools
-      solcDefault
+      # solcDefault
       foundryBin
       pkg-config
       libiconv
@@ -201,9 +200,6 @@ builder (
     preConfigure = ''
       # respect the amount of available cores for building
       export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
-      sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-        ethereum/contracts/foundry.in.toml > \
-        ethereum/contracts/foundry.toml
     '';
 
     preFixup = lib.optionalString (isCross && targetInterpreter != "" && !isStatic) ''

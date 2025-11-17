@@ -2,7 +2,6 @@
   pkgs,
   extraPackages ? [ ],
   pre-commit-check,
-  solcDefault,
   ...
 }@args:
 let

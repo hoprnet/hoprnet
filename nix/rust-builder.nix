@@ -7,7 +7,6 @@
   localSystem,
   nixpkgs,
   rust-overlay,
-  solc,
   useRustNightly ? false,
 }@args:
 let
@@ -21,7 +20,6 @@ let
     overlays = [
       foundry.overlay
       rust-overlay.overlays.default
-      solc.overlay
     ];
   };
 
@@ -39,7 +37,7 @@ let
     inherit localSystem crossSystem;
     overlays = [
       rust-overlay.overlays.default
-      solc.overlay
+      # solc.overlay
     ];
   };
 
@@ -51,8 +49,6 @@ let
   foundryBin = pkgsLocal.foundry-bin;
 
   envCase = triple: pkgsLocal.lib.strings.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] triple);
-
-  solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
 
   cargoTarget =
     if hostPlatform.config == "arm64-apple-darwin" then "aarch64-apple-darwin" else hostPlatform.config;
@@ -106,7 +102,7 @@ in
         // {
           inherit
             foundryBin
-            solcDefault
+            # solcDefault
             craneLib
             isCross
             isStatic

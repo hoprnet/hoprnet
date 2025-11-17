@@ -33,7 +33,7 @@
       rust-overlay,
       crane,
       foundry,
-      solc,
+      # solc,
       pre-commit,
       ...
     }@inputs:
@@ -56,11 +56,11 @@
           overlays = [
             (import rust-overlay)
             foundry.overlay
-            solc.overlay
+            # solc.overlay
           ];
           pkgs = import nixpkgs { inherit localSystem overlays; };
           buildPlatform = pkgs.stdenv.buildPlatform;
-          solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
+          # solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
           craneLib = (crane.mkLib pkgs).overrideToolchain (p: p.rust-bin.stable.latest.default);
           hoprdCrateInfoOriginal = craneLib.crateNameFromCargoToml {
             cargoToml = ./hopr/hopr-lib/Cargo.toml;
@@ -88,14 +88,9 @@
               ./Cargo.lock
               ./README.md
               ./chain/config/data
-              ./ethereum/contracts/contracts-addresses.json
-              ./ethereum/contracts/foundry.in.toml
-              ./ethereum/contracts/remappings.txt
               ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
-              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
             ];
           };
           testSrc = fs.toSource {
@@ -106,14 +101,9 @@
               ./README.md
               ./chain/config/data
               ./hopr/hopr-lib/tests
-              ./ethereum/contracts/contracts-addresses.json
-              ./ethereum/contracts/foundry.in.toml
-              ./ethereum/contracts/remappings.txt
               ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
-              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
             ];
           };
 
@@ -123,7 +113,7 @@
               rust-overlay
               crane
               foundry
-              solc
+              # solc
               localSystem
               ;
           };
@@ -134,7 +124,7 @@
               rust-overlay
               crane
               foundry
-              solc
+              # solc
               localSystem
               ;
             useRustNightly = true;
@@ -146,7 +136,7 @@
               rust-overlay
               crane
               foundry
-              solc
+              # solc
               localSystem
               ;
             crossSystem = pkgs.lib.systems.examples.musl64;
@@ -160,7 +150,7 @@
               rust-overlay
               crane
               foundry
-              solc
+              # solc
               localSystem
               ;
             crossSystem = pkgs.lib.systems.examples.x86_64-darwin;
@@ -173,7 +163,7 @@
               rust-overlay
               crane
               foundry
-              solc
+              # solc
               localSystem
               ;
             crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform-musl;
@@ -187,7 +177,7 @@
               rust-overlay
               crane
               foundry
-              solc
+              # solc
               localSystem
               ;
             crossSystem = pkgs.lib.systems.examples.aarch64-darwin;
@@ -302,10 +292,10 @@
           hopliBuildArgs = {
             inherit src depsSrc rev;
             cargoToml = ./hopli/Cargo.toml;
-            postInstall = ''
-              mkdir -p $out/ethereum/contracts
-              cp ethereum/contracts/contracts-addresses.json $out/ethereum/contracts/
-            '';
+            # postInstall = ''
+            #   mkdir -p $out/ethereum/contracts
+            #   cp ethereum/contracts/contracts-addresses.json $out/ethereum/contracts/
+            # '';
           };
 
           hopli = rust-builder-local.callPackage ./nix/rust-package.nix hopliBuildArgs;
@@ -425,7 +415,7 @@
             Entrypoint = [ "/bin/hopli" ];
             env = [
               "ETHERSCAN_API_KEY=placeholder"
-              "HOPLI_CONTRACTS_ROOT=${package}/ethereum/contracts"
+              # "HOPLI_CONTRACTS_ROOT=${package}/ethereum/contracts"
             ];
           };
           hopli-docker = import ./nix/docker-builder.nix (hopliDockerArgs hopli-x86_64-linux [ ]);
@@ -434,165 +424,165 @@
             hopliDockerArgs hopli-x86_64-linux profileDeps
           );
 
-          anvilSrc = fs.toSource {
-            root = ./.;
-            fileset = fs.unions [
-              ./ethereum/contracts/contracts-addresses.json
-              ./ethereum/contracts/foundry.in.toml
-              ./ethereum/contracts/remappings.txt
-              ./ethereum/contracts/Makefile
-              ./scripts/run-local-anvil.sh
-              ./scripts/utils.sh
-              ./Makefile
-              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
-              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/script)
-              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
-            ];
-          };
-          anvil-docker = pkgs.dockerTools.buildLayeredImage {
-            name = "hopr-anvil";
-            tag = "latest";
-            # breaks binary reproducibility, but makes usage easier
-            created = "now";
-            contents = with pkgs; [
-              anvilSrc
-              coreutils
-              curl
-              findutils
-              foundry-bin
-              gnumake
-              jq
-              lsof
-              runtimeShellPackage
-              solcDefault
-              time
-              tini
-              which
-            ];
-            enableFakechroot = true;
-            fakeRootCommands = ''
-              #!${pkgs.runtimeShell}
+          # anvilSrc = fs.toSource {
+          #   root = ./.;
+          #   fileset = fs.unions [
+          #     ./ethereum/contracts/contracts-addresses.json
+          #     ./ethereum/contracts/foundry.in.toml
+          #     ./ethereum/contracts/remappings.txt
+          #     ./ethereum/contracts/Makefile
+          #     ./scripts/run-local-anvil.sh
+          #     ./scripts/utils.sh
+          #     ./Makefile
+          #     (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+          #     (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+          #     (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/script)
+          #     (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
+          #   ];
+          # };
+          # anvil-docker = pkgs.dockerTools.buildLayeredImage {
+          #   name = "hopr-anvil";
+          #   tag = "latest";
+          #   # breaks binary reproducibility, but makes usage easier
+          #   created = "now";
+          #   contents = with pkgs; [
+          #     anvilSrc
+          #     coreutils
+          #     curl
+          #     findutils
+          #     foundry-bin
+          #     gnumake
+          #     jq
+          #     lsof
+          #     runtimeShellPackage
+          #     solcDefault
+          #     time
+          #     tini
+          #     which
+          #   ];
+          #   enableFakechroot = true;
+          #   fakeRootCommands = ''
+          #     #!${pkgs.runtimeShell}
 
-              # must generate the foundry.toml here
-              if ! grep -q "solc = \"${solcDefault}/bin/solc\"" /ethereum/contracts/foundry.toml; then
-                echo "solc = \"${solcDefault}/bin/solc\""
-                echo "Generating foundry.toml file!"
-                sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                  /ethereum/contracts/foundry.in.toml >| \
-                  /ethereum/contracts/foundry.toml
-              else
-                echo "foundry.toml file already exists!"
-              fi
+          #     # must generate the foundry.toml here
+          #     if ! grep -q "solc = \"${solcDefault}/bin/solc\"" /ethereum/contracts/foundry.toml; then
+          #       echo "solc = \"${solcDefault}/bin/solc\""
+          #       echo "Generating foundry.toml file!"
+          #       sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+          #         /ethereum/contracts/foundry.in.toml >| \
+          #         /ethereum/contracts/foundry.toml
+          #     else
+          #       echo "foundry.toml file already exists!"
+          #     fi
 
-              # rewrite remappings to use absolute paths to fix solc checks
-              sed -i \
-                's|../../vendor/|/vendor/|g' \
-                /ethereum/contracts/remappings.txt
+          #     # rewrite remappings to use absolute paths to fix solc checks
+          #     sed -i \
+          #       's|../../vendor/|/vendor/|g' \
+          #       /ethereum/contracts/remappings.txt
 
-              # unlink all linked files/directories, because forge does
-              # not work well with those
-              cp -R -L /ethereum/contracts /ethereum/contracts-unlinked
-              rm -rf /ethereum/contracts
-              mv /ethereum/contracts-unlinked /ethereum/contracts
+          #     # unlink all linked files/directories, because forge does
+          #     # not work well with those
+          #     cp -R -L /ethereum/contracts /ethereum/contracts-unlinked
+          #     rm -rf /ethereum/contracts
+          #     mv /ethereum/contracts-unlinked /ethereum/contracts
 
-              # need to point to the contracts directory for forge to work
-              ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
-            '';
-            config = {
-              Cmd = [
-                "/bin/tini"
-                "--"
-                "bash"
-                "/scripts/run-local-anvil.sh"
-              ];
-              ExposedPorts = {
-                "8545/tcp" = { };
-              };
-            };
-          };
-          plutoSrc = fs.toSource {
-            root = ./.;
-            fileset = fs.unions [
-              ./ethereum/contracts/contracts-addresses.json
-              ./ethereum/contracts/foundry.in.toml
-              ./ethereum/contracts/remappings.txt
-              ./ethereum/contracts/Makefile
-              ./scripts/protocol-config-anvil.json
-              ./scripts/run-local-anvil.sh
-              ./scripts/run-local-cluster.sh
-              ./scripts/utils.sh
-              (fs.fileFilter (file: true) ./sdk)
-              ./pyproject.toml
-              ./tests/pyproject.toml
-              ./Makefile
-              (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
-              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
-              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/script)
-              (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
-            ];
-          };
-          plutoDeps = with pkgs; [
-            curl
-            foundry-bin
-            gnumake
-            hoprd
-            hopli
-            plutoSrc
-            python313
-            runtimeShellPackage
-            solcDefault
-            lsof
-            tini
-            uv
-            which
-          ];
-          pluto-docker = import ./nix/docker-builder.nix {
-            name = "hopr-pluto";
-            pkgs = pkgs;
-            extraContents = plutoDeps;
-            extraPorts = {
-              "3001-3006/tcp" = { };
-              "10001-10101/tcp" = { };
-              "10001-10101/udp" = { };
-            };
-            Cmd = [
-              "/bin/tini"
-              "--"
-              "bash"
-              "/scripts/run-local-cluster.sh"
-            ];
-            fakeRootCommands = ''
-              #!${pkgs.runtimeShell}
+          #     # need to point to the contracts directory for forge to work
+          #     ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
+          #   '';
+          #   config = {
+          #     Cmd = [
+          #       "/bin/tini"
+          #       "--"
+          #       "bash"
+          #       "/scripts/run-local-anvil.sh"
+          #     ];
+          #     ExposedPorts = {
+          #       "8545/tcp" = { };
+          #     };
+          #   };
+          # };
+          # plutoSrc = fs.toSource {
+          #   root = ./.;
+          #   fileset = fs.unions [
+          #     ./ethereum/contracts/contracts-addresses.json
+          #     ./ethereum/contracts/foundry.in.toml
+          #     ./ethereum/contracts/remappings.txt
+          #     ./ethereum/contracts/Makefile
+          #     ./scripts/protocol-config-anvil.json
+          #     ./scripts/run-local-anvil.sh
+          #     ./scripts/run-local-cluster.sh
+          #     ./scripts/utils.sh
+          #     (fs.fileFilter (file: true) ./sdk)
+          #     ./pyproject.toml
+          #     ./tests/pyproject.toml
+          #     ./Makefile
+          #     (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
+          #     (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
+          #     (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/script)
+          #     (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
+          #   ];
+          # };
+          # plutoDeps = with pkgs; [
+          #   curl
+          #   foundry-bin
+          #   gnumake
+          #   hoprd
+          #   hopli
+          #   plutoSrc
+          #   python313
+          #   runtimeShellPackage
+          #   solcDefault
+          #   lsof
+          #   tini
+          #   uv
+          #   which
+          # ];
+          # pluto-docker = import ./nix/docker-builder.nix {
+          #   name = "hopr-pluto";
+          #   pkgs = pkgs;
+          #   extraContents = plutoDeps;
+          #   extraPorts = {
+          #     "3001-3006/tcp" = { };
+          #     "10001-10101/tcp" = { };
+          #     "10001-10101/udp" = { };
+          #   };
+          #   Cmd = [
+          #     "/bin/tini"
+          #     "--"
+          #     "bash"
+          #     "/scripts/run-local-cluster.sh"
+          #   ];
+          #   fakeRootCommands = ''
+          #     #!${pkgs.runtimeShell}
 
-              # must generate the foundry.toml here
-              if ! grep -q "solc = \"${solcDefault}/bin/solc\"" /ethereum/contracts/foundry.toml; then
-                echo "solc = \"${solcDefault}/bin/solc\""
-                echo "Generating foundry.toml file!"
-                sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                  /ethereum/contracts/foundry.in.toml >| \
-                  /ethereum/contracts/foundry.toml
-              else
-                echo "foundry.toml file already exists!"
-              fi
+          #     # must generate the foundry.toml here
+          #     if ! grep -q "solc = \"${solcDefault}/bin/solc\"" /ethereum/contracts/foundry.toml; then
+          #       echo "solc = \"${solcDefault}/bin/solc\""
+          #       echo "Generating foundry.toml file!"
+          #       sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+          #         /ethereum/contracts/foundry.in.toml >| \
+          #         /ethereum/contracts/foundry.toml
+          #     else
+          #       echo "foundry.toml file already exists!"
+          #     fi
 
-              # rewrite remappings to use absolute paths to fix solc checks
-              sed -i \
-                's|../../vendor/|/vendor/|g' \
-                /ethereum/contracts/remappings.txt
+          #     # rewrite remappings to use absolute paths to fix solc checks
+          #     sed -i \
+          #       's|../../vendor/|/vendor/|g' \
+          #       /ethereum/contracts/remappings.txt
 
-              # unlink all linked files/directories, because forge does
-              # not work well with those
-              cp -R -L /ethereum/contracts /ethereum/contracts-unlinked
-              rm -rf /ethereum/contracts
-              mv /ethereum/contracts-unlinked /ethereum/contracts
+          #     # unlink all linked files/directories, because forge does
+          #     # not work well with those
+          #     cp -R -L /ethereum/contracts /ethereum/contracts-unlinked
+          #     rm -rf /ethereum/contracts
+          #     mv /ethereum/contracts-unlinked /ethereum/contracts
 
-              # need to point to the contracts directory for forge to work
-              ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
+          #     # need to point to the contracts directory for forge to work
+          #     ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
 
-              mkdir /tmp/
-            '';
-          };
+          #     mkdir /tmp/
+          #   '';
+          # };
 
           dockerImageUploadScript =
             image:
@@ -622,9 +612,9 @@
           hopli-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-profile-docker;
           };
-          hopr-pluto-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript pluto-docker;
-          };
+          # hopr-pluto-docker-build-and-upload = flake-utils.lib.mkApp {
+          #   drv = dockerImageUploadScript pluto-docker;
+          # };
           docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (
             hoprdBuildArgs // { buildDocs = true; }
           );
@@ -634,18 +624,15 @@
             src = fs.toSource {
               root = ./.;
               fileset = fs.unions [
-                (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
                 ./tests
                 ./scripts
                 ./sdk/python
-                ./ethereum/contracts/foundry.in.toml
-                ./ethereum/contracts/remappings.txt
               ];
             };
             buildInputs = with pkgs; [
               uv
               foundry-bin
-              solcDefault
+              # solcDefault
               python313
               hopli-dev
               hoprd-dev
@@ -683,58 +670,55 @@
             };
             tools = pkgs;
             excludes = [
-              "vendor/"
-              "ethereum/contracts/"
-              "ethereum/bindings/src/codegen"
               ".gcloudignore"
             ];
           };
 
-          check-bindings =
-            { pkgs, solcDefault, ... }:
-            pkgs.stdenv.mkDerivation {
-              pname = "check-bindings";
-              version = hoprdCrateInfo.version;
+          # check-bindings =
+          #   { pkgs, solcDefault, ... }:
+          #   pkgs.stdenv.mkDerivation {
+          #     pname = "check-bindings";
+          #     version = hoprdCrateInfo.version;
 
-              src = ./.;
+          #     src = ./.;
 
-              buildInputs = with pkgs; [
-                diffutils
-                foundry-bin
-                solcDefault
-                just
-              ];
+          #     buildInputs = with pkgs; [
+          #       diffutils
+          #       foundry-bin
+          #       solcDefault
+          #       just
+          #     ];
 
-              preConfigure = ''
-                mkdir -p ethereum/contracts
-                sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                  ${./ethereum/contracts/foundry.in.toml} > ./ethereum/contracts/foundry.toml
-              '';
+          #     preConfigure = ''
+          #       mkdir -p ethereum/contracts
+          #       sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+          #         ${./ethereum/contracts/foundry.in.toml} > ./ethereum/contracts/foundry.toml
+          #     '';
 
-              buildPhase = ''
-                just generate-bindings
-              '';
+          #     buildPhase = ''
+          #       just generate-bindings
+          #     '';
 
-              checkPhase = ''
-                echo "Checking if generated bindings introduced changes..."
-                if [ -d "ethereum/bindings/src/reference" ]; then
-                    echo "Generated bindings are outdated. Please run the binding generation and commit the changes."
-                    exit 1
-                fi
-                echo "Bindings are up to date."
-              '';
+          #     checkPhase = ''
+          #       echo "Checking if generated bindings introduced changes..."
+          #       if [ -d "ethereum/bindings/src/reference" ]; then
+          #           echo "Generated bindings are outdated. Please run the binding generation and commit the changes."
+          #           exit 1
+          #       fi
+          #       echo "Bindings are up to date."
+          #     '';
 
-              # Disable the installPhase
-              installPhase = "mkdir -p $out";
-              doCheck = true;
-            };
+          #     # Disable the installPhase
+          #     installPhase = "mkdir -p $out";
+          #     doCheck = true;
+          #   };
           devShell = import ./nix/devShell.nix {
             inherit
               pkgs
               config
               crane
               pre-commit-check
-              solcDefault
+              # solcDefault
               ;
             extraPackages = with pkgs; [
               nfpm
@@ -747,7 +731,7 @@
               pkgs
               config
               crane
-              solcDefault
+              # solcDefault
               ;
           };
           ciTestDevShell = import ./nix/ciTestShell.nix {
@@ -755,7 +739,7 @@
               pkgs
               config
               crane
-              solcDefault
+              # solcDefault
               ;
             hoprd = hoprd-dev;
             hopli = hopli-dev;
@@ -765,7 +749,7 @@
               pkgs
               config
               crane
-              solcDefault
+              # solcDefault
               ;
             hoprd = (mkHoprdCandidate "");
             hopli = hopli-candidate;
@@ -776,7 +760,7 @@
               config
               crane
               pre-commit-check
-              solcDefault
+              # solcDefault
               ;
             extraPackages = with pkgs; [
               html-tidy
@@ -855,20 +839,12 @@
               "deploy/nfpm/nfpm.yaml"
               ".github/workflows/build-binaries.yaml"
               "docs/*"
-              "ethereum/bindings/src/codegen/*"
-              "ethereum/contracts/Makefile"
-              "ethereum/contracts/broadcast/*"
-              "ethereum/contracts/contracts-addresses.json"
-              "ethereum/contracts/remappings.txt"
-              "ethereum/contracts/src/static/*"
-              "ethereum/contracts/test/static/*"
               "hopr/hopr-lib/tests/snapshots/*"
               "hoprd/.dockerignore"
               "hoprd/rest-api/.cargo/config"
               "nix/setup-hook-darwin.sh"
               "target/*"
               "tests/pytest.ini"
-              "vendor/*"
             ];
 
             programs.shfmt.enable = true;
@@ -876,7 +852,6 @@
               "*.sh"
               "deploy/compose/.env.sample"
               "deploy/compose/.env-secrets.sample"
-              "ethereum/contracts/.env.example"
             ];
 
             programs.yamlfmt.enable = true;
@@ -897,10 +872,8 @@
             settings.formatter.prettier.includes = [
               "*.md"
               "*.json"
-              "ethereum/contracts/README.md"
             ];
             settings.formatter.prettier.excludes = [
-              "ethereum/contracts/*"
               "*.yml"
               "*.yaml"
             ];
@@ -914,40 +887,40 @@
             settings.formatter.rustfmt = {
               command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
             };
-            settings.formatter.solc = {
-              command = "sh";
-              options = [
-                "-euc"
-                ''
-                  # must generate the foundry.toml here, since this step could
-                  # be executed in isolation
-                  if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
-                    echo "solc = \"${solcDefault}/bin/solc\""
-                    echo "Generating foundry.toml file!"
-                    sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-                      ethereum/contracts/foundry.in.toml >| \
-                      ethereum/contracts/foundry.toml
-                  else
-                    echo "foundry.toml file already exists!"
-                  fi
+          #   settings.formatter.solc = {
+          #     command = "sh";
+          #     options = [
+          #       "-euc"
+          #       ''
+          #         # must generate the foundry.toml here, since this step could
+          #         # be executed in isolation
+          #         if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
+          #           echo "solc = \"${solcDefault}/bin/solc\""
+          #           echo "Generating foundry.toml file!"
+          #           sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+          #             ethereum/contracts/foundry.in.toml >| \
+          #             ethereum/contracts/foundry.toml
+          #         else
+          #           echo "foundry.toml file already exists!"
+          #         fi
 
-                  for file in "$@"; do
-                    ${pkgs.foundry-bin}/bin/forge fmt $file \
-                      --root ./ethereum/contracts;
-                  done
-                ''
-                "--"
-              ];
-              includes = [ "*.sol" ];
-            };
+          #         for file in "$@"; do
+          #           ${pkgs.foundry-bin}/bin/forge fmt $file \
+          #             --root ./ethereum/contracts;
+          #         done
+          #       ''
+          #       "--"
+          #     ];
+          #     includes = [ "*.sol" ];
+          #   };
           };
 
           checks = {
             inherit hoprd-clippy hopli-clippy;
-            check-bindings = check-bindings {
-              pkgs = pkgs;
-              solcDefault = solcDefault;
-            };
+            # check-bindings = check-bindings {
+            #   pkgs = pkgs;
+            #   solcDefault = solcDefault;
+            # };
           };
 
           apps = {
@@ -957,7 +930,7 @@
             inherit hopli-docker-build-and-upload;
             inherit hopli-dev-docker-build-and-upload;
             inherit hopli-profile-docker-build-and-upload;
-            inherit hopr-pluto-docker-build-and-upload;
+            # inherit hopr-pluto-docker-build-and-upload;
             inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
@@ -980,7 +953,7 @@
               ;
             inherit hopli-candidate;
             inherit hopr-test-unit hopr-test-nightly;
-            inherit anvil-docker pluto-docker;
+            # inherit anvil-docker pluto-docker;
             inherit smoke-tests docs;
             inherit pre-commit-check;
             inherit hoprd-bench;
