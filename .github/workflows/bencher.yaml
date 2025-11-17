@@ -105,7 +105,7 @@ jobs:
           fi
 
       - name: Setup Bencher
-        uses: bencherdev/bencher@v0.5.7
+        uses: bencherdev/bencher@v0.5.8
 
       - name: Execute benchmarks
         run: |
