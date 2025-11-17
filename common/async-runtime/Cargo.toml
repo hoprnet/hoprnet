@@ -17,6 +17,6 @@ runtime-tokio = ["dep:tokio"]
 
 [dependencies]
 auto_impl = { workspace = true }
-indexmap = "2.12.0"
+indexmap = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true, optional = true }

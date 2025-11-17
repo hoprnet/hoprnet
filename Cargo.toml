@@ -42,7 +42,7 @@ members = [
 
 [workspace.dependencies]
 ahash = "0.8.12"
-alloy = { version = "=1.1.1", default-features = false, features = [
+alloy = { version = "=1.0.42", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -73,7 +73,6 @@ blokli-client = { git = "https://github.com/hoprnet/blokli" }
 bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.2.0", features = ["serde"] }
 bytes = "1.11.0"
-cfg_eval = "0.1.2"
 cfg-if = "1.0.4"
 chrono = { version = "0.4.42", default-features = false, features = [
   "std",
@@ -99,9 +98,9 @@ hashbrown = "0.16.0"
 hex = "0.4.3"
 hex-literal = "1.1.0"
 hickory-resolver = "0.25.2"
-http = "1.3.1"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
 insta = { version = "1.43.2", features = ["json", "yaml"] }
+indexmap = {version = "2.12.0", features = ["serde", "rayon"]}
 k256 = { version = "0.13.4", features = [
   "arithmetic",
   "ecdh",
@@ -117,7 +116,6 @@ libp2p-identity = { version = "0.2.12", features = [
 ] }
 libp2p-stream = { version = "0.4.0-alpha" }
 mockall = "0.13.1"
-mockito = "1.7.0"
 moka = { version = "0.12.11", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
@@ -127,7 +125,7 @@ opentelemetry-otlp = { version = "0.31.0", default-features = false }
 opentelemetry_sdk = { version = "0.31.0" }
 tracing-opentelemetry = { version = "0.32.0" }
 temp-env = "0.3.6"
-parameterized = "2.1.0"
+parameterized = "2.0.0" # kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
 pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", features = ["serde-1"] }
@@ -139,7 +137,6 @@ prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones
 rayon = "1.11.0"
 regex = "1.12.2"
-reqwest = { version = "0.12.24", features = ["json"] }
 ringbuffer = "0.16.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
@@ -160,11 +157,6 @@ sea-orm-migration = { version = "1.1.19", default-features = false, features = [
   "with-chrono",
 ] }
 sea-query = { version = "0.32.7", default-features = false }
-sea-query-binder = { version = "0.7.0", default-features = false, features = [
-  "with-chrono",
-  "sqlx-sqlite",
-] }
-semver = "1.0.27"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
@@ -184,7 +176,6 @@ sqlx = { version = "0.8.6", default-features = false, features = [
 ] }
 strum = { version = "0.27.2", features = ["derive"] }
 subtle = "2.6.1"
-sysinfo = "0.37.2"
 tempfile = "3.23.0"
 test-log = { version = "0.2.18", features = ["trace"] }
 thiserror = "2.0.17"
@@ -237,7 +228,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
-hopr-bindings = { package = "hopr-bindings", git = "https://github.com/hoprnet/contracts", rev = "0efd78c1" }
+hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "0efd78c1" }
 hopr-chain-connector = { path = "chain/connector" }
 hopr-chain-types = { path = "chain/types", default-features = false }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
