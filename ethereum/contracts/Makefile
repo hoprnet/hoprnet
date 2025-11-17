@@ -21,7 +21,7 @@ sc-audit-coverage:
 
 .PHONY: forked-local-anvil
 forked-local-anvil:
-	anvil -f 'https://gnosis-provider.rpch.tech/'
+	anvil -f 'https://gnosis.publicnode.com/'
 
 .PHONY: anvil-deploy-erc1820
 anvil-deploy-erc1820: ensure-environment-and-network-are-set
