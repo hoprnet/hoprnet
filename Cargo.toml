@@ -48,7 +48,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.1.1", default-features = false, features = [
+alloy = { version = "=1.0.42", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
