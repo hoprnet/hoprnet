@@ -471,14 +471,14 @@ where
                             past_announced.map(|account| {
                                 vec![PeerDiscovery::Announce(
                                     account.public_key.into(),
-                                    account.get_multiaddr().into_iter().collect(),
+                                    account.get_multiaddrs().to_vec(),
                                 )]
                             }),
                             future_announced.filter_map(|event| {
                                 futures::future::ready(event.try_as_announcement().map(|account| {
                                     vec![PeerDiscovery::Announce(
                                         account.public_key.into(),
-                                        account.get_multiaddr().into_iter().collect(),
+                                        account.get_multiaddrs().to_vec(),
                                     )]
                                 }))
                             }),
@@ -644,7 +644,7 @@ where
                 let db = node_db.clone();
                 async move {
                     match chain.redeem_tickets_via_selector(&db, selector).await {
-                        Ok(res) => info!(%res, "redemption complete"),
+                        Ok(res) => debug!(%res, "redemption complete"),
                         Err(error) => error!(%error, "redemption failed"),
                     }
                 }
@@ -739,11 +739,15 @@ where
             .map_err(HoprLibError::chain)
             .await?
             .filter_map(|entry| {
-                futures::future::ready(
-                    entry
-                        .get_multiaddr()
-                        .map(|maddr| (PeerId::from(entry.public_key), entry.chain_addr, vec![maddr])),
-                )
+                futures::future::ready(if entry.has_announced() {
+                    Some((
+                        PeerId::from(entry.public_key),
+                        entry.chain_addr,
+                        entry.get_multiaddrs().to_vec(),
+                    ))
+                } else {
+                    None
+                })
             })
             .collect()
             .await)
@@ -843,7 +847,7 @@ where
             .next()
             .await
         {
-            Some(entry) => Ok(Vec::from_iter(entry.get_multiaddr())),
+            Some(entry) => Ok(entry.get_multiaddrs().to_vec()),
             None => {
                 error!(%peer, "no information");
                 Ok(vec![])

@@ -299,14 +299,13 @@ where
         );
 
         for node_entry in public_nodes {
-            if let AccountType::Announced(multiaddr) = node_entry.entry_type {
+            if let AccountType::Announced(multiaddresses) = node_entry.entry_type {
                 let peer: PeerId = node_entry.public_key.into();
-                let multiaddresses = vec![multiaddr];
 
                 debug!(%peer, ?multiaddresses, "Using initial public node");
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
+                    .send(PeerDiscovery::Announce(peer, multiaddresses))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
             }

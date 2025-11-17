@@ -150,14 +150,7 @@ impl HoprNodeDb {
 
         let caches = Arc::new(NodeDbCaches::default());
         caches.invalidate_all();
-
-        // hopr_db_entity::ticket::Entity::update_many()
-        // .col_expr(hopr_db_entity::ticket::Column::State,
-        // sea_query::Expr::value(sea_query::Value::Int(Some(AcknowledgedTicketStatus::Untouched.into()))))
-        // .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingRedeemed.into()))
-        // .exec(&tickets_db)
-        // .await?;
-
+        
         Ok(Self {
             ticket_manager: Arc::new(TicketManager::new(tickets_db.clone(), caches.clone())),
             tickets_db,

@@ -20,14 +20,14 @@ lazy_static::lazy_static! {
         AccountEntry {
             public_key: *OFFCHAIN_KEYS[0].public(),
             chain_addr: CHAIN_KEYS[0].public().to_address(),
-            entry_type: AccountType::Announced("/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse().unwrap()),
+            entry_type: AccountType::Announced(vec!["/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse().unwrap()]),
             safe_address: None,
             key_id: 1_u32.into(),
         },
         AccountEntry {
             public_key: *OFFCHAIN_KEYS[1].public(),
             chain_addr: CHAIN_KEYS[1].public().to_address(),
-            entry_type: AccountType::Announced("/ip4/34.65.237.190/udp/9091/p2p/12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF".parse().unwrap()),
+            entry_type: AccountType::Announced(vec!["/ip4/34.65.237.190/udp/9091/p2p/12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF".parse().unwrap()]),
             safe_address: None,
             key_id: 2_u32.into(),
         },

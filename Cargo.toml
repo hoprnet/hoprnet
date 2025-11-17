@@ -232,7 +232,7 @@ hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "0efd78c1" }
 hopr-chain-connector = { path = "chain/connector" }
-hopr-chain-types = { path = "chain/types", default-features = false }
+hopr-chain-types = { path = "chain/types" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
