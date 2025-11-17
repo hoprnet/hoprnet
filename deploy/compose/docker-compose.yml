@@ -135,7 +135,7 @@ services:
       - metrics-vis
 
   metricspusher:
-    image: curlimages/curl:latest
+    image: curlimages/curl:latest@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40
     container_name: metricspusher
     hostname: metricspusher
     command: /bin/sh /app/metricspusher.sh ${METRICS_PUSH_URL}
