@@ -265,10 +265,10 @@ async fn main_inner() -> anyhow::Result<()> {
     }
 
     let (_hopr_socket, hopr_processes) = node
-        .run(HoprServerIpForwardingReactor::new(
-            hopr_keys.packet_key.clone(),
-            cfg.session_ip_forwarding,
-        ))
+        .run(
+            None::<hopr_lib::DummyCoverTrafficType>,
+            HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
+        )
         .await?;
 
     processes.extend(hopr_processes.into_iter().map(|(k, v)| HoprdProcesses::HoprLib(k, v)));

@@ -119,7 +119,8 @@ pub use hopr_transport::{
     ApplicationData, ApplicationDataIn, ApplicationDataOut, HalfKeyChallenge, Health, HoprSession, IncomingSession,
     Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU,
     SURB_SIZE, ServiceId, SessionCapabilities, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
-    SessionManagerError, SessionTarget, SurbBalancerConfig, Tag, TicketStatistics, TransportSessionError,
+    SessionManagerError, SessionTarget, SurbBalancerConfig, Tag, Telemetry, TicketStatistics, TrafficGeneration,
+    TransportSessionError,
     config::{HostConfig, HostType, looks_like_domain},
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
@@ -151,6 +152,31 @@ lazy_static::lazy_static! {
         "Node on-chain and off-chain addresses",
         &["peerid", "address", "safe_address", "module_address"]
     ).unwrap();
+}
+
+pub struct DummyCoverTrafficType {
+    #[allow(dead_code)]
+    _unconstructable: (),
+}
+
+impl TrafficGeneration for DummyCoverTrafficType {
+    fn build(
+        self,
+    ) -> (
+        impl futures::Stream<Item = DestinationRouting> + Send,
+        impl futures::Sink<
+            std::result::Result<hopr_transport::Telemetry, hopr_transport::ProbeError>,
+            Error = impl std::error::Error,
+        > + Send
+        + Sync
+        + Clone
+        + 'static,
+    ) {
+        (
+            futures::stream::empty(),
+            futures::sink::drain::<std::result::Result<hopr_transport::Telemetry, hopr_transport::ProbeError>>(),
+        )
+    }
 }
 
 /// Prepare an optimized version of the tokio runtime setup for hopr-lib specifically.
@@ -433,9 +459,11 @@ impl Hopr {
     }
 
     pub async fn run<
+        Ct,
         #[cfg(feature = "session-server")] T: traits::session::HoprSessionServer + Clone + Send + 'static,
     >(
         &self,
+        cover_traffic: Option<Ct>,
         #[cfg(feature = "session-server")] serve_handler: T,
     ) -> errors::Result<(
         hopr_transport::socket::HoprSocket<
@@ -443,7 +471,10 @@ impl Hopr {
             futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         >,
         HashMap<state::HoprLibProcesses, AbortHandle>,
-    )> {
+    )>
+    where
+        Ct: TrafficGeneration + Send + Sync + 'static,
+    {
         self.error_if_not_in_state(
             state::HoprState::Uninitialized,
             "Cannot start the hopr node multiple times".into(),
@@ -767,7 +798,12 @@ impl Hopr {
         }
 
         info!("Starting transport");
-        let (hopr_socket, transport_processes) = self.transport_api.run(indexer_peer_update_rx, session_tx).await?;
+
+        let (hopr_socket, transport_processes) = self
+            .transport_api
+            .run(cover_traffic, indexer_peer_update_rx, session_tx)
+            .await?;
+
         for (id, proc) in transport_processes.into_iter() {
             processes.insert(id.into(), proc);
         }
