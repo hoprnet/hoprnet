@@ -1,14 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Context;
 use futures::{FutureExt, SinkExt, StreamExt, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_internal_types::protocol::HoprPseudonym;
-use hopr_network_types::types::{ResolvedTransportRouting, ValidatedPath};
+use hopr_internal_types::{NodeId, protocol::HoprPseudonym};
+use hopr_network_types::types::{DestinationRouting, RoutingOptions};
 use hopr_platform::time::native::current_time;
-use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
+use hopr_primitive_types::traits::AsUnixTimestamp;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut, ReservedTag};
 use libp2p_identity::PeerId;
 
@@ -17,25 +16,28 @@ use crate::{
     config::ProbeConfig,
     content::{Message, NeighborProbe},
     errors::ProbeError,
-    neighbors::neighbors_to_probe,
     ping::PingQueryReplier,
-    traits::{DbOperations, PeerDiscoveryFetch, ProbeStatusUpdate},
+    traits::TrafficGeneration,
+    types::{NeighborTelemetry, Telemetry},
 };
 
 #[inline(always)]
 fn to_nonce(message: &Message) -> String {
     match message {
         Message::Probe(NeighborProbe::Ping(ping)) => hex::encode(ping),
-        Message::Probe(NeighborProbe::Pong(ping)) => hex::encode(ping),
+        Message::Probe(NeighborProbe::Pong(pong)) => hex::encode(pong),
         _ => "<telemetry>".to_string(),
     }
 }
 
 #[inline(always)]
-fn to_pseudonym(path: &ResolvedTransportRouting) -> HoprPseudonym {
+fn to_pseudonym(path: &DestinationRouting) -> Option<HoprPseudonym> {
     match path {
-        ResolvedTransportRouting::Forward { pseudonym, .. } => *pseudonym,
-        ResolvedTransportRouting::Return(pseudonym, _) => pseudonym.pseudonym(),
+        DestinationRouting::Forward { pseudonym, .. } => *pseudonym,
+        DestinationRouting::Return(matcher) => match matcher {
+            hopr_network_types::types::SurbMatcher::Exact(sender_id) => Some(sender_id.pseudonym()),
+            hopr_network_types::types::SurbMatcher::Pseudonym(pseudonym) => Some(*pseudonym),
+        },
     }
 }
 
@@ -46,10 +48,10 @@ struct Sender<T> {
 
 impl<T> Sender<T>
 where
-    T: futures::Sink<(ResolvedTransportRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
+    T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
 {
-    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
-    async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
+    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=?to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
+    async fn send_message(self, path: DestinationRouting, message: Message) -> crate::errors::Result<()> {
         let push_to_network = self.downstream;
         pin_mut!(push_to_network);
         if push_to_network
@@ -65,61 +67,53 @@ where
     }
 }
 
+type CacheKey = (HoprPseudonym, NeighborProbe);
+type CacheValue = (Box<NodeId>, std::time::Duration, Option<PingQueryReplier>);
+
 /// Probe functionality builder.
 ///
 /// The builder holds information about this node's own addresses and the configuration for the probing process. It is
 /// then used to construct the probing process itself.
 pub struct Probe {
-    /// Own addresses for self reference and surb creation.
-    me: (OffchainPublicKey, Address),
     /// Probe configuration.
     cfg: ProbeConfig,
 }
 
 impl Probe {
-    pub fn new(me: (OffchainPublicKey, Address), cfg: ProbeConfig) -> Self {
-        Self { me, cfg }
+    pub fn new(cfg: ProbeConfig) -> Self {
+        Self { cfg }
     }
 
     /// The main function that assembles and starts the probing process.
-    pub async fn continuously_scan<T, U, V, W, C, Up>(
+    pub async fn continuously_scan<T, U, V, Up, Tr>(
         self,
         api: (T, U),      // lower (tx, rx) channels for sending and receiving messages
         manual_events: V, // explicit requests from the API
-        store: W,         // peer store
-        db: C,            // database for SURB & peer resolution
         move_up: Up,      // forward up non-probing messages from the network
+        traffic_generator: Tr,
     ) -> HashMap<HoprProbeProcess, hopr_async_runtime::AbortHandle>
     where
-        T: futures::Sink<(ResolvedTransportRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
+        T: futures::Sink<(DestinationRouting, ApplicationDataOut)> + Clone + Send + Sync + 'static,
         T::Error: Send,
         U: futures::Stream<Item = (HoprPseudonym, ApplicationDataIn)> + Send + Sync + 'static,
-        W: PeerDiscoveryFetch + ProbeStatusUpdate + Clone + Send + Sync + 'static,
-        C: DbOperations + Clone + Send + Sync + 'static,
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationDataIn)> + Clone + Send + Sync + 'static,
+        Tr: TrafficGeneration + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
         let interval_between_rounds = self.cfg.interval;
 
-        // For each probe target a cached version of transport routing is stored
-        let cache_peer_routing: moka::future::Cache<PeerId, ResolvedTransportRouting> = moka::future::Cache::builder()
-            .time_to_live(std::time::Duration::from_secs(600))
-            .max_capacity(100_000)
-            .build();
+        let (probing_routes, reports) = traffic_generator.build();
 
         // Currently active probes
-        let store_eviction = store.clone();
+        let store_eviction = reports.clone();
         let timeout = self.cfg.timeout;
-        let active_probes: moka::future::Cache<
-            (HoprPseudonym, NeighborProbe),
-            (PeerId, std::time::Duration, Option<PingQueryReplier>),
-        > = moka::future::Cache::builder()
+        let active_probes: moka::future::Cache<CacheKey, CacheValue> = moka::future::Cache::builder()
             .time_to_live(timeout)
             .max_capacity(100_000)
             .async_eviction_listener(
                 move |k: Arc<(HoprPseudonym, NeighborProbe)>,
-                      v: (PeerId, std::time::Duration, Option<PingQueryReplier>),
+                      v: (Box<NodeId>, std::time::Duration, Option<PingQueryReplier>),
                       cause|
                       -> moka::notification::ListenerFuture {
                     if matches!(cause, moka::notification::RemovalCause::Expired) {
@@ -129,87 +123,119 @@ impl Probe {
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
                         if let Some(replier) = notifier {
-                            replier.notify(Err(ProbeError::Timeout(timeout.as_secs())));
+                            if let NodeId::Offchain(opk) = peer.as_ref() {
+                                replier.notify(Err(ProbeError::ProbeNeighborTimeout(opk.into())));
+                            } else {
+                                tracing::warn!(
+                                    reason = "non-offchain peer",
+                                    "cannot notify timeout for non-offchain peer"
+                                );
+                            }
                         };
-                        async move {
-                            store
-                                .on_finished(&peer, &Err(ProbeError::Timeout(timeout.as_secs())))
-                                .await;
+
+                        if let NodeId::Offchain(opk) = peer.as_ref() {
+                            let peer: PeerId = opk.into();
+                            futures::FutureExt::boxed(async move {
+                                pin_mut!(store);
+                                if let Err(error) = store.send(Err(ProbeError::ProbeNeighborTimeout(peer))).await {
+                                    tracing::error!(%peer, %error, "failed to record probe timeout");
+                                }
+                            })
+                        } else {
+                            futures::FutureExt::boxed(futures::future::ready(()))
                         }
-                        .boxed()
                     } else {
                         // If the eviction cause is not expiration, nothing needs to be done
-                        futures::future::ready(()).boxed()
+                        futures::FutureExt::boxed(futures::future::ready(()))
                     }
                 },
             )
             .build();
 
         let active_probes_rx = active_probes.clone();
-        let db_rx = db.clone();
         let push_to_network = api.0.clone();
 
         let mut processes = HashMap::<HoprProbeProcess, hopr_async_runtime::AbortHandle>::new();
 
         // -- Emit probes --
-        let direct_neighbors = neighbors_to_probe(store.clone(), self.cfg)
-            .map(|peer| (peer, None))
-            .merge(manual_events.map(|(peer, notifier)| (peer, Some(notifier))));
+        let direct_neighbors =
+            probing_routes
+                .map(|peer| (peer, None))
+                .merge(manual_events.filter_map(|(peer, notifier)| async move {
+                    if let Ok(peer) = OffchainPublicKey::from_peerid(&peer) {
+                        let routing = DestinationRouting::Forward {
+                            destination: Box::new(peer.into()),
+                            pseudonym: Some(HoprPseudonym::random()),
+                            forward_options: RoutingOptions::Hops(0.try_into().expect("0 is a valid u8")),
+                            return_options: Some(RoutingOptions::Hops(0.try_into().expect("0 is a valid u8"))),
+                        };
+                        Some((routing, Some(notifier)))
+                    } else {
+                        None
+                    }
+                }));
 
         processes.insert(
             HoprProbeProcess::Emit,
             hopr_async_runtime::spawn_as_abortable!(async move {
-                hopr_async_runtime::prelude::sleep(2 * interval_between_rounds).await;   // delay to allow network to stabilize
+                hopr_async_runtime::prelude::sleep(2 * interval_between_rounds).await; // delay to allow network to stabilize
 
                 direct_neighbors
                     .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
-                        let db = db.clone();
-                        let cache_peer_routing = cache_peer_routing.clone();
                         let active_probes = active_probes.clone();
-                        let push_to_network = Sender { downstream: push_to_network.clone() };
-                        let me = self.me;
+                        let push_to_network = Sender {
+                            downstream: push_to_network.clone(),
+                        };
 
                         async move {
-                            let result = cache_peer_routing
-                                .try_get_with(peer, async move {
-                                    // TODO: This is a CPU intensive operation, convert the probing mechanism to use OffchainPublicKey instead of PeerIDs!
-                                    // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-                                    let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer))
-                                        .await
-                                        .context(format!("failed to convert {peer} to offchain public key"))?;
-                                    let cp_address = db
-                                        .resolve_chain_key(&pubkey)
-                                        .await?
-                                        .ok_or_else(|| anyhow::anyhow!("Failed to resolve chain key for peer: {peer}"))?;
-
-                                    Ok::<ResolvedTransportRouting, anyhow::Error>(ResolvedTransportRouting::Forward {
-                                        pseudonym: HoprPseudonym::random(),
-                                        forward_path: ValidatedPath::direct(pubkey, cp_address),
-                                        return_paths: vec![ValidatedPath::direct(me.0, me.1)],
-                                    })
-                                })
-                                .await;
-
-                            match result {
-                                Ok(ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths }) => {
+                            match peer {
+                                DestinationRouting::Forward {
+                                    destination,
+                                    pseudonym,
+                                    forward_options,
+                                    return_options,
+                                } => {
                                     let nonce = NeighborProbe::random_nonce();
 
                                     let message = Message::Probe(nonce);
-                                    let path = ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths };
-                                    if push_to_network.send_message(path, message).await.is_ok() {
+
+                                    let routing = DestinationRouting::Forward {
+                                        destination: destination.clone(),
+                                        pseudonym,
+                                        forward_options,
+                                        return_options,
+                                    };
+
+                                    if let Err(error) = push_to_network.send_message(routing, message).await {
+                                        tracing::error!(?destination, %error, "failed to send out a probe");
+                                    } else {
                                         active_probes
-                                            .insert((pseudonym, nonce), (peer, current_time().as_unix_timestamp(), notifier))
+                                            .insert(
+                                                (
+                                                    pseudonym
+                                                        .expect("the pseudonym must be present in Forward routing"),
+                                                    nonce,
+                                                ),
+                                                (destination, current_time().as_unix_timestamp(), notifier),
+                                            )
                                             .await;
                                     }
-                                },
-                                Ok(_) => tracing::error!(%peer, error = "logical error", "resolved transport routing is not forward"),
-                                Err(error) => tracing::error!(%peer, %error, "failed to resolve transport routing"),
-                            };
+                                }
+                                DestinationRouting::Return(_surb_matcher) => tracing::error!(
+                                    error = "logical error",
+                                    "resolved transport routing is not forward"
+                                ),
+                            }
                         }
                     })
-                    .inspect(|_| tracing::warn!(task = "transport (probe - generate outgoing)", "long-running background task finished"))
+                    .inspect(|_| {
+                        tracing::warn!(
+                            task = "transport (probe - generate outgoing)",
+                            "long-running background task finished"
+                        )
+                    })
                     .await;
-            })
+            }),
         );
 
         // -- Process probes --
@@ -218,9 +244,8 @@ impl Probe {
             hopr_async_runtime::spawn_as_abortable!(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, in_data)| {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
-                let db = db_rx.clone();
-                let store = store.clone();
                 let move_up = move_up.clone();
+                let store = reports.clone();
 
                 async move {
                     // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occurring on random tags
@@ -230,20 +255,19 @@ impl Probe {
                         match message {
                             Ok(message) => {
                                 match message {
-                                    Message::Telemetry(_path_telemetry) => {
-                                        tracing::warn!(%pseudonym, reason = "feature not implemented", "this node could not originate the telemetry");
+                                    Message::Telemetry(path_telemetry) => {
+                                        pin_mut!(store);
+                                        if let Err(error) = store.send(Ok(Telemetry::Loopback(path_telemetry))).await {
+                                            tracing::error!(%pseudonym, %error, "failed to record probe success");
+                                        }
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
-                                        match db.find_surb(pseudonym.into()).await.map(|found_surb| ResolvedTransportRouting::Return(found_surb.sender_id, found_surb.surb)) {
-                                            Ok(path) => {
-                                                tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
-                                            let message = Message::Probe(NeighborProbe::Pong(ping));
-                                                if let Err(error) = push_to_network.send_message(path, message).await {
-                                                    tracing::error!(%pseudonym, %error, "failed to send back a pong");
-                                                }
-                                            },
-                                            Err(error) => tracing::error!(%pseudonym, %error, "failed to get a SURB, cannot send back a pong"),
+                                        tracing::trace!(%pseudonym, nonce = hex::encode(ping), "wrapping a pong in the found SURB");
+
+                                        let message = Message::Probe(NeighborProbe::Pong(ping));
+                                        if let Err(error) = push_to_network.send_message(DestinationRouting::Return(pseudonym.into()), message).await {
+                                            tracing::error!(%pseudonym, %error, "failed to send back a pong");
                                         }
                                     },
                                     Message::Probe(NeighborProbe::Pong(pong)) => {
@@ -252,7 +276,19 @@ impl Probe {
                                             let latency = current_time()
                                                 .as_unix_timestamp()
                                                 .saturating_sub(start);
-                                            store.on_finished(&peer, &Ok(latency)).await;
+
+                                            if let NodeId::Offchain(opk) = peer.as_ref() {
+                                                tracing::info!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful");
+                                                pin_mut!(store);
+                                                if let Err(error) = store.send(Ok(Telemetry::Neighbor(NeighborTelemetry {
+                                                    peer: opk.into(),
+                                                    rtt: latency,
+                                                }))).await {
+                                                    tracing::error!(%pseudonym, %error, "failed to record probe success");
+                                                }
+                                            } else {
+                                                tracing::warn!(%pseudonym, nonce = hex::encode(pong), latency_ms = latency.as_millis(), "probe successful to non-offchain peer");
+                                            }
 
                                             if let Some(replier) = replier {
                                                 replier.notify(Ok(latency))
@@ -282,17 +318,18 @@ impl Probe {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::VecDeque, convert::Infallible, sync::RwLock, time::Duration};
+    use std::{collections::VecDeque, sync::RwLock, time::Duration};
 
     use async_trait::async_trait;
     use futures::future::BoxFuture;
-    use hopr_api::db::FoundSurb;
-    use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use hopr_network_types::prelude::SurbMatcher;
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
 
     use super::*;
+    use crate::{
+        neighbors::ImmediateNeighborProber,
+        traits::{PeerDiscoveryFetch, ProbeStatusUpdate},
+    };
 
     lazy_static::lazy_static!(
         static ref OFFCHAIN_KEYPAIR: OffchainKeypair = OffchainKeypair::random();
@@ -320,7 +357,7 @@ mod tests {
                 *peer,
                 match result {
                     Ok(duration) => Ok(*duration),
-                    Err(_e) => Err(ProbeError::Timeout(1000)),
+                    Err(_e) => Err(ProbeError::ProbeNeighborTimeout(peer.clone())),
                 },
             ));
         }
@@ -334,61 +371,26 @@ mod tests {
         }
     }
 
-    #[derive(Debug, Clone)]
-    pub struct Cache {}
-
-    #[async_trait]
-    impl DbOperations for Cache {
-        type ChainError = Infallible;
-        type DbError = Infallible;
-
-        async fn find_surb(&self, _matcher: SurbMatcher) -> Result<FoundSurb, Self::DbError> {
-            // Mock implementation for testing purposes
-            Ok(FoundSurb {
-                sender_id: HoprSenderId::random(),
-                surb: random_memory_violating_surb(),
-                remaining: 0,
-            })
-        }
-
-        async fn resolve_chain_key(
-            &self,
-            _offchain_key: &OffchainPublicKey,
-        ) -> Result<Option<Address>, Self::ChainError> {
-            Ok(Some(ONCHAIN_KEYPAIR.public().to_address()))
-        }
-    }
-
-    /// !!! This generates a completely random data blob that pretends to be a SURB.
-    ///
-    /// !!! It must never be accessed or invoked, only passed around.
-    fn random_memory_violating_surb() -> HoprSurb {
-        const SURB_SIZE: usize = size_of::<HoprSurb>();
-
-        unsafe { std::mem::transmute::<[u8; SURB_SIZE], HoprSurb>(hopr_crypto_random::random_bytes()) }
-    }
-
     struct TestInterface {
         from_probing_up_rx: futures::channel::mpsc::Receiver<(HoprPseudonym, ApplicationDataIn)>,
-        from_probing_to_network_rx: futures::channel::mpsc::Receiver<(ResolvedTransportRouting, ApplicationDataOut)>,
+        from_probing_to_network_rx: futures::channel::mpsc::Receiver<(DestinationRouting, ApplicationDataOut)>,
         from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
         manual_probe_tx: futures::channel::mpsc::Sender<(PeerId, PingQueryReplier)>,
     }
 
-    async fn test_with_probing<F, Db, St, Fut>(cfg: ProbeConfig, store: St, db: Db, test: F) -> anyhow::Result<()>
+    async fn test_with_probing<F, St, Fut>(cfg: ProbeConfig, store: St, test: F) -> anyhow::Result<()>
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
-        Db: DbOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
         St: ProbeStatusUpdate + PeerDiscoveryFetch + Clone + Send + Sync + 'static,
     {
-        let probe = Probe::new((*OFFCHAIN_KEYPAIR.public(), ONCHAIN_KEYPAIR.public().to_address()), cfg);
+        let probe = Probe::new(cfg);
 
         let (from_probing_up_tx, from_probing_up_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
 
         let (from_probing_to_network_tx, from_probing_to_network_rx) =
-            futures::channel::mpsc::channel::<(ResolvedTransportRouting, ApplicationDataOut)>(100);
+            futures::channel::mpsc::channel::<(DestinationRouting, ApplicationDataOut)>(100);
 
         let (from_network_to_probing_tx, from_network_to_probing_rx) =
             futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationDataIn)>(100);
@@ -406,9 +408,8 @@ mod tests {
             .continuously_scan(
                 (from_probing_to_network_tx, from_network_to_probing_rx),
                 manual_probe_rx,
-                store,
-                db,
                 from_probing_up_tx,
+                ImmediateNeighborProber::new(cfg, store),
             )
             .await;
 
@@ -427,17 +428,17 @@ mod tests {
         delay: Option<std::time::Duration>,
         pass_rate: f64,
         from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationDataIn)>,
-    ) -> impl Fn((ResolvedTransportRouting, ApplicationDataOut)) -> BoxFuture<'static, ()> {
+    ) -> impl Fn((DestinationRouting, ApplicationDataOut)) -> BoxFuture<'static, ()> {
         debug_assert!(
             (NO_PROBE_PASSES..=ALL_PROBES_PASS).contains(&pass_rate),
             "Pass rate must be between {NO_PROBE_PASSES} and {ALL_PROBES_PASS}"
         );
 
-        move |(path, data_out): (ResolvedTransportRouting, ApplicationDataOut)| -> BoxFuture<'static, ()> {
+        move |(path, data_out): (DestinationRouting, ApplicationDataOut)| -> BoxFuture<'static, ()> {
             let mut from_network_to_probing_tx = from_network_to_probing_tx.clone();
 
             Box::pin(async move {
-                if let ResolvedTransportRouting::Forward { pseudonym, .. } = path {
+                if let DestinationRouting::Forward { pseudonym, .. } = path {
                     let message: Message = data_out.data.try_into().expect("failed to convert data into message");
                     if let Message::Probe(NeighborProbe::Ping(ping)) = message {
                         let pong_message = Message::Probe(NeighborProbe::Pong(ping));
@@ -451,7 +452,7 @@ mod tests {
                         {
                             from_network_to_probing_tx
                                 .send((
-                                    pseudonym,
+                                    pseudonym.expect("the pseudonym is always known from cache"),
                                     ApplicationDataIn {
                                         data: pong_message
                                             .try_into()
@@ -482,7 +483,7 @@ mod tests {
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
 
-        test_with_probing(cfg, store, Cache {}, move |iface: TestInterface| async move {
+        test_with_probing(cfg, store, move |iface: TestInterface| async move {
             let mut manual_probe_tx = iface.manual_probe_tx;
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
@@ -522,7 +523,7 @@ mod tests {
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
 
-        test_with_probing(cfg, store, Cache {}, move |iface: TestInterface| async move {
+        test_with_probing(cfg, store, move |iface: TestInterface| async move {
             let mut manual_probe_tx = iface.manual_probe_tx;
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
@@ -565,7 +566,7 @@ mod tests {
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
 
-        test_with_probing(cfg, store.clone(), Cache {}, move |iface: TestInterface| async move {
+        test_with_probing(cfg, store.clone(), move |iface: TestInterface| async move {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
@@ -620,7 +621,7 @@ mod tests {
 
         let timeout = cfg.timeout * 2;
 
-        test_with_probing(cfg, store.clone(), Cache {}, move |iface: TestInterface| async move {
+        test_with_probing(cfg, store.clone(), move |iface: TestInterface| async move {
             let from_probing_to_network_rx = iface.from_probing_to_network_rx;
             let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
@@ -672,7 +673,7 @@ mod tests {
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
 
-        test_with_probing(cfg, store.clone(), Cache {}, move |iface: TestInterface| async move {
+        test_with_probing(cfg, store.clone(), move |iface: TestInterface| async move {
             let mut from_network_to_probing_tx = iface.from_network_to_probing_tx;
             let mut from_probing_up_rx = iface.from_probing_up_rx;
 
