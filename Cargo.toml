@@ -42,7 +42,7 @@ members = [
 
 [workspace.dependencies]
 ahash = "0.8.12"
-alloy = { version = "=1.0.42", default-features = false, features = [
+alloy = { version = "=1.1.1", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -61,8 +61,8 @@ asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 async-broadcast = "0.7.2"
 atomic_enum = "0.3.0"
 auto_impl = "1.3.0"
-axum = { version = "0.8.6", features = ["ws", "http2"] }
-axum-extra = { version = "0.12.1", features = ["query"] }
+axum = { version = "0.8.7", features = ["ws", "http2"] }
+axum-extra = { version = "0.12.2", features = ["query"] }
 backon = { version = "1.6.0", default-features = false }
 base64 = "0.22.1"
 bigdecimal = "0.4.9"
@@ -71,8 +71,8 @@ bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
 blokli-client = { git = "https://github.com/hoprnet/blokli" }
 bloomfilter = { version = "3.0.1", features = ["serde"] }
-bytesize = { version = "2.1.0", features = ["serde"] }
-bytes = "1.10.1"
+bytesize = { version = "2.2.0", features = ["serde"] }
+bytes = "1.11.0"
 cfg_eval = "0.1.2"
 cfg-if = "1.0.4"
 chrono = { version = "0.4.42", default-features = false, features = [
@@ -93,7 +93,7 @@ float-cmp = "0.10.0"
 futures = "0.3.31"
 futures-concurrency = "7.6.3"
 futures-timer = "3.0.3"
-futures-time = "3.0.0"
+futures-time = "3.0.1"
 generic-array = "1.3.5"
 hashbrown = "0.16.0"
 hex = "0.4.3"
@@ -127,7 +127,7 @@ opentelemetry-otlp = { version = "0.31.0", default-features = false }
 opentelemetry_sdk = { version = "0.31.0" }
 tracing-opentelemetry = { version = "0.32.0" }
 temp-env = "0.3.6"
-parameterized = "2.0.0"
+parameterized = "2.1.0"
 parking_lot = "0.12.5"
 pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", features = ["serde-1"] }
@@ -145,16 +145,16 @@ rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
 rstest = { version = "0.26.1" }
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.17", default-features = false, features = [
+sea-orm = { version = "1.1.19", default-features = false, features = [
   "sqlx-sqlite",
   "with-chrono",
   "with-json",
   "debug-print",
 ] }
-sea-orm-cli = { version = "1.1.17", default-features = false, features = [
+sea-orm-cli = { version = "1.1.19", default-features = false, features = [
   "codegen",
 ] }
-sea-orm-migration = { version = "1.1.17", default-features = false, features = [
+sea-orm-migration = { version = "1.1.19", default-features = false, features = [
   "cli",
   "sqlx-sqlite",
   "with-chrono",
@@ -170,7 +170,7 @@ serde_bytes = "0.11.19"
 serde_cbor_2 = "0.13.0"
 serde_json = "1.0.145"
 serde_repr = "0.1.20"
-serde_with = { version = "3.15.1", features = ["base64"] }
+serde_with = { version = "3.16.0", features = ["base64"] }
 serde_yaml = { version = "0.9.33" } # using last version before the library was deprecated
 serial_test = "3.2.0"
 sha3 = "0.10.8"
@@ -209,7 +209,7 @@ tower-http = { version = "0.6.6", features = [
   "sensitive-headers",
 ] }
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
-oas3 = "0.19.0"
+oas3 = "0.20.0"
 urlencoding = "2.1.3"
 utoipa = { version = "5.4.0" }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
