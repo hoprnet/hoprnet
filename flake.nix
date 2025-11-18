@@ -887,32 +887,32 @@
             settings.formatter.rustfmt = {
               command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
             };
-          #   settings.formatter.solc = {
-          #     command = "sh";
-          #     options = [
-          #       "-euc"
-          #       ''
-          #         # must generate the foundry.toml here, since this step could
-          #         # be executed in isolation
-          #         if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
-          #           echo "solc = \"${solcDefault}/bin/solc\""
-          #           echo "Generating foundry.toml file!"
-          #           sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-          #             ethereum/contracts/foundry.in.toml >| \
-          #             ethereum/contracts/foundry.toml
-          #         else
-          #           echo "foundry.toml file already exists!"
-          #         fi
+            #   settings.formatter.solc = {
+            #     command = "sh";
+            #     options = [
+            #       "-euc"
+            #       ''
+            #         # must generate the foundry.toml here, since this step could
+            #         # be executed in isolation
+            #         if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
+            #           echo "solc = \"${solcDefault}/bin/solc\""
+            #           echo "Generating foundry.toml file!"
+            #           sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+            #             ethereum/contracts/foundry.in.toml >| \
+            #             ethereum/contracts/foundry.toml
+            #         else
+            #           echo "foundry.toml file already exists!"
+            #         fi
 
-          #         for file in "$@"; do
-          #           ${pkgs.foundry-bin}/bin/forge fmt $file \
-          #             --root ./ethereum/contracts;
-          #         done
-          #       ''
-          #       "--"
-          #     ];
-          #     includes = [ "*.sol" ];
-          #   };
+            #         for file in "$@"; do
+            #           ${pkgs.foundry-bin}/bin/forge fmt $file \
+            #             --root ./ethereum/contracts;
+            #         done
+            #       ''
+            #       "--"
+            #     ];
+            #     includes = [ "*.sol" ];
+            #   };
           };
 
           checks = {

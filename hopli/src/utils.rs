@@ -3,20 +3,20 @@
 use std::str::FromStr;
 
 use SafeContract::SafeContractInstance;
-use hopr_bindings::exports::alloy::{
-    self,
-    contract::{Error as ContractError, Result as ContractResult},
-    hex::FromHexError,
-    network::{ReceiptResponse, TransactionBuilder},
-    primitives::{self, Address, Bytes, U256, address, aliases, keccak256},
-    providers::{MULTICALL3_ADDRESS, MulticallError, PendingTransactionError},
-    rpc::types::TransactionRequest,
-    signers::{Signer, local::PrivateKeySigner},
-    sol,
-    sol_types::{SolCall, SolValue},
-    transports::TransportErrorKind,
-};
 use hopr_bindings::{
+    exports::alloy::{
+        self,
+        contract::{Error as ContractError, Result as ContractResult},
+        hex::FromHexError,
+        network::{ReceiptResponse, TransactionBuilder},
+        primitives::{self, Address, Bytes, U256, address, aliases, keccak256},
+        providers::{MULTICALL3_ADDRESS, MulticallError, PendingTransactionError},
+        rpc::types::TransactionRequest,
+        signers::{Signer, local::PrivateKeySigner},
+        sol,
+        sol_types::{SolCall, SolValue},
+        transports::TransportErrorKind,
+    },
     hopr_announcements::{HoprAnnouncements, HoprAnnouncements::HoprAnnouncementsInstance},
     hopr_channels::{HoprChannels, HoprChannels::HoprChannelsInstance},
     hopr_node_management_module::{
