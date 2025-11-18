@@ -24,8 +24,6 @@ sha3 = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 
-hopr-bindings = { workspace = true }
-
 [dev-dependencies]
 anyhow = { workspace = true }
 hex-literal = { workspace = true }

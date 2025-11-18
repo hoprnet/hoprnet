@@ -13,7 +13,6 @@ async-trait = { workspace = true }
 auto_impl = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
 multiaddr = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }

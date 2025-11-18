@@ -35,7 +35,6 @@ capture = ["hopr-transport-protocol/capture"]
 
 [dependencies]
 async-trait = { workspace = true }
-async-lock = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
@@ -52,7 +51,6 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
@@ -63,7 +61,6 @@ hopr-protocol-app = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
-hopr-parallelize = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }

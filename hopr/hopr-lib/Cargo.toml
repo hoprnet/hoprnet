@@ -79,7 +79,6 @@ rand = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
-serde_json = { workspace = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
@@ -90,7 +89,6 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-api = { workspace = true }
-hopr-bindings = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
