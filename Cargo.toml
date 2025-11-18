@@ -71,7 +71,7 @@ bigdecimal = "0.4.9"
 bimap = "0.6.3"
 bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
-blokli-client = { git = "https://github.com/hoprnet/blokli" }
+blokli-client = { git = "https://github.com/hoprnet/blokli", branch = "tb/202511-fix-hopr-lib" }
 bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.2.0", features = ["serde"] }
 bytes = "1.11.0"
@@ -230,7 +230,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
-hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "0efd78c1" }
+hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "8b5940d" } # master branch from 18.11.2025
 hopr-chain-connector = { path = "chain/connector" }
 hopr-chain-types = { path = "chain/types" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }

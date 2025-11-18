@@ -28,8 +28,10 @@ pub enum HoprLibProcess {
     SessionServer,
     #[strum(to_string = "flush operation of outgoing ticket indices to the DB")]
     TicketIndexFlush,
-    #[strum(to_string = "driver of the ticket redemption queue")]
+    #[strum(to_string = "ticket redemption queue driver")]
     TicketRedemptions,
-    #[strum(to_string = "subscription process for chain events")]
-    ChainSubscription,
+    #[strum(to_string = "subscription for on-chain account announcements")]
+    AccountAnnouncements,
+    #[strum(to_string = "subscription for on-chain channel announcements")]
+    ChannelEvents,
 }

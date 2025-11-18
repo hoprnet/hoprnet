@@ -87,7 +87,6 @@
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
-              ./chain/config/data
               ./ethereum/contracts/contracts-addresses.json
               ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
