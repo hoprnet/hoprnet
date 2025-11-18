@@ -2,12 +2,13 @@ use std::{str::FromStr, time::Duration};
 
 use anyhow::Context;
 use futures_time::future::FutureExt as _;
+use hopr_chain_connector::testing::{BlokliTestClient, FullStateEmulator};
 use hopr_lib::{
     HoprBalance, RoutingOptions, SessionCapabilities, SessionClientConfig, SessionTarget, SurbBalancerConfig,
     errors::{HoprLibError, HoprTransportError},
     exports::transport::session::{IpOrHost, SealedHost},
     testing::{
-        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes, exclusive_indexes_not_auto_redeeming},
+        fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, build_cluster_fixture, chainenv_fixture},
         hopr::ChannelGuard,
     },
 };
@@ -16,15 +17,20 @@ use rstest::rstest;
 use serial_test::serial;
 use tokio::time::sleep;
 
-const FUNDING_AMOUNT: &str = "1 wxHOPR";
+#[rstest::fixture]
+pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+    build_cluster_fixture(chainenv_fixture, 5).await
+}
+
+const FUNDING_AMOUNT: &str = "10 wxHOPR";
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, dst] = exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
 
     let ip = IpOrHost::from_str(":0")?;
 
@@ -51,11 +57,11 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_not_auto_redeeming::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         vec![
@@ -108,12 +114,12 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     // Test keepalive as well as sending 0 hop messages without channels
-    let [src, dst] = exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
 
     let ip = IpOrHost::from_str(":0")?;
 
@@ -159,11 +165,11 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_not_auto_redeeming::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         vec![

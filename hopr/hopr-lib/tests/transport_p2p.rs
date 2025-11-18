@@ -1,19 +1,23 @@
-use std::time::Duration;
-
 use anyhow::Context;
+use hopr_chain_connector::testing::{BlokliTestClient, FullStateEmulator};
 use hopr_lib::{
     Address,
-    testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+    testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, build_cluster_fixture, chainenv_fixture},
 };
 use rstest::rstest;
 use serial_test::serial;
 
+#[rstest::fixture]
+pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+    build_cluster_fixture(chainenv_fixture, 3).await
+}
+
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [idx] = exclusive_indexes::<1>();
+    let [idx] = cluster_fixture.exclusive_indexes::<1>();
 
     let config = cluster_fixture[idx]
         .inner()
@@ -28,10 +32,10 @@ async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: Clus
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn ping_should_succeed_for_all_visible_nodes(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, dst] = exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
 
     let _ = cluster_fixture[src]
         .inner()
@@ -44,11 +48,10 @@ async fn ping_should_succeed_for_all_visible_nodes(#[future(awt)] cluster_fixtur
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-
 async fn ping_should_fail_for_self(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [random_int] = exclusive_indexes::<1>();
+    let [random_int] = cluster_fixture.exclusive_indexes::<1>();
     let res = cluster_fixture[random_int]
         .inner()
         .ping(&cluster_fixture[random_int].peer_id())
@@ -61,12 +64,12 @@ async fn ping_should_fail_for_self(#[future(awt)] cluster_fixture: ClusterGuard)
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn discovery_should_produce_the_same_public_announcements_inside_the_network(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [idx1, idx2] = exclusive_indexes::<2>();
+    let [idx1, idx2] = cluster_fixture.exclusive_indexes::<2>();
 
     let accounts_addresses_1 = cluster_fixture[idx1]
         .inner()

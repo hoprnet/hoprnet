@@ -15,10 +15,7 @@ use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::{bounded::BoundedVec, prelude::*};
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
 use lazy_static::lazy_static;
-use rand::{
-    prelude::{IteratorRandom, SliceRandom},
-    seq::index::sample,
-};
+use rand::prelude::{IteratorRandom, SliceRandom};
 use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
 
@@ -47,6 +44,11 @@ impl std::ops::Deref for ClusterGuard {
 }
 
 impl ClusterGuard {
+    /// Size of the cluster.
+    pub fn size(&self) -> usize {
+        self.cluster.len()
+    }
+
     /// Get oracle ticket price from the chain
     pub async fn get_oracle_ticket_price(&self) -> anyhow::Result<HoprBalance> {
         Ok(self.chain_client.query_chain_info().await?.ticket_price.0.parse()?)
@@ -113,24 +115,72 @@ impl ClusterGuard {
             Err(_) => Err(anyhow::anyhow!("Session opening timed out after 5s")),
         }
     }
+
+    pub fn exclusive_indexes<const N: usize>(&self) -> [usize; N] {
+        assert!(N <= self.size(), "Requested count exceeds {}", self.size());
+
+        let mut res = (0..self.size()).choose_multiple(&mut rand::thread_rng(), N);
+        res.shuffle(&mut rand::thread_rng());
+
+        res.try_into().unwrap()
+    }
+
+    pub fn exclusive_indexes_not_auto_redeeming<const N: usize>(&self) -> [usize; N] {
+        assert!(N <= self.size(), "Requested count exceeds {}", self.size());
+        assert!(N <= (self.size() + 1) / 2, "Not enough non-auto-redeeming nodes");
+
+        let mut res = (0..self.size())
+            .filter(|i| i % 2 == 0)
+            .choose_multiple(&mut rand::thread_rng(), N);
+        res.shuffle(&mut rand::thread_rng());
+
+        res.try_into().unwrap()
+    }
+
+    pub fn exclusive_indexes_auto_redeeming<const N: usize>(&self) -> [usize; N] {
+        assert!(N <= self.size(), "Requested count exceeds {}", self.size());
+        assert!(N <= self.size() / 2, "Not enough non-auto-redeeming nodes");
+
+        let mut res = (0..self.size())
+            .filter(|i| i % 2 != 0)
+            .choose_multiple(&mut rand::thread_rng(), N);
+        res.shuffle(&mut rand::thread_rng());
+
+        res.try_into().unwrap()
+    }
+
+    /// Select N unique indexes, ensuring all intermediates indexes (not source and destination) are nodes with auto
+    /// redeem enabled
+    pub fn exclusive_indexes_with_auto_redeem_intermediaries<const N: usize>(&self) -> [usize; N] {
+        assert!(N <= self.size(), "Requested count exceeds {}", self.size());
+        assert!(N > 2, "N must be greater than 2 to have intermediaries");
+
+        let mut non_auto_redeem = (0..self.size())
+            .filter(|i| i % 2 == 0)
+            .choose_multiple(&mut rand::thread_rng(), 2);
+        non_auto_redeem.shuffle(&mut rand::thread_rng());
+
+        let mut auto_redeem = (0..self.size())
+            .filter(|i| i % 2 != 0)
+            .choose_multiple(&mut rand::thread_rng(), N - 2);
+        auto_redeem.shuffle(&mut rand::thread_rng());
+
+        let mut ret = [0; N];
+        ret[0] = non_auto_redeem[0];
+        ret[1..N - 1].copy_from_slice(&auto_redeem);
+        ret[N - 1] = non_auto_redeem[1];
+
+        ret
+    }
 }
 
 lazy_static! {
     static ref CLUSTER_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-pub const SWARM_N: usize = 3;
+pub const SWARM_N: usize = 9;
 
-pub fn exclusive_indexes<const N: usize>() -> [usize; N] {
-    assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
-    let indices = sample(&mut rand::thread_rng(), SWARM_N, N);
-    let mut arr = [0; N];
-
-    for (i, idx) in indices.iter().enumerate() {
-        arr[i] = idx;
-    }
-    arr
-}
+pub const TEST_GLOBAL_TIMEOUT: Duration = Duration::from_mins(3);
 
 lazy_static::lazy_static! {
     static ref NODE_CHAIN_KEYS: Vec<ChainKeypair> = vec![
@@ -167,54 +217,6 @@ lazy_static::lazy_static! {
         ("a3d811f7efe65fcd10b7b97ce9bf85429ef657f1".parse().unwrap(), "0ad7675c28f93a161e4b2815326af7f0e866a14e".parse().unwrap()),
         ("5eb2888c6184d9bea2d7a3ab478845b9aa5c812b".parse().unwrap(), "d8ede85de102862e2311d23263342730db18a770".parse().unwrap()),
     ];
-}
-
-pub fn exclusive_indexes_not_auto_redeeming<const N: usize>() -> [usize; N] {
-    assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
-    assert!(N <= (SWARM_N + 1) / 2, "Not enough non-auto-redeeming nodes");
-
-    let mut res = (0..SWARM_N)
-        .filter(|i| i % 2 == 0)
-        .choose_multiple(&mut rand::thread_rng(), N);
-    res.shuffle(&mut rand::thread_rng());
-
-    res.try_into().unwrap()
-}
-
-pub fn exclusive_indexes_auto_redeeming<const N: usize>() -> [usize; N] {
-    assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
-    assert!(N <= SWARM_N / 2, "Not enough non-auto-redeeming nodes");
-
-    let mut res = (0..SWARM_N)
-        .filter(|i| i % 2 != 0)
-        .choose_multiple(&mut rand::thread_rng(), N);
-    res.shuffle(&mut rand::thread_rng());
-
-    res.try_into().unwrap()
-}
-
-/// Select N unique indexes, ensuring all intermediates indexes (not source and destination) are nodes with auto redeem
-/// enabled
-pub fn exclusive_indexes_with_auto_redeem_intermediaries<const N: usize>() -> [usize; N] {
-    assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
-    assert!(N > 2, "N must be greater than 2 to have intermediaries");
-
-    let mut non_auto_redeem = (0..SWARM_N)
-        .filter(|i| i % 2 == 0)
-        .choose_multiple(&mut rand::thread_rng(), 2);
-    non_auto_redeem.shuffle(&mut rand::thread_rng());
-
-    let mut auto_redeem = (0..SWARM_N)
-        .filter(|i| i % 2 != 0)
-        .choose_multiple(&mut rand::thread_rng(), N - 2);
-    auto_redeem.shuffle(&mut rand::thread_rng());
-
-    let mut ret = [0; N];
-    ret[0] = non_auto_redeem[0];
-    ret[1..N - 1].copy_from_slice(&auto_redeem);
-    ret[N - 1] = non_auto_redeem[1];
-
-    ret
 }
 
 pub const INITIAL_SAFE_NATIVE: u64 = 1;
@@ -256,19 +258,18 @@ pub async fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
         .build_dynamic_client([0u8; Address::SIZE].into()) // Placeholder module address, to be filled in later
 }
 
-#[rstest::fixture]
-pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
-    if !(3..=9).contains(&SWARM_N) {
-        panic!("SWARM_N must be between 3 and 9");
+pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmulator>, size: usize) -> ClusterGuard {
+    if !(1..=SWARM_N).contains(&size) {
+        panic!("{size} must be between 1 and {SWARM_N}");
     }
 
     // Acquire the mutex lock to ensure exclusive access to the cluster
     let lock = CLUSTER_MUTEX.lock().await;
 
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
-    let onchain_keys = NODE_CHAIN_KEYS[0..SWARM_N].to_vec();
-    let offchain_keys = NODE_OFFCHAIN_KEYS[0..SWARM_N].to_vec();
-    let safes = NODE_SAFES_MODULES[0..SWARM_N]
+    let onchain_keys = NODE_CHAIN_KEYS[0..size].to_vec();
+    let offchain_keys = NODE_OFFCHAIN_KEYS[0..size].to_vec();
+    let safes = NODE_SAFES_MODULES[0..size]
         .iter()
         .map(|(safe, module)| NodeSafeConfig {
             safe_address: safe.clone(),
@@ -276,15 +277,15 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
         })
         .collect::<Vec<_>>();
 
-    // Setup SWARM_N nodes
-    let hopr_instances: Vec<TestedHopr> = (0..SWARM_N)
+    // Setup nodes
+    let cluster: Vec<TestedHopr> = (0..size)
         .map(|i| {
             let onchain_keys = onchain_keys.clone();
             let offchain_keys = offchain_keys.clone();
             let safes = safes.clone();
             let lower_win_prob = i % 2 != 0; // every other node uses a lower winn_prob
 
-            let blokli_client = chainenv_fixture
+            let blokli_client = chain_client
                 .clone()
                 .with_mutator(FullStateEmulator::new(safes[i].module_address.clone()));
 
@@ -296,7 +297,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                         std::thread::available_parallelism()
                             .map(|v| v.get())
                             .unwrap_or(1)
-                            .div(SWARM_N)
+                            .div(size)
                             .max(3)
                             - 1,
                     )
@@ -309,6 +310,9 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                     let node_db = HoprNodeDb::new_in_memory(onchain_keys[i].clone())
                         .await
                         .expect("failed to create HoprNodeDb for node");
+                    node_db
+                        .start_ticket_processing(Some(futures::sink::drain()))
+                        .expect("failed to start ticket processing");
 
                     blokli_client.update_price_and_win_prob(None, lower_win_prob.then_some(0.2));
 
@@ -352,31 +356,30 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
         .expect("one or more HOPR nodes could not be created");
 
     // Wait for all nodes to reach the 'Running' state
-    futures::future::try_join_all(hopr_instances.iter().map(|instance| {
+    futures::future::try_join_all(cluster.iter().map(|instance| {
         wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(180))
     }))
     .await
     .expect("status wait failed");
 
     // Wait for full mesh connectivity
-    futures::future::try_join_all(
-        hopr_instances
-            .iter()
-            .map(|instance| wait_for_connectivity(instance).timeout(futures_time::time::Duration::from_secs(120))),
-    )
+    let swarm_size = cluster.len();
+    futures::future::try_join_all(cluster.iter().map(|instance| {
+        wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(120))
+    }))
     .await
     .expect("connectivity wait failed");
 
-    info!("CLUSTER STARTED");
+    info!(swarm_size, "CLUSTER STARTED");
 
     ClusterGuard {
-        cluster: hopr_instances,
-        chain_client: chainenv_fixture,
+        cluster,
+        chain_client,
         _lock: lock,
     }
 }
 
-async fn wait_for_connectivity(instance: &TestedHopr) {
+async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {
     info!("Waiting for full connectivity");
     loop {
         let peers = instance
@@ -385,7 +388,7 @@ async fn wait_for_connectivity(instance: &TestedHopr) {
             .await
             .expect("failed to get connected peers");
 
-        if peers.len() == SWARM_N - 1 {
+        if peers.len() == swarm_size - 1 {
             break;
         }
 

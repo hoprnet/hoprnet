@@ -2,12 +2,10 @@ use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
 use futures::AsyncWriteExt;
+use hopr_chain_connector::testing::{BlokliTestClient, FullStateEmulator};
 use hopr_lib::{
     ChannelId, HoprBalance,
-    testing::fixtures::{
-        ClusterGuard, cluster_fixture, exclusive_indexes_auto_redeeming, exclusive_indexes_not_auto_redeeming,
-        exclusive_indexes_with_auto_redeem_intermediaries,
-    },
+    testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, build_cluster_fixture, chainenv_fixture},
 };
 use rstest::rstest;
 use serial_test::serial;
@@ -15,14 +13,19 @@ use tokio::time::sleep;
 
 const FUNDING_AMOUNT: &str = "1 wxHOPR";
 
+#[rstest::fixture]
+pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+    build_cluster_fixture(chainenv_fixture, 5).await
+}
+
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(Duration::from_mins(2))]
 #[serial]
 async fn ticket_statistics_should_reset_when_cleaned(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_not_auto_redeeming::<3>();
 
     let (mut session, fw_channels, bw_channels) = cluster_fixture
         .create_session_between(src, mid, dst, FUNDING_AMOUNT.parse::<HoprBalance>()?)
@@ -94,13 +97,13 @@ async fn ticket_statistics_should_reset_when_cleaned(
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_not_auto_redeeming::<3>();
 
     let ticket_price = cluster_fixture[src]
         .inner()
@@ -144,11 +147,11 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_not_auto_redeeming::<3>();
     let message_count = 10;
 
     let ticket_price = cluster_fixture[src]
@@ -205,11 +208,11 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_not_auto_redeeming::<3>();
 
     let message_count = 3;
 
@@ -273,13 +276,13 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_relay_with_reduced_winn_prob(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     cluster_fixture.update_winning_probability(0.2).await?; // reduced to match the relayers custom winn prob
 
-    let [src, mid, dst] = exclusive_indexes_with_auto_redeem_intermediaries::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_with_auto_redeem_intermediaries::<3>();
     let message_count = 10;
 
     let ticket_price = cluster_fixture[src]
@@ -330,7 +333,7 @@ async fn test_relay_with_reduced_winn_prob(#[future(awt)] cluster_fixture: Clust
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
@@ -338,7 +341,7 @@ async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
 ) -> anyhow::Result<()> {
     cluster_fixture.update_winning_probability(0.5).await?;
 
-    let [src, mid, dst] = exclusive_indexes_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_auto_redeeming::<3>();
     let message_count = 20;
 
     let ticket_price = cluster_fixture[src]
@@ -362,7 +365,7 @@ async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
 
 #[rstest]
 #[test_log::test(tokio::test)]
-#[timeout(Duration::from_mins(1))]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn relay_with_winn_prob_higher_than_min_win_prob_should_succeed(
@@ -370,7 +373,7 @@ async fn relay_with_winn_prob_higher_than_min_win_prob_should_succeed(
 ) -> anyhow::Result<()> {
     cluster_fixture.update_winning_probability(0.1).await?;
 
-    let [src, mid, dst] = exclusive_indexes_with_auto_redeem_intermediaries::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indexes_with_auto_redeem_intermediaries::<3>();
     let message_count = 20;
 
     let ticket_price = cluster_fixture[src]
