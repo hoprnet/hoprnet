@@ -19,7 +19,7 @@ use tokio::time::sleep;
 const FUNDING_AMOUNT: &str = "1 wxHOPR";
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {

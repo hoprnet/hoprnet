@@ -7,7 +7,7 @@ use rstest::rstest;
 use serial_test::serial;
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[serial]
 async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [idx] = exclusive_indexes::<1>();

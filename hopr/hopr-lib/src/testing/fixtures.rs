@@ -15,6 +15,7 @@ use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::{bounded::BoundedVec, prelude::*};
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
 use lazy_static::lazy_static;
+use rand::prelude::{IteratorRandom, SliceRandom};
 use rand::seq::index::sample;
 use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
@@ -170,30 +171,24 @@ pub fn exclusive_indexes_not_auto_redeeming<const N: usize>() -> [usize; N] {
     assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
     assert!(N <= (SWARM_N + 1) / 2, "Not enough non-auto-redeeming nodes");
 
-    let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 == 0).collect();
-    let selected_indices = sample(&mut rand::thread_rng(), not_auto_redeem_indices_candidates.len(), N);
-    let mut arr = [0; N];
+    let mut res = (0..SWARM_N)
+        .filter(|i| i % 2 == 0)
+        .choose_multiple(&mut rand::thread_rng(), N);
+    res.shuffle(&mut rand::thread_rng());
 
-    for (i, idx) in selected_indices.iter().enumerate() {
-        arr[i] = not_auto_redeem_indices_candidates[idx];
-    }
-
-    arr
+    res.try_into().unwrap()
 }
 
 pub fn exclusive_indexes_auto_redeeming<const N: usize>() -> [usize; N] {
     assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
     assert!(N <= SWARM_N / 2, "Not enough non-auto-redeeming nodes");
 
-    let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 != 0).collect();
-    let selected_indices = sample(&mut rand::thread_rng(), not_auto_redeem_indices_candidates.len(), N);
-    let mut arr = [0; N];
+    let mut res = (0..SWARM_N)
+        .filter(|i| i % 2 != 0)
+        .choose_multiple(&mut rand::thread_rng(), N);
+    res.shuffle(&mut rand::thread_rng());
 
-    for (i, idx) in selected_indices.iter().enumerate() {
-        arr[i] = not_auto_redeem_indices_candidates[idx];
-    }
-
-    arr
+    res.try_into().unwrap()
 }
 
 /// Select N unique indexes, ensuring all intermediates indexes (not source and destination) are nodes with auto redeem
@@ -202,25 +197,29 @@ pub fn exclusive_indexes_with_auto_redeem_intermediaries<const N: usize>() -> [u
     assert!(N <= SWARM_N, "Requested count exceeds SWARM_N");
     assert!(N > 2, "N must be greater than 2 to have intermediaries");
 
-    let auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 != 0).collect();
-    let not_auto_redeem_indices_candidates: Vec<usize> = (0..SWARM_N).filter(|i| i % 2 == 0).collect();
+    let mut non_auto_redeem = (0..SWARM_N)
+        .filter(|i| i % 2 == 0)
+        .choose_multiple(&mut rand::thread_rng(), 2);
+    non_auto_redeem.shuffle(&mut rand::thread_rng());
 
-    let auto_redeeming_indices = sample(&mut rand::thread_rng(), auto_redeem_indices_candidates.len(), N - 2);
-    let non_auto_redeeming_index = sample(&mut rand::thread_rng(), not_auto_redeem_indices_candidates.len(), 2);
-    let mut arr = [0; N];
+    let mut auto_redeem = (0..SWARM_N)
+        .filter(|i| i % 2 != 0)
+        .choose_multiple(&mut rand::thread_rng(), N - 2);
+    auto_redeem.shuffle(&mut rand::thread_rng());
 
-    // Select source and destination from non-auto-redeem nodes
-    let non_auto_redeeming = non_auto_redeeming_index.iter().collect::<Vec<_>>();
-    arr[0] = not_auto_redeem_indices_candidates[non_auto_redeeming[0]];
-    arr[N - 1] = not_auto_redeem_indices_candidates[non_auto_redeeming[1]];
+    let mut ret = [0; N];
+    ret[0] = non_auto_redeem[0];
+    ret[1..N-1].copy_from_slice(&auto_redeem);
+    ret[N-1] = non_auto_redeem[1];
 
-    // Select intermediaries from auto-redeem nodes
-    for (i, idx) in auto_redeeming_indices.iter().enumerate() {
-        arr[i + 1] = auto_redeem_indices_candidates[idx];
-    }
-
-    arr
+    ret
 }
+
+pub const INITIAL_SAFE_NATIVE: u64 = 1;
+pub const INITIAL_SAFE_TOKEN: u64 = 1000;
+pub const INITIAL_NODE_NATIVE: u64 = 1;
+pub const INITIAL_NODE_TOKEN: u64 = 10;
+pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1000_000_000_000_u128;
 
 #[rstest::fixture]
 pub async fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
@@ -228,17 +227,27 @@ pub async fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
         .with_balances(
             NODE_CHAIN_KEYS
                 .iter()
-                .map(|c| (c.public().to_address(), XDaiBalance::new_base(1))),
+                .map(|c| (c.public().to_address(), XDaiBalance::new_base(INITIAL_NODE_NATIVE))),
+        )
+        .with_balances(
+            NODE_CHAIN_KEYS
+                .iter()
+                .map(|c| (c.public().to_address(), HoprBalance::new_base(INITIAL_NODE_TOKEN))),
         )
         .with_balances(
             NODE_SAFES_MODULES
                 .iter()
-                .map(|(safe_addr, _)| (*safe_addr, HoprBalance::new_base(1000))),
+                .map(|&(safe_addr,_)| (safe_addr, XDaiBalance::new_base(INITIAL_SAFE_NATIVE))),
+        )
+        .with_balances(
+            NODE_SAFES_MODULES
+                .iter()
+                .map(|&(safe_addr, _)| (safe_addr, HoprBalance::new_base(INITIAL_SAFE_TOKEN))),
         )
         .with_safe_allowances(
             NODE_SAFES_MODULES
                 .iter()
-                .map(|(safe_addr, _)| (*safe_addr, HoprBalance::new_base(1000_000_000_000_u128))),
+                .map(|&(safe_addr, _)| (safe_addr, HoprBalance::new_base(DEFAULT_SAFE_ALLOWANCE))),
         )
         .with_minimum_win_prob(WinningProbability::ALWAYS)
         .with_ticket_price(HoprBalance::new_base(1))

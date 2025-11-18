@@ -281,7 +281,6 @@ pub(super) async fn peers(
         .accounts_announced_on_chain()
         .await?
         .into_iter()
-        .filter(|a| a.has_announced())
         .map(|announced| async move {
             AnnouncedPeer {
                 address: announced.chain_addr,

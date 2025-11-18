@@ -32,6 +32,6 @@ pub enum HoprLibProcess {
     TicketRedemptions,
     #[strum(to_string = "subscription for on-chain account announcements")]
     AccountAnnouncements,
-    #[strum(to_string = "subscription for on-chain channel announcements")]
+    #[strum(to_string = "subscription for on-chain channel updates")]
     ChannelEvents,
 }

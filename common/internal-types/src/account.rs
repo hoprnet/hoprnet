@@ -44,10 +44,11 @@ impl AccountEntry {
     }
 
     /// If the node has announced, did it announce with routing information?
-    pub fn contains_routing_info(&self) -> bool {
+    pub fn has_announced_with_routing_info(&self) -> bool {
         match &self.entry_type {
             AccountType::NotAnnounced => false,
-            AccountType::Announced(multiaddrs) => multiaddrs.iter().all(|multiaddr| {
+            AccountType::Announced(multiaddrs) => !multiaddrs.is_empty() &&
+                multiaddrs.iter().all(|multiaddr| {
                 multiaddr
                     .protocol_stack()
                     .any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
@@ -118,7 +119,7 @@ mod tests {
         };
 
         assert!(ae1.has_announced());
-        assert!(!ae1.contains_routing_info());
+        assert!(!ae1.has_announced_with_routing_info());
 
         Ok(())
     }
@@ -139,7 +140,7 @@ mod tests {
         };
 
         assert!(ae1.has_announced());
-        assert!(ae1.contains_routing_info());
+        assert!(ae1.has_announced_with_routing_info());
 
         let ae1 = AccountEntry {
             public_key,
@@ -152,7 +153,7 @@ mod tests {
         };
 
         assert!(ae1.has_announced());
-        assert!(ae1.contains_routing_info());
+        assert!(ae1.has_announced_with_routing_info());
 
         Ok(())
     }
@@ -171,7 +172,7 @@ mod tests {
         };
 
         assert!(!ae1.has_announced());
-        assert!(!ae1.contains_routing_info());
+        assert!(!ae1.has_announced_with_routing_info());
 
         Ok(())
     }

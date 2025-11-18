@@ -11,6 +11,7 @@ use hopr_lib::{
 };
 use rstest::rstest;
 use serial_test::serial;
+use hopr_lib::testing::fixtures::{DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE, INITIAL_SAFE_TOKEN};
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
@@ -48,30 +49,14 @@ async fn test_get_balance(#[future(awt)] cluster_fixture: ClusterGuard) -> anyho
         .await
         .context("should get safe hopr allowance")?;
 
-    assert_ne!(safe_native, XDaiBalance::zero());
-    assert_ne!(native, XDaiBalance::zero());
-    assert_ne!(safe_hopr, HoprBalance::zero());
-    assert_eq!(hopr, HoprBalance::zero());
-    assert_ne!(safe_allowance, HoprBalance::zero());
+    assert_eq!(safe_native, XDaiBalance::new_base(INITIAL_SAFE_NATIVE));
+    assert_ne!(native, XDaiBalance::new_base(INITIAL_NODE_NATIVE)); // Node made some TXs
+    assert_eq!(safe_hopr, HoprBalance::new_base(INITIAL_SAFE_TOKEN));
+    assert_eq!(hopr, HoprBalance::new_base(INITIAL_NODE_TOKEN));
+    assert_eq!(safe_allowance, HoprBalance::new_base(DEFAULT_SAFE_ALLOWANCE));
 
     Ok(())
 }
-
-// #[rstest]
-// #[tokio::test]
-// #[serial]
-// async fn test_safe_and_module_shouldnt_change(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-// let [idx] = exclusive_indexes::<1>();
-// let safe_address = cluster_fixture[idx].inner().get_safe_config();
-//
-// assert_eq!(
-// safe_address.module_address,
-// cluster_fixture[idx].safe_config.module_address
-// );
-// assert_eq!(safe_address.safe_address, cluster_fixture[idx].safe_config.safe_address);
-//
-// Ok(())
-// }
 
 #[rstest]
 #[test_log::test(tokio::test)]
@@ -304,6 +289,7 @@ async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: Cluster
         .await
         .context("failed to get winning probability")?;
 
+    tracing::debug!("winning prob: {}", winning_prob.as_f64());
     assert!(winning_prob.approx_eq(&WinningProbability::ALWAYS));
 
     Ok(())

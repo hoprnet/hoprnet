@@ -72,7 +72,7 @@ pub struct AccountSelector {
 
 impl AccountSelector {
     pub fn satisfies(&self, account: &AccountEntry) -> bool {
-        if self.public_only && !account.has_announced() {
+        if self.public_only && !account.has_announced_with_routing_info() {
             return false;
         }
 

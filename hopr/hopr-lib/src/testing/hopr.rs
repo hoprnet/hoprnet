@@ -100,9 +100,11 @@ impl TestedHopr {
 impl Drop for TestedHopr {
     fn drop(&mut self) {
         let _ = self.instance.shutdown();
+        std::thread::sleep(Duration::from_secs(1));
         if let Some(runtime) = self.runtime.take() {
             runtime.shutdown_background();
         }
+        tracing::debug!("hopr instance dropped");
     }
 }
 

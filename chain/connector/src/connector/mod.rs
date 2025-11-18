@@ -286,7 +286,7 @@ where
                                 tracing::debug!(%new_account, "account inserted");
                                 // We only track public accounts as events and also
                                 // broadcast announcements of already existing accounts (old_account == None).
-                                if new_account.has_announced() && old_account.is_none_or(|a| !a.has_announced()) {
+                                if new_account.has_announced_with_routing_info() && old_account.is_none_or(|a| !a.has_announced_with_routing_info()) {
                                     tracing::debug!(account = %new_account, "new announcement");
                                     let _ = event_tx
                                         .broadcast_direct(ChainEvent::Announcement(new_account.clone()))

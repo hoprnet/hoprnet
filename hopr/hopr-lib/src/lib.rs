@@ -488,6 +488,7 @@ where
                             .map(Ok)
                             .forward(indexer_peer_update_tx)
                             .await;
+
                         tracing::warn!(
                             task = %HoprLibProcess::AccountAnnouncements,
                             ?res,
@@ -568,11 +569,11 @@ where
             .filter(|&c| c > 0)
             .unwrap_or(256);
 
-        debug!(capacity = incoming_session_channel_capacity, "creating session server");
-        let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
 
+        let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
         #[cfg(feature = "session-server")]
         {
+            debug!(capacity = incoming_session_channel_capacity, "creating session server");
             processes.insert(
                 HoprLibProcess::SessionServer,
                 hopr_async_runtime::spawn_as_abortable!(
@@ -657,10 +658,10 @@ where
         let chain = self.chain_api.clone();
         let node_db = self.node_db.clone();
         let events = chain.subscribe().map_err(HoprLibError::chain)?;
-        spawn(async move {
+        spawn(
             futures::stream::Abortable::new(
                 events
-                    .filter_map(|event|
+                    .filter_map(move |event|
                         futures::future::ready(
                             event
                                 .try_as_channel_closed()
@@ -669,15 +670,16 @@ where
                     ),
                 chain_events_sub_reg
             )
-            .for_each(|closed_channel| {
+            .for_each(move |closed_channel| {
                 let node_db = node_db.clone();
                 async move {
                     if let Err(error) = node_db.mark_tickets_as(closed_channel.into(), TicketMarker::Neglected).await {
                         error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
                     }
                 }
-            }).await;
-        });
+            })
+            .inspect(|_| tracing::warn!(task = %HoprLibProcess::ChannelEvents, "long-running background task finished"))
+        );
 
         // NOTE: after the chain is synced, we can reset tickets which are considered
         // redeemed but on-chain state does not align with that. This implies there was a problem
@@ -765,16 +767,12 @@ where
             })
             .map_err(HoprLibError::chain)
             .await?
-            .filter_map(|entry| {
-                futures::future::ready(if entry.has_announced() {
-                    Some((
+            .map(|entry| {
+                    (
                         PeerId::from(entry.public_key),
                         entry.chain_addr,
                         entry.get_multiaddrs().to_vec(),
-                    ))
-                } else {
-                    None
-                })
+                    )
             })
             .collect()
             .await)
