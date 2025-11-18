@@ -87,7 +87,6 @@
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
-              ./chain/config/data
               ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "rs") ./.)
               (fs.fileFilter (file: file.hasExt "toml") ./.)
@@ -99,7 +98,6 @@
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
-              ./chain/config/data
               ./hopr/hopr-lib/tests
               ./hoprd/hoprd/example_cfg.yaml
               (fs.fileFilter (file: file.hasExt "rs") ./.)
