@@ -83,7 +83,7 @@ use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, channel::mpsc::channe
 use futures_concurrency::stream::Chain;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
-    db::{HoprNodeDbApi, PeerStatus, TicketSelector},
+    db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
@@ -98,7 +98,7 @@ pub use hopr_primitive_types::prelude::*;
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
 use tracing::{debug, error, info, trace, warn};
-use hopr_api::db::TicketMarker;
+
 pub use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
