@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use hopr_lib::testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes};
 use rstest::rstest;
@@ -5,6 +7,7 @@ use serial_test::serial;
 
 #[rstest]
 #[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(
     #[future(awt)] cluster_fixture: ClusterGuard,

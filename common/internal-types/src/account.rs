@@ -47,13 +47,15 @@ impl AccountEntry {
     pub fn has_announced_with_routing_info(&self) -> bool {
         match &self.entry_type {
             AccountType::NotAnnounced => false,
-            AccountType::Announced(multiaddrs) => !multiaddrs.is_empty() &&
-                multiaddrs.iter().all(|multiaddr| {
-                multiaddr
-                    .protocol_stack()
-                    .any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
-                    && multiaddr.protocol_stack().any(|p| p == "tcp" || p == "udp")
-            }),
+            AccountType::Announced(multiaddrs) => {
+                !multiaddrs.is_empty()
+                    && multiaddrs.iter().all(|multiaddr| {
+                        multiaddr
+                            .protocol_stack()
+                            .any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
+                            && multiaddr.protocol_stack().any(|p| p == "tcp" || p == "udp")
+                    })
+            }
         }
     }
 

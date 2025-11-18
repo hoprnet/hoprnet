@@ -15,8 +15,10 @@ use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::{bounded::BoundedVec, prelude::*};
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
 use lazy_static::lazy_static;
-use rand::prelude::{IteratorRandom, SliceRandom};
-use rand::seq::index::sample;
+use rand::{
+    prelude::{IteratorRandom, SliceRandom},
+    seq::index::sample,
+};
 use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
 
@@ -209,8 +211,8 @@ pub fn exclusive_indexes_with_auto_redeem_intermediaries<const N: usize>() -> [u
 
     let mut ret = [0; N];
     ret[0] = non_auto_redeem[0];
-    ret[1..N-1].copy_from_slice(&auto_redeem);
-    ret[N-1] = non_auto_redeem[1];
+    ret[1..N - 1].copy_from_slice(&auto_redeem);
+    ret[N - 1] = non_auto_redeem[1];
 
     ret
 }
@@ -237,7 +239,7 @@ pub async fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
         .with_balances(
             NODE_SAFES_MODULES
                 .iter()
-                .map(|&(safe_addr,_)| (safe_addr, XDaiBalance::new_base(INITIAL_SAFE_NATIVE))),
+                .map(|&(safe_addr, _)| (safe_addr, XDaiBalance::new_base(INITIAL_SAFE_NATIVE))),
         )
         .with_balances(
             NODE_SAFES_MODULES

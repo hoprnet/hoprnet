@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use hopr_lib::{
     Address,
@@ -8,6 +10,7 @@ use serial_test::serial;
 
 #[rstest]
 #[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [idx] = exclusive_indexes::<1>();
@@ -24,7 +27,8 @@ async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: Clus
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 async fn ping_should_succeed_for_all_visible_nodes(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = exclusive_indexes::<2>();
@@ -39,7 +43,8 @@ async fn ping_should_succeed_for_all_visible_nodes(#[future(awt)] cluster_fixtur
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 
 async fn ping_should_fail_for_self(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
@@ -55,7 +60,8 @@ async fn ping_should_fail_for_self(#[future(awt)] cluster_fixture: ClusterGuard)
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 async fn discovery_should_produce_the_same_public_announcements_inside_the_network(
     #[future(awt)] cluster_fixture: ClusterGuard,

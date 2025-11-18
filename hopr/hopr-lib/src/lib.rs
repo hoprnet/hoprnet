@@ -569,7 +569,6 @@ where
             .filter(|&c| c > 0)
             .unwrap_or(256);
 
-
         let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
         #[cfg(feature = "session-server")]
         {
@@ -768,11 +767,11 @@ where
             .map_err(HoprLibError::chain)
             .await?
             .map(|entry| {
-                    (
-                        PeerId::from(entry.public_key),
-                        entry.chain_addr,
-                        entry.get_multiaddrs().to_vec(),
-                    )
+                (
+                    PeerId::from(entry.public_key),
+                    entry.chain_addr,
+                    entry.get_multiaddrs().to_vec(),
+                )
             })
             .collect()
             .await)

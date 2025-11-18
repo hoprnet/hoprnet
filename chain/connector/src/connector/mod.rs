@@ -184,17 +184,20 @@ where
             }
 
             let (account_stream, channel_stream) = connections.unwrap();
+            let graph_clone = graph.clone();
             let account_stream = account_stream
                 .inspect_ok(|entry| tracing::trace!(?entry, "new account entry"))
                 .map_err(ConnectorError::from)
                 .try_filter_map(|account| futures::future::ready(model_to_account_entry(account).map(Some)))
                 .and_then(move |account| {
+                    let graph = graph_clone.clone();
                     let mapper = mapper.clone();
                     let chain_to_packet = chain_to_packet.clone();
                     let packet_to_chain = packet_to_chain.clone();
                     hopr_async_runtime::prelude::spawn_blocking(move || {
                         mapper.key_to_id.insert(account.public_key, Some(account.key_id));
                         mapper.id_to_key.insert(account.key_id, Some(account.public_key));
+                        graph.write().add_node(account.key_id);
                         mapper.backend.insert_account(account.clone()).map(|old| (account, old))
                     })
                     .map_err(|e| ConnectorError::BackendError(e.into()))
@@ -286,7 +289,9 @@ where
                                 tracing::debug!(%new_account, "account inserted");
                                 // We only track public accounts as events and also
                                 // broadcast announcements of already existing accounts (old_account == None).
-                                if new_account.has_announced_with_routing_info() && old_account.is_none_or(|a| !a.has_announced_with_routing_info()) {
+                                if new_account.has_announced_with_routing_info()
+                                    && old_account.is_none_or(|a| !a.has_announced_with_routing_info())
+                                {
                                     tracing::debug!(account = %new_account, "new announcement");
                                     let _ = event_tx
                                         .broadcast_direct(ChainEvent::Announcement(new_account.clone()))

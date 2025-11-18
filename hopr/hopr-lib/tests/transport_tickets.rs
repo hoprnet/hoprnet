@@ -16,9 +16,9 @@ use tokio::time::sleep;
 const FUNDING_AMOUNT: &str = "1 wxHOPR";
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
-#[test_log::test]
 async fn ticket_statistics_should_reset_when_cleaned(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
@@ -93,7 +93,8 @@ async fn ticket_statistics_should_reset_when_cleaned(
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
@@ -142,7 +143,8 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
@@ -202,7 +204,8 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
@@ -269,7 +272,8 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_relay_with_reduced_winn_prob(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
@@ -325,7 +329,8 @@ async fn test_relay_with_reduced_winn_prob(#[future(awt)] cluster_fixture: Clust
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
@@ -356,7 +361,8 @@ async fn test_relay_with_winn_prob_lower_than_min_win_prob_should_fail(
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn relay_with_winn_prob_higher_than_min_win_prob_should_succeed(

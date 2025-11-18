@@ -5,13 +5,15 @@ use hopr_internal_types::prelude::WinningProbability;
 use hopr_lib::{
     ChannelId,
     testing::{
-        fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes, exclusive_indexes_not_auto_redeeming},
+        fixtures::{
+            ClusterGuard, DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE,
+            INITIAL_SAFE_TOKEN, cluster_fixture, exclusive_indexes, exclusive_indexes_not_auto_redeeming,
+        },
         hopr::TestedHopr,
     },
 };
 use rstest::rstest;
 use serial_test::serial;
-use hopr_lib::testing::fixtures::{DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE, INITIAL_SAFE_TOKEN};
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 

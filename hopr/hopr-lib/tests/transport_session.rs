@@ -20,6 +20,7 @@ const FUNDING_AMOUNT: &str = "1 wxHOPR";
 
 #[rstest]
 #[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
@@ -49,11 +50,10 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 }
 
 #[rstest]
-#[timeout(Duration::from_secs(60))]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
-#[test_log::test]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = exclusive_indexes_not_auto_redeeming::<3>();
 
@@ -107,7 +107,8 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
@@ -157,7 +158,8 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 }
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(Duration::from_mins(1))]
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
