@@ -28,7 +28,6 @@ tokio = { workspace = true }
 hopr-db-migration = { workspace = true }
 
 [dependencies]
-chrono = { workspace = true }
 sea-orm = { workspace = true }
 thiserror = { workspace = true }
 

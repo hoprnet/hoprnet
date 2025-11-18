@@ -56,7 +56,7 @@ lazy_static! {
                     AccountEntry {
                         public_key: *node_key,
                         chain_addr: chain_key.to_address(),
-                        entry_type: AccountType::Announced(format!("/ip4/127.0.0.1/tcp/444{i}").parse().unwrap()),
+                        entry_type: AccountType::Announced(vec![format!("/ip4/127.0.0.1/tcp/444{i}").parse().unwrap()]),
                         safe_address: None,
                         key_id: ((i + 1) as u32).into(),
                     },
