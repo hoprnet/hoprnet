@@ -13,7 +13,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:hopr-metrics"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
@@ -34,14 +33,11 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
-hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-protocol-app = { workspace = true }

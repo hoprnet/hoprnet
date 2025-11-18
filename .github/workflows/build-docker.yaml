@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -190,7 +190,7 @@ jobs:
 
       - name: Trigger deploy workflow if needed
         if: vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true' && inputs.package == 'hoprd' && ( env.GITHUB_PR_LABEL_DEPLOY_NODES == '1' || inputs.production )
-        uses: peter-evans/repository-dispatch@5fc4efd1a4797ddb68ffd0714a238564e4cc0e6f # v4.0.0
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           repository: ${{ github.repository }}
