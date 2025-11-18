@@ -362,6 +362,7 @@ pub(crate) struct ApiError {
 
 /// Enumerates all API request errors
 /// Note that `ApiError` should not be instantiated directly, but always rather through the `ApiErrorStatus`.
+#[allow(unused)] // TODO: some errors can no longer be propagated to the REST API
 #[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {

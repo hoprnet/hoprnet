@@ -20,7 +20,7 @@ use tokio::{sync::Mutex, time::sleep};
 use tracing::info;
 
 use crate::{
-    Address,
+    Address, DummyCoverTrafficType,
     state::HoprState,
     testing::{
         dummies::EchoServer,
@@ -326,9 +326,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
                     )
                     .await;
 
-                    let socket = instance
-                        .run(None::<crate::DummyCoverTrafficType>, EchoServer::new())
-                        .await?;
+                    let socket = instance.run(None::<DummyCoverTrafficType>, EchoServer::new()).await?;
                     anyhow::Ok((instance, socket))
                 });
 

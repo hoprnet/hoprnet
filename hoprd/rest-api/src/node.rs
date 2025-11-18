@@ -142,7 +142,7 @@ pub(crate) struct PeerInfo {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
     "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+    "multiaddrs": "[/ip4/178.12.1.9/tcp/19092]"
 }))]
 #[serde(rename_all = "camelCase")]
 /// Represents a peer that has been announced on-chain.
@@ -150,9 +150,9 @@ pub(crate) struct AnnouncedPeer {
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
     address: Address,
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
-    multiaddr: Option<Multiaddr>,
+    #[serde_as(as = "Vec<DisplayFromStr>")]
+    #[schema(value_type = Vec<String>, example = "[/ip4/178.12.1.9/tcp/19092]")]
+    multiaddrs: Vec<Multiaddr>,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -281,10 +281,11 @@ pub(super) async fn peers(
         .accounts_announced_on_chain()
         .await?
         .into_iter()
+        .filter(|a| a.has_announced())
         .map(|announced| async move {
             AnnouncedPeer {
                 address: announced.chain_addr,
-                multiaddr: announced.get_multiaddr(),
+                multiaddrs: announced.get_multiaddrs().to_vec(),
             }
         })
         .collect::<FuturesUnordered<_>>()

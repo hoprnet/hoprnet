@@ -1578,7 +1578,7 @@ dependencies = [
 [[package]]
 name = "blokli-client"
 version = "0.7.0"
-source = "git+https://github.com/hoprnet/blokli?branch=tb%2F202511-fix-hopr-lib#0729922c3c4cfc998d519b38ba3f13e180efe32b"
+source = "git+https://github.com/hoprnet/blokli?rev=a19e46f#a19e46f77cb711d95f22910bbee6938b220f47e5"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -4681,10 +4681,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-entity"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
- "chrono",
  "clap",
  "futures",
  "hopr-crypto-types",
@@ -4700,10 +4699,8 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-migration"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
- "hopr-internal-types",
- "hopr-primitive-types",
  "sea-orm-migration",
  "tokio",
 ]

@@ -207,7 +207,6 @@ async fn init_blokli_connector(
     chain_key: &ChainKeypair,
     cfg: &HoprdConfig,
 ) -> anyhow::Result<HoprBlockchainSafeConnector<BlokliClient>> {
-    // TODO: instantiate the connector properly
     info!("initiating Blokli connector");
     let mut connector = hopr_chain_connector::create_trustful_hopr_blokli_connector(
         chain_key,

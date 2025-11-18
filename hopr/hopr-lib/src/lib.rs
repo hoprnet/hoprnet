@@ -83,7 +83,7 @@ use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, channel::mpsc::channe
 use futures_concurrency::stream::Chain;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
-    db::{HoprNodeDbApi, PeerStatus, TicketSelector},
+    db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
 };
 use hopr_async_runtime::prelude::spawn;
 pub use hopr_async_runtime::{Abortable, AbortableList};
@@ -97,7 +97,7 @@ pub use hopr_primitive_types::prelude::*;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 pub use crate::{
     config::SafeModule,
@@ -454,7 +454,7 @@ where
         let hopr_chain_api = self.chain_api.clone();
         let (announcement_stream_started_tx, announcement_stream_started_rx) = futures::channel::oneshot::channel();
         processes.insert(
-            HoprLibProcess::ChainSubscription,
+            HoprLibProcess::AccountAnnouncements,
             hopr_async_runtime::spawn_as_abortable!(async move {
                 let streams = hopr_chain_api
                     .stream_accounts(AccountSelector {
@@ -471,14 +471,14 @@ where
                             past_announced.map(|account| {
                                 vec![PeerDiscovery::Announce(
                                     account.public_key.into(),
-                                    account.get_multiaddr().into_iter().collect(),
+                                    account.get_multiaddrs().to_vec(),
                                 )]
                             }),
                             future_announced.filter_map(|event| {
                                 futures::future::ready(event.try_as_announcement().map(|account| {
                                     vec![PeerDiscovery::Announce(
                                         account.public_key.into(),
-                                        account.get_multiaddr().into_iter().collect(),
+                                        account.get_multiaddrs().to_vec(),
                                     )]
                                 }))
                             }),
@@ -489,7 +489,7 @@ where
                             .forward(indexer_peer_update_tx)
                             .await;
                         tracing::warn!(
-                            task = %HoprLibProcess::ChainSubscription,
+                            task = %HoprLibProcess::AccountAnnouncements,
                             ?res,
                             "long-running background task finished"
                         );
@@ -618,7 +618,7 @@ where
                     let node_db = node_db.clone();
                     async move {
                         match node_db.persist_outgoing_ticket_indices().await {
-                            Ok(count) => debug!(count, "successfully flushed states of outgoing ticket indices"),
+                            Ok(count) => trace!(count, "successfully flushed states of outgoing ticket indices"),
                             Err(error) => error!(%error, "Failed to flush ticket indices"),
                         }
                     }
@@ -644,13 +644,40 @@ where
                 let db = node_db.clone();
                 async move {
                     match chain.redeem_tickets_via_selector(&db, selector).await {
-                        Ok(res) => info!(%res, "redemption complete"),
+                        Ok(res) => debug!(%res, "redemption complete"),
                         Err(error) => error!(%error, "redemption failed"),
                     }
                 }
             })
             .inspect(|_| tracing::warn!(task = %HoprLibProcess::TicketRedemptions, "long-running background task finished"))
         );
+
+        let (chain_events_sub_handle, chain_events_sub_reg) = hopr_async_runtime::AbortHandle::new_pair();
+        processes.insert(HoprLibProcess::ChannelEvents, chain_events_sub_handle);
+        let chain = self.chain_api.clone();
+        let node_db = self.node_db.clone();
+        let events = chain.subscribe().map_err(HoprLibError::chain)?;
+        spawn(async move {
+            futures::stream::Abortable::new(
+                events
+                    .filter_map(|event|
+                        futures::future::ready(
+                            event
+                                .try_as_channel_closed()
+                                .filter(|channel| channel.direction(chain.me()) == Some(ChannelDirection::Incoming))
+                        )
+                    ),
+                chain_events_sub_reg
+            )
+            .for_each(|closed_channel| {
+                let node_db = node_db.clone();
+                async move {
+                    if let Err(error) = node_db.mark_tickets_as(closed_channel.into(), TicketMarker::Neglected).await {
+                        error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
+                    }
+                }
+            }).await;
+        });
 
         // NOTE: after the chain is synced, we can reset tickets which are considered
         // redeemed but on-chain state does not align with that. This implies there was a problem
@@ -739,11 +766,15 @@ where
             .map_err(HoprLibError::chain)
             .await?
             .filter_map(|entry| {
-                futures::future::ready(
-                    entry
-                        .get_multiaddr()
-                        .map(|maddr| (PeerId::from(entry.public_key), entry.chain_addr, vec![maddr])),
-                )
+                futures::future::ready(if entry.has_announced() {
+                    Some((
+                        PeerId::from(entry.public_key),
+                        entry.chain_addr,
+                        entry.get_multiaddrs().to_vec(),
+                    ))
+                } else {
+                    None
+                })
             })
             .collect()
             .await)
@@ -843,7 +874,7 @@ where
             .next()
             .await
         {
-            Some(entry) => Ok(Vec::from_iter(entry.get_multiaddr())),
+            Some(entry) => Ok(entry.get_multiaddrs().to_vec()),
             None => {
                 error!(%peer, "no information");
                 Ok(vec![])

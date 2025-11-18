@@ -83,7 +83,7 @@ impl BlokliTestStateBuilder {
                     v.insert(blokli_client::api::types::Account {
                         chain_key: hex::encode(account.chain_addr),
                         keyid: u32::from(account.key_id) as i32,
-                        multi_addresses: account.get_multiaddr().iter().map(|a| a.to_string()).collect(),
+                        multi_addresses: account.get_multiaddrs().iter().map(|a| a.to_string()).collect(),
                         packet_key: hex::encode(account.public_key),
                         safe_address: account.safe_address.map(|a| hex::encode(a)),
                     });
@@ -156,11 +156,11 @@ impl BlokliTestStateBuilder {
                     public_key: *ok.public(),
                     chain_addr: *chain_addr,
                     entry_type: if public {
-                        AccountType::Announced(
+                        AccountType::Announced(vec![
                             format!("/ip4/1.2.3.4/udp/{}/p2p/{}", 10000 + index, ok.public().to_peerid_str())
                                 .parse()
                                 .unwrap(),
-                        )
+                        ])
                     } else {
                         AccountType::NotAnnounced
                     },

@@ -117,7 +117,7 @@ pub(crate) mod tests {
         let account = AccountEntry {
             public_key: (*kp.public()).into(),
             chain_addr: cp.public().to_address(),
-            entry_type: AccountType::Announced("/ip4/1.2.3.4/tcp/1234".parse()?),
+            entry_type: AccountType::Announced(vec!["/ip4/1.2.3.4/tcp/1234".parse()?]),
             safe_address: Some(Address::new(&[3u8; 20])),
             key_id: 3.into(),
         };

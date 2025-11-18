@@ -9,19 +9,29 @@ use crate::errors::ConnectorError;
 pub(crate) fn model_to_account_entry(
     model: blokli_client::api::types::Account,
 ) -> Result<AccountEntry, ConnectorError> {
+    let entry_type = if !model.multi_addresses.is_empty() {
+        AccountType::Announced(
+            model
+                .multi_addresses
+                .into_iter()
+                .filter_map(|addr| match Multiaddr::from_str(&addr) {
+                    Ok(addr) => Some(addr),
+                    Err(_) => {
+                        tracing::error!(%addr, "invalid multiaddress");
+                        None
+                    }
+                })
+                .collect(),
+        )
+    } else {
+        AccountType::NotAnnounced
+    };
+
     Ok(AccountEntry {
         public_key: model.packet_key.parse()?,
         chain_addr: model.chain_key.parse()?,
         key_id: (model.keyid as u32).into(),
-        entry_type: if let Some(maddr) = model.multi_addresses.first() {
-            AccountType::Announced(
-                maddr
-                    .parse()
-                    .map_err(|e| ConnectorError::TypeConversion(format!("invalid multiaddress {maddr}: {e}")))?,
-            )
-        } else {
-            AccountType::NotAnnounced
-        },
+        entry_type,
         safe_address: model.safe_address.map(|addr| Address::from_hex(&addr)).transpose()?,
     })
 }

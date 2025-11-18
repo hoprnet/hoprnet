@@ -83,7 +83,7 @@ pub enum ChannelDirection {
 /// Alias for the [`Hash`](struct@Hash) representing a channel ID.
 pub type ChannelId = Hash;
 
-/// A pair of addresses representing parties of a channel.
+/// An immutable pair of addresses representing parties of a channel.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChannelParties(Address, Address);
@@ -95,20 +95,25 @@ impl Display for ChannelParties {
 }
 
 impl ChannelParties {
+    /// New instance from source and destination addresses.
     pub fn new(source: Address, destination: Address) -> Self {
         Self(source, destination)
     }
 
+    /// Channel source.
     pub fn source(&self) -> &Address {
         &self.0
     }
 
+    /// Channel destination.
     pub fn destination(&self) -> &Address {
         &self.1
     }
+}
 
-    pub fn to_id(&self) -> ChannelId {
-        generate_channel_id(&self.0, &self.1)
+impl<'a> From<&'a ChannelParties> for ChannelId {
+    fn from(value: &'a ChannelParties) -> Self {
+        generate_channel_id(&value.0, &value.1)
     }
 }
 
