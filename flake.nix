@@ -726,6 +726,7 @@
               act
               gh
               google-cloud-sdk
+              cargo-machete
               graphviz
               swagger-codegen3
               vacuum-go
