@@ -220,7 +220,7 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
-hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "8b5940d63022018bc46b7ad63ded043cf5b16061" } # master branch on 18.11.2025
+hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c" } # master branch on 18.11.2025
 hopr-chain-connector = { path = "chain/connector" }
 hopr-chain-types = { path = "chain/types" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }

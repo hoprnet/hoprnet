@@ -4490,7 +4490,7 @@ dependencies = [
 [[package]]
 name = "hopr-bindings"
 version = "4.0.0"
-source = "git+https://github.com/hoprnet/contracts?rev=8b5940d63022018bc46b7ad63ded043cf5b16061#8b5940d63022018bc46b7ad63ded043cf5b16061"
+source = "git+https://github.com/hoprnet/contracts?rev=cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c#cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4498,6 +4498,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "strum 0.27.2",
 ]
 
 [[package]]
