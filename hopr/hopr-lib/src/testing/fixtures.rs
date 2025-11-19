@@ -12,7 +12,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::WinningProbability;
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
-use hopr_primitive_types::{bounded::BoundedVec, prelude::*};
+use hopr_primitive_types::prelude::*;
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
 use lazy_static::lazy_static;
 use rand::prelude::{IteratorRandom, SliceRandom};
@@ -62,44 +62,38 @@ impl ClusterGuard {
     /// Create a session between two nodes, ensuring channels are open and funded as needed
     pub async fn create_session_between(
         &self,
-        src: usize,
-        mid: usize,
-        dst: usize,
+        path: &[&TestedHopr],
         funding_amount: HoprBalance,
     ) -> anyhow::Result<(HoprSession, ChannelGuard, ChannelGuard)> {
         let fw_channels = ChannelGuard::try_open_channels_for_path(
-            vec![
-                self.cluster[src].instance.clone(),
-                self.cluster[mid].instance.clone(),
-                self.cluster[dst].instance.clone(),
-            ],
+            path.iter().map(|n| n.instance.clone()).collect::<Vec<_>>(),
             funding_amount,
         )
         .await?;
         let bw_channels = ChannelGuard::try_open_channels_for_path(
-            vec![
-                self.cluster[dst].instance.clone(),
-                self.cluster[mid].instance.clone(),
-                self.cluster[src].instance.clone(),
-            ],
+            path.iter().rev().map(|n| n.instance.clone()).collect::<Vec<_>>(),
             funding_amount,
         )
         .await?;
 
-        sleep(Duration::from_secs(3)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let ip = IpOrHost::from_str(":0")?;
-        let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
-            self.cluster[mid].address().into(),
-        )));
-        let session_result = self.cluster[src]
+        let routing = RoutingOptions::IntermediatePath(
+            path.iter()
+                .skip(1)
+                .take(path.len() - 2)
+                .map(|n| n.address().into())
+                .collect(),
+        );
+        let session_result = path[0]
             .inner()
             .connect_to(
-                self.cluster[dst].address(),
+                path[path.len() - 1].address(),
                 SessionTarget::UdpStream(SealedHost::Plain(ip)),
                 SessionClientConfig {
                     forward_path_options: routing.clone(),
-                    return_path_options: routing,
+                    return_path_options: routing.invert(),
                     capabilities: Default::default(),
                     pseudonym: None,
                     surb_management: None,
@@ -116,61 +110,102 @@ impl ClusterGuard {
         }
     }
 
-    pub fn exclusive_indexes<const N: usize>(&self) -> [usize; N] {
+    pub fn exclusive_indexes<const N: usize>(&self) -> [&TestedHopr; N] {
         assert!(N <= self.size(), "Requested count exceeds {}", self.size());
 
-        let mut res = (0..self.size()).choose_multiple(&mut rand::thread_rng(), N);
+        let mut res = self.cluster.iter().choose_multiple(&mut rand::thread_rng(), N);
+
         res.shuffle(&mut rand::thread_rng());
 
         res.try_into().unwrap()
     }
 
-    pub fn exclusive_indexes_not_auto_redeeming<const N: usize>(&self) -> [usize; N] {
-        assert!(N <= self.size(), "Requested count exceeds {}", self.size());
-        assert!(N <= (self.size() + 1) / 2, "Not enough non-auto-redeeming nodes");
+    pub fn exclusive_indices_with_win_prob_1<const N: usize>(&self) -> [&TestedHopr; N] {
+        assert!(N <= self.size(), "Requested count {N} exceeds {}", self.size());
 
-        let mut res = (0..self.size())
-            .filter(|i| i % 2 == 0)
+        let mut res = self
+            .cluster
+            .iter()
+            .filter(|&n| {
+                n.config()
+                    .protocol
+                    .outgoing_ticket_winning_prob
+                    .is_some_and(|p| p > 0.99)
+            })
             .choose_multiple(&mut rand::thread_rng(), N);
+
         res.shuffle(&mut rand::thread_rng());
 
-        res.try_into().unwrap()
+        res.try_into()
+            .expect(&format!("cannot find {N} nodes with win prob 1.0"))
     }
 
-    pub fn exclusive_indexes_auto_redeeming<const N: usize>(&self) -> [usize; N] {
-        assert!(N <= self.size(), "Requested count exceeds {}", self.size());
-        assert!(N <= self.size() / 2, "Not enough non-auto-redeeming nodes");
+    pub fn exclusive_indices_with_lower_win_prob<const N: usize>(&self) -> [&TestedHopr; N] {
+        assert!(N <= self.size(), "Requested count {N} exceeds {}", self.size());
 
-        let mut res = (0..self.size())
-            .filter(|i| i % 2 != 0)
+        let mut res = self
+            .cluster
+            .iter()
+            .filter(|&n| {
+                n.config()
+                    .protocol
+                    .outgoing_ticket_winning_prob
+                    .is_some_and(|p| p < 0.99)
+            })
             .choose_multiple(&mut rand::thread_rng(), N);
+
         res.shuffle(&mut rand::thread_rng());
 
-        res.try_into().unwrap()
+        res.try_into()
+            .expect(&format!("cannot find {N} nodes with win prob < 0.99"))
     }
 
-    /// Select N unique indexes, ensuring all intermediates indexes (not source and destination) are nodes with auto
-    /// redeem enabled
-    pub fn exclusive_indexes_with_auto_redeem_intermediaries<const N: usize>(&self) -> [usize; N] {
-        assert!(N <= self.size(), "Requested count exceeds {}", self.size());
+    pub fn exclusive_indices_with_win_prob_1_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {
+        assert!(N <= self.size(), "Requested count {N} exceeds {}", self.size());
         assert!(N > 2, "N must be greater than 2 to have intermediaries");
 
-        let mut non_auto_redeem = (0..self.size())
-            .filter(|i| i % 2 == 0)
-            .choose_multiple(&mut rand::thread_rng(), 2);
-        non_auto_redeem.shuffle(&mut rand::thread_rng());
-
-        let mut auto_redeem = (0..self.size())
-            .filter(|i| i % 2 != 0)
+        let win_prob_lower = self.exclusive_indices_with_lower_win_prob::<2>();
+        let mut res = self
+            .cluster
+            .iter()
+            .filter(|&n| {
+                n.config()
+                    .protocol
+                    .outgoing_ticket_winning_prob
+                    .is_some_and(|p| p > 0.99)
+            })
             .choose_multiple(&mut rand::thread_rng(), N - 2);
-        auto_redeem.shuffle(&mut rand::thread_rng());
 
-        let mut ret = [0; N];
-        ret[0] = non_auto_redeem[0];
-        ret[1..N - 1].copy_from_slice(&auto_redeem);
-        ret[N - 1] = non_auto_redeem[1];
+        res.shuffle(&mut rand::thread_rng());
 
-        ret
+        res.insert(0, win_prob_lower[0]);
+        res.push(win_prob_lower[1]);
+
+        res.try_into().expect("cannot find sufficient number of nodes")
+    }
+
+    pub fn exclusive_indices_with_lower_win_prob_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {
+        assert!(N <= self.size(), "Requested count {N} exceeds {}", self.size());
+        assert!(N > 2, "N must be greater than 2 to have intermediaries");
+
+        let win_prob_1 = self.exclusive_indices_with_win_prob_1::<2>();
+        let mut res = self
+            .cluster
+            .iter()
+            .filter(|&n| {
+                n.config()
+                    .protocol
+                    .outgoing_ticket_winning_prob
+                    .is_some_and(|p| p < 0.99)
+            })
+            .choose_multiple(&mut rand::thread_rng(), N - 2);
+
+        res.shuffle(&mut rand::thread_rng());
+
+        res.insert(0, win_prob_1[0]);
+        res.push(win_prob_1[1]);
+
+        res.try_into().expect("cannot find sufficient number of nodes")
     }
 }
 
@@ -224,6 +259,7 @@ pub const INITIAL_SAFE_TOKEN: u64 = 1000;
 pub const INITIAL_NODE_NATIVE: u64 = 1;
 pub const INITIAL_NODE_TOKEN: u64 = 10;
 pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1000_000_000_000_u128;
+pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 
 #[rstest::fixture]
 pub async fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
@@ -253,8 +289,9 @@ pub async fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
                 .iter()
                 .map(|&(safe_addr, _)| (safe_addr, HoprBalance::new_base(DEFAULT_SAFE_ALLOWANCE))),
         )
-        .with_minimum_win_prob(WinningProbability::ALWAYS)
+        .with_minimum_win_prob(WinningProbability::try_from(MINIMUM_INCOMING_WIN_PROB).unwrap())
         .with_ticket_price(HoprBalance::new_base(1))
+        .with_closure_grace_period(Duration::from_secs(1))
         .build_dynamic_client([0u8; Address::SIZE].into()) // Placeholder module address, to be filled in later
 }
 
@@ -283,7 +320,6 @@ pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmula
             let onchain_keys = onchain_keys.clone();
             let offchain_keys = offchain_keys.clone();
             let safes = safes.clone();
-            let lower_win_prob = i % 2 != 0; // every other node uses a lower winn_prob
 
             let blokli_client = chain_client
                 .clone()
@@ -301,6 +337,7 @@ pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmula
                             .max(3)
                             - 1,
                     )
+                    .thread_stack_size(5 * 1024 * 1024)
                     .thread_name(format!("hopr-node-{i}"))
                     .enable_all()
                     .build()
@@ -313,8 +350,6 @@ pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmula
                     node_db
                         .start_ticket_processing(Some(futures::sink::drain()))
                         .expect("failed to start ticket processing");
-
-                    blokli_client.update_price_and_win_prob(None, lower_win_prob.then_some(0.2));
 
                     let mut connector = create_trustful_hopr_blokli_connector(
                         &onchain_keys[i],
@@ -337,7 +372,7 @@ pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmula
                         node_db,
                         std::sync::Arc::new(connector),
                         safes[i],
-                        lower_win_prob.then_some(0.2),
+                        if i % 2 != 0 { MINIMUM_INCOMING_WIN_PROB } else { 1.0 },
                     )
                     .await;
 

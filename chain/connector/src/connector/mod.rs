@@ -433,6 +433,15 @@ impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P> {
             .ok_or(ConnectorError::InvalidState("connector is not connected"))
             .map(|_| ())
     }
+
+    /// Invalidates all cached on-chain data.
+    pub fn invalidate_caches(&self) {
+        self.channel_by_parties.invalidate_all();
+        self.channel_by_id.invalidate_all();
+        self.packet_to_chain.invalidate_all();
+        self.chain_to_packet.invalidate_all();
+        self.values.invalidate_all();
+    }
 }
 
 impl<B, C, P, R> Drop for HoprBlockchainConnector<C, R, B, P> {

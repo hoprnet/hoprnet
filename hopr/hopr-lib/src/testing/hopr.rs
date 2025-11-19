@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{fmt::Formatter, sync::Arc, time::Duration};
 
 use anyhow::Context;
 use futures::future::join_all;
@@ -9,7 +9,8 @@ use hopr_transport::Hash;
 use tokio::time::sleep;
 
 use crate::{
-    Address, ChannelEntry, ChannelStatus, Hopr, HoprState, HoprTransportIO, PeerId, prelude, testing::TestingConnector,
+    Address, ChannelEntry, ChannelStatus, Hopr, HoprState, HoprTransportIO, PeerId, config::HoprLibConfig, prelude,
+    testing::TestingConnector,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -25,7 +26,7 @@ pub async fn create_hopr_instance(
     node_db: HoprNodeDb,
     connector: TestingConnector,
     safe: NodeSafeConfig,
-    winn_prob: Option<f64>,
+    winn_prob: f64,
 ) -> Hopr<TestingConnector, HoprNodeDb> {
     Hopr::new(
         crate::config::HoprLibConfig {
@@ -58,7 +59,7 @@ pub async fn create_hopr_instance(
                 ..Default::default()
             },
             protocol: hopr_transport::config::ProtocolConfig {
-                outgoing_ticket_winning_prob: winn_prob,
+                outgoing_ticket_winning_prob: Some(winn_prob),
                 ..Default::default()
             },
             publish: true,
@@ -80,6 +81,14 @@ pub struct TestedHopr {
     pub instance: Arc<Hopr<TestingConnector, HoprNodeDb>>,
     /// Transport socket that can be used to send and receive data via the HOPR node.
     pub socket: HoprTransportIO,
+}
+
+impl std::fmt::Debug for TestedHopr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TestedHopr")
+            .field("instance", &self.instance.me_onchain())
+            .finish()
+    }
 }
 
 impl TestedHopr {
@@ -119,6 +128,14 @@ impl TestedHopr {
 
     pub fn peer_id(&self) -> PeerId {
         self.instance.me_peer_id()
+    }
+
+    pub fn connector(&self) -> &TestingConnector {
+        &self.instance.chain_api
+    }
+
+    pub fn config(&self) -> &HoprLibConfig {
+        self.instance.config()
     }
 
     pub async fn channel_from_hash(&self, channel_hash: &prelude::Hash) -> Option<ChannelEntry> {

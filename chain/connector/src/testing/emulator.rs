@@ -356,9 +356,10 @@ impl BlokliTestStateMutator for FullStateEmulator {
                     ))
                 })?;
 
-                if &channel_ticket_index < ticket_index {
+                if &channel_ticket_index > ticket_index {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                        "ticket index of {channel_id} is lower than redeemed ticket index {ticket_index}"
+                        "ticket index of {channel_id} ({channel_ticket_index}) is greater than redeemed ticket index \
+                         {ticket_index}"
                     ))
                     .into());
                 }
@@ -371,7 +372,7 @@ impl BlokliTestStateMutator for FullStateEmulator {
 
                 if &balance < ticket_amount {
                     return Err(blokli_client::errors::ErrorKind::MockClientError(anyhow::anyhow!(
-                        "balance of channel {channel_id} is lower than ticket amount {ticket_amount}"
+                        "balance of channel {channel_id} ({balance}) is lower than ticket amount {ticket_amount}"
                     ))
                     .into());
                 }

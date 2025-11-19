@@ -672,8 +672,16 @@ where
             .for_each(move |closed_channel| {
                 let node_db = node_db.clone();
                 async move {
-                    if let Err(error) = node_db.mark_tickets_as(closed_channel.into(), TicketMarker::Neglected).await {
-                        error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
+                    match node_db.mark_tickets_as(closed_channel.into(), TicketMarker::Neglected).await {
+                        Ok(num_neglected) if num_neglected > 0 => {
+                            warn!(%num_neglected, %closed_channel, "tickets on incoming closed channel were neglected");
+                        },
+                        Ok(_) => {
+                            debug!(%closed_channel, "no neglected tickets on incoming closed channel");
+                        },
+                        Err(error) => {
+                            error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
+                        }
                     }
                 }
             })

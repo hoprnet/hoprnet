@@ -34,10 +34,10 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 
     let ip = IpOrHost::from_str(":0")?;
 
-    let _session = cluster_fixture[src]
+    let _session = src
         .inner()
         .connect_to(
-            cluster_fixture[dst].address(),
+            dst.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
             SessionClientConfig {
                 forward_path_options: RoutingOptions::Hops(0_u32.try_into()?),
@@ -61,24 +61,16 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indexes_not_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
-        vec![
-            cluster_fixture[src].instance.clone(),
-            cluster_fixture[mid].instance.clone(),
-            cluster_fixture[dst].instance.clone(),
-        ],
+        [src.instance.clone(), mid.instance.clone(), dst.instance.clone()],
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
     .await?;
 
     let _channels_back = ChannelGuard::try_open_channels_for_path(
-        vec![
-            cluster_fixture[dst].instance.clone(),
-            cluster_fixture[mid].instance.clone(),
-            cluster_fixture[src].instance.clone(),
-        ],
+        [src.instance.clone(), mid.instance.clone(), dst.instance.clone()],
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
     .await?;
@@ -86,14 +78,12 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
     sleep(std::time::Duration::from_secs(3)).await;
 
     let ip = IpOrHost::from_str(":0")?;
-    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
-        cluster_fixture[mid].address().into(),
-    )));
+    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address().into())));
 
-    let _session = cluster_fixture[src]
+    let _session = src
         .inner()
         .connect_to(
-            cluster_fixture[dst].address(),
+            dst.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
             SessionClientConfig {
                 forward_path_options: routing.clone(),
@@ -123,10 +113,10 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 
     let ip = IpOrHost::from_str(":0")?;
 
-    let session = cluster_fixture[src]
+    let session = src
         .inner()
         .connect_to(
-            cluster_fixture[dst].address(),
+            dst.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
             SessionClientConfig {
                 forward_path_options: RoutingOptions::Hops(0_u32.try_into()?),
@@ -141,15 +131,14 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 
     sleep(Duration::from_secs(2)).await;
 
-    cluster_fixture[src]
-        .inner()
+    src.inner()
         .keep_alive_session(&session.id())
         .await
         .context("failed to keep alive session")?;
 
     sleep(Duration::from_secs(3)).await; // sleep longer than the session timeout
 
-    match cluster_fixture[src].inner().keep_alive_session(&session.id()).await {
+    match src.inner().keep_alive_session(&session.id()).await {
         Err(HoprLibError::TransportError(HoprTransportError::Session(hopr_lib::TransportSessionError::Manager(
             hopr_lib::SessionManagerError::NonExistingSession,
         )))) => {}
@@ -169,28 +158,20 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indexes_not_auto_redeeming::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
-        vec![
-            cluster_fixture[src].instance.clone(),
-            cluster_fixture[mid].instance.clone(),
-            cluster_fixture[dst].instance.clone(),
-        ],
+        [src.instance.clone(), mid.instance.clone(), dst.instance.clone()],
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
     .await?;
     let _channels_back = ChannelGuard::try_open_channels_for_path(
-        vec![
-            cluster_fixture[dst].instance.clone(),
-            cluster_fixture[mid].instance.clone(),
-            cluster_fixture[src].instance.clone(),
-        ],
+        [dst.instance.clone(), mid.instance.clone(), src.instance.clone()],
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
     .await?;
 
-    sleep(std::time::Duration::from_secs(5)).await;
+    sleep(Duration::from_secs(2)).await;
 
     let exp_config = SurbBalancerConfig {
         target_surb_buffer_size: 10,
@@ -199,14 +180,12 @@ async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: Clust
     };
 
     let ip = IpOrHost::from_str(":0")?;
-    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
-        cluster_fixture[mid].address().into(),
-    )));
+    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(mid.address().into())));
 
-    let session = cluster_fixture[src]
+    let session = src
         .inner()
         .connect_to(
-            cluster_fixture[dst].address(),
+            dst.address(),
             SessionTarget::UdpStream(SealedHost::Plain(ip)),
             SessionClientConfig {
                 forward_path_options: routing.clone(),
@@ -220,7 +199,7 @@ async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: Clust
         .await
         .context("creating a session must succeed")?;
 
-    let config = cluster_fixture[src]
+    let config = src
         .inner()
         .get_session_surb_balancer_config(&session.id())
         .await
@@ -228,13 +207,12 @@ async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: Clust
 
     assert_eq!(config, Some(exp_config));
 
-    cluster_fixture[src]
-        .inner()
+    src.inner()
         .update_session_surb_balancer_config(&session.id(), SurbBalancerConfig::default())
         .await
         .context("failed to update surb balancer config")?;
 
-    let config = cluster_fixture[src]
+    let config = src
         .inner()
         .get_session_surb_balancer_config(&session.id())
         .await

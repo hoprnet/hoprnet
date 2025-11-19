@@ -18,10 +18,10 @@ async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(
 ) -> anyhow::Result<()> {
     let [candidate, tester] = cluster_fixture.exclusive_indexes::<2>();
 
-    let peer_id = cluster_fixture[candidate].peer_id();
-    let chain_key = cluster_fixture[candidate].address();
+    let peer_id = candidate.peer_id();
+    let chain_key = candidate.address();
 
-    let derived_chain_key = cluster_fixture[tester]
+    let derived_chain_key = tester
         .inner()
         .peerid_to_chain_key(&peer_id)
         .await
@@ -30,7 +30,7 @@ async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(
 
     assert_eq!(chain_key, derived_chain_key);
 
-    let derived_peer_id = cluster_fixture[tester]
+    let derived_peer_id = tester
         .inner()
         .chain_key_to_peerid(&chain_key)
         .await
