@@ -15,12 +15,6 @@ allocator-jemalloc = [
 
 [dependencies]
 anyhow = { workspace = true }
-alloy = { workspace = true, default-features = false, features = [
-  "essentials",
-  "json-rpc",
-  "node-bindings",
-] }
-# using own fork until the PR was merged
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

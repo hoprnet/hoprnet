@@ -11,20 +11,20 @@ use std::{ops::Add, str::FromStr, sync::Arc};
 
 use IMulticall3Extract::IMulticall3ExtractInstance;
 use SafeSingleton::{SafeSingletonInstance, execTransactionCall, removeOwnerCall, setupCall};
-use alloy::{
-    network::TransactionBuilder,
-    primitives::{Address, B256, Bytes, U256, keccak256, utils::format_units},
-    providers::{
-        CallInfoTrait, CallItem, MULTICALL3_ADDRESS, MulticallBuilder, MulticallError, Provider, WalletProvider,
-        bindings::IMulticall3::{Call3, Call3Value, aggregate3Call, aggregate3ValueCall},
-    },
-    rpc::types::TransactionRequest,
-    signers::{Signer, local::PrivateKeySigner},
-    sol,
-    sol_types::{SolCall, SolValue},
-};
 use hex_literal::hex;
 use hopr_bindings::{
+    exports::alloy::{
+        network::TransactionBuilder,
+        primitives::{Address, B256, Bytes, U256, keccak256, utils::format_units},
+        providers::{
+            CallInfoTrait, CallItem, MULTICALL3_ADDRESS, MulticallBuilder, MulticallError, Provider, WalletProvider,
+            bindings::IMulticall3::{Call3, Call3Value, aggregate3Call, aggregate3ValueCall},
+        },
+        rpc::types::TransactionRequest,
+        signers::{Signer, local::PrivateKeySigner},
+        sol,
+        sol_types::{SolCall, SolValue},
+    },
     hopr_node_management_module::HoprNodeManagementModule::{
         HoprNodeManagementModuleInstance, addChannelsAndTokenTargetCall, includeNodeCall, removeNodeCall,
         scopeTargetTokenCall,
@@ -1193,17 +1193,19 @@ pub async fn debug_node_safe_module_setup_main<P: Provider>(
 mod tests {
     use std::vec;
 
-    use alloy::{
-        contract::Result as ContractResult,
-        network::{EthereumWallet, TransactionBuilder},
-        primitives::address,
-        providers::{Identity, RootProvider, fillers::*},
-        rpc::types::TransactionRequest,
-        sol_types::SolValue,
-    };
     use hopr_bindings::{
-        hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels,
-        hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory,
+        exports::alloy::{
+            contract::Result as ContractResult,
+            network::{EthereumWallet, TransactionBuilder},
+            primitives::address,
+            providers::{Identity, RootProvider, fillers::*},
+            rpc::types::TransactionRequest,
+            sol_types::SolValue,
+        },
+        hopr_announcements::HoprAnnouncements,
+        hopr_channels::HoprChannels,
+        hopr_node_safe_registry::HoprNodeSafeRegistry,
+        hopr_node_stake_factory::HoprNodeStakeFactory,
         hopr_token::HoprToken,
     };
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
@@ -1221,10 +1223,10 @@ mod tests {
     >;
     /// Used for testing. Creates RPC client to the local Anvil instance.
     pub fn create_rpc_client_to_anvil(
-        anvil: &alloy::node_bindings::AnvilInstance,
+        anvil: &hopr_bindings::exports::alloy::node_bindings::AnvilInstance,
         signer: &hopr_crypto_types::keypairs::ChainKeypair,
     ) -> Arc<AnvilRpcClient> {
-        use alloy::{
+        use hopr_bindings::exports::alloy::{
             providers::ProviderBuilder, rpc::client::ClientBuilder, signers::local::PrivateKeySigner,
             transports::http::ReqwestTransport,
         };

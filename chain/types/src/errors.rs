@@ -1,4 +1,4 @@
-use alloy::{contract::Error as ContractError, signers::Error as SignerError};
+use hopr_bindings::exports::alloy::{contract::Error as ContractError, signers::Error as SignerError};
 use thiserror::Error;
 
 /// Dynamic contract result type.
