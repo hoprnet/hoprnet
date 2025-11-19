@@ -15,6 +15,7 @@ use hopr_lib::{
 };
 use rstest::rstest;
 use serial_test::serial;
+use hopr_lib::testing::fixtures::MINIMUM_INCOMING_WIN_PROB;
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
@@ -288,7 +289,7 @@ async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: Cluster
         .await
         .context("failed to get winning probability")?;
 
-    assert!(winning_prob.approx_eq(&WinningProbability::ALWAYS));
+    assert!(winning_prob.approx_eq(&WinningProbability::try_from_f64(MINIMUM_INCOMING_WIN_PROB)?));
 
     Ok(())
 }
