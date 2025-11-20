@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "0.11.3"
+version = "0.12.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -46,12 +46,10 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-node = { workspace = true }
 hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
-hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-transport-bloom = { workspace = true }
@@ -60,7 +58,6 @@ hopr-transport-identity = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
-bimap = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
@@ -68,6 +65,7 @@ serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-connector = { workspace = true, features = [
   "runtime-tokio",
   "testing",

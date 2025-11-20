@@ -55,7 +55,7 @@ pub struct ChainPathResolver<'a, R>(&'a R);
 
 impl<R> Clone for ChainPathResolver<'_, R> {
     fn clone(&self) -> Self {
-        Self(self.0)
+        *self
     }
 }
 

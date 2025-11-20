@@ -31,7 +31,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
-use hopr_chain_connector::HoprBlockchainConnector;
+use hopr_chain_connector::HoprBlockchainSafeConnector;
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{Address, Hopr, errors::HoprLibError, utils::session::ListenerJoinHandles};
 use serde::Serialize;
@@ -56,7 +56,7 @@ use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
-type HoprBlokliConnector = HoprBlockchainConnector<hopr_chain_connector::blokli_client::BlokliClient>;
+type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -362,6 +362,7 @@ pub(crate) struct ApiError {
 
 /// Enumerates all API request errors
 /// Note that `ApiError` should not be instantiated directly, but always rather through the `ApiErrorStatus`.
+#[allow(unused)] // TODO: some errors can no longer be propagated to the REST API
 #[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
@@ -370,10 +371,6 @@ enum ApiErrorStatus {
     PeerNotFound,
     ChannelNotFound,
     TicketsNotFound,
-    NotEnoughBalance,
-    NotEnoughAllowance,
-    ChannelAlreadyOpen,
-    UnsupportedFeature,
     Timeout,
     PingError(String),
     Unauthorized,

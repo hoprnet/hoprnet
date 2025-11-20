@@ -1,15 +1,22 @@
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{num::NonZeroUsize, path::PathBuf, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
-use hopr_chain_connector::{HoprBlockchainConnector, blokli_client::BlokliClient};
+use hopr_chain_connector::{
+    BlockchainConnectorConfig, HoprBlockchainSafeConnector,
+    blokli_client::{BlokliClient, BlokliClientConfig},
+};
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::{
-    AbortableList, AcknowledgedTicket, Address, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
-    exports::api::chain::ChainEvents, prelude::ChainKeypair, state::HoprLibProcess,
-    utils::session::ListenerJoinHandles,
+    AbortableList, AcknowledgedTicket, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
+    exports::api::chain::ChainEvents, prelude::ChainKeypair, utils::session::ListenerJoinHandles,
 };
-use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
+use hoprd::{
+    cli::CliArgs,
+    config::{DEFAULT_BLOKLI_URL, HoprdConfig},
+    errors::HoprdError,
+    exit::HoprServerIpForwardingReactor,
+};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
@@ -128,8 +135,6 @@ fn init_logger() -> anyhow::Result<()> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, strum::Display)]
 enum HoprdProcess {
-    #[strum(to_string = "hopr-lib process: {0}")]
-    HoprLib(HoprLibProcess),
     #[strum(to_string = "session listener sockets")]
     ListenerSocket,
     #[strum(to_string = "hopr strategies process")]
@@ -198,20 +203,34 @@ async fn init_db(
     Ok((node_db, on_ack_tkt_rx))
 }
 
-fn init_blokli_connector(chain_key: &ChainKeypair) -> anyhow::Result<Arc<HoprBlockchainConnector<BlokliClient>>> {
-    // TODO: instantiate the connector properly
+async fn init_blokli_connector(
+    chain_key: &ChainKeypair,
+    cfg: &HoprdConfig,
+) -> anyhow::Result<HoprBlockchainSafeConnector<BlokliClient>> {
     info!("initiating Blokli connector");
-    Ok(Arc::new(hopr_chain_connector::create_trustless_hopr_blokli_connector(
+    let mut connector = hopr_chain_connector::create_trustful_hopr_blokli_connector(
         chain_key,
-        hopr_chain_connector::blokli_client::BlokliClient::new("test".parse()?, Default::default()),
-        Address::default(),
-        hopr_chain_connector::ContractAddresses::default(),
-    )?))
+        BlockchainConnectorConfig {
+            tx_confirm_timeout: std::time::Duration::from_secs(30),
+            ..Default::default()
+        },
+        BlokliClient::new(
+            cfg.provider.as_deref().unwrap_or(DEFAULT_BLOKLI_URL).parse()?,
+            BlokliClientConfig {
+                timeout: std::time::Duration::from_secs(5),
+            },
+        ),
+        cfg.hopr.safe_module.module_address,
+    )
+    .await?;
+    connector.connect(std::time::Duration::from_secs(30)).await?;
+
+    Ok(connector)
 }
 
 async fn init_rest_api(
     cfg: &HoprdConfig,
-    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlockchainConnector<BlokliClient>>, HoprNodeDb>>,
+    hopr: Arc<hopr_lib::Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, HoprNodeDb>>,
 ) -> anyhow::Result<AbortableList<HoprdProcess>> {
     let node_cfg_value = serde_json::to_value(cfg.as_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
@@ -261,7 +280,23 @@ async fn init_rest_api(
 
 #[cfg(feature = "runtime-tokio")]
 fn main() -> anyhow::Result<()> {
-    hopr_lib::prepare_tokio_runtime()?.block_on(main_inner())
+    let num_cpu_threads = std::env::var("HOPRD_NUM_CPU_THREADS").ok().and_then(|v| {
+        usize::from_str(&v)
+            .map_err(anyhow::Error::from)
+            .and_then(|v| NonZeroUsize::try_from(v).map_err(anyhow::Error::from))
+            .inspect_err(|error| error!(%error, "failed to parse HOPRD_NUM_CPU_THREADS"))
+            .ok()
+    });
+
+    let num_io_threads = std::env::var("HOPRD_NUM_IO_THREADS").ok().and_then(|v| {
+        usize::from_str(&v)
+            .map_err(anyhow::Error::from)
+            .and_then(|v| NonZeroUsize::try_from(v).map_err(anyhow::Error::from))
+            .inspect_err(|error| error!(%error, "failed to parse HOPRD_NUM_IO_THREADS"))
+            .ok()
+    });
+
+    hopr_lib::prepare_tokio_runtime(num_cpu_threads, num_io_threads)?.block_on(main_inner())
 }
 
 #[cfg(feature = "runtime-tokio")]
@@ -270,10 +305,6 @@ async fn main_inner() -> anyhow::Result<()> {
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
     let _jemalloc_stats = jemalloc_stats::JemallocStats::start().await;
-
-    if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
-        warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
-    }
 
     if cfg!(debug_assertions) {
         warn!("Executable was built using the DEBUG profile.");
@@ -299,16 +330,6 @@ async fn main_inner() -> anyhow::Result<()> {
         info!("The HOPRd node appears to run on DappNode");
     }
 
-    if let hopr_lib::config::HostType::IPv4(address) = &cfg.hopr.host.address {
-        let ipv4 = std::net::Ipv4Addr::from_str(address).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
-
-        if ipv4.is_loopback() && !cfg.hopr.transport.announce_local_addresses {
-            Err(hopr_lib::errors::HoprLibError::GeneralError(
-                "Cannot announce a loopback address".into(),
-            ))?;
-        }
-    }
-
     // Find or create an identity
     let hopr_keys: HoprKeys = match &cfg.identity.private_key {
         Some(private_key) => IdentityRetrievalModes::FromPrivateKey { private_key },
@@ -328,7 +349,7 @@ async fn main_inner() -> anyhow::Result<()> {
     // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
     let (node_db, stored_tickets) = init_db(&cfg, &hopr_keys.chain_key).await?;
 
-    let chain_connector = init_blokli_connector(&hopr_keys.chain_key)?;
+    let chain_connector = Arc::new(init_blokli_connector(&hopr_keys.chain_key, &cfg).await?);
 
     // Create the node instance
     info!("creating the HOPRd node instance from hopr-lib");
@@ -343,13 +364,6 @@ async fn main_inner() -> anyhow::Result<()> {
         .await?,
     );
 
-    let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
-        cfg.strategy.clone(),
-        chain_connector.clone(),
-        node_db.clone(),
-    ));
-    debug!(strategies = ?multi_strategy, "initialized strategies");
-
     let mut processes = AbortableList::<HoprdProcess>::default();
 
     if cfg.api.enable {
@@ -357,14 +371,19 @@ async fn main_inner() -> anyhow::Result<()> {
         processes.extend_from(list);
     }
 
-    let (_hopr_socket, hopr_lib_processes) = node
-        .run(HoprServerIpForwardingReactor::new(
-            hopr_keys.packet_key.clone(),
-            cfg.session_ip_forwarding,
-        ))
+    let _hopr_socket = node
+        .run(
+            None::<hopr_lib::DummyCoverTrafficType>,
+            HoprServerIpForwardingReactor::new(hopr_keys.packet_key.clone(), cfg.session_ip_forwarding),
+        )
         .await?;
 
-    processes.flat_map_extend_from(hopr_lib_processes, HoprdProcess::HoprLib);
+    let multi_strategy = Arc::new(hopr_strategy::strategy::MultiStrategy::new(
+        cfg.strategy.clone(),
+        chain_connector.clone(),
+        node.redemption_requests()?,
+    ));
+    debug!(strategies = ?multi_strategy, "initialized strategies");
 
     debug!("starting up strategies");
     processes.insert(
@@ -386,7 +405,9 @@ async fn main_inner() -> anyhow::Result<()> {
             }
             Signal::Int => {
                 info!("Received the INT signal... tearing down the node");
-                processes.abort_all();
+                // Explicitly tear down running processes here
+                drop(node);
+                drop(processes);
 
                 info!("All processes stopped... emulating the default handler...");
                 low_level::emulate_default_handler(signal as i32)?;

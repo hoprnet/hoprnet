@@ -668,7 +668,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                     Err(NodeDbError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
-                        warn!(?rejected_ticket, %rejected_value, erorr = ?error, "failure to validate during forwarding");
+                        warn!(%rejected_ticket, %rejected_value, %error, "failure to validate during forwarding");
 
                         self.mark_unsaved_ticket_rejected(&rejected_ticket)
                             .await

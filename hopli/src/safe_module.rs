@@ -92,10 +92,12 @@
 //! ```
 use std::str::FromStr;
 
-use alloy::primitives::{Address, U256, utils::parse_units};
 use clap::{Parser, builder::RangedU64ValueParser};
 use hopr_bindings::{
-    hopr_node_safe_registry::HoprNodeSafeRegistry, hopr_node_stake_factory::HoprNodeStakeFactory, hopr_token::HoprToken,
+    exports::alloy::primitives::{Address, U256, utils::parse_units},
+    hopr_node_safe_registry::HoprNodeSafeRegistry,
+    hopr_node_stake_factory::HoprNodeStakeFactory,
+    hopr_token::HoprToken,
 };
 use hopr_crypto_types::keypairs::Keypair;
 use tracing::{info, warn};
@@ -384,7 +386,7 @@ impl SafeModuleSubcommands {
         // transfer safe ownership to actual admins
         // set desired threshold
         let hopr_stake_factory = HoprNodeStakeFactory::new(
-            a2h(contract_addresses.addresses.node_stake_v2_factory),
+            a2h(contract_addresses.addresses.node_stake_factory),
             rpc_provider.clone(),
         );
 

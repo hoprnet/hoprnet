@@ -55,7 +55,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
 
-    let swarm = HoprSwarm::new(identity, transport_updates_rx, vec![multiaddress.clone()]).await;
+    let swarm = HoprSwarm::new(identity, transport_updates_rx, vec![multiaddress.clone()], true).await;
 
     let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};

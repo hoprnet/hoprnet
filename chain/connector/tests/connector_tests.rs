@@ -20,14 +20,14 @@ lazy_static::lazy_static! {
         AccountEntry {
             public_key: *OFFCHAIN_KEYS[0].public(),
             chain_addr: CHAIN_KEYS[0].public().to_address(),
-            entry_type: AccountType::Announced("/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse().unwrap()),
+            entry_type: AccountType::Announced(vec!["/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse().unwrap()]),
             safe_address: None,
             key_id: 1_u32.into(),
         },
         AccountEntry {
             public_key: *OFFCHAIN_KEYS[1].public(),
             chain_addr: CHAIN_KEYS[1].public().to_address(),
-            entry_type: AccountType::Announced("/ip4/34.65.237.190/udp/9091/p2p/12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF".parse().unwrap()),
+            entry_type: AccountType::Announced(vec!["/ip4/34.65.237.190/udp/9091/p2p/12D3KooWPGsW7vZ8VsmJ9Lws9vsKaBiACZXQ3omRm3rFUho5BpvF".parse().unwrap()]),
             safe_address: None,
             key_id: 2_u32.into(),
         },
@@ -70,7 +70,12 @@ lazy_static::lazy_static! {
 #[tokio::test]
 async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<()> {
     let mock_client = BlokliTestStateBuilder::default()
-        .with_accounts(ACCOUNTS.iter().cloned())
+        .with_accounts(
+            ACCOUNTS
+                .iter()
+                .cloned()
+                .map(|a| (a, HoprBalance::zero(), XDaiBalance::zero())),
+        )
         .with_channels(CHANNELS.iter().cloned())
         .with_balances::<WxHOPR>([
             (CHAIN_KEYS[0].public().to_address(), 1000_u32.into()),
@@ -84,8 +89,13 @@ async fn hopr_block_chain_connector_should_return_channels() -> anyhow::Result<(
 
     let me = ChainKeypair::random();
 
-    let mut connector =
-        create_trustful_hopr_blokli_connector(&me, mock_client, Address::new(&[2u8; Address::SIZE])).await?;
+    let mut connector = create_trustful_hopr_blokli_connector(
+        &me,
+        Default::default(),
+        mock_client,
+        Address::new(&[2u8; Address::SIZE]),
+    )
+    .await?;
 
     connector.connect(Duration::from_secs(5)).await?;
 

@@ -76,7 +76,7 @@ impl Abortable for tokio::task::JoinHandle<()> {
 /// dropped.
 ///
 /// Additionally, this object also implements [`Abortable`] allowing it to be arbitrarily nested.
-pub struct AbortableList<T>(indexmap::IndexMap<T, Box<dyn Abortable>>);
+pub struct AbortableList<T>(indexmap::IndexMap<T, Box<dyn Abortable + Send + Sync>>);
 
 impl<T> Default for AbortableList<T> {
     fn default() -> Self {
@@ -86,7 +86,7 @@ impl<T> Default for AbortableList<T> {
 
 impl<T: Hash + Eq> AbortableList<T> {
     /// Appends a new [`abortable task`](Abortable) to the end of this list.
-    pub fn insert<A: Abortable + 'static>(&mut self, process: T, task: A) {
+    pub fn insert<A: Abortable + Send + Sync + 'static>(&mut self, process: T, task: A) {
         self.0.insert(process, Box::new(task));
     }
 

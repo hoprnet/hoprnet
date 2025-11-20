@@ -34,22 +34,22 @@ const BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::s
 impl super::Backend for TempDbBackend {
     type Error = redb::Error;
 
-    fn insert_account(&self, entry: AccountEntry) -> Result<Option<AccountEntry>, Self::Error> {
+    fn insert_account(&self, account: AccountEntry) -> Result<Option<AccountEntry>, Self::Error> {
         let write_tx = self.db.begin_write()?;
         let old_value = {
             let mut address_to_id = write_tx.open_table(ADDRESS_TO_ID)?;
-            let chain_addr: [u8; Address::SIZE] = entry.chain_addr.into();
-            address_to_id.insert(chain_addr, u32::from(entry.key_id))?;
+            let chain_addr: [u8; Address::SIZE] = account.chain_addr.into();
+            address_to_id.insert(chain_addr, u32::from(account.key_id))?;
 
             let mut key_to_id = write_tx.open_table(KEY_TO_ID)?;
-            let packet_addr: [u8; OffchainPublicKey::SIZE] = entry.public_key.into();
-            key_to_id.insert(packet_addr, u32::from(entry.key_id))?;
+            let packet_addr: [u8; OffchainPublicKey::SIZE] = account.public_key.into();
+            key_to_id.insert(packet_addr, u32::from(account.key_id))?;
 
             let mut accounts = write_tx.open_table(ACCOUNTS_TABLE_DEF)?;
             accounts
                 .insert(
-                    u32::from(entry.key_id),
-                    bincode::serde::encode_to_vec(entry, BINCODE_CONFIGURATION)
+                    u32::from(account.key_id),
+                    bincode::serde::encode_to_vec(&account, BINCODE_CONFIGURATION)
                         .map_err(|e| redb::Error::Corrupted(format!("account encoding failed: {e}")))?,
                 )?
                 .map(|v| {
@@ -59,6 +59,8 @@ impl super::Backend for TempDbBackend {
                 .map_err(|e| redb::Error::Corrupted(format!("account decoding failed: {e}")))?
         };
         write_tx.commit()?;
+
+        tracing::debug!(new = %account, old = ?old_value, "upserted account");
         Ok(old_value)
     }
 
@@ -80,6 +82,8 @@ impl super::Backend for TempDbBackend {
                 .map_err(|e| redb::Error::Corrupted(format!("account decoding failed: {e}")))?
         };
         write_tx.commit()?;
+
+        tracing::debug!(new = %channel, old = ?old_value, "upserted channel");
         Ok(old_value)
     }
 

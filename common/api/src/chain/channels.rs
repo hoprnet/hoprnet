@@ -65,33 +65,32 @@ impl ChannelSelector {
 
     /// Sets the channel closure range.
     ///
-    /// This has effect only if `PendingToClose` is set in the allowed states.
+    /// This has an effect only if `PendingToClose` is set in the allowed states.
     #[must_use]
     pub fn with_closure_time_range<T: RangeBounds<DateTime>>(mut self, range: T) -> Self {
         self.closure_time_range = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }
 
-    pub fn satisfies(&self, entry: &ChannelEntry) -> bool {
+    /// Checks if the given [`channel`](ChannelEntry) satisfies the selector.
+    pub fn satisfies(&self, channel: &ChannelEntry) -> bool {
         if let Some(source) = &self.source {
-            if entry.source != *source {
+            if channel.source != *source {
                 return false;
             }
         }
 
         if let Some(dst) = &self.destination {
-            if entry.destination != *dst {
+            if channel.destination != *dst {
                 return false;
             }
         }
 
-        if !self.allowed_states.is_empty() {
-            if !self.allowed_states.contains(&entry.status.discriminant()) {
-                return false;
-            }
+        if !self.allowed_states.is_empty() && !self.allowed_states.contains(&channel.status.discriminant()) {
+            return false;
         }
 
-        if let ChannelStatus::PendingToClose(time) = &entry.status {
+        if let ChannelStatus::PendingToClose(time) = &channel.status {
             let time = DateTime::from(*time);
             if !self.closure_time_range.contains(&time) {
                 return false;

@@ -112,7 +112,6 @@ pub(crate) struct HeartbeatInfo {
     "quality": 0.7,
     "backoff": 0.5,
     "isNew": true,
-    "reportedVersion": "2.1.0"
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerInfo {
@@ -143,7 +142,7 @@ pub(crate) struct PeerInfo {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
     "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+    "multiaddrs": "[/ip4/178.12.1.9/tcp/19092]"
 }))]
 #[serde(rename_all = "camelCase")]
 /// Represents a peer that has been announced on-chain.
@@ -151,9 +150,9 @@ pub(crate) struct AnnouncedPeer {
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
     address: Address,
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
-    multiaddr: Option<Multiaddr>,
+    #[serde_as(as = "Vec<DisplayFromStr>")]
+    #[schema(value_type = Vec<String>, example = "[/ip4/178.12.1.9/tcp/19092]")]
+    multiaddrs: Vec<Multiaddr>,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -171,7 +170,6 @@ pub(crate) struct AnnouncedPeer {
         "quality": 0.7,
         "backoff": 0.5,
         "isNew": true,
-        "reportedVersion": "2.1.0"
     }],
     "announced": [{
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
@@ -192,7 +190,6 @@ pub(crate) struct NodePeersResponse {
         "quality": 0.7,
         "backoff": 0.5,
         "isNew": true,
-        "reportedVersion": "2.1.0"
     }]))]
     connected: Vec<PeerInfo>,
     #[schema(example = json!([{
@@ -287,7 +284,7 @@ pub(super) async fn peers(
         .map(|announced| async move {
             AnnouncedPeer {
                 address: announced.chain_addr,
-                multiaddr: announced.get_multiaddr(),
+                multiaddrs: announced.get_multiaddrs().to_vec(),
             }
         })
         .collect::<FuturesUnordered<_>>()
@@ -371,7 +368,7 @@ pub(crate) struct NodeInfoResponse {
         path = const_format::formatcp!("{BASE_PATH}/node/info"),
         description = "Get information about this HOPR Node",
         responses(
-            (status = 200, description = "Fetched node version", body = NodeInfoResponse),
+            (status = 200, description = "Fetched node informations", body = NodeInfoResponse),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(

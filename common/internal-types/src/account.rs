@@ -11,7 +11,7 @@ pub enum AccountType {
     /// Node is not announced.
     NotAnnounced,
     /// Node is announced with a multi-address
-    Announced(Multiaddr),
+    Announced(Vec<Multiaddr>),
 }
 
 impl Display for AccountType {
@@ -20,7 +20,7 @@ impl Display for AccountType {
             Self::NotAnnounced => {
                 write!(f, "not announced")
             }
-            Self::Announced(multiaddr) => write!(f, "announced as {multiaddr}"),
+            Self::Announced(multiaddr) => write!(f, "announced via {multiaddr:?}"),
         }
     }
 }
@@ -40,26 +40,29 @@ pub struct AccountEntry {
 impl AccountEntry {
     /// Is the node announced?
     pub fn has_announced(&self) -> bool {
-        matches!(self.entry_type, AccountType::Announced { .. })
+        matches!(&self.entry_type, AccountType::Announced(addrs) if !addrs.is_empty())
     }
 
     /// If the node has announced, did it announce with routing information?
-    pub fn contains_routing_info(&self) -> bool {
+    pub fn has_announced_with_routing_info(&self) -> bool {
         match &self.entry_type {
             AccountType::NotAnnounced => false,
-            AccountType::Announced(multiaddr) => {
-                multiaddr
-                    .protocol_stack()
-                    .any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
-                    && multiaddr.protocol_stack().any(|p| p == "tcp" || p == "udp")
+            AccountType::Announced(multiaddrs) => {
+                !multiaddrs.is_empty()
+                    && multiaddrs.iter().all(|multiaddr| {
+                        multiaddr
+                            .protocol_stack()
+                            .any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
+                            && multiaddr.protocol_stack().any(|p| p == "tcp" || p == "udp")
+                    })
             }
         }
     }
 
-    pub fn get_multiaddr(&self) -> Option<Multiaddr> {
+    pub fn get_multiaddrs(&self) -> &[Multiaddr] {
         match &self.entry_type {
-            AccountType::NotAnnounced => None,
-            AccountType::Announced(multiaddr) => Some(multiaddr.clone()),
+            AccountType::NotAnnounced => &[],
+            AccountType::Announced(multiaddrs) => multiaddrs.as_slice(),
         }
     }
 
@@ -111,12 +114,14 @@ mod tests {
             public_key,
             chain_addr,
             key_id: 1.into(),
-            entry_type: Announced("/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?),
+            entry_type: Announced(vec![
+                "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?,
+            ]),
             safe_address: None,
         };
 
         assert!(ae1.has_announced());
-        assert!(!ae1.contains_routing_info());
+        assert!(!ae1.has_announced_with_routing_info());
 
         Ok(())
     }
@@ -130,27 +135,27 @@ mod tests {
             public_key,
             chain_addr,
             key_id: 1.into(),
-            entry_type: Announced(
+            entry_type: Announced(vec![
                 "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?,
-            ),
+            ]),
             safe_address: None,
         };
 
         assert!(ae1.has_announced());
-        assert!(ae1.contains_routing_info());
+        assert!(ae1.has_announced_with_routing_info());
 
         let ae1 = AccountEntry {
             public_key,
             chain_addr,
             key_id: 1.into(),
-            entry_type: Announced(
+            entry_type: Announced(vec![
                 "/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?,
-            ),
+            ]),
             safe_address: None,
         };
 
         assert!(ae1.has_announced());
-        assert!(ae1.contains_routing_info());
+        assert!(ae1.has_announced_with_routing_info());
 
         Ok(())
     }
@@ -169,7 +174,7 @@ mod tests {
         };
 
         assert!(!ae1.has_announced());
-        assert!(!ae1.contains_routing_info());
+        assert!(!ae1.has_announced_with_routing_info());
 
         Ok(())
     }

@@ -1,69 +1,38 @@
-use std::{str::FromStr, time::Duration};
+use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
 use futures::AsyncWriteExt;
+use hopr_chain_connector::testing::{BlokliTestClient, FullStateEmulator};
 use hopr_lib::{
-    ChannelId, HoprBalance, RoutingOptions, SessionClientConfig, SessionTarget,
-    testing::fixtures::{ClusterGuard, cluster_fixture, exclusive_indexes},
+    ChannelId, HoprBalance,
+    testing::fixtures::{
+        ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, build_cluster_fixture, chainenv_fixture,
+    },
 };
-use hopr_primitive_types::bounded::BoundedVec;
-use hopr_transport::session::{IpOrHost, SealedHost};
+use hopr_primitive_types::prelude::UnitaryFloatOps;
 use rstest::rstest;
 use serial_test::serial;
 use tokio::time::sleep;
 
-const FUNDING_AMOUNT: &str = "1 wxHOPR";
+const FUNDING_AMOUNT: &str = "10 wxHOPR";
+
+#[rstest::fixture]
+pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+    build_cluster_fixture(chainenv_fixture, 5).await
+}
 
 #[rstest]
-#[tokio::test]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-#[test_log::test]
 async fn ticket_statistics_should_reset_when_cleaned(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = exclusive_indexes::<3>();
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
 
-    let fw_channel = cluster_fixture[src]
-        .inner()
-        .open_channel(
-            &(cluster_fixture[mid].address()),
-            FUNDING_AMOUNT.parse::<HoprBalance>()?,
-        )
-        .await
-        .context("failed to open forward channel")?;
-
-    let bw_channel = cluster_fixture[dst]
-        .inner()
-        .open_channel(
-            &(cluster_fixture[mid].address()),
-            FUNDING_AMOUNT.parse::<HoprBalance>()?,
-        )
-        .await
-        .context("failed to open return channel")?;
-
-    sleep(std::time::Duration::from_secs(3)).await;
-
-    let ip = IpOrHost::from_str(":0")?;
-    let routing = RoutingOptions::IntermediatePath(BoundedVec::from_iter(std::iter::once(
-        cluster_fixture[mid].address().into(),
-    )));
-
-    let mut session = cluster_fixture[src]
-        .inner()
-        .connect_to(
-            cluster_fixture[dst].address(),
-            SessionTarget::UdpStream(SealedHost::Plain(ip)),
-            SessionClientConfig {
-                forward_path_options: routing.clone(),
-                return_path_options: routing,
-                capabilities: Default::default(),
-                pseudonym: None,
-                surb_management: None,
-                always_max_out_surbs: false,
-            },
-        )
-        .await
-        .context("creating a session must succeed")?;
+    let (mut session, fw_channels, bw_channels) = cluster_fixture
+        .create_session_between(&[src, mid, dst], FUNDING_AMOUNT.parse::<HoprBalance>()?)
+        .await?;
 
     const BUF_LEN: usize = 5000;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
@@ -72,27 +41,26 @@ async fn ticket_statistics_should_reset_when_cleaned(
         .await
         .context("write failed")??;
 
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
-    let _ = cluster_fixture[mid]
-        .inner()
-        .tickets_in_channel(&fw_channel.channel_id)
-        .await
-        .context("failed to list tickets")?
-        .into_iter()
-        .count()
-        .ne(&0);
+    assert!(
+        fw_channels
+            .try_to_get_all_ticket_counts()
+            .await?
+            .first()
+            .context("no tickets found for the first forward channel")?
+            .ne(&0)
+    );
+    assert!(
+        bw_channels
+            .try_to_get_all_ticket_counts()
+            .await?
+            .first()
+            .context("no tickets found for the first backward channel")?
+            .ne(&0)
+    );
 
-    let _ = cluster_fixture[mid]
-        .inner()
-        .tickets_in_channel(&bw_channel.channel_id)
-        .await
-        .context("failed to list tickets")?
-        .into_iter()
-        .count()
-        .ne(&0);
-
-    let channels_with_pending_tickets = cluster_fixture[mid]
+    let channels_with_pending_tickets = mid
         .inner()
         .all_tickets()
         .await
@@ -101,10 +69,10 @@ async fn ticket_statistics_should_reset_when_cleaned(
         .map(|t| t.channel_id)
         .collect::<Vec<ChannelId>>();
 
-    assert!(channels_with_pending_tickets.contains(&fw_channel.channel_id));
-    assert!(channels_with_pending_tickets.contains(&bw_channel.channel_id));
+    assert!(channels_with_pending_tickets.contains(&fw_channels.channel_id(0)));
+    assert!(channels_with_pending_tickets.contains(&bw_channels.channel_id(0)));
 
-    let stats_before = cluster_fixture[mid]
+    let stats_before = mid
         .inner()
         .ticket_statistics()
         .await
@@ -112,13 +80,12 @@ async fn ticket_statistics_should_reset_when_cleaned(
 
     assert!(stats_before.winning_count > 0); // As winning prob is set to 1
 
-    cluster_fixture[mid]
-        .inner()
+    mid.inner()
         .reset_ticket_statistics()
         .await
         .context("failed to reset ticket statistics")?;
 
-    let stats_after = cluster_fixture[mid]
+    let stats_after = mid
         .inner()
         .ticket_statistics()
         .await
@@ -126,6 +93,343 @@ async fn ticket_statistics_should_reset_when_cleaned(
 
     assert_ne!(stats_before, stats_after);
     assert_eq!(stats_after.winning_count, 0);
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
+    #[future(awt)] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+
+    let ticket_price = src
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+
+    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
+        .create_session_between(&[src, mid, dst], ticket_price)
+        .await?;
+
+    const BUF_LEN: usize = 500;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    let stats = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+    assert_eq!(stats.rejected_value, HoprBalance::zero());
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    sleep(Duration::from_secs(2)).await;
+
+    let stats = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+    assert!(stats.rejected_value > HoprBalance::zero());
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+    let message_count = 10;
+
+    let ticket_price = src
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+    let funding_amount = ticket_price.mul(message_count);
+
+    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
+        .create_session_between(&[src, mid, dst], funding_amount)
+        .await?;
+
+    const BUF_LEN: usize = 400;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    for _ in 1..=message_count {
+        tokio::time::timeout(Duration::from_millis(1000), session.write_all(&sent_data))
+            .await
+            .context("write failed")??;
+    }
+
+    sleep(Duration::from_secs(15)).await;
+
+    let stats_before = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+    assert!(stats_before.unredeemed_value > HoprBalance::zero());
+
+    mid.inner()
+        .redeem_all_tickets(0)
+        .await
+        .context("failed to redeem tickets")?;
+
+    sleep(Duration::from_secs(5)).await;
+
+    let stats_after = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert!(stats_after.redeemed_value > stats_before.redeemed_value);
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+
+    let message_count = 3;
+
+    let ticket_price = src
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+
+    mid.inner()
+        .reset_ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    let funding_amount = ticket_price.mul(message_count);
+    let (mut session, fw_channel, bw_channel) = cluster_fixture
+        .create_session_between(&[src, mid, dst], funding_amount)
+        .await?;
+
+    const BUF_LEN: usize = 400;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    for _ in 1..=message_count {
+        tokio::time::timeout(Duration::from_millis(1000), session.write_all(&sent_data))
+            .await
+            .context("write failed")??;
+    }
+
+    sleep(Duration::from_secs(5)).await;
+
+    let stats_before = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert!(stats_before.unredeemed_value > HoprBalance::zero());
+    assert_eq!(stats_before.neglected_value, HoprBalance::zero());
+
+    fw_channel.try_close_channels_all_channels().await?;
+    bw_channel.try_close_channels_all_channels().await?;
+
+    sleep(Duration::from_secs(5)).await;
+
+    let stats_after = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert_eq!(stats_after.unredeemed_value, HoprBalance::zero());
+    assert!(stats_after.neglected_value > HoprBalance::zero());
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
+    #[future(awt)] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1_intermediaries::<3>();
+
+    let message_count = 10;
+
+    let ticket_price = src
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+    let funding_amount = ticket_price.mul(message_count).div_f64(MINIMUM_INCOMING_WIN_PROB)?;
+
+    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
+        .create_session_between(&[src, mid, dst], funding_amount)
+        .await?;
+
+    const BUF_LEN: usize = 400;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    let stats_before = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    for _ in 1..=message_count {
+        tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
+            .await
+            .context("write failed")??;
+    }
+
+    sleep(Duration::from_secs(5)).await;
+
+    mid.inner()
+        .redeem_all_tickets(0)
+        .await
+        .context("failed to redeem tickets")?;
+
+    sleep(Duration::from_secs(5)).await;
+
+    let stats_after = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert!(stats_after.winning_count < stats_before.winning_count + message_count as u128);
+    assert!(stats_after.redeemed_value > stats_before.redeemed_value);
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
+    #[future(awt)] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
+    cluster_fixture.update_winning_probability(0.5).await?;
+
+    // TODO: this can be removed once we have subscription for WP updates
+    cluster_fixture
+        .cluster
+        .iter()
+        .for_each(|node| node.connector().invalidate_caches());
+
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1_intermediaries::<3>();
+    let message_count = 20;
+
+    let ticket_price = src
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+    let funding_amount = ticket_price.mul(message_count + 2);
+
+    assert!(
+        cluster_fixture
+            .create_session_between(&[src, mid, dst], funding_amount)
+            .await
+            .is_err()
+    );
+
+    Ok(())
+}
+
+#[rstest]
+#[test_log::test(tokio::test)]
+#[timeout(TEST_GLOBAL_TIMEOUT)]
+#[serial]
+#[cfg(feature = "session-client")]
+async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
+    #[future(awt)] cluster_fixture: ClusterGuard,
+) -> anyhow::Result<()> {
+    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1_intermediaries::<3>();
+    let message_count = 20;
+
+    let ticket_price = src
+        .inner()
+        .get_ticket_price()
+        .await
+        .context("failed to get ticket price")?;
+    let funding_amount = ticket_price.mul(message_count + 2);
+
+    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
+        .create_session_between(&[src, mid, dst], funding_amount)
+        .await?;
+
+    const BUF_LEN: usize = 400;
+    let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
+
+    tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
+        .await
+        .context("write failed")??;
+
+    let stats_before = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    for _ in 1..=message_count {
+        tokio::time::timeout(Duration::from_millis(500), session.write_all(&sent_data))
+            .await
+            .context("write failed")??;
+    }
+    sleep(Duration::from_secs(5)).await;
+
+    mid.inner()
+        .redeem_all_tickets(0)
+        .await
+        .context("failed to redeem tickets")?;
+
+    sleep(Duration::from_secs(5)).await;
+
+    let stats_after = mid
+        .inner()
+        .ticket_statistics()
+        .await
+        .context("failed to get ticket statistics")?;
+
+    assert!(stats_after.winning_count > stats_before.winning_count);
+    assert!(stats_after.redeemed_value > stats_before.redeemed_value);
 
     Ok(())
 }

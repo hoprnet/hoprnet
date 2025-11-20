@@ -3,20 +3,20 @@
 use std::str::FromStr;
 
 use SafeContract::SafeContractInstance;
-use alloy::{
-    contract::{Error as ContractError, Result as ContractResult},
-    hex::FromHexError,
-    network::{ReceiptResponse, TransactionBuilder},
-    primitives,
-    primitives::{Address, Bytes, U256, address, aliases, keccak256},
-    providers::{MULTICALL3_ADDRESS, MulticallError, PendingTransactionError},
-    rpc::types::TransactionRequest,
-    signers::{Signer, local::PrivateKeySigner},
-    sol,
-    sol_types::{SolCall, SolValue},
-    transports::TransportErrorKind,
-};
 use hopr_bindings::{
+    exports::alloy::{
+        self,
+        contract::{Error as ContractError, Result as ContractResult},
+        hex::FromHexError,
+        network::{ReceiptResponse, TransactionBuilder},
+        primitives::{self, Address, Bytes, U256, address, aliases, keccak256},
+        providers::{MULTICALL3_ADDRESS, MulticallError, PendingTransactionError},
+        rpc::types::TransactionRequest,
+        signers::{Signer, local::PrivateKeySigner},
+        sol,
+        sol_types::{SolCall, SolValue},
+        transports::TransportErrorKind,
+    },
     hopr_announcements::{HoprAnnouncements, HoprAnnouncements::HoprAnnouncementsInstance},
     hopr_announcements_proxy::HoprAnnouncementsProxy,
     hopr_channels::{HoprChannels, HoprChannels::HoprChannelsInstance},
@@ -216,7 +216,7 @@ where
                 provider.clone(),
             ),
             stake_factory: HoprNodeStakeFactoryInstance::new(
-                a2h(contract_addresses.node_stake_v2_factory),
+                a2h(contract_addresses.node_stake_factory),
                 provider.clone(),
             ),
             module_implementation: HoprNodeManagementModuleInstance::new(
@@ -374,7 +374,8 @@ where
             node_safe_registry: h2a(*instances.safe_registry.address()),
             ticket_price_oracle: h2a(*instances.price_oracle.address()),
             winning_probability_oracle: h2a(*instances.win_prob_oracle.address()),
-            node_stake_v2_factory: h2a(*instances.stake_factory.address()),
+            node_safe_migration: hopr_primitive_types::prelude::Address::default(),
+            node_stake_factory: h2a(*instances.stake_factory.address()),
             module_implementation: h2a(*instances.module_implementation.address()),
         }
     }
@@ -406,7 +407,7 @@ pub fn get_create2_address(from: Address, salt: impl AsRef<[u8]>, init_code: imp
 sol!(
     #![sol(abi)]
     #![sol(rpc)]
-    // #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     contract SafeContract {
         function nonce() view returns (uint256);
         function getTransactionHash( address to, uint256 value, bytes calldata data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, uint256 _nonce) public view returns (bytes32);

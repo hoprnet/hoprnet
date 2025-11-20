@@ -3,7 +3,7 @@ name = "hoprd"
 version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "HOPR node executable."
+description = "HOPR node executable"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -20,6 +20,7 @@ default = [
 prometheus = [
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
+  "hopr-db-node/prometheus",
   "hopr-strategy/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
@@ -28,6 +29,8 @@ runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
+  "hopr-db-node/runtime-tokio",
+  "hopr-chain-connector/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
   "hopr-strategy/runtime-tokio",
 ]
@@ -64,7 +67,6 @@ async-signal = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
-dashmap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.12"
 proc-macro-regex = { workspace = true }
@@ -119,3 +121,11 @@ anyhow = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 test-log = { workspace = true }
+hopr-lib = { workspace = true, features = [
+  "runtime-tokio",
+  "session-client",
+  "session-server",
+  "utils_session",
+  "utils_parallel",
+  "testing",
+] }
