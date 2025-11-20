@@ -13,6 +13,38 @@ use hopr_primitive_types::prelude::*;
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
+impl<B, C, P, R> HoprBlockchainConnector<C, B, P, R>
+where
+    B: Backend + Send + Sync + 'static,
+{
+    pub(crate) fn build_account_stream(
+        &self,
+        selector: AccountSelector,
+    ) -> Result<impl futures::Stream<Item = AccountEntry> + Send + 'static, ConnectorError> {
+        let accounts = self.graph.read().nodes().collect::<Vec<_>>();
+        let backend = self.backend.clone();
+        Ok(futures::stream::iter(accounts).filter_map(move |account_id| {
+            let backend = backend.clone();
+            let selector = selector.clone();
+            // This avoids the cache on purpose so it does not get spammed
+            async move {
+                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_id(&account_id)).await
+                {
+                    Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
+                    Ok(Err(error)) => {
+                        tracing::error!(%error, %account_id, "backend error when looking up account");
+                        None
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, %account_id, "join error when looking up account");
+                        None
+                    }
+                }
+            }
+        }))
+    }
+}
+
 #[async_trait::async_trait]
 impl<B, C, P, R> hopr_api::chain::ChainReadAccountOperations for HoprBlockchainConnector<C, B, P, R>
 where
@@ -76,30 +108,7 @@ where
     ) -> Result<BoxStream<'a, AccountEntry>, Self::Error> {
         self.check_connection_state()?;
 
-        let accounts = self.graph.read().nodes().collect::<Vec<_>>();
-        let backend = self.backend.clone();
-        Ok(futures::stream::iter(accounts)
-            .filter_map(move |account_id| {
-                let backend = backend.clone();
-                let selector = selector.clone();
-                // This avoids the cache on purpose so it does not get spammed
-                async move {
-                    match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_account_by_id(&account_id))
-                        .await
-                    {
-                        Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
-                        Ok(Err(error)) => {
-                            tracing::error!(%error, %account_id, "backend error when looking up account");
-                            None
-                        }
-                        Err(error) => {
-                            tracing::error!(%error, %account_id, "join error when looking up account");
-                            None
-                        }
-                    }
-                }
-            })
-            .boxed())
+        Ok(self.build_account_stream(selector)?.boxed())
     }
 
     async fn count_accounts(&self, selector: AccountSelector) -> Result<usize, Self::Error> {

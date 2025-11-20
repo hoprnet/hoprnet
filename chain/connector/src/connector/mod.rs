@@ -163,6 +163,9 @@ where
         let channel_by_id = self.channel_by_id.clone();
         let channel_by_parties = self.channel_by_parties.clone();
 
+        // Query chain info to populate the cache
+        self.query_cached_chain_info().await?;
+
         #[allow(unused, clippy::large_enum_variant)]
         enum SubscribedEventType {
             Account((AccountEntry, Option<AccountEntry>)),

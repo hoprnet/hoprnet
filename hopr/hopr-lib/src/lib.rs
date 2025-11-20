@@ -80,7 +80,6 @@ use std::{
 };
 
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, channel::mpsc::channel};
-use futures_concurrency::stream::Chain;
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
@@ -451,60 +450,26 @@ where
 
         // Stream all the existing announcements and also subscribe to all future on-chain
         // announcements
-        let hopr_chain_api = self.chain_api.clone();
-        let (announcement_stream_started_tx, announcement_stream_started_rx) = futures::channel::oneshot::channel();
-        processes.insert(
-            HoprLibProcess::AccountAnnouncements,
-            hopr_async_runtime::spawn_as_abortable!(async move {
-                let streams = hopr_chain_api
-                    .stream_accounts(AccountSelector {
-                        public_only: true,
-                        ..Default::default()
-                    })
-                    .await
-                    .and_then(|s1| Ok((s1, hopr_chain_api.subscribe()?)));
-
-                match streams {
-                    Ok((past_announced, future_announced)) => {
-                        let _ = announcement_stream_started_tx.send(Ok(()));
-                        let res = (
-                            past_announced.map(|account| {
-                                vec![PeerDiscovery::Announce(
-                                    account.public_key.into(),
-                                    account.get_multiaddrs().to_vec(),
-                                )]
-                            }),
-                            future_announced.filter_map(|event| {
-                                futures::future::ready(event.try_as_announcement().map(|account| {
-                                    vec![PeerDiscovery::Announce(
-                                        account.public_key.into(),
-                                        account.get_multiaddrs().to_vec(),
-                                    )]
-                                }))
-                            }),
-                        )
-                            .chain()
-                            .flat_map(futures::stream::iter)
-                            .map(Ok)
-                            .forward(indexer_peer_update_tx)
-                            .await;
-
-                        tracing::warn!(
-                            task = %HoprLibProcess::AccountAnnouncements,
-                            ?res,
-                            "long-running background task finished"
-                        );
-                    }
-                    Err(error) => {
-                        tracing::error!(%error, "failed to start announcement stream");
-                        let _ = announcement_stream_started_tx.send(Err(HoprLibError::chain(error)));
-                    }
-                }
-            }),
+        let (announcements_stream, announcements_handle) = futures::stream::abortable(
+            self.chain_api
+                .subscribe_with_state_sync([StateSyncOptions::PublicAccounts])
+                .map_err(HoprLibError::chain)?,
         );
-        announcement_stream_started_rx
-            .await
-            .map_err(|_| HoprLibError::GeneralError("failed to notify announcement stream start".into()))??;
+        processes.insert(HoprLibProcess::AccountAnnouncements, announcements_handle);
+
+        spawn(
+            announcements_stream
+                .filter_map(|event| {
+                    futures::future::ready(event.try_as_announcement().map(|account| {
+                        PeerDiscovery::Announce(account.public_key.into(), account.get_multiaddrs().to_vec())
+                    }))
+                })
+                .map(Ok)
+                .forward(indexer_peer_update_tx)
+                .inspect(
+                    |_| warn!(task = %HoprLibProcess::AccountAnnouncements,"long-running background task finished"),
+                ),
+        );
 
         info!(peer_id = %self.me_peer_id(), address = %self.me_onchain(), version = constants::APP_VERSION, "Node information");
 

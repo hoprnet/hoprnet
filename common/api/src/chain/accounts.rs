@@ -62,7 +62,7 @@ pub trait ChainWriteAccountOperations {
 /// See [`ChainReadAccountOperations::stream_accounts`].
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct AccountSelector {
-    /// Selects accounts that are announced with multi-addresses.
+    /// Selects accounts that announced with publicly routable multi-addresses.
     pub public_only: bool,
     /// Selects accounts bound with the given chain key.
     pub chain_key: Option<Address>,
@@ -71,6 +71,28 @@ pub struct AccountSelector {
 }
 
 impl AccountSelector {
+    /// Selects only accounts that announced with publicly routable multi-addresses.
+    #[must_use]
+    pub fn with_public_only(mut self, public_only: bool) -> Self {
+        self.public_only = public_only;
+        self
+    }
+
+    /// Selects accounts bound with the given chain key.
+    #[must_use]
+    pub fn with_chain_key(mut self, chain_key: Address) -> Self {
+        self.chain_key = Some(chain_key);
+        self
+    }
+
+    /// Selects accounts bound with the given off-chain key.
+    #[must_use]
+    pub fn with_offchain_key(mut self, offchain_key: OffchainPublicKey) -> Self {
+        self.offchain_key = Some(offchain_key);
+        self
+    }
+
+    /// Checks if the given [`account`](AccountEntry) satisfies the selector.
     pub fn satisfies(&self, account: &AccountEntry) -> bool {
         if self.public_only && !account.has_announced_with_routing_info() {
             return false;

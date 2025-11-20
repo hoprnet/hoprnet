@@ -8,14 +8,14 @@ use hopr_lib::{
     testing::{
         fixtures::{
             ClusterGuard, DEFAULT_SAFE_ALLOWANCE, INITIAL_NODE_NATIVE, INITIAL_NODE_TOKEN, INITIAL_SAFE_NATIVE,
-            INITIAL_SAFE_TOKEN, TEST_GLOBAL_TIMEOUT, build_cluster_fixture, chainenv_fixture,
+            INITIAL_SAFE_TOKEN, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, build_cluster_fixture,
+            chainenv_fixture,
         },
         hopr::TestedHopr,
     },
 };
 use rstest::rstest;
 use serial_test::serial;
-use hopr_lib::testing::fixtures::MINIMUM_INCOMING_WIN_PROB;
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 

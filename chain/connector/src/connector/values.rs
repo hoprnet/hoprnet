@@ -9,14 +9,19 @@ use hopr_primitive_types::prelude::*;
 
 use crate::{connector::HoprBlockchainConnector, errors::ConnectorError};
 
+pub(crate) const CHAIN_INFO_CACHE_KEY: u32 = 0;
+
 impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P>
 where
     C: BlokliQueryClient + Send + Sync + 'static,
 {
-    async fn query_cached_chain_info(&self) -> Result<blokli_client::api::types::ChainInfo, ConnectorError> {
+    pub(crate) async fn query_cached_chain_info(&self) -> Result<blokli_client::api::types::ChainInfo, ConnectorError> {
         Ok(self
             .values
-            .try_get_with(0, self.client.query_chain_info().map_err(ConnectorError::from))
+            .try_get_with(
+                CHAIN_INFO_CACHE_KEY,
+                self.client.query_chain_info().map_err(ConnectorError::from),
+            )
             .await?)
     }
 }

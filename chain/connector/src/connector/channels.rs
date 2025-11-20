@@ -8,6 +8,51 @@ use hopr_primitive_types::prelude::*;
 
 use crate::{backend::Backend, connector::HoprBlockchainConnector, errors::ConnectorError};
 
+impl<B, C, P, R> HoprBlockchainConnector<C, B, P, R>
+where
+    B: Backend + Send + Sync + 'static,
+{
+    pub(crate) fn build_channel_stream(
+        &self,
+        selector: ChannelSelector,
+    ) -> Result<impl futures::Stream<Item = ChannelEntry> + Send + 'static, ConnectorError> {
+        // Note: Since the graph does not contain Closed channels, they cannot
+        // be selected if requested solely via the ChannelSelector.
+        if selector.allowed_states == [ChannelStatusDiscriminants::Closed] {
+            return Err(ConnectorError::InvalidArguments("cannot stream closed channels only"));
+        }
+
+        let channels = self
+            .graph
+            .read()
+            .all_edges()
+            .map(|(_, _, e)| e)
+            .copied()
+            .collect::<Vec<_>>();
+
+        let backend = self.backend.clone();
+        Ok(futures::stream::iter(channels).filter_map(move |channel_id| {
+            let backend = backend.clone();
+            let selector = selector.clone();
+            // This avoids the cache on purpose so it does not get spammed
+            async move {
+                match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_channel_by_id(&channel_id)).await
+                {
+                    Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
+                    Ok(Err(error)) => {
+                        tracing::error!(%error, %channel_id, "backend error when looking up channel");
+                        None
+                    }
+                    Err(error) => {
+                        tracing::error!(%error, %channel_id, "join error when looking up channel");
+                        None
+                    }
+                }
+            }
+        }))
+    }
+}
+
 #[async_trait::async_trait]
 impl<B, C, P, R> hopr_api::chain::ChainReadChannelOperations for HoprBlockchainConnector<C, B, P, R>
 where
@@ -71,42 +116,7 @@ where
     ) -> Result<BoxStream<'a, ChannelEntry>, Self::Error> {
         self.check_connection_state()?;
 
-        // Note: Since the graph does not contain Closed channels, they cannot
-        // be selected if requested solely via the ChannelSelector.
-        if selector.allowed_states == [ChannelStatusDiscriminants::Closed] {
-            return Err(ConnectorError::InvalidArguments("cannot stream closed channels only"));
-        }
-
-        let channels = self
-            .graph
-            .read()
-            .all_edges()
-            .map(|(_, _, e)| e)
-            .copied()
-            .collect::<Vec<_>>();
-        let backend = self.backend.clone();
-        Ok(futures::stream::iter(channels)
-            .filter_map(move |channel_id| {
-                let backend = backend.clone();
-                let selector = selector.clone();
-                // This avoids the cache on purpose so it does not get spammed
-                async move {
-                    match hopr_async_runtime::prelude::spawn_blocking(move || backend.get_channel_by_id(&channel_id))
-                        .await
-                    {
-                        Ok(Ok(value)) => value.filter(|c| selector.satisfies(c)),
-                        Ok(Err(error)) => {
-                            tracing::error!(%error, %channel_id, "backend error when looking up channel");
-                            None
-                        }
-                        Err(error) => {
-                            tracing::error!(%error, %channel_id, "join error when looking up channel");
-                            None
-                        }
-                    }
-                }
-            })
-            .boxed())
+        Ok(self.build_channel_stream(selector)?.boxed())
     }
 }
 
