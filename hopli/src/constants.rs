@@ -13,12 +13,15 @@ pub const SAFE_DIAMOND_PROXY_SINGLETON_DEPLOY_CODE: [u8; 169] = hex!(
 #[allow(unused)]
 pub const DIV_BY_ZERO: &str = "4e487b710000000000000000000000000000000000000000000000000000000000000012";
 
+/// Initial key binding fee required to initialize a key binding in the HOPR token contract
+pub const INIT_KEY_BINDING_FEE: U256 = uint!(10_000_000_000_000_000_U256); // 0.01 ether
+
 /// ERC1820 deployer wallet
 pub const ERC_1820_DEPLOYER: Address = address!("a990077c3205cbDf861e17Fa532eeB069cE9fF96");
 
 /// Amount of ETH to fund ERC_1820_DEPLOYER, to deployer ERC1820 registry
 /// ERC1820Registry contract is used by the HOPR token contract (ERC777 token)
-pub const ETH_VALUE_FOR_ERC1820_DEPLOYER: U256 = uint!(80_000_000_000_000_000_U256); // 0.08 (anvil) ETH
+pub const ETH_VALUE_FOR_ERC1820_DEPLOYER: U256 = uint!(80_000_000_000_000_000_U256); // 0.08 (anvil) 
 
 /// Deployed code of the ERC1820 registry contract of type [u8; 2619]
 pub const ERC_1820_REGISTRY_DEPLOY_CODE: [u8; 2619] = hex!(

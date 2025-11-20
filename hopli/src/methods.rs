@@ -44,7 +44,7 @@ use crate::constants::{
     ERC_1967_PROXY_CREATION_CODE, SAFE_MULTISEND_ADDRESS, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS,
     SAFE_SAFE_L2_ADDRESS, SAFE_SAFEPROXYFACTORY_ADDRESS, DEFAULT_ANNOUNCEMENT_PERMISSIONS, 
     DEFAULT_CAPABILITY_PERMISSIONS, DEFAULT_NODE_PERMISSIONS, DOMAIN_SEPARATOR_TYPEHASH,
-    SAFE_TX_TYPEHASH, SENTINEL_OWNERS, MULTICALL3_DEPLOYER, ETH_VALUE_FOR_MULTICALL3_DEPLOYER
+    SAFE_TX_TYPEHASH, SENTINEL_OWNERS, MULTICALL3_DEPLOYER, ETH_VALUE_FOR_MULTICALL3_DEPLOYER,
 };
 
 sol!(
@@ -669,25 +669,19 @@ pub fn prepare_safe_tx_multicall_payload_from_owner_contract(
     CallItem::<execTransactionCall>::new(deployed_safe, input.into())
 }
 
-/// Deploy a safe and a module proxies via HoprStakeFactory contract with default permissions and announcement targets
-/// Within one multicall, as an owner of the safe:
-/// - deploy a safe proxy instance and a module proxy instance with multicall as an owner
-/// - add announcement as a permitted target in the deployed module proxy
-/// - approve token transfer to be done for the safe by channel contracts
-/// - if node addresses are known, include nodes to the module by safe
-/// - transfer safe ownership to actual admins
-/// - set desired threshold
-/// - if node addresses are known, include nodes and safes to the network registry.
+/// Deploy a safe and a module proxies via v4 HoprStakeFactory contract with default permissions and announcement targets
+/// With the multicall contract, it deploys a safe proxy instance and a module proxy instance with multicall as an owner, 
+/// and completes necessary setup.
+/// Then the multicall includes some additional steps:
+/// 1. if node addresses are known, include nodes to the module by safe 
+/// 2. transfer safe ownership to actual admins
+/// 3. set desired threshold
 ///
 /// Returns safe proxy address and module proxy address
 #[allow(clippy::too_many_arguments)]
 pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provider>(
     hopr_node_stake_factory: HoprNodeStakeFactoryInstance<Arc<P>>,
-    hopr_token_address: Address,
     hopr_channels_address: Address,
-    hopr_module_implementation_address: Address,
-    hopr_announcement_address: Address,
-    allowance: U256,
     node_addresses: Option<Vec<Address>>,
     admins: Vec<Address>,
     threshold: U256,
@@ -759,52 +753,14 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
         target: *hopr_node_stake_factory.address(),
         allowFailure: false,
         callData: cloneCall {
-            // moduleSingletonAddress: hopr_module_implementation_address,
-            admins: temporary_admins,
             nonce: nonce.into(),
             defaultTarget: default_target.into(),
+            admins: temporary_admins,
         }
         .abi_encode()
         .into(),
     });
     info!("Safe and module deployment multicall payload is created");
-
-    // add announcement as a permitted target in the deployed module proxy
-    let announcement_target =
-        U256::from_str(format!("{hopr_announcement_address:?}{DEFAULT_ANNOUNCEMENT_PERMISSIONS}").as_str()).unwrap();
-    let scope_announcement_tx_payload = scopeTargetTokenCall {
-        defaultTarget: announcement_target,
-    }
-    .abi_encode();
-
-    let multicall_payload_2 = prepare_safe_tx_multicall_payload_from_owner_contract(
-        // multicall.clone(),
-        safe_address,
-        module_address,
-        caller,
-        scope_announcement_tx_payload,
-    );
-    // let multicall = multicall.add_call(multicall_payload_2);
-    multicall_payloads.push(multicall_payload_2.to_call3());
-    info!("Announcement contract scoping multicall payload is created");
-
-    // approve token transfer to be done for the safe by channel contracts
-    let approve_tx_payload = approveCall {
-        spender: hopr_channels_address,
-        value: allowance,
-    }
-    .abi_encode();
-
-    let multicall_payload_3 = prepare_safe_tx_multicall_payload_from_owner_contract(
-        safe_address,
-        hopr_token_address,
-        caller,
-        approve_tx_payload,
-    );
-    // let multicall = multicall.add_call(multicall_payload_3);
-    multicall_payloads.push(multicall_payload_3.to_call3());
-
-    info!("Token transfer approval multicall payload is created");
 
     // if node addresses are known, include nodes to the module by safe
     if let Some(nodes) = node_addresses {
@@ -870,6 +826,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
         .decoded_log::<hopr_bindings::hopr_node_stake_factory::HoprNodeStakeFactory::NewHoprNodeStakeModule>()
         .ok_or_else(|| HelperErrors::ContractNotDeployed("cannot find module from log".into()))?
         .instance;
+    info!("tx_receipt {:?}", tx_receipt);
 
     assert_eq!(
         safe_address,
@@ -1716,6 +1673,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_deploy_safe_and_module() -> anyhow::Result<()> {
+        init_tracing();
         let _ = env_logger::builder().is_test(true).try_init();
 
         // prepare some input data
@@ -1743,11 +1701,7 @@ mod tests {
         // register some nodes
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             instances.stake_factory,
-            *instances.token.address(),
             *instances.channels.address(),
-            *instances.module_implementation.address(),
-            *instances.announcements.address(),
-            U256::MAX,
             Some(node_addresses.clone()),
             admin_addresses.clone(),
             U256::from(2),
@@ -1769,7 +1723,7 @@ mod tests {
             .call()
             .await?;
 
-        assert_eq!(allowance, U256::MAX, "allowance is not set");
+        assert_eq!(allowance, U256::from(1_000_000_000_000_000_000_000_u128), "allowance is not set");
 
         // check nodes have been included in the module
         for node_address in node_addresses {
@@ -1812,11 +1766,7 @@ mod tests {
         // create a safe
         let (safe, _node_module) = deploy_safe_module_with_targets_and_nodes(
             instances.stake_factory,
-            *instances.token.address(),
             *instances.channels.address(),
-            *instances.module_implementation.address(),
-            *instances.announcements.address(),
-            U256::MAX,
             None,
             vec![a2h(contract_deployer.public().to_address())],
             U256::from(1),
@@ -1839,7 +1789,7 @@ mod tests {
             .call()
             .await?;
 
-        assert_eq!(allowance, U256::MAX, "allowance initiation is wrong");
+        assert_eq!(allowance, U256::from(1_000_000_000_000_000_000_000_u128), "allowance is not set");
 
         let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
         for val in desired_amount {
@@ -1908,11 +1858,7 @@ mod tests {
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             instances.stake_factory,
-            *instances.token.address(),
             *instances.channels.address(),
-            *instances.module_implementation.address(),
-            *instances.announcements.address(),
-            U256::MAX,
             Some(deployer_vec.clone()),
             deployer_vec.clone(),
             U256::from(1),
@@ -1989,11 +1935,7 @@ mod tests {
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             instances.stake_factory,
-            *instances.token.address(),
             *instances.channels.address(),
-            *instances.module_implementation.address(),
-            *instances.announcements.address(),
-            U256::MAX,
             None,
             deployer_vec.clone(),
             U256::from(1),
@@ -2060,11 +2002,7 @@ mod tests {
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             instances.stake_factory,
-            *instances.token.address(),
             *instances.channels.address(),
-            *instances.module_implementation.address(),
-            *instances.announcements.address(),
-            U256::MAX,
             None,
             deployer_vec.clone(),
             U256::from(1),
@@ -2124,11 +2062,7 @@ mod tests {
         // create a safe
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             instances.stake_factory,
-            *instances.token.address(),
             *instances.channels.address(),
-            *instances.module_implementation.address(),
-            *instances.announcements.address(),
-            U256::MAX,
             None,
             deployer_vec.clone(),
             U256::from(1),
