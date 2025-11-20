@@ -1,8 +1,10 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
+use hopr_api::chain::{ChainInfo, DomainSeparators};
 use hopr_chain_types::chain_events::ChainEvent;
+use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::{Address, ToHex};
+use hopr_primitive_types::prelude::*;
 
 use crate::errors::ConnectorError;
 
@@ -70,6 +72,73 @@ pub(crate) fn model_to_graph_entry(
         (model.channel.epoch as u32).into(),
     );
     Ok((src, dst, channel))
+}
+
+pub(crate) fn model_to_ticket_params(
+    model: blokli_client::api::types::TicketParameters,
+) -> Result<(HoprBalance, WinningProbability), ConnectorError> {
+    Ok((
+        model.ticket_price.0.parse()?,
+        WinningProbability::try_from_f64(model.min_ticket_winning_probability)?,
+    ))
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ParsedChainInfo {
+    pub channel_closure_grace_period: Duration,
+    pub domain_separators: DomainSeparators,
+    pub info: ChainInfo,
+    pub ticket_win_prob: WinningProbability,
+    pub ticket_price: HoprBalance,
+}
+
+pub(crate) fn model_to_chain_info(
+    model: blokli_client::api::types::ChainInfo,
+) -> Result<ParsedChainInfo, ConnectorError> {
+    Ok(ParsedChainInfo {
+        channel_closure_grace_period: model
+            .channel_closure_grace_period
+            .ok_or(ConnectorError::TypeConversion("missing channel grace period".into()))
+            .and_then(|v| {
+                v.0.parse()
+                    .map(Duration::from_secs)
+                    .map_err(|e| ConnectorError::TypeConversion(format!("invalid channel grace period: {e}")))
+            })?,
+        domain_separators: DomainSeparators {
+            ledger: model
+                .ledger_dst
+                .ok_or(ConnectorError::TypeConversion("missing ledger dst".into()))
+                .and_then(|v| {
+                    Hash::from_hex(&v).map_err(|e| ConnectorError::TypeConversion(format!("invalid ledger dst: {e}")))
+                })?,
+            safe_registry: model
+                .safe_registry_dst
+                .ok_or(ConnectorError::TypeConversion("missing safe registry dst".into()))
+                .and_then(|v| {
+                    Hash::from_hex(&v)
+                        .map_err(|e| ConnectorError::TypeConversion(format!("invalid safe registry dst: {e}")))
+                })?,
+            channel: model
+                .channel_dst
+                .ok_or(ConnectorError::TypeConversion("missing channel dst".into()))
+                .and_then(|v| {
+                    Hash::from_hex(&v).map_err(|e| ConnectorError::TypeConversion(format!("invalid channel dst: {e}")))
+                })?,
+        },
+        info: ChainInfo {
+            chain_id: model.chain_id as u64,
+            hopr_network_name: model.network,
+            contract_addresses: serde_json::from_str(&model.contract_addresses.0)
+                .map_err(|e| ConnectorError::TypeConversion(format!("invalid contract addresses JSON: {e}")))?,
+        },
+        ticket_win_prob: WinningProbability::try_from_f64(model.min_ticket_winning_probability)
+            .map_err(|e| ConnectorError::TypeConversion(format!("invalid winning probability info: {e}")))?,
+        ticket_price: model
+            .ticket_price
+            .0
+            .parse()
+            .map_err(|e| ConnectorError::TypeConversion(format!("invalid ticket price: {e}")))?,
+    })
 }
 
 pub(crate) async fn process_channel_changes_into_events(

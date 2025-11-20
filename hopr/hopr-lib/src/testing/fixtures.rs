@@ -55,6 +55,7 @@ impl ClusterGuard {
 
     /// Update winning probability
     pub async fn update_winning_probability(&self, new_prob: f64) -> anyhow::Result<()> {
+        tracing::debug!(new_prob, "updating winning probability");
         Ok(self.chain_client.update_price_and_win_prob(None, Some(new_prob)))
     }
 

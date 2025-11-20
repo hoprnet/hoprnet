@@ -1,4 +1,4 @@
-use std::{str::FromStr, time::Duration};
+use std::{cmp::Ordering, str::FromStr, time::Duration};
 
 use blokli_client::api::{BlokliQueryClient, BlokliSubscriptionClient, BlokliTransactionClient};
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
@@ -9,7 +9,7 @@ use hopr_async_runtime::AbortHandle;
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::{Address, HoprBalance};
+use hopr_primitive_types::prelude::*;
 use petgraph::prelude::DiGraphMap;
 
 use crate::{
@@ -17,7 +17,11 @@ use crate::{
     connector::{
         keys::HoprKeyMapper,
         sequencer::TransactionSequencer,
-        utils::{model_to_account_entry, model_to_graph_entry, process_channel_changes_into_events},
+        utils::{
+            ParsedChainInfo, model_to_account_entry, model_to_graph_entry, model_to_ticket_params,
+            process_channel_changes_into_events,
+        },
+        values::CHAIN_INFO_CACHE_KEY,
     },
     errors::ConnectorError,
 };
@@ -73,7 +77,7 @@ pub struct HoprBlockchainConnector<C, B, P, R> {
     // Fast retrieval of channel entries by parties
     channel_by_parties: moka::future::Cache<ChannelParties, Option<ChannelEntry>, ahash::RandomState>,
     // Contains only the chain info structure
-    values: moka::future::Cache<u32, blokli_client::api::types::ChainInfo>,
+    values: moka::future::Cache<u32, ParsedChainInfo>,
 }
 
 impl<B, C, P> HoprBlockchainConnector<C, B, P, P::TxRequest>
@@ -166,7 +170,8 @@ where
         // Query chain info to populate the cache
         self.query_cached_chain_info().await?;
 
-        #[allow(unused, clippy::large_enum_variant)]
+        #[allow(clippy::large_enum_variant)]
+        #[derive(Debug)]
         enum SubscribedEventType {
             Account((AccountEntry, Option<AccountEntry>)),
             Channel((ChannelEntry, Option<Vec<ChannelChange>>)),
@@ -177,7 +182,8 @@ where
         hopr_async_runtime::prelude::spawn(async move {
             let connections = client
                 .subscribe_accounts(None)
-                .and_then(|accounts| Ok((accounts, client.subscribe_graph()?)));
+                .and_then(|accounts| Ok((accounts, client.subscribe_graph()?)))
+                .and_then(|(accounts, channels)| Ok((accounts, channels, client.subscribe_ticket_params()?)));
 
             if let Err(error) = connections {
                 if let Some(connection_ready_tx) = connection_ready_tx.take() {
@@ -186,7 +192,9 @@ where
                 return;
             }
 
-            let (account_stream, channel_stream) = connections.unwrap();
+            let (account_stream, channel_stream, ticket_params_stream) = connections.unwrap();
+
+            // Stream of Account events (Announcements)
             let graph_clone = graph.clone();
             let account_stream = account_stream
                 .inspect_ok(|entry| tracing::trace!(?entry, "new account entry"))
@@ -224,6 +232,7 @@ where
                 })
                 .fuse();
 
+            // Stream of channel graph updates
             let channel_stream = channel_stream
                 .map_err(ConnectorError::from)
                 .inspect_ok(|entry| tracing::trace!(?entry, "new graph entry"))
@@ -258,6 +267,61 @@ where
                 })
                 .fuse();
 
+            // Stream of ticket parameter updates (ticket price, minimum winning probability)
+            let ticket_params_stream = ticket_params_stream
+                .map_err(ConnectorError::from)
+                .inspect_ok(|entry| tracing::trace!(?entry, "new ticket params"))
+                .try_filter_map(|ticket_value_event| {
+                    futures::future::ready(model_to_ticket_params(ticket_value_event).map(Some))
+                })
+                .and_then(|(new_ticket_price, new_win_prob)| {
+                    let values_cache = values_cache.clone();
+                    async move {
+                        let mut events = Vec::<SubscribedEventType>::new();
+                        values_cache
+                            .entry(CHAIN_INFO_CACHE_KEY)
+                            .and_compute_with(|cached_entry| {
+                                futures::future::ready(match cached_entry {
+                                    Some(chain_info) => {
+                                        let mut chain_info = chain_info.into_value();
+                                        if chain_info.ticket_price != new_ticket_price {
+                                            events.push(SubscribedEventType::TicketPrice((
+                                                new_ticket_price,
+                                                Some(chain_info.ticket_price),
+                                            )));
+                                            chain_info.ticket_price = new_ticket_price;
+                                        }
+                                        if !chain_info.ticket_win_prob.approx_eq(&new_win_prob) {
+                                            events.push(SubscribedEventType::WinningProbability((
+                                                new_win_prob,
+                                                Some(chain_info.ticket_win_prob),
+                                            )));
+                                            chain_info.ticket_win_prob = new_win_prob;
+                                        }
+
+                                        if !events.is_empty() {
+                                            moka::ops::compute::Op::Put(chain_info)
+                                        } else {
+                                            moka::ops::compute::Op::Nop
+                                        }
+                                    }
+                                    None => {
+                                        tracing::warn!(
+                                            "chain info not present in the cache before ticket params update"
+                                        );
+                                        events.push(SubscribedEventType::TicketPrice((new_ticket_price, None)));
+                                        events.push(SubscribedEventType::WinningProbability((new_win_prob, None)));
+                                        moka::ops::compute::Op::Nop
+                                    }
+                                })
+                            })
+                            .await;
+                        Ok(futures::stream::iter(events).map(Ok::<_, ConnectorError>))
+                    }
+                })
+                .try_flatten()
+                .fuse();
+
             let mut account_counter = 0;
             let mut channel_counter = 0;
             if min_accounts == 0 && min_channels == 0 {
@@ -265,89 +329,90 @@ where
                 let _ = connection_ready_tx.take().unwrap().send(Ok(()));
             }
 
-            futures::stream::Abortable::new((account_stream, channel_stream).merge(), abort_reg)
-                .inspect_ok(move |event_type| {
-                    if connection_ready_tx.is_some() {
-                        match event_type {
-                            SubscribedEventType::Account(_) => account_counter += 1,
-                            SubscribedEventType::Channel(_) => channel_counter += 1,
-                            _ => {}
-                        }
-
-                        // Send the completion notification
-                        // once we reach the expected number of accounts and channels with
-                        // the given tolerance
-                        if account_counter >= min_accounts && channel_counter >= min_channels {
-                            tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
-                            let _ = connection_ready_tx.take().unwrap().send(Ok(()));
-                        }
+            futures::stream::Abortable::new(
+                (account_stream, channel_stream, ticket_params_stream).merge(),
+                abort_reg,
+            )
+            .inspect_ok(move |event_type| {
+                if connection_ready_tx.is_some() {
+                    match event_type {
+                        SubscribedEventType::Account(_) => account_counter += 1,
+                        SubscribedEventType::Channel(_) => channel_counter += 1,
+                        _ => {}
                     }
-                })
-                .for_each(|event_type| {
-                    let event_tx = event_tx.clone();
-                    let values_cache = values_cache.clone();
-                    async move {
-                        match event_type {
-                            Ok(SubscribedEventType::Account((new_account, old_account))) => {
-                                tracing::debug!(%new_account, "account inserted");
-                                // We only track public accounts as events and also
-                                // broadcast announcements of already existing accounts (old_account == None).
-                                if new_account.has_announced_with_routing_info()
-                                    && old_account.is_none_or(|a| !a.has_announced_with_routing_info())
-                                {
-                                    tracing::debug!(account = %new_account, "new announcement");
-                                    let _ = event_tx
-                                        .broadcast_direct(ChainEvent::Announcement(new_account.clone()))
-                                        .await;
-                                }
+
+                    // Send the completion notification
+                    // once we reach the expected number of accounts and channels with
+                    // the given tolerance
+                    if account_counter >= min_accounts && channel_counter >= min_channels {
+                        tracing::debug!(account_counter, channel_counter, "on-chain graph has been synced");
+                        let _ = connection_ready_tx.take().unwrap().send(Ok(()));
+                    }
+                }
+            })
+            .for_each(|event_type| {
+                let event_tx = event_tx.clone();
+                async move {
+                    match event_type {
+                        Ok(SubscribedEventType::Account((new_account, old_account))) => {
+                            tracing::debug!(%new_account, "account inserted");
+                            // We only track public accounts as events and also
+                            // broadcast announcements of already existing accounts (old_account == None).
+                            if new_account.has_announced_with_routing_info()
+                                && old_account.is_none_or(|a| !a.has_announced_with_routing_info())
+                            {
+                                tracing::debug!(account = %new_account, "new announcement");
+                                let _ = event_tx
+                                    .broadcast_direct(ChainEvent::Announcement(new_account.clone()))
+                                    .await;
                             }
-                            Ok(SubscribedEventType::Channel((new_channel, Some(changes)))) => {
-                                tracing::debug!(
-                                    id = %new_channel.get_id(),
-                                    src = %new_channel.source, dst = %new_channel.destination,
-                                    num_changes = changes.len(),
-                                    "channel updated"
-                                );
-                                process_channel_changes_into_events(new_channel, changes, &me, &event_tx).await;
-                            }
-                            Ok(SubscribedEventType::Channel((new_channel, None))) => {
-                                tracing::debug!(
-                                    id = %new_channel.get_id(),
-                                    src = %new_channel.source, dst = %new_channel.destination,
-                                    "channel opened"
-                                );
-                                let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new_channel)).await;
-                            }
-                            // TODO: update the values in values_cache instead of invalidating it (make them separate
-                            // cache entries?)
-                            Ok(SubscribedEventType::WinningProbability((new, old))) => {
-                                let old = old.unwrap_or_default();
-                                if new.approx_cmp(&old).is_gt() {
-                                    tracing::debug!(%new, %old, "winning probability increased");
-                                    values_cache.invalidate_all();
-                                    let _ = event_tx
-                                        .broadcast_direct(ChainEvent::WinningProbabilityIncreased(new))
-                                        .await;
-                                } else if new.approx_cmp(&old).is_lt() {
+                        }
+                        Ok(SubscribedEventType::Channel((new_channel, Some(changes)))) => {
+                            tracing::debug!(
+                                id = %new_channel.get_id(),
+                                src = %new_channel.source, dst = %new_channel.destination,
+                                num_changes = changes.len(),
+                                "channel updated"
+                            );
+                            process_channel_changes_into_events(new_channel, changes, &me, &event_tx).await;
+                        }
+                        Ok(SubscribedEventType::Channel((new_channel, None))) => {
+                            tracing::debug!(
+                                id = %new_channel.get_id(),
+                                src = %new_channel.source, dst = %new_channel.destination,
+                                "channel opened"
+                            );
+                            let _ = event_tx.broadcast_direct(ChainEvent::ChannelOpened(new_channel)).await;
+                        }
+                        Ok(SubscribedEventType::WinningProbability((new, old))) => {
+                            let old = old.unwrap_or_default();
+                            match new.approx_cmp(&old) {
+                                Ordering::Less => {
                                     tracing::debug!(%new, %old, "winning probability decreased");
-                                    values_cache.invalidate_all();
                                     let _ = event_tx
                                         .broadcast_direct(ChainEvent::WinningProbabilityDecreased(new))
                                         .await;
                                 }
-                            }
-                            Ok(SubscribedEventType::TicketPrice((new, old))) => {
-                                tracing::debug!(%new, ?old, "ticket price changed");
-                                values_cache.invalidate_all();
-                                let _ = event_tx.broadcast_direct(ChainEvent::TicketPriceChanged(new)).await;
-                            }
-                            Err(error) => {
-                                tracing::error!(%error, "error processing account/graph subscription");
+                                Ordering::Greater => {
+                                    tracing::debug!(%new, %old, "winning probability increased");
+                                    let _ = event_tx
+                                        .broadcast_direct(ChainEvent::WinningProbabilityIncreased(new))
+                                        .await;
+                                }
+                                Ordering::Equal => {}
                             }
                         }
+                        Ok(SubscribedEventType::TicketPrice((new, old))) => {
+                            tracing::debug!(%new, ?old, "ticket price changed");
+                            let _ = event_tx.broadcast_direct(ChainEvent::TicketPriceChanged(new)).await;
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, "error processing account/graph/ticket params subscription");
+                        }
                     }
-                })
-                .await;
+                }
+            })
+            .await;
         });
 
         connection_ready_rx

@@ -3,11 +3,16 @@ use std::time::Duration;
 use blokli_client::api::BlokliQueryClient;
 use futures::TryFutureExt;
 use hopr_api::chain::{ChainInfo, DomainSeparators};
-use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
-use crate::{connector::HoprBlockchainConnector, errors::ConnectorError};
+use crate::{
+    connector::{
+        HoprBlockchainConnector,
+        utils::{ParsedChainInfo, model_to_chain_info},
+    },
+    errors::ConnectorError,
+};
 
 pub(crate) const CHAIN_INFO_CACHE_KEY: u32 = 0;
 
@@ -15,12 +20,15 @@ impl<B, C, P, R> HoprBlockchainConnector<C, R, B, P>
 where
     C: BlokliQueryClient + Send + Sync + 'static,
 {
-    pub(crate) async fn query_cached_chain_info(&self) -> Result<blokli_client::api::types::ChainInfo, ConnectorError> {
+    pub(crate) async fn query_cached_chain_info(&self) -> Result<ParsedChainInfo, ConnectorError> {
         Ok(self
             .values
             .try_get_with(
                 CHAIN_INFO_CACHE_KEY,
-                self.client.query_chain_info().map_err(ConnectorError::from),
+                self.client
+                    .query_chain_info()
+                    .map_err(ConnectorError::from)
+                    .and_then(|model| futures::future::ready(model_to_chain_info(model))),
             )
             .await?)
     }
@@ -39,76 +47,30 @@ where
     async fn domain_separators(&self) -> Result<DomainSeparators, Self::Error> {
         self.check_connection_state()?;
 
-        let info = self.query_cached_chain_info().await?;
-
-        Ok(DomainSeparators {
-            ledger: Hash::from_hex(
-                &info
-                    .ledger_dst
-                    .ok_or(ConnectorError::InvalidState("ledger DST not found"))
-                    .inspect_err(|_| self.values.invalidate_all())?,
-            )?,
-            safe_registry: Hash::from_hex(
-                &info
-                    .safe_registry_dst
-                    .ok_or(ConnectorError::InvalidState("safe registry DST not found"))
-                    .inspect_err(|_| self.values.invalidate_all())?,
-            )?,
-            channel: Hash::from_hex(
-                &info
-                    .channel_dst
-                    .ok_or(ConnectorError::InvalidState("channel DST not found"))
-                    .inspect_err(|_| self.values.invalidate_all())?,
-            )?,
-        })
+        Ok(self.query_cached_chain_info().await?.domain_separators)
     }
 
     async fn minimum_incoming_ticket_win_prob(&self) -> Result<WinningProbability, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(WinningProbability::try_from_f64(
-            self.query_cached_chain_info().await?.min_ticket_winning_probability,
-        )?)
+        Ok(self.query_cached_chain_info().await?.ticket_win_prob)
     }
 
     async fn minimum_ticket_price(&self) -> Result<HoprBalance, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(self
-            .query_cached_chain_info()
-            .await?
-            .ticket_price
-            .0
-            .parse()
-            .inspect_err(|_| self.values.invalidate_all())?)
+        Ok(self.query_cached_chain_info().await?.ticket_price)
     }
 
     async fn channel_closure_notice_period(&self) -> Result<Duration, Self::Error> {
         self.check_connection_state()?;
 
-        Ok(Duration::from_millis(
-            self.query_cached_chain_info()
-                .await?
-                .channel_closure_grace_period
-                .ok_or(ConnectorError::InvalidState("channel closure grace period not found"))?
-                .0
-                .parse()
-                .map_err(|_| ConnectorError::TypeConversion("channel closure grace period not a number".into()))
-                .inspect_err(|_| self.values.invalidate_all())?,
-        ))
+        Ok(self.query_cached_chain_info().await?.channel_closure_grace_period)
     }
 
     async fn chain_info(&self) -> Result<ChainInfo, Self::Error> {
         self.check_connection_state()?;
 
-        let info = self.query_cached_chain_info().await?;
-
-        Ok(ChainInfo {
-            chain_id: info.chain_id as u64,
-            hopr_network_name: "<not set>".into(),
-            contract_addresses: serde_json::from_str(&info.contract_addresses.0)
-                .map_err(|e| ConnectorError::TypeConversion(format!("contract addresses not a valid JSON: {e}")))
-                .inspect_err(|_| self.values.invalidate_all())?,
-        })
+        Ok(self.query_cached_chain_info().await?.info)
     }
 }

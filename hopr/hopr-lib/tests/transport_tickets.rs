@@ -332,12 +332,6 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
 ) -> anyhow::Result<()> {
     cluster_fixture.update_winning_probability(0.5).await?;
 
-    // TODO: this can be removed once we have subscription for WP updates
-    cluster_fixture
-        .cluster
-        .iter()
-        .for_each(|node| node.connector().invalidate_caches());
-
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
     let message_count = 20;
 
