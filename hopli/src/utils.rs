@@ -18,6 +18,7 @@ use alloy::{
 };
 use hopr_bindings::{
     hopr_announcements::{HoprAnnouncements, HoprAnnouncements::HoprAnnouncementsInstance},
+    hopr_announcements_proxy::HoprAnnouncementsProxy,
     hopr_channels::{HoprChannels, HoprChannels::HoprChannelsInstance},
     hopr_node_management_module::{
         HoprNodeManagementModule, HoprNodeManagementModule::HoprNodeManagementModuleInstance,
@@ -38,6 +39,7 @@ use tracing::debug;
 
 use crate::constants::{
     ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER, MULTICALL3_DEPLOY_CODE,
+    INIT_KEY_BINDING_FEE,
 };
 
 pub trait Cmd: clap::Parser + Sized {
@@ -293,24 +295,57 @@ where
             primitives::Address::from(safe_registry.address().as_ref()),
         )
         .await?;
-        let announcements = HoprAnnouncements::deploy(
+        let announcements_implementation = HoprAnnouncements::deploy(
             provider.clone(),
-            // primitives::Address::from(safe_registry.address().as_ref()),
         )
         .await?;
-        // TODO (QianchenYu): is this correct?
+        let announcement_initialize_parameters = (
+            token.address().clone(),
+            safe_registry.address().clone(),
+            INIT_KEY_BINDING_FEE,
+            self_address
+        ).abi_encode();
+        let encode_initialization = HoprAnnouncements::initializeCall {
+            initParams: announcement_initialize_parameters.into()
+        }.abi_encode();
+
+        let announcements_proxy = HoprAnnouncementsProxy::deploy(
+            provider.clone(),
+            primitives::Address::from(announcements_implementation.address().as_ref()),
+            encode_initialization.into(),
+        )
+        .await?;
+
         let stake_factory = HoprNodeStakeFactory::deploy(
             provider.clone(),
             primitives::Address::from(module_implementation.address().as_ref()),
-            primitives::Address::from(announcements.address().as_ref()),
+            primitives::Address::from(announcements_proxy.address().as_ref()),
             self_address,
         )
         .await?;
 
+        // get the defaultHoprNetwork from the stake factory
+        let default_hopr_network = stake_factory.defaultHoprNetwork().call().await?;
+        let new_default_hopr_network = HoprNodeStakeFactory::HoprNetwork {
+            tokenAddress: token.address().clone(),
+            defaultTokenAllowance: default_hopr_network.defaultTokenAllowance,
+            defaultAnnouncementTarget: default_hopr_network.defaultAnnouncementTarget,
+        };
+        // Update the `defaultHoprNetwork` in the factory contract, to update the token address
+        stake_factory
+            .updateHoprNetwork(new_default_hopr_network)
+            .send()
+            .await?
+            .watch()
+            .await?;
+
         Ok(Self {
             token,
             channels,
-            announcements,
+            announcements: HoprAnnouncementsInstance::new(
+                announcements_proxy.address().clone(),
+                provider.clone(),
+            ),
             safe_registry,
             price_oracle,
             win_prob_oracle,
