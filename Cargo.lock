@@ -4788,7 +4788,6 @@ dependencies = [
  "const_format",
  "dashmap",
  "futures",
- "futures-concurrency",
  "futures-time",
  "hex-literal",
  "hopr-api",

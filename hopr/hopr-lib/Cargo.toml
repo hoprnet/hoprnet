@@ -70,7 +70,6 @@ const_format = { workspace = true }
 dashmap = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
-futures-concurrency = { workspace = true }
 hex-literal = { workspace = true, optional = true }
 human-bandwidth = { workspace = true, optional = true }
 lazy_static = { workspace = true }

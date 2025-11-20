@@ -2,32 +2,22 @@ use std::{ops::Mul, time::Duration};
 
 use anyhow::Context;
 use futures::AsyncWriteExt;
-use hopr_chain_connector::testing::{BlokliTestClient, FullStateEmulator};
 use hopr_lib::{
     ChannelId, HoprBalance,
-    testing::fixtures::{
-        ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, build_cluster_fixture, chainenv_fixture,
-    },
+    testing::fixtures::{ClusterGuard, MINIMUM_INCOMING_WIN_PROB, TEST_GLOBAL_TIMEOUT, cluster_fixture},
 };
 use hopr_primitive_types::prelude::UnitaryFloatOps;
-use rstest::rstest;
+use rstest::*;
 use serial_test::serial;
 use tokio::time::sleep;
 
 const FUNDING_AMOUNT: &str = "10 wxHOPR";
 
-#[rstest::fixture]
-pub async fn cluster_fixture(chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
-    build_cluster_fixture(chainenv_fixture, 5).await
-}
-
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-async fn ticket_statistics_should_reset_when_cleaned(
-    #[future(awt)] cluster_fixture: ClusterGuard,
-) -> anyhow::Result<()> {
+async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let (mut session, fw_channels, bw_channels) = cluster_fixture
@@ -103,7 +93,7 @@ async fn ticket_statistics_should_reset_when_cleaned(
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
-    #[future(awt)] cluster_fixture: ClusterGuard,
+    #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
@@ -113,9 +103,8 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         .await
         .context("failed to get ticket price")?;
 
-    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session(&[src, mid, dst], ticket_price)
-        .await?;
+    let (mut session, _fw_channel, _bw_channel) =
+        cluster_fixture.create_session(&[src, mid, dst], ticket_price).await?;
 
     const BUF_LEN: usize = 500;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
@@ -124,12 +113,11 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         .await
         .context("write failed")??;
 
-    let stats = mid
+    let stats_before = mid
         .inner()
         .ticket_statistics()
         .await
         .context("failed to get ticket statistics")?;
-    assert_eq!(stats.rejected_value, HoprBalance::zero());
 
     tokio::time::timeout(Duration::from_secs(1), session.write_all(&sent_data))
         .await
@@ -137,12 +125,12 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 
     sleep(Duration::from_secs(2)).await;
 
-    let stats = mid
+    let stats_after = mid
         .inner()
         .ticket_statistics()
         .await
         .context("failed to get ticket statistics")?;
-    assert!(stats.rejected_value > HoprBalance::zero());
+    assert!(stats_before.rejected_value < stats_after.rejected_value);
 
     Ok(())
 }
@@ -152,7 +140,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
-async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn test_redeem_ticket_on_request(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
     let message_count = 10;
 
@@ -163,9 +151,8 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
         .context("failed to get ticket price")?;
     let funding_amount = ticket_price.mul(message_count);
 
-    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session(&[src, mid, dst], funding_amount)
-        .await?;
+    let (mut session, _fw_channel, _bw_channel) =
+        cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
@@ -212,7 +199,7 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 #[cfg(feature = "session-client")]
-async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn test_neglect_ticket_on_closing(#[with(5)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let message_count = 3;
@@ -229,9 +216,8 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
         .context("failed to get ticket statistics")?;
 
     let funding_amount = ticket_price.mul(message_count);
-    let (mut session, fw_channel, bw_channel) = cluster_fixture
-        .create_session(&[src, mid, dst], funding_amount)
-        .await?;
+    let (mut session, fw_channel, bw_channel) =
+        cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
@@ -280,7 +266,7 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
 #[serial]
 #[cfg(feature = "session-client")]
 async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
-    #[future(awt)] cluster_fixture: ClusterGuard,
+    #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
 
@@ -293,9 +279,8 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
         .context("failed to get ticket price")?;
     let funding_amount = ticket_price.mul(message_count).div_f64(MINIMUM_INCOMING_WIN_PROB)?;
 
-    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session(&[src, mid, dst], funding_amount)
-        .await?;
+    let (mut session, _fw_channel, _bw_channel) =
+        cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();
@@ -343,7 +328,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
 #[serial]
 #[cfg(feature = "session-client")]
 async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
-    #[future(awt)] cluster_fixture: ClusterGuard,
+    #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     cluster_fixture.update_winning_probability(0.5).await?;
 
@@ -379,7 +364,7 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
 #[serial]
 #[cfg(feature = "session-client")]
 async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
-    #[future(awt)] cluster_fixture: ClusterGuard,
+    #[with(5)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
     let message_count = 20;
@@ -391,9 +376,8 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
         .context("failed to get ticket price")?;
     let funding_amount = ticket_price.mul(message_count + 2);
 
-    let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session(&[src, mid, dst], funding_amount)
-        .await?;
+    let (mut session, _fw_channel, _bw_channel) =
+        cluster_fixture.create_session(&[src, mid, dst], funding_amount).await?;
 
     const BUF_LEN: usize = 400;
     let sent_data = hopr_crypto_random::random_bytes::<BUF_LEN>();

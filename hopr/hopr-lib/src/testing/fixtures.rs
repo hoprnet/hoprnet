@@ -15,6 +15,7 @@ use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
 use rand::prelude::{IteratorRandom, SliceRandom};
+use rstest::fixture;
 use tokio::time::sleep;
 use tracing::info;
 
@@ -255,8 +256,7 @@ pub const INITIAL_NODE_TOKEN: u64 = 10;
 pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1000_000_000_000_u128;
 pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 
-#[rstest::fixture]
-pub fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
+pub fn build_blokli_client() -> BlokliTestClient<FullStateEmulator> {
     BlokliTestStateBuilder::default()
         .with_balances(
             NODE_CHAIN_KEYS
@@ -289,10 +289,13 @@ pub fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
         .build_dynamic_client([0u8; Address::SIZE].into()) // Placeholder module address, to be filled in later
 }
 
-pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmulator>, size: usize) -> ClusterGuard {
+#[fixture]
+pub fn cluster_fixture(#[default(3)] size: usize) -> ClusterGuard {
     if !(1..=SWARM_N).contains(&size) {
         panic!("{size} must be between 1 and {SWARM_N}");
     }
+
+    let chain_client = build_blokli_client();
 
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
     let onchain_keys = NODE_CHAIN_KEYS[0..size].to_vec();
@@ -381,27 +384,36 @@ pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmula
         .collect::<Result<Vec<_>, _>>()
         .expect("one or more HOPR nodes could not be created");
 
-    // Wait for all nodes to reach the 'Running' state
-    futures::future::try_join_all(cluster.iter().map(|instance| {
-        wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(180))
-    }))
-    .await
-    .expect("status wait failed");
-
-    // Wait for full mesh connectivity
     let swarm_size = cluster.len();
-    futures::future::try_join_all(cluster.iter().map(|instance| {
-        wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(120))
-    }))
-    .await
-    .expect("connectivity wait failed");
+    let cluster = std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("failed to build Tokio runtime in local thread");
+
+        rt.block_on(async {
+            // Wait for all nodes to reach the 'Running' state
+            futures::future::try_join_all(cluster.iter().map(|instance| {
+                wait_for_status(instance, &HoprState::Running).timeout(futures_time::time::Duration::from_secs(180))
+            }))
+            .await
+            .expect("status wait failed");
+
+            // Wait for full mesh connectivity
+            futures::future::try_join_all(cluster.iter().map(|instance| {
+                wait_for_connectivity(instance, swarm_size).timeout(futures_time::time::Duration::from_secs(120))
+            }))
+            .await
+            .expect("connectivity wait failed");
+        });
+        cluster
+    })
+    .join()
+    .expect("cluster readiness thread panicked");
 
     info!(swarm_size, "CLUSTER STARTED");
 
-    ClusterGuard {
-        cluster,
-        chain_client,
-    }
+    ClusterGuard { cluster, chain_client }
 }
 
 async fn wait_for_connectivity(instance: &TestedHopr, swarm_size: usize) {

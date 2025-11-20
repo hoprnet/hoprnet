@@ -1,22 +1,16 @@
 use anyhow::Context;
-use hopr_chain_connector::testing::{BlokliTestClient, FullStateEmulator};
 use hopr_lib::{
     Address,
-    testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, build_cluster_fixture, chainenv_fixture},
+    testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, cluster_fixture},
 };
 use rstest::rstest;
 use serial_test::serial;
-
-#[rstest::fixture]
-pub async fn cluster_fixture(chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
-    build_cluster_fixture(chainenv_fixture, 3).await
-}
 
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn all_visible_peers_should_be_listed(cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [idx] = cluster_fixture.sample_nodes::<1>();
 
     let config = idx
@@ -34,7 +28,7 @@ async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: Clus
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-async fn ping_should_succeed_for_all_visible_nodes(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn ping_should_succeed_for_all_visible_nodes(cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [src, dst] = cluster_fixture.sample_nodes::<2>();
 
     let _ = src.inner().ping(&dst.peer_id()).await.context("failed to ping peer")?;
@@ -46,7 +40,7 @@ async fn ping_should_succeed_for_all_visible_nodes(#[future(awt)] cluster_fixtur
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
-async fn ping_should_fail_for_self(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+async fn ping_should_fail_for_self(cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     let [random_int] = cluster_fixture.sample_nodes::<1>();
     let res = random_int.inner().ping(&random_int.peer_id()).await;
 
@@ -60,7 +54,7 @@ async fn ping_should_fail_for_self(#[future(awt)] cluster_fixture: ClusterGuard)
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn discovery_should_produce_the_same_public_announcements_inside_the_network(
-    #[future(awt)] cluster_fixture: ClusterGuard,
+    cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [idx1, idx2] = cluster_fixture.sample_nodes::<2>();
 

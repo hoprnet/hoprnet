@@ -1,20 +1,14 @@
 use anyhow::Context;
-use hopr_chain_connector::testing::{BlokliTestClient, FullStateEmulator};
-use hopr_lib::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, build_cluster_fixture, chainenv_fixture};
+use hopr_lib::testing::fixtures::{ClusterGuard, TEST_GLOBAL_TIMEOUT, cluster_fixture};
 use rstest::rstest;
 use serial_test::serial;
-
-#[rstest::fixture]
-pub async fn cluster_fixture(chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
-    build_cluster_fixture(chainenv_fixture, 2).await
-}
 
 #[rstest]
 #[test_log::test(tokio::test)]
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(
-    #[future(awt)] cluster_fixture: ClusterGuard,
+    #[with(2)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
     let [candidate, tester] = cluster_fixture.sample_nodes::<2>();
 
