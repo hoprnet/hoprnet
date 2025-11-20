@@ -363,14 +363,6 @@ impl SafeModuleSubcommands {
             Some(node_eth_addresses.clone())
         };
 
-        // get allowance
-        let token_allowance: U256 = match allowance {
-            Some(allw) => parse_units(&allw.to_string(), "ether")
-                .map_err(|_| HelperErrors::ParseError("Failed to parse allowance units".into()))?
-                .into(),
-            None => U256::MAX,
-        };
-
         // read private key
         let signer_private_key = private_key.read_default()?;
         // get RPC provider for the given network and environment
@@ -400,11 +392,7 @@ impl SafeModuleSubcommands {
 
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             hopr_stake_factory,
-            a2h(contract_addresses.addresses.token),
             a2h(contract_addresses.addresses.channels),
-            a2h(contract_addresses.addresses.module_implementation),
-            a2h(contract_addresses.addresses.announcements),
-            token_allowance,
             node_addresses,
             admin_eth_addresses,
             U256::from(threshold),
