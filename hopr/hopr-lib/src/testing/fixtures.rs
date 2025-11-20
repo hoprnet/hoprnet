@@ -14,9 +14,8 @@ use hopr_internal_types::prelude::WinningProbability;
 use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
-use lazy_static::lazy_static;
 use rand::prelude::{IteratorRandom, SliceRandom};
-use tokio::{sync::Mutex, time::sleep};
+use tokio::time::sleep;
 use tracing::info;
 
 use crate::{
@@ -32,7 +31,6 @@ use crate::{
 pub struct ClusterGuard {
     pub cluster: Vec<TestedHopr>,
     pub chain_client: BlokliTestClient<FullStateEmulator>,
-    _lock: tokio::sync::MutexGuard<'static, ()>,
 }
 
 impl std::ops::Deref for ClusterGuard {
@@ -60,7 +58,7 @@ impl ClusterGuard {
     }
 
     /// Create a session between two nodes, ensuring channels are open and funded as needed
-    pub async fn create_session_between(
+    pub async fn create_session(
         &self,
         path: &[&TestedHopr],
         funding_amount: HoprBalance,
@@ -110,7 +108,7 @@ impl ClusterGuard {
         }
     }
 
-    pub fn exclusive_indexes<const N: usize>(&self) -> [&TestedHopr; N] {
+    pub fn sample_nodes<const N: usize>(&self) -> [&TestedHopr; N] {
         assert!(N <= self.size(), "Requested count exceeds {}", self.size());
 
         let mut res = self.cluster.iter().choose_multiple(&mut rand::thread_rng(), N);
@@ -120,7 +118,7 @@ impl ClusterGuard {
         res.try_into().unwrap()
     }
 
-    pub fn exclusive_indices_with_win_prob_1<const N: usize>(&self) -> [&TestedHopr; N] {
+    pub fn sample_nodes_with_win_prob_1<const N: usize>(&self) -> [&TestedHopr; N] {
         assert!(N <= self.size(), "Requested count {N} exceeds {}", self.size());
 
         let mut res = self
@@ -140,7 +138,7 @@ impl ClusterGuard {
             .expect(&format!("cannot find {N} nodes with win prob 1.0"))
     }
 
-    pub fn exclusive_indices_with_lower_win_prob<const N: usize>(&self) -> [&TestedHopr; N] {
+    pub fn sample_nodes_with_lower_win_prob<const N: usize>(&self) -> [&TestedHopr; N] {
         assert!(N <= self.size(), "Requested count {N} exceeds {}", self.size());
 
         let mut res = self
@@ -160,11 +158,11 @@ impl ClusterGuard {
             .expect(&format!("cannot find {N} nodes with win prob < 0.99"))
     }
 
-    pub fn exclusive_indices_with_win_prob_1_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {
+    pub fn sample_nodes_with_win_prob_1_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {
         assert!(N <= self.size(), "Requested count {N} exceeds {}", self.size());
         assert!(N > 2, "N must be greater than 2 to have intermediaries");
 
-        let win_prob_lower = self.exclusive_indices_with_lower_win_prob::<2>();
+        let win_prob_lower = self.sample_nodes_with_lower_win_prob::<2>();
         let mut res = self
             .cluster
             .iter()
@@ -184,11 +182,11 @@ impl ClusterGuard {
         res.try_into().expect("cannot find sufficient number of nodes")
     }
 
-    pub fn exclusive_indices_with_lower_win_prob_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {
+    pub fn sample_nodes_with_lower_win_prob_intermediaries<const N: usize>(&self) -> [&TestedHopr; N] {
         assert!(N <= self.size(), "Requested count {N} exceeds {}", self.size());
         assert!(N > 2, "N must be greater than 2 to have intermediaries");
 
-        let win_prob_1 = self.exclusive_indices_with_win_prob_1::<2>();
+        let win_prob_1 = self.sample_nodes_with_win_prob_1::<2>();
         let mut res = self
             .cluster
             .iter()
@@ -207,10 +205,6 @@ impl ClusterGuard {
 
         res.try_into().expect("cannot find sufficient number of nodes")
     }
-}
-
-lazy_static! {
-    static ref CLUSTER_MUTEX: Mutex<()> = Mutex::new(());
 }
 
 pub const SWARM_N: usize = 9;
@@ -262,7 +256,7 @@ pub const DEFAULT_SAFE_ALLOWANCE: u128 = 1000_000_000_000_u128;
 pub const MINIMUM_INCOMING_WIN_PROB: f64 = 0.2;
 
 #[rstest::fixture]
-pub async fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
+pub fn chainenv_fixture() -> BlokliTestClient<FullStateEmulator> {
     BlokliTestStateBuilder::default()
         .with_balances(
             NODE_CHAIN_KEYS
@@ -299,9 +293,6 @@ pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmula
     if !(1..=SWARM_N).contains(&size) {
         panic!("{size} must be between 1 and {SWARM_N}");
     }
-
-    // Acquire the mutex lock to ensure exclusive access to the cluster
-    let lock = CLUSTER_MUTEX.lock().await;
 
     // Use the first SWARM_N onchain keypairs from the chainenv fixture
     let onchain_keys = NODE_CHAIN_KEYS[0..size].to_vec();
@@ -410,7 +401,6 @@ pub async fn build_cluster_fixture(chain_client: BlokliTestClient<FullStateEmula
     ClusterGuard {
         cluster,
         chain_client,
-        _lock: lock,
     }
 }
 

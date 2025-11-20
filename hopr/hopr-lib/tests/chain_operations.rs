@@ -14,13 +14,13 @@ use hopr_lib::{
         hopr::TestedHopr,
     },
 };
-use rstest::rstest;
+use rstest::*;
 use serial_test::serial;
 
 const FUNDING_AMOUNT: &str = "0.1 wxHOPR";
 
-#[rstest::fixture]
-pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+#[fixture]
+pub async fn cluster_fixture(chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
     build_cluster_fixture(chainenv_fixture, 3).await
 }
 
@@ -75,7 +75,7 @@ async fn test_open_close_channel(#[future(awt)] cluster_fixture: ClusterGuard) -
     use hopr_lib::{ChannelStatus, HoprBalance};
     use tokio::time::sleep;
 
-    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.sample_nodes::<2>();
 
     assert!(
         src.outgoing_channels_by_status(ChannelStatus::Open)
@@ -127,7 +127,7 @@ async fn channel_funding_should_be_visible_in_channel_stake(
 ) -> anyhow::Result<()> {
     use hopr_lib::HoprBalance;
 
-    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.sample_nodes::<2>();
     let funding_amount: HoprBalance = FUNDING_AMOUNT.parse()?;
 
     let channel = src
@@ -153,7 +153,7 @@ async fn channel_funding_should_be_visible_in_channel_stake(
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn test_channel_retrieval(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, ext, dst] = cluster_fixture.exclusive_indexes::<3>();
+    let [src, ext, dst] = cluster_fixture.sample_nodes::<3>();
 
     let channel = src
         .inner()
@@ -198,7 +198,7 @@ async fn test_channel_retrieval(#[future(awt)] cluster_fixture: ClusterGuard) ->
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.sample_nodes::<2>();
 
     let withdrawn_amount = "0.005 xDai".parse::<hopr_lib::XDaiBalance>()?;
 
@@ -244,7 +244,7 @@ async fn test_withdraw_native(#[future(awt)] cluster_fixture: ClusterGuard) -> a
 async fn ticket_price_is_set_to_non_zero_value_on_start(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [node] = cluster_fixture.exclusive_indexes::<1>();
+    let [node] = cluster_fixture.sample_nodes::<1>();
 
     let ticket_price = node
         .inner()
@@ -262,7 +262,7 @@ async fn ticket_price_is_set_to_non_zero_value_on_start(
 #[timeout(Duration::from_mins(1))]
 #[serial]
 async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [node] = cluster_fixture.exclusive_indexes::<1>();
+    let [node] = cluster_fixture.sample_nodes::<1>();
     let oracle_price = cluster_fixture.get_oracle_ticket_price().await?;
 
     let ticket_price = node
@@ -280,8 +280,8 @@ async fn ticket_price_is_equal_to_oracle_value(#[future(awt)] cluster_fixture: C
 #[test_log::test(tokio::test)]
 #[timeout(Duration::from_mins(1))]
 #[serial]
-async fn test_check_winn_prob_is_default(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [node] = cluster_fixture.exclusive_indices_with_win_prob_1::<1>();
+async fn test_check_win_prob_is_default(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
+    let [node] = cluster_fixture.sample_nodes_with_win_prob_1::<1>();
 
     let winning_prob = node
         .inner()

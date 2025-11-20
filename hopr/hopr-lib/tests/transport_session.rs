@@ -18,7 +18,7 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 #[rstest::fixture]
-pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+pub async fn cluster_fixture(chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
     build_cluster_fixture(chainenv_fixture, 5).await
 }
 
@@ -30,7 +30,7 @@ const FUNDING_AMOUNT: &str = "10 wxHOPR";
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.sample_nodes::<2>();
 
     let ip = IpOrHost::from_str(":0")?;
 
@@ -61,7 +61,7 @@ async fn test_create_0_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         [src.instance.clone(), mid.instance.clone(), dst.instance.clone()],
@@ -70,7 +70,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
     .await?;
 
     let _channels_back = ChannelGuard::try_open_channels_for_path(
-        [src.instance.clone(), mid.instance.clone(), dst.instance.clone()],
+        [dst.instance.clone(), mid.instance.clone(), src.instance.clone()],
         FUNDING_AMOUNT.parse::<HoprBalance>()?,
     )
     .await?;
@@ -109,7 +109,7 @@ async fn test_create_1_hop_session(#[future(awt)] cluster_fixture: ClusterGuard)
 #[cfg(feature = "session-client")]
 async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
     // Test keepalive as well as sending 0 hop messages without channels
-    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.sample_nodes::<2>();
 
     let ip = IpOrHost::from_str(":0")?;
 
@@ -158,7 +158,7 @@ async fn test_keep_alive_session(#[future(awt)] cluster_fixture: ClusterGuard) -
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_session_surb_balancer_config(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let _channels_there = ChannelGuard::try_open_channels_for_path(
         [src.instance.clone(), mid.instance.clone(), dst.instance.clone()],

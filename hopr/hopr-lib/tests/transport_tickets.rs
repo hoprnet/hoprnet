@@ -17,7 +17,7 @@ use tokio::time::sleep;
 const FUNDING_AMOUNT: &str = "10 wxHOPR";
 
 #[rstest::fixture]
-pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+pub async fn cluster_fixture(chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
     build_cluster_fixture(chainenv_fixture, 5).await
 }
 
@@ -28,10 +28,10 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
 async fn ticket_statistics_should_reset_when_cleaned(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let (mut session, fw_channels, bw_channels) = cluster_fixture
-        .create_session_between(&[src, mid, dst], FUNDING_AMOUNT.parse::<HoprBalance>()?)
+        .create_session(&[src, mid, dst], FUNDING_AMOUNT.parse::<HoprBalance>()?)
         .await?;
 
     const BUF_LEN: usize = 5000;
@@ -105,7 +105,7 @@ async fn ticket_statistics_should_reset_when_cleaned(
 async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let ticket_price = src
         .inner()
@@ -114,7 +114,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
         .context("failed to get ticket price")?;
 
     let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session_between(&[src, mid, dst], ticket_price)
+        .create_session(&[src, mid, dst], ticket_price)
         .await?;
 
     const BUF_LEN: usize = 500;
@@ -153,7 +153,7 @@ async fn test_reject_relaying_a_message_when_the_channel_is_out_of_funding(
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
     let message_count = 10;
 
     let ticket_price = src
@@ -164,7 +164,7 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
     let funding_amount = ticket_price.mul(message_count);
 
     let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session_between(&[src, mid, dst], funding_amount)
+        .create_session(&[src, mid, dst], funding_amount)
         .await?;
 
     const BUF_LEN: usize = 400;
@@ -213,7 +213,7 @@ async fn test_redeem_ticket_on_request(#[future(awt)] cluster_fixture: ClusterGu
 #[serial]
 #[cfg(feature = "session-client")]
 async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1::<3>();
 
     let message_count = 3;
 
@@ -230,7 +230,7 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
 
     let funding_amount = ticket_price.mul(message_count);
     let (mut session, fw_channel, bw_channel) = cluster_fixture
-        .create_session_between(&[src, mid, dst], funding_amount)
+        .create_session(&[src, mid, dst], funding_amount)
         .await?;
 
     const BUF_LEN: usize = 400;
@@ -282,7 +282,7 @@ async fn test_neglect_ticket_on_closing(#[future(awt)] cluster_fixture: ClusterG
 async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1_intermediaries::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
 
     let message_count = 10;
 
@@ -294,7 +294,7 @@ async fn relay_gets_less_tickets_if_sender_has_lower_win_prob(
     let funding_amount = ticket_price.mul(message_count).div_f64(MINIMUM_INCOMING_WIN_PROB)?;
 
     let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session_between(&[src, mid, dst], funding_amount)
+        .create_session(&[src, mid, dst], funding_amount)
         .await?;
 
     const BUF_LEN: usize = 400;
@@ -353,7 +353,7 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
         .iter()
         .for_each(|node| node.connector().invalidate_caches());
 
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1_intermediaries::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
     let message_count = 20;
 
     let ticket_price = src
@@ -365,7 +365,7 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
 
     assert!(
         cluster_fixture
-            .create_session_between(&[src, mid, dst], funding_amount)
+            .create_session(&[src, mid, dst], funding_amount)
             .await
             .is_err()
     );
@@ -381,7 +381,7 @@ async fn ticket_with_win_prob_lower_than_min_win_prob_should_be_rejected(
 async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [src, mid, dst] = cluster_fixture.exclusive_indices_with_win_prob_1_intermediaries::<3>();
+    let [src, mid, dst] = cluster_fixture.sample_nodes_with_win_prob_1_intermediaries::<3>();
     let message_count = 20;
 
     let ticket_price = src
@@ -392,7 +392,7 @@ async fn relay_with_win_prob_higher_than_min_win_prob_should_succeed(
     let funding_amount = ticket_price.mul(message_count + 2);
 
     let (mut session, _fw_channel, _bw_channel) = cluster_fixture
-        .create_session_between(&[src, mid, dst], funding_amount)
+        .create_session(&[src, mid, dst], funding_amount)
         .await?;
 
     const BUF_LEN: usize = 400;

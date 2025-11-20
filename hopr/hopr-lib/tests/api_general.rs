@@ -5,7 +5,7 @@ use rstest::rstest;
 use serial_test::serial;
 
 #[rstest::fixture]
-pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+pub async fn cluster_fixture(chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
     build_cluster_fixture(chainenv_fixture, 2).await
 }
 
@@ -16,7 +16,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
 async fn peerids_should_be_convertible_to_chain_keys_and_vice_versa(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [candidate, tester] = cluster_fixture.exclusive_indexes::<2>();
+    let [candidate, tester] = cluster_fixture.sample_nodes::<2>();
 
     let peer_id = candidate.peer_id();
     let chain_key = candidate.address();

@@ -8,7 +8,7 @@ use rstest::rstest;
 use serial_test::serial;
 
 #[rstest::fixture]
-pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
+pub async fn cluster_fixture(chainenv_fixture: BlokliTestClient<FullStateEmulator>) -> ClusterGuard {
     build_cluster_fixture(chainenv_fixture, 3).await
 }
 
@@ -17,7 +17,7 @@ pub async fn cluster_fixture(#[future(awt)] chainenv_fixture: BlokliTestClient<F
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [idx] = cluster_fixture.exclusive_indexes::<1>();
+    let [idx] = cluster_fixture.sample_nodes::<1>();
 
     let config = idx
         .inner()
@@ -35,7 +35,7 @@ async fn all_visible_peers_should_be_listed(#[future(awt)] cluster_fixture: Clus
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn ping_should_succeed_for_all_visible_nodes(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [src, dst] = cluster_fixture.exclusive_indexes::<2>();
+    let [src, dst] = cluster_fixture.sample_nodes::<2>();
 
     let _ = src.inner().ping(&dst.peer_id()).await.context("failed to ping peer")?;
 
@@ -47,7 +47,7 @@ async fn ping_should_succeed_for_all_visible_nodes(#[future(awt)] cluster_fixtur
 #[timeout(TEST_GLOBAL_TIMEOUT)]
 #[serial]
 async fn ping_should_fail_for_self(#[future(awt)] cluster_fixture: ClusterGuard) -> anyhow::Result<()> {
-    let [random_int] = cluster_fixture.exclusive_indexes::<1>();
+    let [random_int] = cluster_fixture.sample_nodes::<1>();
     let res = random_int.inner().ping(&random_int.peer_id()).await;
 
     assert!(res.is_err());
@@ -62,7 +62,7 @@ async fn ping_should_fail_for_self(#[future(awt)] cluster_fixture: ClusterGuard)
 async fn discovery_should_produce_the_same_public_announcements_inside_the_network(
     #[future(awt)] cluster_fixture: ClusterGuard,
 ) -> anyhow::Result<()> {
-    let [idx1, idx2] = cluster_fixture.exclusive_indexes::<2>();
+    let [idx1, idx2] = cluster_fixture.sample_nodes::<2>();
 
     let accounts_addresses_1 = idx1
         .inner()
