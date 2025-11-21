@@ -10,12 +10,21 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 prometheus = ["dep:hopr-metrics"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+serde = [
+  "dep:cfg_eval",
+  "dep:serde",
+  "dep:serde_with",
+  "hopr-protocol-hopr/serde",
+  "hopr-protocol-app/serde",
+  "hopr-internal-types/serde",
+]
 
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+cfg_eval = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true }
@@ -23,8 +32,8 @@ lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_with = { workspace = true }
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -40,7 +49,7 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true, features = ["serde"] }
+hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
@@ -58,6 +67,11 @@ criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 hopr-transport-mixer = { workspace = true }
 
 [[bench]]

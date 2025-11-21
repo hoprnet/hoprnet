@@ -31,6 +31,7 @@ prometheus = [
 capture = ["dep:pcap-file"]
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
@@ -55,20 +56,22 @@ hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
-hopr-protocol-app = { workspace = true }
-hopr-protocol-hopr = { workspace = true }
+hopr-protocol-app = { workspace = true, features = ["serde"] }
+hopr-protocol-hopr = { workspace = true, features = ["serde"] }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-probe = { workspace = true }
-hopr-transport-protocol = { workspace = true }
+hopr-transport-protocol = { workspace = true, features = ["serde"] }
 hopr-transport-session = { workspace = true }
 
 [dev-dependencies]
-temp-env = { workspace = true }
-
+hex-literal = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-protocol-start = { workspace = true }
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
+temp-env = { workspace = true }

@@ -339,7 +339,11 @@ pub trait HoprDbTicketOperations {
     /// Returns the old value.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: &ChannelId, index: u64) -> Result<u64, Self::Error>;
+    async fn compare_and_set_outgoing_ticket_index(
+        &self,
+        channel_id: &ChannelId,
+        index: u64,
+    ) -> Result<u64, Self::Error>;
 
     /// Resets the outgoing ticket index to 0 for the given channel id.
     ///

@@ -9,7 +9,6 @@ use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, instrument};
 
 use crate::{
-    channels::ChannelId,
     errors,
     errors::CoreTypesError,
     prelude::{ChannelId, CoreTypesError::InvalidInputData, generate_channel_id},

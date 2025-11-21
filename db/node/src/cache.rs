@@ -4,6 +4,7 @@ use std::{
 };
 
 use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::ChannelId;
 use hopr_primitive_types::{balance::HoprBalance, prelude::U256};
 use moka::{Expiry, future::Cache};
 
@@ -18,10 +19,10 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 /// Contains all caches used by the [crate::db::HoprDb].
 #[derive(Debug)]
 pub struct NodeDbCaches {
-    pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
+    pub(crate) ticket_index: Cache<ChannelId, Arc<AtomicU64>>,
     // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
     // include tickets from other epochs
-    pub(crate) unrealized_value: Cache<(Hash, U256), HoprBalance>,
+    pub(crate) unrealized_value: Cache<(ChannelId, U256), HoprBalance>,
 }
 
 impl Default for NodeDbCaches {

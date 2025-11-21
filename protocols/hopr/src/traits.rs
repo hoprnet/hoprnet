@@ -1,15 +1,16 @@
 use std::ops::Mul;
+
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
+use crate::TicketCreationError;
 pub use crate::{
     errors::IncomingPacketError,
     types::{FoundSurb, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
 };
-use crate::TicketCreationError;
 
 #[async_trait::async_trait]
 pub trait SurbStore {
@@ -44,11 +45,8 @@ pub trait PacketEncoder {
 pub trait PacketDecoder {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    async fn decode(
-        &self,
-        sender: PeerId,
-        data: Box<[u8]>,
-    ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
+    async fn decode(&self, sender: PeerId, data: Box<[u8]>)
+    -> Result<IncomingPacket, IncomingPacketError<Self::Error>>;
 }
 
 /// Performs necessary processing of unacknowledged tickets.
@@ -83,7 +81,11 @@ pub trait TicketTracker {
     ///
     /// This allows guarding from situations where the ticket issuer issues more tickets
     /// than there's balance in the given channel.
-    async fn incoming_channel_unrealized_balance(&self, channel_id: &ChannelId, epoch: u32) -> Result<HoprBalance, Self::Error>;
+    async fn incoming_channel_unrealized_balance(
+        &self,
+        channel_id: &ChannelId,
+        epoch: u32,
+    ) -> Result<HoprBalance, Self::Error>;
 
     /// Convenience function that allows creating multi-hop tickets.
     async fn create_multihop_ticket(
@@ -103,13 +105,17 @@ pub trait TicketTracker {
         );
 
         if channel.balance.lt(&amount) {
-            return Err(TicketCreationError::OutOfFunds(*channel.get_id(),amount))
+            return Err(TicketCreationError::OutOfFunds(*channel.get_id(), amount));
         }
 
         let ticket_builder = TicketBuilder::default()
             .channel_id(*channel.get_id())
             .balance(amount)
-            .index(self.next_outgoing_ticket_index(channel.get_id()).await.map_err(TicketCreationError::Other)?)
+            .index(
+                self.next_outgoing_ticket_index(channel.get_id())
+                    .await
+                    .map_err(TicketCreationError::Other)?,
+            )
             .win_prob(winning_prob)
             .channel_epoch(channel.channel_epoch.as_u32());
 

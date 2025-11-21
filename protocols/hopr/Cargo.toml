@@ -8,6 +8,10 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
+[features]
+default = []
+serde = ["dep:serde"]
+
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -17,8 +21,9 @@ hex = { workspace = true }
 moka = { workspace = true }
 parking_lot = { workspace = true }
 ringbuffer = { workspace = true }
-strum = { workspace = true }
+serde = { workspace = true, optional = true }
 smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
@@ -29,7 +34,6 @@ hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
-hopr-path = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]

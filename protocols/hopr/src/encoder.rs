@@ -1,13 +1,14 @@
-use futures::TryFutureExt;
 use hopr_api::chain::*;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
-use hopr_path::Path;
 use hopr_primitive_types::prelude::*;
 
-use crate::{OutgoingPacket, PacketEncoder, SurbStore, TicketTracker, errors::HoprProtocolError, TicketCreationError, HoprCodecConfig};
+use crate::{
+    HoprCodecConfig, OutgoingPacket, PacketEncoder, SurbStore, TicketCreationError, TicketTracker,
+    errors::HoprProtocolError,
+};
 
 pub struct HoprEncoder<R, S, T> {
     provider: R,

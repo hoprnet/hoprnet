@@ -79,7 +79,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, channel::mpsc::channel};
+use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, channel::mpsc::channel};
 use hopr_api::{
     chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
     db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
@@ -201,6 +201,11 @@ pub type HoprTransportIO = socket::HoprSocket<
     futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
 >;
 
+type NewTicketEvents = (
+    async_broadcast::Sender<VerifiedTicket>,
+    async_broadcast::InactiveReceiver<VerifiedTicket>,
+);
+
 /// HOPR main object providing the entire HOPR node functionality
 ///
 /// Instantiating this object creates all processes and objects necessary for
@@ -220,6 +225,7 @@ pub struct Hopr<Chain, Db> {
     redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
     node_db: Db,
     chain_api: Chain,
+    winning_ticket_subscribers: NewTicketEvents,
     processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
@@ -278,6 +284,10 @@ where
             }
         }
 
+        let (mut new_tickets_tx, new_tickets_rx) = async_broadcast::broadcast(2048);
+        new_tickets_tx.set_await_active(false);
+        new_tickets_tx.set_overflow(true);
+
         Ok(Self {
             me: me.clone(),
             cfg,
@@ -287,6 +297,7 @@ where
             node_db: hopr_node_db,
             redeem_requests: OnceLock::new(),
             processes: OnceLock::new(),
+            winning_ticket_subscribers: (new_tickets_tx, new_tickets_rx.deactivate()),
         })
     }
 
@@ -564,11 +575,52 @@ where
             );
         }
 
-        info!("starting transport");
+        info!("starting ticket events processor");
+        let (tickets_tx, tickets_rx) = channel(1024);
+        let (tickets_rx, tickets_handle) = futures::stream::abortable(tickets_rx);
+        processes.insert(HoprLibProcess::OnTicketEvent, tickets_handle);
+        let node_db = self.node_db.clone();
+        let new_ticket_tx = self.winning_ticket_subscribers.0.clone();
+        spawn(
+            tickets_rx
+                .filter_map(move |ticket_event| {
+                    let node_db = node_db.clone();
+                    async move {
+                        match ticket_event {
+                            TicketEvent::WinningTicket(winning) => {
+                                // TODO: adjust DB interface to accept RedeemableTickets
+                                // node_db.insert_received_ticket()
+                                Some(winning)
+                            }
+                            TicketEvent::RejectedTicket(rejected) => {
+                                if let Err(error) = node_db.mark_unsaved_ticket_rejected(rejected.as_ref()).await {
+                                    tracing::error!(%error, %rejected, "failed to mark ticket as rejected");
+                                } else {
+                                    tracing::debug!(%rejected, "marked ticket as rejected");
+                                }
+                                None
+                            }
+                        }
+                    }
+                })
+                .for_each(move |ticket| {
+                    if let Err(error) = new_ticket_tx.try_broadcast(ticket.ticket.clone()) {
+                        tracing::error!(%error, "failed to broadcast new winning ticket to subscribers");
+                    }
+                    futures::future::ready(())
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::OnTicketEvent,
+                        "long-running background task finished"
+                    )
+                }),
+        );
 
+        info!("starting transport");
         let (hopr_socket, transport_processes) = self
             .transport_api
-            .run(cover_traffic, indexer_peer_update_rx, session_tx)
+            .run(cover_traffic, indexer_peer_update_rx, tickets_tx, session_tx)
             .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
@@ -721,6 +773,11 @@ where
         self.state.store(HoprState::Terminated, Ordering::Relaxed);
         info!("NODE SHUTDOWN COMPLETE");
         Ok(())
+    }
+
+    /// Allows external users to receive notifications about new winning tickets.
+    pub fn subscribe_winning_tickets(&self) -> impl Stream<Item = VerifiedTicket> + Send {
+        self.winning_ticket_subscribers.1.activate_cloned()
     }
 
     // p2p transport =========

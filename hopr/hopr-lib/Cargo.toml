@@ -61,6 +61,7 @@ testing = [
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+async-broadcast = { workspace = true }
 atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
 base64 = { workspace = true, optional = true }

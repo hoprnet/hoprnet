@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    fs::File,
-};
+use std::{borrow::Cow, fs::File};
 
 use futures::{StreamExt, pin_mut};
 use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
@@ -25,7 +22,7 @@ use pcap_file::{
     },
 };
 
-use crate::HOPR_PACKET_SIZE;
+use crate::PeerId;
 
 /// Direction of the packet.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
@@ -335,11 +332,7 @@ fn inspect_ticket_data_in_packet(raw_packet: &[u8]) -> &[u8] {
 impl<C: PacketDecoder + Send + Sync> PacketDecoder for CapturePacketCodec<C> {
     type Error = C::Error;
 
-    async fn decode(
-        &self,
-        peer: OffchainPublicKey,
-        data: Box<[u8]>,
-    ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
+    async fn decode(&self, peer: PeerId, data: Box<[u8]>) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
         let packet = self.inner.decode(peer, data).await?;
 
         if let Err(error) = self.sender.clone().try_send(
@@ -463,9 +456,7 @@ mod tests {
         let me = *OffchainKeypair::random().public();
 
         File::create("/tmp/start_capturing")?;
-        let (pcap, ah) = packet_capture_channel(
-            Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?),
-        );
+        let (pcap, ah) = packet_capture_channel(Box::new(File::create("test.pcap").and_then(PcapPacketWriter::new)?));
         pin_mut!(pcap);
 
         let packet = IncomingPacket::Final(

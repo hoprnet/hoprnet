@@ -325,7 +325,6 @@ mod tests {
     use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_protocol_app::prelude::{ApplicationData, Tag};
-    use hopr_transport_protocol::FoundSurb;
 
     use super::*;
     use crate::{

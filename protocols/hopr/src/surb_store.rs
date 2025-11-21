@@ -10,6 +10,7 @@ use crate::{FoundSurb, traits::SurbStore};
 
 /// Configuration for the SURB cache.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, smart_default::SmartDefault)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SurbStoreConfig {
     /// Size of the SURB ring buffer per pseudonym.
     #[default(10_000)]

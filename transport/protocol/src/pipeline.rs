@@ -1,13 +1,14 @@
 use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt as TimeExt;
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use tracing::Instrument;
 use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::{prelude::*, timeout::TimeoutSinkExt};
 use hopr_protocol_app::prelude::*;
 use hopr_protocol_hopr::prelude::*;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+use tracing::Instrument;
+
 use crate::PeerId;
 
 const TICKET_ACK_BUFFER_SIZE: usize = 1_000_000;
@@ -16,7 +17,6 @@ const ACK_OUT_BUFFER_SIZE: usize = 1_000_000;
 const NUM_CONCURRENT_ACK_OUT_PROCESSING: usize = 10;
 const QUEUE_SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 const PACKET_DECODING_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(150);
-
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -462,7 +462,7 @@ where
     let ticket_events = ticket_events.with_timeout(QUEUE_SEND_TIMEOUT);
 
     let encoder = std::sync::Arc::new(codec.0);
-    let decoder =  std::sync::Arc::new(codec.1);
+    let decoder = std::sync::Arc::new(codec.1);
     let ticket_proc = std::sync::Arc::new(ticket_proc);
 
     processes.insert(

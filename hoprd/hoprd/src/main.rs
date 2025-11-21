@@ -146,10 +146,7 @@ enum HoprdProcess {
 #[cfg(not(feature = "runtime-tokio"))]
 compile_error!("The 'runtime-tokio' feature must be enabled");
 
-async fn init_db(
-    cfg: &HoprdConfig,
-    chain_key: &ChainKeypair,
-) -> Result<(HoprNodeDb, futures::channel::mpsc::Receiver<AcknowledgedTicket>), anyhow::Error> {
+async fn init_db(cfg: &HoprdConfig, chain_key: &ChainKeypair) -> Result<HoprNodeDb, anyhow::Error> {
     let db_path: PathBuf = [&cfg.db.data, "node_db"].iter().collect();
     info!(path = ?db_path, "initiating DB");
 
@@ -176,14 +173,14 @@ async fn init_db(
         create_if_missing,
         force_create: cfg.db.force_initialize,
         log_slow_queries: std::time::Duration::from_millis(150),
-        surb_ring_buffer_size: std::env::var("HOPR_PROTOCOL_SURB_RB_SIZE")
-            .ok()
-            .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-            .unwrap_or_else(|| HoprNodeDbConfig::default().surb_ring_buffer_size),
-        surb_distress_threshold: std::env::var("HOPR_PROTOCOL_SURB_RB_DISTRESS")
-            .ok()
-            .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-            .unwrap_or_else(|| HoprNodeDbConfig::default().surb_distress_threshold),
+        // surb_ring_buffer_size: std::env::var("HOPR_PROTOCOL_SURB_RB_SIZE")
+        // .ok()
+        // .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
+        // .unwrap_or_else(|| HoprNodeDbConfig::default().surb_ring_buffer_size),
+        // surb_distress_threshold: std::env::var("HOPR_PROTOCOL_SURB_RB_DISTRESS")
+        // .ok()
+        // .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
+        // .unwrap_or_else(|| HoprNodeDbConfig::default().surb_distress_threshold),
     };
     let node_db = HoprNodeDb::new(db_path.as_path(), chain_key.clone(), db_cfg).await?;
 
@@ -197,10 +194,9 @@ async fn init_db(
         capacity = ack_ticket_channel_capacity,
         "starting winning ticket processing"
     );
-    let (on_ack_tkt_tx, on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
-    node_db.start_ticket_processing(Some(on_ack_tkt_tx))?;
+    node_db.start_ticket_processing(Some(futures::sink::drain()))?;
 
-    Ok((node_db, on_ack_tkt_rx))
+    Ok(node_db)
 }
 
 async fn init_blokli_connector(
@@ -346,8 +342,7 @@ async fn main_inner() -> anyhow::Result<()> {
         "Node public identifiers"
     );
 
-    // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
-    let (node_db, stored_tickets) = init_db(&cfg, &hopr_keys.chain_key).await?;
+    let node_db = init_db(&cfg, &hopr_keys.chain_key).await?;
 
     let chain_connector = Arc::new(init_blokli_connector(&hopr_keys.chain_key, &cfg).await?);
 
@@ -391,7 +386,7 @@ async fn main_inner() -> anyhow::Result<()> {
         hopr_strategy::stream_events_to_strategy_with_tick(
             multi_strategy,
             chain_connector.subscribe()?,
-            stored_tickets,
+            node.subscribe_winning_tickets(),
             cfg.strategy.execution_interval,
             hopr_keys.chain_key.public().to_address(),
         ),

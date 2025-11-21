@@ -1,10 +1,9 @@
 use hopr_api::Address;
 use hopr_crypto_packet::errors::TicketValidationError;
-use hopr_crypto_types::prelude::HalfKeyChallenge;
-use thiserror::Error;
-use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_crypto_types::{prelude::HalfKeyChallenge, types::OffchainPublicKey};
 use hopr_internal_types::prelude::ChannelId;
 use hopr_primitive_types::balance::HoprBalance;
+use thiserror::Error;
 
 /// Error that can occur when processing an incoming packet.
 #[derive(Debug, strum::EnumIs, strum::EnumTryAs, Error)]
@@ -30,7 +29,7 @@ pub enum TicketCreationError<E: std::error::Error> {
     #[error("channel {0} does not have at least {1} to create a ticket")]
     OutOfFunds(ChannelId, HoprBalance),
     #[error("could not create ticket: {0}")]
-    Other(E)
+    Other(E),
 }
 
 #[derive(Error, Debug)]

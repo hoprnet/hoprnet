@@ -1,12 +1,19 @@
-use std::ops::{Mul, Sub};
-use std::time::Duration;
+use std::{
+    ops::{Mul, Sub},
+    time::Duration,
+};
+
 use hopr_api::chain::*;
 use hopr_crypto_packet::{errors::TicketValidationError, prelude::*};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use crate::{AuxiliaryPacketInfo, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket, IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, TicketTracker, errors::HoprProtocolError, tbf::TagBloomFilter, TicketCreationError, HoprCodecConfig};
+use crate::{
+    AuxiliaryPacketInfo, HoprCodecConfig, IncomingAcknowledgementPacket, IncomingFinalPacket, IncomingForwardedPacket,
+    IncomingPacket, IncomingPacketError, PacketDecoder, SurbStore, TicketCreationError, TicketTracker,
+    errors::HoprProtocolError, tbf::TagBloomFilter,
+};
 
 pub struct HoprDecoder<R, S, T> {
     provider: R,
@@ -153,15 +160,18 @@ where
             // The following operation fails if there's not enough balance on the channel to the next hop.
             // Again, in this case, we cannot save the ticket we previously extracted because there is no way it gets
             // acknowledged without enough balance.
-            self.tracker.create_multihop_ticket(
-                &outgoing_channel,
-                fwd.path_pos,
-                outgoing_ticket_win_prob,
-                outgoing_ticket_price,
-            ).await.map_err(|e| match e {
-                TicketCreationError::OutOfFunds(id, a) => HoprProtocolError::OutOfFunds(id, a),
-                e => HoprProtocolError::TicketTrackerError(e.into()),
-            })?
+            self.tracker
+                .create_multihop_ticket(
+                    &outgoing_channel,
+                    fwd.path_pos,
+                    outgoing_ticket_win_prob,
+                    outgoing_ticket_price,
+                )
+                .await
+                .map_err(|e| match e {
+                    TicketCreationError::OutOfFunds(id, a) => HoprProtocolError::OutOfFunds(id, a),
+                    e => HoprProtocolError::TicketTrackerError(e.into()),
+                })?
         } else {
             TicketBuilder::zero_hop().direction(self.chain_key.as_ref(), &next_hop_addr)
         };
@@ -195,14 +205,19 @@ where
         data: Box<[u8]>,
     ) -> Result<IncomingPacket, IncomingPacketError<Self::Error>> {
         // Try to retrieve the peer's public key from the cache or compute it if it does not exist yet
-        let previous_hop = match self.peer_id_cache
-            .try_get_with_by_ref(&sender, hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender)))
-            .await {
+        let previous_hop = match self
+            .peer_id_cache
+            .try_get_with_by_ref(
+                &sender,
+                hopr_parallelize::cpu::spawn_fifo_blocking(move || OffchainPublicKey::from_peerid(&sender)),
+            )
+            .await
+        {
             Ok(peer) => peer,
             Err(error) => {
                 // There absolutely nothing we can do when the peer id is unparseable (e.g., non-ed25519 based)
                 tracing::error!(%sender, %error, "dropping packet - cannot convert peer id");
-                return Err(IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender))
+                return Err(IncomingPacketError::Undecodable(HoprProtocolError::InvalidSender));
             }
         };
 
@@ -226,7 +241,10 @@ where
             // This operation has run-time of ~10 nanoseconds,
             // and therefore does not need to be invoked via spawn_blocking
             if self.tbf.lock().check_and_set(tag) {
-                return Err(IncomingPacketError::ProcessingError(previous_hop, HoprProtocolError::Replay));
+                return Err(IncomingPacketError::ProcessingError(
+                    previous_hop,
+                    HoprProtocolError::Replay,
+                ));
             }
         }
 
@@ -280,7 +298,9 @@ where
                         .await
                         .map_err(|error| match error {
                             // Distinguish ticket validation errors so that they can get extra treatment later
-                            HoprProtocolError::TicketValidationError(e) => IncomingPacketError::InvalidTicket(previous_hop, e),
+                            HoprProtocolError::TicketValidationError(e) => {
+                                IncomingPacketError::InvalidTicket(previous_hop, e)
+                            }
                             e => IncomingPacketError::ProcessingError(previous_hop, e),
                         })?;
 
@@ -301,9 +321,10 @@ where
                     .into(),
                 ))
             }
-            HoprPacket::Outgoing(_) => Err(IncomingPacketError::ProcessingError(previous_hop, HoprProtocolError::InvalidState(
-                "cannot be outgoing packet",
-            ))),
+            HoprPacket::Outgoing(_) => Err(IncomingPacketError::ProcessingError(
+                previous_hop,
+                HoprProtocolError::InvalidState("cannot be outgoing packet"),
+            )),
         }
     }
 }
