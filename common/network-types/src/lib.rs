@@ -15,6 +15,7 @@ pub mod utils;
 pub mod capture;
 
 pub mod addr;
+pub mod timeout;
 
 #[doc(hidden)]
 pub mod prelude {

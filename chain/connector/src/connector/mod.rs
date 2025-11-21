@@ -243,7 +243,7 @@ where
                     let channel_by_id = channel_by_id.clone();
                     let channel_by_parties = channel_by_parties.clone();
                     hopr_async_runtime::prelude::spawn_blocking(move || {
-                        graph.write().add_edge(src.key_id, dst.key_id, channel.get_id());
+                        graph.write().add_edge(src.key_id, dst.key_id, *channel.get_id());
                         backend
                             .insert_channel(channel)
                             .map(|old| (channel, old.map(|old| old.diff(&channel))))
@@ -255,7 +255,7 @@ where
                         async move {
                             if let Ok((channel, _)) = &res {
                                 // Rather update the cached entry than invalidating it
-                                channel_by_id.insert(channel.get_id(), Some(*channel)).await;
+                                channel_by_id.insert(*channel.get_id(), Some(*channel)).await;
                                 channel_by_parties
                                     .insert(ChannelParties::from(channel), Some(*channel))
                                     .await;

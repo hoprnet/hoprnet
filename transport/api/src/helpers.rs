@@ -1,13 +1,11 @@
 use futures::{TryStreamExt, stream::FuturesUnordered};
-use hopr_api::{
-    chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations},
-    db::{FoundSurb, HoprDbProtocolOperations},
-};
+use hopr_api::chain::{ChainKeyOperations, ChainPathResolver, ChainReadChannelOperations};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use hopr_protocol_hopr::{FoundSurb, SurbStore};
 use tracing::trace;
 
 use crate::errors::HoprTransportError;
@@ -41,7 +39,7 @@ pub(crate) struct PathPlanner<Db, R, S> {
 
 impl<Db, R, S> PathPlanner<Db, R, S>
 where
-    Db: HoprDbProtocolOperations + Send + Sync + 'static,
+    Db: SurbStore + Send + Sync + 'static,
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
@@ -62,11 +60,11 @@ where
                 .packet_key_to_chain_key(key)
                 .await
                 .map_err(|e| {
-                    HoprTransportError::Other(format!("failed to resolve offchain key to chain key: {e}").into())
+                    HoprTransportError::Other(anyhow::anyhow!("failed to resolve offchain key to chain key: {e}"))
                 })?
-                .ok_or(HoprTransportError::Other(
-                    "failed to resolve offchain key to chain key: no chain key found".into(),
-                )),
+                .ok_or(HoprTransportError::Other(anyhow::anyhow!(
+                    "failed to resolve offchain key to chain key: no chain key found"
+                ))),
         }
     }
 
@@ -174,7 +172,7 @@ where
                     .db
                     .find_surb(matcher)
                     .await
-                    .map_err(|e| HoprTransportError::Other(e.into()))?;
+                    .ok_or(HoprTransportError::Api("no surb".into()))?;
                 Ok((ResolvedTransportRouting::Return(sender_id, surb), Some(remaining)))
             }
         }

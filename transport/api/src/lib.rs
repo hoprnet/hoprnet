@@ -21,6 +21,9 @@ pub mod errors;
 mod helpers;
 pub mod network_notifier;
 
+#[cfg(feature = "capture")]
+mod capture;
+mod pipeline;
 pub mod socket;
 
 use std::{
@@ -36,7 +39,7 @@ use futures::{
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
-    db::{HoprDbPeersOperations, HoprDbProtocolOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
+    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -50,6 +53,7 @@ pub use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::prelude::{DestinationRouting, *};
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
+use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, MemorySurbStore, SurbStoreConfig};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
@@ -66,8 +70,7 @@ pub use hopr_transport_probe::{
     traits::TrafficGeneration,
     types::{NeighborTelemetry, Telemetry},
 };
-pub use hopr_transport_protocol::PeerDiscovery;
-use hopr_transport_protocol::processor::PacketInteractionConfig;
+pub use hopr_transport_protocol::{PeerDiscovery, TicketEvent};
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
@@ -77,20 +80,15 @@ pub use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
-#[cfg(feature = "mixer-stream")]
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, info, trace, warn};
 
 pub use crate::{config::HoprTransportConfig, helpers::TicketStatistics};
-use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, socket::HoprSocket};
+use crate::{
+    constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, pipeline::HoprPacketPipelineConfig,
+    socket::HoprSocket,
+};
 
 pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
-
-#[cfg(any(
-    all(feature = "mixer-channel", feature = "mixer-stream"),
-    all(not(feature = "mixer-channel"), not(feature = "mixer-stream"))
-))]
-compile_error!("Exactly one of the 'mixer-channel' or 'mixer-stream' features must be specified");
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
 lazy_static::lazy_static! {
@@ -101,8 +99,8 @@ lazy_static::lazy_static! {
 pub enum HoprTransportProcess {
     #[strum(to_string = "component responsible for the transport medium (libp2p swarm)")]
     Medium,
-    #[strum(to_string = "HOPR protocol ({0})")]
-    Protocol(hopr_transport_protocol::ProtocolProcesses),
+    #[strum(to_string = "HOPR packet pipeline ({0})")]
+    Protocol(hopr_transport_protocol::PacketPipelineProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
     #[strum(to_string = "network probing sub-process: {0}")]
@@ -117,21 +115,21 @@ type CurrentPathSelector = NoPathSelector;
 /// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<Db, R> {
     me: OffchainKeypair,
+    me_onchain: ChainKeypair,
     me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
-    me_address: Address,
     cfg: HoprTransportConfig,
     db: Db,
     resolver: R,
     ping: Arc<OnceLock<Pinger>>,
     network: Arc<Network<Db>>,
-    path_planner: PathPlanner<Db, R, CurrentPathSelector>,
+    path_planner: PathPlanner<MemorySurbStore, R, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     smgr: SessionManager<Sender<(DestinationRouting, ApplicationDataOut)>, Sender<IncomingSession>>,
 }
 
 impl<Db, R> HoprTransport<Db, R>
 where
-    Db: HoprDbTicketOperations + HoprDbPeersOperations + HoprDbProtocolOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbTicketOperations + HoprDbPeersOperations + Clone + Send + Sync + 'static,
     R: ChainReadChannelOperations
         + ChainReadAccountOperations
         + ChainKeyOperations
@@ -150,12 +148,11 @@ where
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
         let me_peerid: PeerId = me.into();
-        let me_chain_addr = me_onchain.public().to_address();
 
         Self {
             me: me.clone(),
             me_peerid,
-            me_address: me_chain_addr,
+            me_onchain: me_onchain.clone(),
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
                 me_peerid,
@@ -164,8 +161,8 @@ where
                 db.clone(),
             )),
             path_planner: PathPlanner::new(
-                me_chain_addr,
-                db.clone(),
+                *me_onchain.as_ref(),
+                MemorySurbStore::new(cfg.protocol.surb_store),
                 resolver.clone(),
                 CurrentPathSelector::default(),
             ),
@@ -189,7 +186,7 @@ where
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
                 initial_return_session_egress_rate: 10,
                 minimum_surb_buffer_duration: Duration::from_secs(5),
-                maximum_surb_buffer_size: db.get_surb_config().rb_capacity,
+                maximum_surb_buffer_size: cfg.protocol.surb_store.rb_capacity,
                 // Allow a 10% increase of the target SURB buffer on incoming Sessions
                 // if the SURB buffer level has surpassed it by at least 10% in the last 2 minutes.
                 growable_target_surb_buffer: Some((Duration::from_secs(120), 0.10)),
@@ -207,10 +204,11 @@ where
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
-    pub async fn run<S, Ct>(
+    pub async fn run<S, T, Ct>(
         &self,
         cover_traffic: Option<Ct>,
         discovery_updates: S,
+        ticket_events: T,
         on_incoming_session: Sender<IncomingSession>,
     ) -> errors::Result<(
         HoprSocket<
@@ -221,6 +219,8 @@ where
     )>
     where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
+        T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
+        T::Error: std::fmt::Display,
         Ct: TrafficGeneration + Send + Sync + 'static,
     {
         info!("Loading initial peers from the chain");
@@ -236,7 +236,7 @@ where
             .await;
 
         // Calculate the minimum capacity based on public nodes (each node can generate 2 messages)
-        // plus 100 as additional buffer
+        // plus 100 as an additional buffer
         let minimum_capacity = public_nodes.len().saturating_mul(2).saturating_add(100);
 
         let internal_discovery_updates_capacity = std::env::var("HOPR_INTERNAL_DISCOVERY_UPDATES_CAPACITY")
@@ -319,41 +319,7 @@ where
         // -- transport medium
         let mixer_cfg = build_mixer_cfg_from_env();
 
-        #[cfg(feature = "mixer-channel")]
         let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
-
-        #[cfg(feature = "mixer-stream")]
-        let (mixing_channel_tx, mixing_channel_rx) = {
-            let (tx, rx) = futures::channel::mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
-            let rx = rx.then_concurrent(move |v| {
-                let cfg = mixer_cfg;
-
-                async move {
-                    let random_delay = cfg.random_delay();
-                    trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    hopr_transport_mixer::channel::METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-                    sleep(random_delay).await;
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    {
-                        hopr_transport_mixer::channel::METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-                        let weight = 1.0f64 / cfg.metric_delay_window as f64;
-                        hopr_transport_mixer::channel::METRIC_MIXER_AVERAGE_DELAY.set(
-                            (weight * random_delay.as_millis() as f64)
-                                + ((1.0f64 - weight) * hopr_transport_mixer::channel::METRIC_MIXER_AVERAGE_DELAY.get()),
-                        );
-                    }
-
-                    v
-                }
-            });
-
-            (tx, rx)
-        };
 
         let transport_layer = HoprSwarm::new(
             (&self.me).into(),
@@ -369,7 +335,7 @@ where
         let (wire_msg_tx, wire_msg_rx) =
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
-        let _mixing_process_before_sending_out = hopr_async_runtime::prelude::spawn(
+        let _mixing_process_before_sending_out = spawn(
             mixing_channel_rx
                 .inspect(|(peer, _)| tracing::trace!(%peer, "moving message from mixer to p2p stream"))
                 .map(Ok)
@@ -382,8 +348,7 @@ where
                 }),
         );
 
-        let (transport_events_tx, transport_events_rx) =
-            futures::channel::mpsc::channel::<hopr_transport_p2p::DiscoveryEvent>(2048);
+        let (transport_events_tx, transport_events_rx) = channel::<hopr_transport_p2p::DiscoveryEvent>(2048);
 
         let network_clone = self.network.clone();
         spawn(
@@ -428,18 +393,6 @@ where
             ))),
         );
 
-        // -- msg-ack protocol over the wire transport
-        let packet_cfg = PacketInteractionConfig {
-            packet_keypair: self.me.clone(),
-            outgoing_ticket_win_prob: self
-                .cfg
-                .protocol
-                .outgoing_ticket_winning_prob
-                .map(WinningProbability::try_from)
-                .transpose()?,
-            outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
-        };
-
         let msg_protocol_bidirectional_channel_capacity =
             std::env::var("HOPR_INTERNAL_PROTOCOL_BIDIRECTIONAL_CHANNEL_CAPACITY")
                 .ok()
@@ -460,7 +413,7 @@ where
         // We have to resolve DestinationRouting -> ResolvedTransportRouting before
         // sending the external packets to the transport pipeline.
         let path_planner = self.path_planner.clone();
-        let distress_threshold = self.db.get_surb_config().distress_threshold;
+        let distress_threshold = self.cfg.protocol.surb_store.distress_threshold;
         let all_resolved_external_msg_rx = unresolved_routing_msg_rx.filter_map(move |(unresolved, mut data)| {
             let path_planner = path_planner.clone();
             async move {
@@ -505,22 +458,39 @@ where
             .in_current_span()
         });
 
-        for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
-            packet_cfg,
-            self.db.clone(),
-            self.resolver.clone(),
-            (
-                mixing_channel_tx.with(|(peer, msg): (PeerId, Box<[u8]>)| {
-                    trace!(%peer, "sending message to peer");
-                    futures::future::ok::<_, hopr_transport_mixer::channel::SenderError>((peer, msg))
-                }),
-                wire_msg_rx.inspect(|(peer, _)| trace!(%peer, "received message from peer")),
-            ),
+        let channels_dst = self
+            .resolver
+            .domain_separators()
+            .await
+            .map_err(HoprTransportError::chain)?
+            .channel;
+        let hopr_pipeline_cfg = HoprPacketPipelineConfig {
+            codec_cfg: HoprCodecConfig {
+                outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
+                outgoing_win_prob: self
+                    .cfg
+                    .protocol
+                    .outgoing_ticket_winning_prob
+                    .map(WinningProbability::try_from)
+                    .transpose()?,
+                channels_dst,
+            },
+            ticket_proc_cfg: HoprTicketProcessorConfig {
+                channels_dst,
+                ..Default::default()
+            },
+            surb_cfg: SurbStoreConfig::default(),
+        };
+
+        for (k, v) in pipeline::run_hopr_packet_pipeline(
+            (self.me.clone(), self.me_onchain.clone()),
+            (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
-        )
-        .await
-        .into_iter()
-        {
+            ticket_events,
+            self.resolver.clone(),
+            self.db.clone(),
+            hopr_pipeline_cfg,
+        ) {
             processes.insert(HoprTransportProcess::Protocol(k), v);
         }
 
@@ -774,7 +744,7 @@ where
             .await
             .map_err(|e| HoprTransportError::Other(e.into()))?
         {
-            if channel.destination == self.me_address {
+            if &channel.destination == self.me_onchain.as_ref() {
                 Ok(Some(
                     self.db
                         .stream_tickets(Some((&channel).into()))

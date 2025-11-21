@@ -342,7 +342,7 @@ impl TicketBuilder {
     /// Sets the channel id.
     /// This, [TicketBuilder::addresses] or [TicketBuilder::direction] must be set.
     #[must_use]
-    pub fn channel_id(mut self, channel_id: Hash) -> Self {
+    pub fn channel_id(mut self, channel_id: ChannelId) -> Self {
         self.channel_id = Some(channel_id);
         self
     }

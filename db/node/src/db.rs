@@ -5,9 +5,8 @@ use std::{
     time::Duration,
 };
 
-use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
 use hopr_internal_types::prelude::ChannelEntry;
-use hopr_primitive_types::primitives::Address;
+
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sqlx::{
@@ -27,8 +26,6 @@ pub const SQL_DB_TICKETS_FILE_NAME: &str = "hopr_tickets.db";
 
 pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
-pub const MIN_SURB_RING_BUFFER_SIZE: usize = 1024;
-
 #[derive(Clone, Debug, validator::Validate, smart_default::SmartDefault)]
 pub struct HoprNodeDbConfig {
     #[default(true)]
@@ -37,12 +34,6 @@ pub struct HoprNodeDbConfig {
     pub force_create: bool,
     #[default(Duration::from_secs(5))]
     pub log_slow_queries: Duration,
-    #[default(10_000)]
-    #[validate(range(min = MIN_SURB_RING_BUFFER_SIZE))]
-    pub surb_ring_buffer_size: usize,
-    #[default(1000)]
-    #[validate(range(min = 2))]
-    pub surb_distress_threshold: usize,
 }
 
 #[derive(Clone)]
@@ -51,20 +42,11 @@ pub struct HoprNodeDb {
     pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) caches: Arc<NodeDbCaches>,
-    pub(crate) me_onchain: ChainKeypair,
-    pub(crate) me_address: Address,
     pub(crate) cfg: HoprNodeDbConfig,
 }
 
 impl HoprNodeDb {
-    pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprNodeDbConfig) -> Result<Self, NodeDbError> {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
-            lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
-            lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
-        }
-
+    pub async fn new(directory: &Path, cfg: HoprNodeDbConfig) -> Result<Self, NodeDbError> {
         cfg.validate().map_err(|e| NodeDbError::Other(e.into()))?;
 
         fs::create_dir_all(directory).map_err(|e| NodeDbError::Other(e.into()))?;
@@ -95,13 +77,12 @@ impl HoprNodeDb {
         .await?;
 
         #[cfg(feature = "sqlite")]
-        Self::new_sqlx_sqlite(chain_key, tickets, peers, cfg).await
+        Self::new_sqlx_sqlite(tickets, peers, cfg).await
     }
 
     #[cfg(feature = "sqlite")]
-    pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self, NodeDbError> {
+    pub async fn new_in_memory() -> Result<Self, NodeDbError> {
         Self::new_sqlx_sqlite(
-            chain_key,
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| NodeDbError::Other(e.into()))?,
@@ -115,7 +96,6 @@ impl HoprNodeDb {
 
     #[cfg(feature = "sqlite")]
     async fn new_sqlx_sqlite(
-        me_onchain: ChainKeypair,
         peers_db_pool: SqlitePool,
         tickets_db_pool: SqlitePool,
         cfg: HoprNodeDbConfig,
@@ -156,8 +136,6 @@ impl HoprNodeDb {
             tickets_db,
             peers_db,
             caches,
-            me_address: me_onchain.public().to_address(),
-            me_onchain,
             cfg,
         })
     }
@@ -197,7 +175,7 @@ impl HoprNodeDb {
     pub async fn invalidate_unrealized_value(&self, channel: &ChannelEntry) {
         self.caches
             .unrealized_value
-            .invalidate(&(channel.get_id(), channel.channel_epoch))
+            .invalidate(&(*channel.get_id(), channel.channel_epoch))
             .await;
     }
 

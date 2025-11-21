@@ -111,8 +111,8 @@ where
     <C as Decoder>::Item: Clone + Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
-    let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(10_000);
-    let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(10_000);
+    let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
+    let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(100_000);
 
     let cache_out = moka::future::Cache::builder()
         .max_capacity(2000)
