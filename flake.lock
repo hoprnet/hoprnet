@@ -271,7 +271,6 @@
         "nixpkgs": "nixpkgs",
         "pre-commit": "pre-commit",
         "rust-overlay": "rust-overlay_2",
-        "solc": "solc",
         "treefmt-nix": "treefmt-nix_2"
       }
     },
@@ -316,42 +315,6 @@
         "ref": "master",
         "repo": "rust-overlay",
         "type": "github"
-      }
-    },
-    "solc": {
-      "inputs": {
-        "flake-utils": [
-          "flake-utils"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "solc-macos-amd64-list-json": "solc-macos-amd64-list-json"
-      },
-      "locked": {
-        "lastModified": 1756368702,
-        "narHash": "sha256-cqEHv7uCV0LibmQphyiXZ1+jYtGjMNb9Pae4tfcAcF8=",
-        "owner": "hellwolf",
-        "repo": "solc.nix",
-        "rev": "d83e90df2fa8359a690f6baabf76099432193c3f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "hellwolf",
-        "repo": "solc.nix",
-        "type": "github"
-      }
-    },
-    "solc-macos-amd64-list-json": {
-      "flake": false,
-      "locked": {
-        "narHash": "sha256-AvITkfpNYgCypXuLJyqco0li+unVw39BAfdOZvd/SPE=",
-        "type": "file",
-        "url": "https://github.com/argotorg/solc-bin/raw/26fc3fd/macosx-amd64/list.json"
-      },
-      "original": {
-        "type": "file",
-        "url": "https://github.com/argotorg/solc-bin/raw/26fc3fd/macosx-amd64/list.json"
       }
     },
     "systems": {
