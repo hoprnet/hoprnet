@@ -1,9 +1,9 @@
 [package]
 name = "hoprd"
-version = "3.1.1"
+version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "HOPR node executable."
+description = "HOPR node executable"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -20,6 +20,8 @@ default = [
 prometheus = [
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
+  "hopr-db-node/prometheus",
+  "hopr-strategy/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
 ]
@@ -27,7 +29,10 @@ runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
+  "hopr-db-node/runtime-tokio",
+  "hopr-chain-connector/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
+  "hopr-strategy/runtime-tokio",
 ]
 telemetry = [
   "dep:opentelemetry",
@@ -58,8 +63,8 @@ allocator-jemalloc-stats = ["allocator-jemalloc", "dep:tikv-jemalloc-ctl"]
 
 [dependencies]
 anyhow = { workspace = true }
-async-lock = { workspace = true }
 async-signal = { workspace = true }
+async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
@@ -71,6 +76,7 @@ serde_yaml = { workspace = true }
 serde_json = { workspace = true }
 signal-hook = { workspace = true }
 smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-retry = { workspace = true, optional = true }
@@ -88,6 +94,9 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
 opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
+hopr-chain-connector = { workspace = true }
+hopr-db-node = { workspace = true }
+hopr-strategy = { workspace = true }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
@@ -112,3 +121,11 @@ anyhow = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 test-log = { workspace = true }
+hopr-lib = { workspace = true, features = [
+  "runtime-tokio",
+  "session-client",
+  "session-server",
+  "utils_session",
+  "utils_parallel",
+  "testing",
+] }

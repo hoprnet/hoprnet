@@ -7,7 +7,6 @@ pub struct OpenChannelResult {
 
 pub struct CloseChannelResult {
     pub tx_hash: Hash,
-    pub status: hopr_internal_types::channels::ChannelStatus,
 }
 
 #[async_trait::async_trait]

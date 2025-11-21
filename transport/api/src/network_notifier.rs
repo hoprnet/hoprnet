@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_api::{chain::ChainKeyOperations, db::HoprDbPeersOperations};
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_path::channel_graph::ChannelGraph;
+use hopr_api::db::HoprDbPeersOperations;
 use hopr_transport_network::network::{Network, UpdateFailure};
 use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
-use tracing::{debug, error};
+use tracing::error;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -32,31 +29,23 @@ lazy_static::lazy_static! {
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP
 /// compliant.
 #[derive(Debug, Clone)]
-pub struct ProbeNetworkInteractions<Db, R> {
+pub struct ProbeNetworkInteractions<Db> {
     network: Arc<Network<Db>>,
-    resolver: R,
-    channel_graph: Arc<RwLock<ChannelGraph>>,
 }
 
-impl<Db, R> ProbeNetworkInteractions<Db, R>
+impl<Db> ProbeNetworkInteractions<Db>
 where
     Db: HoprDbPeersOperations + Sync + Send + Clone,
-    R: ChainKeyOperations + Sync + Send + Clone,
 {
-    pub fn new(network: Arc<Network<Db>>, resolver: R, channel_graph: Arc<RwLock<ChannelGraph>>) -> Self {
-        Self {
-            network,
-            resolver,
-            channel_graph,
-        }
+    pub fn new(network: Arc<Network<Db>>) -> Self {
+        Self { network }
     }
 }
 
 #[async_trait]
-impl<Db, R> PeerDiscoveryFetch for ProbeNetworkInteractions<Db, R>
+impl<Db> PeerDiscoveryFetch for ProbeNetworkInteractions<Db>
 where
     Db: HoprDbPeersOperations + Sync + Send + Clone,
-    R: ChainKeyOperations + Sync + Send + Clone,
 {
     /// Get all peers considered by the `Network` to be pingable.
     ///
@@ -74,10 +63,9 @@ where
 }
 
 #[async_trait]
-impl<Db, R> ProbeStatusUpdate for ProbeNetworkInteractions<Db, R>
+impl<Db> ProbeStatusUpdate for ProbeNetworkInteractions<Db>
 where
     Db: HoprDbPeersOperations + Sync + Send + Clone,
-    R: ChainKeyOperations + Sync + Send + Clone,
 {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn on_finished(
@@ -104,23 +92,7 @@ where
             }
         };
 
-        // Update the channel graph
-        let peer = *peer;
-        // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        if let Ok(pubkey) = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await {
-            let maybe_chain_key = self.resolver.packet_key_to_chain_key(&pubkey).await;
-            if let Ok(Some(chain_key)) = maybe_chain_key {
-                let mut g = self.channel_graph.write_arc().await;
-                g.update_node_score(&chain_key, result.into());
-                debug!(%chain_key, ?result, "update node score for peer");
-            } else {
-                error!("could not resolve chain key");
-            }
-        } else {
-            error!("encountered invalid peer id");
-        }
-
-        if let Err(error) = self.network.update(&peer, result).await {
+        if let Err(error) = self.network.update(peer, result).await {
             error!(%error, "Encountered error on on updating the collected ping data")
         }
     }

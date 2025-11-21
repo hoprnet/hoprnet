@@ -130,17 +130,6 @@ impl FromStr for Address {
     }
 }
 
-impl From<alloy::primitives::Address> for Address {
-    fn from(a: alloy::primitives::Address) -> Self {
-        Address::from(a.0.0)
-    }
-}
-impl From<Address> for alloy::primitives::Address {
-    fn from(a: Address) -> Self {
-        alloy::primitives::Address::from_slice(a.as_ref())
-    }
-}
-
 /// Represents and Ethereum challenge.
 ///
 /// This is a one-way encoding of the secp256k1 curve point to an Ethereum address.
@@ -289,7 +278,7 @@ impl PartialOrd<Self> for SerializableLog {
 }
 
 /// Identifier of public keys.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct KeyIdent<const N: usize = 4>(#[serde(with = "serde_bytes")] [u8; N]);
 
 impl<const N: usize> Display for KeyIdent<N> {

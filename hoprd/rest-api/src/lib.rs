@@ -31,6 +31,8 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
+use hopr_chain_connector::HoprBlockchainSafeConnector;
+use hopr_db_node::HoprNodeDb;
 use hopr_lib::{Address, Hopr, errors::HoprLibError, utils::session::ListenerJoinHandles};
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
@@ -54,9 +56,11 @@ use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
+type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
+
 #[derive(Clone)]
 pub(crate) struct AppState {
-    pub hopr: Arc<Hopr>, // checks
+    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>, // checks
 }
 
 pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
@@ -65,9 +69,9 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 pub(crate) struct InternalState {
     pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
-    pub hopr: Arc<Hopr>,
+    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
     pub websocket_active_count: Arc<AtomicU16>,
-    pub open_listeners: ListenerJoinHandles,
+    pub open_listeners: Arc<ListenerJoinHandles>,
     pub default_listen_host: std::net::SocketAddr,
 }
 
@@ -82,7 +86,6 @@ pub(crate) struct InternalState {
         channels::list_channels,
         channels::open_channel,
         channels::show_channel,
-        channels::corrupted_channels,
         checks::eligiblez,
         checks::healthyz,
         checks::readyz,
@@ -92,7 +95,6 @@ pub(crate) struct InternalState {
         node::configuration,
         node::entry_nodes,
         node::info,
-        node::channel_graph,
         node::peers,
         node::version,
         peers::ping_peer,
@@ -119,7 +121,7 @@ pub(crate) struct InternalState {
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery, node::NodeGraphResponse,
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol, session::SessionConfig,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
@@ -175,8 +177,8 @@ pub struct RestApiParameters {
     pub listener: TcpListener,
     pub hoprd_cfg: serde_json::Value,
     pub cfg: crate::config::Api,
-    pub hopr: Arc<hopr_lib::Hopr>,
-    pub session_listener_sockets: ListenerJoinHandles,
+    pub hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
+    pub session_listener_sockets: Arc<ListenerJoinHandles>,
     pub default_session_listen_host: std::net::SocketAddr,
 }
 
@@ -206,8 +208,8 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
 async fn build_api(
     hoprd_cfg: serde_json::Value,
     cfg: crate::config::Api,
-    hopr: Arc<hopr_lib::Hopr>,
-    open_listeners: ListenerJoinHandles,
+    hopr: Arc<Hopr<Arc<HoprBlokliConnector>, HoprNodeDb>>,
+    open_listeners: Arc<ListenerJoinHandles>,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {
     let state = AppState { hopr };
@@ -279,7 +281,6 @@ async fn build_api(
                 .route("/peers/{destination}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
-                .route("/channels/corrupted", get(channels::corrupted_channels))
                 .route("/channels/{channelId}", get(channels::show_channel))
                 .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
                 .route("/channels/{channelId}", delete(channels::close_channel))
@@ -299,7 +300,6 @@ async fn build_api(
                 .route("/node/info", get(node::info))
                 .route("/node/peers", get(node::peers))
                 .route("/node/entry-nodes", get(node::entry_nodes))
-                .route("/node/graph", get(node::channel_graph))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/config/{id}", get(session::session_config))
                 .route("/session/config/{id}", post(session::adjust_session))
@@ -362,6 +362,7 @@ pub(crate) struct ApiError {
 
 /// Enumerates all API request errors
 /// Note that `ApiError` should not be instantiated directly, but always rather through the `ApiErrorStatus`.
+#[allow(unused)] // TODO: some errors can no longer be propagated to the REST API
 #[derive(Debug, Clone, PartialEq, Eq, strum::Display)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
@@ -370,10 +371,6 @@ enum ApiErrorStatus {
     PeerNotFound,
     ChannelNotFound,
     TicketsNotFound,
-    NotEnoughBalance,
-    NotEnoughAllowance,
-    ChannelAlreadyOpen,
-    UnsupportedFeature,
     Timeout,
     PingError(String),
     Unauthorized,

@@ -65,8 +65,6 @@ pub mod processor;
 /// Stream processing utilities
 pub mod stream;
 
-pub mod timer;
-
 /// Allows capturing dissected HOPR packets before they are processed by the transport.
 ///
 /// Requires the `capture` feature to be enabled.
@@ -95,7 +93,6 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::Instrument;
 
 use crate::processor::{PacketUnwrapping, PacketWrapping};
-pub use crate::timer::execute_on_tick;
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 const SLOW_OP: std::time::Duration = std::time::Duration::from_millis(150);

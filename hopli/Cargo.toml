@@ -1,6 +1,6 @@
 [package]
 name = "hopli"
-version = "0.9.1"
+version = "0.10.0"
 edition = "2021"
 license = "GPL-3.0-only"
 
@@ -14,17 +14,13 @@ allocator-jemalloc = [
 ] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
-alloy = { workspace = true, default-features = false, features = [
-  "essentials",
-  "json-rpc",
-  "node-bindings",
-] }
-# using own fork until the PR was merged
+anyhow = { workspace = true }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
 hex = { workspace = true }
+lazy_static = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

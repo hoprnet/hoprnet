@@ -15,7 +15,7 @@ pub enum HoprTransportError {
     General(#[from] hopr_primitive_types::errors::GeneralError),
 
     #[error("Path error: {0}")]
-    Path(#[from] hopr_path::errors::PathError),
+    Path(#[from] hopr_internal_types::errors::PathError),
 
     #[error("Protocol error: {0}")]
     Protocol(#[from] ProtocolError),

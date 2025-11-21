@@ -41,10 +41,8 @@ where
 
                 impl migration::MigratorTrait for TempMigrator {
                     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-                        let mut migrations = migration::MigratorIndex::migrations();
-                        migrations.extend(migration::MigratorPeers::migrations());
+                        let mut migrations = migration::MigratorPeers::migrations();
                         migrations.extend(migration::MigratorTickets::migrations());
-                        migrations.extend(migration::MigratorChainLogs::migrations());
 
                         migrations
                     }

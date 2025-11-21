@@ -6,8 +6,10 @@ use std::{
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use hopr_api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector, Utc};
-use hopr_internal_types::prelude::*;
+use hopr_lib::{
+    ChannelStatusDiscriminants, Utc,
+    exports::api::chain::{ChainReadChannelOperations, ChainWriteChannelOperations, ChannelSelector},
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DurationSeconds, serde_as};
 use tracing::{debug, error, info};
@@ -104,16 +106,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::Bound, time::SystemTime};
+    use std::{ops::Add, time::SystemTime};
 
+    use futures_time::future::FutureExt;
     use hex_literal::hex;
-    use hopr_api::chain::ChainReceipt;
-    use hopr_crypto_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
+    use hopr_lib::{
+        Address, BytesRepresentable, ChainKeypair, ChannelEntry, ChannelStatus, HoprBalance, Keypair, XDaiBalance,
+        exports::api::chain::{ChainEvent, ChainEvents},
+    };
     use lazy_static::lazy_static;
 
     use super::*;
-    use crate::tests::{MockChainActions, MockTestActions};
 
     lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
@@ -131,43 +135,70 @@ mod tests {
     async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
         let max_closure_overdue = Duration::from_secs(600);
 
-        // Should finalize closure of this channel
-        let c_pending_elapsed = ChannelEntry::new(
+        let channel_to_be_closed = ChannelEntry::new(
             *ALICE,
             *DAVE,
             10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
-            0.into(),
+            1.into(),
         );
 
-        let mut mock = MockTestActions::new();
-        mock.expect_me().return_const(*ALICE);
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHARLIE, &*DAVE, &*EUGENE],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([
+                // Should leave this channel opened
+                ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into()),
+                // Should leave this unfinalized, because the channel closure period has not yet elapsed
+                ChannelEntry::new(
+                    *ALICE,
+                    *CHARLIE,
+                    10.into(),
+                    0.into(),
+                    ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
+                    1.into(),
+                ),
+                // Should finalize closure of this channel
+                channel_to_be_closed,
+                // Should leave this unfinalized, because the channel closure is long overdue
+                ChannelEntry::new(
+                    *ALICE,
+                    *EUGENE,
+                    10.into(),
+                    0.into(),
+                    ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
+                    1.into(),
+                ),
+            ])
+            .build_dynamic_client([1; Address::SIZE].into());
 
-        mock.expect_stream_channels()
-            .once()
-            .withf(move |selector| {
-                selector.source == Some(*ALICE)
-                    && selector.destination.is_none()
-                    && selector.allowed_states == &[ChannelStatusDiscriminants::PendingToClose]
-                    && match selector.closure_time_range {
-                        (Bound::Included(a), Bound::Included(b)) => {
-                            b.sub(a).to_std().is_ok_and(|d| d == max_closure_overdue)
-                        }
-                        _ => false,
-                    }
-            })
-            .return_once(move |_| futures::stream::iter([c_pending_elapsed]).boxed());
-
-        mock.expect_close_channel()
-            .once()
-            .with(mockall::predicate::eq(c_pending_elapsed.get_id()))
-            .return_once(|_| Ok((ChannelStatus::Closed, ChainReceipt::default())));
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&ALICE_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect(Duration::from_secs(3)).await?;
+        let events = chain_connector.subscribe()?;
 
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 
-        let strat = ClosureFinalizerStrategy::new(cfg, MockChainActions(mock.into()));
+        let strat = ClosureFinalizerStrategy::new(cfg, chain_connector);
         strat.on_tick().await?;
+
+        events
+            .filter(|event| {
+                futures::future::ready(
+                    matches!(event, ChainEvent::ChannelClosed(c) if channel_to_be_closed.get_id() == c.get_id()),
+                )
+            })
+            .next()
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await?;
+
+        // Cannot do snapshot testing here, since the execution is time-dependent
 
         Ok(())
     }

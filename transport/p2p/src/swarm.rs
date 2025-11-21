@@ -36,13 +36,14 @@ lazy_static::lazy_static! {
 async fn build_p2p_network<T>(
     me: libp2p::identity::Keypair,
     indexer_update_input: T,
+    allow_private_addresses: bool,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>>
 where
     T: Stream<Item = PeerDiscovery> + Send + 'static,
 {
     let me_public: PublicKey = me.public();
 
-    // Both features could be enabled during testing, therefore we only use tokio when its
+    // Both features could be enabled during testing; therefore, we only use tokio when it's
     // exclusively enabled.
     //
     // NOTE: Private address filtering is implemented at multiple levels for defense-in-depth:
@@ -71,7 +72,7 @@ where
 
     Ok(swarm
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, indexer_update_input))
+        .with_behaviour(|_key| HoprNetworkBehavior::new(me_public, indexer_update_input, allow_private_addresses))
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_swarm_config(|cfg| {
             cfg.with_dial_concurrency_factor(
@@ -99,6 +100,7 @@ where
 
 pub struct HoprSwarm {
     pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
+    pub allow_private_addresses: bool,
 }
 
 impl std::fmt::Debug for HoprSwarm {
@@ -118,11 +120,12 @@ impl HoprSwarm {
         identity: libp2p::identity::Keypair,
         indexer_update_input: T,
         my_multiaddresses: Vec<Multiaddr>,
+        allow_private_addresses: bool,
     ) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
-        let mut swarm = build_p2p_network(identity, indexer_update_input)
+        let mut swarm = build_p2p_network(identity, indexer_update_input, allow_private_addresses)
             .await
             .expect("swarm must be constructible");
 
@@ -169,7 +172,10 @@ impl HoprSwarm {
         //     "The node failed to listen on at least one of the specified interfaces"
         // );
 
-        Self { swarm }
+        Self {
+            swarm,
+            allow_private_addresses,
+        }
     }
 
     pub fn build_protocol_control(&self, protocol: &'static str) -> crate::HoprStreamProtocolControl {
@@ -186,6 +192,7 @@ impl HoprSwarm {
     where
         T: Sink<crate::behavior::discovery::Event> + Send + 'static,
     {
+        let allow_private_addrs = self.allow_private_addresses;
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.into();
         futures::pin_mut!(events);
 
@@ -324,7 +331,7 @@ impl HoprSwarm {
                         peer_id, address
                     } => {
                         // Only store public/routable addresses
-                        if is_public_address(&address) {
+                        if allow_private_addrs || is_public_address(&address) {
                             swarm.add_peer_address(peer_id, address.clone());
                             trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "Public peer address stored in swarm")
                         } else {

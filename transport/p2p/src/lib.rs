@@ -100,13 +100,13 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    pub fn new<T>(me: PublicKey, onchain_events: T) -> Self
+    pub fn new<T>(me: PublicKey, onchain_events: T, allow_private_addresses: bool) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
             streams: libp2p_stream::Behaviour::new(),
-            discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events),
+            discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events, allow_private_addresses),
             identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
                 "/hopr/identify/1.0.0".to_string(),
                 me.clone(),

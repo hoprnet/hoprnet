@@ -5,86 +5,66 @@
 //! See `chain-actions` and `chain-indexer` crates for details.
 use std::fmt::{Display, Formatter};
 
-use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use libp2p_identity::PeerId;
-use multiaddr::Multiaddr;
-
-/// Contains TX hash along with the Chain Event data.
-/// This could be used to pair up some events with [Action](crate::actions::Action).
-/// Each [Action](crate::actions::Action) is typically concluded by a significant chain event.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SignificantChainEvent {
-    /// TX hash
-    pub tx_hash: Hash,
-    /// Chain event of interest
-    pub event_type: ChainEventType,
-}
-
-impl Display for SignificantChainEvent {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} @ tx {}", self.event_type, self.tx_hash)
-    }
-}
-
-/// Status of a node in network registry.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NetworkRegistryStatus {
-    /// Connections to the node are allowed.
-    Allowed,
-    /// Connections to the node are not allowed.
-    Denied,
-}
 
 /// Enumeration of HOPR chain events.
-#[allow(clippy::large_enum_variant)] // TODO: Refactor the large enum variant
-#[derive(Debug, Clone, PartialEq, strum::EnumTryAs)]
-pub enum ChainEventType {
+#[derive(Debug, Clone, strum::EnumTryAs, strum::EnumIs, strum::EnumDiscriminants)]
+pub enum ChainEvent {
     /// Peer on-chain announcement event.
-    Announcement {
-        /// Announced peer id
-        peer: PeerId,
-        /// Announced on-chain address
-        address: Address,
-        /// Multiaddresses
-        multiaddresses: Vec<Multiaddr>,
-    },
-    /// New channel has been opened
+    ///
+    /// The [`AccountEntry`] is guaranteed to be [announced](AccountEntry::has_announced).
+    Announcement(AccountEntry),
+    /// A new channel has been opened
+    ///
+    /// The [`ChannelEntry`] is guaranteed to be [opened](ChannelStatus::Open).
     ChannelOpened(ChannelEntry),
     /// Channel closure has been initiated.
+    ///
+    /// The [`ChannelEntry`] is guaranteed to be [pending to close](ChannelStatus::PendingToClose).
     ChannelClosureInitiated(ChannelEntry),
     /// Channel closure has been finalized.
+    ///
+    /// The [`ChannelEntry`] is guaranteed to be [closed](ChannelStatus::Closed).
     ChannelClosed(ChannelEntry),
     /// Channel balance has increased by an amount.
+    ///
+    /// The [`HoprBalance`] is never `0` and represents the difference from the current new balance on the
+    /// [`ChannelEntry`].
     ChannelBalanceIncreased(ChannelEntry, HoprBalance),
     /// Channel balance has decreased by an amount.
+    ///
+    /// The [`HoprBalance`] is never `0` and represents the difference from the current new balance on the
+    /// [`ChannelEntry`].
     ChannelBalanceDecreased(ChannelEntry, HoprBalance),
     /// Ticket has been redeemed on a channel.
+    ///
     /// If the channel is a node's own, it also contains the ticket that has been redeemed.
-    TicketRedeemed(ChannelEntry, Option<AcknowledgedTicket>),
-    /// Safe has been registered with the node.
-    NodeSafeRegistered(Address),
-    /// Network registry update for a node.
-    NetworkRegistryUpdate(Address, NetworkRegistryStatus),
+    TicketRedeemed(ChannelEntry, Option<Box<VerifiedTicket>>),
+
+    /// The minimum winning probability has been increased.
+    WinningProbabilityIncreased(WinningProbability),
+
+    /// The minimum winning probability has been decreased.
+    WinningProbabilityDecreased(WinningProbability),
+
+    /// A new ticket price has been set.
+    TicketPriceChanged(HoprBalance),
 }
 
-impl Display for ChainEventType {
+impl Display for ChainEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChainEventType::Announcement {
-                peer,
-                address,
-                multiaddresses,
-            } => write!(f, "announcement event of {peer} ({address}): {multiaddresses:?}"),
-            ChainEventType::ChannelOpened(c) => write!(f, "open channel event {}", c.get_id()),
-            ChainEventType::ChannelClosureInitiated(c) => write!(f, "close channel initiation event {}", c.get_id()),
-            ChainEventType::ChannelClosed(c) => write!(f, "close channel event {}", c.get_id()),
-            ChainEventType::ChannelBalanceIncreased(c, _) => write!(f, "channel increase balance event {}", c.get_id()),
-            ChainEventType::ChannelBalanceDecreased(c, _) => write!(f, "channel decrease balance event {}", c.get_id()),
-            ChainEventType::TicketRedeemed(c, _) => write!(f, "ticket redeem event in channel {}", c.get_id()),
-            ChainEventType::NodeSafeRegistered(s) => write!(f, "safe registered event {s}"),
-            ChainEventType::NetworkRegistryUpdate(a, s) => write!(f, "network registry update event {a}: {s:?}"),
+            ChainEvent::Announcement(a) => write!(f, "announcement event of {a}"),
+            ChainEvent::ChannelOpened(c) => write!(f, "open channel event {}", c.get_id()),
+            ChainEvent::ChannelClosureInitiated(c) => write!(f, "close channel initiation event {}", c.get_id()),
+            ChainEvent::ChannelClosed(c) => write!(f, "close channel event {}", c.get_id()),
+            ChainEvent::ChannelBalanceIncreased(c, _) => write!(f, "channel increase balance event {}", c.get_id()),
+            ChainEvent::ChannelBalanceDecreased(c, _) => write!(f, "channel decrease balance event {}", c.get_id()),
+            ChainEvent::TicketRedeemed(c, _) => write!(f, "ticket redeem event in channel {}", c.get_id()),
+            ChainEvent::WinningProbabilityIncreased(p) => write!(f, "winning probability increased to {p}"),
+            ChainEvent::WinningProbabilityDecreased(p) => write!(f, "winning probability decreased to {p}"),
+            ChainEvent::TicketPriceChanged(p) => write!(f, "ticket price changed to {p}"),
         }
     }
 }

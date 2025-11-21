@@ -38,11 +38,9 @@ pub mod testing;
 /// Re-exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {
-    pub mod chain {
-        pub use hopr_chain_types as types;
-    }
-
+    pub use hopr_api as api;
     pub mod types {
+        pub use hopr_internal_types as internal;
         pub use hopr_primitive_types as primitive;
     }
     pub mod crypto {
@@ -75,64 +73,36 @@ pub mod prelude {
 }
 
 use std::{
-    collections::HashMap,
-    ops::Deref,
-    path::PathBuf,
-    str::FromStr,
-    sync::{Arc, atomic::Ordering},
+    convert::identity,
+    num::NonZeroUsize,
+    sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
 
-use async_lock::RwLock;
-pub use async_trait::async_trait;
-use errors::{HoprLibError, HoprStatusError};
-use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::AbortHandle};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, channel::mpsc::channel};
 use hopr_api::{
-    chain::{
-        AccountSelector, AnnouncementError, ChainEvents, ChainKeyOperations, ChainReadAccountOperations,
-        ChainReadChannelOperations, ChainValues, ChainWriteAccountOperations, ChainWriteChannelOperations,
-        ChainWriteTicketOperations, ChannelSelector,
-    },
-    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerStatus, TicketSelector},
+    chain::{AccountSelector, AnnouncementError, ChannelSelector, *},
+    db::{HoprNodeDbApi, PeerStatus, TicketMarker, TicketSelector},
 };
 use hopr_async_runtime::prelude::spawn;
-pub use hopr_chain_api::config::{
-    Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
-};
-use hopr_chain_api::{HoprChain, HoprChainProcess, config::ChainNetworkConfig, errors::HoprChainError, wait_for_funds};
-use hopr_chain_types::ContractAddresses;
+pub use hopr_async_runtime::{Abortable, AbortableList};
 pub use hopr_crypto_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-use hopr_crypto_types::prelude::Hash;
-use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
+pub use hopr_crypto_types::prelude::*;
 pub use hopr_internal_types::prelude::*;
-pub use hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions};
-pub use hopr_path::channel_graph::GraphExportConfig;
-use hopr_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate};
+pub use hopr_network_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_platform::time::native::current_time;
 pub use hopr_primitive_types::prelude::*;
-pub use hopr_strategy::Strategy;
-use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
-pub use hopr_transport::{
-    ApplicationData, ApplicationDataIn, ApplicationDataOut, HalfKeyChallenge, Health, HoprSession, IncomingSession,
-    Keypair, Multiaddr, OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_MTU,
-    SURB_SIZE, ServiceId, SessionCapabilities, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
-    SessionManagerError, SessionTarget, SurbBalancerConfig, Tag, Telemetry, TicketStatistics, TrafficGeneration,
-    TransportSessionError,
-    config::{HostConfig, HostType, looks_like_domain},
-    errors::{HoprTransportError, NetworkingError, ProtocolError},
-};
-use hopr_transport::{
-    ChainKeypair, HoprTransport, HoprTransportConfig, OffchainKeypair, PeerDiscovery, execute_on_tick,
-};
+pub use hopr_transport::*;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::{
+pub use crate::{
     config::SafeModule,
     constants::{MIN_NATIVE_BALANCE, SUGGESTED_NATIVE_BALANCE},
-    state::HoprState,
+    errors::{HoprLibError, HoprStatusError},
+    state::{HoprLibProcess, HoprState},
     traits::chain::{CloseChannelResult, OpenChannelResult},
 };
 
@@ -184,13 +154,16 @@ impl TrafficGeneration for DummyCoverTrafficType {
 /// Divide the available CPU parallelism by 2, since half of the available threads are
 /// to be used for IO-bound and half for CPU-bound tasks.
 #[cfg(feature = "runtime-tokio")]
-pub fn prepare_tokio_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
+pub fn prepare_tokio_runtime(
+    num_cpu_threads: Option<NonZeroUsize>,
+    num_io_threads: Option<NonZeroUsize>,
+) -> anyhow::Result<tokio::runtime::Runtime> {
+    use std::str::FromStr;
     let avail_parallelism = std::thread::available_parallelism().ok().map(|v| v.get() / 2);
 
     hopr_parallelize::cpu::init_thread_pool(
-        std::env::var("HOPRD_NUM_CPU_THREADS")
-            .ok()
-            .and_then(|v| usize::from_str(&v).ok())
+        num_cpu_threads
+            .map(|v| v.get())
             .or(avail_parallelism)
             .ok_or(anyhow::anyhow!(
                 "Could not determine the number of CPU threads to use. Please set the HOPRD_NUM_CPU_THREADS \
@@ -202,9 +175,8 @@ pub fn prepare_tokio_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
     Ok(tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(
-            std::env::var("HOPRD_NUM_IO_THREADS")
-                .ok()
-                .and_then(|v| usize::from_str(&v).ok())
+            num_io_threads
+                .map(|v| v.get())
                 .or(avail_parallelism)
                 .ok_or(anyhow::anyhow!(
                     "Could not determine the number of IO threads to use. Please set the HOPRD_NUM_IO_THREADS \
@@ -223,137 +195,53 @@ pub fn prepare_tokio_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
         .build()?)
 }
 
+/// Type alias used to send and receive transport data via a running HOPR node.
+pub type HoprTransportIO = socket::HoprSocket<
+    futures::channel::mpsc::Receiver<ApplicationDataIn>,
+    futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
+>;
+
 /// HOPR main object providing the entire HOPR node functionality
 ///
 /// Instantiating this object creates all processes and objects necessary for
 /// running the HOPR node. Once created, the node can be started using the
 /// `run()` method.
 ///
-/// Externally offered API should be sufficient to perform all necessary tasks
+/// Externally offered API should be enough to perform all necessary tasks
 /// with the HOPR node manually, but it is advised to create such a configuration
 /// that manual interaction is unnecessary.
 ///
 /// As such, the `hopr_lib` serves mainly as an integration point into Rust programs.
-pub struct Hopr {
+pub struct Hopr<Chain, Db> {
     me: OffchainKeypair,
     cfg: config::HoprLibConfig,
     state: Arc<state::AtomicHoprState>,
-    transport_api: HoprTransport<HoprNodeDb, HoprChain>,
-    hopr_chain_api: HoprChain,
-    node_db: HoprNodeDb,
-    // objects that could be removed pending architectural cleanup ========
-    chain_cfg: ChainNetworkConfig,
-    channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
-    multistrategy: Arc<MultiStrategy>,
+    transport_api: HoprTransport<Db, Chain>,
+    redeem_requests: OnceLock<futures::channel::mpsc::Sender<TicketSelector>>,
+    node_db: Db,
+    chain_api: Chain,
+    processes: OnceLock<AbortableList<HoprLibProcess>>,
 }
 
-impl Hopr {
+impl<Chain, Db> Hopr<Chain, Db>
+where
+    Chain: HoprChainApi + Clone + Send + Sync + 'static,
+    Db: HoprNodeDbApi + Clone + Send + Sync + 'static,
+{
     pub async fn new(
-        mut cfg: config::HoprLibConfig,
+        cfg: config::HoprLibConfig,
+        hopr_chain_api: Chain,
+        hopr_node_db: Db,
         me: &OffchainKeypair,
         me_onchain: &ChainKeypair,
-    ) -> crate::errors::Result<Self> {
+    ) -> errors::Result<Self> {
         if hopr_crypto_random::is_rng_fixed() {
             warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
         }
 
-        let multiaddress: Multiaddr = (&cfg.host).try_into()?;
-
-        let db_path: PathBuf = [&cfg.db.data, "node_db"].iter().collect();
-        info!(path = ?db_path, "Initiating DB");
-
-        if cfg.db.force_initialize {
-            info!("Force cleaning up existing database");
-            hopr_platform::file::native::remove_dir_all(db_path.as_path()).map_err(|e| {
-                HoprLibError::GeneralError(format!(
-                    "Failed to remove the existing DB directory at '{db_path:?}': {e}"
-                ))
-            })?;
-            cfg.db.initialize = true
-        }
-
-        // create DB dir if it does not exist
-        if let Some(parent_dir_path) = db_path.as_path().parent() {
-            if !parent_dir_path.is_dir() {
-                std::fs::create_dir_all(parent_dir_path).map_err(|e| {
-                    HoprLibError::GeneralError(format!(
-                        "Failed to create DB parent directory at '{parent_dir_path:?}': {e}"
-                    ))
-                })?
-            }
-        }
-
-        let db_cfg = HoprNodeDbConfig {
-            create_if_missing: cfg.db.initialize,
-            force_create: cfg.db.force_initialize,
-            log_slow_queries: std::time::Duration::from_millis(150),
-            surb_ring_buffer_size: std::env::var("HOPR_PROTOCOL_SURB_RB_SIZE")
-                .ok()
-                .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-                .unwrap_or_else(|| HoprNodeDbConfig::default().surb_ring_buffer_size),
-            surb_distress_threshold: std::env::var("HOPR_PROTOCOL_SURB_RB_DISTRESS")
-                .ok()
-                .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-                .unwrap_or_else(|| HoprNodeDbConfig::default().surb_distress_threshold),
-        };
-        let node_db = HoprNodeDb::new(db_path.as_path(), me_onchain.clone(), db_cfg).await?;
-
-        if let Some(provider) = &cfg.chain.provider {
-            info!(provider, "Creating chain components using the custom provider");
-        } else {
-            info!("Creating chain components using the default provider");
-        }
-        let resolved_environment = hopr_chain_api::config::ChainNetworkConfig::new(
-            &cfg.chain.network,
-            crate::constants::APP_VERSION_COERCED,
-            cfg.chain.provider.as_deref(),
-            cfg.chain.max_rpc_requests_per_sec,
-            &mut cfg.chain.protocols,
-        )
-        .map_err(|e| HoprLibError::GeneralError(format!("Failed to resolve blockchain environment: {e}")))?;
-
-        let contract_addresses = ContractAddresses::from(&resolved_environment);
-        info!(
-            myself = me_onchain.public().to_hex(),
-            contract_addresses = ?contract_addresses,
-            "Resolved contract addresses",
-        );
+        let multiaddress: Multiaddr = (&cfg.host).try_into().map_err(HoprLibError::TransportError)?;
 
         let my_multiaddresses = vec![multiaddress];
-
-        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(
-            me_onchain.public().to_address(),
-            ChannelGraphConfig::default(),
-        )));
-
-        // TODO (4.0): replace this with new implementation that follows the chain traits from the hopr-api crate
-        let hopr_chain_api = hopr_chain_api::HoprChain::new(
-            me_onchain.clone(),
-            resolved_environment.clone(),
-            node_db.clone(),
-            &cfg.db.data,
-            cfg.safe_module.module_address,
-            ContractAddresses {
-                announcements: resolved_environment.announcements,
-                channels: resolved_environment.channels,
-                token: resolved_environment.token,
-                ticket_price_oracle: resolved_environment.ticket_price_oracle,
-                winning_probability_oracle: resolved_environment.winning_probability_oracle,
-                network_registry: resolved_environment.network_registry,
-                network_registry_proxy: resolved_environment.network_registry_proxy,
-                node_stake_v2_factory: resolved_environment.node_stake_v2_factory,
-                node_safe_registry: resolved_environment.node_safe_registry,
-                module_implementation: resolved_environment.module_implementation,
-            },
-            cfg.safe_module.safe_address,
-            hopr_chain_api::IndexerConfig {
-                start_block_number: resolved_environment.channel_contract_deploy_block as u64,
-                fast_sync: cfg.chain.fast_sync,
-                enable_logs_snapshot: cfg.chain.enable_logs_snapshot,
-                logs_snapshot_url: cfg.chain.logs_snapshot_url.clone(),
-                data_directory: cfg.db.data.clone(),
-            },
-        )?;
 
         let hopr_transport_api = HoprTransport::new(
             me,
@@ -365,16 +253,9 @@ impl Hopr {
                 probe: cfg.probe,
                 session: cfg.session,
             },
-            node_db.clone(),
+            hopr_node_db.clone(),
             hopr_chain_api.clone(),
-            channel_graph.clone(),
             my_multiaddresses,
-        );
-
-        let multi_strategy = Arc::new(MultiStrategy::new(cfg.strategy.clone(), hopr_chain_api.clone()));
-        debug!(
-            strategies = tracing::field::debug(&multi_strategy),
-            "Initialized strategies"
         );
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -382,34 +263,34 @@ impl Hopr {
             METRIC_PROCESS_START_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
             METRIC_HOPR_LIB_VERSION.set(
                 &[const_format::formatcp!("{}", constants::APP_VERSION)],
-                f64::from_str(const_format::formatcp!(
+                const_format::formatcp!(
                     "{}.{}",
                     env!("CARGO_PKG_VERSION_MAJOR"),
                     env!("CARGO_PKG_VERSION_MINOR")
-                ))
+                )
+                .parse()
                 .unwrap_or(0.0),
             );
 
             // Calling get_ticket_statistics will initialize the respective metrics on tickets
-            if let Err(e) = node_db.get_ticket_statistics(None).await {
-                error!(error = %e, "Failed to initialize ticket statistics metrics");
+            if let Err(error) = hopr_node_db.get_ticket_statistics(None).await {
+                error!(%error, "failed to initialize ticket statistics metrics");
             }
         }
 
         Ok(Self {
             me: me.clone(),
             cfg,
-            state: Arc::new(state::AtomicHoprState::new(state::HoprState::Uninitialized)),
+            state: Arc::new(state::AtomicHoprState::new(HoprState::Uninitialized)),
             transport_api: hopr_transport_api,
-            hopr_chain_api,
-            node_db,
-            chain_cfg: resolved_environment,
-            channel_graph,
-            multistrategy: multi_strategy,
+            chain_api: hopr_chain_api,
+            node_db: hopr_node_db,
+            redeem_requests: OnceLock::new(),
+            processes: OnceLock::new(),
         })
     }
 
-    fn error_if_not_in_state(&self, state: state::HoprState, error: String) -> errors::Result<()> {
+    fn error_if_not_in_state(&self, state: HoprState, error: String) -> errors::Result<()> {
         if self.status() == state {
             Ok(())
         } else {
@@ -417,45 +298,39 @@ impl Hopr {
         }
     }
 
-    pub fn status(&self) -> state::HoprState {
+    pub fn status(&self) -> HoprState {
         self.state.load(Ordering::Relaxed)
     }
 
-    pub fn network(&self) -> String {
-        self.cfg.chain.network.clone()
-    }
-
     pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        Ok(self.hopr_chain_api.node_balance().await?)
+        self.chain_api
+            .get_balance(self.me_onchain())
+            .await
+            .map_err(HoprLibError::chain)
     }
 
     pub async fn get_safe_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        Ok(self.hopr_chain_api.safe_balance().await?)
+        self.chain_api
+            .get_balance(self.cfg.safe_module.safe_address)
+            .await
+            .map_err(HoprLibError::chain)
+    }
+
+    pub async fn chain_info(&self) -> errors::Result<ChainInfo> {
+        self.chain_api.chain_info().await.map_err(HoprLibError::chain)
     }
 
     pub fn get_safe_config(&self) -> SafeModule {
         self.cfg.safe_module.clone()
     }
 
-    pub fn chain_config(&self) -> ChainNetworkConfig {
-        self.chain_cfg.clone()
-    }
-
     pub fn config(&self) -> &config::HoprLibConfig {
         &self.cfg
     }
 
-    pub fn get_provider(&self) -> String {
-        self.cfg
-            .chain
-            .provider
-            .clone()
-            .unwrap_or(self.chain_cfg.chain.default_provider.clone())
-    }
-
     #[inline]
     fn is_public(&self) -> bool {
-        self.cfg.chain.announce
+        self.cfg.publish
     }
 
     pub async fn run<
@@ -465,19 +340,13 @@ impl Hopr {
         &self,
         cover_traffic: Option<Ct>,
         #[cfg(feature = "session-server")] serve_handler: T,
-    ) -> errors::Result<(
-        hopr_transport::socket::HoprSocket<
-            futures::channel::mpsc::Receiver<ApplicationDataIn>,
-            futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
-        >,
-        HashMap<state::HoprLibProcesses, AbortHandle>,
-    )>
+    ) -> errors::Result<HoprTransportIO>
     where
         Ct: TrafficGeneration + Send + Sync + 'static,
     {
         self.error_if_not_in_state(
-            state::HoprState::Uninitialized,
-            "Cannot start the hopr node multiple times".into(),
+            HoprState::Uninitialized,
+            "cannot start the hopr node multiple times".into(),
         )?;
 
         #[cfg(feature = "testing")]
@@ -485,68 +354,82 @@ impl Hopr {
 
         info!(
             address = %self.me_onchain(), minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
-            "Node is not started, please fund this node",
+            "node is not started, please fund this node",
         );
 
-        wait_for_funds(
+        helpers::wait_for_funds(
             *MIN_NATIVE_BALANCE,
             *SUGGESTED_NATIVE_BALANCE,
             Duration::from_secs(200),
-            &self.hopr_chain_api,
+            self.me_onchain(),
+            &self.chain_api,
         )
         .await?;
 
-        let mut processes: HashMap<state::HoprLibProcesses, AbortHandle> = HashMap::new();
+        let mut processes = AbortableList::<HoprLibProcess>::default();
 
-        info!("Starting the node...");
-
-        self.state.store(state::HoprState::Initializing, Ordering::Relaxed);
+        info!("starting HOPR node...");
+        self.state.store(HoprState::Initializing, Ordering::Relaxed);
 
         let balance: XDaiBalance = self.get_balance().await?;
         let minimum_balance = *constants::MIN_NATIVE_BALANCE;
 
         info!(
-            address = %self.hopr_chain_api.me_onchain(),
+            address = %self.me_onchain(),
             %balance,
             %minimum_balance,
-            "Node information"
+            "node information"
         );
 
         if balance.le(&minimum_balance) {
             return Err(HoprLibError::GeneralError(
-                "Cannot start the node without a sufficiently funded wallet".to_string(),
+                "cannot start the node without a sufficiently funded wallet".into(),
             ));
         }
 
-        #[cfg(not(feature = "testing"))]
-        {
-            // Once we are able to query the chain,
-            // check if the winning probability is configured correctly.
-            let network_min_win_prob = self.hopr_chain_api.minimum_incoming_ticket_win_prob().await?;
-            let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
-
-            if configured_win_prob
+        // Once we are able to query the chain,
+        // check if the ticket price is configured correctly.
+        let network_min_ticket_price = self
+            .chain_api
+            .minimum_ticket_price()
+            .await
+            .map_err(HoprLibError::chain)?;
+        let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
+        if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
+            return Err(HoprLibError::GeneralError(format!(
+                "configured outgoing ticket price is lower than the network minimum ticket price: \
+                 {configured_ticket_price:?} < {network_min_ticket_price}"
+            )));
+        }
+        // Once we are able to query the chain,
+        // check if the winning probability is configured correctly.
+        let network_min_win_prob = self
+            .chain_api
+            .minimum_incoming_ticket_win_prob()
+            .await
+            .map_err(HoprLibError::chain)?;
+        let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
+        if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
+            && configured_win_prob
                 .and_then(|c| WinningProbability::try_from(c).ok())
                 .is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
-            {
-                return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
-                    "configured outgoing ticket winning probability is lower than the network minimum winning \
-                     probability: {configured_win_prob:?} < {network_min_win_prob}"
-                ))));
-            }
+        {
+            return Err(HoprLibError::GeneralError(format!(
+                "configured outgoing ticket winning probability is lower than the network minimum winning \
+                 probability: {configured_win_prob:?} < {network_min_win_prob}"
+            )));
         }
-
-        self.state.store(state::HoprState::Indexing, Ordering::Relaxed);
 
         // Calculate the minimum capacity based on accounts (each account can generate 2 messages),
         // plus 100 as an additional buffer
         let minimum_capacity = self
-            .hopr_chain_api
+            .chain_api
             .count_accounts(AccountSelector {
                 public_only: true,
                 ..Default::default()
             })
-            .await?
+            .await
+            .map_err(HoprLibError::chain)?
             .saturating_mul(2)
             .saturating_add(100);
 
@@ -560,199 +443,90 @@ impl Hopr {
         debug!(
             capacity = chain_discovery_events_capacity,
             minimum_required = minimum_capacity,
-            "Creating chain discovery events channel"
+            "creating chain discovery events channel"
         );
         let (indexer_peer_update_tx, indexer_peer_update_rx) =
-            futures::channel::mpsc::channel::<PeerDiscovery>(chain_discovery_events_capacity);
+            channel::<PeerDiscovery>(chain_discovery_events_capacity);
 
-        let indexer_event_pipeline = helpers::chain_events_to_transport_events(
-            self.hopr_chain_api.subscribe()?,
-            self.me_onchain(),
-            self.multistrategy.clone(),
-            self.channel_graph.clone(),
-            self.node_db.clone(),
+        // Stream all the existing announcements and also subscribe to all future on-chain
+        // announcements
+        let (announcements_stream, announcements_handle) = futures::stream::abortable(
+            self.chain_api
+                .subscribe_with_state_sync([StateSyncOptions::PublicAccounts])
+                .map_err(HoprLibError::chain)?,
         );
+        processes.insert(HoprLibProcess::AccountAnnouncements, announcements_handle);
 
-        spawn(async move {
-            let result = indexer_event_pipeline
+        spawn(
+            announcements_stream
+                .filter_map(|event| {
+                    futures::future::ready(event.try_as_announcement().map(|account| {
+                        PeerDiscovery::Announce(account.public_key.into(), account.get_multiaddrs().to_vec())
+                    }))
+                })
                 .map(Ok)
                 .forward(indexer_peer_update_tx)
-                .inspect(|result| {
-                    tracing::warn!(
-                        ?result,
-                        task = "indexer -> transport",
-                        "long-running background task finished"
-                    )
-                })
-                .await;
-
-            result.expect("The index to transport event chain failed")
-        });
-
-        info!("Start the chain process and sync the indexer");
-        for (id, proc) in self.hopr_chain_api.start().await?.into_iter() {
-            let nid = match id {
-                HoprChainProcess::Indexer => state::HoprLibProcesses::Indexing,
-                HoprChainProcess::OutgoingOnchainActionQueue => state::HoprLibProcesses::OutgoingOnchainActionQueue,
-            };
-            processes.insert(nid, proc);
-        }
+                .inspect(
+                    |_| warn!(task = %HoprLibProcess::AccountAnnouncements,"long-running background task finished"),
+                ),
+        );
 
         info!(peer_id = %self.me_peer_id(), address = %self.me_onchain(), version = constants::APP_VERSION, "Node information");
 
-        // Check Safe-module status:
-        // 1) if the node is already included into the module
-        // 2) if the module is enabled in the safe
-        // 3) if the safe is the owner of the module
-        // if any of the conditions is not met, return error
-        if !self.hopr_chain_api.check_node_safe_module_status().await? {
-            return Err(HoprLibError::ChainApi(HoprChainError::Api(
-                "Safe and module are not configured correctly".into(),
-            )));
+        let safe_addr = self.cfg.safe_module.safe_address;
+
+        if self.me_onchain() == safe_addr {
+            return Err(HoprLibError::GeneralError("cannot self as staking safe address".into()));
         }
 
-        // Possibly register a node-safe pair to NodeSafeRegistry.
-        // Following that, the connector is set to use safe tx variants.
-
-        if self
-            .hopr_chain_api
-            .can_register_with_safe(&self.cfg.safe_module.safe_address)
-            .await?
-        {
-            info!("Registering safe by node");
-
-            if self.me_onchain() == self.cfg.safe_module.safe_address {
-                return Err(HoprLibError::GeneralError("cannot self as staking safe address".into()));
+        info!(%safe_addr, "registering safe with this node");
+        match self.chain_api.register_safe(&safe_addr).await {
+            Ok(awaiter) => {
+                // Wait until the registration is confirmed on-chain, otherwise we cannot proceed.
+                awaiter.await.map_err(HoprLibError::chain)?;
+                info!(%safe_addr, "safe successfully registered with this node");
             }
-
-            if let Err(error) = self
-                .hopr_chain_api
-                .register_safe(&self.cfg.safe_module.safe_address)
-                .await?
-                .await
-            {
-                // Intentionally ignoring the errored state
-                error!(%error, "Failed to register node with safe")
+            Err(SafeRegistrationError::AlreadyRegistered(registered_safe)) if registered_safe == safe_addr => {
+                info!(%safe_addr, "this safe is already registered with this node");
+            }
+            Err(error) => {
+                error!(%safe_addr, %error, "safe registration failed");
+                return Err(HoprLibError::chain(error));
             }
         }
 
-        if self.is_public() {
-            // At this point the node is already registered with Safe, so
-            // we can announce via Safe-compliant TX
+        // Only public nodes announce multiaddresses
+        let multiaddresses_to_announce = if self.is_public() {
+            // The multiaddresses are filtered for the non-private ones,
+            // unless `announce_local_addresses` is set to `true`.
+            self.transport_api.announceable_multiaddresses()
+        } else {
+            Vec::with_capacity(0)
+        };
 
-            let multiaddresses_to_announce = self.transport_api.announceable_multiaddresses();
+        // Warn when announcing a private multiaddress, which is acceptable in certain scenarios
+        multiaddresses_to_announce
+            .iter()
+            .filter(|a| !is_public_address(a))
+            .for_each(|multi_addr| tracing::warn!(?multi_addr, "announcing private multiaddress"));
 
-            // The announcement is intentionally not awaited until confirmation
-            match self
-                .hopr_chain_api
-                .announce(&multiaddresses_to_announce, &self.me)
-                .await
-            {
-                Ok(_) => info!(?multiaddresses_to_announce, "Announcing node on chain",),
-                Err(AnnouncementError::AlreadyAnnounced) => {
-                    info!(multiaddresses_announced = ?multiaddresses_to_announce, "Node already announced on chain")
-                }
-                // If the announcement fails, we keep going to prevent the node from retrying
-                // after restart.
-                // Functionality is limited, and users must check the logs for errors.
-                Err(error) => error!(%error, "Failed to transmit node announcement"),
+        // At this point the node is already registered with Safe, so
+        // we can announce via Safe-compliant TX
+        info!(?multiaddresses_to_announce, "announcing node on chain");
+        match self.chain_api.announce(&multiaddresses_to_announce, &self.me).await {
+            Ok(awaiter) => {
+                // Wait until the announcement is confirmed on-chain, otherwise we cannot proceed.
+                awaiter.await.map_err(HoprLibError::chain)?;
+                info!(?multiaddresses_to_announce, "node has been successfully announced");
+            }
+            Err(AnnouncementError::AlreadyAnnounced) => {
+                info!(multiaddresses_announced = ?multiaddresses_to_announce, "node already announced on chain")
+            }
+            Err(error) => {
+                error!(%error, ?multiaddresses_to_announce, "failed to transmit node announcement");
+                return Err(HoprLibError::chain(error));
             }
         }
-
-        {
-            // Sync key ids from indexed Accounts
-
-            // Sync the Channel graph
-            let channel_graph = self.channel_graph.clone();
-            let mut cg = channel_graph.write_arc().await;
-
-            info!("Syncing channels from the previous runs");
-            let mut channel_stream = self
-                .hopr_chain_api
-                .stream_channels(
-                    ChannelSelector::default()
-                        .with_allowed_states(&[
-                            ChannelStatusDiscriminants::Open,
-                            ChannelStatusDiscriminants::PendingToClose,
-                        ])
-                        .with_closure_time_range(Utc::now()..),
-                )
-                .await?;
-            while let Some(channel) = channel_stream.next().await {
-                cg.update_channel(channel);
-            }
-
-            // Initialize node latencies and scores in the channel graph:
-            // Sync only those nodes that we know that had a good quality
-            // Other nodes will be repopulated into the channel graph during heartbeat
-            // rounds.
-            info!("Syncing peer qualities from the previous runs");
-            let min_quality_to_sync: f64 = std::env::var("HOPR_MIN_PEER_QUALITY_TO_SYNC")
-                .map_err(|e| e.to_string())
-                .and_then(|v| std::str::FromStr::from_str(&v).map_err(|_| "parse error".to_string()))
-                .unwrap_or_else(|error| {
-                    warn!(error, "invalid value for HOPR_MIN_PEER_QUALITY_TO_SYNC env variable");
-                    constants::DEFAULT_MIN_QUALITY_TO_SYNC
-                });
-
-            let mut peer_stream = self
-                .node_db
-                .get_network_peers(Default::default(), false)
-                .await?
-                .filter(|status| futures::future::ready(status.quality >= min_quality_to_sync));
-
-            while let Some(peer) = peer_stream.next().await {
-                if let Some(key) = self.hopr_chain_api.packet_key_to_chain_key(&peer.id.0).await? {
-                    // For nodes that had a good quality, we assign a perfect score
-                    cg.update_node_score(&key, NodeScoreUpdate::Initialize(peer.last_seen_latency, 1.0));
-                } else {
-                    error!(peer = %peer.id.1, "Could not translate peer information");
-                }
-            }
-
-            info!(
-                channels = cg.count_channels(),
-                nodes = cg.count_nodes(),
-                "Channel graph sync complete"
-            );
-        }
-
-        // notifier on acknowledged ticket reception
-        let multi_strategy_ack_ticket = self.multistrategy.clone();
-
-        let ack_ticket_channel_capacity = std::env::var("HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY")
-            .ok()
-            .and_then(|s| s.trim().parse::<usize>().ok())
-            .filter(|&c| c > 0)
-            .unwrap_or(2048);
-
-        debug!(
-            capacity = ack_ticket_channel_capacity,
-            "Creating acknowledged ticket channel"
-        );
-        let (on_ack_tkt_tx, mut on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
-        self.node_db.start_ticket_processing(Some(on_ack_tkt_tx))?;
-
-        processes.insert(
-            state::HoprLibProcesses::OnReceivedAcknowledgement,
-            hopr_async_runtime::spawn_as_abortable!(async move {
-                while let Some(ack) = on_ack_tkt_rx.next().await {
-                    if let Err(error) = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
-                        &*multi_strategy_ack_ticket,
-                        &ack,
-                    )
-                    .await
-                    {
-                        error!(%error, "Failed to process acknowledged winning ticket with the strategy");
-                    }
-                }
-
-                tracing::warn!(
-                    task = %state::HoprLibProcesses::OnReceivedAcknowledgement,
-                    "long-running background task finished"
-                )
-            }),
-        );
 
         let incoming_session_channel_capacity = std::env::var("HOPR_INTERNAL_SESSION_INCOMING_CAPACITY")
             .ok()
@@ -760,16 +534,12 @@ impl Hopr {
             .filter(|&c| c > 0)
             .unwrap_or(256);
 
-        debug!(
-            capacity = incoming_session_channel_capacity,
-            "Creating incoming session channel"
-        );
         let (session_tx, _session_rx) = channel::<IncomingSession>(incoming_session_channel_capacity);
-
         #[cfg(feature = "session-server")]
         {
+            debug!(capacity = incoming_session_channel_capacity, "creating session server");
             processes.insert(
-                state::HoprLibProcesses::SessionServer,
+                HoprLibProcess::SessionServer,
                 hopr_async_runtime::spawn_as_abortable!(
                     _session_rx
                         .for_each_concurrent(None, move |session| {
@@ -777,59 +547,110 @@ impl Hopr {
                             async move {
                                 let session_id = *session.session.id();
                                 match serve_handler.process(session).await {
-                                    Ok(_) => debug!(
-                                        session_id = ?session_id,
-                                        "Client session processed successfully"
-                                    ),
-                                    Err(e) => error!(
-                                        session_id = ?session_id,
-                                        error = %e,
-                                        "Client session processing failed"
+                                    Ok(_) => debug!(?session_id, "client session processed successfully"),
+                                    Err(error) => error!(
+                                        ?session_id,
+                                        %error,
+                                        "client session processing failed"
                                     ),
                                 }
                             }
                         })
                         .inspect(|_| tracing::warn!(
-                            task = %state::HoprLibProcesses::SessionServer,
+                            task = %HoprLibProcess::SessionServer,
                             "long-running background task finished"
                         ))
                 ),
             );
         }
 
-        info!("Starting transport");
+        info!("starting transport");
 
         let (hopr_socket, transport_processes) = self
             .transport_api
             .run(cover_traffic, indexer_peer_update_rx, session_tx)
             .await?;
+        processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
 
-        for (id, proc) in transport_processes.into_iter() {
-            processes.insert(id.into(), proc);
-        }
-
-        let db_clone = self.node_db.clone();
-        processes.insert(
-            state::HoprLibProcesses::TicketIndexFlush,
-            hopr_async_runtime::spawn_as_abortable!(
-                Box::pin(execute_on_tick(
-                    Duration::from_secs(5),
-                    move || {
-                        let db_clone = db_clone.clone();
-                        async move {
-                            match db_clone.persist_outgoing_ticket_indices().await {
-                                Ok(n) => debug!(count = n, "Successfully flushed states of outgoing ticket indices"),
-                                Err(e) => error!(error = %e, "Failed to flush ticket indices"),
-                            }
+        info!("starting outgoing ticket flush process");
+        let (index_flush_stream, index_flush_handle) =
+            futures::stream::abortable(futures_time::stream::interval(Duration::from_secs(5).into()));
+        processes.insert(HoprLibProcess::TicketIndexFlush, index_flush_handle);
+        let node_db = self.node_db.clone();
+        spawn(
+            index_flush_stream
+                .for_each(move |_| {
+                    let node_db = node_db.clone();
+                    async move {
+                        match node_db.persist_outgoing_ticket_indices().await {
+                            Ok(count) => trace!(count, "successfully flushed states of outgoing ticket indices"),
+                            Err(error) => error!(%error, "Failed to flush ticket indices"),
                         }
-                    },
-                    "flush the states of outgoing ticket indices".into(),
-                ))
-                .inspect(|_| tracing::warn!(
-                    task = %state::HoprLibProcesses::TicketIndexFlush,
-                    "long-running background task finished"
-                ))
-            ),
+                    }
+                })
+                .inspect(|_| {
+                    tracing::warn!(
+                        task = %HoprLibProcess::TicketIndexFlush,
+                        "long-running background task finished"
+                    )
+                }),
+        );
+
+        // Start a queue that takes care of redeeming tickets via given TicketSelectors
+        let (redemption_req_tx, redemption_req_rx) = channel::<TicketSelector>(1024);
+        let _ = self.redeem_requests.set(redemption_req_tx);
+        let (redemption_req_rx, redemption_req_handle) = futures::stream::abortable(redemption_req_rx);
+        processes.insert(HoprLibProcess::TicketRedemptions, redemption_req_handle);
+        let chain = self.chain_api.clone();
+        let node_db = self.node_db.clone();
+        spawn(redemption_req_rx
+            .for_each(move |selector| {
+                let chain = chain.clone();
+                let db = node_db.clone();
+                async move {
+                    match chain.redeem_tickets_via_selector(&db, selector).await {
+                        Ok(res) => debug!(%res, "redemption complete"),
+                        Err(error) => error!(%error, "redemption failed"),
+                    }
+                }
+            })
+            .inspect(|_| tracing::warn!(task = %HoprLibProcess::TicketRedemptions, "long-running background task finished"))
+        );
+
+        let (chain_events_sub_handle, chain_events_sub_reg) = hopr_async_runtime::AbortHandle::new_pair();
+        processes.insert(HoprLibProcess::ChannelEvents, chain_events_sub_handle);
+        let chain = self.chain_api.clone();
+        let node_db = self.node_db.clone();
+        let events = chain.subscribe().map_err(HoprLibError::chain)?;
+        spawn(
+            futures::stream::Abortable::new(
+                events
+                    .filter_map(move |event|
+                        futures::future::ready(
+                            event
+                                .try_as_channel_closed()
+                                .filter(|channel| channel.direction(chain.me()) == Some(ChannelDirection::Incoming))
+                        )
+                    ),
+                chain_events_sub_reg
+            )
+            .for_each(move |closed_channel| {
+                let node_db = node_db.clone();
+                async move {
+                    match node_db.mark_tickets_as(closed_channel.into(), TicketMarker::Neglected).await {
+                        Ok(num_neglected) if num_neglected > 0 => {
+                            warn!(%num_neglected, %closed_channel, "tickets on incoming closed channel were neglected");
+                        },
+                        Ok(_) => {
+                            debug!(%closed_channel, "no neglected tickets on incoming closed channel");
+                        },
+                        Err(error) => {
+                            error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
+                        }
+                    }
+                }
+            })
+            .inspect(|_| tracing::warn!(task = %HoprLibProcess::ChannelEvents, "long-running background task finished"))
         );
 
         // NOTE: after the chain is synced, we can reset tickets which are considered
@@ -837,11 +658,12 @@ impl Hopr {
         // right when the transaction was sent on-chain. In such cases, we simply let it retry and
         // handle errors appropriately.
         let mut channels = self
-            .hopr_chain_api
+            .chain_api
             .stream_channels(ChannelSelector {
                 destination: self.me_onchain().into(),
                 ..Default::default()
             })
+            .map_err(HoprLibError::chain)
             .await?;
 
         while let Some(channel) = channels.next().await {
@@ -852,6 +674,7 @@ impl Hopr {
                         .with_index_range(channel.ticket_index.as_u64()..),
                     AcknowledgedTicketStatus::Untouched,
                 )
+                .map_err(HoprLibError::db)
                 .await?
                 .for_each(|ticket| {
                     info!(%ticket, "fixed next out-of-sync ticket");
@@ -860,34 +683,7 @@ impl Hopr {
                 .await;
         }
 
-        // NOTE: strategy ticks must start after the chain is synced, otherwise
-        // the strategy would react to historical data and drain through the native
-        // balance on chain operations not relevant for the present network state
-        let multi_strategy = self.multistrategy.clone();
-        let strategy_interval = self.cfg.strategy.execution_interval;
-        processes.insert(
-            state::HoprLibProcesses::StrategyTick,
-            hopr_async_runtime::spawn_as_abortable!(
-                execute_on_tick(
-                    Duration::from_secs(strategy_interval),
-                    move || {
-                        let multi_strategy = multi_strategy.clone();
-
-                        async move {
-                            trace!(state = "started", "strategy tick");
-                            let _ = multi_strategy.on_tick().await;
-                            trace!(state = "finished", "strategy tick");
-                        }
-                    },
-                    "run strategies".into(),
-                )
-                .inspect(
-                    |_| tracing::warn!(task = %state::HoprLibProcesses::StrategyTick, "long-running background task finished")
-                )
-            ),
-        );
-
-        self.state.store(state::HoprState::Running, Ordering::Relaxed);
+        self.state.store(HoprState::Running, Ordering::Relaxed);
 
         info!(
             id = %self.me_peer_id(),
@@ -906,7 +702,25 @@ impl Hopr {
             1.0,
         );
 
-        Ok((hopr_socket, processes))
+        let _ = self.processes.set(processes);
+        Ok(hopr_socket)
+    }
+
+    /// Used to practically shut down all node's processes without dropping the instance.
+    ///
+    /// This means that the instance can be used to retrieve some information, but all
+    /// active operations will stop and new will be impossible to perform.
+    /// Such operations will return [`HoprStatusError::NotThereYet`].
+    ///
+    /// This is the final state and cannot be reversed by calling [`HoprLib::run`] again.
+    pub fn shutdown(&self) -> Result<(), HoprLibError> {
+        self.error_if_not_in_state(HoprState::Running, "node is not running".into())?;
+        if let Some(processes) = self.processes.get() {
+            processes.abort_all();
+        }
+        self.state.store(HoprState::Terminated, Ordering::Relaxed);
+        info!("NODE SHUTDOWN COMPLETE");
+        Ok(())
     }
 
     // p2p transport =========
@@ -918,17 +732,18 @@ impl Hopr {
     /// Get the list of all announced public nodes in the network
     pub async fn get_public_nodes(&self) -> errors::Result<Vec<(PeerId, Address, Vec<Multiaddr>)>> {
         Ok(self
-            .hopr_chain_api
+            .chain_api
             .stream_accounts(AccountSelector {
                 public_only: true,
                 ..Default::default()
             })
+            .map_err(HoprLibError::chain)
             .await?
-            .filter_map(|entry| {
-                futures::future::ready(
-                    entry
-                        .get_multiaddr()
-                        .map(|maddr| (PeerId::from(entry.public_key), entry.chain_addr, vec![maddr])),
+            .map(|entry| {
+                (
+                    PeerId::from(entry.public_key),
+                    entry.chain_addr,
+                    entry.get_multiaddrs().to_vec(),
                 )
             })
             .collect()
@@ -939,10 +754,7 @@ impl Hopr {
     ///
     /// Returns the RTT (round trip time), i.e. how long it took for the ping to return.
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self.transport_api.ping(peer).await?)
     }
@@ -956,10 +768,7 @@ impl Hopr {
         target: SessionTarget,
         cfg: SessionClientConfig,
     ) -> errors::Result<HoprSession> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let backoff = backon::ConstantBuilder::default()
             .with_max_times(self.cfg.session.establish_max_retries as usize)
@@ -981,36 +790,24 @@ impl Hopr {
     /// Sends keep-alive to the given [`HoprSessionId`], making sure the session is not
     /// closed due to inactivity.
     #[cfg(feature = "session-client")]
-    pub async fn keep_alive_session(&self, id: &HoprSessionId) -> errors::Result<()> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+    pub async fn keep_alive_session(&self, id: &SessionId) -> errors::Result<()> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.probe_session(id).await?)
     }
 
     #[cfg(feature = "session-client")]
-    pub async fn get_session_surb_balancer_config(
-        &self,
-        id: &HoprSessionId,
-    ) -> errors::Result<Option<SurbBalancerConfig>> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+    pub async fn get_session_surb_balancer_config(&self, id: &SessionId) -> errors::Result<Option<SurbBalancerConfig>> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.session_surb_balancing_cfg(id).await?)
     }
 
     #[cfg(feature = "session-client")]
     pub async fn update_session_surb_balancer_config(
         &self,
-        id: &HoprSessionId,
+        id: &SessionId,
         cfg: SurbBalancerConfig,
     ) -> errors::Result<()> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
         Ok(self.transport_api.update_session_surb_balancing_cfg(id, cfg).await?)
     }
 
@@ -1030,27 +827,27 @@ impl Hopr {
     }
 
     /// List all multiaddresses announced on-chain for the given node.
-    pub async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> Vec<Multiaddr> {
+    pub async fn multiaddresses_announced_on_chain(&self, peer: &PeerId) -> errors::Result<Vec<Multiaddr>> {
         let peer = *peer;
         // PeerId -> OffchainPublicKey is a CPU-intensive blocking operation
-        let pubkey =
-            match hopr_parallelize::cpu::spawn_blocking(move || prelude::OffchainPublicKey::from_peerid(&peer)).await {
-                Ok(k) => k,
-                Err(e) => {
-                    error!(%peer, error = %e, "failed to convert peer id to off-chain key");
-                    return vec![];
-                }
-            };
+        let pubkey = hopr_parallelize::cpu::spawn_blocking(move || OffchainPublicKey::from_peerid(&peer)).await?;
 
-        match self.hopr_chain_api.find_account_by_packet_key(&pubkey).await {
-            Ok(Some(entry)) => Vec::from_iter(entry.get_multiaddr()),
-            Ok(None) => {
+        match self
+            .chain_api
+            .stream_accounts(AccountSelector {
+                public_only: false,
+                offchain_key: Some(pubkey),
+                ..Default::default()
+            })
+            .map_err(HoprLibError::chain)
+            .await?
+            .next()
+            .await
+        {
+            Some(entry) => Ok(entry.get_multiaddrs().to_vec()),
+            None => {
                 error!(%peer, "no information");
-                vec![]
-            }
-            Err(e) => {
-                error!(%peer, error = %e, "failed to retrieve information");
-                vec![]
+                Ok(vec![])
             }
         }
     }
@@ -1117,37 +914,39 @@ impl Hopr {
 
     /// Reset the ticket metrics to zero
     pub async fn reset_ticket_statistics(&self) -> errors::Result<()> {
-        Ok(self.node_db.reset_ticket_statistics().await?)
-    }
-
-    // DB ============
-    pub fn peer_resolver(&self) -> &impl ChainKeyOperations {
-        &self.hopr_chain_api
+        self.node_db
+            .reset_ticket_statistics()
+            .await
+            .map_err(HoprLibError::chain)
     }
 
     // Chain =========
     pub fn me_onchain(&self) -> Address {
-        self.hopr_chain_api.me_onchain()
+        *self.chain_api.me()
     }
 
     /// Get ticket price
     pub async fn get_ticket_price(&self) -> errors::Result<HoprBalance> {
-        Ok(self.hopr_chain_api.minimum_ticket_price().await?)
+        self.chain_api.minimum_ticket_price().await.map_err(HoprLibError::chain)
     }
 
     /// Get minimum incoming ticket winning probability
     pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<WinningProbability> {
-        Ok(self.hopr_chain_api.minimum_incoming_ticket_win_prob().await?)
+        self.chain_api
+            .minimum_incoming_ticket_win_prob()
+            .await
+            .map_err(HoprLibError::chain)
     }
 
     /// List of all accounts announced on the chain
     pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
         Ok(self
-            .hopr_chain_api
+            .chain_api
             .stream_accounts(AccountSelector {
                 public_only: true,
                 ..Default::default()
             })
+            .map_err(HoprLibError::chain)
             .await?
             .collect()
             .await)
@@ -1156,7 +955,10 @@ impl Hopr {
     /// Get the channel entry from Hash.
     /// @returns the channel entry of those two nodes
     pub async fn channel_from_hash(&self, channel_id: &Hash) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.hopr_chain_api.channel_by_id(channel_id).await?)
+        self.chain_api
+            .channel_by_id(channel_id)
+            .await
+            .map_err(HoprLibError::chain)
     }
 
     /// Get the channel entry between source and destination node.
@@ -1164,18 +966,22 @@ impl Hopr {
     /// @param dest Address
     /// @returns the channel entry of those two nodes
     pub async fn channel(&self, src: &Address, dest: &Address) -> errors::Result<Option<ChannelEntry>> {
-        Ok(self.hopr_chain_api.channel_by_parties(src, dest).await?)
+        self.chain_api
+            .channel_by_parties(src, dest)
+            .await
+            .map_err(HoprLibError::chain)
     }
 
     /// List all channels open from a specified Address
     pub async fn channels_from(&self, src: &Address) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
-            .hopr_chain_api
+            .chain_api
             .stream_channels(ChannelSelector::default().with_source(*src).with_allowed_states(&[
                 ChannelStatusDiscriminants::Closed,
                 ChannelStatusDiscriminants::Open,
                 ChannelStatusDiscriminants::PendingToClose,
             ]))
+            .map_err(HoprLibError::chain)
             .await?
             .collect()
             .await)
@@ -1184,7 +990,7 @@ impl Hopr {
     /// List all channels open to a specified address
     pub async fn channels_to(&self, dest: &Address) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
-            .hopr_chain_api
+            .chain_api
             .stream_channels(
                 ChannelSelector::default()
                     .with_destination(*dest)
@@ -1194,6 +1000,7 @@ impl Hopr {
                         ChannelStatusDiscriminants::PendingToClose,
                     ]),
             )
+            .map_err(HoprLibError::chain)
             .await?
             .collect()
             .await)
@@ -1202,135 +1009,133 @@ impl Hopr {
     /// List all channels
     pub async fn all_channels(&self) -> errors::Result<Vec<ChannelEntry>> {
         Ok(self
-            .hopr_chain_api
+            .chain_api
             .stream_channels(ChannelSelector::default().with_allowed_states(&[
                 ChannelStatusDiscriminants::Closed,
                 ChannelStatusDiscriminants::Open,
                 ChannelStatusDiscriminants::PendingToClose,
             ]))
+            .map_err(HoprLibError::chain)
             .await?
             .collect()
             .await)
     }
 
-    /// List all corrupted channels
-    pub async fn corrupted_channels(&self) -> errors::Result<Vec<CorruptedChannelEntry>> {
-        Ok(self.hopr_chain_api.corrupted_channels().await?)
-    }
-
     /// Current safe allowance balance
     pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
-        Ok(self.hopr_chain_api.safe_allowance().await?)
+        self.chain_api
+            .safe_allowance(self.cfg.safe_module.safe_address)
+            .await
+            .map_err(HoprLibError::chain)
     }
 
     /// Withdraw on-chain assets to a given address
     /// @param recipient the account where the assets should be transferred to
     /// @param amount how many tokens to be transferred
     pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> errors::Result<prelude::Hash> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let awaiter = self.hopr_chain_api.withdraw(amount, &recipient).await?;
-
-        Ok(awaiter.await?)
+        self.chain_api
+            .withdraw(amount, &recipient)
+            .and_then(identity)
+            .map_err(HoprLibError::chain)
+            .await
     }
 
     /// Withdraw on-chain native assets to a given address
     /// @param recipient the account where the assets should be transferred to
     /// @param amount how many tokens to be transferred
     pub async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> errors::Result<prelude::Hash> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let awaiter = self.hopr_chain_api.withdraw(amount, &recipient).await?;
-
-        Ok(awaiter.await?)
+        self.chain_api
+            .withdraw(amount, &recipient)
+            .and_then(identity)
+            .map_err(HoprLibError::chain)
+            .await
     }
 
     pub async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> errors::Result<OpenChannelResult> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let (channel_id, tx_hash) = self.hopr_chain_api.open_channel(destination, amount).await?.await?;
+        let (channel_id, tx_hash) = self
+            .chain_api
+            .open_channel(destination, amount)
+            .and_then(identity)
+            .map_err(HoprLibError::chain)
+            .await?;
 
         Ok(OpenChannelResult { tx_hash, channel_id })
     }
 
     pub async fn fund_channel(&self, channel_id: &prelude::Hash, amount: HoprBalance) -> errors::Result<prelude::Hash> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let awaiter = self.hopr_chain_api.fund_channel(channel_id, amount).await?;
-
-        Ok(awaiter.await?)
+        self.chain_api
+            .fund_channel(channel_id, amount)
+            .and_then(identity)
+            .map_err(HoprLibError::chain)
+            .await
     }
 
     pub async fn close_channel_by_id(&self, channel_id: &ChannelId) -> errors::Result<CloseChannelResult> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        let (status, tx_hash) = self.hopr_chain_api.close_channel(channel_id).await?.await?;
+        let tx_hash = self
+            .chain_api
+            .close_channel(channel_id)
+            .and_then(identity)
+            .map_err(HoprLibError::chain)
+            .await?;
 
-        Ok(CloseChannelResult { tx_hash, status })
+        Ok(CloseChannelResult { tx_hash })
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
-        Ok(self.hopr_chain_api.channel_closure_notice_period().await?)
+        self.chain_api
+            .channel_closure_notice_period()
+            .await
+            .map_err(HoprLibError::chain)
     }
 
-    pub async fn redeem_all_tickets<B: Into<HoprBalance>>(
+    pub fn redemption_requests(
         &self,
-        min_value: B,
-        only_aggregated: bool,
-    ) -> errors::Result<()> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+    ) -> errors::Result<impl futures::Sink<TicketSelector, Error = HoprLibError> + Clone> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        // TODO: add universal timeout sink here
+        Ok(self
+            .redeem_requests
+            .get()
+            .cloned()
+            .expect("redeem_requests is not initialized")
+            .sink_map_err(HoprLibError::other))
+    }
+
+    pub async fn redeem_all_tickets<B: Into<HoprBalance>>(&self, min_value: B) -> errors::Result<()> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let min_value = min_value.into();
-        let chain_api = self.hopr_chain_api.clone();
 
-        // Does not need to be done concurrently, because we do not await each channel's redemption
-        self.hopr_chain_api
+        self.chain_api
             .stream_channels(
                 ChannelSelector::default()
-                    .with_destination(chain_api.me_onchain())
+                    .with_destination(self.me_onchain())
                     .with_allowed_states(&[
                         ChannelStatusDiscriminants::Open,
                         ChannelStatusDiscriminants::PendingToClose,
                     ]),
             )
+            .map_err(HoprLibError::chain)
             .await?
-            .for_each(|channel| {
-                let chain_api = chain_api.clone();
-                async move {
-                    match chain_api
-                        .redeem_tickets_via_selector(
-                            TicketSelector::from(&channel)
-                                .with_amount(min_value..)
-                                .with_aggregated_only(only_aggregated)
-                                .with_index_range(channel.ticket_index.as_u64()..)
-                                .with_state(AcknowledgedTicketStatus::Untouched),
-                        )
-                        .await
-                    {
-                        Ok(awaiters) => info!(count = awaiters.len(), %channel, "redeemed tickets in channel"),
-                        Err(error) => error!(%error, %channel, "failed to redeem tickets"),
-                    }
-                }
+            .map(|channel| {
+                Ok(TicketSelector::from(&channel)
+                    .with_amount(min_value..)
+                    .with_index_range(channel.ticket_index.as_u64()..)
+                    .with_state(AcknowledgedTicketStatus::Untouched))
             })
-            .await;
+            .forward(self.redemption_requests()?)
+            .await?;
 
         Ok(())
     }
@@ -1339,53 +1144,43 @@ impl Hopr {
         &self,
         counterparty: &Address,
         min_value: B,
-        only_aggregated: bool,
-    ) -> errors::Result<usize> {
-        self.redeem_tickets_in_channel(
-            &generate_channel_id(counterparty, &self.me_onchain()),
-            min_value,
-            only_aggregated,
-        )
-        .await
+    ) -> errors::Result<()> {
+        self.redeem_tickets_in_channel(&generate_channel_id(counterparty, &self.me_onchain()), min_value)
+            .await
     }
 
     pub async fn redeem_tickets_in_channel<B: Into<HoprBalance>>(
         &self,
         channel_id: &Hash,
         min_value: B,
-        only_aggregated: bool,
-    ) -> errors::Result<usize> {
+    ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let channel = self
-            .hopr_chain_api
+            .chain_api
             .channel_by_id(channel_id)
-            .await?
+            .await
+            .map_err(HoprLibError::chain)?
             .ok_or(HoprLibError::GeneralError("Channel not found".into()))?;
 
-        let out = self
-            .hopr_chain_api
-            .redeem_tickets_via_selector(
+        self.redemption_requests()?
+            .send(
                 TicketSelector::from(channel)
                     .with_amount(min_value.into()..)
-                    .with_aggregated_only(only_aggregated)
                     .with_index_range(channel.ticket_index.as_u64()..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             )
             .await?;
 
-        Ok(out.len())
+        Ok(())
     }
 
     pub async fn redeem_ticket(&self, ack_ticket: AcknowledgedTicket) -> errors::Result<()> {
-        self.error_if_not_in_state(
-            state::HoprState::Running,
-            "Node is not ready for on-chain operations".into(),
-        )?;
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        // We do not await the on-chain confirmation
-        #[allow(clippy::let_underscore_future)]
-        let _ = self.hopr_chain_api.redeem_ticket(ack_ticket).await?;
+        self.redemption_requests()?
+            .send(TicketSelector::from(&ack_ticket).with_state(AcknowledgedTicketStatus::Untouched))
+            .await?;
 
         Ok(())
     }
@@ -1397,28 +1192,18 @@ impl Hopr {
             .await
             .map_err(|e| HoprLibError::GeneralError(format!("failed to convert peer id to off-chain key: {}", e)))?;
 
-        Ok(self.hopr_chain_api.packet_key_to_chain_key(&pubkey).await?)
+        self.chain_api
+            .packet_key_to_chain_key(&pubkey)
+            .await
+            .map_err(HoprLibError::chain)
     }
 
     pub async fn chain_key_to_peerid(&self, address: &Address) -> errors::Result<Option<PeerId>> {
-        Ok(self
-            .hopr_chain_api
+        self.chain_api
             .chain_key_to_packet_key(address)
             .await
-            .map(|pk| pk.map(|v| v.into()))?)
-    }
-
-    pub async fn export_channel_graph(&self, cfg: GraphExportConfig) -> String {
-        self.channel_graph.read_arc().await.as_dot(cfg)
-    }
-
-    pub async fn export_raw_channel_graph(&self) -> errors::Result<String> {
-        let cg = self.channel_graph.read_arc().await;
-        serde_json::to_string(cg.deref()).map_err(|e| HoprLibError::GeneralError(e.to_string()))
-    }
-
-    pub async fn get_indexer_state(&self) -> errors::Result<hopr_chain_api::IndexerStateInfo> {
-        Ok(self.hopr_chain_api.get_indexer_state().await?)
+            .map(|pk| pk.map(|v| v.into()))
+            .map_err(HoprLibError::chain)
     }
 
     // === telemetry
@@ -1426,10 +1211,9 @@ impl Hopr {
     pub fn collect_hopr_metrics() -> errors::Result<String> {
         cfg_if::cfg_if! {
             if #[cfg(all(feature = "prometheus", not(test)))] {
-                hopr_metrics::gather_all_metrics().map_err(|e| HoprLibError::GeneralError(e.to_string()))
+                hopr_metrics::gather_all_metrics().map_err(|e| HoprLibError::Other(e.into()))
             } else {
-        Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
-
+                Err(HoprLibError::GeneralError("BUILT WITHOUT METRICS SUPPORT".into()))
             }
         }
     }

@@ -1,13 +1,15 @@
 [package]
 name = "hopr-crypto-random"
-version = "0.2.2"
+description = "Commonly used randomness using a cryptographically secure random generator"
+version = "0.3.0"
 edition = "2021"
 license = "GPL-3.0-only"
 
 [features]
 default = []
-fixed_rng = []
+fixed-rng = ["dep:lazy_static"]
 
 [dependencies]
 rand = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 generic-array = { workspace = true }

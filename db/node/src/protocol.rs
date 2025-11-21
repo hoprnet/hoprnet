@@ -10,7 +10,6 @@ use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_parallelize::cpu::spawn_fifo_blocking;
-use hopr_path::{Path, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 
@@ -669,7 +668,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                     Err(NodeDbError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
-                        warn!(?rejected_ticket, %rejected_value, erorr = ?error, "failure to validate during forwarding");
+                        warn!(%rejected_ticket, %rejected_value, %error, "failure to validate during forwarding");
 
                         self.mark_unsaved_ticket_rejected(&rejected_ticket)
                             .await
@@ -766,7 +765,6 @@ impl HoprNodeDb {
             .direction(&self.me_address, &destination)
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
-            .index_offset(1) // unaggregated always have index_offset == 1
             .win_prob(winning_prob)
             .channel_epoch(channel.channel_epoch.as_u32());
 

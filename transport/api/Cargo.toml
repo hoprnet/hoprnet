@@ -15,7 +15,6 @@ p2p-announce-quic = []
 p2p-transport-quic = ["hopr-transport-p2p/transport-quic"]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
@@ -23,7 +22,6 @@ runtime-tokio = [
 ]
 prometheus = [
   "dep:hopr-metrics",
-  "hopr-path/prometheus",
   "hopr-network-types/prometheus",
   "hopr-transport-mixer/prometheus",
   "hopr-transport-network/prometheus",
@@ -37,7 +35,6 @@ capture = ["hopr-transport-protocol/capture"]
 
 [dependencies]
 async-trait = { workspace = true }
-async-lock = { workspace = true }
 cfg-if = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
@@ -54,19 +51,16 @@ validator = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
-hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
-hopr-path = { workspace = true }
 hopr-protocol-app = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-network = { workspace = true }
-hopr-parallelize = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-probe = { workspace = true }
 hopr-transport-protocol = { workspace = true }
@@ -75,7 +69,6 @@ hopr-transport-session = { workspace = true }
 [dev-dependencies]
 temp-env = { workspace = true }
 
-hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-network = { workspace = true }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }

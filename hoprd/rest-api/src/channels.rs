@@ -308,15 +308,15 @@ pub(super) async fn open_channel(
             }),
         )
             .into_response(),
-        Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            hopr_lib::errors::ChainActionsError::BalanceTooLow,
-        ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response(),
-        Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            hopr_lib::errors::ChainActionsError::NotEnoughAllowance,
-        ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response(),
-        Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-            hopr_lib::errors::ChainActionsError::ChannelAlreadyExists,
-        ))) => (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response(),
+        // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
+        // hopr_lib::errors::ChainActionsError::BalanceTooLow,
+        // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response(),
+        // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
+        // hopr_lib::errors::ChainActionsError::NotEnoughAllowance,
+        // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response(),
+        // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
+        // hopr_lib::errors::ChainActionsError::ChannelAlreadyExists,
+        // ))) => (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response(),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
@@ -389,10 +389,10 @@ pub(crate) struct CloseChannelResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118")]
     receipt: Hash,
-    /// New status of the channel. Will be one of `Closed` or `PendingToClose`.
-    #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String, example = "PendingToClose")]
-    channel_status: ChannelStatus,
+    // /// New status of the channel. Will be one of `Closed` or `PendingToClose`.
+    // #[serde_as(as = "DisplayFromStr")]
+    // #[schema(value_type = String, example = "PendingToClose")]
+    // channel_status: ChannelStatus,
 }
 
 /// Closes the given channel.
@@ -432,17 +432,17 @@ pub(super) async fn close_channel(
             Ok(receipt) => (
                 StatusCode::OK,
                 Json(CloseChannelResponse {
-                    channel_status: receipt.status,
+                    // channel_status: receipt.status,
                     receipt: receipt.tx_hash,
                 }),
             )
                 .into_response(),
-            Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-                hopr_lib::errors::ChainActionsError::ChannelDoesNotExist,
-            ))) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-                hopr_lib::errors::ChainActionsError::InvalidArguments(_),
-            ))) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response(),
+            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
+            // hopr_lib::errors::ChainActionsError::ChannelDoesNotExist,
+            // ))) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
+            // hopr_lib::errors::ChainActionsError::InvalidArguments(_),
+            // ))) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response(),
             Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
@@ -516,15 +516,15 @@ pub(super) async fn fund_channel(
     match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.fund_channel(&channel_id, fund_req.amount).await {
             Ok(hash) => (StatusCode::OK, Json(FundChannelResponse { hash })).into_response(),
-            Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-                hopr_lib::errors::ChainActionsError::ChannelDoesNotExist,
-            ))) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-                hopr_lib::errors::ChainActionsError::NotEnoughAllowance,
-            ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response(),
-            Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
-                hopr_lib::errors::ChainActionsError::BalanceTooLow,
-            ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response(),
+            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
+            // hopr_lib::errors::ChainActionsError::ChannelDoesNotExist,
+            // ))) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
+            // hopr_lib::errors::ChainActionsError::NotEnoughAllowance,
+            // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughAllowance).into_response(),
+            // Err(HoprLibError::ChainApi(hopr_lib::errors::HoprChainError::ActionsError(
+            // hopr_lib::errors::ChainActionsError::BalanceTooLow,
+            // ))) => (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response(),
             Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
@@ -532,44 +532,4 @@ pub(super) async fn fund_channel(
         },
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),
     }
-}
-
-#[serde_as]
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-#[schema(example = json!({
-        "channelIds": ["0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f"],
-}))]
-#[serde(rename_all = "camelCase")]
-/// Response body for the list of corrupted channels.
-pub(crate) struct CorruptedChannelsResponse {
-    #[schema(value_type = Vec<String>)]
-    channel_ids: Vec<String>,
-}
-
-#[utoipa::path(
-    get,
-    path = const_format::formatcp!("{BASE_PATH}/channels/corrupted"),
-    description = "List corrupted channels due to incorrect indexing.",
-    responses(
-        (status = 200, description = "Corrupted channels retrieved", body = CorruptedChannelsResponse),
-        (status = 401, description = "Invalid authorization token.", body = ApiError),
-        (status = 422, description = "Unknown failure", body = ApiError)
-    ),
-    security(
-        ("api_token" = []),
-        ("bearer_token" = [])
-    ),
-    tag = "Channels",
-)]
-pub(super) async fn corrupted_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    let hopr = state.hopr.clone();
-
-    let corrupted = match hopr.corrupted_channels().await {
-        Ok(corrupted) => corrupted,
-        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
-    };
-
-    let channel_ids: Vec<String> = corrupted.into_iter().map(|c| c.channel_id().to_string()).collect();
-
-    (StatusCode::OK, Json(CorruptedChannelsResponse { channel_ids })).into_response()
 }

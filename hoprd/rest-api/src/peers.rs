@@ -5,9 +5,10 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
+use futures::FutureExt;
 use hopr_lib::{
-    Address, HoprTransportError, Multiaddr,
-    errors::{HoprLibError, HoprStatusError},
+    Address, Multiaddr,
+    errors::{HoprLibError, HoprStatusError, HoprTransportError},
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
@@ -73,13 +74,16 @@ pub(super) async fn show_peer_info(
     let hopr = state.hopr.clone();
 
     match hopr.chain_key_to_peerid(&destination).await {
-        Ok(Some(peer)) => Ok((
-            StatusCode::OK,
-            Json(NodePeerInfoResponse {
-                announced: hopr.multiaddresses_announced_on_chain(&peer).await,
-                observed: hopr.network_observed_multiaddresses(&peer).await,
-            }),
-        )),
+        Ok(Some(peer)) => {
+            let res = futures::try_join!(
+                hopr.multiaddresses_announced_on_chain(&peer),
+                hopr.network_observed_multiaddresses(&peer).map(Ok)
+            );
+            match res {
+                Ok((announced, observed)) => Ok((StatusCode::OK, Json(NodePeerInfoResponse { announced, observed }))),
+                Err(error) => Err(ApiErrorStatus::UnknownFailure(error.to_string())),
+            }
+        }
         Ok(None) => Err(ApiErrorStatus::PeerNotFound),
         Err(_) => Err(ApiErrorStatus::PeerNotFound),
     }
@@ -135,9 +139,9 @@ pub(super) async fn ping_peer(
                 let resp = Json(PingResponse { latency: latency / 2 });
                 Ok((StatusCode::OK, resp).into_response())
             }
-            Err(HoprLibError::TransportError(HoprTransportError::Protocol(hopr_lib::ProtocolError::Timeout))) => {
-                Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response())
-            }
+            Err(HoprLibError::TransportError(HoprTransportError::Protocol(
+                hopr_lib::errors::ProtocolError::Timeout,
+            ))) => Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response()),
             Err(HoprLibError::TransportError(HoprTransportError::Probe(
                 hopr_lib::ProbeError::ProbeNeighborTimeout(_),
             ))) => Ok((StatusCode::REQUEST_TIMEOUT, ApiErrorStatus::Timeout).into_response()),
