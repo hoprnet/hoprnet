@@ -1,6 +1,6 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
-use hopr_chain_types::prelude::SignableTransaction;
+use hopr_chain_types::prelude::{GasEstimation, SignableTransaction};
 use hopr_crypto_types::prelude::*;
 
 use crate::errors::{self, ConnectorError};
@@ -17,6 +17,8 @@ pub struct TransactionSequencer<C, R> {
     client: std::sync::Arc<C>,
     signer: ChainKeypair,
 }
+
+const TX_QUEUE_CAPACITY: usize = 2048;
 
 impl<C, R> TransactionSequencer<C, R>
 where
@@ -39,7 +41,7 @@ where
             .await?;
         self.nonce.store(tx_count, std::sync::atomic::Ordering::SeqCst);
 
-        let (sender, receiver) = futures::channel::mpsc::channel(1024);
+        let (sender, receiver) = futures::channel::mpsc::channel(TX_QUEUE_CAPACITY);
         self.sender = Some(sender);
 
         tracing::debug!(tx_count, signer = %self.signer.public().to_address(), "starting transaction sequencer");
@@ -55,10 +57,11 @@ where
                     let signer = signer.clone();
                     let nonce = nonce_load.load(std::sync::atomic::Ordering::SeqCst);
                     async move {
-                        tx.sign_and_encode_to_eip2718(nonce, None, &signer)
+                        // We currently use fixed gas estimation.
+                        tx.sign_and_encode_to_eip2718(nonce, GasEstimation::default().into(), &signer)
                             .map_err(errors::ConnectorError::from)
                             .and_then(move |tx| {
-                                tracing::debug!("submitting transaction");
+                                tracing::debug!(nonce, "submitting transaction");
                                 let client = client.clone();
                                 async move {
                                     client
@@ -72,14 +75,17 @@ where
                     }
                 })
                 .for_each(move |(res, notifier)| {
-                    // The nonce is incremented when the transaction succeeded or failed for other reasons than on-chain
+                    // The nonce is incremented when the transaction succeeded or failed due to on-chain
                     // rejection.
                     if res.is_ok()
                         || res
                             .as_ref()
-                            .is_err_and(|error| error.as_transaction_rejection_error().is_none())
+                            .is_err_and(|error| error.as_transaction_rejection_error().is_some())
                     {
-                        nonce_inc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        let prev_nonce = nonce_inc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        tracing::debug!(prev_nonce, ?res, "nonce incremented due to tx success or rejection");
+                    } else {
+                        tracing::debug!(?res, "nonce not incremented due to tx failure other than rejection");
                     }
                     if notifier.send(res).is_err() {
                         tracing::debug!(
@@ -139,6 +145,7 @@ where
 impl<C, R> Drop for TransactionSequencer<C, R> {
     fn drop(&mut self) {
         if let Some(mut sender) = self.sender.take() {
+            // Causes the internally spawned task that drives the queue to terminate
             sender.close_channel();
         }
     }

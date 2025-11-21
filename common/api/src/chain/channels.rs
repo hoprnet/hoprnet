@@ -90,10 +90,15 @@ impl ChannelSelector {
             return false;
         }
 
-        if let ChannelStatus::PendingToClose(time) = &channel.status {
-            let time = DateTime::from(*time);
-            if !self.closure_time_range.contains(&time) {
-                return false;
+        if self
+            .allowed_states
+            .contains(&ChannelStatusDiscriminants::PendingToClose)
+        {
+            if let ChannelStatus::PendingToClose(time) = &channel.status {
+                let time = DateTime::from(*time);
+                if !self.closure_time_range.contains(&time) {
+                    return false;
+                }
             }
         }
 

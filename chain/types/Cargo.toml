@@ -36,7 +36,6 @@ insta = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 
-hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true, features = ["serde"] }
 
 [features]
