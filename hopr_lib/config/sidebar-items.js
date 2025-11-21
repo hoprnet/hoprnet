@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_HOST","DEFAULT_PORT","DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER"],"enum":["HostType"],"fn":["looks_like_domain","validate_external_host"],"struct":["HoprLibConfig","HostConfig","NetworkConfig","ProbeConfig","ProtocolConfig","SafeModule","SessionGlobalConfig","TransportConfig"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["IMulticall3ExtractCalls"],"fn":["new"],"mod":["abi"],"struct":["IMulticall3ExtractInstance","getEthBalanceCall","getEthBalanceReturn"]};

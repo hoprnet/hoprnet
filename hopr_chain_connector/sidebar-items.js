@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["create_trustful_hopr_blokli_connector","create_trustless_hopr_blokli_connector"],"mod":["blokli_client","errors"],"struct":["Address","BlockchainConnectorConfig","ChainKeypair","ContractAddresses","HoprBlockchainConnector","SafePayloadGenerator","TempDbBackend"],"trait":["Backend","PayloadGenerator"],"type":["HoprBlockchainSafeConnector"]};
