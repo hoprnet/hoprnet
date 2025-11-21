@@ -76,7 +76,6 @@ jobs:
         package:
           - hopli
           - hoprd
-          - hopr-pluto
     name: Build ${{ matrix.package }}
     # only run build and tag if the PR is merged, not if its closed
     if: github.event.pull_request.merged == true
