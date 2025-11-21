@@ -3,7 +3,6 @@ use std::{
     time::Duration,
 };
 
-use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::ChannelId;
 use hopr_primitive_types::{balance::HoprBalance, prelude::U256};
 use moka::{Expiry, future::Cache};

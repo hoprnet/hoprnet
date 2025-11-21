@@ -10,14 +10,10 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt, pin_mut};
-use hopr_lib::{
-    AcknowledgedTicket, AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus,
-    ChannelStatusDiscriminants, HoprBalance, Utc,
-    exports::api::{
-        chain::{ChainReadChannelOperations, ChannelSelector},
-        db::TicketSelector,
-    },
-};
+use hopr_lib::{AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants, HoprBalance, Utc, exports::api::{
+    chain::{ChainReadChannelOperations, ChannelSelector},
+    db::TicketSelector,
+}, VerifiedTicket};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, error, info};
@@ -164,7 +160,7 @@ where
         }
     }
 
-    async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
+    async fn on_acknowledged_winning_ticket(&self, ack: &VerifiedTicket) -> crate::errors::Result<()> {
         if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
             if let Some(channel) = self
                 .hopr_chain_actions
@@ -174,14 +170,14 @@ where
             {
                 info!(%ack, "redeeming");
 
-                if ack.ticket.verified_ticket().index < channel.ticket_index.as_u64() {
+                if ack.verified_ticket().index < channel.ticket_index.as_u64() {
                     error!(%ack, "acknowledged ticket is older than channel ticket index");
                     return Err(CriteriaNotSatisfied);
                 }
 
                 let selector = TicketSelector::from(channel)
                     .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                    .with_index_range(channel.ticket_index.as_u64()..=ack.ticket.verified_ticket().index)
+                    .with_index_range(channel.ticket_index.as_u64()..=ack.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched);
 
                 self.enqueue_redeem_request(selector).await

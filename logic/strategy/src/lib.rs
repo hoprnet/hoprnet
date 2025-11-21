@@ -37,7 +37,7 @@ use std::{ops::Sub, str::FromStr, time::Duration};
 use futures::{StreamExt, pin_mut};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    AcknowledgedTicket, Address, ChannelChange, ChannelStatus, HoprBalance, VerifiedTicket,
+    Address, ChannelChange, ChannelStatus, HoprBalance, VerifiedTicket,
     exports::api::chain::ChainEvent,
 };
 use serde::{Deserialize, Serialize};

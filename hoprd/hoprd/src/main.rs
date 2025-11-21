@@ -1,14 +1,14 @@
 use std::{num::NonZeroUsize, path::PathBuf, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
-use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
+use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{
     BlockchainConnectorConfig, HoprBlockchainSafeConnector,
     blokli_client::{BlokliClient, BlokliClientConfig},
 };
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::{
-    AbortableList, AcknowledgedTicket, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
     exports::api::chain::ChainEvents, prelude::ChainKeypair, utils::session::ListenerJoinHandles,
 };
 use hoprd::{
@@ -146,7 +146,7 @@ enum HoprdProcess {
 #[cfg(not(feature = "runtime-tokio"))]
 compile_error!("The 'runtime-tokio' feature must be enabled");
 
-async fn init_db(cfg: &HoprdConfig, chain_key: &ChainKeypair) -> Result<HoprNodeDb, anyhow::Error> {
+async fn init_db(cfg: &HoprdConfig) -> Result<HoprNodeDb, anyhow::Error> {
     let db_path: PathBuf = [&cfg.db.data, "node_db"].iter().collect();
     info!(path = ?db_path, "initiating DB");
 
@@ -173,16 +173,8 @@ async fn init_db(cfg: &HoprdConfig, chain_key: &ChainKeypair) -> Result<HoprNode
         create_if_missing,
         force_create: cfg.db.force_initialize,
         log_slow_queries: std::time::Duration::from_millis(150),
-        // surb_ring_buffer_size: std::env::var("HOPR_PROTOCOL_SURB_RB_SIZE")
-        // .ok()
-        // .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-        // .unwrap_or_else(|| HoprNodeDbConfig::default().surb_ring_buffer_size),
-        // surb_distress_threshold: std::env::var("HOPR_PROTOCOL_SURB_RB_DISTRESS")
-        // .ok()
-        // .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-        // .unwrap_or_else(|| HoprNodeDbConfig::default().surb_distress_threshold),
     };
-    let node_db = HoprNodeDb::new(db_path.as_path(), chain_key.clone(), db_cfg).await?;
+    let node_db = HoprNodeDb::new(db_path.as_path(), db_cfg).await?;
 
     let ack_ticket_channel_capacity = std::env::var("HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY")
         .ok()
@@ -342,7 +334,7 @@ async fn main_inner() -> anyhow::Result<()> {
         "Node public identifiers"
     );
 
-    let node_db = init_db(&cfg, &hopr_keys.chain_key).await?;
+    let node_db = init_db(&cfg).await?;
 
     let chain_connector = Arc::new(init_blokli_connector(&hopr_keys.chain_key, &cfg).await?);
 

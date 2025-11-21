@@ -5,9 +5,8 @@ use std::{
     time::Duration,
 };
 
-use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
 use hopr_internal_types::prelude::ChannelEntry;
-use hopr_primitive_types::primitives::Address;
+
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sqlx::{
@@ -43,13 +42,11 @@ pub struct HoprNodeDb {
     pub(crate) peers_db: sea_orm::DatabaseConnection,
     pub(crate) ticket_manager: Arc<TicketManager>,
     pub(crate) caches: Arc<NodeDbCaches>,
-    pub(crate) me_onchain: ChainKeypair,
-    pub(crate) me_address: Address,
     pub(crate) cfg: HoprNodeDbConfig,
 }
 
 impl HoprNodeDb {
-    pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprNodeDbConfig) -> Result<Self, NodeDbError> {
+    pub async fn new(directory: &Path, cfg: HoprNodeDbConfig) -> Result<Self, NodeDbError> {
         cfg.validate().map_err(|e| NodeDbError::Other(e.into()))?;
 
         fs::create_dir_all(directory).map_err(|e| NodeDbError::Other(e.into()))?;
@@ -80,13 +77,12 @@ impl HoprNodeDb {
         .await?;
 
         #[cfg(feature = "sqlite")]
-        Self::new_sqlx_sqlite(chain_key, tickets, peers, cfg).await
+        Self::new_sqlx_sqlite(tickets, peers, cfg).await
     }
 
     #[cfg(feature = "sqlite")]
-    pub async fn new_in_memory(chain_key: ChainKeypair) -> Result<Self, NodeDbError> {
+    pub async fn new_in_memory() -> Result<Self, NodeDbError> {
         Self::new_sqlx_sqlite(
-            chain_key,
             SqlitePool::connect(":memory:")
                 .await
                 .map_err(|e| NodeDbError::Other(e.into()))?,
@@ -100,7 +96,6 @@ impl HoprNodeDb {
 
     #[cfg(feature = "sqlite")]
     async fn new_sqlx_sqlite(
-        me_onchain: ChainKeypair,
         peers_db_pool: SqlitePool,
         tickets_db_pool: SqlitePool,
         cfg: HoprNodeDbConfig,
@@ -141,8 +136,6 @@ impl HoprNodeDb {
             tickets_db,
             peers_db,
             caches,
-            me_address: me_onchain.public().to_address(),
-            me_onchain,
             cfg,
         })
     }
