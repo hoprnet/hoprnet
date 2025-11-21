@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.15.2"
+version = "0.16.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -13,12 +13,14 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-tokio = ["hopr-transport-protocol/runtime-tokio"]
-prometheus = ["dep:hopr-metrics", "hopr-transport-protocol/prometheus"]
+runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-async-runtime/runtime-tokio"]
+prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
 async-trait = { workspace = true }
 futures = { workspace = true }
+futures-time = { workspace = true }
+futures-concurrency = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 lazy_static = { workspace = true }
@@ -28,19 +30,22 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-hopr-api = { workspace = true }
-hopr-crypto-random = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-internal-types = { workspace = true }
+hopr-lib = { workspace = true }
+hopr-async-runtime = { workspace = true }
 hopr-metrics = { workspace = true, optional = true, default-features = false }
-hopr-platform = { workspace = true }
-hopr-primitive-types = { workspace = true }
-hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-tokio = { workspace = true }
-mockall = { workspace = true }
+chrono = { workspace = true }
 hex-literal = { workspace = true }
+hopr-lib = { workspace = true, features = ["runtime-tokio"] }
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
+hopr-chain-connector = { workspace = true, features = [
+  "testing",
+  "runtime-tokio",
+] }
 hopr-crypto-random = { workspace = true }
-futures = { workspace = true }
+insta = { workspace = true }
+mockall = { workspace = true }
+test-log = { workspace = true }
+tokio = { workspace = true }

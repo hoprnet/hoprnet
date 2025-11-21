@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, stream::FuturesUnordered};
-use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr, prelude::Hash};
+use hopr_lib::{Address, AsUnixTimestamp, Health, Multiaddr};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -112,7 +112,6 @@ pub(crate) struct HeartbeatInfo {
     "quality": 0.7,
     "backoff": 0.5,
     "isNew": true,
-    "reportedVersion": "2.1.0"
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerInfo {
@@ -143,7 +142,7 @@ pub(crate) struct PeerInfo {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
     "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-    "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+    "multiaddrs": "[/ip4/178.12.1.9/tcp/19092]"
 }))]
 #[serde(rename_all = "camelCase")]
 /// Represents a peer that has been announced on-chain.
@@ -151,9 +150,9 @@ pub(crate) struct AnnouncedPeer {
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
     address: Address,
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
-    multiaddr: Option<Multiaddr>,
+    #[serde_as(as = "Vec<DisplayFromStr>")]
+    #[schema(value_type = Vec<String>, example = "[/ip4/178.12.1.9/tcp/19092]")]
+    multiaddrs: Vec<Multiaddr>,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -171,7 +170,6 @@ pub(crate) struct AnnouncedPeer {
         "quality": 0.7,
         "backoff": 0.5,
         "isNew": true,
-        "reportedVersion": "2.1.0"
     }],
     "announced": [{
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
@@ -192,7 +190,6 @@ pub(crate) struct NodePeersResponse {
         "quality": 0.7,
         "backoff": 0.5,
         "isNew": true,
-        "reportedVersion": "2.1.0"
     }]))]
     connected: Vec<PeerInfo>,
     #[schema(example = json!([{
@@ -287,7 +284,7 @@ pub(super) async fn peers(
         .map(|announced| async move {
             AnnouncedPeer {
                 address: announced.chain_addr,
-                multiaddr: announced.get_multiaddr(),
+                multiaddrs: announced.get_multiaddrs().to_vec(),
             }
         })
         .collect::<FuturesUnordered<_>>()
@@ -300,96 +297,6 @@ pub(super) async fn peers(
     };
 
     Ok((StatusCode::OK, Json(body)).into_response())
-}
-
-#[derive(Debug, Clone, Deserialize, Default, utoipa::IntoParams, utoipa::ToSchema)]
-#[into_params(parameter_in = Query)]
-#[serde(default, rename_all = "camelCase")]
-#[schema(example = json!({
-        "ignoreDisconnectedComponents": true,
-        "ignoreNonOpenedChannels": true,
-        "only3HopPaths": true,
-        "rawGraph": true
-    }))]
-/// Query parameters for the channel graph export.
-pub(crate) struct GraphExportQuery {
-    /// If set, nodes that are not connected to this node (via open channels) will not be exported.
-    /// This setting automatically implies `ignore_non_opened_channels`.
-    #[schema(required = false)]
-    #[serde(default)]
-    pub ignore_disconnected_components: bool,
-    /// Do not export channels that are not in the `Open` state.
-    #[schema(required = false)]
-    #[serde(default)]
-    pub ignore_non_opened_channels: bool,
-    /// Show only nodes that are accessible via 3-hops (via open channels) from this node.
-    #[schema(required = false)]
-    #[serde(default)]
-    pub only_3_hop_paths: bool,
-    /// Export the entire graph in raw JSON format, that can be later
-    /// used to load the graph into e.g., a unit test.
-    ///
-    /// Note that `ignore_disconnected_components` and `ignore_non_opened_channels` are ignored.
-    #[schema(required = false)]
-    #[serde(default)]
-    pub raw_graph: bool,
-}
-
-impl From<GraphExportQuery> for GraphExportConfig {
-    fn from(value: GraphExportQuery) -> Self {
-        Self {
-            ignore_disconnected_components: value.ignore_disconnected_components,
-            ignore_non_opened_channels: value.ignore_non_opened_channels,
-            only_3_hop_accessible_nodes: value.only_3_hop_paths,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-#[schema(example = json!({
-        "graph": "
-        ...
-        242 -> 381 [ label = 'Open channel 0x82a72e271cdedd56c29e970ced3517ba93b679869c729112b5a56fa08698df8f; stake=100000000000000000 HOPR; score=None; status=open;' ]
-        ...",
-    }))]
-#[serde(rename_all = "camelCase")]
-/// Response body for the channel graph export.
-pub(crate) struct NodeGraphResponse {
-    graph: String,
-}
-
-/// Retrieve node's channel graph in DOT or JSON format.
-#[utoipa::path(
-    get,
-    path = const_format::formatcp!("{BASE_PATH}/node/graph"),
-    description = "Retrieve node's channel graph in DOT or JSON format",
-    params(GraphExportQuery),
-    responses(
-            (status = 200, description = "Fetched channel graph", body = NodeGraphResponse),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-    ),
-    security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-    ),
-    tag = "Node"
-)]
-pub(super) async fn channel_graph(
-    State(state): State<Arc<InternalState>>,
-    Query(args): Query<GraphExportQuery>,
-) -> impl IntoResponse {
-    if args.raw_graph {
-        match state.hopr.export_raw_channel_graph().await {
-            Ok(raw_graph) => (StatusCode::OK, Json(NodeGraphResponse { graph: raw_graph })).into_response(),
-            Err(error) => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                ApiErrorStatus::UnknownFailure(error.to_string()),
-            )
-                .into_response(),
-        }
-    } else {
-        (StatusCode::OK, state.hopr.export_channel_graph(args.into()).await).into_response()
-    }
 }
 
 #[serde_as]
@@ -424,8 +331,6 @@ pub(super) async fn channel_graph(
 /// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses
 /// and indexer state.
 pub(crate) struct NodeInfoResponse {
-    #[schema(value_type = String, example = "anvil-localhost")]
-    network: String,
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19092"]))]
     announced_address: Vec<Multiaddr>,
@@ -434,17 +339,12 @@ pub(crate) struct NodeInfoResponse {
     listening_address: Vec<Multiaddr>,
     #[schema(example = "anvil-localhost")]
     chain: String,
-    #[schema(example = "http://127.0.0.1:8545")]
-    provider: String,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x9a676e781a523b5d0c0e43731313a708cb607508")]
     hopr_token: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae")]
     hopr_channels: Address,
-    #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String, example = "0x3aa5ebb10dc797cac828524e59a333d0a371443c")]
-    hopr_network_registry: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82")]
     hopr_node_safe_registry: Address,
@@ -454,23 +354,12 @@ pub(crate) struct NodeInfoResponse {
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x42bc901b1d040f984ed626eff550718498a6798a")]
     hopr_node_safe: Address,
-    #[schema(example = true)]
-    is_eligible: bool,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "Green")]
     connectivity_status: Health,
     /// Channel closure period in seconds
     #[schema(example = 15)]
     channel_closure_period: u64,
-    #[schema(example = 123456)]
-    indexer_block: u32,
-    #[schema(example = 123450)]
-    indexer_last_log_block: u32,
-    #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String, example = "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae")]
-    indexer_last_log_checksum: Hash,
-    #[schema(example = true)]
-    is_indexer_corrupted: bool,
 }
 
 /// Get information about this HOPR Node.
@@ -479,7 +368,7 @@ pub(crate) struct NodeInfoResponse {
         path = const_format::formatcp!("{BASE_PATH}/node/info"),
         description = "Get information about this HOPR Node",
         responses(
-            (status = 200, description = "Fetched node version", body = NodeInfoResponse),
+            (status = 200, description = "Fetched node informations", body = NodeInfoResponse),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -491,43 +380,23 @@ pub(crate) struct NodeInfoResponse {
 pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl IntoResponse, ApiError> {
     let hopr = state.hopr.clone();
 
-    let chain_config = hopr.chain_config();
     let safe_config = hopr.get_safe_config();
-    let network = hopr.network();
 
-    let indexer_state_info = match hopr.get_indexer_state().await {
-        Ok(info) => info,
-        Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
-    };
+    let chain_data = futures::try_join!(hopr.get_channel_closure_notice_period(), hopr.chain_info());
 
-    // If one channel or more are corrupted, we consider the indexer as corrupted.
-    let is_indexer_corrupted = hopr
-        .corrupted_channels()
-        .await
-        .map(|channels| !channels.is_empty())
-        .unwrap_or_default();
-
-    match hopr.get_channel_closure_notice_period().await {
-        Ok(channel_closure_notice_period) => {
+    match chain_data {
+        Ok((channel_closure_notice_period, chain_info)) => {
             let body = NodeInfoResponse {
-                network,
                 announced_address: hopr.local_multiaddresses(),
                 listening_address: hopr.local_multiaddresses(),
-                chain: chain_config.id,
-                provider: hopr.get_provider(),
-                hopr_token: chain_config.token,
-                hopr_channels: chain_config.channels,
-                hopr_network_registry: chain_config.network_registry,
-                hopr_node_safe_registry: chain_config.node_safe_registry,
-                hopr_management_module: chain_config.module_implementation,
+                chain: chain_info.chain_id.to_string(),
+                hopr_token: chain_info.contract_addresses.token,
+                hopr_channels: chain_info.contract_addresses.channels,
+                hopr_node_safe_registry: chain_info.contract_addresses.node_safe_registry,
+                hopr_management_module: chain_info.contract_addresses.module_implementation,
                 hopr_node_safe: safe_config.safe_address,
-                is_eligible: true,
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),
-                indexer_block: indexer_state_info.latest_block_number,
-                indexer_last_log_block: indexer_state_info.latest_log_block_number,
-                indexer_last_log_checksum: indexer_state_info.latest_log_checksum,
-                is_indexer_corrupted,
             };
 
             Ok((StatusCode::OK, Json(body)).into_response())

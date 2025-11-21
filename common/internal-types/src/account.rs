@@ -11,84 +11,58 @@ pub enum AccountType {
     /// Node is not announced.
     NotAnnounced,
     /// Node is announced with a multi-address
-    Announced { multiaddr: Multiaddr, updated_block: u32 },
+    Announced(Vec<Multiaddr>),
 }
 
 impl Display for AccountType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             Self::NotAnnounced => {
-                write!(f, "Not announced")
+                write!(f, "not announced")
             }
-            Self::Announced {
-                multiaddr,
-                updated_block,
-            } => f
-                .debug_struct("AccountType")
-                .field("MultiAddr", multiaddr)
-                .field("UpdatedAt", updated_block)
-                .finish(),
+            Self::Announced(multiaddr) => write!(f, "announced via {multiaddr:?}"),
         }
     }
 }
 
 /// Represents a node announcement entry on the block chain.
-/// This contains node's public key and optional announcement information (multiaddress, block number).
+/// This contains node's public key and optional announcement information (multiaddress).
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountEntry {
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,
     pub entry_type: AccountType,
-    pub published_at: u32,
+    pub safe_address: Option<Address>,
+    pub key_id: KeyIdent<4>,
 }
 
 impl AccountEntry {
-    /// Gets the block number of the announcement if this peer ID has been announced.
-    pub fn updated_at(&self) -> Option<u32> {
-        match &self.entry_type {
-            AccountType::NotAnnounced => None,
-            AccountType::Announced { updated_block, .. } => Some(*updated_block),
-        }
-    }
-
-    /// Returns the computed key ID for this account.
-    // TODO: change this to use assigned ID from the SC in the next version
-    pub fn key_id(&self) -> KeyIdent<4> {
-        let id_hash = Hash::create(&[
-            self.public_key.as_ref(),
-            self.chain_addr.as_ref(),
-            &self.published_at.to_be_bytes(),
-        ]);
-
-        u32::from_be_bytes(
-            id_hash.as_ref()[0..std::mem::size_of::<u32>()]
-                .try_into()
-                .expect("4 byte must fit into u32"),
-        )
-        .into()
-    }
-
     /// Is the node announced?
     pub fn has_announced(&self) -> bool {
-        matches!(self.entry_type, AccountType::Announced { .. })
+        matches!(&self.entry_type, AccountType::Announced(addrs) if !addrs.is_empty())
     }
 
     /// If the node has announced, did it announce with routing information?
-    pub fn contains_routing_info(&self) -> bool {
+    pub fn has_announced_with_routing_info(&self) -> bool {
         match &self.entry_type {
             AccountType::NotAnnounced => false,
-            AccountType::Announced { multiaddr, .. } => {
-                multiaddr.protocol_stack().any(|p| p == "ip4" || p == "dns4")
-                    && multiaddr.protocol_stack().any(|p| p == "tcp")
+            AccountType::Announced(multiaddrs) => {
+                !multiaddrs.is_empty()
+                    && multiaddrs.iter().all(|multiaddr| {
+                        multiaddr
+                            .protocol_stack()
+                            .any(|p| p == "ip4" || p == "dns4" || p == "ip6" || p == "dns6")
+                            && multiaddr.protocol_stack().any(|p| p == "tcp" || p == "udp")
+                    })
             }
         }
     }
 
-    pub fn get_multiaddr(&self) -> Option<Multiaddr> {
+    pub fn get_multiaddrs(&self) -> &[Multiaddr] {
         match &self.entry_type {
-            AccountType::NotAnnounced => None,
-            AccountType::Announced { multiaddr, .. } => Some(multiaddr.clone()),
+            AccountType::NotAnnounced => &[],
+            AccountType::Announced(multiaddrs) => multiaddrs.as_slice(),
         }
     }
 
@@ -97,9 +71,23 @@ impl AccountEntry {
     /// Examples:
     /// - a node transitions from being a PRN to an edge node
     /// - a node becomes a PRN
-    /// - the IP of a PRN has changed, e.g. due to relocation
+    /// - the IP of a PRN has changed, e.g., due to relocation
     pub fn update(&mut self, new_entry_type: AccountType) {
         self.entry_type = new_entry_type;
+    }
+}
+
+impl Display for AccountEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "account {} ({}:{}) (safe: {:?}) {}",
+            self.key_id,
+            self.chain_addr,
+            self.public_key.to_peerid_str(),
+            self.safe_address,
+            self.entry_type
+        )
     }
 }
 
@@ -108,7 +96,6 @@ mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::types::OffchainPublicKey;
     use hopr_primitive_types::prelude::*;
-    use multiaddr::Multiaddr;
 
     use crate::account::{
         AccountEntry,
@@ -126,16 +113,15 @@ mod tests {
         let ae1 = AccountEntry {
             public_key,
             chain_addr,
-            published_at: 1,
-            entry_type: Announced {
-                multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse::<Multiaddr>()?,
-                updated_block: 1,
-            },
+            key_id: 1.into(),
+            entry_type: Announced(vec![
+                "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?,
+            ]),
+            safe_address: None,
         };
 
         assert!(ae1.has_announced());
-        assert_eq!(1, ae1.updated_at().expect("should be present"));
-        assert!(!ae1.contains_routing_info());
+        assert!(!ae1.has_announced_with_routing_info());
 
         Ok(())
     }
@@ -148,18 +134,28 @@ mod tests {
         let ae1 = AccountEntry {
             public_key,
             chain_addr,
-            published_at: 1,
-            entry_type: Announced {
-                multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
-                    .parse::<Multiaddr>()?,
-                updated_block: 1,
-            },
+            key_id: 1.into(),
+            entry_type: Announced(vec![
+                "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?,
+            ]),
+            safe_address: None,
         };
 
         assert!(ae1.has_announced());
-        assert_eq!(1, ae1.updated_at().expect("should be present"));
-        assert!(ae1.contains_routing_info());
-        assert_eq!("0x4e1ddc66", ae1.key_id().to_hex());
+        assert!(ae1.has_announced_with_routing_info());
+
+        let ae1 = AccountEntry {
+            public_key,
+            chain_addr,
+            key_id: 1.into(),
+            entry_type: Announced(vec![
+                "/ip4/34.65.237.196/udp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse()?,
+            ]),
+            safe_address: None,
+        };
+
+        assert!(ae1.has_announced());
+        assert!(ae1.has_announced_with_routing_info());
 
         Ok(())
     }
@@ -172,13 +168,13 @@ mod tests {
         let ae1 = AccountEntry {
             public_key,
             chain_addr,
-            published_at: 0,
+            key_id: 0.into(),
             entry_type: NotAnnounced,
+            safe_address: None,
         };
 
         assert!(!ae1.has_announced());
-        assert!(ae1.updated_at().is_none());
-        assert!(!ae1.contains_routing_info());
+        assert!(!ae1.has_announced_with_routing_info());
 
         Ok(())
     }

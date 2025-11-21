@@ -487,7 +487,6 @@ mod tests {
             .win_prob(WinningProbability::try_from_f64(0.5)?)
             .channel_epoch(1)
             .index(10)
-            .index_offset(1)
             .build_signed(&ChainKeypair::random(), &Hash::default())?;
 
         let _ = pcap

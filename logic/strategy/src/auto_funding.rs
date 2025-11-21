@@ -7,9 +7,10 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_api::chain::ChainWriteChannelOperations;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
+use hopr_lib::{
+    ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, HoprBalance,
+    exports::api::chain::ChainWriteChannelOperations,
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::info;
@@ -87,7 +88,7 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
             return Ok(());
         }
 
-        if let ChannelChange::CurrentBalance { right: new, .. } = change {
+        if let ChannelChange::Balance { right: new, .. } = change {
             if new.lt(&self.cfg.min_stake_threshold) && channel.status == ChannelStatus::Open {
                 info!(%channel, balance = %channel.balance, threshold = %self.cfg.min_stake_threshold,
                     "stake on channel is below threshold",
@@ -115,24 +116,36 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
 
 #[cfg(test)]
 mod tests {
+    use std::{str::FromStr, time::Duration};
+
+    use futures::StreamExt;
+    use futures_time::future::FutureExt;
     use hex_literal::hex;
-    use hopr_api::chain::ChainReceipt;
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
+    use hopr_lib::{
+        Address, BytesRepresentable, ChainKeypair, Keypair, XDaiBalance,
+        exports::api::chain::{ChainEvent, ChainEvents},
+    };
 
     use super::*;
     use crate::{
         auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
         strategy::SingularStrategy,
-        tests::{MockChainActions, MockTestActions},
     };
 
     lazy_static::lazy_static! {
+        static ref BOB_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
+        ))
+        .expect("lazy static keypair should be valid");
+
         static ref ALICE: Address = hex!("18f8ae833c85c51fbeba29cef9fbfb53b3bad950").into();
-        static ref BOB: Address = hex!("44f23fa14130ca540b37251309700b6c281d972e").into();
+        static ref BOB: Address = BOB_KP.public().to_address();
         static ref CHRIS: Address = hex!("b6021e0860dd9d96c9ff0a73e2e5ba3a466ba234").into();
         static ref DAVE: Address = hex!("68499f50ff68d523385dc60686069935d17d762a").into();
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_auto_funding_strategy() -> anyhow::Result<()> {
         let stake_limit = HoprBalance::from(7_u32);
         let fund_amount = HoprBalance::from(5_u32);
@@ -160,26 +173,40 @@ mod tests {
             *DAVE,
             5_u32.into(),
             0_u32.into(),
-            ChannelStatus::PendingToClose(std::time::SystemTime::now()),
+            ChannelStatus::PendingToClose(
+                chrono::DateTime::<chrono::Utc>::from_str("2025-11-10T00:00:00+00:00")?.into(),
+            ),
             0_u32.into(),
         );
+
+        let blokli_sim = BlokliTestStateBuilder::default()
+            .with_generated_accounts(
+                &[&*ALICE, &*BOB, &*CHRIS, &*DAVE],
+                false,
+                XDaiBalance::new_base(1),
+                HoprBalance::new_base(1000),
+            )
+            .with_channels([c1, c2, c3])
+            .build_dynamic_client([1; Address::SIZE].into());
+
+        let snapshot = blokli_sim.snapshot();
+
+        let mut chain_connector =
+            create_trustful_hopr_blokli_connector(&BOB_KP, Default::default(), blokli_sim, [1; Address::SIZE].into())
+                .await?;
+        chain_connector.connect(Duration::from_secs(3)).await?;
+        let events = chain_connector.subscribe()?;
 
         let cfg = AutoFundingStrategyConfig {
             min_stake_threshold: stake_limit,
             funding_amount: fund_amount,
         };
 
-        let mut mock = MockTestActions::new();
-        mock.expect_fund_channel()
-            .once()
-            .with(mockall::predicate::eq(c2.get_id()), mockall::predicate::eq(fund_amount))
-            .return_once(|_, _| Ok(ChainReceipt::default()));
-
-        let afs = AutoFundingStrategy::new(cfg, MockChainActions(mock.into()));
+        let afs = AutoFundingStrategy::new(cfg, chain_connector);
         afs.on_own_channel_changed(
             &c1,
             ChannelDirection::Outgoing,
-            ChannelChange::CurrentBalance {
+            ChannelChange::Balance {
                 left: HoprBalance::zero(),
                 right: c1.balance,
             },
@@ -189,7 +216,7 @@ mod tests {
         afs.on_own_channel_changed(
             &c2,
             ChannelDirection::Outgoing,
-            ChannelChange::CurrentBalance {
+            ChannelChange::Balance {
                 left: HoprBalance::zero(),
                 right: c2.balance,
             },
@@ -199,12 +226,20 @@ mod tests {
         afs.on_own_channel_changed(
             &c3,
             ChannelDirection::Outgoing,
-            ChannelChange::CurrentBalance {
+            ChannelChange::Balance {
                 left: HoprBalance::zero(),
                 right: c3.balance,
             },
         )
         .await?;
+
+        events
+            .filter(|event| futures::future::ready(matches!(event, ChainEvent::ChannelBalanceIncreased(c, amount) if c.get_id() == c2.get_id() && amount == &fund_amount)))
+            .next()
+            .timeout(futures_time::time::Duration::from_secs(2))
+            .await?;
+
+        insta::assert_yaml_snapshot!(*snapshot.refresh());
 
         Ok(())
     }

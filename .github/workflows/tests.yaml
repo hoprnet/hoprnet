@@ -31,7 +31,7 @@ jobs:
       CI: "true"
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -44,7 +44,30 @@ jobs:
           persist-credentials: false
 
       - name: Run unit tests
-        run: nix build -L .#hopr-test
+        run: nix develop -c cargo test --lib
+
+  tests-integration:
+    name: Integration Tests
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 60
+    env:
+      CI: "true"
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Run integration tests
+        run: nix develop -c cargo test --test '*' -- --test-threads=1
 
   tests-unit-nightly:
     name: Unit Tests Nightly
@@ -55,7 +78,7 @@ jobs:
       CI: "true"
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -75,41 +98,9 @@ jobs:
           token_format: "access_token"
           credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
 
-      - name: Run unit tests nightly
+      - name: Run unit tests with nightly
         run: |
           nix build -L .#hopr-test-nightly
-
-  tests-smart-contracts:
-    runs-on: self-hosted-hoprnet-bigger
-    name: Smart Contracts
-    timeout-minutes: 60
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
-
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
-
-      - name: Set up Google Cloud Credentials
-        id: auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        if: ${{ !env.ACT }}
-        with:
-          token_format: "access_token"
-          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-
-      - name: Run tests
-        run: nix develop -L -c make -j smart-contract-test
-        env:
-          HOPR_NETWORK: anvil-localhost
 
   build-candidate-binaries:
     name: Build Candidate Binaries
@@ -124,7 +115,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -139,94 +130,98 @@ jobs:
       - name: Build binary
         run: nix build .#${{ matrix.binary }}-candidate
 
-  tests-smoke:
-    runs-on: self-hosted-hoprnet-bigger
-    name: Smoke Tests
-    needs:
-      - build-candidate-binaries
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        suite:
-          - hopli
-          - websocket_api
-          - rest_api
-          - session
-          - integration
-          - redeeming
-          - win_prob
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+  ## NOTE:  pending extraction of hopli and hoprd to separate repositories, smoke tests are disabled ##
+  # tests-smoke:
+  #   runs-on: self-hosted-hoprnet-bigger
+  #   name: Smoke Tests
+  #   needs:
+  #     - build-candidate-binaries
+  #   timeout-minutes: 30
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       suite: 
+  #         ## NOTE: disabled pending extraction of hopli to a separate repository
+  #         # - hopli
+  #         #
+  #         ## NOTE: disabled pending extraction of hoprd to a separate repository
+  #         # - websocket_api
+  #         # - rest_api
+  #         # - session
+  #         # - integration
+  #         # - redeeming
+  #         # - win_prob 
+  #   if: github.event.pull_request.draft == false
+  #   steps:
+  #     - name: Harden Runner
+  #       uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+  #       with:
+  #         disable-sudo: true
+  #         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: false
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+  #       with:
+  #         repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+  #         ref: ${{ github.event.pull_request.head.ref || github.ref }}
+  #         persist-credentials: false
 
-      - name: Setup GCP
-        id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
-        with:
-          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-          login-artifact-registry: "false"
-          install-sdk: "true"
+  #     - name: Setup GCP
+  #       id: gcp
+  #       uses: hoprnet/hopr-workflows/actions/setup-gcp@12c56020e16036982e6cc529848edeedfc705865 # master
+  #       with:
+  #         google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+  #         login-artifact-registry: "false"
+  #         install-sdk: "true"
 
-      - name: Find base port
-        id: find_base_port
-        run: |
-          base_port=$(nix run .#find-port-ci)
-          echo "Using base port ${base_port}"
-          echo "base-port=${base_port}" >> "$GITHUB_OUTPUT"
-          echo "snapshot-name=snapshot-${base_port}" >> "$GITHUB_OUTPUT"
-          echo "snapshot-dir=/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
+  #     - name: Find base port
+  #       id: find_base_port
+  #       run: |
+  #         base_port=$(nix run .#find-port-ci)
+  #         echo "Using base port ${base_port}"
+  #         echo "base-port=${base_port}" >> "$GITHUB_OUTPUT"
+  #         echo "snapshot-name=snapshot-${base_port}" >> "$GITHUB_OUTPUT"
+  #         echo "snapshot-dir=/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
 
-      - name: Download snapshot
-        id: download-snapshot
-        if: ${{ !env.ACT }}
-        run: |
-          mkdir -p "${{ steps.find_base_port.outputs.snapshot-dir }}"
-          gcloud storage rsync gs://hoprnet-test-artifacts/${{ steps.find_base_port.outputs.snapshot-name }} ${{ steps.find_base_port.outputs.snapshot-dir }} --recursive
-        continue-on-error: true
+  #     - name: Download snapshot
+  #       id: download-snapshot
+  #       if: ${{ !env.ACT }}
+  #       run: |
+  #         mkdir -p "${{ steps.find_base_port.outputs.snapshot-dir }}"
+  #         gcloud storage rsync gs://hoprnet-test-artifacts/${{ steps.find_base_port.outputs.snapshot-name }} ${{ steps.find_base_port.outputs.snapshot-dir }} --recursive
+  #       continue-on-error: true
 
-      - name: Check snapshot
-        run: ls -lR "${{ steps.find_base_port.outputs.snapshot-dir }}" || echo "no snapshot found"
+  #     - name: Check snapshot
+  #       run: ls -lR "${{ steps.find_base_port.outputs.snapshot-dir }}" || echo "no snapshot found"
 
-      - name: Run smoke tests ${{ matrix.suite }}
-        run: nix develop -L .#citest -c uv run --frozen -m pytest tests/test_${{ matrix.suite }}.py
-        env:
-          HOPR_SMOKETEST_BASE_PORT: ${{ steps.find_base_port.outputs.base-port }}
+  #     - name: Run smoke tests ${{ matrix.suite }}
+  #       run: nix develop -L .#citest -c uv run --frozen -m pytest tests/test_${{ matrix.suite }}.py
+  #       env:
+  #         HOPR_SMOKETEST_BASE_PORT: ${{ steps.find_base_port.outputs.base-port }}
 
-      - name: Upload snapshot
-        uses: google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a # v3.0.0
-        if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
-        with:
-          path: ${{ steps.find_base_port.outputs.snapshot-dir }}
-          destination: hoprnet-test-artifacts/
-          gzip: false
+  #     - name: Upload snapshot
+  #       uses: google-github-actions/upload-cloud-storage@6397bd7208e18d13ba2619ee21b9873edc94427a # v3.0.0
+  #       if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
+  #       with:
+  #         path: ${{ steps.find_base_port.outputs.snapshot-dir }}
+  #         destination: hoprnet-test-artifacts/
+  #         gzip: false
 
-      - name: Compress and upload test logs
-        if: ${{ !env.ACT && always() }}
-        working-directory: "/tmp"
-        run: |
-          # Copy all the logs to a directory to avoid log file changes and simplify tar command
-          test_name=test-smoke-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_number }}
-          mkdir -p ${test_name}
+  #     - name: Compress and upload test logs
+  #       if: ${{ !env.ACT && always() }}
+  #       working-directory: "/tmp"
+  #       run: |
+  #         # Copy all the logs to a directory to avoid log file changes and simplify tar command
+  #         test_name=test-smoke-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_number }}
+  #         mkdir -p ${test_name}
 
-          # Copy files, delete all but the log files
-          cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
-          find ${test_name}/ -type f ! -name "hoprd.log" ! -name "*.pcap" -delete
-          cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
+  #         # Copy files, delete all but the log files
+  #         cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
+  #         find ${test_name}/ -type f ! -name "hoprd.log" ! -name "*.pcap" -delete
+  #         cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
 
-          # Create tarball and upload to GCP
-          tar -czvf ${test_name}.tgz ${test_name}/
-          gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
+  #         # Create tarball and upload to GCP
+  #         tar -czvf ${test_name}.tgz ${test_name}/
+  #         gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
 
-          echo "Download logs from: https://console.cloud.google.com/storage/browser/hoprnet-test-logs/pr-${{ github.event.pull_request.number }}"
+  #         echo "Download logs from: https://console.cloud.google.com/storage/browser/hoprnet-test-logs/pr-${{ github.event.pull_request.number }}"

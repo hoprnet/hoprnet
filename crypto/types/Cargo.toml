@@ -1,11 +1,13 @@
 [package]
 name = "hopr-crypto-types"
-version = "0.7.3"
+version = "0.8.0"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
+license = "GPL-3.0-only"
 
 [features]
 rust-ecdsa = []
+fixed-rng = ["hopr-crypto-random/fixed-rng"]
 serde = [
   "dep:serde",
   "dep:serde_bytes",
@@ -15,6 +17,12 @@ serde = [
   "k256/serde",
   "libp2p-identity/serde",
 ]
+allocator-mimalloc = [
+  "dep:mimalloc",
+] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = [
+  "dep:tikv-jemallocator",
+] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
 aes = "0.8.4"
@@ -45,7 +53,7 @@ sha3 = { workspace = true }
 subtle = { workspace = true }
 thiserror = { workspace = true }
 typenum = { workspace = true }
-zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 
 hopr-crypto-random = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -81,4 +89,5 @@ harness = false
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.0"
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }

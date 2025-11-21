@@ -3,7 +3,6 @@ use std::fmt::{Display, Formatter};
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_path::{NonEmptyPath, TransportPath};
 use hopr_primitive_types::prelude::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
@@ -570,7 +569,6 @@ mod tests {
     use bimap::BiHashMap;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
-    use hopr_path::TransportPath;
     use parameterized::parameterized;
 
     use super::*;
@@ -644,7 +642,6 @@ mod tests {
                 .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
                 .amount(price_per_packet.div_f64(1.0)? * U256::from(path_len as u64 - 1))
                 .index(1)
-                .index_offset(1)
                 .win_prob(WinningProbability::ALWAYS)
                 .channel_epoch(1)
                 .eth_challenge(Default::default()))
@@ -674,7 +671,7 @@ mod tests {
         let return_paths = return_hops
             .into_iter()
             .map(|h| TransportPath::new(PEERS[0..=h].iter().rev().map(|kp| *kp.1.public())))
-            .collect::<std::result::Result<Vec<_>, hopr_path::errors::PathError>>()?;
+            .collect::<std::result::Result<Vec<_>, hopr_internal_types::errors::PathError>>()?;
 
         Ok(HoprPacket::into_outgoing(
             msg,

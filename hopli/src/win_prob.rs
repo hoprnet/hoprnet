@@ -17,16 +17,17 @@
 //!     --contracts-root "../ethereum/contracts" \
 //!     --provider-url "http://localhost:8545"
 //! ```
-use alloy::primitives::aliases::U56;
 use clap::Parser;
-use hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle;
+use hopr_bindings::{
+    exports::alloy::primitives::aliases::U56, hopr_winning_probability_oracle::HoprWinningProbabilityOracle,
+};
 use hopr_internal_types::{prelude::WinningProbability, tickets::EncodedWinProb};
 use tracing::{debug, info};
 
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{ArgEnvReader, PrivateKeyArgs},
-    utils::{Cmd, HelperErrors},
+    utils::{Cmd, HelperErrors, a2h},
 };
 
 /// CLI arguments for `hopli win-prob`
@@ -71,7 +72,7 @@ impl WinProbSubcommands {
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
         let hopr_win_prob = HoprWinningProbabilityOracle::new(
-            contract_addresses.addresses.winning_probability_oracle.into(),
+            a2h(contract_addresses.addresses.winning_probability_oracle),
             rpc_provider.clone(),
         );
 
@@ -101,7 +102,7 @@ impl WinProbSubcommands {
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
         let hopr_win_prob = HoprWinningProbabilityOracle::new(
-            contract_addresses.addresses.winning_probability_oracle.into(),
+            a2h(contract_addresses.addresses.winning_probability_oracle),
             rpc_provider.clone(),
         );
 

@@ -40,11 +40,7 @@ use futures::{AsyncRead, AsyncWrite, Stream};
 use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
 use hopr_transport_protocol::PeerDiscovery;
-use libp2p::{StreamProtocol, autonat, swarm::NetworkBehaviour};
-use rand::rngs::OsRng;
-
-pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-pub const NAT_SERVER_PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
+use libp2p::{StreamProtocol, autonat, identity::PublicKey, swarm::NetworkBehaviour};
 
 // Control object for the streams over the HOPR protocols
 #[derive(Clone)]
@@ -93,8 +89,8 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
 pub struct HoprNetworkBehavior {
     discovery: behavior::discovery::Behaviour,
     streams: libp2p_stream::Behaviour,
-    pub autonat_client: autonat::v2::client::Behaviour,
-    pub autonat_server: autonat::v2::server::Behaviour,
+    identify: libp2p::identify::Behaviour,
+    autonat: autonat::Behaviour,
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -104,18 +100,18 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    pub fn new<T>(me: PeerId, onchain_events: T) -> Self
+    pub fn new<T>(me: PublicKey, onchain_events: T, allow_private_addresses: bool) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
             streams: libp2p_stream::Behaviour::new(),
-            discovery: behavior::discovery::Behaviour::new(me, onchain_events),
-            autonat_client: autonat::v2::client::Behaviour::new(
-                OsRng,
-                autonat::v2::client::Config::default().with_probe_interval(NAT_SERVER_PROBE_INTERVAL), /* TODO (jean): make this configurable */
-            ),
-            autonat_server: autonat::v2::server::Behaviour::new(OsRng),
+            discovery: behavior::discovery::Behaviour::new(me.clone().into(), onchain_events, allow_private_addresses),
+            identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
+                "/hopr/identify/1.0.0".to_string(),
+                me.clone(),
+            )),
+            autonat: autonat::Behaviour::new(me.into(), autonat::Config::default()),
         }
     }
 }
@@ -130,8 +126,8 @@ pub enum HoprNetworkBehaviorEvent {
     TicketAggregation(
         libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
-    AutonatClient(autonat::v2::client::Event),
-    AutonatServer(autonat::v2::server::Event),
+    Identify(Box<libp2p::identify::Event>),
+    Autonat(autonat::Event),
 }
 
 // Unexpected libp2p_stream event
@@ -157,15 +153,14 @@ impl From<libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::r
     }
 }
 
-impl From<autonat::v2::client::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: autonat::v2::client::Event) -> Self {
-        Self::AutonatClient(event)
+impl From<libp2p::identify::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: libp2p::identify::Event) -> Self {
+        Self::Identify(Box::new(event))
     }
 }
-
-impl From<autonat::v2::server::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: autonat::v2::server::Event) -> Self {
-        Self::AutonatServer(event)
+impl From<autonat::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: autonat::Event) -> Self {
+        Self::Autonat(event)
     }
 }
 

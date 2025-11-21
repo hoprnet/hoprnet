@@ -1,19 +1,22 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
-use common::{PEERS, PEERS_CHAIN, create_dbs, create_minimal_topology, random_packets_of_count, resolve_mock_path};
+
+use std::{sync::Arc, time::Duration};
+
+use common::{CHAIN_DATA, PEERS, PEERS_CHAIN, random_packets_of_count, resolve_mock_path};
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{SinkExt, StreamExt};
+use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::keypairs::Keypair;
+use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::HoprBalance;
 use hopr_protocol_app::prelude::{ApplicationDataIn, ApplicationDataOut};
 use hopr_transport_protocol::processor::PacketInteractionConfig;
 use libp2p::PeerId;
-
-use crate::common::IndexerDbChainWrapper;
 
 const SAMPLE_SIZE: usize = 50;
 
@@ -37,18 +40,40 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                 let packets = random_packets_of_count(*bytes / PAYLOAD_SIZE);
 
                 let runtime = tokio::runtime::Runtime::new().expect("tokio runtime must be constructible");
-                let (node_dbs, index_dbs) = runtime.block_on(async {
-                    let (node_dbs, mut index_dbs) = create_dbs(PEER_COUNT).await.expect("DBs must be constructible");
-                    create_minimal_topology(&mut index_dbs)
+                let (node_dbs, connectors) = runtime.block_on(async {
+                    let mut node_dbs = Vec::new();
+                    let mut connectors = Vec::new();
+                    for i in 0..PEER_COUNT {
+                        let node_db = HoprNodeDb::new_in_memory(PEERS_CHAIN[i].clone())
+                            .await
+                            .expect("node db must be constructible");
+                        node_db
+                            .start_ticket_processing(Some(futures::sink::drain()))
+                            .expect("ticket processing must be started");
+                        node_dbs.push(node_db);
+
+                        let mut connector = create_trustful_hopr_blokli_connector(
+                            &PEERS_CHAIN[i],
+                            Default::default(),
+                            CHAIN_DATA.clone().build_static_client(),
+                            Default::default(),
+                        )
                         .await
-                        .expect("topology must be constructible");
-                    (node_dbs, index_dbs)
+                        .expect("connector must be constructible");
+
+                        connector
+                            .connect(Duration::from_secs(3))
+                            .await
+                            .expect("connector must be connected");
+                        connectors.push(Arc::new(connector));
+                    }
+                    (node_dbs, connectors)
                 });
 
                 b.to_async(runtime).iter(|| {
                     let packets = packets.clone();
                     let node_dbs = node_dbs.clone();
-                    let index_dbs = index_dbs.clone();
+                    let connectors = connectors.clone();
 
                     async move {
                         let (wire_msg_send_tx, wire_msg_send_rx) =
@@ -71,7 +96,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let processes = hopr_transport_protocol::run_msg_ack_protocol(
                             cfg,
                             node_dbs[TESTED_PEER_ID].clone(),
-                            IndexerDbChainWrapper(index_dbs[TESTED_PEER_ID].clone()),
+                            connectors[TESTED_PEER_ID].clone(),
                             (wire_msg_send_tx, wire_msg_recv_rx),
                             (api_recv_tx, api_send_rx),
                         )
@@ -79,7 +104,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let path = resolve_mock_path(
                             PEERS_CHAIN[TESTED_PEER_ID].public().to_address(),
-                            PEERS[1..PEER_COUNT].iter().map(|p| *p.public()).collect(),
                             PEERS_CHAIN[1..PEER_COUNT]
                                 .iter()
                                 .map(|key| key.public().to_address())

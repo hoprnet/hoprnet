@@ -24,6 +24,12 @@ prometheus = [
   "dep:hopr-metrics",
   "dep:lazy_static",
 ]
+allocator-mimalloc = [
+  "dep:mimalloc",
+] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = [
+  "dep:tikv-jemallocator",
+] # Use jemalloc as the global allocator on Linux
 
 [dependencies]
 arrayvec = { workspace = true }
@@ -62,6 +68,7 @@ hopr-network-types = { workspace = true, features = ["runtime-tokio", "serde"] }
 hopr-protocol-session = { workspace = true, features = [
   "session-types",
   "serde",
+  "runtime-tokio",
 ] }
 mockall = { workspace = true }
 rand = { workspace = true }
@@ -78,4 +85,5 @@ harness = false
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.0"
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }

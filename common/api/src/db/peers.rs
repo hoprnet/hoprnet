@@ -172,6 +172,7 @@ impl std::fmt::Display for PeerStatus {
 }
 
 #[async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait HoprDbPeersOperations {
     type Error: std::error::Error + Send + Sync + 'static;
     /// Adds a peer to the backend.

@@ -18,7 +18,7 @@ pub mod config;
 pub mod constants;
 /// Errors used by the crate.
 pub mod errors;
-pub mod helpers;
+mod helpers;
 pub mod network_notifier;
 
 pub mod socket;
@@ -26,24 +26,21 @@ mod capture;
 mod pipeline;
 
 use std::{
-    collections::{HashMap, HashSet},
     sync::{Arc, OnceLock},
     time::Duration,
 };
 
-use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
     FutureExt, SinkExt, StreamExt,
     channel::mpsc::{Sender, channel},
 };
-use futures_concurrency::stream::StreamExt as ConcurrentStreamExt;
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
     db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
 };
-use hopr_async_runtime::{AbortHandle, prelude::spawn, spawn_as_abortable};
+use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -52,21 +49,27 @@ pub use hopr_crypto_types::{
 pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::RoutingOptions;
-use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
-use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
+use hopr_network_types::prelude::{DestinationRouting, *};
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
-pub use hopr_transport_identity::{Multiaddr, PeerId};
+pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network};
 use hopr_transport_p2p::HoprSwarm;
 use hopr_transport_probe::{
-    DbProxy, Probe,
+    Probe,
+    neighbors::ImmediateNeighborProber,
     ping::{PingConfig, Pinger},
 };
-pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
-pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
+pub use hopr_transport_probe::{
+    errors::ProbeError,
+    ping::PingQueryReplier,
+    traits::TrafficGeneration,
+    types::{NeighborTelemetry, Telemetry},
+};
+pub use hopr_transport_protocol::PeerDiscovery;
+use hopr_transport_protocol::processor::PacketInteractionConfig;
 pub use hopr_transport_session as session;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
@@ -76,14 +79,12 @@ pub use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
-use rand::seq::SliceRandom;
+#[cfg(feature = "mixer-stream")]
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{Instrument, debug, error, info, trace, warn};
 use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, MemorySurbStore, SurbStoreConfig};
 pub use hopr_transport_protocol::TicketEvent;
-pub use crate::{
-    config::HoprTransportConfig,
-    helpers::{PeerEligibility, TicketStatistics},
-};
+pub use crate::{config::HoprTransportConfig, helpers::TicketStatistics};
 use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError, socket::HoprSocket};
 use crate::pipeline::HoprPacketPipelineConfig;
 
@@ -106,8 +107,9 @@ pub enum HoprTransportProcess {
     Probing(hopr_transport_probe::HoprProbeProcess),
 }
 
+// TODO (4.1): implement path selector based on probing
 /// Currently used implementation of [`PathSelector`](hopr_path::selectors::PathSelector).
-type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
+type CurrentPathSelector = NoPathSelector;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
@@ -143,7 +145,6 @@ where
         cfg: HoprTransportConfig,
         db: Db,
         resolver: R,
-        channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
         let me_peerid: PeerId = me.into();
@@ -163,15 +164,7 @@ where
                 *me_onchain.as_ref(),
                 db.clone(),
                 resolver.clone(),
-                CurrentPathSelector::new(
-                    channel_graph.clone(),
-                    DfsPathSelectorConfig {
-                        node_score_threshold: cfg.network.node_score_auto_path_threshold,
-                        max_first_hop_latency: cfg.network.max_first_hop_latency_threshold,
-                        ..Default::default()
-                    },
-                ),
-                channel_graph.clone(),
+                CurrentPathSelector::default(),
             ),
             my_multiaddresses,
             smgr: SessionManager::new(SessionManagerConfig {
@@ -204,29 +197,31 @@ where
         }
     }
 
-    /// Execute all processes of the [`crate::HoprTransport`] object.
+    /// Execute all processes of the [`HoprTransport`] object.
     ///
     /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`],
     /// [`crate::HoprTransportProcess::BloomFilterSave`], [`crate::HoprTransportProcess::Swarm`] and session-related
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
-    pub async fn run<S, T>(
+    pub async fn run<S, T, Ct>(
         &self,
+        cover_traffic: Option<Ct>,
         discovery_updates: S,
         ticket_events: T,
         on_incoming_session: Sender<IncomingSession>,
-    ) -> crate::errors::Result<(
+    ) -> errors::Result<(
         HoprSocket<
             futures::channel::mpsc::Receiver<ApplicationDataIn>,
             futures::channel::mpsc::Sender<(DestinationRouting, ApplicationDataOut)>,
         >,
-        HashMap<HoprTransportProcess, AbortHandle>,
+        AbortableList<HoprTransportProcess>,
     )>
     where
         S: futures::Stream<Item = PeerDiscovery> + Send + 'static,
         T: futures::Sink<TicketEvent> + Clone + Send + Unpin + 'static,
-        T::Error: std::fmt::Display
+        T::Error: std::fmt::Display,
+        Ct: TrafficGeneration + Send + Sync + 'static,
     {
         info!("Loading initial peers from the chain");
         let public_nodes = self
@@ -303,50 +298,36 @@ where
             "Initializing swarm with peers from chain"
         );
 
-        let mut addresses: HashSet<Multiaddr> = HashSet::new();
         for node_entry in public_nodes {
-            if let AccountType::Announced { multiaddr, .. } = node_entry.entry_type {
+            if let AccountType::Announced(multiaddresses) = node_entry.entry_type {
                 let peer: PeerId = node_entry.public_key.into();
-                let multiaddresses = vec![multiaddr];
 
                 debug!(%peer, ?multiaddresses, "Using initial public node");
-                addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
-                    .send(PeerDiscovery::Announce(peer, multiaddresses.clone()))
+                    .send(PeerDiscovery::Announce(peer, multiaddresses))
                     .await
                     .map_err(|e| HoprTransportError::Api(e.to_string()))?;
             }
         }
 
-        let mut processes: HashMap<HoprTransportProcess, AbortHandle> = HashMap::new();
+        let mut processes = AbortableList::<HoprTransportProcess>::default();
 
         let (unresolved_routing_msg_tx, unresolved_routing_msg_rx) =
             channel::<(DestinationRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
-
-        let (resolved_routing_msg_tx, resolved_routing_msg_rx) =
-            channel::<(ResolvedTransportRouting, ApplicationDataOut)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         // -- transport medium
         let mixer_cfg = build_mixer_cfg_from_env();
 
         let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
 
-        let mut transport_layer =
-            HoprSwarm::new((&self.me).into(), discovery_updates, self.my_multiaddresses.clone()).await;
-
-        if let Some(port) = self.cfg.protocol.autonat_port {
-            transport_layer.run_nat_server(port);
-        }
-
-        if addresses.is_empty() {
-            warn!("No addresses found in the database, not dialing any NAT servers");
-        } else {
-            info!(num_addresses = addresses.len(), "Found addresses from the database");
-            let mut randomized_addresses: Vec<_> = addresses.into_iter().collect();
-            randomized_addresses.shuffle(&mut rand::thread_rng());
-            transport_layer.dial_nat_server(randomized_addresses);
-        }
+        let transport_layer = HoprSwarm::new(
+            (&self.me).into(),
+            discovery_updates,
+            self.my_multiaddresses.clone(),
+            self.cfg.transport.prefer_local_addresses,
+        )
+        .await;
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
@@ -434,51 +415,49 @@ where
         // sending the external packets to the transport pipeline.
         let path_planner = self.path_planner.clone();
         let distress_threshold = self.db.get_surb_config().distress_threshold;
-        let all_resolved_external_msg_rx = unresolved_routing_msg_rx
-            .filter_map(move |(unresolved, mut data)| {
-                let path_planner = path_planner.clone();
-                async move {
-                    trace!(?unresolved, "resolving routing for packet");
-                    match path_planner
-                        .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
-                        .await
-                    {
-                        Ok((resolved, rem_surbs)) => {
-                            // Set the SURB distress/out-of-SURBs flag if applicable.
-                            // These flags are translated into HOPR protocol packet signals and are
-                            // applicable only on the return path.
-                            let mut signals_to_dst = data
-                                .packet_info
-                                .as_ref()
-                                .map(|info| info.signals_to_destination)
-                                .unwrap_or_default();
+        let all_resolved_external_msg_rx = unresolved_routing_msg_rx.filter_map(move |(unresolved, mut data)| {
+            let path_planner = path_planner.clone();
+            async move {
+                trace!(?unresolved, "resolving routing for packet");
+                match path_planner
+                    .resolve_routing(data.data.total_len(), data.estimate_surbs_with_msg(), unresolved)
+                    .await
+                {
+                    Ok((resolved, rem_surbs)) => {
+                        // Set the SURB distress/out-of-SURBs flag if applicable.
+                        // These flags are translated into HOPR protocol packet signals and are
+                        // applicable only on the return path.
+                        let mut signals_to_dst = data
+                            .packet_info
+                            .as_ref()
+                            .map(|info| info.signals_to_destination)
+                            .unwrap_or_default();
 
-                            if resolved.is_return() {
-                                signals_to_dst = match rem_surbs {
-                                    Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
-                                        signals_to_dst | PacketSignal::SurbDistress
-                                    }
-                                    Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
-                                    _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
-                                };
-                            } else {
-                                // Unset these flags as they make no sense on the forward path.
-                                signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
-                            }
+                        if resolved.is_return() {
+                            signals_to_dst = match rem_surbs {
+                                Some(rem) if (1..distress_threshold.max(2)).contains(&rem) => {
+                                    signals_to_dst | PacketSignal::SurbDistress
+                                }
+                                Some(0) => signals_to_dst | PacketSignal::OutOfSurbs,
+                                _ => signals_to_dst - (PacketSignal::OutOfSurbs | PacketSignal::SurbDistress),
+                            };
+                        } else {
+                            // Unset these flags as they make no sense on the forward path.
+                            signals_to_dst -= PacketSignal::SurbDistress | PacketSignal::OutOfSurbs;
+                        }
 
-                            data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
-                            trace!(?resolved, "resolved routing for packet");
-                            Some((resolved, data))
-                        }
-                        Err(error) => {
-                            error!(%error, "failed to resolve routing");
-                            None
-                        }
+                        data.packet_info.get_or_insert_default().signals_to_destination = signals_to_dst;
+                        trace!(?resolved, "resolved routing for packet");
+                        Some((resolved, data))
+                    }
+                    Err(error) => {
+                        error!(%error, "failed to resolve routing");
+                        None
                     }
                 }
-                .in_current_span()
-            })
-            .merge(resolved_routing_msg_rx);
+            }
+            .in_current_span()
+        });
 
         let channels_dst = self.resolver.domain_separators().await?.channel;
         let hopr_pipeline_cfg = HoprPacketPipelineConfig {
@@ -518,6 +497,7 @@ where
             note = "same as protocol bidirectional",
             "Creating probing channel"
         );
+
         let (tx_from_probing, rx_from_probing) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
 
@@ -529,24 +509,31 @@ where
         debug!(capacity = manual_ping_channel_capacity, "Creating manual ping channel");
         let (manual_ping_tx, manual_ping_rx) = channel::<(PeerId, PingQueryReplier)>(manual_ping_channel_capacity);
 
-        // TODO (Tibor): make Probing accept Sender<(DestinationRouting, ApplicationDataOut)> and remove the
-        // resolved_routing_msg_tx channel completely
-        let probe = Probe::new((*self.me.public(), *self.me_onchain.as_ref()), self.cfg.probe);
-        for (k, v) in probe
-            .continuously_scan(
-                (resolved_routing_msg_tx, rx_from_protocol),
-                manual_ping_rx,
-                network_notifier::ProbeNetworkInteractions::new(
-                    self.network.clone(),
-                    self.resolver.clone(),
-                    self.path_planner.channel_graph(),
-                ),
-                DbProxy::new(self.db.clone(), self.resolver.clone()),
-                tx_from_probing,
-            )
-            .await
-            .into_iter()
-        {
+        let probe = Probe::new(self.cfg.probe);
+        let probing_processes = if let Some(ct) = cover_traffic {
+            probe
+                .continuously_scan(
+                    (unresolved_routing_msg_tx.clone(), rx_from_protocol),
+                    manual_ping_rx,
+                    tx_from_probing,
+                    ct,
+                )
+                .await
+        } else {
+            probe
+                .continuously_scan(
+                    (unresolved_routing_msg_tx.clone(), rx_from_protocol),
+                    manual_ping_rx,
+                    tx_from_probing,
+                    ImmediateNeighborProber::new(
+                        self.cfg.probe,
+                        network_notifier::ProbeNetworkInteractions::new(self.network.clone()),
+                    ),
+                )
+                .await
+        };
+
+        for (k, v) in probing_processes.into_iter() {
             processes.insert(HoprTransportProcess::Probing(k), v);
         }
 
@@ -678,8 +665,7 @@ where
             .into_iter()
             .filter(|ma| {
                 hopr_transport_identity::multiaddrs::is_supported(ma)
-                    && (self.cfg.transport.announce_local_addresses
-                        || !hopr_transport_identity::multiaddrs::is_private(ma))
+                    && (self.cfg.transport.announce_local_addresses || is_public_address(ma))
             })
             .map(|ma| strip_p2p_protocol(&ma))
             .filter(|v| !v.is_empty())

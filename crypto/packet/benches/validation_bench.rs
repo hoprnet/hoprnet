@@ -5,8 +5,14 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::HoprBalance;
 
 // Avoid musl's default allocator due to degraded performance
+//
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "allocator-mimalloc", feature = "allocator-jemalloc"))]
+compile_error!("feature \"allocator-jemalloc\" and feature \"allocator-mimalloc\" cannot be enabled at the same time");
+#[cfg(all(target_os = "linux", feature = "allocator-mimalloc"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[cfg(all(target_os = "linux", feature = "allocator-jemalloc"))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
@@ -29,7 +35,6 @@ pub fn validate_ticket_bench(c: &mut Criterion) {
         .addresses(source.public().to_address(), dest.public().to_address())
         .balance(HoprBalance::new_base(100))
         .index(1)
-        .index_offset(1)
         .eth_challenge(Default::default())
         .win_prob(WinningProbability::ALWAYS)
         .channel_epoch(1)

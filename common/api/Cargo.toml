@@ -10,10 +10,12 @@ license = "GPL-3.0-only"
 
 [dependencies]
 async-trait = { workspace = true }
+auto_impl = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
 multiaddr = { workspace = true }
 strum = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-internal-types = { workspace = true }

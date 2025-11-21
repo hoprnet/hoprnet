@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use hopr_lib::HostConfig;
+use hopr_lib::config::HostConfig;
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 

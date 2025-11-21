@@ -1,9 +1,9 @@
 [package]
 name = "hoprd"
-version = "3.1.1"
+version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
-description = "HOPR node executable."
+description = "HOPR node executable"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
@@ -16,11 +16,12 @@ default = [
   "telemetry",
   "explicit-path",
   "transport-quic",
-  "jemalloc-stats",
 ] # uses tokio by default because of axum
 prometheus = [
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
+  "hopr-db-node/prometheus",
+  "hopr-strategy/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
 ]
@@ -28,7 +29,10 @@ runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
+  "hopr-db-node/runtime-tokio",
+  "hopr-chain-connector/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
+  "hopr-strategy/runtime-tokio",
 ]
 telemetry = [
   "dep:opentelemetry",
@@ -48,16 +52,23 @@ capture = ["hopr-lib/capture"]
 prof = [
   "dep:console-subscriber",
 ] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
-jemalloc-stats = ["dep:tikv-jemalloc-ctl"]
+
+allocator-mimalloc = [
+  "dep:mimalloc",
+] # Use mimalloc as the global allocator on Linux
+allocator-jemalloc = [
+  "dep:tikv-jemallocator",
+] # Use jemalloc as the global allocator on Linux
+allocator-jemalloc-stats = ["allocator-jemalloc", "dep:tikv-jemalloc-ctl"]
 
 [dependencies]
 anyhow = { workspace = true }
-async-lock = { workspace = true }
 async-signal = { workspace = true }
+async-trait = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { workspace = true, optional = true }
 futures = { workspace = true }
-home = "0.5.11"
+home = "0.5.12"
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -65,6 +76,7 @@ serde_yaml = { workspace = true }
 serde_json = { workspace = true }
 signal-hook = { workspace = true }
 smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-retry = { workspace = true, optional = true }
@@ -82,6 +94,9 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
 opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
+hopr-chain-connector = { workspace = true }
+hopr-db-node = { workspace = true }
+hopr-strategy = { workspace = true }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
@@ -91,13 +106,13 @@ hopr-lib = { workspace = true, features = [
 ] }
 hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-parallelize = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 
 # Target-specific dependencies for memory allocators
 [target.'cfg(target_os = "linux")'.dependencies]
-tikv-jemallocator = "0.6.0"
-tikv-jemalloc-ctl = { version = "0.6.0", features = ["stats"], optional = true }
+mimalloc = { workspace = true, optional = true }
+tikv-jemallocator = { workspace = true, optional = true }
+tikv-jemalloc-ctl = { workspace = true, features = ["stats"], optional = true }
 
 [build-dependencies]
 vergen-gix = { workspace = true, features = ["build"] }
@@ -106,3 +121,11 @@ anyhow = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 test-log = { workspace = true }
+hopr-lib = { workspace = true, features = [
+  "runtime-tokio",
+  "session-client",
+  "session-server",
+  "utils_session",
+  "utils_parallel",
+  "testing",
+] }

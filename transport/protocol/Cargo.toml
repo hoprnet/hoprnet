@@ -11,7 +11,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
-prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
+prometheus = ["dep:hopr-metrics"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -44,8 +44,6 @@ hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-parallelize = { workspace = true, features = ["rayon"] }
-hopr-path = { workspace = true }
-hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-protocol-hopr = { workspace = true }
 hopr-protocol-app = { workspace = true }
@@ -54,11 +52,9 @@ hopr-transport-identity = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
-bimap = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
-hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }

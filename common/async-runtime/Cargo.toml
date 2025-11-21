@@ -1,6 +1,6 @@
 [package]
 name = "hopr-async-runtime"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Feature-selected async executor for HOPR"
@@ -16,5 +16,7 @@ default = []
 runtime-tokio = ["dep:tokio"]
 
 [dependencies]
-tokio = { workspace = true, optional = true }
+auto_impl = { workspace = true }
+indexmap = { workspace = true }
 futures = { workspace = true }
+tokio = { workspace = true, optional = true }

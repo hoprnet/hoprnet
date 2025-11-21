@@ -5,14 +5,19 @@ use bimap::BiHashMap;
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_random::Randomizable;
-use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};
+use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_path::{Path, TransportPath};
 use hopr_primitive_types::prelude::{BytesEncodable, KeyIdent};
 
 // Avoid musl's default allocator due to degraded performance
+//
 // https://nickb.dev/blog/default-musl-allocator-considered-harmful-to-performance
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "allocator-mimalloc", feature = "allocator-jemalloc"))]
+compile_error!("feature \"allocator-jemalloc\" and feature \"allocator-mimalloc\" cannot be enabled at the same time");
+#[cfg(all(target_os = "linux", feature = "allocator-mimalloc"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[cfg(all(target_os = "linux", feature = "allocator-jemalloc"))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 

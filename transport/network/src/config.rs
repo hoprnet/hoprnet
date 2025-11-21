@@ -78,6 +78,9 @@ pub struct NetworkConfig {
     #[serde(default = "backoff_max")]
     #[default(backoff_max())]
     pub backoff_max: f64,
+
+    #[serde(default)]
+    pub allow_private_addresses_in_store: bool,
 }
 
 impl Validate for NetworkConfig {

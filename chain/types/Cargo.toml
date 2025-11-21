@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-types"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -12,20 +12,17 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
-alloy = { workspace = true, default-features = false, features = [
-  "contract",
-  "node-bindings",
-] }
-libp2p-identity = { workspace = true }
-lazy_static = { workspace = true }
-tracing = { workspace = true }
-multiaddr = { workspace = true }
+async-trait = { workspace = true }
+anyhow = { workspace = true }
 hex-literal = { workspace = true }
+lazy_static = { workspace = true }
+multiaddr = { workspace = true }
 serde = { workspace = true }
+serde_with = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 
-hopr-bindings = { workspace = true }
+hopr-bindings = { workspace = true, optional = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -33,5 +30,14 @@ hopr-primitive-types = { workspace = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 hex = { workspace = true }
 
+[dev-dependencies]
+bincode = { workspace = true }
+insta = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+
+hopr-internal-types = { workspace = true, features = ["serde"] }
+
 [features]
-default = []
+default = ["use-bindings"]
+use-bindings = ["dep:hopr-bindings"]

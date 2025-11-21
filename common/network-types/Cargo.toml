@@ -17,7 +17,6 @@ serde = [
   "libp2p-identity/serde",
   "hopr-crypto-packet/serde",
   "hopr-crypto-types/serde",
-  "hopr-path/serde",
 ]
 runtime-tokio = [
   "dep:tokio",
@@ -56,7 +55,6 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-async-runtime = { workspace = true, optional = true }
 hopr-metrics = { workspace = true, optional = true }
-hopr-path = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

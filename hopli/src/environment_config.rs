@@ -9,14 +9,10 @@
 //!
 //! [NetworkDetail] specifies the environment type of the network, the starting block number, and
 //! the deployed contract addresses in [ContractAddresses]
-use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::HashMap, ffi::OsStr, path::PathBuf, sync::Arc};
 
-use alloy::{
+use clap::Parser;
+use hopr_bindings::exports::alloy::{
     network::EthereumWallet,
     providers::{
         Identity, ProviderBuilder, RootProvider,
@@ -29,13 +25,23 @@ use alloy::{
     signers::local::PrivateKeySigner,
     transports::http::ReqwestTransport,
 };
-use clap::Parser;
-use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
+use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::utils::HelperErrors;
+
+/// Types of HOPR network environments.
+#[derive(Debug, Copy, Clone, Deserialize, Serialize, Eq, PartialEq, strum::Display, strum::EnumString)]
+#[serde(rename_all(deserialize = "lowercase"))]
+#[strum(serialize_all = "lowercase")]
+pub enum EnvironmentType {
+    Production,
+    Staging,
+    Development,
+    Local,
+}
 
 type SharedFillerChain = JoinFill<
     JoinFill<JoinFill<JoinFill<Identity, ChainIdFiller>, NonceFiller<CachedNonceManager>>, GasFiller>,
@@ -187,54 +193,22 @@ impl NetworkProviderArgs {
 
 /// ensures that the network and environment_type exist
 /// in `contracts-addresses.json` and are matched
-pub fn ensure_environment_and_network_are_set(
-    make_root_dir_path: &Path,
-    network: &str,
-    environment_type: &str,
-) -> Result<bool, HelperErrors> {
-    let network_detail = get_network_details_from_name(make_root_dir_path, network)?;
-
-    if network_detail.environment_type.to_string() == environment_type {
-        Ok(true)
-    } else {
-        Ok(false)
-    }
-}
-
-/// Returns the environment type from the network name
-/// according to `contracts-addresses.json`
-pub fn get_environment_type_from_name(
-    make_root_dir_path: &Path,
-    network: &str,
-) -> Result<EnvironmentType, HelperErrors> {
-    let network_detail = get_network_details_from_name(make_root_dir_path, network)?;
-    Ok(network_detail.environment_type)
-}
-
-/// Get the NetworkDetail (contract addresses, environment type) from network names
-pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -> Result<NetworkDetail, HelperErrors> {
-    // read `contracts-addresses.json` at make_root_dir_path
-    let contract_environment_config_path = make_root_dir_path.join("contracts-addresses.json");
-
-    let file_read =
-        std::fs::read_to_string(contract_environment_config_path).map_err(HelperErrors::UnableToReadFromPath)?;
-
-    let network_config = serde_json::from_str::<NetworkConfig>(&file_read).map_err(HelperErrors::SerdeJson)?;
-
-    network_config
+pub fn ensure_environment_and_network_are_set(network: &str, environment_type: &str) -> Result<bool, HelperErrors> {
+    let network_detail = hopr_bindings::config::NetworksWithContractAddresses::default()
         .networks
         .get(network)
         .cloned()
-        .ok_or_else(|| HelperErrors::UnknownNetwork)
+        .ok_or_else(|| HelperErrors::UnknownNetwork)?;
+
+    Ok(network_detail.environment_type.to_string() == environment_type)
 }
 
 #[cfg(test)]
 mod tests {
-    use alloy::{
+    use hopr_bindings::exports::alloy::{
         node_bindings::{Anvil, AnvilInstance},
         providers::Provider,
     };
-    use anyhow::Context;
 
     use super::*;
 
@@ -258,59 +232,23 @@ mod tests {
 
     #[test]
     fn read_anvil_localhost_at_right_path() -> anyhow::Result<()> {
-        let correct_dir = &std::env::current_dir()
-            .context("Current dir failed")?
-            .parent()
-            .context("Parent dir failed")?
-            .join("ethereum")
-            .join("contracts");
         let network = "anvil-localhost";
         let environment_type = "local";
-        assert!(ensure_environment_and_network_are_set(
-            correct_dir,
-            network,
-            environment_type
-        )?);
-        Ok(())
-    }
-
-    #[test]
-    fn read_anvil_localhost_at_wrong_path() -> anyhow::Result<()> {
-        let wrong_dir = &std::env::current_dir().context("Current dir failed")?;
-        let network = "anvil-localhost";
-        let environment_type = "local";
-        assert!(ensure_environment_and_network_are_set(wrong_dir, network, environment_type).is_err());
+        assert!(ensure_environment_and_network_are_set(network, environment_type)?);
         Ok(())
     }
 
     #[test]
     fn read_non_existing_environment_at_right_path() -> anyhow::Result<()> {
-        let correct_dir = &std::env::current_dir()
-            .context("Current dir failed")?
-            .parent()
-            .context("Parent dir failed")?
-            .join("ethereum")
-            .join("contracts");
-
-        assert!(ensure_environment_and_network_are_set(correct_dir, "non-existing", "development").is_err());
+        assert!(ensure_environment_and_network_are_set("non-existing", "development").is_err());
         Ok(())
     }
 
     #[test]
     fn read_wrong_type_at_right_path() -> anyhow::Result<()> {
-        let correct_dir = &std::env::current_dir()
-            .context("Current dir failed")?
-            .parent()
-            .context("Parent dir failed")?
-            .join("ethereum")
-            .join("contracts");
         let network = "anvil-localhost";
         let environment_type = "production";
-        assert!(!ensure_environment_and_network_are_set(
-            correct_dir,
-            network,
-            environment_type
-        )?);
+        assert!(!ensure_environment_and_network_are_set(network, environment_type)?);
         Ok(())
     }
 
