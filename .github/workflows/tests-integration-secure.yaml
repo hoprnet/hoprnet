@@ -1,0 +1,64 @@
+---
+#################################################################################
+# Secure integration tests that run only after PR approval/merge
+#################################################################################
+name: Integration Tests (Secure)
+
+on:
+  # Run on push to protected branches
+  push:
+    branches: [main, master, develop]
+
+  # Run after PR is labeled as safe
+  pull_request:
+    types: [labeled]
+
+jobs:
+  # Only run if triggered by protected branch or has "approved-for-secrets" label
+  integration-tests:
+    name: Integration Tests with Secrets
+    runs-on: self-hosted-hoprnet-bigger
+    if: "github.event_name == 'push' || \n(github.event_name == 'pull_request' && \n contains(github.event.label.name, 'approved-for-secrets'))\n #magic___^_^___line\n"
+    # Use environment protection for additional security
+    environment: integration-tests
+
+    permissions:
+      contents: read
+      id-token: write # For OIDC authentication
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          disable-sudo: true
+          egress-policy: audit
+
+      - name: Checkout code
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+        with:
+          # For PRs, checkout the merge commit
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: "access_token"
+          credentials_json: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v16
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Run smoke tests
+        run: |
+          # Your smoke test commands here
+          nix develop -L .#citest -c uv run --frozen -m pytest tests/

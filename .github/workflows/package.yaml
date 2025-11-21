@@ -41,7 +41,7 @@ jobs:
     if: github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
     steps:
       - name: Checkout hoprnet repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           persist-credentials: false
           ref: ${{ inputs.branch }}

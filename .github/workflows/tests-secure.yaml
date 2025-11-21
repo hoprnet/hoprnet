@@ -1,0 +1,104 @@
+---
+#################################################################################
+# Secure pipeline for pull request testing without exposing secrets
+#################################################################################
+name: Test (Secure)
+
+env:
+  RUST_BACKTRACE: "1"
+  FOUNDRY_PROFILE: ci
+
+on:
+  merge_group:
+    types: [checks_requested]
+  pull_request:
+    types:
+      - opened
+      - ready_for_review
+      - reopened
+      - synchronize
+
+concurrency:
+  group: ${{ github.head_ref || github.ref_name }}-${{ github.workflow}}
+  cancel-in-progress: true
+
+# Minimal permissions by default
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Unit tests run without secrets
+  tests-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest # Use GitHub-hosted runners for untrusted code
+    timeout-minutes: 60
+    env:
+      CI: "true"
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+
+      - name: Checkout PR code
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run unit tests
+        run: nix build -L .#hopr-test
+
+  # Smart contract tests without sensitive operations
+  tests-smart-contracts:
+    runs-on: ubuntu-latest
+    name: Smart Contracts
+    timeout-minutes: 60
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          disable-sudo: true
+          egress-policy: block
+
+      - name: Checkout PR code
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run tests
+        run: nix develop -L -c make -j smart-contract-test
+        env:
+          HOPR_NETWORK: anvil-localhost
+
+  # Label PR as "tests-passed" for trusted workflow trigger
+  label-pr:
+    name: Label PR
+    runs-on: ubuntu-latest
+    needs: [tests-unit, tests-smart-contracts]
+    if: success()
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Add tests-passed label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['tests-passed']
+            })
