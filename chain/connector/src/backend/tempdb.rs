@@ -37,16 +37,8 @@ impl super::Backend for TempDbBackend {
     fn insert_account(&self, account: AccountEntry) -> Result<Option<AccountEntry>, Self::Error> {
         let write_tx = self.db.begin_write()?;
         let old_value = {
-            let mut address_to_id = write_tx.open_table(ADDRESS_TO_ID)?;
-            let chain_addr: [u8; Address::SIZE] = account.chain_addr.into();
-            address_to_id.insert(chain_addr, u32::from(account.key_id))?;
-
-            let mut key_to_id = write_tx.open_table(KEY_TO_ID)?;
-            let packet_addr: [u8; OffchainPublicKey::SIZE] = account.public_key.into();
-            key_to_id.insert(packet_addr, u32::from(account.key_id))?;
-
             let mut accounts = write_tx.open_table(ACCOUNTS_TABLE_DEF)?;
-            accounts
+            let old_value = accounts
                 .insert(
                     u32::from(account.key_id),
                     bincode::serde::encode_to_vec(&account, BINCODE_CONFIGURATION)
@@ -56,7 +48,26 @@ impl super::Backend for TempDbBackend {
                     bincode::serde::decode_from_slice::<AccountEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0)
                 })
                 .transpose()
-                .map_err(|e| redb::Error::Corrupted(format!("account decoding failed: {e}")))?
+                .map_err(|e| redb::Error::Corrupted(format!("account decoding failed: {e}")))?;
+
+            let mut address_to_id = write_tx.open_table(ADDRESS_TO_ID)?;
+            let mut key_to_id = write_tx.open_table(KEY_TO_ID)?;
+
+            // Remove old account entry references not to create stale mappings if keys changed
+            if let Some(old_entry) = &old_value {
+                let chain_addr: [u8; Address::SIZE] = old_entry.chain_addr.into();
+                let packet_addr: [u8; OffchainPublicKey::SIZE] = old_entry.public_key.into();
+                address_to_id.remove(&chain_addr)?;
+                key_to_id.remove(&packet_addr)?;
+            }
+
+            let chain_addr: [u8; Address::SIZE] = account.chain_addr.into();
+            address_to_id.insert(chain_addr, u32::from(account.key_id))?;
+
+            let packet_addr: [u8; OffchainPublicKey::SIZE] = account.public_key.into();
+            key_to_id.insert(packet_addr, u32::from(account.key_id))?;
+
+            old_value
         };
         write_tx.commit()?;
 
