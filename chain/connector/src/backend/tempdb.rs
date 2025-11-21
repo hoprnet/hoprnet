@@ -7,9 +7,13 @@ use hopr_internal_types::{
 use hopr_primitive_types::prelude::{Address, BytesRepresentable};
 use redb::{ReadableDatabase, TableDefinition};
 
+/// A backend that is implemented via [`redb`](https://docs.rs/redb/latest/redb/) database stored in a temporary file.
+///
+/// The database file is dropped once the last instance is dropped.
 #[derive(Clone)]
 pub struct TempDbBackend {
     db: std::sync::Arc<redb::Database>,
+    _tmp: std::sync::Arc<tempfile::NamedTempFile>,
 }
 
 impl TempDbBackend {
@@ -18,6 +22,7 @@ impl TempDbBackend {
 
         Ok(Self {
             db: std::sync::Arc::new(redb::Database::create(file.path()).map_err(std::io::Error::other)?),
+            _tmp: std::sync::Arc::new(file),
         })
     }
 }
