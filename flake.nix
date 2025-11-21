@@ -709,6 +709,7 @@
             extraPackages = with pkgs; [
               sqlite
               cargo-machete
+              foundry-bin
               nfpm
               envsubst
             ];
