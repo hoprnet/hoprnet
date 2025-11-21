@@ -1,11 +1,11 @@
+#[cfg(feature = "use-bindings")]
 use hopr_bindings::exports::alloy::{contract::Error as ContractError, signers::Error as SignerError};
-use thiserror::Error;
 
 /// Dynamic contract result type.
 pub type Result<T, E = ChainTypesError> = core::result::Result<T, E>;
 
 /// Error when working with chain types.
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ChainTypesError {
     #[error("invalid state: {0}")]
     InvalidState(&'static str),
@@ -17,10 +17,12 @@ pub enum ChainTypesError {
     SigningError(anyhow::Error),
 
     /// An error occurred while signing a hash.
+    #[cfg(feature = "use-bindings")]
     #[error(transparent)]
     SignerError(#[from] SignerError),
 
     /// An error occurred while interacting with contracts.
+    #[cfg(feature = "use-bindings")]
     #[error(transparent)]
     ContractError(#[from] ContractError),
 

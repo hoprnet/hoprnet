@@ -90,7 +90,7 @@ impl super::Backend for TempDbBackend {
                     bincode::serde::decode_from_slice::<ChannelEntry, _>(&v.value(), BINCODE_CONFIGURATION).map(|v| v.0)
                 })
                 .transpose()
-                .map_err(|e| redb::Error::Corrupted(format!("account decoding failed: {e}")))?
+                .map_err(|e| redb::Error::Corrupted(format!("channel decoding failed: {e}")))?
         };
         write_tx.commit()?;
 
