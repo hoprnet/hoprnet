@@ -330,7 +330,6 @@ impl SafeModuleSubcommands {
         node_address: Option<String>,
         admin_address: Option<String>,
         threshold: u32,
-        allowance: Option<f64>,
         hopr_amount: Option<f64>,
         native_amount: Option<f64>,
         private_key: PrivateKeyArgs,
@@ -714,6 +713,7 @@ impl Cmd for SafeModuleSubcommands {
                 node_address,
                 admin_address,
                 threshold,
+                #[allow(unused_variables)]
                 allowance,
                 hopr_amount,
                 native_amount,
@@ -726,7 +726,6 @@ impl Cmd for SafeModuleSubcommands {
                     node_address,
                     admin_address,
                     threshold,
-                    allowance,
                     hopr_amount,
                     native_amount,
                     private_key,

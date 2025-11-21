@@ -38,8 +38,8 @@ use thiserror::Error;
 use tracing::debug;
 
 use crate::constants::{
-    ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER, MULTICALL3_DEPLOY_CODE,
-    INIT_KEY_BINDING_FEE,
+    ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER, INIT_KEY_BINDING_FEE,
+    MULTICALL3_DEPLOY_CODE,
 };
 
 pub trait Cmd: clap::Parser + Sized {
@@ -295,19 +295,18 @@ where
             primitives::Address::from(safe_registry.address().as_ref()),
         )
         .await?;
-        let announcements_implementation = HoprAnnouncements::deploy(
-            provider.clone(),
-        )
-        .await?;
+        let announcements_implementation = HoprAnnouncements::deploy(provider.clone()).await?;
         let announcement_initialize_parameters = (
-            token.address().clone(),
-            safe_registry.address().clone(),
+            *token.address(),
+            *safe_registry.address(),
             INIT_KEY_BINDING_FEE,
-            self_address
-        ).abi_encode();
+            self_address,
+        )
+            .abi_encode();
         let encode_initialization = HoprAnnouncements::initializeCall {
-            initParams: announcement_initialize_parameters.into()
-        }.abi_encode();
+            initParams: announcement_initialize_parameters.into(),
+        }
+        .abi_encode();
 
         let announcements_proxy = HoprAnnouncementsProxy::deploy(
             provider.clone(),
@@ -327,7 +326,7 @@ where
         // get the defaultHoprNetwork from the stake factory
         let default_hopr_network = stake_factory.defaultHoprNetwork().call().await?;
         let new_default_hopr_network = HoprNodeStakeFactory::HoprNetwork {
-            tokenAddress: token.address().clone(),
+            tokenAddress: *token.address(),
             defaultTokenAllowance: default_hopr_network.defaultTokenAllowance,
             defaultAnnouncementTarget: default_hopr_network.defaultAnnouncementTarget,
         };
@@ -342,10 +341,7 @@ where
         Ok(Self {
             token,
             channels,
-            announcements: HoprAnnouncementsInstance::new(
-                announcements_proxy.address().clone(),
-                provider.clone(),
-            ),
+            announcements: HoprAnnouncementsInstance::new(*announcements_proxy.address(), provider.clone()),
             safe_registry,
             price_oracle,
             win_prob_oracle,

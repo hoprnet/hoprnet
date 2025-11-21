@@ -26,8 +26,8 @@ use hopr_bindings::{
         sol_types::{SolCall, SolValue},
     },
     hopr_node_management_module::HoprNodeManagementModule::{
-        HoprNodeManagementModuleInstance, addChannelsAndTokenTargetCall, includeNodeCall, removeNodeCall,
-        scopeTargetTokenCall, initializeCall
+        HoprNodeManagementModuleInstance, addChannelsAndTokenTargetCall, includeNodeCall, initializeCall,
+        removeNodeCall, scopeTargetTokenCall,
     },
     hopr_node_safe_registry::HoprNodeSafeRegistry::{HoprNodeSafeRegistryInstance, deregisterNodeBySafeCall},
     hopr_node_stake_factory::HoprNodeStakeFactory::{HoprNodeStakeFactoryInstance, cloneCall},
@@ -36,15 +36,14 @@ use hopr_bindings::{
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use tracing::{debug, info};
 
-use crate::utils::{
-    HelperErrors, get_create2_address,
-};
-
-use crate::constants::{
-    ERC_1967_PROXY_CREATION_CODE, SAFE_MULTISEND_ADDRESS, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS,
-    SAFE_SAFE_L2_ADDRESS, SAFE_SAFEPROXYFACTORY_ADDRESS, DEFAULT_ANNOUNCEMENT_PERMISSIONS, 
-    DEFAULT_CAPABILITY_PERMISSIONS, DEFAULT_NODE_PERMISSIONS, DOMAIN_SEPARATOR_TYPEHASH,
-    SAFE_TX_TYPEHASH, SENTINEL_OWNERS, MULTICALL3_DEPLOYER, ETH_VALUE_FOR_MULTICALL3_DEPLOYER,
+use crate::{
+    constants::{
+        DEFAULT_ANNOUNCEMENT_PERMISSIONS, DEFAULT_CAPABILITY_PERMISSIONS, DEFAULT_NODE_PERMISSIONS,
+        DOMAIN_SEPARATOR_TYPEHASH, ERC_1967_PROXY_CREATION_CODE, ETH_VALUE_FOR_MULTICALL3_DEPLOYER,
+        MULTICALL3_DEPLOYER, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS, SAFE_MULTISEND_ADDRESS, SAFE_SAFE_L2_ADDRESS,
+        SAFE_SAFEPROXYFACTORY_ADDRESS, SAFE_TX_TYPEHASH, SENTINEL_OWNERS,
+    },
+    utils::{HelperErrors, get_create2_address},
 };
 
 sol!(
@@ -553,17 +552,16 @@ pub fn predict_module_address(
         safe_address,
         SAFE_MULTISEND_ADDRESS,
         default_announcement_target,
-        default_target
-    ).abi_encode();
+        default_target,
+    )
+        .abi_encode();
 
     let encode_initialization = initializeCall {
-        initParams: initialize_parameters.into()
-    }.abi_encode();
+        initParams: initialize_parameters.into(),
+    }
+    .abi_encode();
 
-    let erc1967_initialize_code = (
-            implementation_address,
-            encode_initialization
-        ).abi_encode()[32..].to_vec();
+    let erc1967_initialize_code = (implementation_address, encode_initialization).abi_encode()[32..].to_vec();
     debug!("erc1967_initialize_code {:?}", hex::encode(&erc1967_initialize_code));
 
     let module_creation_code = (
@@ -572,7 +570,10 @@ pub fn predict_module_address(
     )
         .abi_encode_packed();
     debug!("module_creation_code {:?}", hex::encode(&module_creation_code));
-    debug!("module_creation_code_hash {:?}", hex::encode(keccak256(&module_creation_code)));
+    debug!(
+        "module_creation_code_hash {:?}",
+        hex::encode(keccak256(&module_creation_code))
+    );
 
     let predict_module_addr = get_create2_address(factory_address, module_salt, keccak256(&module_creation_code));
     debug!("predict_module_addr {:?}", predict_module_addr);
@@ -669,11 +670,11 @@ pub fn prepare_safe_tx_multicall_payload_from_owner_contract(
     CallItem::<execTransactionCall>::new(deployed_safe, input.into())
 }
 
-/// Deploy a safe and a module proxies via v4 HoprStakeFactory contract with default permissions and announcement targets
-/// With the multicall contract, it deploys a safe proxy instance and a module proxy instance with multicall as an owner, 
-/// and completes necessary setup.
+/// Deploy a safe and a module proxies via v4 HoprStakeFactory contract with default permissions and announcement
+/// targets With the multicall contract, it deploys a safe proxy instance and a module proxy instance with multicall as
+/// an owner, and completes necessary setup.
 /// Then the multicall includes some additional steps:
-/// 1. if node addresses are known, include nodes to the module by safe 
+/// 1. if node addresses are known, include nodes to the module by safe
 /// 2. transfer safe ownership to actual admins
 /// 3. set desired threshold
 ///
@@ -735,12 +736,10 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
     )?;
     debug!("predicted safe address {:?}", safe_address.to_string());
 
-    let module_address = hopr_node_stake_factory.predictModuleAddress_1(
-        MULTICALL3_ADDRESS,
-        nonce.into(),
-        safe_address,
-        default_target.into(),
-    ).call().await?;
+    let module_address = hopr_node_stake_factory
+        .predictModuleAddress_1(MULTICALL3_ADDRESS, nonce.into(), safe_address, default_target.into())
+        .call()
+        .await?;
     debug!("predicted module address {:?}", module_address.to_string());
 
     let deployed_module = HoprNodeManagementModuleInstance::new(module_address, provider.clone());
@@ -1195,9 +1194,9 @@ mod tests {
     };
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
+    use tracing_subscriber::{EnvFilter, Registry, fmt, prelude::*};
 
     use super::*;
-    use tracing_subscriber::{prelude::*, EnvFilter, fmt, Registry};
     use crate::utils::{ContractInstances, a2h, create_anvil};
 
     pub type AnvilRpcClient = FillProvider<
@@ -1210,8 +1209,7 @@ mod tests {
 
     fn init_tracing() {
         // Use RUST_LOG if set, otherwise default to "debug" for verbose test output
-        let env_filter = EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new("debug"));
+        let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
 
         // Match main.rs formatting style
         let format = fmt::layer()
@@ -1222,10 +1220,7 @@ mod tests {
             .with_test_writer(); // ensures logs show up in `cargo test`
 
         // Set the global subscriber (harmless no-op if already initialized)
-        let _ = Registry::default()
-            .with(env_filter)
-            .with(format)
-            .try_init();
+        let _ = Registry::default().with(env_filter).with(format).try_init();
     }
 
     /// Used for testing. Creates RPC client to the local Anvil instance.
@@ -1610,9 +1605,6 @@ mod tests {
         let curr_nonce = client.get_transaction_count(caller).pending().await?;
         let nonce = keccak256((caller, U256::from(curr_nonce)).abi_encode_packed());
 
-        let default_hopr_network_value = instances.stake_factory.defaultHoprNetwork(
-        ).call().await?;
-
         let safe_address = predict_safe_address(
             *instances.stake_factory.address(),
             vec![caller],
@@ -1624,21 +1616,35 @@ mod tests {
 
         debug!("predict_safe_address {:?}", safe_address);
 
-        let safe_address_predicted_from_sc = instances.stake_factory.predictSafeAddress(
-            vec![caller],
-            nonce.into()
-        ).call().await?;
-        debug!("predicted safe address from smart contract {:?}", safe_address_predicted_from_sc.to_string());
+        let safe_address_predicted_from_sc = instances
+            .stake_factory
+            .predictSafeAddress(vec![caller], nonce.into())
+            .call()
+            .await?;
+        debug!(
+            "predicted safe address from smart contract {:?}",
+            safe_address_predicted_from_sc.to_string()
+        );
 
-        assert_eq!(safe_address, safe_address_predicted_from_sc, "safe address prediction local vs smart contract does not match");
+        assert_eq!(
+            safe_address, safe_address_predicted_from_sc,
+            "safe address prediction local vs smart contract does not match"
+        );
 
-        let module_address_predicted_from_sc = instances.stake_factory.predictModuleAddress_1(
-            caller,
-            nonce.into(),
-            safe_address,
-            U256::from_str(default_target.as_str())?.into(),
-        ).call().await?;
-        info!("predicted module address from smart contract {:?}", module_address_predicted_from_sc.to_string());
+        let module_address_predicted_from_sc = instances
+            .stake_factory
+            .predictModuleAddress_1(
+                caller,
+                nonce.into(),
+                safe_address,
+                U256::from_str(default_target.as_str())?.into(),
+            )
+            .call()
+            .await?;
+        info!(
+            "predicted module address from smart contract {:?}",
+            module_address_predicted_from_sc.to_string()
+        );
 
         // deploy a safe proxy instance and a module proxy instance with multicall as an owner
         let deployment_receipt = instances
@@ -1669,7 +1675,10 @@ mod tests {
         info!("deployed module address {:?}", module_addr);
 
         assert_eq!(safe_addr, safe_address, "safe prediction does not match");
-        assert_eq!(module_addr, module_address_predicted_from_sc, "module prediction does not match");
+        assert_eq!(
+            module_addr, module_address_predicted_from_sc,
+            "module prediction does not match"
+        );
         Ok(())
     }
 
@@ -1725,7 +1734,11 @@ mod tests {
             .call()
             .await?;
 
-        assert_eq!(allowance, U256::from(1_000_000_000_000_000_000_000_u128), "allowance is not set");
+        assert_eq!(
+            allowance,
+            U256::from(1_000_000_000_000_000_000_000_u128),
+            "allowance is not set"
+        );
 
         // check nodes have been included in the module
         for node_address in node_addresses {
@@ -1791,7 +1804,11 @@ mod tests {
             .call()
             .await?;
 
-        assert_eq!(allowance, U256::from(1_000_000_000_000_000_000_000_u128), "allowance is not set");
+        assert_eq!(
+            allowance,
+            U256::from(1_000_000_000_000_000_000_000_u128),
+            "allowance is not set"
+        );
 
         let mut multisend_txns: Vec<MultisendTransaction> = Vec::new();
         for val in desired_amount {
@@ -2062,7 +2079,7 @@ mod tests {
         let deployer_vec: Vec<Address> = vec![a2h(contract_deployer.public().to_address())];
 
         // create a safe
-        let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
+        let (_safe, _node_module) = deploy_safe_module_with_targets_and_nodes(
             instances.stake_factory,
             *instances.channels.address(),
             None,
@@ -2071,15 +2088,6 @@ mod tests {
         )
         .await?;
 
-        // debug_node_safe_module_setup_main(
-        //     instances.token.clone(),
-        //     node_module.address(),
-        //     &node_addresses[0],
-        //     safe.address(),
-        //     instances.channels.address(),
-        //     instances.announcements.address(),
-        // )
-        // .await?;
         Ok(())
     }
 }
