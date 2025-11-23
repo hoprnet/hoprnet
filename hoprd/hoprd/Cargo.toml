@@ -16,7 +16,8 @@ default = [
   "telemetry",
   "explicit-path",
   "transport-quic",
-  "hopr-lib/utils_blokli"
+  "hopr-lib/utils_blokli",
+  "hopr-lib/utils_db"
 ] # uses tokio by default because of axum
 prometheus = [
   "hopr-lib/prometheus",

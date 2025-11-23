@@ -47,6 +47,9 @@ utils_session = [ # utility session functionality for advanced interaction with 
 utils_blokli = [ # utility to include blokli functionality
   "dep:hopr-chain-connector",
 ]
+utils_db = [ # utility database functionality
+  "dep:hopr-db-node",
+]
 utils_futures = [] # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
