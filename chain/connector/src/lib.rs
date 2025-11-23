@@ -18,6 +18,10 @@ pub mod blokli_client {
     };
 }
 
+pub mod reexports {
+    pub use hopr_chain_types;
+}
+
 pub use hopr_chain_types::prelude::{ContractAddresses, PayloadGenerator};
 pub use hopr_crypto_types::prelude::ChainKeypair;
 pub use hopr_primitive_types::prelude::Address;
