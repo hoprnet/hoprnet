@@ -4,6 +4,9 @@ compile_error!("'utils_session' feature requires the 'runtime-tokio' feature to 
 #[cfg(feature = "utils_session")]
 pub mod session;
 
+#[cfg(feature = "utils_blokli")]
+pub mod blokli;
+
 #[cfg(all(feature = "utils_futures", not(feature = "runtime-tokio")))]
 compile_error!("'utils_futures' feature requires the 'runtime-tokio' feature to be enabled");
 #[cfg(feature = "utils_futures")]

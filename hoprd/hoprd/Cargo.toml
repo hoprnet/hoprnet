@@ -16,6 +16,7 @@ default = [
   "telemetry",
   "explicit-path",
   "transport-quic",
+  "hopr-lib/utils_blokli"
 ] # uses tokio by default because of axum
 prometheus = [
   "hopr-lib/prometheus",
@@ -30,7 +31,6 @@ runtime-tokio = [
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
   "hopr-db-node/runtime-tokio",
-  "hopr-chain-connector/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
   "hopr-strategy/runtime-tokio",
 ]
@@ -94,7 +94,6 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
 opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
-hopr-chain-connector = { workspace = true }
 hopr-db-node = { workspace = true }
 hopr-strategy = { workspace = true }
 hopr-lib = { workspace = true, features = [

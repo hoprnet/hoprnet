@@ -5283,7 +5283,6 @@ dependencies = [
  "console-subscriber",
  "futures",
  "home",
- "hopr-chain-connector",
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",

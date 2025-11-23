@@ -44,6 +44,9 @@ utils_session = [ # utility session functionality for advanced interaction with 
   "dep:tokio",
   "dep:tokio-stream",
 ]
+utils_blokli = [ # utility to include blokli functionality
+  "dep:hopr-chain-connector",
+]
 utils_futures = [] # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
