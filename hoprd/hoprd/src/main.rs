@@ -2,7 +2,6 @@ use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
-
 use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
     AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,

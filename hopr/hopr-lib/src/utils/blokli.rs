@@ -1,5 +1,4 @@
 use hopr_chain_connector::{BlockchainConnectorConfig, blokli_client::BlokliClientConfig};
-
 pub use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
 
 pub const DEFAULT_BLOKLI_URL: &str = "https://blokli.hoprnet.org";

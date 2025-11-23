@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use futures::channel::mpsc::channel;
+pub use hopr_api::chain::AcknowledgedTicket;
+pub use hopr_db_node::HoprNodeDb;
 use hopr_db_node::HoprNodeDbConfig;
 use hopr_transport::ChainKeypair;
-
-pub use {hopr_api::chain::AcknowledgedTicket, hopr_db_node::HoprNodeDb};
 
 pub async fn init_db(
     chain_key: &ChainKeypair,
