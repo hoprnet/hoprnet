@@ -1214,7 +1214,9 @@ where
             .map(|pk| pk.map(|v| v.into()))
             .map_err(HoprLibError::chain)
     }
+}
 
+impl<Chain, Db> Hopr<Chain, Db> {
     // === telemetry
     /// Prometheus formatted metrics collected by the hopr-lib components.
     pub fn collect_hopr_metrics() -> errors::Result<String> {
