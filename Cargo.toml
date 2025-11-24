@@ -38,6 +38,7 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
+  "utils/session"
 ]
 
 [workspace.dependencies]
@@ -255,6 +256,7 @@ hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hopr-utils-session = { path = "utils/session" }
 
 [profile.dev]
 panic = "abort"

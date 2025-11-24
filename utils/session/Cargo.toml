@@ -1,0 +1,86 @@
+[package]
+name = "hopr-utils-session"
+version = "1.0.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2024"
+description = "Utility functionalito for managing HOPR sessions through the hopr-lib interface."
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+runtime-tokio = [
+  "hopr-async-runtime/runtime-tokio",
+  "hopr-network-types/runtime-tokio",
+  "hopr-transport/runtime-tokio",
+  "hopr-chain-connector?/runtime-tokio",
+  "hopr-db-node?/runtime-tokio",
+]
+prometheus = [
+  "dep:hopr-metrics",
+  "hopr-transport/prometheus",
+  "hopr-network-types/prometheus",
+  "hopr-db-node/prometheus",
+]
+
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+atomic_enum = { workspace = true }
+backon = { workspace = true, features = ["futures-timer-sleep"] }
+base64 = { workspace = true }
+bytesize = { workspace = true }
+cfg-if = { workspace = true }
+const_format = { workspace = true }
+dashmap = { workspace = true}
+futures = { workspace = true }
+futures-time = { workspace = true }
+hex-literal = { workspace = true, optional = true }
+human-bandwidth = { workspace = true }
+lazy_static = { workspace = true }
+parking_lot = { workspace = true }
+rand = { workspace = true, optional = true }
+rstest = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_with = { workspace = true }
+strum = { workspace = true }
+smart-default = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true, features = ["compat"], optional = true }
+tracing = { workspace = true }
+validator = { workspace = true }
+
+hopr-api = { workspace = true }
+hopr-lib = { workspace = true }
+hopr-async-runtime = { workspace = true }
+hopr-crypto-keypair = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-chain-connector = { workspace = true, optional = true }
+hopr-db-node = { workspace = true, optional = true }
+hopr-internal-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-network-types = { workspace = true }
+hopr-parallelize = { workspace = true }
+hopr-platform = { workspace = true }
+hopr-primitive-types = { workspace = true }
+hopr-transport = { workspace = true }
+
+[dev-dependencies]
+hex-literal = { workspace = true }
+parameterized = { workspace = true }
+rand = { workspace = true }
+rstest = { workspace = true }
+serial_test = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+test-log = { workspace = true }
+
+

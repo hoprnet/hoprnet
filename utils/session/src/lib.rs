@@ -30,7 +30,7 @@ use serde_with::serde_as;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info};
 
-use crate::{
+use hopr_lib::{
     Address, Hopr, HoprSession, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
     errors::HoprLibError, transfer_session,
 };

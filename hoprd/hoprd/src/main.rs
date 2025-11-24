@@ -6,10 +6,7 @@ use hopr_db_node::HoprNodeDb;
 use hopr_lib::{
     AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
     exports::api::chain::ChainEvents,
-    utils::{
-        blokli::{BlokliClient, HoprBlockchainSafeConnector},
-        session::ListenerJoinHandles,
-    },
+    utils::blokli::{BlokliClient, HoprBlockchainSafeConnector},
 };
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
@@ -161,7 +158,7 @@ async fn init_rest_api(
 
     info!(listen_address, "Running a REST API");
 
-    let session_listener_sockets = Arc::new(ListenerJoinHandles::default());
+    let session_listener_sockets = Arc::new(hopr_utils_session::ListenerJoinHandles::default());
 
     let mut processes = AbortableList::<HoprdProcess>::default();
 

@@ -5273,6 +5273,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-utils-session"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "atomic_enum",
+ "backon",
+ "base64 0.22.1",
+ "bytesize",
+ "cfg-if",
+ "const_format",
+ "dashmap",
+ "futures",
+ "futures-time",
+ "hex-literal",
+ "hopr-api",
+ "hopr-async-runtime",
+ "hopr-chain-connector",
+ "hopr-crypto-keypair",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-node",
+ "hopr-internal-types",
+ "hopr-lib",
+ "hopr-metrics",
+ "hopr-network-types",
+ "hopr-parallelize",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "hopr-transport",
+ "human-bandwidth",
+ "lazy_static",
+ "parameterized",
+ "parking_lot",
+ "rand 0.8.5",
+ "rstest",
+ "serde",
+ "serde_with",
+ "serde_yaml",
+ "serial_test",
+ "smart-default",
+ "strum 0.27.2",
+ "test-log",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "validator",
+]
+
+[[package]]
 name = "hoprd"
 version = "4.0.0"
 dependencies = [
@@ -5287,6 +5339,7 @@ dependencies = [
  "hopr-lib",
  "hopr-metrics",
  "hopr-strategy",
+ "hopr-utils-session",
  "hoprd-api",
  "lazy_static",
  "mimalloc",
@@ -5331,6 +5384,7 @@ dependencies = [
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-utils-session",
  "human-bandwidth",
  "lazy_static",
  "oas3",

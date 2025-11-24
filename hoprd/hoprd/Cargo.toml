@@ -104,6 +104,7 @@ hopr-lib = { workspace = true, features = [
   "utils_session",
   "utils_parallel",
 ] }
+hopr-utils-session = { workspace = true }
 hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
