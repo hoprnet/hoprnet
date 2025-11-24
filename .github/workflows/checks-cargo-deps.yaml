@@ -51,5 +51,8 @@ jobs:
         env:
           USER: runner
 
-      - name: Find unused cargo dependencies
+      - name: Find unused cargo dependencies (machete)
         run: nix develop .#ci --command cargo machete
+
+      - name: Find unused cargo dependencies (shear)
+        run: nix develop .#ci --command cargo shear

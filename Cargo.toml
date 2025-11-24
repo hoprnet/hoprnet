@@ -192,7 +192,6 @@ tower-http = { version = "0.6.6", features = [
   "sensitive-headers",
 ] }
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
-oas3 = "0.20.1"
 urlencoding = "2.1.3"
 utoipa = { version = "5.4.0" }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
@@ -208,7 +207,6 @@ tracing-subscriber = { version = "0.3.20", features = [
   "registry",
   "std",
 ] }
-tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.19.0"
 uuid = { version = "1.18.1" }
 url = { version = "2.5.7", features = ["serde"] }

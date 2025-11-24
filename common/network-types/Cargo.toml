@@ -61,7 +61,6 @@ parameterized = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 test-log = { workspace = true }
-serial_test = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }

@@ -45,7 +45,6 @@ hopr-primitive-types = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
 hex = { workspace = true }
-hex-literal = { workspace = true }
 parameterized = { workspace = true }
 subtle = { workspace = true }
 

@@ -37,6 +37,5 @@ hopr-network-types = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 tokio = { workspace = true }
-mockall = { workspace = true }
 more-asserts = { workspace = true }
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
