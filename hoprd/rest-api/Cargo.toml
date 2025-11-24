@@ -61,5 +61,5 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 oas3 = { workspace = true }
+anyhow = { workspace = true }
