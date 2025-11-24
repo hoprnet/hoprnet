@@ -4629,7 +4629,6 @@ dependencies = [
  "elliptic-curve",
  "generic-array 1.3.5",
  "hex",
- "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",
@@ -4805,7 +4804,6 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport",
- "hopr-transport-session",
  "human-bandwidth",
  "lazy_static",
  "parameterized",
@@ -4860,7 +4858,6 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_bytes",
- "serial_test",
  "socket2 0.6.1",
  "strum 0.27.2",
  "test-log",
@@ -5047,7 +5044,6 @@ dependencies = [
 name = "hopr-transport-bloom"
 version = "0.2.0"
 dependencies = [
- "anyhow",
  "bloomfilter",
  "criterion",
  "hopr-crypto-random",
@@ -5077,14 +5073,11 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-metrics",
  "lazy_static",
- "mockall",
- "more-asserts",
  "rust-stream-ext-concurrent",
  "smart-default",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "tracing-test",
 ]
 
 [[package]]
@@ -5103,7 +5096,6 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
- "mockall",
  "more-asserts",
  "multiaddr",
  "serde",
@@ -5140,7 +5132,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "tracing-test",
 ]
 
 [[package]]
@@ -5175,7 +5166,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "tracing-test",
  "validator",
 ]
 
@@ -5340,7 +5330,6 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum 0.27.2",
- "test-log",
  "tokio",
  "tower",
  "tower-http",
@@ -5880,9 +5869,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.44.0"
+version = "1.44.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b246c455fbf8e7bdda56a226b525b24b601c0bbe15458beb72412678319cda5a"
+checksum = "e8732d3774162a0851e3f2b150eb98f31a9885dd75985099421d393385a01dfd"
 dependencies = [
  "console",
  "once_cell",
@@ -6744,9 +6733,9 @@ dependencies = [
 
 [[package]]
 name = "mockall"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
+checksum = "f58d964098a5f9c6b63d0798e5372fd04708193510a7af313c22e9f29b7b620b"
 dependencies = [
  "cfg-if",
  "downcast",
@@ -6758,9 +6747,9 @@ dependencies = [
 
 [[package]]
 name = "mockall_derive"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25ca3004c2efe9011bd4e461bd8256445052b9615405b4f7ea43fc8ca5c20898"
+checksum = "ca41ce716dda6a9be188b385aa78ee5260fc25cd3802cb2a8afdc6afbe6b6dbf"
 dependencies = [
  "cfg-if",
  "proc-macro2",
@@ -10310,27 +10299,6 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
-]
-
-[[package]]
-name = "tracing-test"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "557b891436fe0d5e0e363427fc7f217abf9ccd510d5136549847bdcbcd011d68"
-dependencies = [
- "tracing-core",
- "tracing-subscriber",
- "tracing-test-macro",
-]
-
-[[package]]
-name = "tracing-test-macro"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04659ddb06c87d233c566112c1c9c5b9e98256d9af50ec3bc9c8327f873a7568"
-dependencies = [
- "quote",
- "syn 2.0.110",
 ]
 
 [[package]]
