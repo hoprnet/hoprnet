@@ -111,13 +111,14 @@ mockall = "0.14.0"
 moka = { version = "0.12.11", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
+oas3 = "0.20.1"
 num_enum = "0.7.5"
 opentelemetry = { version = "0.31.0" }
 opentelemetry-otlp = { version = "0.31.0", default-features = false }
 opentelemetry_sdk = { version = "0.31.0" }
 tracing-opentelemetry = { version = "0.32.0" }
 temp-env = "0.3.6"
-parameterized = "2.0.0" # kept back to 2.0.0 due to conflict with indexmap
+parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
 pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", features = ["serde-1"] }
@@ -288,3 +289,6 @@ strip = false
 [profile.dev.package]
 insta.opt-level = 3
 similar.opt-level = 3
+
+[workspace.metadata.cargo-shear]
+ignored = ["oas3"]

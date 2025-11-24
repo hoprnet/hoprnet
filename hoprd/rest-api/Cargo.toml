@@ -61,4 +61,5 @@ hopr-chain-connector = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
+oas3 = { workspace = true }
 anyhow = { workspace = true }
