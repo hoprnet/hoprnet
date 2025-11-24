@@ -1,14 +1,13 @@
 use sea_orm_migration::prelude::*;
 
-use crate::BackendType;
-
 #[derive(DeriveMigrationName)]
-pub struct Migration(pub crate::BackendType);
+pub struct Migration;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let mut table = Table::create()
+        manager.create_table(
+            Table::create()
             .table(OutgoingTicketIndex::Table)
             .if_not_exists()
             .col(
@@ -30,26 +29,8 @@ impl MigrationTrait for Migration {
                     .binary_len(8)
                     .default(vec![0u8; 8]),
             )
-            .to_owned();
-
-        manager
-            .create_table(if self.0 != BackendType::SQLite {
-                table
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("fk_ticket_channel")
-                            .from_tbl(OutgoingTicketIndex::Table)
-                            .from_col(OutgoingTicketIndex::ChannelId)
-                            .to_tbl(Channel::Table)
-                            .to_col(Channel::ChannelId)
-                            .on_delete(ForeignKeyAction::Cascade)
-                            .on_update(ForeignKeyAction::Restrict),
-                    )
-                    .to_owned()
-            } else {
-                table
-            })
-            .await
+            .to_owned()
+        ).await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -65,11 +46,4 @@ enum OutgoingTicketIndex {
     Id,
     ChannelId,
     Index,
-}
-
-#[allow(clippy::enum_variant_names)]
-#[derive(DeriveIden)]
-enum Channel {
-    Table,
-    ChannelId,
 }
