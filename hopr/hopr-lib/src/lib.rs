@@ -35,13 +35,6 @@ pub mod state;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
-/// Export of relevant types for easier integration.
-#[doc(hidden)]
-pub mod reexports {
-    #[cfg(feature = "utils_blokli")]
-    pub use hopr_chain_connector::reexports::hopr_chain_types::exports::alloy;
-}
-
 /// Exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {

@@ -1,12 +1,3 @@
-#[cfg(all(feature = "utils_session", not(feature = "runtime-tokio")))]
-compile_error!("'utils_session' feature requires the 'runtime-tokio' feature to be enabled");
-
-#[cfg(feature = "utils_blokli")]
-pub mod blokli;
-
-#[cfg(feature = "utils_db")]
-pub mod db;
-
 #[cfg(all(feature = "utils_futures", not(feature = "runtime-tokio")))]
 compile_error!("'utils_futures' feature requires the 'runtime-tokio' feature to be enabled");
 #[cfg(feature = "utils_futures")]

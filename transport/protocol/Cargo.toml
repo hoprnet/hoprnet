@@ -66,7 +66,7 @@ hopr-network-types = { workspace = true }
 test-log = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
-hopr-chain-connector = { workspace = true, features = [
+hopr-utils-chain-connector = { workspace = true, features = [
   "runtime-tokio",
   "testing",
 ] }

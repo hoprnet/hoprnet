@@ -1,10 +1,10 @@
 [package]
-name = "hopr-chain-connector"
+name = "hopr-utils-chain-connector"
 version = "0.1.1"
 edition = "2024"
 
 [features]
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
+runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-async-runtime/runtime-tokio"]
 testing = ["dep:hex", "blokli-client/testing", "hopr-chain-types/use-bindings"]
 
 [dependencies]
@@ -29,6 +29,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
 
+hopr-lib = { workspace = true }
 hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-types = { workspace = true }
@@ -37,7 +38,7 @@ hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-hopr-chain-connector = { workspace = true, features = [
+hopr-utils-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }

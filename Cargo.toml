@@ -3,7 +3,6 @@
 resolver = "2"
 
 members = [
-  "chain/connector",
   "chain/types",
   "common/api",
   "common/async-runtime",
@@ -38,7 +37,9 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
-  "utils/session"
+  "utils/session",
+  "utils/node-db",
+  "utils/chain/connector",
 ]
 
 [workspace.dependencies]
@@ -222,7 +223,6 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c" } # master branch on 18.11.2025
-hopr-chain-connector = { path = "chain/connector" }
 hopr-chain-types = { path = "chain/types" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
@@ -257,6 +257,8 @@ hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hopr-utils-session = { path = "utils/session" }
+hopr-utils-node-db = { path = "utils/node-db" }
+hopr-utils-chain-connector = { path = "utils/chain/connector" }
 
 [profile.dev]
 panic = "abort"

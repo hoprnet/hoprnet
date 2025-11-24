@@ -1,4 +1,4 @@
-use hopr_chain_connector::{
+use hopr_utils_chain_connector::{
     HoprBlockchainSafeConnector,
     testing::{BlokliTestClient, FullStateEmulator},
 };

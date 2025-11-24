@@ -56,7 +56,7 @@ hopr-lib = { workspace = true, features = [
 ] }
 
 hopr-db-node = { workspace = true }
-hopr-chain-connector = { workspace = true }
+hopr-utils-chain-connector = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }
 

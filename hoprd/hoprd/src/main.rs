@@ -3,11 +3,9 @@ use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_db_node::HoprNodeDb;
-use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex,
-    exports::api::chain::ChainEvents,
-    utils::blokli::{BlokliClient, HoprBlockchainSafeConnector},
-};
+use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, exports::api::chain::ChainEvents};
+
+use hopr_utils_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
@@ -211,6 +209,8 @@ fn main() -> anyhow::Result<()> {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
+    use hopr_utils_chain_connector::init_blokli_connector;
+
     init_logger()?;
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
@@ -266,7 +266,7 @@ async fn main_inner() -> anyhow::Result<()> {
     .await?;
 
     let chain_connector = Arc::new(
-        hopr_lib::utils::blokli::init_blokli_connector(
+        init_blokli_connector(
             &hopr_keys.chain_key,
             cfg.provider.clone(),
             cfg.hopr.safe_module.module_address,

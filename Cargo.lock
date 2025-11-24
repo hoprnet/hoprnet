@@ -4503,41 +4503,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-chain-connector"
-version = "0.1.1"
-dependencies = [
- "ahash",
- "anyhow",
- "async-broadcast",
- "async-trait",
- "bincode",
- "blokli-client",
- "dashmap",
- "futures",
- "futures-concurrency",
- "futures-time",
- "hex",
- "hopr-api",
- "hopr-async-runtime",
- "hopr-chain-connector",
- "hopr-chain-types",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-primitive-types",
- "lazy_static",
- "moka",
- "parking_lot",
- "petgraph",
- "redb",
- "serde_json",
- "smart-default",
- "tempfile",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "hopr-chain-types"
 version = "0.10.0"
 dependencies = [
@@ -4793,7 +4758,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -4989,10 +4953,10 @@ dependencies = [
  "futures-time",
  "hex-literal",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-crypto-random",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-utils-chain-connector",
  "insta",
  "lazy_static",
  "mockall",
@@ -5194,7 +5158,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -5212,6 +5175,7 @@ dependencies = [
  "hopr-transport-mixer",
  "hopr-transport-probe",
  "hopr-transport-session",
+ "hopr-utils-chain-connector",
  "lazy_static",
  "libp2p",
  "moka",
@@ -5273,6 +5237,79 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-utils-chain-connector"
+version = "0.1.1"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "async-broadcast",
+ "async-trait",
+ "bincode",
+ "blokli-client",
+ "dashmap",
+ "futures",
+ "futures-concurrency",
+ "futures-time",
+ "hex",
+ "hopr-api",
+ "hopr-async-runtime",
+ "hopr-chain-types",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-lib",
+ "hopr-primitive-types",
+ "hopr-utils-chain-connector",
+ "lazy_static",
+ "moka",
+ "parking_lot",
+ "petgraph",
+ "redb",
+ "serde_json",
+ "smart-default",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-utils-node-db"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "axum-extra",
+ "base64 0.22.1",
+ "bytesize",
+ "const_format",
+ "futures",
+ "futures-concurrency",
+ "hopr-db-node",
+ "hopr-lib",
+ "hopr-metrics",
+ "hopr-utils-chain-connector",
+ "human-bandwidth",
+ "lazy_static",
+ "oas3",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "smart-default",
+ "strum 0.27.2",
+ "test-log",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "urlencoding",
+ "utoipa",
+ "utoipa-scalar",
+ "utoipa-swagger-ui",
+ "validator",
+]
+
+[[package]]
 name = "hopr-utils-session"
 version = "1.0.0"
 dependencies = [
@@ -5290,7 +5327,6 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -5303,6 +5339,7 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport",
+ "hopr-utils-chain-connector",
  "human-bandwidth",
  "lazy_static",
  "parameterized",
@@ -5339,6 +5376,8 @@ dependencies = [
  "hopr-lib",
  "hopr-metrics",
  "hopr-strategy",
+ "hopr-utils-chain-connector",
+ "hopr-utils-node-db",
  "hopr-utils-session",
  "hoprd-api",
  "lazy_static",
@@ -5380,10 +5419,10 @@ dependencies = [
  "const_format",
  "futures",
  "futures-concurrency",
- "hopr-chain-connector",
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-utils-chain-connector",
  "hopr-utils-session",
  "human-bandwidth",
  "lazy_static",

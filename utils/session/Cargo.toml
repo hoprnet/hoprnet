@@ -17,7 +17,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
-  "hopr-chain-connector?/runtime-tokio",
+  "hopr-utils-chain-connector?/runtime-tokio",
   "hopr-db-node?/runtime-tokio",
 ]
 prometheus = [
@@ -63,7 +63,7 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-chain-connector = { workspace = true, optional = true }
+hopr-utils-chain-connector = { workspace = true, optional = true }
 hopr-db-node = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }

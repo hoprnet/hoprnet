@@ -16,7 +16,6 @@ default = [
   "telemetry",
   "explicit-path",
   "transport-quic",
-  "hopr-lib/utils_blokli",
 ] # uses tokio by default because of axum
 prometheus = [
   "hopr-lib/prometheus",
@@ -104,6 +103,7 @@ hopr-lib = { workspace = true, features = [
 ] }
 hopr-utils-session = { workspace = true }
 hopr-utils-node-db = { workspace = true }
+hopr-utils-chain-connector = { workspace = true }
 hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
