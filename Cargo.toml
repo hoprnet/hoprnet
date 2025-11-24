@@ -117,7 +117,7 @@ opentelemetry-otlp = { version = "0.31.0", default-features = false }
 opentelemetry_sdk = { version = "0.31.0" }
 tracing-opentelemetry = { version = "0.32.0" }
 temp-env = "0.3.6"
-parameterized = "2.1.0" # kept back to 2.0.0 due to conflict with indexmap
+parameterized = "2.0.0" # kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
 pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", features = ["serde-1"] }
