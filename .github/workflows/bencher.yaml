@@ -62,7 +62,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           repository: ${{ steps.vars.outputs.source_repo }}
           ref: ${{ steps.vars.outputs.source_branch }}
@@ -105,7 +105,7 @@ jobs:
           fi
 
       - name: Setup Bencher
-        uses: bencherdev/bencher@v0.5.7
+        uses: bencherdev/bencher@v0.5.8
 
       - name: Execute benchmarks
         run: |
