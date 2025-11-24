@@ -233,10 +233,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::*};
     use hopr_crypto_random::Randomizable;
-    use hopr_lib::{
-        Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, Response, TicketBuilder, UnitaryFloatOps,
-        WinningProbability, XDaiBalance,
-    };
+    use hopr_lib::{Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, RedeemableTicket, Response, TicketBuilder, UnitaryFloatOps, WinningProbability, XDaiBalance};
 
     use super::*;
 
@@ -270,7 +267,7 @@ mod tests {
             .build_static_client();
     }
 
-    fn generate_random_ack_ticket(index: u64, worth_packets: u32) -> anyhow::Result<AcknowledgedTicket> {
+    fn generate_random_ack_ticket(index: u64, worth_packets: u32) -> anyhow::Result<RedeemableTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -284,7 +281,8 @@ mod tests {
             .channel_epoch(4)
             .challenge(challenge)
             .build_signed(&ALICE, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
+            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
+            .into_redeemable(&*BOB, &Hash::default())?)
     }
 
     #[tokio::test]

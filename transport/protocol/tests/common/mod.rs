@@ -92,7 +92,7 @@ pub type LogicalChannels = (
 );
 
 #[allow(dead_code)]
-pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<AcknowledgedTicket>;
+pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<RedeemableTicket>;
 
 #[allow(dead_code)]
 pub async fn peer_setup_for(
@@ -128,7 +128,7 @@ pub async fn peer_setup_for(
 
     for i in 0..peer_count {
         let (received_ack_tickets_tx, received_ack_tickets_rx) =
-            futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
+            futures::channel::mpsc::unbounded::<RedeemableTicket>();
 
         let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
         let (mixer_channel_tx, mixer_channel_rx) =
