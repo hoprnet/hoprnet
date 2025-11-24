@@ -100,7 +100,7 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
                 let channel_id = channel.get_id();
                 let rx = self
                     .hopr_chain_actions
-                    .fund_channel(&channel_id, self.cfg.funding_amount)
+                    .fund_channel(channel_id, self.cfg.funding_amount)
                     .await
                     .map_err(|e| StrategyError::Other(e.into()))?;
 

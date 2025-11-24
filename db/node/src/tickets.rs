@@ -457,7 +457,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
                         Box::pin(async move {
                             let stats = find_stats_for_channel(tx, &channel).await?;
                             let unredeemed_value = ticket::Entity::find()
-                                .filter(ticket::Column::ChannelId.eq(channel.to_hex()))
+                                .filter(ticket::Column::ChannelId.eq(hex::encode(channel)))
                                 .stream(tx)
                                 .await?
                                 .try_fold(U256::zero(), |amount, x| {
@@ -649,8 +649,7 @@ impl HoprNodeDb {
         let tkt_manager = self.ticket_manager.clone();
         let channel_id = *channel_id;
 
-        Ok(self
-            .caches
+        self.caches
             .ticket_index
             .try_get_with(channel_id, async move {
                 let maybe_index = outgoing_ticket_index::Entity::find()
@@ -679,9 +678,7 @@ impl HoprNodeDb {
                 })))
             })
             .await
-            .map_err(|e: Arc<NodeDbError>| {
-                NodeDbError::LogicalError(format!("failed to retrieve ticket index: {e}"))
-            })?)
+            .map_err(|e: Arc<NodeDbError>| NodeDbError::LogicalError(format!("failed to retrieve ticket index: {e}")))
     }
 }
 

@@ -233,7 +233,10 @@ mod tests {
     use hex_literal::hex;
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::*};
     use hopr_crypto_random::Randomizable;
-    use hopr_lib::{Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, RedeemableTicket, Response, TicketBuilder, UnitaryFloatOps, WinningProbability, XDaiBalance};
+    use hopr_lib::{
+        Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, RedeemableTicket, Response, TicketBuilder,
+        UnitaryFloatOps, WinningProbability, XDaiBalance,
+    };
 
     use super::*;
 

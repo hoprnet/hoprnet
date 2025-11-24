@@ -88,21 +88,20 @@ where
         BoxFuture<'a, Result<(VerifiedTicket, ChainReceipt), TicketRedeemError<Self::Error>>>,
         TicketRedeemError<Self::Error>,
     > {
-        match self.prepare_ticket_redeem_payload(ticket.clone()).await {
+        match self.prepare_ticket_redeem_payload(ticket).await {
             Ok(tx_req) => {
-                let ticket_clone = ticket.clone();
                 Ok(self
                     .send_tx(tx_req)
                     .await
-                    .map_err(|e| TicketRedeemError::ProcessingError(ticket.ticket.clone(), e))?
+                    .map_err(|e| TicketRedeemError::ProcessingError(ticket.ticket, e))?
                     .map_err(move |tx_tracking_error|
                         // For ticket redemption, certain errors are to be handled differently
                         if let Some(reject_error) = tx_tracking_error.as_transaction_rejection_error() {
-                            TicketRedeemError::Rejected(ticket.ticket.clone(), format!("on-chain rejection: {reject_error:?}"))
+                            TicketRedeemError::Rejected(ticket.ticket, format!("on-chain rejection: {reject_error:?}"))
                         } else {
-                            TicketRedeemError::ProcessingError(ticket.ticket.clone(), tx_tracking_error)
+                            TicketRedeemError::ProcessingError(ticket.ticket, tx_tracking_error)
                         })
-                    .and_then(move |receipt| futures::future::ok((ticket_clone.ticket, receipt)))
+                    .and_then(move |receipt| futures::future::ok((ticket.ticket, receipt)))
                     .boxed())
             }
             Err(e @ ConnectorError::InvalidTicket)

@@ -793,13 +793,13 @@ impl VerifiedTicket {
             .expect("verified ticket always has a signature")
     }
 
-    /// Deconstructs self back into the unverified [Ticket].
+    /// Deconstructs self back into the unverified [`Ticket`].
     #[inline]
     pub fn leak(self) -> Ticket {
         self.0
     }
 
-    /// Creates a new unacknowledged ticket from the [VerifiedTicket],
+    /// Creates a new unacknowledged ticket from the [`VerifiedTicket`],
     /// given our own part of the PoR challenge.
     pub fn into_unacknowledged(self, own_key: HalfKey) -> UnacknowledgedTicket {
         UnacknowledgedTicket { ticket: self, own_key }

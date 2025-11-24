@@ -348,7 +348,7 @@ pub trait HoprDbTicketOperations {
 }
 
 /// Contains ticket statistics for one or more channels.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChannelTicketStatistics {
     /// Total number of winning tickets.
     pub winning_tickets: u128,
@@ -356,6 +356,20 @@ pub struct ChannelTicketStatistics {
     pub finalized_values: HashMap<TicketMarker, HoprBalance>,
     /// The total value in unredeemed winning tickets still in the DB.
     pub unredeemed_value: HoprBalance,
+}
+
+impl Default for ChannelTicketStatistics {
+    fn default() -> Self {
+        Self {
+            winning_tickets: 0,
+            finalized_values: HashMap::from([
+                (TicketMarker::Neglected, HoprBalance::zero()),
+                (TicketMarker::Rejected, HoprBalance::zero()),
+                (TicketMarker::Redeemed, HoprBalance::zero()),
+            ]),
+            unredeemed_value: HoprBalance::zero(),
+        }
+    }
 }
 
 impl ChannelTicketStatistics {

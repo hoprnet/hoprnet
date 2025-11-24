@@ -70,16 +70,15 @@ impl TicketManager {
         spawn(async move {
             pin_mut!(ticket_notifier);
             while let Some(ticket_to_insert) = rx.next().await {
-                let ticket_to_insert_clone = ticket_to_insert.clone();
                 let tx_result = {
                     let _quard = mutex_clone.lock().await;
                     db_clone
                         .transaction(|tx| {
                             Box::pin(async move {
                                 // Insertion of a new acknowledged ticket
-                                let channel_id = ticket_to_insert_clone.verified_ticket().channel_id.to_hex();
+                                let channel_id = ticket_to_insert.verified_ticket().channel_id.to_hex();
 
-                                hopr_db_entity::ticket::ActiveModel::from(ticket_to_insert_clone)
+                                hopr_db_entity::ticket::ActiveModel::from(ticket_to_insert)
                                     .insert(tx)
                                     .await?;
 
