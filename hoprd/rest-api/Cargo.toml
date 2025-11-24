@@ -63,4 +63,3 @@ hopr-utils-session = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 oas3 = { workspace = true }
-test-log = { workspace = true }

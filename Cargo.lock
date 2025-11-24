@@ -4594,7 +4594,6 @@ dependencies = [
  "elliptic-curve",
  "generic-array 1.3.5",
  "hex",
- "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",
@@ -4651,7 +4650,6 @@ version = "0.5.0"
 dependencies = [
  "anyhow",
  "clap",
- "futures",
  "hopr-crypto-types",
  "hopr-db-migration",
  "hopr-internal-types",
@@ -4680,7 +4678,6 @@ dependencies = [
  "async-trait",
  "bimap",
  "bincode",
- "criterion",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -4728,7 +4725,6 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport",
- "hopr-transport-session",
  "hopr-utils-chain-connector",
  "hopr-utils-db-node",
  "human-bandwidth",
@@ -4785,7 +4781,6 @@ dependencies = [
  "pin-project",
  "serde",
  "serde_bytes",
- "serial_test",
  "socket2 0.6.1",
  "strum 0.27.2",
  "test-log",
@@ -4972,7 +4967,6 @@ dependencies = [
 name = "hopr-transport-bloom"
 version = "0.2.0"
 dependencies = [
- "anyhow",
  "bloomfilter",
  "criterion",
  "hopr-crypto-random",
@@ -5002,14 +4996,11 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-metrics",
  "lazy_static",
- "mockall",
- "more-asserts",
  "rust-stream-ext-concurrent",
  "smart-default",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "tracing-test",
 ]
 
 [[package]]
@@ -5028,7 +5019,6 @@ dependencies = [
  "hopr-utils-db-node",
  "lazy_static",
  "libp2p-identity",
- "mockall",
  "more-asserts",
  "multiaddr",
  "serde",
@@ -5065,7 +5055,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "tracing-test",
 ]
 
 [[package]]
@@ -5100,7 +5089,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "tracing-test",
  "validator",
 ]
 
@@ -5277,51 +5265,34 @@ name = "hopr-utils-session"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "async-trait",
- "atomic_enum",
- "backon",
  "base64 0.22.1",
  "bytesize",
- "cfg-if",
- "const_format",
  "dashmap",
  "futures",
  "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-crypto-keypair",
- "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-internal-types",
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
- "hopr-parallelize",
- "hopr-platform",
- "hopr-primitive-types",
  "hopr-transport",
  "hopr-utils-chain-connector",
  "hopr-utils-db-node",
  "human-bandwidth",
  "lazy_static",
- "parameterized",
  "parking_lot",
  "rand 0.8.5",
  "rstest",
  "serde",
  "serde_with",
- "serde_yaml",
- "serial_test",
- "smart-default",
- "strum 0.27.2",
  "test-log",
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
  "tokio-util",
  "tracing",
- "validator",
 ]
 
 [[package]]
@@ -5395,7 +5366,6 @@ dependencies = [
  "serde_with",
  "smart-default",
  "strum 0.27.2",
- "test-log",
  "tokio",
  "tower",
  "tower-http",
@@ -10365,27 +10335,6 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
-]
-
-[[package]]
-name = "tracing-test"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "557b891436fe0d5e0e363427fc7f217abf9ccd510d5136549847bdcbcd011d68"
-dependencies = [
- "tracing-core",
- "tracing-subscriber",
- "tracing-test-macro",
-]
-
-[[package]]
-name = "tracing-test-macro"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04659ddb06c87d233c566112c1c9c5b9e98256d9af50ec3bc9c8327f873a7568"
-dependencies = [
- "quote",
- "syn 2.0.110",
 ]
 
 [[package]]

@@ -103,7 +103,6 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 
 hopr-utils-db-node = { workspace = true }
-hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",
