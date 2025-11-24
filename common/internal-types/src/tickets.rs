@@ -281,12 +281,12 @@ impl From<&Ticket> for TicketId {
     }
 }
 
-/// Builder for [Ticket] and [VerifiedTicket].
+/// Builder for the [`Ticket`] and [`VerifiedTicket`].
 ///
-/// A new builder is created via [TicketBuilder::default] or [TicketBuilder::zero_hop].
+/// A new builder is created via [`TicketBuilder::default`] or [`TicketBuilder::zero_hop`].
 ///
-/// Input validation is performed upon calling [TicketBuilder::build], [TicketBuilder::build_signed]
-/// and [TicketBuilder::build_verified].
+/// Input validation is performed upon calling [`TicketBuilder::build`], [`TicketBuilder::build_signed`]
+/// and [`TicketBuilder::build_verified`].
 #[derive(Debug, Clone, smart_default::SmartDefault)]
 pub struct TicketBuilder {
     channel_id: Option<Hash>,
@@ -505,7 +505,7 @@ impl From<Ticket> for TicketBuilder {
 /// Contains the overall description of a ticket with a signature.
 ///
 /// This structure is not considered [verified](VerifiedTicket), unless
-/// the [Ticket::verify] or [Ticket::sign] methods are called.
+/// the [`Ticket::verify`] or [`Ticket::sign`] methods are called.
 ///
 /// # Ticket state machine
 /// See the entire state machine describing the relations of different ticket types below:
@@ -522,21 +522,25 @@ impl From<Ticket> for TicketBuilder {
 ///     E --> |into_transferable| F
 ///     F --> |into_redeemable| E
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ticket {
     /// Channel ID.
-    /// See [generate_channel_id] for how this value is generated.
-    pub channel_id: Hash,
+    ///
+    /// See [`generate_channel_id`] for how this value is generated.
+    pub channel_id: ChannelId,
     /// Amount of HOPR tokens this ticket is worth.
+    ///
     /// Always between 0 and 2^92.
     pub amount: HoprBalance, // 92 bits
     /// Ticket index.
+    ///
     /// Always between 0 and 2^48.
     pub index: u64, // 48 bits
     /// Encoded winning probability represented via 56-bit number.
     pub encoded_win_prob: EncodedWinProb, // 56 bits
     /// Epoch of the channel this ticket belongs to.
+    ///
     /// Always between 0 and 2^24.
     pub channel_epoch: u32, // 24 bits
     /// Represent the Proof of Relay challenge encoded as an Ethereum address.
@@ -714,7 +718,7 @@ impl BytesEncodable<TICKET_SIZE> for Ticket {}
 /// Holds a ticket that has been already verified.
 /// This structure guarantees that [`Ticket::get_hash()`] of [`VerifiedTicket::verified_ticket()`]
 /// is always equal to [`VerifiedTicket::verified_hash`]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerifiedTicket(Ticket, Hash, Address);
 
@@ -734,7 +738,7 @@ impl VerifiedTicket {
     ///
     /// ## Ticket luck value
     /// This ticket's `luck value` is the first 7 bytes of Keccak256 hash
-    /// of the concatenation of ticket's hash, VRF's encoded `v` value,
+    /// where the input is the concatenation of ticket's hash, VRF's encoded `v` value,
     /// PoR response and the ticket's signature.
     ///
     /// ## Winning probability
@@ -830,10 +834,10 @@ impl Ord for VerifiedTicket {
     }
 }
 
-/// Represents a [VerifiedTicket] with an unknown other part of the [HalfKey].
-/// Once the other [HalfKey] is known (forming a [Response]),
+/// Represents a [`VerifiedTicket`] with an unknown other part of the [`HalfKey`].
+/// Once the other [`HalfKey`] is known (forming a [`Response`]),
 /// it can be [acknowledged](UnacknowledgedTicket::acknowledge).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UnacknowledgedTicket {
     pub ticket: VerifiedTicket,
@@ -884,12 +888,10 @@ pub enum AcknowledgedTicketStatus {
     Untouched = 0,
     /// Ticket is currently being redeemed in and ongoing redemption process
     BeingRedeemed = 1,
-    /// Ticket is currently being aggregated in and ongoing aggregation process
-    BeingAggregated = 2,
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AcknowledgedTicket {
     #[cfg_attr(feature = "serde", serde(default))]
@@ -931,7 +933,7 @@ impl AcknowledgedTicket {
         self,
         chain_keypair: &ChainKeypair,
         domain_separator: &Hash,
-    ) -> crate::errors::Result<RedeemableTicket> {
+    ) -> errors::Result<RedeemableTicket> {
         // This function must be called by the ticket recipient and not the issuer
         if chain_keypair.public().to_address().eq(self.ticket.verified_issuer()) {
             return Err(errors::CoreTypesError::LoopbackTicket);
@@ -976,7 +978,7 @@ impl Display for AcknowledgedTicket {
 }
 
 /// Represents a winning ticket that can be successfully redeemed on-chain.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RedeemableTicket {
     /// Verified ticket that can be redeemed.
@@ -1042,11 +1044,11 @@ impl From<RedeemableTicket> for AcknowledgedTicket {
 /// Represents a ticket that could be transferred over the wire
 /// and independently verified again by the other party.
 ///
-/// The [TransferableWinningTicket] can be easily retrieved from [RedeemableTicket], which strips
+/// The [`TransferableWinningTicket`] can be easily retrieved from [`RedeemableTicket`], which strips
 /// information about verification.
-/// [TransferableWinningTicket] can be attempted to be converted back to [RedeemableTicket] only
+/// [`TransferableWinningTicket`] can be attempted to be converted back to [`RedeemableTicket`] only
 /// when verified via [`TransferableWinningTicket::into_redeemable`] again.
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransferableWinningTicket {
     pub ticket: Ticket,
@@ -1056,7 +1058,7 @@ pub struct TransferableWinningTicket {
 }
 
 impl TransferableWinningTicket {
-    /// Attempts to transform this ticket back into a [RedeemableTicket].
+    /// Attempts to transform this ticket back into a [`RedeemableTicket`].
     ///
     /// Verifies that the `signer` matches the `expected_issuer` and that the
     /// ticket has a valid signature from the `signer`.
@@ -1068,7 +1070,7 @@ impl TransferableWinningTicket {
         domain_separator: &Hash,
     ) -> errors::Result<RedeemableTicket> {
         if !self.signer.eq(expected_issuer) {
-            return Err(crate::errors::CoreTypesError::InvalidInputData(
+            return Err(InvalidInputData(
                 "invalid ticket issuer".into(),
             ));
         }
@@ -1092,7 +1094,7 @@ impl TransferableWinningTicket {
                 channel_dst: *domain_separator,
             })
         } else {
-            Err(crate::errors::CoreTypesError::InvalidInputData(
+            Err(InvalidInputData(
                 "ticket is not a win".into(),
             ))
         }
@@ -1391,7 +1393,7 @@ pub mod tests {
 
         assert!(deserialized_ticket.is_winning(&BOB, &dst));
 
-        deserialized_ticket.status = super::AcknowledgedTicketStatus::BeingAggregated;
+        deserialized_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
 
         assert_eq!(
             deserialized_ticket,

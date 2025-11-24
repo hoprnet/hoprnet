@@ -14,7 +14,7 @@ where
     P: PayloadGenerator + Send + Sync + 'static,
     P::TxRequest: Send + Sync + 'static,
 {
-    async fn prepare_ticket_redeem_payload(&self, ticket: AcknowledgedTicket) -> Result<P::TxRequest, ConnectorError> {
+    async fn prepare_ticket_redeem_payload(&self, ticket: RedeemableTicket) -> Result<P::TxRequest, ConnectorError> {
         self.check_connection_state()?;
 
         let channel_id = ticket.verified_ticket().channel_id;
@@ -66,16 +66,8 @@ where
             );
             return Err(ConnectorError::InvalidTicket);
         }
-
-        // `into_redeemable` is a CPU-intensive operation. See #7616 for a future resolution.
-        let channel_dst = self.domain_separators().await?.channel;
-        let chain_key = self.chain_key.clone();
-        let ticket =
-            hopr_async_runtime::prelude::spawn_blocking(move || ticket.into_redeemable(&chain_key, &channel_dst))
-                .await
-                .map_err(|e| ConnectorError::OtherError(e.into()))??;
-
-        Ok(self.payload_generator.redeem_ticket(ticket.clone())?)
+        
+        Ok(self.payload_generator.redeem_ticket(ticket)?)
     }
 }
 
@@ -91,7 +83,7 @@ where
 
     async fn redeem_ticket<'a>(
         &'a self,
-        ticket: AcknowledgedTicket,
+        ticket: RedeemableTicket,
     ) -> Result<
         BoxFuture<'a, Result<(VerifiedTicket, ChainReceipt), TicketRedeemError<Self::Error>>>,
         TicketRedeemError<Self::Error>,

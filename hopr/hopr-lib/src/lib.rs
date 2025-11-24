@@ -626,27 +626,35 @@ where
             futures::stream::Abortable::new(
                 events
                     .filter_map(move |event|
-                        futures::future::ready(
-                            event
-                                .try_as_channel_closed()
-                                .filter(|channel| channel.direction(chain.me()) == Some(ChannelDirection::Incoming))
-                        )
+                        futures::future::ready(event.try_as_channel_closed())
                     ),
                 chain_events_sub_reg
             )
             .for_each(move |closed_channel| {
                 let node_db = node_db.clone();
                 async move {
-                    match node_db.mark_tickets_as(closed_channel.into(), TicketMarker::Neglected).await {
-                        Ok(num_neglected) if num_neglected > 0 => {
-                            warn!(%num_neglected, %closed_channel, "tickets on incoming closed channel were neglected");
+                    match closed_channel.direction(chain.me()) {
+                        Some(ChannelDirection::Incoming) => {
+                            match node_db.mark_tickets_as(closed_channel.into(), TicketMarker::Neglected).await {
+                                Ok(num_neglected) if num_neglected > 0 => {
+                                    warn!(%num_neglected, %closed_channel, "tickets on incoming closed channel were neglected");
+                                },
+                                Ok(_) => {
+                                    debug!(%closed_channel, "no neglected tickets on incoming closed channel");
+                                },
+                                Err(error) => {
+                                    error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
+                                }
+                            }
                         },
-                        Ok(_) => {
-                            debug!(%closed_channel, "no neglected tickets on incoming closed channel");
-                        },
-                        Err(error) => {
-                            error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
+                        Some(ChannelDirection::Outgoing) => {
+                            if let Err(error) = node_db.reset_outgoing_ticket_index(&closed_channel.get_id()).await {
+                                error!(%error, %closed_channel, "failed to reset ticket index on closed outgoing channel");
+                            } else {
+                                debug!(%closed_channel, "outgoing ticket index has been resets on outgoing channel closure");
+                            }
                         }
+                        _ => {} // Event for a channel that is not our own
                     }
                 }
             })

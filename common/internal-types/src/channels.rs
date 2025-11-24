@@ -74,7 +74,7 @@ impl Eq for ChannelStatus {}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display, strum::EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub enum ChannelDirection {
-    /// The other party is initiator of the channel.
+    /// The other party is the initiator of the channel.
     Incoming = 0,
     /// Our own node is the initiator of the channel.
     Outgoing = 1,
