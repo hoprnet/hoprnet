@@ -15,7 +15,12 @@
     { "matchCategories": ["rust"], "enabled": true },
     { "matchCategories": ["docker"], "enabled": true, "pinDigests": true },
     {
-      "matchPackageNames": ["serde_yaml", "libp2p-stream", "rand"],
+      "matchPackageNames": [
+        "serde_yaml",
+        "libp2p-stream",
+        "rand",
+        "parameterized"
+      ],
       "enabled": false
     }
   ]

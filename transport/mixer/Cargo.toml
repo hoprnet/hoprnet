@@ -19,7 +19,6 @@ prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 futures = { workspace = true }
 futures-timer = { workspace = true }
 lazy_static = { workspace = true, optional = true }
-rust-stream-ext-concurrent = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -32,10 +31,8 @@ anyhow = { workspace = true }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures = { workspace = true }
-mockall = { workspace = true }
-more-asserts = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
-tracing-test = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
 
 [[bench]]
 name = "mixer_throughput"
