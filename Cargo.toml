@@ -15,9 +15,6 @@ members = [
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
-  "db/entity",
-  "db/migration",
-  "db/node",
   "hopli",
   "hopr/hopr-lib",
   "hoprd/hoprd",
@@ -37,9 +34,11 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
-  "utils/session",
-  "utils/node-db",
   "utils/chain/connector",
+  "utils/db/entity",
+  "utils/db/migration",
+  "utils/db/node",
+  "utils/session",
 ]
 
 [workspace.dependencies]
@@ -232,9 +231,6 @@ hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, feature
   "ed25519",
 ] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
-hopr-db-entity = { path = "db/entity" }
-hopr-db-migration = { path = "db/migration" }
-hopr-db-node = { path = "db/node" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
@@ -256,8 +252,10 @@ hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hopr-db-entity = { path = "utils/db/entity" }
+hopr-db-migration = { path = "utils/db/migration" }
 hopr-utils-session = { path = "utils/session" }
-hopr-utils-node-db = { path = "utils/node-db" }
+hopr-utils-db-node = { path = "utils/db/node" }
 hopr-utils-chain-connector = { path = "utils/chain/connector" }
 
 [profile.dev]

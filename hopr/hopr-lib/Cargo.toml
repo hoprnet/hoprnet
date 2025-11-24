@@ -22,12 +22,13 @@ runtime-tokio = [
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
   "dep:tokio",
+  "hopr-utils-chain-connector?/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
-  "hopr-db-node/prometheus",
+  "hopr-utils-db-node/prometheus",
 ]
 capture = ["hopr-transport/capture"]
 fixed-rng = ["hopr-crypto-random/fixed-rng"]
@@ -42,7 +43,9 @@ testing = [
   "dep:tokio",
   "dep:tokio-util",
   "dep:hex-literal",
-  "dep:hopr-db-node",
+  "dep:hopr-utils-db-node",
+  "dep:hopr-utils-chain-connector",
+  "hopr-utils-chain-connector/testing"
 ] # testing related functionality
 
 [dependencies]
@@ -79,7 +82,7 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-node = { workspace = true, optional = true }
+hopr-utils-db-node = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
@@ -87,6 +90,7 @@ hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport = { workspace = true }
+hopr-utils-chain-connector = { workspace = true, optional = true}
 
 [dev-dependencies]
 hex-literal = { workspace = true }
@@ -98,7 +102,7 @@ serde_yaml = { workspace = true }
 tokio = { workspace = true }
 test-log = { workspace = true }
 
-hopr-db-node = { workspace = true }
+hopr-utils-db-node = { workspace = true }
 hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",

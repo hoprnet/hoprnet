@@ -1,11 +1,23 @@
+mod db;
+
+mod peers;
+
+mod protocol;
+
+mod tickets;
+
+mod cache;
+pub mod errors;
+mod ticket_manager;
+
+pub use db::{HoprNodeDb, HoprNodeDbConfig};
+pub use hopr_api::chain::AcknowledgedTicket;
+pub use hopr_api::db::*;
+use hopr_crypto_types::keypairs::ChainKeypair;
+
 use std::path::PathBuf;
 
 use futures::channel::mpsc::channel;
-
-pub use hopr_db_node::HoprNodeDb;
-use hopr_db_node::HoprNodeDbConfig;
-pub use hopr_lib::AcknowledgedTicket;
-use hopr_lib::ChainKeypair;
 
 pub async fn init_db(
     chain_key: &ChainKeypair,

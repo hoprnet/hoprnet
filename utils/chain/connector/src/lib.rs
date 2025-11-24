@@ -107,7 +107,7 @@ where
 pub const DEFAULT_BLOKLI_URL: &str = "https://blokli.hoprnet.org";
 
 pub async fn init_blokli_connector(
-    chain_key: &hopr_lib::ChainKeypair,
+    chain_key: &hopr_crypto_types::prelude::ChainKeypair,
     provider: Option<String>,
     safe_module_address: hopr_api::Address,
 ) -> anyhow::Result<HoprBlockchainSafeConnector<BlokliClient>> {

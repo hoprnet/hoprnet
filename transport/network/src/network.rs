@@ -454,9 +454,9 @@ mod tests {
 
     use anyhow::Context;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use hopr_db_node::HoprNodeDb;
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
+    use hopr_utils_db_node::HoprNodeDb;
     use libp2p_identity::PeerId;
     use more_asserts::*;
 

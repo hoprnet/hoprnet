@@ -121,11 +121,11 @@ mod tests {
     use futures::StreamExt;
     use futures_time::future::FutureExt;
     use hex_literal::hex;
-    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, Keypair, XDaiBalance,
         exports::api::chain::{ChainEvent, ChainEvents},
     };
+    use hopr_utils_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 
     use super::*;
     use crate::{

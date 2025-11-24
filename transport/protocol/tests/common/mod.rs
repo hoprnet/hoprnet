@@ -4,16 +4,16 @@ use anyhow::Context;
 use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
 use hopr_api::chain::*;
-use hopr_chain_connector::create_trustful_hopr_blokli_connector;
 use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
 use hopr_crypto_types::prelude::*;
-use hopr_db_node::HoprNodeDb;
 use hopr_internal_types::{errors::PathError, prelude::*};
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_protocol_app::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::processor::PacketInteractionConfig;
+use hopr_utils_chain_connector::create_trustful_hopr_blokli_connector;
+use hopr_utils_db_node::HoprNodeDb;
 use lazy_static::lazy_static;
 use libp2p::PeerId;
 use tokio::time::timeout;
@@ -47,8 +47,8 @@ lazy_static! {
         .enumerate()
         .map(|(i, cp)| { create_dummy_channel(cp.public().to_address(), PEERS_CHAIN[i + 1].public().to_address()) })
         .collect::<Vec<_>>();
-    pub static ref CHAIN_DATA: hopr_chain_connector::testing::BlokliTestStateBuilder =
-        hopr_chain_connector::testing::BlokliTestStateBuilder::default()
+    pub static ref CHAIN_DATA: hopr_utils_chain_connector::testing::BlokliTestStateBuilder =
+        hopr_utils_chain_connector::testing::BlokliTestStateBuilder::default()
             .with_accounts(PEERS.iter().enumerate().map(|(i, kp)| {
                 let node_key = kp.public();
                 let chain_key = PEERS_CHAIN[i].public();

@@ -4,7 +4,7 @@ version = "0.1.1"
 edition = "2024"
 
 [features]
-runtime-tokio = ["hopr-lib/runtime-tokio", "hopr-async-runtime/runtime-tokio"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 testing = ["dep:hex", "blokli-client/testing", "hopr-chain-types/use-bindings"]
 
 [dependencies]
@@ -29,7 +29,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tempfile = { workspace = true }
 
-hopr-lib = { workspace = true }
 hopr-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-types = { workspace = true }

@@ -55,7 +55,7 @@ hopr-lib = { workspace = true, features = [
   "utils_futures",
 ] }
 
-hopr-db-node = { workspace = true }
+hopr-utils-db-node = { workspace = true }
 hopr-utils-chain-connector = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-utils-session = { workspace = true }

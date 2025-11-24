@@ -12,9 +12,9 @@ crate-type = ["rlib"]
 default = []
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
-  "hopr-db-node/runtime-tokio",
+  "hopr-utils-db-node/runtime-tokio",
 ]
-prometheus = ["dep:hopr-metrics", "hopr-db-node/prometheus"]
+prometheus = ["dep:hopr-metrics", "hopr-utils-db-node/prometheus"]
 capture = ["dep:pcap-file"]
 
 [dependencies]
@@ -65,7 +65,7 @@ serial_test = { workspace = true }
 hopr-network-types = { workspace = true }
 test-log = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
-hopr-db-node = { workspace = true, features = ["runtime-tokio"] }
+hopr-utils-db-node = { workspace = true, features = ["runtime-tokio"] }
 hopr-utils-chain-connector = { workspace = true, features = [
   "runtime-tokio",
   "testing",

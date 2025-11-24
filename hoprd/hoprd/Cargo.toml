@@ -20,7 +20,7 @@ default = [
 prometheus = [
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
-  "hopr-db-node/prometheus",
+  "hopr-utils-db-node/prometheus",
   "hopr-strategy/prometheus",
   "dep:hopr-metrics",
   "dep:lazy_static",
@@ -29,7 +29,7 @@ runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
-  "hopr-db-node/runtime-tokio",
+  "hopr-utils-db-node/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
   "hopr-strategy/runtime-tokio",
 ]
@@ -93,7 +93,6 @@ opentelemetry-otlp = { workspace = true, default-features = false, features = [
 opentelemetry_sdk = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 
-hopr-db-node = { workspace = true }
 hopr-strategy = { workspace = true }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
@@ -101,9 +100,9 @@ hopr-lib = { workspace = true, features = [
   "session-server",
   "utils_parallel",
 ] }
-hopr-utils-session = { workspace = true }
-hopr-utils-node-db = { workspace = true }
+hopr-utils-db-node = { workspace = true }
 hopr-utils-chain-connector = { workspace = true }
+hopr-utils-session = { workspace = true }
 hoprd-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }

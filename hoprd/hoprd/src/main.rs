@@ -2,8 +2,8 @@ use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
-use hopr_db_node::HoprNodeDb;
 use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, exports::api::chain::ChainEvents};
+use hopr_utils_db_node::HoprNodeDb;
 
 use hopr_utils_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
@@ -257,7 +257,7 @@ async fn main_inner() -> anyhow::Result<()> {
     );
 
     // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
-    let (node_db, stored_tickets) = hopr_utils_node_db::init_db(
+    let (node_db, stored_tickets) = hopr_utils_db_node::init_db(
         &hopr_keys.chain_key,
         &cfg.db.data,
         cfg.db.initialize,
