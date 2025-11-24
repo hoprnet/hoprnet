@@ -17,14 +17,11 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
-  "hopr-utils-chain-connector?/runtime-tokio",
-  "hopr-utils-db-node?/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
   "hopr-transport/prometheus",
   "hopr-network-types/prometheus",
-  "hopr-utils-db-node/prometheus",
 ]
 
 
@@ -35,26 +32,20 @@ bytesize = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
-hex-literal = { workspace = true, optional = true }
 human-bandwidth = { workspace = true }
 lazy_static = { workspace = true }
 parking_lot = { workspace = true }
-rand = { workspace = true, optional = true }
-rstest = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
-tokio-util = { workspace = true, features = ["compat"], optional = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true }
 hopr-lib = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-utils-chain-connector = { workspace = true, optional = true }
-hopr-utils-db-node = { workspace = true, optional = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
 hopr-transport = { workspace = true }

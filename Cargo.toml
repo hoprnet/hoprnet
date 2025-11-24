@@ -34,9 +34,9 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
+  "db/entity",
+  "db/migration",
   "utils/chain/connector",
-  "utils/db/entity",
-  "utils/db/migration",
   "utils/db/node",
   "utils/session",
 ]
@@ -186,7 +186,7 @@ tokio-util = { version = "0.7.17", default-features = false, features = [
 ] }
 tokio-retry = "0.3.0"
 tokio-stream = { version = "0.1.17", features = ["net"] }
-tower-http = { version = "0.6.6", features = [
+tower-http = { version = "0.6.7", features = [
   "validate-request",
   "compression-full",
   "cors",
@@ -251,8 +251,8 @@ hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
-hopr-db-entity = { path = "utils/db/entity" }
-hopr-db-migration = { path = "utils/db/migration" }
+hopr-db-entity = { path = "db/entity" }
+hopr-db-migration = { path = "db/migration" }
 hopr-utils-session = { path = "utils/session" }
 hopr-utils-db-node = { path = "utils/db/node" }
 hopr-utils-chain-connector = { path = "utils/chain/connector" }

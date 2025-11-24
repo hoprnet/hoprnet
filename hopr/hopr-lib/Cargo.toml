@@ -53,17 +53,12 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
-base64 = { workspace = true, optional = true }
-bytesize = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 const_format = { workspace = true }
-dashmap = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true, optional = true }
-human-bandwidth = { workspace = true, optional = true }
 lazy_static = { workspace = true }
-parking_lot = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 serde = { workspace = true }
@@ -72,7 +67,6 @@ strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
-tokio-stream = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["compat"], optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
