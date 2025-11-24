@@ -2,7 +2,6 @@ use std::{
     collections::HashSet,
     fmt::{Display, Formatter},
     ops::{Bound, RangeBounds},
-    sync::{Arc, atomic::AtomicU64},
 };
 use std::collections::HashMap;
 use futures::stream::BoxStream;
@@ -258,7 +257,7 @@ pub trait HoprDbTicketOperations {
     /// Retrieve acknowledged winning tickets, according to the given `selectors`.
     ///
     /// If no selector is given, streams tickets in all channels.
-    async fn stream_tickets<'c, S: Into<TicketSelector>, I: IntoIterator<Item = S>>(
+    async fn stream_tickets<'c, S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
         &'c self,
         selectors: I,
     ) -> Result<BoxStream<'c, RedeemableTicket>, Self::Error>;
@@ -272,7 +271,7 @@ pub trait HoprDbTicketOperations {
     /// ticket statistics for each ticket's channel.
     ///
     /// Returns the number of marked tickets.
-    async fn mark_tickets_as<S: Into<TicketSelector>, I: IntoIterator<Item = S>>(&self, selector: I, mark_as: TicketMarker) -> Result<usize, Self::Error>;
+    async fn mark_tickets_as<S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(&self, selector: I, mark_as: TicketMarker) -> Result<usize, Self::Error>;
 
     /// Updates the ticket statistics according to the fact that the given ticket has
     /// been rejected by the packet processing pipeline.
@@ -284,14 +283,14 @@ pub trait HoprDbTicketOperations {
     /// Updates the [state](AcknowledgedTicketStatus) of the tickets matching the given `selectors`.
     ///
     /// Returns the updated tickets in the new state.
-    async fn update_ticket_states_and_fetch<'a, S: Into<TicketSelector>, I: IntoIterator<Item = S>>(
+    async fn update_ticket_states_and_fetch<'a, S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
         &'a self,
         selectors: I,
         new_state: AcknowledgedTicketStatus,
     ) -> Result<BoxStream<'a, RedeemableTicket>, Self::Error>;
 
     /// Updates [state](AcknowledgedTicketStatus) of the tickets matching the given `selector`.
-    async fn update_ticket_states<S: Into<TicketSelector>, I: IntoIterator<Item = S>>(
+    async fn update_ticket_states<S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(
         &self,
         selectors: I,
         new_state: AcknowledgedTicketStatus,
