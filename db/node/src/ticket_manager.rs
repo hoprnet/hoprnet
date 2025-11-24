@@ -8,7 +8,7 @@ use futures::{Sink, SinkExt, StreamExt, TryStreamExt, pin_mut};
 use hopr_api::db::TicketSelector;
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_entity::ticket;
-use hopr_internal_types::tickets::AcknowledgedTicket;
+use hopr_internal_types::prelude::RedeemableTicket;
 use hopr_primitive_types::prelude::{HoprBalance, IntoEndian, ToHex};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait,
@@ -34,7 +34,7 @@ use crate::{cache::NodeDbCaches, db::HoprNodeDb, errors::NodeDbError, tickets::W
 pub(crate) struct TicketManager {
     pub(crate) tickets_db: sea_orm::DatabaseConnection,
     pub(crate) mutex: Arc<async_lock::Mutex<()>>,
-    incoming_ack_tickets_tx: Arc<OnceLock<futures::channel::mpsc::Sender<AcknowledgedTicket>>>,
+    incoming_ack_tickets_tx: Arc<OnceLock<futures::channel::mpsc::Sender<RedeemableTicket>>>,
     caches: Arc<NodeDbCaches>,
 }
 
@@ -51,10 +51,10 @@ impl TicketManager {
     /// Must be called to start processing tickets into the DB.
     pub fn start_ticket_processing<S, E>(&self, ticket_notifier: S) -> Result<(), NodeDbError>
     where
-        S: Sink<AcknowledgedTicket, Error = E> + Send + 'static,
+        S: Sink<RedeemableTicket, Error = E> + Send + 'static,
         E: std::error::Error,
     {
-        let (tx, mut rx) = futures::channel::mpsc::channel::<AcknowledgedTicket>(100_000);
+        let (tx, mut rx) = futures::channel::mpsc::channel::<RedeemableTicket>(100_000);
 
         self.incoming_ack_tickets_tx
             .set(tx)
@@ -132,7 +132,7 @@ impl TicketManager {
     ///
     /// The [`start_ticket_processing`](TicketManager::start_ticket_processing) method
     /// must be called before calling this method, or it will fail.
-    pub async fn insert_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), NodeDbError> {
+    pub async fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), NodeDbError> {
         let channel = ticket.verified_ticket().channel_id;
         let value = ticket.verified_ticket().amount;
         let epoch = ticket.verified_ticket().channel_epoch;
@@ -166,14 +166,8 @@ impl TicketManager {
 
     /// Get unrealized value for a channel
     pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, NodeDbError> {
-        if !selector.is_single_channel() {
-            return Err(NodeDbError::LogicalError(
-                "selector must represent a single channel".into(),
-            ));
-        }
-
-        let channel_id = selector.channel_identifiers[0].0;
-        let channel_epoch = selector.channel_identifiers[0].1;
+        let channel_id = selector.channel_identifier.0;
+        let channel_epoch = selector.channel_identifier.1;
         let selector: WrappedTicketSelector = selector.into();
 
         let tickets_db = self.tickets_db.clone();
@@ -220,7 +214,7 @@ impl HoprNodeDb {
     /// persisted into the Tickets DB.
     pub fn start_ticket_processing<S>(&self, ticket_notifier: Option<S>) -> Result<(), NodeDbError>
     where
-        S: futures::Sink<AcknowledgedTicket> + Send + 'static,
+        S: futures::Sink<RedeemableTicket> + Send + 'static,
         S::Error: std::fmt::Display + std::error::Error,
     {
         if let Some(notifier) = ticket_notifier {
@@ -251,7 +245,7 @@ mod tests {
 
     const TICKET_VALUE: u64 = 100_000;
 
-    fn generate_random_ack_ticket(index: u32) -> anyhow::Result<AcknowledgedTicket> {
+    fn generate_random_ack_ticket(index: u32) -> anyhow::Result<RedeemableTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -265,7 +259,9 @@ mod tests {
             .challenge(challenge)
             .build_signed(&BOB, &Hash::default())?;
 
-        Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
+        Ok(ticket
+            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
+            .into_redeemable(&*ALICE, &Hash::default())?)
     }
 
     #[tokio::test]

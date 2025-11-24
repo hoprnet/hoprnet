@@ -1,9 +1,9 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fmt::{Display, Formatter},
     ops::{Bound, RangeBounds},
 };
-use std::collections::HashMap;
+
 use futures::stream::BoxStream;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -114,8 +114,8 @@ impl TicketSelector {
 
     /// If `false` is returned, the selector can fetch more than a single ticket.
     pub fn is_unique(&self) -> bool {
-        matches!(&self.index, TicketIndexSelector::Single(_)) ||
-        matches!(&self.index, TicketIndexSelector::Multiple(indices) if indices.len() == 1)
+        matches!(&self.index, TicketIndexSelector::Single(_))
+            || matches!(&self.index, TicketIndexSelector::Multiple(indices) if indices.len() == 1)
     }
 
     /// Returns this instance with a ticket index set.
@@ -207,7 +207,7 @@ impl From<&Ticket> for TicketSelector {
 impl From<&ChannelEntry> for TicketSelector {
     fn from(value: &ChannelEntry) -> Self {
         Self {
-            channel_identifier: (value.get_id(), value.channel_epoch),
+            channel_identifier: (*value.get_id(), value.channel_epoch),
             index: TicketIndexSelector::None,
             win_prob: (Bound::Unbounded, Bound::Unbounded),
             amount: (Bound::Unbounded, Bound::Unbounded),
@@ -265,13 +265,17 @@ pub trait HoprDbTicketOperations {
     /// Inserts a new winning ticket into the DB.
     ///
     /// Returns an error if the ticket already exists.
-    async fn insert_ticket(ticket: RedeemableTicket) -> Result<(), Self::Error>;
+    async fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), Self::Error>;
 
     /// Marks tickets as the given [`TicketMarker`], removing them from the DB and updating the
     /// ticket statistics for each ticket's channel.
     ///
     /// Returns the number of marked tickets.
-    async fn mark_tickets_as<S: Into<TicketSelector>, I: IntoIterator<Item = S> + Send>(&self, selector: I, mark_as: TicketMarker) -> Result<usize, Self::Error>;
+    async fn mark_tickets_as<S: Into<TicketSelector> + Send, I: IntoIterator<Item = S> + Send>(
+        &self,
+        selectors: I,
+        mark_as: TicketMarker,
+    ) -> Result<usize, Self::Error>;
 
     /// Updates the ticket statistics according to the fact that the given ticket has
     /// been rejected by the packet processing pipeline.
@@ -299,7 +303,10 @@ pub trait HoprDbTicketOperations {
     /// Retrieves the ticket statistics for the given channel.
     ///
     /// If no channel is given, it retrieves aggregate ticket statistics for all channels.
-    async fn get_ticket_statistics(&self, channel_id: Option<ChannelId>) -> Result<ChannelTicketStatistics, Self::Error>;
+    async fn get_ticket_statistics(
+        &self,
+        channel_id: Option<ChannelId>,
+    ) -> Result<ChannelTicketStatistics, Self::Error>;
 
     /// Resets the ticket statistics about neglected, rejected, and redeemed tickets.
     async fn reset_ticket_statistics(&self) -> Result<(), Self::Error>;
@@ -315,7 +322,11 @@ pub trait HoprDbTicketOperations {
     /// Returns the old value.
     ///
     /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn compare_and_set_outgoing_ticket_index(&self, channel_id: &ChannelId, index: u64) -> Result<u64, Self::Error>;
+    async fn compare_and_set_outgoing_ticket_index(
+        &self,
+        channel_id: &ChannelId,
+        index: u64,
+    ) -> Result<u64, Self::Error>;
 
     /// Resets the outgoing ticket index to 0 for the given channel id.
     ///
@@ -350,16 +361,25 @@ pub struct ChannelTicketStatistics {
 impl ChannelTicketStatistics {
     /// The total value of neglected tickets.
     pub fn neglected_value(&self) -> HoprBalance {
-        self.finalized_values.get(&TicketMarker::Neglected).copied().unwrap_or_default()
+        self.finalized_values
+            .get(&TicketMarker::Neglected)
+            .copied()
+            .unwrap_or_default()
     }
 
     /// The total value of rejected tickets.
     pub fn rejected_value(&self) -> HoprBalance {
-        self.finalized_values.get(&TicketMarker::Rejected).copied().unwrap_or_default()
+        self.finalized_values
+            .get(&TicketMarker::Rejected)
+            .copied()
+            .unwrap_or_default()
     }
 
     /// The total value of redeemed tickets.
     pub fn redeemed_value(&self) -> HoprBalance {
-        self.finalized_values.get(&TicketMarker::Redeemed).copied().unwrap_or_default()
+        self.finalized_values
+            .get(&TicketMarker::Redeemed)
+            .copied()
+            .unwrap_or_default()
     }
 }

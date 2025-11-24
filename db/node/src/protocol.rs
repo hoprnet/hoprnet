@@ -237,7 +237,7 @@ impl HoprNodeDb {
                         // and should not be done for bogus unacknowledged tickets
                         let ack_ticket = unacknowledged.acknowledge(&ack_half_key)?;
 
-                        if ack_ticket.is_winning(&chain_key, &domain_separator) {
+                        if let Ok(ack_ticket) = ack_ticket.into_redeemable(&chain_key, &domain_separator) {
                             trace!("Found a winning ticket");
                             Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                         } else {

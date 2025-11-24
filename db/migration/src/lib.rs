@@ -23,9 +23,7 @@ pub struct MigratorPeers;
 #[async_trait::async_trait]
 impl MigratorTrait for MigratorPeers {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![
-            Box::new(m20251124_00004_peers_create_peers::Migration),
-        ]
+        vec![Box::new(m20251124_00004_peers_create_peers::Migration)]
     }
 }
 

@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
 
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::FuturesUnordered};
-use hopr_internal_types::prelude::{AcknowledgedTicketStatus};
+use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 pub use hopr_internal_types::prelude::{RedeemableTicket, VerifiedTicket};
 
 use crate::{
@@ -93,7 +93,8 @@ pub trait ChainWriteTicketOperations {
         // Make sure the selector only matches untouched tickets
         let selectors = selectors
             .into_iter()
-            .map(|sel| sel.into().with_state(AcknowledgedTicketStatus::Untouched));
+            .map(|sel| sel.into().with_state(AcknowledgedTicketStatus::Untouched))
+            .collect::<Vec<_>>();
 
         // Collect the tickets first so we don't hold up the DB connection
         let mut tickets = db

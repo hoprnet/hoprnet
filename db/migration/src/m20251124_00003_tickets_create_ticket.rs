@@ -6,29 +6,32 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.create_table(Table::create()
-            .table(Ticket::Table)
-            .if_not_exists()
-            .col(
-                ColumnDef::new(Ticket::Id)
-                    .integer()
-                    .not_null()
-                    .auto_increment()
-                    .primary_key(),
+        manager
+            .create_table(
+                Table::create()
+                    .table(Ticket::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Ticket::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(Ticket::ChannelId).string_len(64).not_null())
+                    .col(ColumnDef::new(Ticket::Amount).binary_len(12).not_null())
+                    .col(ColumnDef::new(Ticket::Index).binary_len(8).not_null())
+                    .col(ColumnDef::new(Ticket::WinningProbability).binary_len(7).not_null())
+                    .col(ColumnDef::new(Ticket::ChannelEpoch).binary_len(8).not_null())
+                    .col(ColumnDef::new(Ticket::Signature).binary_len(64).not_null())
+                    .col(ColumnDef::new(Ticket::Response).binary_len(32).not_null())
+                    .col(ColumnDef::new(Ticket::State).tiny_unsigned().not_null().default(0))
+                    .col(ColumnDef::new(Ticket::Hash).binary_len(32).not_null())
+                    .col(ColumnDef::new(Ticket::VrfParams).binary_len(97).not_null())
+                    .col(ColumnDef::new(Ticket::ChannelDst).binary_len(32).not_null())
+                    .to_owned(),
             )
-            .col(ColumnDef::new(Ticket::ChannelId).string_len(64).not_null())
-            .col(ColumnDef::new(Ticket::Amount).binary_len(12).not_null())
-            .col(ColumnDef::new(Ticket::Index).binary_len(8).not_null())
-            .col(ColumnDef::new(Ticket::WinningProbability).binary_len(7).not_null())
-            .col(ColumnDef::new(Ticket::ChannelEpoch).binary_len(8).not_null())
-            .col(ColumnDef::new(Ticket::Signature).binary_len(64).not_null())
-            .col(ColumnDef::new(Ticket::Response).binary_len(32).not_null())
-            .col(ColumnDef::new(Ticket::State).tiny_unsigned().not_null().default(0))
-            .col(ColumnDef::new(Ticket::Hash).binary_len(32).not_null())
-            .col(ColumnDef::new(Ticket::VrfParams).binary_len(97).not_null())
-            .col(ColumnDef::new(Ticket::ChannelDst).binary_len(32).not_null())
-            .to_owned()
-        ).await?;
+            .await?;
 
         manager
             .create_index(

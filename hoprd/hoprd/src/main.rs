@@ -8,7 +8,7 @@ use hopr_chain_connector::{
 };
 use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
 use hopr_lib::{
-    AbortableList, AcknowledgedTicket, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, errors::HoprLibError,
+    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, RedeemableTicket, ToHex, errors::HoprLibError,
     exports::api::chain::ChainEvents, prelude::ChainKeypair, utils::session::ListenerJoinHandles,
 };
 use hoprd::{
@@ -149,7 +149,7 @@ compile_error!("The 'runtime-tokio' feature must be enabled");
 async fn init_db(
     cfg: &HoprdConfig,
     chain_key: &ChainKeypair,
-) -> Result<(HoprNodeDb, futures::channel::mpsc::Receiver<AcknowledgedTicket>), anyhow::Error> {
+) -> Result<(HoprNodeDb, futures::channel::mpsc::Receiver<RedeemableTicket>), anyhow::Error> {
     let db_path: PathBuf = [&cfg.db.data, "node_db"].iter().collect();
     info!(path = ?db_path, "initiating DB");
 
@@ -197,7 +197,7 @@ async fn init_db(
         capacity = ack_ticket_channel_capacity,
         "starting winning ticket processing"
     );
-    let (on_ack_tkt_tx, on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
+    let (on_ack_tkt_tx, on_ack_tkt_rx) = channel::<RedeemableTicket>(ack_ticket_channel_capacity);
     node_db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
     Ok((node_db, on_ack_tkt_rx))

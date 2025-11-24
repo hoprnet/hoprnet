@@ -1,6 +1,6 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use hopr_api::chain::{ChainReceipt, ChainValues, TicketRedeemError};
+use hopr_api::chain::{ChainReceipt, TicketRedeemError};
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -66,7 +66,7 @@ where
             );
             return Err(ConnectorError::InvalidTicket);
         }
-        
+
         Ok(self.payload_generator.redeem_ticket(ticket)?)
     }
 }

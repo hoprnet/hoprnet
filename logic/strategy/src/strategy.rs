@@ -22,7 +22,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
 use hopr_lib::{
-    AcknowledgedTicket, ChannelChange, ChannelDirection, ChannelEntry,
+    ChannelChange, ChannelDirection, ChannelEntry, VerifiedTicket,
     exports::api::{
         chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
         db::TicketSelector,
@@ -59,7 +59,7 @@ pub trait SingularStrategy: Display {
     }
 
     /// Strategy event raised when a new **winning** acknowledged ticket is received in a channel
-    async fn on_acknowledged_winning_ticket(&self, _ack: &AcknowledgedTicket) -> Result<()> {
+    async fn on_acknowledged_winning_ticket(&self, _ack: &VerifiedTicket) -> Result<()> {
         Ok(())
     }
 
@@ -235,7 +235,7 @@ impl SingularStrategy for MultiStrategy {
         Ok(())
     }
 
-    async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> Result<()> {
+    async fn on_acknowledged_winning_ticket(&self, ack: &VerifiedTicket) -> Result<()> {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_acknowledged_winning_ticket(ack).await {
                 if !self.cfg.on_fail_continue {

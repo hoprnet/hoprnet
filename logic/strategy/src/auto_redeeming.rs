@@ -11,8 +11,8 @@ use std::{
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt, pin_mut};
 use hopr_lib::{
-    AcknowledgedTicket, AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus,
-    ChannelStatusDiscriminants, HoprBalance, Utc,
+    AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants,
+    HoprBalance, Utc, VerifiedTicket,
     exports::api::{
         chain::{ChainReadChannelOperations, ChannelSelector},
         db::TicketSelector,
@@ -164,7 +164,7 @@ where
         }
     }
 
-    async fn on_acknowledged_winning_ticket(&self, ack: &AcknowledgedTicket) -> crate::errors::Result<()> {
+    async fn on_acknowledged_winning_ticket(&self, ack: &VerifiedTicket) -> crate::errors::Result<()> {
         if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
             if let Some(channel) = self
                 .hopr_chain_actions
@@ -174,14 +174,14 @@ where
             {
                 info!(%ack, "redeeming");
 
-                if ack.ticket.verified_ticket().index < channel.ticket_index.as_u64() {
+                if ack.verified_ticket().index < channel.ticket_index.as_u64() {
                     error!(%ack, "acknowledged ticket is older than channel ticket index");
                     return Err(CriteriaNotSatisfied);
                 }
 
                 let selector = TicketSelector::from(channel)
                     .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                    .with_index_range(channel.ticket_index.as_u64()..=ack.ticket.verified_ticket().index)
+                    .with_index_range(channel.ticket_index.as_u64()..=ack.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched);
 
                 self.enqueue_redeem_request(selector).await
@@ -314,7 +314,7 @@ mod tests {
                 tx.sink_map_err(|e| StrategyError::Other(e.into())),
             );
 
-            ars.on_acknowledged_winning_ticket(&ack_ticket).await?;
+            ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await?;
             assert!(ars.on_tick().await.is_err());
         }
 
@@ -407,10 +407,10 @@ mod tests {
                 Arc::new(connector),
                 tx.sink_map_err(|e| StrategyError::Other(e.into())),
             );
-            ars.on_acknowledged_winning_ticket(&ack_ticket_below)
+            ars.on_acknowledged_winning_ticket(&ack_ticket_below.ticket)
                 .await
                 .expect_err("ticket below threshold should not satisfy");
-            ars.on_acknowledged_winning_ticket(&ack_ticket_at).await?;
+            ars.on_acknowledged_winning_ticket(&ack_ticket_at.ticket).await?;
         }
 
         let redeem_requests = rx.collect::<Vec<_>>().await;
@@ -505,7 +505,7 @@ mod tests {
                 Arc::new(connector),
                 tx.sink_map_err(|e| StrategyError::Other(e.into())),
             );
-            ars.on_acknowledged_winning_ticket(&ack_ticket_1).await?;
+            ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await?;
             assert!(ars.on_tick().await.is_err());
         }
 

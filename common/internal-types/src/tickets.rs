@@ -1070,9 +1070,7 @@ impl TransferableWinningTicket {
         domain_separator: &Hash,
     ) -> errors::Result<RedeemableTicket> {
         if !self.signer.eq(expected_issuer) {
-            return Err(InvalidInputData(
-                "invalid ticket issuer".into(),
-            ));
+            return Err(InvalidInputData("invalid ticket issuer".into()));
         }
 
         let verified_ticket = self
@@ -1094,9 +1092,7 @@ impl TransferableWinningTicket {
                 channel_dst: *domain_separator,
             })
         } else {
-            Err(InvalidInputData(
-                "ticket is not a win".into(),
-            ))
+            Err(InvalidInputData("ticket is not a win".into()))
         }
     }
 }
