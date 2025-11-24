@@ -211,8 +211,6 @@ fn main() -> anyhow::Result<()> {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
-    use hopr_lib::utils::db::init_db;
-
     init_logger()?;
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
@@ -259,7 +257,7 @@ async fn main_inner() -> anyhow::Result<()> {
     );
 
     // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
-    let (node_db, stored_tickets) = init_db(
+    let (node_db, stored_tickets) = hopr_utils_node_db::init_db(
         &hopr_keys.chain_key,
         &cfg.db.data,
         cfg.db.initialize,

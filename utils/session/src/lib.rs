@@ -694,7 +694,7 @@ mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
-    use crate::{
+    use hopr_lib::{
         Address, ApplicationData, ApplicationDataIn, ApplicationDataOut, DestinationRouting, HoprPseudonym,
         HoprSession, RoutingOptions, SessionId,
     };

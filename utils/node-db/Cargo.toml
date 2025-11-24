@@ -1,0 +1,66 @@
+[package]
+name = "hopr-utils-node-db"
+version = "1.0.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2024"
+description = "Utility functionality for managing HOPR node DB using the hopr-lib interface."
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = ["prometheus"]
+prometheus = [
+  "hopr-lib/prometheus",
+  "dep:hopr-metrics",
+  "dep:lazy_static",
+  "dep:regex",
+]
+explicit-path = []
+# placeholder feature so we can enable it globally during tests
+runtime-tokio = []
+
+[dependencies]
+anyhow = { workspace = true }
+axum = { workspace = true, features = ["ws", "http2"] }
+axum-extra = { workspace = true, features = ["query"] }
+human-bandwidth = { workspace = true }
+base64 = { workspace = true }
+bytesize = { workspace = true }
+const_format = { workspace = true }
+futures = { workspace = true }
+futures-concurrency = { workspace = true }
+lazy_static = { workspace = true, optional = true }
+regex = { workspace = true, optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+smart-default = { workspace = true }
+strum = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+urlencoding = { workspace = true }
+utoipa = { workspace = true }
+utoipa-scalar = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+validator = { workspace = true }
+
+hopr-lib = { workspace = true, features = [
+  "runtime-tokio",
+  "session-client",
+  "utils_futures",
+] }
+
+hopr-db-node = { workspace = true }
+hopr-chain-connector = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+oas3 = { workspace = true }
+test-log = { workspace = true }
