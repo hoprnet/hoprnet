@@ -110,11 +110,11 @@ mod tests {
 
     use futures_time::future::FutureExt;
     use hex_literal::hex;
-    use hopr_utils_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, ChannelEntry, ChannelStatus, HoprBalance, Keypair, XDaiBalance,
         exports::api::chain::{ChainEvent, ChainEvents},
     };
+    use hopr_utils_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use lazy_static::lazy_static;
 
     use super::*;

@@ -34,7 +34,7 @@ capture = ["hopr-transport/capture"]
 fixed-rng = ["hopr-crypto-random/fixed-rng"]
 
 # === utility features ===
-utils_futures = [] # utility futures for async adapters
+utils_futures = []  # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
 testing = [
@@ -45,7 +45,7 @@ testing = [
   "dep:hex-literal",
   "dep:hopr-utils-db-node",
   "dep:hopr-utils-chain-connector",
-  "hopr-utils-chain-connector/testing"
+  "hopr-utils-chain-connector/testing",
 ] # testing related functionality
 
 [dependencies]
@@ -90,7 +90,7 @@ hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport = { workspace = true }
-hopr-utils-chain-connector = { workspace = true, optional = true}
+hopr-utils-chain-connector = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }

@@ -10,14 +10,12 @@ mod cache;
 pub mod errors;
 mod ticket_manager;
 
-pub use db::{HoprNodeDb, HoprNodeDbConfig};
-pub use hopr_api::chain::AcknowledgedTicket;
-pub use hopr_api::db::*;
-use hopr_crypto_types::keypairs::ChainKeypair;
-
 use std::path::PathBuf;
 
+pub use db::{HoprNodeDb, HoprNodeDbConfig};
 use futures::channel::mpsc::channel;
+pub use hopr_api::{chain::AcknowledgedTicket, db::*};
+use hopr_crypto_types::keypairs::ChainKeypair;
 
 pub async fn init_db(
     chain_key: &ChainKeypair,
@@ -25,7 +23,7 @@ pub async fn init_db(
     initialize: bool,
     force_initialize: bool,
 ) -> anyhow::Result<(HoprNodeDb, futures::channel::mpsc::Receiver<AcknowledgedTicket>)> {
-    let db_path: PathBuf = [&db_data_path, "node_db"].iter().collect();
+    let db_path: PathBuf = [db_data_path, "node_db"].iter().collect();
     tracing::info!(path = ?db_path, "initiating DB");
 
     let mut create_if_missing = initialize;

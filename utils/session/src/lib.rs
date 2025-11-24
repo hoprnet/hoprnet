@@ -19,6 +19,10 @@ use futures::{
 };
 use hopr_api::{chain::HoprChainApi, db::HoprNodeDbApi};
 use hopr_async_runtime::Abortable;
+use hopr_lib::{
+    Address, Hopr, HoprSession, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
+    errors::HoprLibError, transfer_session,
+};
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, IpProtocol, SealedHost, UdpStreamParallelism},
     udp::ForeignDataMode,
@@ -29,11 +33,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info};
-
-use hopr_lib::{
-    Address, Hopr, HoprSession, SURB_SIZE, ServiceId, SessionClientConfig, SessionId, SessionTarget,
-    errors::HoprLibError, transfer_session,
-};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -608,17 +607,16 @@ async fn tcp_listen_on<A: std::net::ToSocketAddrs>(
 
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
-    if addrs.iter().all(|a| a.port() == 0) {
-        if let Some(range_str) = port_range {
-            let tcp_listener =
-                try_restricted_bind(
-                    addrs,
-                    &range_str,
-                    |a| async move { TcpListener::bind(a.as_slice()).await },
-                )
-                .await?;
-            return Ok((tcp_listener.local_addr()?, tcp_listener));
-        }
+    if addrs.iter().all(|a| a.port() == 0)
+        && let Some(range_str) = port_range
+    {
+        let tcp_listener = try_restricted_bind(
+            addrs,
+            &range_str,
+            |a| async move { TcpListener::bind(a.as_slice()).await },
+        )
+        .await?;
+        return Ok((tcp_listener.local_addr()?, tcp_listener));
     }
 
     let tcp_listener = TcpListener::bind(addrs.as_slice()).await?;
@@ -645,15 +643,15 @@ pub async fn udp_bind_to<A: std::net::ToSocketAddrs>(
 
     // If automatic port allocation is requested and there's a restriction on the port range
     // (via HOPRD_SESSION_PORT_RANGE), try to find an address within that range.
-    if addrs.iter().all(|a| a.port() == 0) {
-        if let Some(range_str) = port_range {
-            let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
-                futures::future::ready(builder.clone().build(addrs.as_slice()))
-            })
-            .await?;
+    if addrs.iter().all(|a| a.port() == 0)
+        && let Some(range_str) = port_range
+    {
+        let udp_listener = try_restricted_bind(addrs, &range_str, |addrs| {
+            futures::future::ready(builder.clone().build(addrs.as_slice()))
+        })
+        .await?;
 
-            return Ok((*udp_listener.bound_address(), udp_listener));
-        }
+        return Ok((*udp_listener.bound_address(), udp_listener));
     }
 
     let udp_socket = builder.build(address)?;
@@ -691,13 +689,13 @@ mod tests {
     };
     use futures_time::future::FutureExt as TimeFutureExt;
     use hopr_crypto_types::crypto_traits::Randomizable;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    use super::*;
     use hopr_lib::{
         Address, ApplicationData, ApplicationDataIn, ApplicationDataOut, DestinationRouting, HoprPseudonym,
         HoprSession, RoutingOptions, SessionId,
     };
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
 
     fn loopback_transport() -> (
         UnboundedSender<(DestinationRouting, ApplicationDataOut)>,

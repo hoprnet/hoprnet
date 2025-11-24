@@ -10,7 +10,6 @@ use hopr_primitive_types::{
     balance::WxHOPR,
     prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
 };
-
 use hopr_utils_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 
 lazy_static::lazy_static! {

@@ -37,7 +37,7 @@ base64 = { workspace = true }
 bytesize = { workspace = true }
 cfg-if = { workspace = true }
 const_format = { workspace = true }
-dashmap = { workspace = true}
+dashmap = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true, optional = true }
@@ -82,5 +82,3 @@ serial_test = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 test-log = { workspace = true }
-
-

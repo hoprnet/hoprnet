@@ -3,9 +3,8 @@ use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, exports::api::chain::ChainEvents};
-use hopr_utils_db_node::HoprNodeDb;
-
 use hopr_utils_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
+use hopr_utils_db_node::HoprNodeDb;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;

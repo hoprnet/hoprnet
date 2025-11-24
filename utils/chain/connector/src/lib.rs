@@ -22,7 +22,6 @@ pub mod blokli_client {
 #[doc(hidden)]
 pub mod reexports {
     pub use hopr_chain_types;
-
     /// Export of relevant types for easier integration.
     pub use hopr_chain_types::exports::alloy;
 }

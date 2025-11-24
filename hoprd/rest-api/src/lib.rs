@@ -31,9 +31,9 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
-use hopr_utils_db_node::HoprNodeDb;
 use hopr_lib::{Address, Hopr, errors::HoprLibError};
 use hopr_utils_chain_connector::HoprBlockchainSafeConnector;
+use hopr_utils_db_node::HoprNodeDb;
 use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
