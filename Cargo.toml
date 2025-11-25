@@ -36,8 +36,8 @@ members = [
   "transport/session",
   "db/entity",
   "db/migration",
-  "utils/chain/connector",
-  "utils/db/node",
+  "chain/connector",
+  "db/node",
   "utils/session",
 ]
 
@@ -254,8 +254,8 @@ hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
 hopr-utils-session = { path = "utils/session" }
-hopr-utils-db-node = { path = "utils/db/node" }
-hopr-utils-chain-connector = { path = "utils/chain/connector" }
+hopr-utils-db-node = { path = "db/node" }
+hopr-utils-chain-connector = { path = "chain/connector" }
 
 [profile.dev]
 panic = "abort"
