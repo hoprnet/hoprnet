@@ -4502,41 +4502,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-chain-connector"
-version = "0.1.1"
-dependencies = [
- "ahash",
- "anyhow",
- "async-broadcast",
- "async-trait",
- "bincode",
- "blokli-client",
- "dashmap",
- "futures",
- "futures-concurrency",
- "futures-time",
- "hex",
- "hopr-api",
- "hopr-async-runtime",
- "hopr-chain-connector",
- "hopr-chain-types",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-primitive-types",
- "lazy_static",
- "moka",
- "parking_lot",
- "petgraph",
- "redb",
- "serde_json",
- "smart-default",
- "tempfile",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "hopr-chain-types"
 version = "0.10.0"
 dependencies = [
@@ -4704,47 +4669,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hopr-db-node"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-lock",
- "async-stream",
- "async-trait",
- "bincode",
- "chrono",
- "futures",
- "hex",
- "hex-literal",
- "hopr-api",
- "hopr-async-runtime",
- "hopr-crypto-packet",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-db-entity",
- "hopr-db-migration",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-network-types",
- "hopr-parallelize",
- "hopr-platform",
- "hopr-primitive-types",
- "lazy_static",
- "moka",
- "parking_lot",
- "rand 0.8.5",
- "ringbuffer",
- "sea-orm",
- "sea-query",
- "smart-default",
- "sqlx",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
- "validator",
-]
-
-[[package]]
 name = "hopr-internal-types"
 version = "0.14.0"
 dependencies = [
@@ -4779,21 +4703,16 @@ dependencies = [
  "async-trait",
  "atomic_enum",
  "backon",
- "base64 0.22.1",
- "bytesize",
  "cfg-if",
  "const_format",
- "dashmap",
  "futures",
  "futures-time",
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-crypto-keypair",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-node",
  "hopr-internal-types",
  "hopr-lib",
  "hopr-metrics",
@@ -4802,10 +4721,10 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport",
- "human-bandwidth",
+ "hopr-utils-chain-connector",
+ "hopr-utils-db-node",
  "lazy_static",
  "parameterized",
- "parking_lot",
  "rand 0.8.5",
  "rstest",
  "serde",
@@ -4817,7 +4736,6 @@ dependencies = [
  "test-log",
  "thiserror 2.0.17",
  "tokio",
- "tokio-stream",
  "tokio-util",
  "tracing",
  "validator",
@@ -4983,10 +4901,10 @@ dependencies = [
  "futures-time",
  "hex-literal",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-crypto-random",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-utils-chain-connector",
  "insta",
  "lazy_static",
  "mockall",
@@ -5087,11 +5005,11 @@ dependencies = [
  "hopr-api",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-node",
  "hopr-metrics",
  "hopr-network-types",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-utils-db-node",
  "lazy_static",
  "libp2p-identity",
  "more-asserts",
@@ -5181,11 +5099,9 @@ dependencies = [
  "hex-literal",
  "hopr-api",
  "hopr-async-runtime",
- "hopr-chain-connector",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-node",
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
@@ -5199,6 +5115,8 @@ dependencies = [
  "hopr-transport-mixer",
  "hopr-transport-probe",
  "hopr-transport-session",
+ "hopr-utils-chain-connector",
+ "hopr-utils-db-node",
  "lazy_static",
  "libp2p",
  "moka",
@@ -5260,6 +5178,111 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-utils-chain-connector"
+version = "0.1.1"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "async-broadcast",
+ "async-trait",
+ "bincode",
+ "blokli-client",
+ "dashmap",
+ "futures",
+ "futures-concurrency",
+ "futures-time",
+ "hex",
+ "hopr-api",
+ "hopr-async-runtime",
+ "hopr-chain-types",
+ "hopr-crypto-types",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "hopr-utils-chain-connector",
+ "lazy_static",
+ "moka",
+ "parking_lot",
+ "petgraph",
+ "redb",
+ "serde_json",
+ "smart-default",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-utils-db-node"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-lock",
+ "async-stream",
+ "async-trait",
+ "bincode",
+ "chrono",
+ "futures",
+ "hex",
+ "hex-literal",
+ "hopr-api",
+ "hopr-async-runtime",
+ "hopr-crypto-packet",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-entity",
+ "hopr-db-migration",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-network-types",
+ "hopr-parallelize",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "lazy_static",
+ "moka",
+ "parking_lot",
+ "rand 0.8.5",
+ "ringbuffer",
+ "sea-orm",
+ "sea-query",
+ "smart-default",
+ "sqlx",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "validator",
+]
+
+[[package]]
+name = "hopr-utils-session"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "bytesize",
+ "dashmap",
+ "futures",
+ "futures-time",
+ "hopr-api",
+ "hopr-async-runtime",
+ "hopr-crypto-types",
+ "hopr-lib",
+ "hopr-metrics",
+ "hopr-network-types",
+ "hopr-transport",
+ "human-bandwidth",
+ "lazy_static",
+ "parking_lot",
+ "serde",
+ "serde_with",
+ "test-log",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "hoprd"
 version = "4.0.0"
 dependencies = [
@@ -5270,11 +5293,12 @@ dependencies = [
  "console-subscriber",
  "futures",
  "home",
- "hopr-chain-connector",
- "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
  "hopr-strategy",
+ "hopr-utils-chain-connector",
+ "hopr-utils-db-node",
+ "hopr-utils-session",
  "hoprd-api",
  "lazy_static",
  "mimalloc",
@@ -5315,10 +5339,11 @@ dependencies = [
  "const_format",
  "futures",
  "futures-concurrency",
- "hopr-chain-connector",
- "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-utils-chain-connector",
+ "hopr-utils-db-node",
+ "hopr-utils-session",
  "human-bandwidth",
  "lazy_static",
  "oas3",
@@ -10171,9 +10196,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adc82fd73de2a9722ac5da747f12383d2bfdb93591ee6c58486e0097890f05f2"
+checksum = "9cf146f99d442e8e68e585f5d798ccd3cad9a7835b917e09728880a862706456"
 dependencies = [
  "async-compression",
  "bitflags 2.10.0",

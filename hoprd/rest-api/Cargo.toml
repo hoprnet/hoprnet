@@ -52,13 +52,13 @@ validator = { workspace = true }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-client",
-  "utils_session",
   "utils_futures",
 ] }
 
-hopr-db-node = { workspace = true }
-hopr-chain-connector = { workspace = true }
+hopr-utils-db-node = { workspace = true }
+hopr-utils-chain-connector = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-utils-session = { workspace = true }
 
 [dev-dependencies]
 oas3 = { workspace = true }

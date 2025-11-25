@@ -9,7 +9,7 @@ mod parser;
 pub mod payload;
 
 #[cfg(feature = "use-bindings")]
-pub use parser::ParsedHoprChainAction;
+pub use {hopr_bindings::exports, parser::ParsedHoprChainAction};
 
 pub mod prelude {
     #[cfg(feature = "use-bindings")]

@@ -2,18 +2,18 @@ use std::{convert::identity, ops::Div, str::FromStr, time::Duration};
 
 use futures_time::future::FutureExt;
 use hex_literal::hex;
-use hopr_chain_connector::{
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::WinningProbability;
+use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
+use hopr_primitive_types::prelude::*;
+use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
+use hopr_utils_chain_connector::{
     BlockchainConnectorConfig,
     blokli_client::BlokliQueryClient,
     create_trustful_hopr_blokli_connector,
     testing::{BlokliTestClient, BlokliTestStateBuilder, FullStateEmulator},
 };
-use hopr_crypto_types::prelude::*;
-use hopr_db_node::HoprNodeDb;
-use hopr_internal_types::prelude::WinningProbability;
-use hopr_network_types::prelude::{IpOrHost, RoutingOptions, SealedHost};
-use hopr_primitive_types::prelude::*;
-use hopr_transport::{HoprSession, SessionClientConfig, SessionTarget};
+use hopr_utils_db_node::HoprNodeDb;
 use rand::prelude::{IteratorRandom, SliceRandom};
 use rstest::fixture;
 use tokio::time::sleep;
