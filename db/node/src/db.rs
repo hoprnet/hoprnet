@@ -186,7 +186,7 @@ impl HoprNodeDb {
 #[cfg(test)]
 mod tests {
     use hopr_api::{db::*, *};
-    use hopr_crypto_types::keypairs::OffchainKeypair;
+    use hopr_crypto_types::{keypairs::OffchainKeypair, prelude::Keypair};
     use hopr_primitive_types::prelude::SingleSumSMA;
     use rand::{Rng, distributions::Alphanumeric};
 
@@ -194,7 +194,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_basic_db_init() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
         MigratorTickets::status(&db.tickets_db).await?;
         MigratorPeers::status(&db.peers_db).await?;
 
@@ -217,7 +217,7 @@ mod tests {
         let path = std::path::Path::new(&random_tmp_file);
 
         {
-            let db = HoprNodeDb::new(path, ChainKeypair::random(), HoprNodeDbConfig::default()).await?;
+            let db = HoprNodeDb::new(path, HoprNodeDbConfig::default()).await?;
 
             db.add_network_peer(
                 &peer_id,
@@ -230,7 +230,7 @@ mod tests {
         }
 
         {
-            let db = HoprNodeDb::new(path, ChainKeypair::random(), HoprNodeDbConfig::default()).await?;
+            let db = HoprNodeDb::new(path, HoprNodeDbConfig::default()).await?;
 
             let not_found_peer = db.get_network_peer(&peer_id).await?;
 
@@ -257,7 +257,7 @@ mod tests {
         let path = std::path::Path::new(&random_tmp_file);
 
         {
-            let db = HoprNodeDb::new(path, ChainKeypair::random(), HoprNodeDbConfig::default()).await?;
+            let db = HoprNodeDb::new(path, HoprNodeDbConfig::default()).await?;
 
             db.add_network_peer(
                 &peer_id,
@@ -286,7 +286,7 @@ mod tests {
             .await?;
         }
         {
-            let db = HoprNodeDb::new(path, ChainKeypair::random(), HoprNodeDbConfig::default()).await?;
+            let db = HoprNodeDb::new(path, HoprNodeDbConfig::default()).await?;
 
             let found_peer = db.get_network_peer(&peer_id).await?.map(|p| p.id.1);
 

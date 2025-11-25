@@ -30,22 +30,22 @@ pub struct TicketStatistics {
 }
 
 #[derive(Clone)]
-pub(crate) struct PathPlanner<Db, R, S> {
-    db: Db,
+pub(crate) struct PathPlanner<Surb, R, S> {
+    pub(crate) surb_store: Surb,
     resolver: R,
     selector: S,
     me: Address,
 }
 
-impl<Db, R, S> PathPlanner<Db, R, S>
+impl<Surb, R, S> PathPlanner<Surb, R, S>
 where
-    Db: SurbStore + Send + Sync + 'static,
+    Surb: SurbStore + Send + Sync + 'static,
     R: ChainKeyOperations + ChainReadChannelOperations + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
-    pub(crate) fn new(me: Address, db: Db, resolver: R, selector: S) -> Self {
+    pub(crate) fn new(me: Address, surb_store: Surb, resolver: R, selector: S) -> Self {
         Self {
-            db,
+            surb_store,
             resolver,
             selector,
             me,
@@ -169,7 +169,7 @@ where
                     surb,
                     remaining,
                 } = self
-                    .db
+                    .surb_store
                     .find_surb(matcher)
                     .await
                     .ok_or(HoprTransportError::Api("no surb".into()))?;

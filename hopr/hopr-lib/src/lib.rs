@@ -98,7 +98,7 @@ pub use hopr_primitive_types::prelude::*;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
 pub use hopr_transport::*;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, warn};
 
 pub use crate::{
     config::SafeModule,
@@ -580,7 +580,7 @@ where
         info!("starting ticket events processor");
         let (tickets_tx, tickets_rx) = channel(1024);
         let (tickets_rx, tickets_handle) = futures::stream::abortable(tickets_rx);
-        processes.insert(HoprLibProcess::OnTicketEvent, tickets_handle);
+        processes.insert(HoprLibProcess::TicketEvents, tickets_handle);
         let node_db = self.node_db.clone();
         let new_ticket_tx = self.winning_ticket_subscribers.0.clone();
         spawn(
@@ -616,7 +616,7 @@ where
                 })
                 .inspect(|_| {
                     tracing::warn!(
-                        task = %HoprLibProcess::OnTicketEvent,
+                        task = %HoprLibProcess::TicketEvents,
                         "long-running background task finished"
                     )
                 }),
@@ -628,30 +628,6 @@ where
             .run(cover_traffic, indexer_peer_update_rx, tickets_tx, session_tx)
             .await?;
         processes.flat_map_extend_from(transport_processes, HoprLibProcess::Transport);
-
-        info!("starting outgoing ticket flush process");
-        let (index_flush_stream, index_flush_handle) =
-            futures::stream::abortable(futures_time::stream::interval(Duration::from_secs(5).into()));
-        processes.insert(HoprLibProcess::TicketIndexFlush, index_flush_handle);
-        let node_db = self.node_db.clone();
-        spawn(
-            index_flush_stream
-                .for_each(move |_| {
-                    let node_db = node_db.clone();
-                    async move {
-                        match node_db.persist_outgoing_ticket_indices().await {
-                            Ok(count) => trace!(count, "successfully flushed states of outgoing ticket indices"),
-                            Err(error) => error!(%error, "Failed to flush ticket indices"),
-                        }
-                    }
-                })
-                .inspect(|_| {
-                    tracing::warn!(
-                        task = %HoprLibProcess::TicketIndexFlush,
-                        "long-running background task finished"
-                    )
-                }),
-        );
 
         // Start a queue that takes care of redeeming tickets via given TicketSelectors
         let (redemption_req_tx, redemption_req_rx) = channel::<TicketSelector>(1024);
@@ -706,7 +682,7 @@ where
                             }
                         },
                         Some(ChannelDirection::Outgoing) => {
-                            if let Err(error) = node_db.reset_outgoing_ticket_index(closed_channel.get_id()).await {
+                            if let Err(error) = node_db.remove_outgoing_ticket_index(closed_channel.get_id(), closed_channel.channel_epoch.as_u32()).await {
                                 error!(%error, %closed_channel, "failed to reset ticket index on closed outgoing channel");
                             } else {
                                 debug!(%closed_channel, "outgoing ticket index has been resets on outgoing channel closure");

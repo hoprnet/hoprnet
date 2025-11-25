@@ -265,7 +265,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(BOB.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let channel = ChannelEntry::new(
             BOB.public().to_address(),

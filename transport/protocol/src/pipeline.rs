@@ -1,6 +1,6 @@
 use futures::{SinkExt, StreamExt};
 use futures_time::future::FutureExt as TimeExt;
-use hopr_async_runtime::spawn_as_abortable;
+use hopr_async_runtime::{AbortableList, spawn_as_abortable};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::{prelude::*, timeout::TimeoutSinkExt};
@@ -425,7 +425,7 @@ pub fn run_packet_pipeline<WIn, WOut, C, D, T, TEvt, AppOut, AppIn>(
     ticket_proc: T,
     ticket_events: TEvt,
     api: (AppOut, AppIn),
-) -> std::collections::HashMap<PacketPipelineProcesses, hopr_async_runtime::AbortHandle>
+) -> AbortableList<PacketPipelineProcesses>
 where
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::fmt::Display,
@@ -439,7 +439,7 @@ where
     AppOut::Error: std::fmt::Display,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
 {
-    let mut processes = std::collections::HashMap::new();
+    let mut processes = AbortableList::default();
 
     #[cfg(all(feature = "prometheus", not(test)))]
     {

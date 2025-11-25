@@ -11,7 +11,7 @@ pub use decoder::HoprDecoder;
 pub use encoder::HoprEncoder;
 pub use errors::*;
 pub use surb_store::{MemorySurbStore, SurbStoreConfig};
-pub use ticket_processing::{HoprTicketProcessor, HoprTicketProcessorConfig};
+pub use ticket_processing::{HoprTicketProcessor, HoprTicketProcessorConfig, TicketIndexTracker};
 pub use traits::*;
 pub use types::*;
 

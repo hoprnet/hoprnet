@@ -1,11 +1,4 @@
-use std::{
-    collections::HashMap,
-    ops::Bound,
-    sync::{
-        Arc,
-        atomic::{AtomicU64, Ordering},
-    },
-};
+use std::{collections::HashMap, ops::Bound};
 
 use async_stream::stream;
 use async_trait::async_trait;
@@ -172,6 +165,28 @@ impl HoprDbTicketOperations for HoprNodeDb {
                 futures::future::ready(ticket.inspect_err(|error| error!(%error, "invalid ticket in db")).ok())
             })
             .boxed())
+    }
+
+    async fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
+        self.ticket_manager.insert_ticket(ticket).await?;
+
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
+                &["unredeemed"],
+                self.ticket_manager
+                    .unrealized_value(TicketSelector::new(
+                        ticket.verified_ticket().channel_id,
+                        ticket.verified_ticket().channel_epoch,
+                    ))
+                    .await?
+                    .amount()
+                    .as_u128() as f64,
+            );
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["winning_count"], 1.0f64);
+            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["losing_count"], 1.0f64);
+        }
+        Ok(())
     }
 
     async fn mark_tickets_as<S: Into<TicketSelector> + Send, I: IntoIterator<Item = S> + Send>(
@@ -511,108 +526,114 @@ impl HoprDbTicketOperations for HoprNodeDb {
         self.get_tickets_value_int(&self.tickets_db, selector).await
     }
 
-    async fn compare_and_set_outgoing_ticket_index(
+    async fn get_or_create_outgoing_ticket_index(
         &self,
         channel_id: &ChannelId,
-        index: u64,
-    ) -> Result<u64, NodeDbError> {
-        let old_value = self
-            .get_outgoing_ticket_index(channel_id)
-            .await?
-            .fetch_max(index, Ordering::SeqCst);
+        epoch: u32,
+    ) -> Result<Option<u64>, Self::Error> {
+        let maybe_index = outgoing_ticket_index::Entity::find()
+            .filter(
+                outgoing_ticket_index::Column::ChannelId
+                    .eq(hex::encode(channel_id))
+                    .and(outgoing_ticket_index::Column::Epoch.eq(epoch)),
+            )
+            .one(&self.ticket_manager.tickets_db)
+            .await?;
 
-        // TODO: should we hint the persisting mechanism to trigger the flush?
-        // if old_value < index {}
-
-        Ok(old_value)
-    }
-
-    async fn reset_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, NodeDbError> {
-        let old_value = self
-            .get_outgoing_ticket_index(channel_id)
-            .await?
-            .swap(0, Ordering::SeqCst);
-
-        // TODO: should we hint the persisting mechanism to trigger the flush?
-        // if old_value > 0 { }
-
-        Ok(old_value)
-    }
-
-    async fn increment_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, NodeDbError> {
-        let old_value = self
-            .get_outgoing_ticket_index(channel_id)
-            .await?
-            .fetch_add(1, Ordering::SeqCst);
-
-        // TODO: should we hint the persisting mechanism to trigger the flush?
-
-        Ok(old_value)
-    }
-
-    async fn persist_outgoing_ticket_indices(&self) -> Result<usize, NodeDbError> {
-        let outgoing_indices = outgoing_ticket_index::Entity::find().all(&self.tickets_db).await?;
-
-        let mut updated = 0;
-        for index_model in outgoing_indices {
-            let channel_id = Hash::from_hex(&index_model.channel_id).map_err(NodeDbError::from)?;
-            let db_index = U256::from_be_bytes(&index_model.index).as_u64();
-            if let Some(cached_index) = self.caches.ticket_index.get(&channel_id).await {
-                // Note that the persisted value is always lagging behind the cache,
-                // so the fact that the cached index can change between this load
-                // storing it in the DB is allowed.
-                let cached_index = cached_index.load(Ordering::SeqCst);
-
-                // Store the ticket index in a separate write transaction
-                if cached_index > db_index {
-                    let mut index_active_model = index_model.into_active_model();
-                    index_active_model.index = Set(cached_index.to_be_bytes().to_vec());
-                    self.ticket_manager
-                        .write_transaction(|tx| {
-                            Box::pin(async move {
-                                index_active_model.save(tx).await?;
-                                Ok::<_, sea_orm::DbErr>(())
-                            })
+        Ok(match maybe_index {
+            Some(model) => Some(U256::from_be_bytes(model.index).as_u64()),
+            None => {
+                let channel_id = *channel_id;
+                self.ticket_manager
+                    .write_transaction(|tx| {
+                        Box::pin(async move {
+                            outgoing_ticket_index::ActiveModel {
+                                channel_id: Set(hex::encode(channel_id)),
+                                ..Default::default()
+                            }
+                            .insert(tx)
+                            .await?;
+                            Ok::<_, sea_orm::DbErr>(())
                         })
+                    })
+                    .await?;
+                None
+            }
+        })
+    }
+
+    async fn update_outgoing_ticket_index(
+        &self,
+        channel_id: &ChannelId,
+        epoch: u32,
+        index: u64,
+    ) -> Result<(), Self::Error> {
+        let channel_id = *channel_id;
+        Ok(self
+            .ticket_manager
+            .write_transaction(|tx| {
+                Box::pin(async move {
+                    let maybe_index = outgoing_ticket_index::Entity::find()
+                        .filter(
+                            outgoing_ticket_index::Column::ChannelId
+                                .eq(hex::encode(channel_id))
+                                .and(outgoing_ticket_index::Column::Epoch.eq(epoch)),
+                        )
+                        .one(tx)
                         .await?;
 
-                    debug!("updated ticket index in channel {channel_id} from {db_index} to {cached_index}");
-                    updated += 1;
-                }
-            } else {
-                // The value is not yet in the cache, meaning there's low traffic on this
-                // channel, so the value has not been yet fetched.
-                trace!(?channel_id, "channel not in cache yet");
-            }
-        }
+                    if let Some(model) = maybe_index {
+                        let current_index = U256::from_be_bytes(model.index.as_slice()).as_u64();
+                        if current_index > index {
+                            return Err(NodeDbError::LogicalError(format!(
+                                "cannot set outgoing ticket index to {index} for channel {channel_id} - index is \
+                                 already {current_index}"
+                            )));
+                        }
 
-        Ok(Ok::<_, NodeDbError>(updated)?)
+                        // Save us the writing, if the indices are equal.
+                        if current_index != index {
+                            let mut active_model = model.into_active_model();
+                            active_model.index = Set(index.to_be_bytes().to_vec());
+                            active_model.save(tx).await?;
+
+                            tracing::debug!(%channel_id, %epoch, %index, "updated outgoing ticket index");
+                        }
+                    } else {
+                        tracing::debug!("ignoring attempt to update outgoing ticket index non-existing entry");
+                    }
+
+                    Ok::<_, NodeDbError>(())
+                })
+            })
+            .await?)
     }
 
-    async fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        self.ticket_manager.insert_ticket(ticket).await?;
+    async fn remove_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<(), Self::Error> {
+        let channel_id = *channel_id;
+        Ok(self
+            .ticket_manager
+            .write_transaction(|tx| {
+                Box::pin(async move {
+                    let res = outgoing_ticket_index::Entity::delete_many()
+                        .filter(
+                            outgoing_ticket_index::Column::ChannelId
+                                .eq(hex::encode(channel_id))
+                                .and(outgoing_ticket_index::Column::Epoch.eq(epoch)),
+                        )
+                        .exec(tx)
+                        .await?;
 
-        #[cfg(all(feature = "prometheus", not(test)))]
-        {
-            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
-                &["unredeemed"],
-                self.ticket_manager
-                    .unrealized_value(TicketSelector::new(
-                        ticket.verified_ticket().channel_id,
-                        ticket.verified_ticket().channel_epoch,
-                    ))
-                    .await?
-                    .amount()
-                    .as_u128() as f64,
-            );
-            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["winning_count"], 1.0f64);
-            METRIC_HOPR_TICKETS_INCOMING_STATISTICS.increment(&["losing_count"], 1.0f64);
-        }
-        Ok(())
-    }
+                    if res.rows_affected > 0 {
+                        tracing::debug!(%channel_id, %epoch, "removed outgoing ticket index");
+                    } else {
+                        tracing::warn!(%channel_id, %epoch, "outgoing ticket index not found");
+                    }
 
-    async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, NodeDbError> {
-        self.ticket_manager.unrealized_value(selector).await
+                    Ok::<_, NodeDbError>(())
+                })
+            })
+            .await?)
     }
 }
 
@@ -631,7 +652,7 @@ impl HoprNodeDb {
                         .with_index(acknowledged_ticket.verified_ticket().index),
                     );
 
-                    debug!("upserting ticket {acknowledged_ticket}");
+                    debug!(%acknowledged_ticket, "upserting ticket");
                     let mut model = ticket::ActiveModel::from(acknowledged_ticket);
 
                     if let Some(ticket) = ticket::Entity::find().filter(selector).one(tx).await? {
@@ -665,42 +686,6 @@ impl HoprNodeDb {
                 })
             })
             .await?)
-    }
-
-    async fn get_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<Arc<AtomicU64>, NodeDbError> {
-        let tkt_manager = self.ticket_manager.clone();
-        let channel_id = *channel_id;
-
-        self.caches
-            .ticket_index
-            .try_get_with(channel_id, async move {
-                let maybe_index = outgoing_ticket_index::Entity::find()
-                    .filter(outgoing_ticket_index::Column::ChannelId.eq(channel_id.to_hex()))
-                    .one(&tkt_manager.tickets_db)
-                    .await?;
-
-                Ok(Arc::new(AtomicU64::new(match maybe_index {
-                    Some(model) => U256::from_be_bytes(model.index).as_u64(),
-                    None => {
-                        tkt_manager
-                            .write_transaction(|tx| {
-                                Box::pin(async move {
-                                    outgoing_ticket_index::ActiveModel {
-                                        channel_id: Set(channel_id.to_hex()),
-                                        ..Default::default()
-                                    }
-                                    .insert(tx)
-                                    .await?;
-                                    Ok::<_, sea_orm::DbErr>(())
-                                })
-                            })
-                            .await?;
-                        0_u64
-                    }
-                })))
-            })
-            .await
-            .map_err(|e: Arc<NodeDbError>| NodeDbError::LogicalError(format!("failed to retrieve ticket index: {e}")))
     }
 }
 
@@ -774,7 +759,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_get_ticket() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let mut tickets = init_db_with_tickets(&db, 1).await?;
         let ack_ticket = tickets.pop().context("ticket should be present")?;
@@ -817,7 +802,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mark_redeemed() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
         const COUNT_TICKETS: u64 = 10;
 
         let tickets = init_db_with_tickets(&db, COUNT_TICKETS).await?;
@@ -869,7 +854,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mark_redeem_should_not_mark_redeem_twice() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let ticket = init_db_with_tickets(&db, 1)
             .await?
@@ -884,7 +869,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mark_redeem_should_redeem_all_tickets() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let count_tickets = 10;
         init_db_with_tickets(&db, count_tickets).await?;
@@ -902,7 +887,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mark_tickets_neglected() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
         const COUNT_TICKETS: u64 = 10;
 
         init_db_with_tickets(&db, COUNT_TICKETS).await?;
@@ -954,7 +939,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mark_unsaved_ticket_rejected() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let mut ticket = init_db_with_tickets(&db, 1).await?;
         let ticket = ticket.pop().context("ticket should be present")?.ticket;
@@ -982,7 +967,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_tickets_states_and_fetch() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         init_db_with_tickets(&db, 10).await?;
 
@@ -1015,7 +1000,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_tickets_states() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         init_db_with_tickets(&db, 10).await?;
         let selector = TicketSelector::new(*CHANNEL_ID, CHANNEL_EPOCH).with_state(AcknowledgedTicketStatus::Untouched);
@@ -1036,12 +1021,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_ticket_index_should_be_zero_if_not_yet_present() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let hash = Hash::default();
 
-        let idx = db.get_outgoing_ticket_index(&hash).await?;
-        assert_eq!(0, idx.load(Ordering::SeqCst), "initial index must be zero");
+        let idx = db.get_or_create_outgoing_ticket_index(&hash).await?;
+        assert_eq!(0, idx, "initial index must be zero");
 
         let r = hopr_db_entity::outgoing_ticket_index::Entity::find()
             .filter(hopr_db_entity::outgoing_ticket_index::Column::ChannelId.eq(hash.to_hex()))
@@ -1068,7 +1053,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ticket_stats_must_be_zero_for_non_existing_channel() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let stats = db.get_ticket_statistics(Some(*CHANNEL_ID)).await?;
 
@@ -1079,7 +1064,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ticket_stats_must_be_zero_when_no_tickets() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let stats = db.get_ticket_statistics(Some(*CHANNEL_ID)).await?;
 
@@ -1100,7 +1085,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ticket_stats_must_be_different_per_channel() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let channel_1 = generate_channel_id(BOB.public().as_ref(), ALICE.public().as_ref());
         let channel_2 = generate_channel_id(ALICE.public().as_ref(), BOB.public().as_ref());
@@ -1142,20 +1127,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_ticket_index_compare_and_set_and_increment() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let hash = Hash::default();
 
         let old_idx = db.compare_and_set_outgoing_ticket_index(&hash, 1).await?;
         assert_eq!(0, old_idx, "old value must be 0");
 
-        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
+        let new_idx = db
+            .get_or_create_outgoing_ticket_index(&hash)
+            .await?
+            .load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
         let old_idx = db.increment_outgoing_ticket_index(&hash).await?;
         assert_eq!(1, old_idx, "old value must be 1");
 
-        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
+        let new_idx = db
+            .get_or_create_outgoing_ticket_index(&hash)
+            .await?
+            .load(Ordering::SeqCst);
         assert_eq!(2, new_idx, "new value must be 2");
 
         Ok(())
@@ -1163,16 +1154,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_ticket_index_compare_and_set_must_not_decrease() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let hash = Hash::default();
 
-        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
+        let new_idx = db
+            .get_or_create_outgoing_ticket_index(&hash)
+            .await?
+            .load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "value must be 0");
 
         db.compare_and_set_outgoing_ticket_index(&hash, 1).await?;
 
-        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
+        let new_idx = db
+            .get_or_create_outgoing_ticket_index(&hash)
+            .await?
+            .load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
         let old_idx = db.compare_and_set_outgoing_ticket_index(&hash, 0).await?;
@@ -1188,34 +1185,43 @@ mod tests {
 
     #[tokio::test]
     async fn test_ticket_index_reset() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let hash = Hash::default();
 
-        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
+        let new_idx = db
+            .get_or_create_outgoing_ticket_index(&hash)
+            .await?
+            .load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "value must be 0");
 
         db.compare_and_set_outgoing_ticket_index(&hash, 1).await?;
 
-        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
+        let new_idx = db
+            .get_or_create_outgoing_ticket_index(&hash)
+            .await?
+            .load(Ordering::SeqCst);
         assert_eq!(1, new_idx, "new value must be 1");
 
         let old_idx = db.reset_outgoing_ticket_index(&hash).await?;
         assert_eq!(1, old_idx, "old value must be 1");
 
-        let new_idx = db.get_outgoing_ticket_index(&hash).await?.load(Ordering::SeqCst);
+        let new_idx = db
+            .get_or_create_outgoing_ticket_index(&hash)
+            .await?
+            .load(Ordering::SeqCst);
         assert_eq!(0, new_idx, "new value must be 0");
         Ok(())
     }
 
     #[tokio::test]
     async fn test_persist_ticket_indices() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ChainKeypair::random()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let hash_1 = Hash::default();
         let hash_2 = Hash::from(hopr_crypto_random::random_bytes());
 
-        db.get_outgoing_ticket_index(&hash_1).await?;
+        db.get_or_create_outgoing_ticket_index(&hash_1).await?;
         db.compare_and_set_outgoing_ticket_index(&hash_2, 10).await?;
 
         let persisted = db.persist_outgoing_ticket_indices().await?;
@@ -1278,7 +1284,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_ticket_statistics_when_tickets_are_in_db() -> anyhow::Result<()> {
-        let db = HoprNodeDb::new_in_memory(ALICE.clone()).await?;
+        let db = HoprNodeDb::new_in_memory().await?;
 
         let ticket = init_db_with_tickets(&db, 1).await?.pop().unwrap();
 

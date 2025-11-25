@@ -5,7 +5,6 @@ use std::{
 };
 
 use futures::stream::BoxStream;
-use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -42,7 +41,7 @@ impl Display for TicketIndexSelector {
 #[derive(Clone, Debug)]
 pub struct TicketSelector {
     /// Channel ID and Epoch pair.
-    pub channel_identifier: (Hash, U256),
+    pub channel_identifier: (ChannelId, U256),
     /// If given, will select ticket(s) with the given indices
     /// in the given channel and epoch.
     ///
@@ -102,7 +101,7 @@ impl PartialEq for TicketSelector {
 
 impl TicketSelector {
     /// Create a new ticket selector given the `channel_id` and `epoch`.
-    pub fn new<T: Into<U256>>(channel_id: Hash, epoch: T) -> Self {
+    pub fn new<T: Into<U256>>(channel_id: ChannelId, epoch: T) -> Self {
         Self {
             channel_identifier: (channel_id, epoch.into()),
             index: TicketIndexSelector::None,
@@ -312,41 +311,34 @@ pub trait HoprDbTicketOperations {
     async fn reset_ticket_statistics(&self) -> Result<(), Self::Error>;
 
     /// Counts the total value of tickets matching the given `selector` on a single channel.
+    ///
+    /// Returns the count of tickets and the total ticket value.
     async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance), Self::Error>;
 
-    // TODO: outgoing ticket index manipulations APIs will be refactored in #7575
-
-    /// Sets the stored outgoing ticket index to `index`, only if the currently stored value
-    /// is less than `index`. This ensures the stored value can only be growing.
+    /// Gets the index of the next outgoing ticket for the given channel.
     ///
-    /// Returns the old value.
-    ///
-    /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn compare_and_set_outgoing_ticket_index(
+    /// If such an entry does not exist, it is initialized with 0 and `None` is returned.
+    async fn get_or_create_outgoing_ticket_index(
         &self,
         channel_id: &ChannelId,
+        epoch: u32,
+    ) -> Result<Option<u64>, Self::Error>;
+
+    /// Stores the ticket index of the next outgoing ticket for the given channel.
+    ///
+    /// Does nothing if the entry for the given channel and epoch does not exist.
+    /// Returns an error if the given `index` is less than the current index in the DB.
+    async fn update_outgoing_ticket_index(
+        &self,
+        channel_id: &ChannelId,
+        epoch: u32,
         index: u64,
-    ) -> Result<u64, Self::Error>;
+    ) -> Result<(), Self::Error>;
 
-    /// Resets the outgoing ticket index to 0 for the given channel id.
+    /// Removes the outgoing ticket index for the given channel and epoch.
     ///
-    /// Returns the old value before reset.
-    ///
-    /// If the entry is not yet present for the given ID, it is initialized to 0.
-    async fn reset_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, Self::Error>;
-
-    /// Increments the outgoing ticket index in the given channel ID and returns the value before incrementing.
-    ///
-    /// If the entry is not yet present for the given ID, it is initialized to 0 and incremented.
-    async fn increment_outgoing_ticket_index(&self, channel_id: &ChannelId) -> Result<u64, Self::Error>;
-
-    /// Compares outgoing ticket indices in the cache with the stored values
-    /// and updates the stored value where changed.
-    ///
-    /// Returns the number of updated ticket indices.
-    async fn persist_outgoing_ticket_indices(&self) -> Result<usize, Self::Error>;
-
-    async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance, Self::Error>;
+    /// Does nothing if the value did not exist
+    async fn remove_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<(), Self::Error>;
 }
 
 /// Contains ticket statistics for one or more channels.

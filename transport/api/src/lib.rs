@@ -53,7 +53,7 @@ pub use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::prelude::{DestinationRouting, *};
 use hopr_primitive_types::prelude::*;
 pub use hopr_protocol_app::prelude::{ApplicationData, ApplicationDataIn, ApplicationDataOut, Tag};
-use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, MemorySurbStore, SurbStoreConfig};
+use hopr_protocol_hopr::{HoprCodecConfig, HoprTicketProcessorConfig, MemorySurbStore};
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId, Protocol};
 use hopr_transport_mixer::MixerConfig;
@@ -100,11 +100,16 @@ pub enum HoprTransportProcess {
     #[strum(to_string = "component responsible for the transport medium (libp2p swarm)")]
     Medium,
     #[strum(to_string = "HOPR packet pipeline ({0})")]
-    Protocol(hopr_transport_protocol::PacketPipelineProcesses),
+    Pipeline(hopr_transport_protocol::PacketPipelineProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
     #[strum(to_string = "network probing sub-process: {0}")]
     Probing(hopr_transport_probe::HoprProbeProcess),
+    #[strum(to_string = "outgoing ticket index sync")]
+    OutgoingTicketIndexSync,
+    #[cfg(feature = "capture")]
+    #[strum(to_string = "packet capture")]
+    Capture,
 }
 
 // TODO (4.1): implement path selector based on probing
@@ -203,7 +208,6 @@ where
     /// [`crate::HoprTransportProcess::BloomFilterSave`], [`crate::HoprTransportProcess::Swarm`] and session-related
     /// processes and return join handles to the calling function. These processes are not started immediately but
     /// are waiting for a trigger from this piece of code.
-    #[allow(clippy::too_many_arguments)]
     pub async fn run<S, T, Ct>(
         &self,
         cover_traffic: Option<Ct>,
@@ -223,7 +227,7 @@ where
         T::Error: std::fmt::Display,
         Ct: TrafficGeneration + Send + Sync + 'static,
     {
-        info!("Loading initial peers from the chain");
+        info!("loading initial peers from the chain");
         let public_nodes = self
             .resolver
             .stream_accounts(AccountSelector {
@@ -249,7 +253,7 @@ where
         debug!(
             capacity = internal_discovery_updates_capacity,
             minimum_required = minimum_capacity,
-            "Creating internal discovery updates channel"
+            "creating internal discovery updates channel"
         );
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
             futures::channel::mpsc::channel::<PeerDiscovery>(internal_discovery_updates_capacity);
@@ -295,14 +299,14 @@ where
 
         info!(
             public_nodes = public_nodes.len(),
-            "Initializing swarm with peers from chain"
+            "initializing swarm with peers from chain"
         );
 
         for node_entry in public_nodes {
             if let AccountType::Announced(multiaddresses) = node_entry.entry_type {
                 let peer: PeerId = node_entry.public_key.into();
 
-                debug!(%peer, ?multiaddresses, "Using initial public node");
+                debug!(%peer, ?multiaddresses, "using initial public node");
 
                 internal_discovery_update_tx
                     .send(PeerDiscovery::Announce(peer, multiaddresses))
@@ -355,7 +359,6 @@ where
             transport_events_rx
                 .for_each(move |event| {
                     let network = network_clone.clone();
-
                     async move {
                         match event {
                             hopr_transport_p2p::DiscoveryEvent::IncomingConnection(peer, multiaddr) => {
@@ -405,7 +408,7 @@ where
 
         debug!(
             capacity = msg_protocol_bidirectional_channel_capacity,
-            "Creating protocol bidirectional channel"
+            "creating protocol bidirectional channel"
         );
         let (tx_from_protocol, rx_from_protocol) =
             channel::<(HoprPseudonym, ApplicationDataIn)>(msg_protocol_bidirectional_channel_capacity);
@@ -479,20 +482,18 @@ where
                 channels_dst,
                 ..Default::default()
             },
-            surb_cfg: SurbStoreConfig::default(),
         };
 
-        for (k, v) in pipeline::run_hopr_packet_pipeline(
+        processes.extend_from(pipeline::run_hopr_packet_pipeline(
             (self.me.clone(), self.me_onchain.clone()),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, all_resolved_external_msg_rx),
             ticket_events,
+            self.path_planner.surb_store.clone(),
             self.resolver.clone(),
             self.db.clone(),
             hopr_pipeline_cfg,
-        ) {
-            processes.insert(HoprTransportProcess::Protocol(k), v);
-        }
+        ));
 
         // -- network probing
         debug!(
@@ -536,9 +537,7 @@ where
                 .await
         };
 
-        for (k, v) in probing_processes.into_iter() {
-            processes.insert(HoprTransportProcess::Probing(k), v);
-        }
+        processes.flat_map_extend_from(probing_processes, HoprTransportProcess::Probing);
 
         // manual ping
         self.ping
