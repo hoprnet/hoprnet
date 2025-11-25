@@ -122,7 +122,7 @@ pub(crate) fn any_selector<I: IntoIterator<Item = S>, S: Into<TicketSelector>>(s
         .into_iter()
         .map(|s| WrappedTicketSelector(s.into()).into_condition())
         .reduce(|a, b| a.or(b).into_condition())
-        .unwrap_or(Condition::any())
+        .unwrap_or(Condition::all())
 }
 
 pub(crate) async fn find_stats_for_channel(
@@ -770,6 +770,17 @@ mod tests {
 
         let db_ticket = db
             .stream_tickets([&ack_ticket])
+            .await?
+            .collect::<Vec<_>>()
+            .await
+            .first()
+            .cloned()
+            .context("ticket should exist")?;
+
+        assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
+
+        let db_ticket = db
+            .stream_tickets(None::<TicketSelector>)
             .await?
             .collect::<Vec<_>>()
             .await
