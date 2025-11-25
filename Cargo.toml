@@ -254,8 +254,8 @@ hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hopr-db-entity = { path = "db/entity" }
 hopr-db-migration = { path = "db/migration" }
 hopr-utils-session = { path = "utils/session" }
-hopr-utils-db-node = { path = "db/node" }
-hopr-utils-chain-connector = { path = "chain/connector" }
+hopr-db-node = { path = "db/node" }
+hopr-chain-connector = { path = "chain/connector" }
 
 [profile.dev]
 panic = "abort"

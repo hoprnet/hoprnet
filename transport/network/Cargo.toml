@@ -38,4 +38,4 @@ hopr-network-types = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 more-asserts = { workspace = true }
-hopr-utils-db-node = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-node = { workspace = true, features = ["runtime-tokio"] }

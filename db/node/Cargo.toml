@@ -1,5 +1,5 @@
 [package]
-name = "hopr-utils-db-node"
+name = "hopr-db-node"
 version = "0.2.0"
 edition = "2021"
 description = "Contains SQL Node DB functionality implementing the DB API traits"

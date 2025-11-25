@@ -4781,11 +4781,8 @@ dependencies = [
  "async-trait",
  "atomic_enum",
  "backon",
- "base64 0.22.1",
- "bytesize",
  "cfg-if",
  "const_format",
- "dashmap",
  "futures",
  "futures-time",
  "hex-literal",
@@ -4804,10 +4801,8 @@ dependencies = [
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport",
- "human-bandwidth",
  "lazy_static",
  "parameterized",
- "parking_lot",
  "rand 0.8.5",
  "rstest",
  "serde",
@@ -4819,7 +4814,6 @@ dependencies = [
  "test-log",
  "thiserror 2.0.17",
  "tokio",
- "tokio-stream",
  "tokio-util",
  "tracing",
  "validator",
@@ -5262,6 +5256,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-utils-session"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "bytesize",
+ "dashmap",
+ "futures",
+ "futures-time",
+ "hopr-api",
+ "hopr-async-runtime",
+ "hopr-crypto-types",
+ "hopr-lib",
+ "hopr-metrics",
+ "hopr-network-types",
+ "hopr-transport",
+ "human-bandwidth",
+ "lazy_static",
+ "parking_lot",
+ "serde",
+ "serde_with",
+ "test-log",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "hoprd"
 version = "4.0.0"
 dependencies = [
@@ -5277,6 +5300,7 @@ dependencies = [
  "hopr-lib",
  "hopr-metrics",
  "hopr-strategy",
+ "hopr-utils-session",
  "hoprd-api",
  "lazy_static",
  "mimalloc",
@@ -5321,6 +5345,7 @@ dependencies = [
  "hopr-db-node",
  "hopr-lib",
  "hopr-metrics",
+ "hopr-utils-session",
  "human-bandwidth",
  "lazy_static",
  "oas3",
@@ -10173,9 +10198,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adc82fd73de2a9722ac5da747f12383d2bfdb93591ee6c58486e0097890f05f2"
+checksum = "9cf146f99d442e8e68e585f5d798ccd3cad9a7835b917e09728880a862706456"
 dependencies = [
  "async-compression",
  "bitflags 2.10.0",
