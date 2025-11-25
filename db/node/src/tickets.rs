@@ -174,10 +174,6 @@ impl HoprDbTicketOperations for HoprNodeDb {
             .boxed())
     }
 
-    async fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
-        self.ticket_manager.insert_ticket(ticket).await
-    }
-
     async fn mark_tickets_as<S: Into<TicketSelector> + Send, I: IntoIterator<Item = S> + Send>(
         &self,
         selectors: I,
@@ -593,10 +589,7 @@ impl HoprDbTicketOperations for HoprNodeDb {
         Ok(Ok::<_, NodeDbError>(updated)?)
     }
 
-    async fn insert_received_ticket(&self, ticket: AcknowledgedTicket) -> Result<(), Self::Error> {
-        #[cfg(all(feature = "prometheus", not(test)))]
-        let verified_ticket = ticket.ticket.verified_ticket().clone();
-
+    async fn insert_ticket(&self, ticket: RedeemableTicket) -> Result<(), Self::Error> {
         self.ticket_manager.insert_ticket(ticket).await?;
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -605,8 +598,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
                 &["unredeemed"],
                 self.ticket_manager
                     .unrealized_value(TicketSelector::new(
-                        verified_ticket.channel_id,
-                        verified_ticket.channel_epoch,
+                        ticket.verified_ticket().channel_id,
+                        ticket.verified_ticket().channel_epoch,
                     ))
                     .await?
                     .amount()

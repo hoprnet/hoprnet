@@ -39,9 +39,7 @@ use futures::{
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
-    db::{
-        HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus, TicketSelector,
-    },
+    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus, TicketSelector},
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;

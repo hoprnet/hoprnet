@@ -21,10 +21,13 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use async_trait::async_trait;
-use hopr_lib::{ChannelChange, ChannelDirection, ChannelEntry,VerifiedTicket, exports::api::{
-    chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
-    db::TicketSelector,
-}, VerifiedTicket};
+use hopr_lib::{
+    ChannelChange, ChannelDirection, ChannelEntry, VerifiedTicket,
+    exports::api::{
+        chain::{ChainReadChannelOperations, ChainWriteChannelOperations},
+        db::TicketSelector,
+    },
+};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 #[cfg(all(feature = "prometheus", not(test)))]

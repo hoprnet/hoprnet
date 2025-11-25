@@ -10,10 +10,14 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt, pin_mut};
-use hopr_lib::{AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants, HoprBalance, Utc,VerifiedTicket, exports::api::{
-    chain::{ChainReadChannelOperations, ChannelSelector},
-    db::TicketSelector,
-}, VerifiedTicket};
+use hopr_lib::{
+    AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants,
+    HoprBalance, Utc, VerifiedTicket,
+    exports::api::{
+        chain::{ChainReadChannelOperations, ChannelSelector},
+        db::TicketSelector,
+    },
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, error, info};

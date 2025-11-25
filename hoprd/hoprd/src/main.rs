@@ -3,7 +3,7 @@ use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
 use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
-use hopr_db_node::HoprNodeDb;
+use hopr_db_node::{HoprNodeDb, init_hopr_node_db};
 use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, exports::api::chain::ChainEvents};
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
@@ -255,7 +255,7 @@ async fn main_inner() -> anyhow::Result<()> {
         "Node public identifiers"
     );
 
-    let node_db = init_db(&cfg).await?;
+    let node_db = init_hopr_node_db(&cfg.db.data, cfg.db.initialize, cfg.db.force_initialize).await?;
 
     let chain_connector = Arc::new(
         init_blokli_connector(

@@ -590,8 +590,11 @@ where
                     async move {
                         match ticket_event {
                             TicketEvent::WinningTicket(winning) => {
-                                // TODO: adjust DB interface to accept RedeemableTickets
-                                // node_db.insert_received_ticket()
+                                if let Err(error) = node_db.insert_ticket(*winning).await {
+                                    tracing::error!(%error, %winning, "failed to insert ticket into database");
+                                } else {
+                                    tracing::debug!(%winning, "inserted ticket into database");
+                                }
                                 Some(winning)
                             }
                             TicketEvent::RejectedTicket(rejected) => {
@@ -606,7 +609,7 @@ where
                     }
                 })
                 .for_each(move |ticket| {
-                    if let Err(error) = new_ticket_tx.try_broadcast(ticket.ticket.clone()) {
+                    if let Err(error) = new_ticket_tx.try_broadcast(ticket.ticket) {
                         tracing::error!(%error, "failed to broadcast new winning ticket to subscribers");
                     }
                     futures::future::ready(())

@@ -6,7 +6,6 @@ use std::{
 };
 
 use hopr_internal_types::prelude::ChannelEntry;
-
 use migration::{MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sqlx::{
