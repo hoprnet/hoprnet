@@ -40,7 +40,7 @@ chrono = { workspace = true }
 hex-literal = { workspace = true }
 hopr-lib = { workspace = true, features = ["runtime-tokio"] }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
-hopr-chain-connector = { workspace = true, features = [
+hopr-utils-chain-connector = { workspace = true, features = [
   "testing",
   "runtime-tokio",
 ] }

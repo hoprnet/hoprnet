@@ -35,14 +35,16 @@ pub mod state;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
-/// Re-exports of libraries necessary for API and interface operations.
+/// Exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {
     pub use hopr_api as api;
+
     pub mod types {
         pub use hopr_internal_types as internal;
         pub use hopr_primitive_types as primitive;
     }
+
     pub mod crypto {
         pub use hopr_crypto_keypair as keypair;
         pub use hopr_crypto_types as types;
@@ -1214,7 +1216,9 @@ where
             .map(|pk| pk.map(|v| v.into()))
             .map_err(HoprLibError::chain)
     }
+}
 
+impl<Chain, Db> Hopr<Chain, Db> {
     // === telemetry
     /// Prometheus formatted metrics collected by the hopr-lib components.
     pub fn collect_hopr_metrics() -> errors::Result<String> {

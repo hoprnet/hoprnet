@@ -31,9 +31,10 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
-use hopr_chain_connector::HoprBlockchainSafeConnector;
-use hopr_db_node::HoprNodeDb;
-use hopr_lib::{Address, Hopr, errors::HoprLibError, utils::session::ListenerJoinHandles};
+use hopr_lib::{Address, Hopr, errors::HoprLibError};
+use hopr_utils_chain_connector::HoprBlockchainSafeConnector;
+use hopr_utils_db_node::HoprNodeDb;
+use hopr_utils_session::ListenerJoinHandles;
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use tokio::net::TcpListener;
@@ -56,7 +57,7 @@ use crate::config::Auth;
 
 pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
-type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_chain_connector::blokli_client::BlokliClient>;
+type HoprBlokliConnector = HoprBlockchainSafeConnector<hopr_utils_chain_connector::blokli_client::BlokliClient>;
 
 #[derive(Clone)]
 pub(crate) struct AppState {

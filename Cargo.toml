@@ -3,7 +3,6 @@
 resolver = "2"
 
 members = [
-  "chain/connector",
   "chain/types",
   "common/api",
   "common/async-runtime",
@@ -16,9 +15,6 @@ members = [
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
-  "db/entity",
-  "db/migration",
-  "db/node",
   "hopli",
   "hopr/hopr-lib",
   "hoprd/hoprd",
@@ -38,6 +34,11 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
+  "db/entity",
+  "db/migration",
+  "chain/connector",
+  "db/node",
+  "utils/session",
 ]
 
 [workspace.dependencies]
@@ -111,8 +112,8 @@ mockall = "0.14.0"
 moka = { version = "0.12.11", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
-oas3 = "0.20.1"
 num_enum = "0.7.5"
+oas3 = "0.20.0"
 opentelemetry = { version = "0.31.0" }
 opentelemetry-otlp = { version = "0.31.0", default-features = false }
 opentelemetry_sdk = { version = "0.31.0" }
@@ -185,7 +186,7 @@ tokio-util = { version = "0.7.17", default-features = false, features = [
 ] }
 tokio-retry = "0.3.0"
 tokio-stream = { version = "0.1.17", features = ["net"] }
-tower-http = { version = "0.6.6", features = [
+tower-http = { version = "0.6.7", features = [
   "validate-request",
   "compression-full",
   "cors",
@@ -220,7 +221,6 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c" } # master branch on 18.11.2025
-hopr-chain-connector = { path = "chain/connector" }
 hopr-chain-types = { path = "chain/types" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
@@ -230,9 +230,6 @@ hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, feature
   "ed25519",
 ] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
-hopr-db-entity = { path = "db/entity" }
-hopr-db-migration = { path = "db/migration" }
-hopr-db-node = { path = "db/node" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
@@ -254,6 +251,11 @@ hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hopr-db-entity = { path = "db/entity" }
+hopr-db-migration = { path = "db/migration" }
+hopr-utils-session = { path = "utils/session" }
+hopr-utils-db-node = { path = "db/node" }
+hopr-utils-chain-connector = { path = "chain/connector" }
 
 [profile.dev]
 panic = "abort"
@@ -291,4 +293,4 @@ insta.opt-level = 3
 similar.opt-level = 3
 
 [workspace.metadata.cargo-shear]
-ignored = ["oas3"]
+ignored = ["oas3", "serde_bytes"]

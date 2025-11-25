@@ -1,0 +1,54 @@
+[package]
+name = "hopr-utils-session"
+version = "1.0.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2024"
+description = "Utility functionalito for managing HOPR sessions through the hopr-lib interface."
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+runtime-tokio = [
+  "hopr-async-runtime/runtime-tokio",
+  "hopr-network-types/runtime-tokio",
+  "hopr-transport/runtime-tokio",
+]
+prometheus = [
+  "dep:hopr-metrics",
+  "hopr-transport/prometheus",
+  "hopr-network-types/prometheus",
+]
+
+[dependencies]
+anyhow = { workspace = true }
+base64 = { workspace = true }
+bytesize = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+futures-time = { workspace = true }
+human-bandwidth = { workspace = true }
+lazy_static = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true }
+serde_with = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }
+
+hopr-api = { workspace = true }
+hopr-lib = { workspace = true }
+hopr-async-runtime = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-network-types = { workspace = true }
+hopr-transport = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+test-log = { workspace = true }

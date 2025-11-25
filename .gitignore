@@ -4,6 +4,7 @@
 **/.idea
 **/gha-creds-*.json
 .DS_Store
+db/entity/src/codegen/sqlite
 
 openapi.spec.json
 

@@ -1,22 +1,11 @@
-use std::{num::NonZeroUsize, path::PathBuf, str::FromStr, sync::Arc};
+use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
-use futures::{FutureExt, StreamExt, channel::mpsc::channel, future::abortable};
-use hopr_chain_connector::{
-    BlockchainConnectorConfig, HoprBlockchainSafeConnector,
-    blokli_client::{BlokliClient, BlokliClientConfig},
-};
-use hopr_db_node::{HoprNodeDb, HoprNodeDbConfig};
-use hopr_lib::{
-    AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, RedeemableTicket, ToHex, errors::HoprLibError,
-    exports::api::chain::ChainEvents, prelude::ChainKeypair, utils::session::ListenerJoinHandles,
-};
-use hoprd::{
-    cli::CliArgs,
-    config::{DEFAULT_BLOKLI_URL, HoprdConfig},
-    errors::HoprdError,
-    exit::HoprServerIpForwardingReactor,
-};
+use futures::{FutureExt, StreamExt, future::abortable};
+use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, RedeemableTicket, ToHex, exports::api::chain::ChainEvents};
+use hopr_utils_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
+use hopr_utils_db_node::HoprNodeDb;
+use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
 use tracing::{debug, error, info, warn};
@@ -146,88 +135,6 @@ enum HoprdProcess {
 #[cfg(not(feature = "runtime-tokio"))]
 compile_error!("The 'runtime-tokio' feature must be enabled");
 
-async fn init_db(
-    cfg: &HoprdConfig,
-    chain_key: &ChainKeypair,
-) -> Result<(HoprNodeDb, futures::channel::mpsc::Receiver<RedeemableTicket>), anyhow::Error> {
-    let db_path: PathBuf = [&cfg.db.data, "node_db"].iter().collect();
-    info!(path = ?db_path, "initiating DB");
-
-    let mut create_if_missing = cfg.db.initialize;
-
-    if cfg.db.force_initialize {
-        info!("Force cleaning up existing database");
-        std::fs::remove_dir_all(db_path.as_path())?;
-        create_if_missing = true;
-    }
-
-    // create DB dir if it does not exist
-    if let Some(parent_dir_path) = db_path.as_path().parent() {
-        if !parent_dir_path.is_dir() {
-            std::fs::create_dir_all(parent_dir_path).map_err(|e| {
-                HoprLibError::GeneralError(format!(
-                    "Failed to create DB parent directory at '{parent_dir_path:?}': {e}"
-                ))
-            })?
-        }
-    }
-
-    let db_cfg = HoprNodeDbConfig {
-        create_if_missing,
-        force_create: cfg.db.force_initialize,
-        log_slow_queries: std::time::Duration::from_millis(150),
-        surb_ring_buffer_size: std::env::var("HOPR_PROTOCOL_SURB_RB_SIZE")
-            .ok()
-            .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-            .unwrap_or_else(|| HoprNodeDbConfig::default().surb_ring_buffer_size),
-        surb_distress_threshold: std::env::var("HOPR_PROTOCOL_SURB_RB_DISTRESS")
-            .ok()
-            .and_then(|s| u64::from_str(&s).map(|v| v as usize).ok())
-            .unwrap_or_else(|| HoprNodeDbConfig::default().surb_distress_threshold),
-    };
-    let node_db = HoprNodeDb::new(db_path.as_path(), chain_key.clone(), db_cfg).await?;
-
-    let ack_ticket_channel_capacity = std::env::var("HOPR_INTERNAL_ACKED_TICKET_CHANNEL_CAPACITY")
-        .ok()
-        .and_then(|s| s.trim().parse::<usize>().ok())
-        .filter(|&c| c > 0)
-        .unwrap_or(2048);
-
-    debug!(
-        capacity = ack_ticket_channel_capacity,
-        "starting winning ticket processing"
-    );
-    let (on_ack_tkt_tx, on_ack_tkt_rx) = channel::<RedeemableTicket>(ack_ticket_channel_capacity);
-    node_db.start_ticket_processing(Some(on_ack_tkt_tx))?;
-
-    Ok((node_db, on_ack_tkt_rx))
-}
-
-async fn init_blokli_connector(
-    chain_key: &ChainKeypair,
-    cfg: &HoprdConfig,
-) -> anyhow::Result<HoprBlockchainSafeConnector<BlokliClient>> {
-    info!("initiating Blokli connector");
-    let mut connector = hopr_chain_connector::create_trustful_hopr_blokli_connector(
-        chain_key,
-        BlockchainConnectorConfig {
-            tx_confirm_timeout: std::time::Duration::from_secs(30),
-            ..Default::default()
-        },
-        BlokliClient::new(
-            cfg.provider.as_deref().unwrap_or(DEFAULT_BLOKLI_URL).parse()?,
-            BlokliClientConfig {
-                timeout: std::time::Duration::from_secs(5),
-            },
-        ),
-        cfg.hopr.safe_module.module_address,
-    )
-    .await?;
-    connector.connect(std::time::Duration::from_secs(30)).await?;
-
-    Ok(connector)
-}
-
 async fn init_rest_api(
     cfg: &HoprdConfig,
     hopr: Arc<hopr_lib::Hopr<Arc<HoprBlockchainSafeConnector<BlokliClient>>, HoprNodeDb>>,
@@ -248,7 +155,7 @@ async fn init_rest_api(
 
     info!(listen_address, "Running a REST API");
 
-    let session_listener_sockets = Arc::new(ListenerJoinHandles::default());
+    let session_listener_sockets = Arc::new(hopr_utils_session::ListenerJoinHandles::default());
 
     let mut processes = AbortableList::<HoprdProcess>::default();
 
@@ -301,6 +208,8 @@ fn main() -> anyhow::Result<()> {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
+    use hopr_utils_chain_connector::init_blokli_connector;
+
     init_logger()?;
 
     #[cfg(all(target_os = "linux", feature = "allocator-jemalloc-stats"))]
@@ -347,9 +256,22 @@ async fn main_inner() -> anyhow::Result<()> {
     );
 
     // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
-    let (node_db, stored_tickets) = init_db(&cfg, &hopr_keys.chain_key).await?;
+    let (node_db, stored_tickets) = hopr_utils_db_node::init_db(
+        &hopr_keys.chain_key,
+        &cfg.db.data,
+        cfg.db.initialize,
+        cfg.db.force_initialize,
+    )
+    .await?;
 
-    let chain_connector = Arc::new(init_blokli_connector(&hopr_keys.chain_key, &cfg).await?);
+    let chain_connector = Arc::new(
+        init_blokli_connector(
+            &hopr_keys.chain_key,
+            cfg.provider.clone(),
+            cfg.hopr.safe_module.module_address,
+        )
+        .await?,
+    );
 
     // Create the node instance
     info!("creating the HOPRd node instance from hopr-lib");
@@ -357,7 +279,7 @@ async fn main_inner() -> anyhow::Result<()> {
         hopr_lib::Hopr::new(
             cfg.clone().into(),
             chain_connector.clone(),
-            node_db.clone(),
+            node_db,
             &hopr_keys.packet_key,
             &hopr_keys.chain_key,
         )
