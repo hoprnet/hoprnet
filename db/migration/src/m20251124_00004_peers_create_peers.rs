@@ -70,7 +70,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .name(IDX_NAME_IGNORED)
                     .table(NetworkPeer::Table)
-                    .col((NetworkPeer::Ignored, IndexOrder::Asc))
+                    .col((NetworkPeer::IgnoredUntil, IndexOrder::Asc))
                     .to_owned(),
             )
             .await?;
@@ -126,7 +126,6 @@ pub(crate) enum NetworkPeer {
     Origin,
     LastSeen,
     LastSeenLatency,
-    Ignored,
     IgnoredUntil,
     Quality,
     QualitySma,

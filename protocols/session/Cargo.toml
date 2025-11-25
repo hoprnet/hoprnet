@@ -8,9 +8,6 @@ homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
-
 [features]
 default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-packet/serde"]
@@ -85,3 +82,9 @@ harness = false
 [target.'cfg(target_os = "linux")'.dependencies]
 mimalloc = { workspace = true, optional = true }
 tikv-jemallocator = { workspace = true, optional = true }
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
+[package.metadata.cargo-shear]
+ignored = ["serde_bytes"]
