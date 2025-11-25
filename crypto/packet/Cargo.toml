@@ -63,6 +63,9 @@ hopr-crypto-sphinx = { workspace = true, features = [
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
 
+[package.metadata.cargo-shear]
+ignored = ["serde_bytes"]
+
 [[bench]]
 name = "packet_benches"
 harness = false

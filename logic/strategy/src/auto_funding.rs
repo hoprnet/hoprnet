@@ -100,7 +100,7 @@ impl<A: ChainWriteChannelOperations + Send + Sync> SingularStrategy for AutoFund
                 let channel_id = channel.get_id();
                 let rx = self
                     .hopr_chain_actions
-                    .fund_channel(&channel_id, self.cfg.funding_amount)
+                    .fund_channel(channel_id, self.cfg.funding_amount)
                     .await
                     .map_err(|e| StrategyError::Other(e.into()))?;
 
@@ -121,11 +121,11 @@ mod tests {
     use futures::StreamExt;
     use futures_time::future::FutureExt;
     use hex_literal::hex;
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, Keypair, XDaiBalance,
         exports::api::chain::{ChainEvent, ChainEvents},
     };
-    use hopr_utils_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 
     use super::*;
     use crate::{

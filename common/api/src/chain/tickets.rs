@@ -2,7 +2,7 @@ use std::fmt::Formatter;
 
 use futures::{FutureExt, StreamExt, future::BoxFuture, stream::FuturesUnordered};
 use hopr_internal_types::prelude::AcknowledgedTicketStatus;
-pub use hopr_internal_types::prelude::{AcknowledgedTicket, VerifiedTicket};
+pub use hopr_internal_types::prelude::{RedeemableTicket, VerifiedTicket};
 
 use crate::{
     chain::ChainReceipt,
@@ -56,7 +56,6 @@ pub enum TicketRedeemError<E> {
     ProcessingError(VerifiedTicket, E),
 }
 
-// TODO: change these APIs to accept RedeemableTicket (see #7616)
 /// On-chain write operations with tickets.
 #[async_trait::async_trait]
 #[auto_impl::auto_impl(&, Box, Arc)]
@@ -67,7 +66,7 @@ pub trait ChainWriteTicketOperations {
     /// The input `ticket` is always returned as [`VerifiedTicket`], either on success or failure.
     async fn redeem_ticket<'a>(
         &'a self,
-        ticket: AcknowledgedTicket,
+        ticket: RedeemableTicket,
     ) -> Result<
         BoxFuture<'a, Result<(VerifiedTicket, ChainReceipt), TicketRedeemError<Self::Error>>>,
         TicketRedeemError<Self::Error>,
@@ -81,20 +80,25 @@ pub trait ChainWriteTicketOperations {
     ///
     /// The method waits until all matched tickets are either redeemed or fail to redeem,
     /// reporting the results in the [`BatchRedemptionResult`] object.
-    async fn redeem_tickets_via_selector<Db>(
+    async fn redeem_tickets_via_selectors<Db, S, I>(
         &self,
         db: &Db,
-        selector: TicketSelector,
+        selectors: I,
     ) -> Result<BatchRedemptionResult<Self::Error>, Db::Error>
     where
         Db: HoprDbTicketOperations + Sync,
+        I: IntoIterator<Item = S> + Send,
+        S: Into<TicketSelector>,
     {
         // Make sure the selector only matches untouched tickets
-        let selector = selector.with_state(AcknowledgedTicketStatus::Untouched);
+        let selectors = selectors
+            .into_iter()
+            .map(|sel| sel.into().with_state(AcknowledgedTicketStatus::Untouched))
+            .collect::<Vec<_>>();
 
         // Collect the tickets first so we don't hold up the DB connection
         let mut tickets = db
-            .update_ticket_states_and_fetch(selector.clone(), AcknowledgedTicketStatus::BeingRedeemed)
+            .update_ticket_states_and_fetch(selectors, AcknowledgedTicketStatus::BeingRedeemed)
             .await?
             .collect::<Vec<_>>()
             .await;
@@ -118,20 +122,20 @@ pub trait ChainWriteTicketOperations {
             .fold(BatchRedemptionResult::default(), |mut res, item| async move {
                 match item {
                     Ok((ticket, receipt)) => {
-                        if let Err(error) = db.mark_tickets_as((&ticket).into(), TicketMarker::Redeemed).await {
+                        if let Err(error) = db.mark_tickets_as([&ticket], TicketMarker::Redeemed).await {
                             tracing::error!(%error, "failed to mark ticket as redeemed");
                         }
                         res.successful.push((ticket, receipt));
                     }
                     Err(TicketRedeemError::Rejected(ticket, reason)) => {
-                        if let Err(error) = db.mark_tickets_as((&ticket).into(), TicketMarker::Rejected).await {
+                        if let Err(error) = db.mark_tickets_as([&ticket], TicketMarker::Rejected).await {
                             tracing::error!(%error, "failed to mark ticket as rejected");
                         }
                         res.rejected.push((ticket, reason));
                     }
                     Err(TicketRedeemError::ProcessingError(ticket, proc_error)) => {
                         if let Err(error) = db
-                            .update_ticket_states((&ticket).into(), AcknowledgedTicketStatus::Untouched)
+                            .update_ticket_states([&ticket], AcknowledgedTicketStatus::Untouched)
                             .await
                         {
                             tracing::error!(%error, "failed to update ticket state to untouched");

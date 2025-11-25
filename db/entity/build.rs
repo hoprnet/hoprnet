@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::Context;
 use clap::Parser;
-use migration::MigrationTrait;
 
 async fn execute_sea_orm_cli_command<I, T>(itr: I) -> anyhow::Result<()>
 where
@@ -33,29 +32,11 @@ where
                 ConnectOptions::new(database_url.unwrap_or("/tmp/sea_orm_cli.db".into()))
                     .set_schema_search_path(database_schema.unwrap_or_else(|| "public".to_owned()))
                     .to_owned();
-            let is_sqlite = connect_options.get_url().starts_with("sqlite");
             let db = &Database::connect(connect_options).await?;
 
-            if is_sqlite {
-                struct TempMigrator;
-
-                impl migration::MigratorTrait for TempMigrator {
-                    fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-                        let mut migrations = migration::MigratorPeers::migrations();
-                        migrations.extend(migration::MigratorTickets::migrations());
-
-                        migrations
-                    }
-                }
-
-                sea_orm_migration::cli::run_migrate(TempMigrator {}, db, command, cli.verbose)
-                    .await
-                    .map_err(|e| anyhow::anyhow!(e.to_string()))
-            } else {
-                sea_orm_migration::cli::run_migrate(migration::Migrator {}, db, command, cli.verbose)
-                    .await
-                    .map_err(|e| anyhow::anyhow!(e.to_string()))
-            }
+            sea_orm_migration::cli::run_migrate(migration::Migrator {}, db, command, cli.verbose)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.to_string()))
         }
     }
 }

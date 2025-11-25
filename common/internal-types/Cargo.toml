@@ -1,6 +1,6 @@
 [package]
 name = "hopr-internal-types"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains HOPR-specific types required internally by the HOPR node"
 edition = "2021"
@@ -44,4 +44,7 @@ parameterized = { workspace = true }
 tokio = { workspace = true }
 
 [package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
+[package.metadata.cargo-shear]
 ignored = ["serde_bytes"]

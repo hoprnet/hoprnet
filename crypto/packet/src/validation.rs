@@ -35,7 +35,7 @@ pub fn validate_unacknowledged_ticket(
                 "ticket amount {} in not at least {min_ticket_amount}",
                 inner_ticket.amount
             ),
-            ticket: inner_ticket.clone().into(),
+            ticket: (*inner_ticket).into(),
         });
     }
 
@@ -46,7 +46,7 @@ pub fn validate_unacknowledged_ticket(
                 "ticket winning probability {} is lower than required winning probability {required_win_prob}",
                 verified_ticket.win_prob()
             ),
-            ticket: inner_ticket.clone().into(),
+            ticket: (*inner_ticket).into(),
         });
     }
 
@@ -54,7 +54,7 @@ pub fn validate_unacknowledged_ticket(
     if channel.status == ChannelStatus::Closed {
         return Err(TicketValidationError {
             reason: format!("payment channel {} is not opened or pending to close", channel.get_id()),
-            ticket: inner_ticket.clone().into(),
+            ticket: (*inner_ticket).into(),
         });
     }
 
@@ -67,7 +67,7 @@ pub fn validate_unacknowledged_ticket(
                 channel.channel_epoch,
                 channel.get_id()
             ),
-            ticket: inner_ticket.clone().into(),
+            ticket: (*inner_ticket).into(),
         });
     }
 
@@ -80,7 +80,7 @@ pub fn validate_unacknowledged_ticket(
                 inner_ticket.amount,
                 channel.get_id()
             ),
-            ticket: inner_ticket.clone().into(),
+            ticket: (*inner_ticket).into(),
         });
     }
 

@@ -14,15 +14,16 @@ use std::path::PathBuf;
 
 pub use db::{HoprNodeDb, HoprNodeDbConfig};
 use futures::channel::mpsc::channel;
-pub use hopr_api::{chain::AcknowledgedTicket, db::*};
+pub use hopr_api::{chain::RedeemableTicket, db::*};
 use hopr_crypto_types::keypairs::ChainKeypair;
 
-pub async fn init_db(
+/// Convenience function to initialize the HOPR node database.
+pub async fn init_hopr_node_db(
     chain_key: &ChainKeypair,
     db_data_path: &str,
     initialize: bool,
     force_initialize: bool,
-) -> anyhow::Result<(HoprNodeDb, futures::channel::mpsc::Receiver<AcknowledgedTicket>)> {
+) -> anyhow::Result<(HoprNodeDb, futures::channel::mpsc::Receiver<RedeemableTicket>)> {
     let db_path: PathBuf = [db_data_path, "node_db"].iter().collect();
     tracing::info!(path = ?db_path, "initiating DB");
 
@@ -67,7 +68,7 @@ pub async fn init_db(
         capacity = ack_ticket_channel_capacity,
         "starting winning ticket processing"
     );
-    let (on_ack_tkt_tx, on_ack_tkt_rx) = channel::<AcknowledgedTicket>(ack_ticket_channel_capacity);
+    let (on_ack_tkt_tx, on_ack_tkt_rx) = channel::<RedeemableTicket>(ack_ticket_channel_capacity);
     node_db.start_ticket_processing(Some(on_ack_tkt_tx))?;
 
     Ok((node_db, on_ack_tkt_rx))

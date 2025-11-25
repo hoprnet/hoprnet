@@ -2,9 +2,9 @@ use std::{num::NonZeroUsize, str::FromStr, sync::Arc};
 
 use async_signal::{Signal, Signals};
 use futures::{FutureExt, StreamExt, future::abortable};
+use hopr_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
+use hopr_db_node::HoprNodeDb;
 use hopr_lib::{AbortableList, HoprKeys, IdentityRetrievalModes, Keypair, ToHex, exports::api::chain::ChainEvents};
-use hopr_utils_chain_connector::{HoprBlockchainSafeConnector, blokli_client::BlokliClient};
-use hopr_utils_db_node::HoprNodeDb;
 use hoprd::{cli::CliArgs, config::HoprdConfig, errors::HoprdError, exit::HoprServerIpForwardingReactor};
 use hoprd_api::{RestApiParameters, serve_api};
 use signal_hook::low_level;
@@ -208,7 +208,7 @@ fn main() -> anyhow::Result<()> {
 
 #[cfg(feature = "runtime-tokio")]
 async fn main_inner() -> anyhow::Result<()> {
-    use hopr_utils_chain_connector::init_blokli_connector;
+    use hopr_chain_connector::init_blokli_connector;
 
     init_logger()?;
 
@@ -256,7 +256,7 @@ async fn main_inner() -> anyhow::Result<()> {
     );
 
     // TODO: stored tickets need to be emitted from the Hopr object (addressed in #7575)
-    let (node_db, stored_tickets) = hopr_utils_db_node::init_db(
+    let (node_db, stored_tickets) = hopr_db_node::init_hopr_node_db(
         &hopr_keys.chain_key,
         &cfg.db.data,
         cfg.db.initialize,

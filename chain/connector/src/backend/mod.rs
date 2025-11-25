@@ -71,7 +71,7 @@ impl Backend for InMemoryBackend {
     }
 
     fn insert_channel(&self, channel: ChannelEntry) -> Result<Option<ChannelEntry>, Self::Error> {
-        Ok(self.channels.insert(channel.get_id(), channel))
+        Ok(self.channels.insert(*channel.get_id(), channel))
     }
 
     fn get_account_by_id(&self, id: &HoprKeyIdent) -> Result<Option<AccountEntry>, Self::Error> {

@@ -112,7 +112,7 @@ pub(crate) struct NodeChannelsResponse {
 
 async fn query_topology_info(channel: ChannelEntry) -> Result<ChannelInfoResponse, HoprLibError> {
     Ok(ChannelInfoResponse {
-        channel_id: channel.get_id(),
+        channel_id: *channel.get_id(),
         source: channel.source,
         destination: channel.destination,
         balance: channel.balance,
@@ -205,7 +205,7 @@ pub(super) async fn list_channels(
                         .into_iter()
                         .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
                         .map(|c| NodeChannel {
-                            id: c.get_id(),
+                            id: *c.get_id(),
                             peer_address: c.source,
                             status: c.status,
                             balance: c.balance,
@@ -215,7 +215,7 @@ pub(super) async fn list_channels(
                         .into_iter()
                         .filter(|c| query.including_closed || c.status != ChannelStatus::Closed)
                         .map(|c| NodeChannel {
-                            id: c.get_id(),
+                            id: *c.get_id(),
                             peer_address: c.destination,
                             status: c.status,
                             balance: c.balance,

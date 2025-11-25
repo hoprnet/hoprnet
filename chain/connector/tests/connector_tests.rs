@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use hopr_api::chain::ChainReadAccountOperations;
+use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_internal_types::{
     channels::ChannelStatus,
@@ -10,7 +11,6 @@ use hopr_primitive_types::{
     balance::WxHOPR,
     prelude::{Address, BytesRepresentable, HoprBalance, XDai, XDaiBalance},
 };
-use hopr_utils_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
 
 lazy_static::lazy_static! {
     static ref CHAIN_KEYS: Vec<ChainKeypair> = (0..3).map(|_| ChainKeypair::random()).collect();

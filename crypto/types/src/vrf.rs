@@ -22,57 +22,12 @@ use crate::{
 /// entropy that can only be derived by the ticket redeemer.
 #[allow(non_snake_case)]
 #[derive(Clone, Copy, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VrfParameters {
     /// the pseudo-random point
     pub V: AffinePoint,
     pub h: Scalar,
     pub s: Scalar,
-}
-
-#[cfg(feature = "serde")]
-impl serde::Serialize for VrfParameters {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let v: [u8; Self::SIZE] = (*self).into();
-        serializer.serialize_bytes(v.as_ref())
-    }
-}
-
-#[cfg(feature = "serde")]
-mod de {
-    use serde::de;
-
-    use super::*;
-
-    pub(super) struct VrfParametersVisitor {}
-
-    impl de::Visitor<'_> for VrfParametersVisitor {
-        type Value = VrfParameters;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_fmt(format_args!("a byte-array with {} elements", VrfParameters::SIZE))
-        }
-
-        fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            VrfParameters::try_from(v).map_err(|e| de::Error::custom(e.to_string()))
-        }
-    }
-}
-
-// Use compact deserialization for tickets as they are used very often
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for VrfParameters {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_bytes(de::VrfParametersVisitor {})
-    }
 }
 
 impl std::fmt::Debug for VrfParameters {

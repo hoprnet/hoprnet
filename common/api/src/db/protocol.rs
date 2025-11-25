@@ -179,6 +179,6 @@ impl std::fmt::Debug for OutgoingPacket {
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum ResolvedAcknowledgement {
     Sending(VerifiedAcknowledgement),
-    RelayingWin(AcknowledgedTicket),
+    RelayingWin(RedeemableTicket),
     RelayingLoss(Hash),
 }

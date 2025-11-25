@@ -84,7 +84,7 @@ impl HoprNodeDb {
             })?;
 
         // Check: is the ticket in the packet really for the given channel?
-        if !fwd.outgoing.ticket.channel_id.eq(&incoming_channel.get_id()) {
+        if !fwd.outgoing.ticket.channel_id.eq(incoming_channel.get_id()) {
             return Err(NodeDbError::LogicalError("invalid ticket for channel".into()));
         }
 
@@ -237,7 +237,7 @@ impl HoprNodeDb {
                         // and should not be done for bogus unacknowledged tickets
                         let ack_ticket = unacknowledged.acknowledge(&ack_half_key)?;
 
-                        if ack_ticket.is_winning(&chain_key, &domain_separator) {
+                        if let Ok(ack_ticket) = ack_ticket.into_redeemable(&chain_key, &domain_separator) {
                             trace!("Found a winning ticket");
                             Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
                         } else {
@@ -272,7 +272,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
                 // If the ticket was a win, store it
-                self.ticket_manager.insert_ticket(ack_ticket.clone()).await?;
+                self.ticket_manager.insert_ticket(*ack_ticket).await?;
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 {
@@ -674,7 +674,7 @@ impl HoprDbProtocolOperations for HoprNodeDb {
                             .await
                             .map_err(|e| {
                                 NodeDbError::TicketValidationError(Box::new((
-                                    rejected_ticket.clone(),
+                                    rejected_ticket,
                                     format!("during validation error '{error}' update another error occurred: {e}"),
                                 )))
                             })

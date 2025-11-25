@@ -88,7 +88,7 @@ where
 
         while let Some(channel) = outgoing_channels.next().await {
             info!(%channel, "channel closure finalizer: finalizing closure");
-            match self.hopr_chain_actions.close_channel(&channel.get_id()).await {
+            match self.hopr_chain_actions.close_channel(channel.get_id()).await {
                 Ok(_) => {
                     // Currently, we're not interested in awaiting the Close transactions to confirmation
                     debug!(%channel, "channel closure finalizer: finalizing closure");
@@ -110,11 +110,11 @@ mod tests {
 
     use futures_time::future::FutureExt;
     use hex_literal::hex;
+    use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use hopr_lib::{
         Address, BytesRepresentable, ChainKeypair, ChannelEntry, ChannelStatus, HoprBalance, Keypair, XDaiBalance,
         exports::api::chain::{ChainEvent, ChainEvents},
     };
-    use hopr_utils_chain_connector::{create_trustful_hopr_blokli_connector, testing::BlokliTestStateBuilder};
     use lazy_static::lazy_static;
 
     use super::*;
