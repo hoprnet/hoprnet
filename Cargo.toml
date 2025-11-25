@@ -3,7 +3,6 @@
 resolver = "2"
 
 members = [
-  "chain/connector",
   "chain/types",
   "common/api",
   "common/async-runtime",
@@ -16,9 +15,6 @@ members = [
   "crypto/random",
   "crypto/sphinx",
   "crypto/types",
-  "db/entity",
-  "db/migration",
-  "db/node",
   "hopli",
   "hopr/hopr-lib",
   "hoprd/hoprd",
@@ -38,6 +34,11 @@ members = [
   "transport/probe",
   "transport/protocol",
   "transport/session",
+  "db/entity",
+  "db/migration",
+  "chain/connector",
+  "db/node",
+  "utils/session",
 ]
 
 [workspace.dependencies]
@@ -63,7 +64,7 @@ bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
 blokli-client = { git = "https://github.com/hoprnet/blokli", rev = "e2dc682" } #v0.8.0
 bloomfilter = { version = "3.0.1", features = ["serde"] }
-bytesize = { version = "2.2.0", features = ["serde"] }
+bytesize = { version = "2.3.0", features = ["serde"] }
 bytes = "1.11.0"
 cfg-if = "1.0.4"
 cfg_eval = "0.1.2"
@@ -71,7 +72,7 @@ chrono = { version = "0.4.42", default-features = false, features = [
   "std",
   "clock",
 ] }
-clap = { version = "4.5.51", features = ["derive", "env", "string"] }
+clap = { version = "4.5.53", features = ["derive", "env", "string"] }
 const_format = "0.2.35"
 console-subscriber = "0.5.0"
 criterion = { version = "0.7.0", features = ["async_tokio", "html_reports"] }
@@ -87,13 +88,13 @@ futures-concurrency = "7.6.3"
 futures-timer = "3.0.3"
 futures-time = "3.0.1"
 generic-array = "1.3.5"
-hashbrown = "0.16.0"
+hashbrown = "0.16.1"
 hex = "0.4.3"
 hex-literal = "1.1.0"
 hickory-resolver = "0.25.2"
 human-bandwidth = { version = "0.1.4", features = ["serde"] }
-insta = { version = "1.43.2", features = ["json", "yaml"] }
-indexmap = { version = "2.12.0", features = ["serde", "rayon"] }
+insta = { version = "1.44.1", features = ["json", "yaml"] }
+indexmap = { version = "2.12.1", features = ["serde", "rayon"] }
 k256 = { version = "0.13.4", features = [
   "arithmetic",
   "ecdh",
@@ -108,17 +109,18 @@ libp2p-identity = { version = "0.2.12", features = [
   "rand",
 ] }
 libp2p-stream = { version = "0.4.0-alpha" }
-mockall = "0.13.1"
+mockall = "0.14.0"
 moka = { version = "0.12.11", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num_enum = "0.7.5"
+oas3 = "0.20.0"
 opentelemetry = { version = "0.31.0" }
 opentelemetry-otlp = { version = "0.31.0", default-features = false }
 opentelemetry_sdk = { version = "0.31.0" }
 tracing-opentelemetry = { version = "0.32.0" }
 temp-env = "0.3.6"
-parameterized = "2.0.0" # kept back to 2.0.0 due to conflict with indexmap
+parameterized = "2.0.0" # ignored in renovate, kept back to 2.0.0 due to conflict with indexmap
 parking_lot = "0.12.5"
 pcap-file = "2.0.0"
 petgraph = { version = "0.8.3", features = ["serde-1"] }
@@ -185,7 +187,7 @@ tokio-util = { version = "0.7.17", default-features = false, features = [
 ] }
 tokio-retry = "0.3.0"
 tokio-stream = { version = "0.1.17", features = ["net"] }
-tower-http = { version = "0.6.6", features = [
+tower-http = { version = "0.6.7", features = [
   "validate-request",
   "compression-full",
   "cors",
@@ -193,7 +195,6 @@ tower-http = { version = "0.6.6", features = [
   "sensitive-headers",
 ] }
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
-oas3 = "0.20.0"
 urlencoding = "2.1.3"
 utoipa = { version = "5.4.0" }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
@@ -209,7 +210,6 @@ tracing-subscriber = { version = "0.3.20", features = [
   "registry",
   "std",
 ] }
-tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.19.0"
 uuid = { version = "1.18.1" }
 url = { version = "2.5.7", features = ["serde"] }
@@ -222,7 +222,6 @@ mimalloc = { version = "0.1.48", default-features = false, features = [
 hopr-api = { path = "common/api" }
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { git = "https://github.com/hoprnet/contracts", rev = "cc74253f4226fdca9f3ac4147e7ee0ac9b629c7c" } # master branch on 18.11.2025
-hopr-chain-connector = { path = "chain/connector" }
 hopr-chain-types = { path = "chain/types" }
 hopr-crypto-keypair = { path = "crypto/keypair", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
@@ -232,9 +231,6 @@ hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, feature
   "ed25519",
 ] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
-hopr-db-entity = { path = "db/entity" }
-hopr-db-migration = { path = "db/migration" }
-hopr-db-node = { path = "db/node" }
 hopr-internal-types = { path = "common/internal-types", default-features = false }
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
@@ -256,6 +252,11 @@ hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
+hopr-db-entity = { path = "db/entity" }
+hopr-db-migration = { path = "db/migration" }
+hopr-utils-session = { path = "utils/session" }
+hopr-db-node = { path = "db/node" }
+hopr-chain-connector = { path = "chain/connector" }
 
 [profile.dev]
 panic = "abort"
@@ -291,3 +292,6 @@ strip = false
 [profile.dev.package]
 insta.opt-level = 3
 similar.opt-level = 3
+
+[workspace.metadata.cargo-shear]
+ignored = ["oas3", "serde_bytes"]

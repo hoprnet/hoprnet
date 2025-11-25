@@ -10,7 +10,7 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt, pin_mut};
-use hopr_lib::{AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants, HoprBalance, Utc, exports::api::{
+use hopr_lib::{AcknowledgedTicketStatus, ChannelChange, ChannelDirection, ChannelEntry, ChannelStatus, ChannelStatusDiscriminants, HoprBalance, Utc,VerifiedTicket, exports::api::{
     chain::{ChainReadChannelOperations, ChannelSelector},
     db::TicketSelector,
 }, VerifiedTicket};
@@ -230,8 +230,8 @@ mod tests {
     use hopr_chain_connector::{create_trustful_hopr_blokli_connector, testing::*};
     use hopr_crypto_random::Randomizable;
     use hopr_lib::{
-        Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, Response, TicketBuilder, UnitaryFloatOps,
-        WinningProbability, XDaiBalance,
+        Address, BytesRepresentable, ChainKeypair, HalfKey, Hash, Keypair, RedeemableTicket, Response, TicketBuilder,
+        UnitaryFloatOps, WinningProbability, XDaiBalance,
     };
 
     use super::*;
@@ -266,7 +266,7 @@ mod tests {
             .build_static_client();
     }
 
-    fn generate_random_ack_ticket(index: u64, worth_packets: u32) -> anyhow::Result<AcknowledgedTicket> {
+    fn generate_random_ack_ticket(index: u64, worth_packets: u32) -> anyhow::Result<RedeemableTicket> {
         let hk1 = HalfKey::random();
         let hk2 = HalfKey::random();
 
@@ -280,7 +280,8 @@ mod tests {
             .channel_epoch(4)
             .challenge(challenge)
             .build_signed(&ALICE, &Hash::default())?
-            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
+            .into_acknowledged(Response::from_half_keys(&hk1, &hk2)?)
+            .into_redeemable(&*BOB, &Hash::default())?)
     }
 
     #[tokio::test]
@@ -310,7 +311,7 @@ mod tests {
                 tx.sink_map_err(|e| StrategyError::Other(e.into())),
             );
 
-            ars.on_acknowledged_winning_ticket(&ack_ticket).await?;
+            ars.on_acknowledged_winning_ticket(&ack_ticket.ticket).await?;
             assert!(ars.on_tick().await.is_err());
         }
 
@@ -403,10 +404,10 @@ mod tests {
                 Arc::new(connector),
                 tx.sink_map_err(|e| StrategyError::Other(e.into())),
             );
-            ars.on_acknowledged_winning_ticket(&ack_ticket_below)
+            ars.on_acknowledged_winning_ticket(&ack_ticket_below.ticket)
                 .await
                 .expect_err("ticket below threshold should not satisfy");
-            ars.on_acknowledged_winning_ticket(&ack_ticket_at).await?;
+            ars.on_acknowledged_winning_ticket(&ack_ticket_at.ticket).await?;
         }
 
         let redeem_requests = rx.collect::<Vec<_>>().await;
@@ -501,7 +502,7 @@ mod tests {
                 Arc::new(connector),
                 tx.sink_map_err(|e| StrategyError::Other(e.into())),
             );
-            ars.on_acknowledged_winning_ticket(&ack_ticket_1).await?;
+            ars.on_acknowledged_winning_ticket(&ack_ticket_1.ticket).await?;
             assert!(ars.on_tick().await.is_err());
         }
 

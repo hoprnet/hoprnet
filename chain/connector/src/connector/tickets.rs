@@ -1,6 +1,6 @@
 use blokli_client::api::{BlokliQueryClient, BlokliTransactionClient};
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use hopr_api::chain::{ChainReceipt, ChainValues, TicketRedeemError};
+use hopr_api::chain::{ChainReceipt, TicketRedeemError};
 use hopr_chain_types::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -14,7 +14,7 @@ where
     P: PayloadGenerator + Send + Sync + 'static,
     P::TxRequest: Send + Sync + 'static,
 {
-    async fn prepare_ticket_redeem_payload(&self, ticket: AcknowledgedTicket) -> Result<P::TxRequest, ConnectorError> {
+    async fn prepare_ticket_redeem_payload(&self, ticket: RedeemableTicket) -> Result<P::TxRequest, ConnectorError> {
         self.check_connection_state()?;
 
         let channel_id = ticket.verified_ticket().channel_id;
@@ -67,15 +67,7 @@ where
             return Err(ConnectorError::InvalidTicket);
         }
 
-        // `into_redeemable` is a CPU-intensive operation. See #7616 for a future resolution.
-        let channel_dst = self.domain_separators().await?.channel;
-        let chain_key = self.chain_key.clone();
-        let ticket =
-            hopr_async_runtime::prelude::spawn_blocking(move || ticket.into_redeemable(&chain_key, &channel_dst))
-                .await
-                .map_err(|e| ConnectorError::OtherError(e.into()))??;
-
-        Ok(self.payload_generator.redeem_ticket(ticket.clone())?)
+        Ok(self.payload_generator.redeem_ticket(ticket)?)
     }
 }
 
@@ -91,26 +83,25 @@ where
 
     async fn redeem_ticket<'a>(
         &'a self,
-        ticket: AcknowledgedTicket,
+        ticket: RedeemableTicket,
     ) -> Result<
         BoxFuture<'a, Result<(VerifiedTicket, ChainReceipt), TicketRedeemError<Self::Error>>>,
         TicketRedeemError<Self::Error>,
     > {
-        match self.prepare_ticket_redeem_payload(ticket.clone()).await {
+        match self.prepare_ticket_redeem_payload(ticket).await {
             Ok(tx_req) => {
-                let ticket_clone = ticket.clone();
                 Ok(self
                     .send_tx(tx_req)
                     .await
-                    .map_err(|e| TicketRedeemError::ProcessingError(ticket.ticket.clone(), e))?
+                    .map_err(|e| TicketRedeemError::ProcessingError(ticket.ticket, e))?
                     .map_err(move |tx_tracking_error|
                         // For ticket redemption, certain errors are to be handled differently
                         if let Some(reject_error) = tx_tracking_error.as_transaction_rejection_error() {
-                            TicketRedeemError::Rejected(ticket.ticket.clone(), format!("on-chain rejection: {reject_error:?}"))
+                            TicketRedeemError::Rejected(ticket.ticket, format!("on-chain rejection: {reject_error:?}"))
                         } else {
-                            TicketRedeemError::ProcessingError(ticket.ticket.clone(), tx_tracking_error)
+                            TicketRedeemError::ProcessingError(ticket.ticket, tx_tracking_error)
                         })
-                    .and_then(move |receipt| futures::future::ok((ticket_clone.ticket, receipt)))
+                    .and_then(move |receipt| futures::future::ok((ticket.ticket, receipt)))
                     .boxed())
             }
             Err(e @ ConnectorError::InvalidTicket)

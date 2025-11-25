@@ -5,13 +5,13 @@ use sea_orm::Set;
 
 use crate::{errors::DbEntityError, ticket};
 
-impl TryFrom<&ticket::Model> for AcknowledgedTicket {
+impl TryFrom<&ticket::Model> for RedeemableTicket {
     type Error = DbEntityError;
 
     fn try_from(value: &ticket::Model) -> Result<Self, Self::Error> {
         let response = Response::try_from(value.response.as_ref())?;
 
-        let mut ticket = TicketBuilder::default()
+        let ticket = TicketBuilder::default()
             .channel_id(Hash::from_hex(&value.channel_id)?)
             .amount(U256::from_be_bytes(&value.amount))
             .index(U256::from_be_bytes(&value.index).as_u64())
@@ -38,17 +38,18 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
                     .try_into()
                     .map_err(|_| DbEntityError::ConversionError("invalid ticket hash".into()))?,
             )
-            .map_err(|e| DbEntityError::ConversionError(format!("invalid ticket in the db: {e}")))?
-            .into_acknowledged(response);
+            .map_err(|e| DbEntityError::ConversionError(format!("invalid ticket in the db: {e}")))?;
 
-        ticket.status = AcknowledgedTicketStatus::try_from(value.state as u8)
-            .map_err(|_| DbEntityError::ConversionError("invalid ticket state".into()))?;
-
-        Ok(ticket)
+        Ok(RedeemableTicket {
+            ticket,
+            response,
+            vrf_params: VrfParameters::try_from(value.vrf_params.as_slice())?,
+            channel_dst: Hash::try_from(value.channel_dst.as_slice())?,
+        })
     }
 }
 
-impl TryFrom<ticket::Model> for AcknowledgedTicket {
+impl TryFrom<ticket::Model> for RedeemableTicket {
     type Error = DbEntityError;
 
     fn try_from(value: ticket::Model) -> Result<Self, Self::Error> {
@@ -56,20 +57,20 @@ impl TryFrom<ticket::Model> for AcknowledgedTicket {
     }
 }
 
-impl From<AcknowledgedTicket> for ticket::ActiveModel {
-    fn from(value: AcknowledgedTicket) -> Self {
+impl From<RedeemableTicket> for ticket::ActiveModel {
+    fn from(value: RedeemableTicket) -> Self {
         ticket::ActiveModel {
-            channel_id: Set(value.verified_ticket().channel_id.to_hex()),
+            channel_id: Set(hex::encode(value.verified_ticket().channel_id)), // serialize without 0x prefix
             amount: Set(value.verified_ticket().amount.amount().to_be_bytes().to_vec()),
             index: Set(value.verified_ticket().index.to_be_bytes().to_vec()),
-            index_offset: Set(1),
             winning_probability: Set(value.verified_ticket().encoded_win_prob.to_vec()),
             channel_epoch: Set(U256::from(value.verified_ticket().channel_epoch).to_be_bytes().to_vec()),
             signature: Set(value.verified_ticket().signature.unwrap().as_ref().to_vec()),
             response: Set(value.response.as_ref().to_vec()),
-            state: Set(value.status as i8),
+            vrf_params: Set(value.vrf_params.into_encoded().to_vec()),
+            channel_dst: Set(value.channel_dst.as_ref().to_vec()),
             hash: Set(value.ticket.verified_hash().as_ref().to_vec()),
-            ..Default::default()
+            ..Default::default() // State is always set to 0 = Untouched
         }
     }
 }

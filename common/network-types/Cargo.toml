@@ -62,10 +62,12 @@ parameterized = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 test-log = { workspace = true }
-serial_test = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 
 [package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
+[package.metadata.cargo-shear]
 ignored = ["serde_bytes"]

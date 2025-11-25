@@ -165,7 +165,7 @@ async fn test_channel_retrieval(cluster_fixture: ClusterGuard) -> anyhow::Result
         .await
         .context("failed to get channels from src")?
         .into_iter()
-        .map(|c| c.get_id())
+        .map(|c| *c.get_id())
         .collect::<Vec<ChannelId>>();
 
     let channel_to_ids = ext
@@ -174,10 +174,10 @@ async fn test_channel_retrieval(cluster_fixture: ClusterGuard) -> anyhow::Result
         .await
         .context("failed to get channels to dst")?
         .into_iter()
-        .map(|c| c.get_id())
+        .map(|c| *c.get_id())
         .collect::<Vec<ChannelId>>();
 
-    assert_eq!(channel_by_parties.get_id(), channel.channel_id);
+    assert_eq!(*channel_by_parties.get_id(), channel.channel_id);
     assert!(channel_from_ids.contains(&channel.channel_id));
     assert!(channel_to_ids.contains(&channel.channel_id));
 

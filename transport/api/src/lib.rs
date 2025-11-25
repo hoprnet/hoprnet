@@ -39,7 +39,9 @@ use futures::{
 use helpers::PathPlanner;
 use hopr_api::{
     chain::{AccountSelector, ChainKeyOperations, ChainReadAccountOperations, ChainReadChannelOperations, ChainValues},
-    db::{HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus},
+    db::{
+        HoprDbPeersOperations, HoprDbTicketOperations, PeerOrigin, PeerStatus, TicketSelector,
+    },
 };
 use hopr_async_runtime::{AbortableList, prelude::spawn, spawn_as_abortable};
 use hopr_crypto_packet::prelude::PacketSignal;
@@ -730,14 +732,14 @@ where
         Ok(TicketStatistics {
             winning_count: ticket_stats.winning_tickets,
             unredeemed_value: ticket_stats.unredeemed_value,
-            redeemed_value: ticket_stats.redeemed_value,
-            neglected_value: ticket_stats.neglected_value,
-            rejected_value: ticket_stats.rejected_value,
+            redeemed_value: ticket_stats.redeemed_value(),
+            neglected_value: ticket_stats.neglected_value(),
+            rejected_value: ticket_stats.rejected_value(),
         })
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
+    pub async fn tickets_in_channel(&self, channel_id: &Hash) -> errors::Result<Option<Vec<RedeemableTicket>>> {
         if let Some(channel) = self
             .resolver
             .channel_by_id(channel_id)
@@ -747,7 +749,7 @@ where
             if &channel.destination == self.me_onchain.as_ref() {
                 Ok(Some(
                     self.db
-                        .stream_tickets(Some((&channel).into()))
+                        .stream_tickets([&channel])
                         .await
                         .map_err(|e| HoprTransportError::Other(e.into()))?
                         .collect()
@@ -765,7 +767,7 @@ where
     pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
         Ok(self
             .db
-            .stream_tickets(None)
+            .stream_tickets(None::<TicketSelector>)
             .await
             .map_err(|e| HoprTransportError::Other(e.into()))?
             .map(|v| v.ticket.leak())

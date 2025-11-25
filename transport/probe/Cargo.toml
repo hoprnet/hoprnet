@@ -48,7 +48,6 @@ lazy_static = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
 tokio = { workspace = true }
-tracing-test = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-packet = { workspace = true }

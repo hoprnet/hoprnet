@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-node"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Contains SQL Node DB functionality implementing the DB API traits"
 homepage = "https://hoprnet.org/"
@@ -22,6 +22,7 @@ prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 sqlite = ["sea-query/backend-sqlite"]
 
 [dependencies]
+anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }

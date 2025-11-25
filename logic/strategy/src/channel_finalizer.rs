@@ -88,7 +88,7 @@ where
 
         while let Some(channel) = outgoing_channels.next().await {
             info!(%channel, "channel closure finalizer: finalizing closure");
-            match self.hopr_chain_actions.close_channel(&channel.get_id()).await {
+            match self.hopr_chain_actions.close_channel(channel.get_id()).await {
                 Ok(_) => {
                     // Currently, we're not interested in awaiting the Close transactions to confirmation
                     debug!(%channel, "channel closure finalizer: finalizing closure");

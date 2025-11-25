@@ -21,9 +21,8 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-transport/runtime-tokio",
-  "hopr-chain-connector?/runtime-tokio",
-  "hopr-db-node?/runtime-tokio",
   "dep:tokio",
+  "hopr-chain-connector?/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
@@ -35,16 +34,7 @@ capture = ["hopr-transport/capture"]
 fixed-rng = ["hopr-crypto-random/fixed-rng"]
 
 # === utility features ===
-utils_session = [ # utility session functionality for advanced interaction with hopr-lib
-  "dep:base64",
-  "dep:bytesize",
-  "dep:dashmap",
-  "dep:human-bandwidth",
-  "dep:parking_lot",
-  "dep:tokio",
-  "dep:tokio-stream",
-]
-utils_futures = [] # utility futures for async adapters
+utils_futures = []  # utility futures for async adapters
 utils_parallel = [] # utility parallelization functionality
 
 testing = [
@@ -53,8 +43,8 @@ testing = [
   "dep:tokio",
   "dep:tokio-util",
   "dep:hex-literal",
-  "dep:hopr-chain-connector",
   "dep:hopr-db-node",
+  "dep:hopr-chain-connector",
   "hopr-chain-connector/testing",
 ] # testing related functionality
 
@@ -64,17 +54,12 @@ async-trait = { workspace = true }
 async-broadcast = { workspace = true }
 atomic_enum = { workspace = true }
 backon = { workspace = true, features = ["futures-timer-sleep"] }
-base64 = { workspace = true, optional = true }
-bytesize = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 const_format = { workspace = true }
-dashmap = { workspace = true, optional = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 hex-literal = { workspace = true, optional = true }
-human-bandwidth = { workspace = true, optional = true }
 lazy_static = { workspace = true }
-parking_lot = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rstest = { workspace = true, optional = true }
 serde = { workspace = true }
@@ -83,7 +68,6 @@ strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
-tokio-stream = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["compat"], optional = true }
 tracing = { workspace = true }
 validator = { workspace = true }
@@ -93,7 +77,6 @@ hopr-async-runtime = { workspace = true }
 hopr-crypto-keypair = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-chain-connector = { workspace = true, optional = true }
 hopr-db-node = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
@@ -102,6 +85,7 @@ hopr-parallelize = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport = { workspace = true }
+hopr-chain-connector = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex-literal = { workspace = true }
@@ -114,11 +98,6 @@ tokio = { workspace = true }
 test-log = { workspace = true }
 
 hopr-db-node = { workspace = true }
-hopr-chain-connector = { workspace = true, features = [
-  "runtime-tokio",
-  "testing",
-] }
-hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = [
   "runtime-tokio",
   "session-server",

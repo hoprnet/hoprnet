@@ -17,11 +17,9 @@ use hopr_lib::{
     Address, HoprSession, NodeId, SESSION_MTU, SURB_SIZE, ServiceId, SessionCapabilities, SessionClientConfig,
     SessionId, SessionManagerError, SessionTarget, SurbBalancerConfig, TransportSessionError,
     errors::{HoprLibError, HoprTransportError},
-    utils::{
-        futures::AsyncReadStreamer,
-        session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding},
-    },
+    utils::futures::AsyncReadStreamer,
 };
+use hopr_utils_session::{ListenerId, build_binding_host, create_tcp_client_binding, create_udp_client_binding};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, error, info, trace};
@@ -88,7 +86,7 @@ impl FromStr for SessionTargetSpec {
     }
 }
 
-impl From<SessionTargetSpec> for hopr_lib::utils::session::SessionTargetSpec {
+impl From<SessionTargetSpec> for hopr_utils_session::SessionTargetSpec {
     fn from(spec: SessionTargetSpec) -> Self {
         match spec {
             SessionTargetSpec::Plain(t) => Self::Plain(t),
@@ -186,7 +184,7 @@ impl SessionWebsocketClientQueryRequest {
         let mut capabilities = SessionCapabilities::empty();
         capabilities.extend(self.capabilities.into_iter().flat_map(SessionCapabilities::from));
 
-        let target_spec: hopr_lib::utils::session::SessionTargetSpec = self.target.into();
+        let target_spec: hopr_utils_session::SessionTargetSpec = self.target.into();
 
         Ok((
             self.destination,
@@ -452,7 +450,7 @@ impl SessionClientRequest {
         self,
         target_protocol: IpProtocol,
     ) -> Result<(hopr_lib::Address, SessionTarget, SessionClientConfig), ApiErrorStatus> {
-        let target_spec: hopr_lib::utils::session::SessionTargetSpec = self.target.clone().into();
+        let target_spec: hopr_utils_session::SessionTargetSpec = self.target.clone().into();
         Ok((
             self.destination,
             target_spec.into_target(target_protocol.into())?,
@@ -618,7 +616,7 @@ pub(crate) async fn create_client(
         IpProtocol::TCP => {
             let session_pool = args.session_pool;
             let max_client_sessions = args.max_client_sessions;
-            let target_spec: hopr_lib::utils::session::SessionTargetSpec = args.target.clone().into();
+            let target_spec: hopr_utils_session::SessionTargetSpec = args.target.clone().into();
             let (destination, _target, config) = args
                 .clone()
                 .into_protocol_session_config(IpProtocol::TCP)
@@ -638,17 +636,17 @@ pub(crate) async fn create_client(
             )
             .await
             .map_err(|e| match e {
-                hopr_lib::utils::session::BindError::ListenHostAlreadyUsed => {
+                hopr_utils_session::BindError::ListenHostAlreadyUsed => {
                     (StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed)
                 }
-                hopr_lib::utils::session::BindError::UnknownFailure(_) => (
+                hopr_utils_session::BindError::UnknownFailure(_) => (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(format!("failed to start TCP listener on {bind_host}: {e}")),
                 ),
             })?
         }
         IpProtocol::UDP => {
-            let target_spec: hopr_lib::utils::session::SessionTargetSpec = args.target.clone().into();
+            let target_spec: hopr_utils_session::SessionTargetSpec = args.target.clone().into();
             let (destination, _target, config) = args
                 .clone()
                 .into_protocol_session_config(IpProtocol::UDP)
@@ -666,10 +664,10 @@ pub(crate) async fn create_client(
             )
             .await
             .map_err(|e| match e {
-                hopr_lib::utils::session::BindError::ListenHostAlreadyUsed => {
+                hopr_utils_session::BindError::ListenHostAlreadyUsed => {
                     (StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed)
                 }
-                hopr_lib::utils::session::BindError::UnknownFailure(_) => (
+                hopr_utils_session::BindError::UnknownFailure(_) => (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(format!("failed to start UDP listener on {bind_host}: {e}")),
                 ),

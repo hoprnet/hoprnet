@@ -37,7 +37,7 @@ use std::{ops::Sub, str::FromStr, time::Duration};
 use futures::{StreamExt, pin_mut};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, ChannelChange, ChannelStatus, HoprBalance, VerifiedTicket,
+    Address, ChannelChange, ChannelStatus, HoprBalance, RedeemableTicket, VerifiedTicket,
     exports::api::chain::ChainEvent,
 };
 use serde::{Deserialize, Serialize};
@@ -94,7 +94,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
 enum StrategyEvent {
     Tick,
     ChainEvent(ChainEvent),
-    NewTicket(VerifiedTicket),
+    Ticket(VerifiedTicket),
 }
 
 /// Streams [`ChainEvents`](ChainEvent), [`VerifiedTickets`](VerifiedTicket) and `tick` at regular time
@@ -108,12 +108,12 @@ pub fn stream_events_to_strategy_with_tick<C, T, S>(
 ) -> hopr_async_runtime::AbortHandle
 where
     C: futures::stream::Stream<Item = ChainEvent> + Send + 'static,
-    T: futures::stream::Stream<Item = VerifiedTicket> + Send + 'static,
+    T: futures::stream::Stream<Item = RedeemableTicket> + Send + 'static,
     S: SingularStrategy + Send + Sync + 'static,
 {
     let tick_stream = futures_time::stream::interval(tick.into()).map(|_| StrategyEvent::Tick);
     let chain_stream = chain_events.map(StrategyEvent::ChainEvent).fuse();
-    let ticket_stream = ticket_events.map(StrategyEvent::NewTicket).fuse();
+    let ticket_stream = ticket_events.map(|t| StrategyEvent::Ticket(t.ticket)).fuse();
 
     let (stream, abort_handle) = futures::stream::abortable((tick_stream, chain_stream, ticket_stream).merge());
     hopr_async_runtime::prelude::spawn(async move {
@@ -218,7 +218,7 @@ where
                         _ => {}
                     }
                 }
-                StrategyEvent::NewTicket(ack_ticket) => {
+                StrategyEvent::Ticket(ack_ticket) => {
                     if let Err(error) = strategy.on_acknowledged_winning_ticket(&ack_ticket).await {
                         tracing::error!(%error, "error while notifying new winning ticket to strategy");
                     }

@@ -497,6 +497,7 @@
             extraPackages = with pkgs; [
               sqlite
               cargo-machete
+              cargo-shear
               foundry-bin
               nfpm
               envsubst
@@ -516,6 +517,7 @@
               gh
               google-cloud-sdk
               cargo-machete
+              cargo-shear
               graphviz
               swagger-codegen3
               vacuum-go
@@ -590,6 +592,7 @@
               pandoc
               sqlite
               cargo-machete
+              cargo-shear
             ];
             shellHook = ''
               ${pre-commit-check.shellHook}

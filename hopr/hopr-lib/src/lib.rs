@@ -35,14 +35,16 @@ pub mod state;
 #[cfg(any(feature = "testing", test))]
 pub mod testing;
 
-/// Re-exports of libraries necessary for API and interface operations.
+/// Exports of libraries necessary for API and interface operations.
 #[doc(hidden)]
 pub mod exports {
     pub use hopr_api as api;
+
     pub mod types {
         pub use hopr_internal_types as internal;
         pub use hopr_primitive_types as primitive;
     }
+
     pub mod crypto {
         pub use hopr_crypto_keypair as keypair;
         pub use hopr_crypto_types as types;
@@ -660,7 +662,7 @@ where
                 let chain = chain.clone();
                 let db = node_db.clone();
                 async move {
-                    match chain.redeem_tickets_via_selector(&db, selector).await {
+                    match chain.redeem_tickets_via_selectors(&db, [selector]).await {
                         Ok(res) => debug!(%res, "redemption complete"),
                         Err(error) => error!(%error, "redemption failed"),
                     }
@@ -678,27 +680,36 @@ where
             futures::stream::Abortable::new(
                 events
                     .filter_map(move |event|
-                        futures::future::ready(
-                            event
-                                .try_as_channel_closed()
-                                .filter(|channel| channel.direction(chain.me()) == Some(ChannelDirection::Incoming))
-                        )
+                        futures::future::ready(event.try_as_channel_closed())
                     ),
                 chain_events_sub_reg
             )
             .for_each(move |closed_channel| {
                 let node_db = node_db.clone();
+                let chain = chain.clone();
                 async move {
-                    match node_db.mark_tickets_as(closed_channel.into(), TicketMarker::Neglected).await {
-                        Ok(num_neglected) if num_neglected > 0 => {
-                            warn!(%num_neglected, %closed_channel, "tickets on incoming closed channel were neglected");
+                    match closed_channel.direction(chain.me()) {
+                        Some(ChannelDirection::Incoming) => {
+                            match node_db.mark_tickets_as([&closed_channel], TicketMarker::Neglected).await {
+                                Ok(num_neglected) if num_neglected > 0 => {
+                                    warn!(%num_neglected, %closed_channel, "tickets on incoming closed channel were neglected");
+                                },
+                                Ok(_) => {
+                                    debug!(%closed_channel, "no neglected tickets on incoming closed channel");
+                                },
+                                Err(error) => {
+                                    error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
+                                }
+                            }
                         },
-                        Ok(_) => {
-                            debug!(%closed_channel, "no neglected tickets on incoming closed channel");
-                        },
-                        Err(error) => {
-                            error!(%error, %closed_channel, "failed to mark tickets on incoming closed channel as neglected");
+                        Some(ChannelDirection::Outgoing) => {
+                            if let Err(error) = node_db.reset_outgoing_ticket_index(closed_channel.get_id()).await {
+                                error!(%error, %closed_channel, "failed to reset ticket index on closed outgoing channel");
+                            } else {
+                                debug!(%closed_channel, "outgoing ticket index has been resets on outgoing channel closure");
+                            }
                         }
+                        _ => {} // Event for a channel that is not our own
                     }
                 }
             })
@@ -721,9 +732,9 @@ where
         while let Some(channel) = channels.next().await {
             self.node_db
                 .update_ticket_states_and_fetch(
-                    TicketSelector::from(&channel)
+                    [TicketSelector::from(&channel)
                         .with_state(AcknowledgedTicketStatus::BeingRedeemed)
-                        .with_index_range(channel.ticket_index.as_u64()..),
+                        .with_index_range(channel.ticket_index.as_u64()..)],
                     AcknowledgedTicketStatus::Untouched,
                 )
                 .map_err(HoprLibError::db)
@@ -955,7 +966,7 @@ where
 
     // Ticket ========
     /// Get all tickets in a channel specified by [`prelude::Hash`]
-    pub async fn tickets_in_channel(&self, channel: &prelude::Hash) -> errors::Result<Option<Vec<AcknowledgedTicket>>> {
+    pub async fn tickets_in_channel(&self, channel: &prelude::Hash) -> errors::Result<Option<Vec<RedeemableTicket>>> {
         Ok(self.transport_api.tickets_in_channel(channel).await?)
     }
 
@@ -1262,7 +1273,9 @@ where
             .map(|pk| pk.map(|v| v.into()))
             .map_err(HoprLibError::chain)
     }
+}
 
+impl<Chain, Db> Hopr<Chain, Db> {
     // === telemetry
     /// Prometheus formatted metrics collected by the hopr-lib components.
     pub fn collect_hopr_metrics() -> errors::Result<String> {
