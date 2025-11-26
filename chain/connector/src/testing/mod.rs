@@ -50,7 +50,7 @@ impl BlokliTestStateBuilder {
                         .find(|a| a.chain_key == hex::encode(channel.source))
                         .map(|a| a.keyid)
                         .expect(&format!("missing dst account {}", channel.source)),
-                    epoch: channel.channel_epoch.as_u32() as i32,
+                    epoch: channel.channel_epoch as i32,
                     destination: self
                         .0
                         .accounts
@@ -63,7 +63,7 @@ impl BlokliTestStateBuilder {
                         ChannelStatus::Open => blokli_client::api::types::ChannelStatus::Open,
                         ChannelStatus::PendingToClose(_) => blokli_client::api::types::ChannelStatus::PendingToClose,
                     },
-                    ticket_index: blokli_client::api::types::Uint64(channel.ticket_index.as_u64().to_string()),
+                    ticket_index: blokli_client::api::types::Uint64(channel.ticket_index.to_string()),
                 },
             )
         }));

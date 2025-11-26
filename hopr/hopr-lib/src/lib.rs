@@ -713,7 +713,7 @@ where
                 .update_ticket_states_and_fetch(
                     [TicketSelector::from(&channel)
                         .with_state(AcknowledgedTicketStatus::BeingRedeemed)
-                        .with_index_range(channel.ticket_index.as_u64()..)],
+                        .with_index_range(channel.ticket_index..)],
                     AcknowledgedTicketStatus::Untouched,
                 )
                 .map_err(HoprLibError::db)
@@ -950,7 +950,7 @@ where
     }
 
     /// Get all tickets
-    pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
+    pub async fn all_tickets(&self) -> errors::Result<Vec<VerifiedTicket>> {
         Ok(self.transport_api.all_tickets().await?)
     }
 
@@ -1178,7 +1178,7 @@ where
             .map(|channel| {
                 Ok(TicketSelector::from(&channel)
                     .with_amount(min_value..)
-                    .with_index_range(channel.ticket_index.as_u64()..)
+                    .with_index_range(channel.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched))
             })
             .forward(self.redemption_requests()?)
@@ -1214,7 +1214,7 @@ where
             .send(
                 TicketSelector::from(channel)
                     .with_amount(min_value.into()..)
-                    .with_index_range(channel.ticket_index.as_u64()..)
+                    .with_index_range(channel.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             )
             .await?;

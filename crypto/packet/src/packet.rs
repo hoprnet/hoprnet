@@ -629,25 +629,20 @@ mod tests {
         }
     }
 
-    fn mock_ticket(
-        next_peer_channel_key: &PublicKey,
-        path_len: usize,
-        private_key: &ChainKeypair,
-    ) -> anyhow::Result<TicketBuilder> {
+    fn mock_ticket(next_peer_channel_key: &PublicKey, path_len: usize) -> anyhow::Result<TicketBuilder> {
         assert!(path_len > 0);
         let price_per_packet: U256 = 10000000000000000u128.into();
 
         if path_len > 1 {
             Ok(TicketBuilder::default()
-                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address())
+                .counterparty(next_peer_channel_key.to_address())
                 .amount(price_per_packet.div_f64(1.0)? * U256::from(path_len as u64 - 1))
                 .index(1)
                 .win_prob(WinningProbability::ALWAYS)
                 .channel_epoch(1)
                 .eth_challenge(Default::default()))
         } else {
-            Ok(TicketBuilder::zero_hop()
-                .direction(&private_key.public().to_address(), &next_peer_channel_key.to_address()))
+            Ok(TicketBuilder::zero_hop().counterparty(next_peer_channel_key.to_address()))
         }
     }
 
@@ -665,7 +660,7 @@ mod tests {
             "return hops must be between 1 and 3"
         );
 
-        let ticket = mock_ticket(&PEERS[1].0.public(), forward_hops + 1, &PEERS[0].0)?;
+        let ticket = mock_ticket(&PEERS[1].0.public(), forward_hops + 1)?;
         let forward_path = TransportPath::new(PEERS[1..=forward_hops + 1].iter().map(|kp| *kp.1.public()))?;
 
         let return_paths = return_hops
@@ -700,7 +695,6 @@ mod tests {
         let ticket = mock_ticket(
             &PEERS[sender_node - 1].0.public(),
             surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
-            &PEERS[sender_node].0,
         )?;
 
         Ok(HoprPacket::into_outgoing(
@@ -748,7 +742,7 @@ mod tests {
                     (_, true) => PEERS[node_pos - 1].0.public().clone(),
                 };
 
-                let next_ticket = mock_ticket(&next_hop, path_len, &PEERS[node_pos].0)?;
+                let next_ticket = mock_ticket(&next_hop, path_len)?;
                 Ok(forward(
                     packet.clone(),
                     &PEERS[node_pos].0,

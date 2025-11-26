@@ -1,7 +1,7 @@
 use cipher::Block;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_types::{crypto_traits::KeyIvInit, lioness::LionessBlake3ChaCha20};
-use typenum::{U1022, Unsigned};
+use typenum::{U1024, Unsigned};
 
 // Avoid musl's default allocator due to degraded performance
 //
@@ -16,7 +16,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 const SAMPLE_SIZE: usize = 100_000;
-type BlockSize = U1022;
+type BlockSize = U1024;
 
 pub fn lioness_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("lioness_bench");

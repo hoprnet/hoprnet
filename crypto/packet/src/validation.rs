@@ -24,6 +24,7 @@ pub fn validate_unacknowledged_ticket(
         .map_err(|ticket| TicketValidationError {
             reason: format!("ticket signer does not match the sender: {ticket}"),
             ticket,
+            issuer: None,
         })?;
 
     let inner_ticket = verified_ticket.verified_ticket();
@@ -36,6 +37,7 @@ pub fn validate_unacknowledged_ticket(
                 inner_ticket.amount
             ),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
@@ -47,6 +49,7 @@ pub fn validate_unacknowledged_ticket(
                 verified_ticket.win_prob()
             ),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
@@ -55,11 +58,12 @@ pub fn validate_unacknowledged_ticket(
         return Err(TicketValidationError {
             reason: format!("payment channel {} is not opened or pending to close", channel.get_id()),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
     // The ticket's channelEpoch MUST match the current channel's epoch
-    if !channel.channel_epoch.eq(&inner_ticket.channel_epoch.into()) {
+    if channel.channel_epoch != inner_ticket.channel_epoch {
         return Err(TicketValidationError {
             reason: format!(
                 "ticket was created for a different channel iteration {} != {} of channel {}",
@@ -68,6 +72,7 @@ pub fn validate_unacknowledged_ticket(
                 channel.get_id()
             ),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
@@ -81,6 +86,7 @@ pub fn validate_unacknowledged_ticket(
                 channel.get_id()
             ),
             ticket: (*inner_ticket).into(),
+            issuer: Some(*verified_ticket.verified_issuer()),
         });
     }
 
@@ -110,7 +116,7 @@ mod tests {
 
     fn create_valid_ticket() -> anyhow::Result<Ticket> {
         Ok(TicketBuilder::default()
-            .addresses(&*SENDER_PRIV_KEY, &*TARGET_PRIV_KEY)
+            .counterparty(&*TARGET_PRIV_KEY)
             .amount(1)
             .index(1)
             .win_prob(1.0.try_into()?)
@@ -125,9 +131,9 @@ mod tests {
             SENDER_PRIV_KEY.public().to_address(),
             TARGET_PRIV_KEY.public().to_address(),
             100.into(),
-            U256::zero(),
+            0,
             ChannelStatus::Open,
-            U256::one(),
+            1,
         )
     }
 
@@ -241,7 +247,7 @@ mod tests {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
         channel.balance = 0.into();
-        channel.channel_epoch = U256::from(ticket.channel_epoch);
+        channel.channel_epoch = ticket.channel_epoch;
 
         let ret =
             validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());

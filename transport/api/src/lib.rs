@@ -761,13 +761,13 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn all_tickets(&self) -> errors::Result<Vec<Ticket>> {
+    pub async fn all_tickets(&self) -> errors::Result<Vec<VerifiedTicket>> {
         Ok(self
             .db
             .stream_tickets(None::<TicketSelector>)
             .await
             .map_err(|e| HoprTransportError::Other(e.into()))?
-            .map(|v| v.ticket.leak())
+            .map(|v| v.ticket)
             .collect()
             .await)
     }

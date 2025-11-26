@@ -152,7 +152,7 @@ where
                 .map(|channel| {
                     Ok(TicketSelector::from(&channel)
                         .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                        .with_index_range(channel.ticket_index.as_u64()..)
+                        .with_index_range(channel.ticket_index..)
                         .with_state(AcknowledgedTicketStatus::Untouched))
                 })
                 .forward(self.redeem_sink.clone())
@@ -168,20 +168,20 @@ where
         if self.cfg.redeem_on_winning && ack.verified_ticket().amount.ge(&self.cfg.minimum_redeem_ticket_value) {
             if let Some(channel) = self
                 .hopr_chain_actions
-                .channel_by_id(&ack.verified_ticket().channel_id)
+                .channel_by_id(ack.channel_id())
                 .await
                 .map_err(|e| StrategyError::Other(e.into()))?
             {
                 info!(%ack, "redeeming");
 
-                if ack.verified_ticket().index < channel.ticket_index.as_u64() {
+                if ack.verified_ticket().index < channel.ticket_index {
                     error!(%ack, "acknowledged ticket is older than channel ticket index");
                     return Err(CriteriaNotSatisfied);
                 }
 
                 let selector = TicketSelector::from(channel)
                     .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                    .with_index_range(channel.ticket_index.as_u64()..=ack.verified_ticket().index)
+                    .with_index_range(channel.ticket_index..=ack.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched);
 
                 self.enqueue_redeem_request(selector).await
@@ -212,7 +212,7 @@ where
 
             let selector = TicketSelector::from(channel)
                 .with_amount(self.cfg.minimum_redeem_ticket_value..)
-                .with_index_range(channel.ticket_index.as_u64()..)
+                .with_index_range(channel.ticket_index..)
                 .with_state(AcknowledgedTicketStatus::Untouched);
 
             self.enqueue_redeem_request(selector).await
@@ -250,18 +250,18 @@ mod tests {
             ALICE.public().to_address(),
             BOB.public().to_address(),
             *PRICE_PER_PACKET * 10,
-            0.into(),
+            0,
             ChannelStatus::Open,
-            4.into()
+            4
         );
 
         static ref CHANNEL_2: ChannelEntry = ChannelEntry::new(
             CHARLIE.public().to_address(),
             BOB.public().to_address(),
             *PRICE_PER_PACKET * 11,
-            1.into(),
+            1,
             ChannelStatus::Open,
-            4.into()
+            4
         );
 
         static ref CHAIN_CLIENT: BlokliTestClient<StaticState> = BlokliTestStateBuilder::default()
@@ -277,7 +277,7 @@ mod tests {
         let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         Ok(TicketBuilder::default()
-            .addresses(&*ALICE, &*BOB)
+            .counterparty(&*BOB)
             .amount(PRICE_PER_PACKET.div_f64(1.0f64)?.amount() * worth_packets)
             .index(index)
             .win_prob(WinningProbability::ALWAYS)
@@ -369,11 +369,11 @@ mod tests {
             vec![
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched),
                 TicketSelector::from(CHANNEL_2.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_2.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_2.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched)
             ]
         );
@@ -420,7 +420,7 @@ mod tests {
             vec![
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_at.ticket.verified_ticket().index)
+                    .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_at.ticket.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched)
             ]
         );
@@ -472,7 +472,7 @@ mod tests {
             vec![
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::from(*PRICE_PER_PACKET * 5)..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..)
+                    .with_index_range(CHANNEL_1.ticket_index..)
                     .with_state(AcknowledgedTicketStatus::Untouched)
             ]
         );
@@ -516,7 +516,7 @@ mod tests {
             vec![
                 TicketSelector::from(CHANNEL_1.clone())
                     .with_amount(HoprBalance::zero()..)
-                    .with_index_range(CHANNEL_1.ticket_index.as_u64()..=ack_ticket_1.ticket.verified_ticket().index)
+                    .with_index_range(CHANNEL_1.ticket_index..=ack_ticket_1.ticket.verified_ticket().index)
                     .with_state(AcknowledgedTicketStatus::Untouched),
             ]
         );

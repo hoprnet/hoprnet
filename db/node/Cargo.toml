@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-node"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Contains SQL Node DB functionality implementing the DB API traits"
 homepage = "https://hoprnet.org/"
@@ -67,6 +67,7 @@ rand = { workspace = true }
 sea-orm = { workspace = true }
 sqlx = { workspace = true, features = ["runtime-tokio"] }
 tokio = { workspace = true }
+test-log = { workspace = true }
 
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-crypto-random = { workspace = true }

@@ -56,7 +56,7 @@ async fn ticket_statistics_should_reset_when_cleaned(#[with(5)] cluster_fixture:
         .await
         .context("failed to get all tickets")?
         .into_iter()
-        .map(|t| t.channel_id)
+        .map(|t| *t.channel_id())
         .collect::<Vec<ChannelId>>();
 
     assert!(channels_with_pending_tickets.contains(&fw_channels.channel_id(0)));

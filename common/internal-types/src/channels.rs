@@ -130,9 +130,9 @@ pub struct ChannelEntry {
     pub source: Address,
     pub destination: Address,
     pub balance: HoprBalance,
-    pub ticket_index: U256,
+    pub ticket_index: u64,
     pub status: ChannelStatus,
-    pub channel_epoch: U256,
+    pub channel_epoch: u32,
     id: ChannelId,
 }
 
@@ -144,9 +144,9 @@ impl ChannelEntry {
         source: Address,
         destination: Address,
         balance: HoprBalance,
-        ticket_index: U256,
+        ticket_index: u64,
         status: ChannelStatus,
-        channel_epoch: U256,
+        channel_epoch: u32,
     ) -> Self {
         ChannelEntry {
             source,
@@ -184,7 +184,8 @@ impl ChannelEntry {
     }
 
     /// Returns the earliest time the channel can transition from `PendingToClose` into `Closed`.
-    /// If the channel is not in `PendingToClose` state, returns `None`.
+    ///
+    /// If the channel is not in the ` PendingToClose ` state, it returns `None`.
     pub fn closure_time_at(&self) -> Option<SystemTime> {
         match self.status {
             ChannelStatus::PendingToClose(ct) => Some(ct),
@@ -192,7 +193,8 @@ impl ChannelEntry {
         }
     }
 
-    /// Determines the channel direction given the self address.
+    /// Determines the channel direction given the self-address.
+    ///
     /// Returns `None` if neither source nor destination are equal to `me`.
     pub fn direction(&self, me: &Address) -> Option<ChannelDirection> {
         if self.source.eq(me) {
@@ -205,6 +207,7 @@ impl ChannelEntry {
     }
 
     /// Determines the channel's direction and counterparty relative to `me`.
+    ///
     /// Returns `None` if neither source nor destination are equal to `me`.
     pub fn orientation(&self, me: &Address) -> Option<(ChannelDirection, Address)> {
         if self.source.eq(me) {
@@ -217,6 +220,7 @@ impl ChannelEntry {
     }
 
     /// Makes a diff of this channel (left) and the `other` channel (right).
+    ///
     /// The channels must have the same ID.
     ///
     /// See [`ChannelChange`]
@@ -288,15 +292,15 @@ impl ChannelChange {
 
         if left.channel_epoch != right.channel_epoch {
             ret.push(ChannelChange::Epoch {
-                left: left.channel_epoch.as_u32(),
-                right: right.channel_epoch.as_u32(),
+                left: left.channel_epoch,
+                right: right.channel_epoch,
             });
         }
 
         if left.ticket_index != right.ticket_index {
             ret.push(ChannelChange::TicketIndex {
-                left: left.ticket_index.as_u64(),
-                right: right.ticket_index.as_u64(),
+                left: left.ticket_index,
+                right: right.ticket_index,
             })
         }
 
@@ -387,14 +391,7 @@ mod tests {
 
     #[test]
     pub fn channel_entry_closure_time() {
-        let mut ce = ChannelEntry::new(
-            *ADDRESS_1,
-            *ADDRESS_2,
-            10.into(),
-            23u64.into(),
-            ChannelStatus::Open,
-            3u64.into(),
-        );
+        let mut ce = ChannelEntry::new(*ADDRESS_1, *ADDRESS_2, 10.into(), 23, ChannelStatus::Open, 3);
 
         assert!(
             !ce.closure_time_passed(SystemTime::now()),

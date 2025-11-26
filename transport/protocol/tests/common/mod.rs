@@ -69,14 +69,7 @@ lazy_static! {
 }
 
 fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
-    ChannelEntry::new(
-        from,
-        to,
-        *DEFAULT_PRICE_PER_PACKET * 100,
-        U256::zero(),
-        ChannelStatus::Open,
-        U256::zero(),
-    )
+    ChannelEntry::new(from, to, *DEFAULT_PRICE_PER_PACKET * 100, 0, ChannelStatus::Open, 0)
 }
 
 #[allow(dead_code)]

@@ -284,8 +284,8 @@ impl HoprDbTicketOperations for HoprNodeDb {
             .await?)
     }
 
-    async fn mark_unsaved_ticket_rejected(&self, ticket: &Ticket) -> Result<(), NodeDbError> {
-        let channel_id = ticket.channel_id;
+    async fn mark_unsaved_ticket_rejected(&self, issuer: &Address, ticket: &Ticket) -> Result<(), NodeDbError> {
+        let channel_id = generate_channel_id(issuer, &ticket.counterparty);
         let amount = ticket.amount;
         Ok(self
             .ticket_manager
@@ -644,13 +644,7 @@ impl HoprNodeDb {
             .transaction(|tx| {
                 Box::pin(async move {
                     // For upserting, we must select only by the triplet (channel id, epoch, index)
-                    let selector = WrappedTicketSelector::from(
-                        TicketSelector::new(
-                            acknowledged_ticket.verified_ticket().channel_id,
-                            acknowledged_ticket.verified_ticket().channel_epoch,
-                        )
-                        .with_index(acknowledged_ticket.verified_ticket().index),
-                    );
+                    let selector = WrappedTicketSelector::from(TicketSelector::from(&acknowledged_ticket));
 
                     debug!(%acknowledged_ticket, "upserting ticket");
                     let mut model = ticket::ActiveModel::from(acknowledged_ticket);
@@ -734,7 +728,7 @@ mod tests {
         let challenge = Response::from_half_keys(&hk1, &hk2)?.to_challenge()?;
 
         Ok(TicketBuilder::default()
-            .addresses(src, dst)
+            .counterparty(dst)
             .amount(TICKET_VALUE)
             .index(index)
             .win_prob(win_prob.try_into()?)
@@ -757,18 +751,14 @@ mod tests {
         Ok(tickets)
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_insert_get_ticket() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory().await?;
 
         let mut tickets = init_db_with_tickets(&db, 1).await?;
         let ack_ticket = tickets.pop().context("ticket should be present")?;
 
-        assert_eq!(
-            *CHANNEL_ID,
-            ack_ticket.verified_ticket().channel_id,
-            "channel ids must match"
-        );
+        assert_eq!(*CHANNEL_ID, *ack_ticket.ticket.channel_id(), "channel ids must match");
         assert_eq!(
             CHANNEL_EPOCH,
             ack_ticket.verified_ticket().channel_epoch,
@@ -782,7 +772,7 @@ mod tests {
             .await
             .first()
             .cloned()
-            .context("ticket should exist")?;
+            .context("ticket should exist 1")?;
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
 
@@ -793,7 +783,7 @@ mod tests {
             .await
             .first()
             .cloned()
-            .context("ticket should exist")?;
+            .context("ticket should exist 2")?;
 
         assert_eq!(ack_ticket, db_ticket, "tickets must be equal");
 
@@ -937,7 +927,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_mark_unsaved_ticket_rejected() -> anyhow::Result<()> {
         let db = HoprNodeDb::new_in_memory().await?;
 
@@ -952,7 +942,9 @@ mod tests {
             "per channel stats must be same"
         );
 
-        db.mark_unsaved_ticket_rejected(ticket.verified_ticket()).await?;
+        tracing::debug!("marking ticket as rejected");
+        db.mark_unsaved_ticket_rejected(BOB.public().as_ref(), ticket.verified_ticket())
+            .await?;
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(ticket.verified_ticket().amount, stats.rejected_value());
