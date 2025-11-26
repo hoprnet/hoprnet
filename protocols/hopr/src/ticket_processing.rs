@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, atomic::AtomicU64},
 };
 
+use futures::StreamExt;
 use hopr_api::{
     chain::ChainReadChannelOperations,
     db::{HoprDbTicketOperations, TicketSelector},
@@ -13,10 +14,14 @@ use hopr_primitive_types::balance::HoprBalance;
 
 use crate::{HoprProtocolError, ResolvedAcknowledgement, TicketTracker, UnacknowledgedTicketProcessor};
 
-#[derive(Debug, Clone, smart_default::SmartDefault)]
+#[derive(Debug, Clone, Copy, smart_default::SmartDefault)]
 pub struct HoprTicketProcessorConfig {
     #[default(std::time::Duration::from_secs(30))]
     pub unack_ticket_timeout: std::time::Duration,
+    #[default(std::time::Duration::from_secs(10))]
+    pub outgoing_index_cache_retention: std::time::Duration,
+    #[default(std::time::Duration::from_mins(30))]
+    pub unrealized_value_cache_retention: std::time::Duration,
     #[default(10_000_000)]
     pub max_unack_tickets: usize,
     pub channels_dst: Hash,
@@ -24,28 +29,71 @@ pub struct HoprTicketProcessorConfig {
 
 pub struct HoprTicketProcessor<Db, R> {
     unacknowledged_tickets: moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>,
-    index_tracker: TicketIndexTracker<Db>,
+    out_ticket_index: moka::future::Cache<(ChannelId, u32), Arc<AtomicU64>>,
+    in_unrealized_value: moka::future::Cache<(ChannelId, u32), HoprBalance>,
+    db: Db,
     provider: R,
     chain_key: ChainKeypair,
     channels_dst: Hash,
+    index_sync_handle: hopr_async_runtime::AbortHandle,
 }
 
-impl<Db, R> HoprTicketProcessor<Db, R> {
-    pub fn new(
-        provider: R,
-        index_tracker: TicketIndexTracker<Db>,
-        chain_key: ChainKeypair,
-        cfg: HoprTicketProcessorConfig,
-    ) -> Self {
+impl<Db, R> Drop for HoprTicketProcessor<Db, R> {
+    fn drop(&mut self) {
+        self.index_sync_handle.abort();
+    }
+}
+
+impl<Db: HoprDbTicketOperations + Clone + Send + 'static, R> HoprTicketProcessor<Db, R> {
+    pub fn new(provider: R, db: Db, chain_key: ChainKeypair, cfg: HoprTicketProcessorConfig) -> Self {
+        let out_ticket_index: moka::future::Cache<(ChannelId, u32), Arc<AtomicU64>> = moka::future::Cache::builder()
+            .time_to_idle(cfg.outgoing_index_cache_retention)
+            .max_capacity(10_000)
+            .build();
+
+        let (index_save_stream, index_sync_handle) = futures::stream::abortable(futures_time::stream::interval(
+            futures_time::time::Duration::from(cfg.outgoing_index_cache_retention.div_f32(2.0)),
+        ));
+
+        let db_clone = db.clone();
+        let out_ticket_index_clone = out_ticket_index.clone();
+        hopr_async_runtime::prelude::spawn(index_save_stream.for_each(move |_| {
+            let db = db_clone.clone();
+            let ticket_index = out_ticket_index_clone.clone();
+            async move {
+                // This iteration does not alter the popularity estimator of the cache
+                // and therefore still allows the unused entries to expire
+                for (channel_key, out_idx) in ticket_index.iter() {
+                    if let Err(error) = db
+                        .update_outgoing_ticket_index(
+                            &channel_key.0,
+                            channel_key.1,
+                            out_idx.load(std::sync::atomic::Ordering::SeqCst),
+                        )
+                        .await
+                    {
+                        tracing::error!(%error, channel_id = %channel_key.0, epoch = channel_key.1, "failed to sync outgoing ticket index to db");
+                    }
+                }
+                tracing::trace!("synced outgoing ticket indices to db");
+            }
+        }));
+
         Self {
+            provider,
+            db,
+            chain_key,
+            out_ticket_index,
+            index_sync_handle,
+            channels_dst: cfg.channels_dst,
+            in_unrealized_value: moka::future::Cache::builder()
+                .time_to_idle(cfg.unrealized_value_cache_retention)
+                .max_capacity(10_000)
+                .build(),
             unacknowledged_tickets: moka::future::Cache::builder()
                 .time_to_live(cfg.unack_ticket_timeout)
                 .max_capacity(cfg.max_unack_tickets as u64)
                 .build(),
-            provider,
-            index_tracker,
-            chain_key,
-            channels_dst: cfg.channels_dst,
         }
     }
 }
@@ -125,11 +173,10 @@ where
         })
         .await;
 
-        // Account the newly received winning ticket into unrealized value for that channel
+        // Account the newly received winning ticket into the unrealized value for that channel
         if let Ok(ResolvedAcknowledgement::RelayingWin(redeemable)) = &res {
             let ticket_value = redeemable.verified_ticket().amount;
-            self.index_tracker
-                .unrealized_value
+            self.in_unrealized_value
                 .entry((
                     redeemable.verified_ticket().channel_id,
                     redeemable.verified_ticket().channel_epoch,
@@ -145,66 +192,14 @@ where
     }
 }
 
-pub struct TicketIndexTracker<Db> {
-    db: Arc<Db>,
-    ticket_index: moka::future::Cache<(ChannelId, u32), Arc<AtomicU64>>,
-    // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
-    // include tickets from other epochs
-    unrealized_value: moka::future::Cache<(ChannelId, u32), HoprBalance>,
-}
-
-impl<Db: HoprDbTicketOperations> TicketIndexTracker<Db> {
-    pub fn new(db: Db, outgoing_index_cache_retention: std::time::Duration) -> Self {
-        Self {
-            db: Arc::new(db),
-            ticket_index: moka::future::Cache::builder()
-                .time_to_idle(outgoing_index_cache_retention)
-                .max_capacity(10_000)
-                .build(),
-            unrealized_value: moka::future::Cache::builder()
-                .time_to_idle(std::time::Duration::from_mins(30))
-                .max_capacity(10_000)
-                .build(),
-        }
-    }
-
-    pub async fn sync_indices_to_db(&self) {
-        // This iteration does not alter the popularity estimator of the cache
-        // and therefore still allows the unused entries to expire
-        for (channel_key, out_idx) in self.ticket_index.iter() {
-            if let Err(error) = self
-                .db
-                .update_outgoing_ticket_index(
-                    &channel_key.0,
-                    channel_key.1,
-                    out_idx.load(std::sync::atomic::Ordering::SeqCst),
-                )
-                .await
-            {
-                tracing::error!(%error, channel_id = %channel_key.0, epoch = channel_key.1, "failed to sync outgoing ticket index to db");
-            }
-        }
-    }
-}
-
-impl<Db> Clone for TicketIndexTracker<Db> {
-    fn clone(&self) -> Self {
-        Self {
-            db: self.db.clone(),
-            ticket_index: self.ticket_index.clone(),
-            unrealized_value: self.unrealized_value.clone(),
-        }
-    }
-}
-
 #[async_trait::async_trait]
-impl<Db: HoprDbTicketOperations + Send + Sync> TicketTracker for TicketIndexTracker<Db> {
+impl<R: Send + Sync, Db: HoprDbTicketOperations + Clone + Send + Sync> TicketTracker for HoprTicketProcessor<Db, R> {
     type Error = Arc<Db::Error>;
 
     async fn next_outgoing_ticket_index(&self, channel_id: &ChannelId, epoch: u32) -> Result<u64, Self::Error> {
         let channel_id = *channel_id;
         let db = self.db.clone();
-        self.ticket_index
+        self.out_ticket_index
             .try_get_with((channel_id, epoch), async move {
                 db.get_or_create_outgoing_ticket_index(&channel_id, epoch)
                     .await
@@ -221,7 +216,7 @@ impl<Db: HoprDbTicketOperations + Send + Sync> TicketTracker for TicketIndexTrac
     ) -> Result<HoprBalance, Self::Error> {
         let db = self.db.clone();
         let channel_id = *channel_id;
-        self.unrealized_value
+        self.in_unrealized_value
             .try_get_with((channel_id, epoch), async move {
                 db.get_tickets_value(TicketSelector::new(channel_id, epoch))
                     .await

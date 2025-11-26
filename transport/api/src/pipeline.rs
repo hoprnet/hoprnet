@@ -1,4 +1,3 @@
-use futures::StreamExt;
 use hopr_api::{
     chain::{ChainKeyOperations, ChainReadChannelOperations, ChainValues},
     db::HoprDbTicketOperations,
@@ -13,9 +12,7 @@ use hopr_transport_protocol::{TicketEvent, run_packet_pipeline};
 
 use crate::HoprTransportProcess;
 
-const OUTGOING_TICKET_INDEX_SYNC_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
-
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct HoprPacketPipelineConfig {
     pub codec_cfg: HoprCodecConfig,
     pub ticket_proc_cfg: HoprTicketProcessorConfig,
@@ -36,7 +33,7 @@ where
     WOut: futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + 'static,
     WOut::Error: std::fmt::Display,
     WIn: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + 'static,
-    Db: HoprDbTicketOperations + Send + Sync + 'static,
+    Db: HoprDbTicketOperations + Clone + Send + Sync + 'static,
     R: ChainKeyOperations + ChainReadChannelOperations + ChainValues + Clone + Send + Sync + 'static,
     S: SurbStore + Clone + Send + Sync + 'static,
     TEvt: futures::Sink<TicketEvent> + Clone + Unpin + Send + 'static,
@@ -45,27 +42,25 @@ where
     AppOut::Error: std::fmt::Display,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
 {
-    let tracker = TicketIndexTracker::new(db, OUTGOING_TICKET_INDEX_SYNC_INTERVAL * 2);
-
+    let ticket_proc = std::sync::Arc::new(HoprTicketProcessor::new(
+        provider.clone(),
+        db.clone(),
+        chain_key.clone(),
+        cfg.ticket_proc_cfg,
+    ));
     let encoder = HoprEncoder::new(
         provider.clone(),
         surb_store.clone(),
-        tracker.clone(),
+        ticket_proc.clone(),
         chain_key.clone(),
         cfg.codec_cfg,
     );
     let decoder = HoprDecoder::new(
         provider.clone(),
         surb_store,
-        tracker.clone(),
+        ticket_proc.clone(),
         (packet_key.clone(), chain_key.clone()),
         cfg.codec_cfg,
-    );
-    let ticket_proc = HoprTicketProcessor::new(
-        provider.clone(),
-        tracker.clone(),
-        chain_key.clone(),
-        cfg.ticket_proc_cfg,
     );
 
     let mut processes = AbortableList::default();
@@ -107,20 +102,6 @@ where
         ),
         HoprTransportProcess::Pipeline,
     );
-
-    let (index_save_stream, index_save_handle) = futures::stream::abortable(futures_time::stream::interval(
-        futures_time::time::Duration::from(OUTGOING_TICKET_INDEX_SYNC_INTERVAL),
-    ));
-
-    hopr_async_runtime::prelude::spawn(index_save_stream.for_each(move |_| {
-        let tracker = tracker.clone();
-        async move {
-            tracker.sync_indices_to_db().await;
-            tracing::trace!("synced outgoing ticket indices to db");
-        }
-    }));
-
-    processes.insert(HoprTransportProcess::OutgoingTicketIndexSync, index_save_handle);
 
     processes
 }

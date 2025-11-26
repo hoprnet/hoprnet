@@ -13,6 +13,7 @@ pub use crate::{
 };
 
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait SurbStore {
     async fn find_surb(&self, matcher: SurbMatcher) -> Option<FoundSurb>;
 
@@ -24,6 +25,7 @@ pub trait SurbStore {
 }
 
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait PacketEncoder {
     type Error: std::error::Error + Send + Sync + 'static;
 
@@ -42,6 +44,7 @@ pub trait PacketEncoder {
 }
 
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait PacketDecoder {
     type Error: std::error::Error + Send + Sync + 'static;
 
@@ -51,6 +54,7 @@ pub trait PacketDecoder {
 
 /// Performs necessary processing of unacknowledged tickets.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait UnacknowledgedTicketProcessor {
     type Error: std::error::Error + Send + Sync + 'static;
 
@@ -71,6 +75,7 @@ pub trait UnacknowledgedTicketProcessor {
 /// Allows tracking ticket indices of outgoing channels and
 /// unrealized balances of incoming channels.
 #[async_trait::async_trait]
+#[auto_impl::auto_impl(&, Box, Arc)]
 pub trait TicketTracker {
     type Error: std::error::Error + Send + Sync + 'static;
 
