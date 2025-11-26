@@ -105,8 +105,8 @@ pub enum HoprTransportProcess {
     SessionsManagement(usize),
     #[strum(to_string = "network probing sub-process: {0}")]
     Probing(hopr_transport_probe::HoprProbeProcess),
-    #[strum(to_string = "outgoing ticket index sync")]
-    OutgoingTicketIndexSync,
+    #[strum(to_string = "sync of outgoing ticket indices")]
+    OutgoingIndexSync,
     #[cfg(feature = "capture")]
     #[strum(to_string = "packet capture")]
     Capture,

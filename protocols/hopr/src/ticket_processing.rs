@@ -27,6 +27,8 @@ pub struct HoprTicketProcessorConfig {
     pub channels_dst: Hash,
 }
 
+/// HOPR-specific implementation of [`UnacknowledgedTicketProcessor`] and [`TicketTracker`].
+#[derive(Clone)]
 pub struct HoprTicketProcessor<Db, R> {
     unacknowledged_tickets: moka::future::Cache<HalfKeyChallenge, UnacknowledgedTicket>,
     out_ticket_index: moka::future::Cache<(ChannelId, u32), Arc<AtomicU64>>,
@@ -34,58 +36,16 @@ pub struct HoprTicketProcessor<Db, R> {
     db: Db,
     provider: R,
     chain_key: ChainKeypair,
-    channels_dst: Hash,
-    index_sync_handle: hopr_async_runtime::AbortHandle,
+    cfg: HoprTicketProcessorConfig,
 }
 
-impl<Db, R> Drop for HoprTicketProcessor<Db, R> {
-    fn drop(&mut self) {
-        self.index_sync_handle.abort();
-    }
-}
-
-impl<Db: HoprDbTicketOperations + Clone + Send + 'static, R> HoprTicketProcessor<Db, R> {
+impl<Db, R> HoprTicketProcessor<Db, R> {
     pub fn new(provider: R, db: Db, chain_key: ChainKeypair, cfg: HoprTicketProcessorConfig) -> Self {
-        let out_ticket_index: moka::future::Cache<(ChannelId, u32), Arc<AtomicU64>> = moka::future::Cache::builder()
-            .time_to_idle(cfg.outgoing_index_cache_retention)
-            .max_capacity(10_000)
-            .build();
-
-        let (index_save_stream, index_sync_handle) = futures::stream::abortable(futures_time::stream::interval(
-            futures_time::time::Duration::from(cfg.outgoing_index_cache_retention.div_f32(2.0)),
-        ));
-
-        let db_clone = db.clone();
-        let out_ticket_index_clone = out_ticket_index.clone();
-        hopr_async_runtime::prelude::spawn(index_save_stream.for_each(move |_| {
-            let db = db_clone.clone();
-            let ticket_index = out_ticket_index_clone.clone();
-            async move {
-                // This iteration does not alter the popularity estimator of the cache
-                // and therefore still allows the unused entries to expire
-                for (channel_key, out_idx) in ticket_index.iter() {
-                    if let Err(error) = db
-                        .update_outgoing_ticket_index(
-                            &channel_key.0,
-                            channel_key.1,
-                            out_idx.load(std::sync::atomic::Ordering::SeqCst),
-                        )
-                        .await
-                    {
-                        tracing::error!(%error, channel_id = %channel_key.0, epoch = channel_key.1, "failed to sync outgoing ticket index to db");
-                    }
-                }
-                tracing::trace!("synced outgoing ticket indices to db");
-            }
-        }));
-
         Self {
-            provider,
-            db,
-            chain_key,
-            out_ticket_index,
-            index_sync_handle,
-            channels_dst: cfg.channels_dst,
+            out_ticket_index: moka::future::Cache::builder()
+                .time_to_idle(cfg.outgoing_index_cache_retention)
+                .max_capacity(10_000)
+                .build(),
             in_unrealized_value: moka::future::Cache::builder()
                 .time_to_idle(cfg.unrealized_value_cache_retention)
                 .max_capacity(10_000)
@@ -94,7 +54,54 @@ impl<Db: HoprDbTicketOperations + Clone + Send + 'static, R> HoprTicketProcessor
                 .time_to_live(cfg.unack_ticket_timeout)
                 .max_capacity(cfg.max_unack_tickets as u64)
                 .build(),
+            provider,
+            db,
+            chain_key,
+            cfg,
         }
+    }
+}
+
+impl<Db, R> HoprTicketProcessor<Db, R>
+where
+    Db: HoprDbTicketOperations + Clone + Send + 'static,
+{
+    pub fn outgoing_index_sync_task(
+        &self,
+        reg: futures::future::AbortRegistration,
+    ) -> impl Future<Output = ()> + use<Db, R> {
+        let index_save_stream = futures::stream::Abortable::new(
+            futures_time::stream::interval(futures_time::time::Duration::from(
+                self.cfg.outgoing_index_cache_retention.div_f32(2.0),
+            )),
+            reg,
+        );
+
+        let db = self.db.clone();
+        let out_ticket_index = self.out_ticket_index.clone();
+
+        index_save_stream
+            .for_each(move |_| {
+                let db = db.clone();
+                let out_ticket_index = out_ticket_index.clone();
+                async move {
+                    // This iteration does not alter the popularity estimator of the cache
+                    // and therefore still allows the unused entries to expire
+                    for (channel_key, out_idx) in out_ticket_index.iter() {
+                        if let Err(error) = db
+                            .update_outgoing_ticket_index(
+                                &channel_key.0,
+                                channel_key.1,
+                                out_idx.load(std::sync::atomic::Ordering::SeqCst),
+                            )
+                            .await
+                        {
+                            tracing::error!(%error, channel_id = %channel_key.0, epoch = channel_key.1, "failed to sync outgoing ticket index to db");
+                        }
+                    }
+                    tracing::trace!("synced outgoing ticket indices to db");
+                }
+            })
     }
 }
 
@@ -144,7 +151,7 @@ where
                 *self.chain_key.as_ref(),
             ))?;
 
-        let domain_separator = self.channels_dst;
+        let domain_separator = self.cfg.channels_dst;
         let chain_key = self.chain_key.clone();
         let channel_id = *issuer_channel.get_id();
         let res = hopr_parallelize::cpu::spawn_fifo_blocking(move || {

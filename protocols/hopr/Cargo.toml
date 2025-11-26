@@ -11,7 +11,6 @@ license = "GPL-3.0-only"
 [features]
 default = []
 serde = ["dep:serde"]
-runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -31,7 +30,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-api = { workspace = true }
-hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }

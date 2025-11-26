@@ -42,12 +42,7 @@ where
     AppOut::Error: std::fmt::Display,
     AppIn: futures::Stream<Item = (ResolvedTransportRouting, ApplicationDataOut)> + Send + 'static,
 {
-    let ticket_proc = std::sync::Arc::new(HoprTicketProcessor::new(
-        provider.clone(),
-        db.clone(),
-        chain_key.clone(),
-        cfg.ticket_proc_cfg,
-    ));
+    let ticket_proc = HoprTicketProcessor::new(provider.clone(), db.clone(), chain_key.clone(), cfg.ticket_proc_cfg);
     let encoder = HoprEncoder::new(
         provider.clone(),
         surb_store.clone(),
@@ -90,6 +85,10 @@ where
             capture::CapturePacketCodec::new(decoder, *packet_key.public(), sender.clone()),
         )
     };
+
+    let (index_sync_handle, index_sync_reg) = futures::future::AbortHandle::new_pair();
+    hopr_async_runtime::prelude::spawn(ticket_proc.outgoing_index_sync_task(index_sync_reg));
+    processes.insert(HoprTransportProcess::OutgoingIndexSync, index_sync_handle);
 
     processes.flat_map_extend_from(
         run_packet_pipeline(
